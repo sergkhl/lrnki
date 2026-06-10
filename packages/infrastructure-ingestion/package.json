@@ -1,0 +1,19 @@
+{
+  "name": "@lrnki/infrastructure-ingestion",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@lrnki/domain-core": "workspace:*",
+    "@lrnki/ports": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

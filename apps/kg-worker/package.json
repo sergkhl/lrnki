@@ -1,0 +1,8 @@
+{
+  "name": "@lrnki/kg-worker",
+  "private": true,
+  "type": "module",
+  "scripts": { "worker:kg": "tsx src/knowledgeGraphWorker.ts", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "dependencies": { "@lrnki/application": "workspace:*" },
+  "devDependencies": { "@types/node": "catalog:", "tsx": "catalog:", "typescript": "catalog:" }
+}

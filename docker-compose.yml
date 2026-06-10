@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    container_name: lrnki-postgres
+    networks:
+      - lrnki
+    environment:
+      POSTGRES_USER: lrnki
+      POSTGRES_PASSWORD: lrnki
+      POSTGRES_DB: lrnki
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./scripts/docker/postgres/01-init-litellm-db.sh:/docker-entrypoint-initdb.d/01-init-litellm-db.sh:ro
+      - ./scripts/docker/postgres/02-init-test-db.sh:/docker-entrypoint-initdb.d/02-init-test-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lrnki -d lrnki"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  litellm:
+    image: ghcr.io/berriai/litellm@sha256:7c311546c25e7bb6e8cafede9fcd3d0d622ac636b5c9418befaa32e85dfb0186
+    container_name: lrnki-litellm
+    networks:
+      - lrnki
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/litellm
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+networks:
+  lrnki:
+    name: lrnki
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-lrnki
+
+volumes:
+  postgres_data:

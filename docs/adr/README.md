@@ -1,0 +1,16 @@
+# Architecture Decision Records
+
+- [0001-adopt-greenfield-deep-module-architecture](./0001-adopt-greenfield-deep-module-architecture.md)
+- [0002-define-learner-neutral-core-concept-graph](./0002-define-learner-neutral-core-concept-graph.md)
+- [0003-use-postgres-json-table-artifact-store](./0003-use-postgres-json-table-artifact-store.md)
+- [0004-normalize-curated-sources](./0004-normalize-curated-sources.md)
+- [0005-admit-concepts-before-claims](./0005-admit-concepts-before-claims.md)
+- [0006-use-forced-named-tool-schemas](./0006-use-forced-named-tool-schemas.md)
+- [0007-extract-claims-in-concept-context](./0007-extract-claims-in-concept-context.md)
+- [0008-use-rdf-compatible-boundary](./0008-use-rdf-compatible-boundary.md)
+- [0009-apply-conservative-refinement](./0009-apply-conservative-refinement.md)
+- [0010-publish-static-graph-versions-atomically](./0010-publish-static-graph-versions-atomically.md)
+- [0011-retain-minimal-admin-lab](./0011-retain-minimal-admin-lab.md)
+- [0012-measure-embedding-sidecars](./0012-measure-embedding-sidecars.md)
+- [0013-use-mixed-format-oracle-suite](./0013-use-mixed-format-oracle-suite.md)
+- [0014-defer-learner-modeling](./0014-defer-learner-modeling.md)

@@ -1,0 +1,21 @@
+{
+  "enabledPlugins": {
+    "compound-engineering@compound-engineering-plugin": true,
+    "last30days@last30days-skill": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)",
+      "WebFetch(*)",
+      "MultiEdit(*)"
+    ]
+  },
+  "prefersReducedMotion": true,
+  "permissionMode": "bypassPermissions",
+  "defaultMode": "auto",
+  "outputStyle": "Explanatory",
+  "skipDangerousModePermissionPrompt": true
+}

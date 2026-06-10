@@ -1,0 +1,29 @@
+{
+  "name": "lrnki",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": "11.4.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @lrnki/admin-lab dev",
+    "build": "pnpm --filter @lrnki/admin-lab build",
+    "start": "pnpm --filter @lrnki/admin-lab start",
+    "lint": "eslint .",
+    "test": "pnpm -r --sort --if-present run test",
+    "typecheck": "pnpm -r --sort --if-present run typecheck",
+    "check": "pnpm run tmp:clean && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build",
+    "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
+    "db:migrate": "pnpm --filter @lrnki/infrastructure-postgres db:migrate",
+    "worker:kg": "pnpm --filter @lrnki/kg-worker worker:kg"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,1 @@
+export type OracleReference = { sourceResourceId: string; oracleModel: string; promptVersion: string; rubricVersion: string; conceptLabels: Array<{ label: string; expectedTier: "core" | "optional" | "reject" | "quarantine"; evidenceQuotes: string[] }>; secondJudgeStatus: "agreed" | "quarantined" };

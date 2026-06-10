@@ -1,0 +1,201 @@
+model_list:
+  - model_name: "nvidia_nim/moonshotai/kimi-k2.5"
+    litellm_params:
+      model: nvidia_nim/moonshotai/kimi-k2.5
+      api_key: os.environ/NVIDIA_NIM_API_KEY
+     # api_base: "" # [OPTIONAL] - default is https://integrate.api.nvidia.com/v1/
+  - model_name: "gemini/gemini-3.5-flash"
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 5
+      tpm: 250000
+    model_info:
+      mode: "chat"
+      # input_cost_per_token: 0.000001
+      # output_cost_per_token: 0.000002
+      # max_tokens: 8192
+  - model_name: "gemini/gemma-4-31b-it"
+    litellm_params:
+      model: gemini/gemma-4-31b-it
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 15
+      tpm: 1000000
+    model_info:
+      mode: "chat"
+      # input_cost_per_token: 0.000001
+      # output_cost_per_token: 0.000002
+      # max_tokens: 8192
+  - model_name: "gemini/gemma-4-26B-A4B-it"
+    litellm_params:
+      model: gemini/gemma-4-26B-A4B-it
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 15
+      tpm: 1000000
+    model_info:
+      mode: "chat"
+      # input_cost_per_token: 0.000001
+      # output_cost_per_token: 0.000002
+      # max_tokens: 8192
+
+  - model_name: "gemini/gemini-embedding-001"
+    litellm_params:
+      model: gemini/gemini-embedding-001
+      api_key: os.environ/GOOGLE_API_KEY
+      # drop_params: true
+      # additional_drop_params: ["temperature", "top_p", "max_tokens", "stream"]
+
+  - model_name: "gemini/gemini-2.5-flash-preview-tts"
+    litellm_params:
+      model: gemini/gemini-2.5-flash-preview-tts
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 3
+
+  - model_name: "gemini/gemini-2.5-flash"
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 5
+      tpm: 250000
+    model_info:
+      mode: "chat"
+      # input_cost_per_token: 0.000001
+      # output_cost_per_token: 0.000002
+      # max_tokens: 8192
+
+  - model_name: "gemini/gemini-2.5-flash-lite"
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GOOGLE_API_KEY
+      rpm: 10
+      tpm: 250000
+    model_info:
+      mode: "chat"
+      # input_cost_per_token: 0.000001
+      # output_cost_per_token: 0.000002
+      # max_tokens: 8192
+
+
+  - model_name: "deepseek/deepseek-v4-pro"
+    litellm_params:
+      model: deepseek/deepseek-v4-pro
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
+      # max_tokens: 8192
+      # # Options: "high" (default) or "max"
+      # reasoning_effort: "max"
+      # # Alternatively, use extra_body for explicit toggle configurations
+      # extra_body:
+      #   thinking:
+      #     type: "enabled" # Set to "disabled" to turn off thinking entirely
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
+
+  - model_name: "deepseek/deepseek-v4-flash"
+    litellm_params:
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+      # max_tokens: 8192
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
+
+  # Same provider model with thinking disabled (required for forced tool_choice in span extraction).
+  - model_name: "deepseek/deepseek-v4-flash-no-thinking"
+    litellm_params:
+      model: deepseek/deepseek-v4-flash
+      api_key: os.environ/DEEPSEEK_API_KEY
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
+      extra_body:
+        thinking:
+          type: "disabled"
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
+
+  # Mistral Models
+  - model_name: "mistral/mistral-small-2603"
+    litellm_params:
+      model: "mistral/mistral-small-2603"
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: "openai/text-embedding-3-small"
+    litellm_params:
+      model: "openai/text-embedding-3-small"
+      api_key: "os.environ/OPENAI_API_KEY"
+      input_cost_per_token: 0.00000002
+
+  # # OpenRouter Models
+  - model_name: "openrouter/qwen/qwen3-embedding-4b"
+    litellm_params:
+      model: "openrouter/qwen/qwen3-embedding-4b"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000002
+
+  - model_name: "openrouter/qwen/qwen3-embedding-8b"
+    litellm_params:
+      model: "openrouter/qwen/qwen3-embedding-8b"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000001
+
+  # - model_name: "openrouter/mistralai/mistral-small-2603"
+  #   litellm_params:
+  #     model: "openrouter/mistralai/mistral-small-2603"
+  #     api_key: os.environ/OPENROUTER_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY # Required for API key management
+  block_robots: true
+  # database_url: "sqlite:///litellm.db"
+  store_prompts_in_spend_logs: true
+  disable_error_logs: True # turn off writing LLM Exceptions to DB
+  alerting: ["slack"]
+  # enforce_user_param: true # securiy
+  # allowed_ips: ["127.0.0.1", "192.168.1.0/24"]
+  # background_health_checks: true
+  # health_check_interval: 300
+
+litellm_settings:
+  # Logging / monitoring
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  # callbacks: ["prometheus"]
+  redact_user_api_key_info: true
+  # service_callbacks: ["prometheus"]
+  json_logs: true
+  drop_params: True
+  # enable_json_schema_validation: True
+
+  # # Caching
+  # cache: true
+  # cache_params:
+  #   type: "redis"
+  #   host: "localhost"
+  #   port: 6379
+  #   password: "your-redis-password"
+  # ttl: 600  # cache TTL
+
+router_settings:
+  routing_strategy: "usage-based-routing"
+  fallbacks:
+    - {"kg-span-extraction": ["kg-span-extraction-fallback"]}
+
+  num_retries: 0
+  retry_after: 5
+  # allowed_fails: 1
+  enable_pre_call_checks: false
+  cooldown_time: 15
+  # disable_cooldowns: true
+  # default_litellm_params:
+  #   temperature: 0.5
+
+  model_group_alias:
+    default-model: deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-discovery: deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-admission: deepseek/deepseek-v4-flash-no-thinking
+    kg-claim-extraction: deepseek/deepseek-v4-flash-no-thinking
+    kg-oracle-reference: deepseek/deepseek-v4-flash-no-thinking
+    kg-oracle-judge: deepseek/deepseek-v4-flash-no-thinking

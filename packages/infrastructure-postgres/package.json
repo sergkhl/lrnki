@@ -1,0 +1,23 @@
+{
+  "name": "@lrnki/infrastructure-postgres",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@lrnki/domain-core": "workspace:*",
+    "@lrnki/ports": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "postgres": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "drizzle-kit": "catalog:"
+  }
+}
