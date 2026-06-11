@@ -1,10 +1,11 @@
 # TODO
 
-1. **Admission stability check before Gate 1 sign-off.**
-   - Core-concept counts swing across re-runs of the unchanged admission stage (Rust
-     24→14 between published versions). Quantify the variance over a few repeated runs
-     per source and decide whether admission needs a determinism lever (e.g. lower
-     temperature, self-consistency vote) before the human makes the Gate 1 call.
+1. **Gate 1 human sign-off.**
+   - Determinism investigation is complete (see
+     `tmp/admission-determinism-quality-evaluation.md`). Authoritative graph version
+     `0137a32b-…` = 26 concepts / 99 claims, single clean version, zero evidence-free and
+     zero self-referential claims. Awaiting the human's PASS/FIX_FIRST call. The agent
+     recommends PASS.
 
 2. **Residual economics limiting-relation prose (low priority).**
    - The causal-suppression gate cleared soft-prose `uses` over-application, but a couple
@@ -51,23 +52,34 @@
 - **Causal-relation suppression gate**: claim schema now carries a required `evidenceLinkNature`
   enum; the app boundary drops `causal-or-motivational`-labelled claims fail-closed, keeping
   soft-prose "X gives occasion to Y" statements out of `uses`/`part-of` (ADR-0016 defers `causes`).
+- **Admission determinism lever (ADR-0018)**: forced-tool client gained optional
+  `temperature`/`seed` (neutral transport; set only by the composition root). Applied
+  `temperature: 0` + seed to admission and claims; discovery kept at default sampling.
+  A frozen-candidate probe (`apps/kg-worker/src/admissionVarianceProbe.ts`) proved the
+  lever collapses admission's per-stage drift; end-to-end variance was found to be
+  discovery-driven and irreducible (resolved architecturally by ADR-0017 builds).
 
 ## VALIDATION
 
 Latest re-run (2026-06-11) end-to-end with real DeepSeek V4 Flash (thinking disabled) across all
-three Gate 1 fixtures under pipeline config `…-v3`; published graph version `bd7c5203-…` =
-**26 concepts, 66 claims**. Full note: `tmp/causal-relation-gate-quality-evaluation.md`.
-Recommendation: **PASS** (residual narrowed).
+three Gate 1 fixtures under pipeline config `…-admit-temp0-v5` (admission/claims at temperature 0
++ seed, discovery at default sampling — ADR-0018). Single authoritative published graph version
+`0137a32b-f905-474b-8e0b-e28ea7e1b6b5` = **26 concepts, 99 claims**.
+Full note: `tmp/admission-determinism-quality-evaluation.md`. Recommendation: **PASS**.
 
-- Per-source runs (latest): Rust 26 cand → 14 core, 35/1 verified/rejected; Biology 26 → 8 core,
-  29/3; Economics 34 → 4 core, 5/1. Latency ~45–73s/source.
-- Causal gate effective: economics verified claims 29→5, soft-prose causal `uses`/`part-of`
-  eliminated; Rust/biology relation richness preserved (genuine taxonomy, structural, contrast,
-  mechanism). Published distribution: part-of 24, uses 17, contrasts-with 15, is-a 6,
-  asserted-prerequisite-of 2, defined-as 2.
+- Per-source runs (v5): Rust 35 cand → 14 core, 65/2 verified/rejected; Biology 23 → 8 core,
+  34/0; Economics 30 → 4 core, 9/0. Latency ~40–70s/source.
+- Determinism: frozen-candidate probe shows the lever collapses admission drift (Rust spread
+  3→1, Biology 4→0, Economics 1→0 across 5 re-runs). End-to-end core count still varies
+  run-to-run because discovery output is non-deterministic across processes even at temperature 0
+  (DeepSeek MoE); this is handled by run versioning + deterministic builds (ADR-0017), not at the
+  extraction layer. Global temperature 0 on discovery was reverted because it inflated recall and
+  over-admitted generic primitives (Rust 14 → 23–29 core).
 - Integrity: **zero self-referential and zero evidence-free** published claims (verified by SQL
-  against the published version).
+  against the published version); 102 evidence rows for 99 claims. Predicate distribution: uses 39,
+  part-of 29, contrasts-with 26, is-a 3, asserted-prerequisite-of 1, defined-as 1.
 - Remaining caveats: two economics "limited by / gives occasion to" sentences still type
-  structurally (TODO 2); admission core-count variance across re-runs (TODO 1). Cost not captured.
+  structurally (TODO 2); `uses` is the most common predicate (Gate 2 should measure relation
+  precision). Cost not captured.
 - Static checks: `pnpm -r typecheck` clean, `pnpm lint` clean. No package-level unit tests exist;
   this layer is validated by the real-use-quality-evaluation skill, not assertions.

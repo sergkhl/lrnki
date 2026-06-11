@@ -8,7 +8,12 @@ type LiteLlmResponse = {
 };
 
 export class LiteLlmForcedToolClient {
-  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number }) {}
+  // `temperature`/`seed` are the determinism lever (TODO 1). When set, every
+  // forced-tool call samples greedily with a fixed seed so the neural stages
+  // (discovery/admission/claims) stop drifting across re-runs. Left unset, the
+  // client stays a neutral transport at the model's default sampling — the
+  // composition root chooses the policy, not this transport.
+  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number; temperature?: number; seed?: number }) {}
 
   async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T> }): Promise<T> {
     // Retry budget for transient model deviations (zero/multiple tool calls,
@@ -35,7 +40,9 @@ export class LiteLlmForcedToolClient {
         model: input.model,
         messages: input.messages,
         tools: [{ type: "function", function: { name: input.toolName, description: input.toolDescription, parameters: input.parameters, strict: true } }],
-        tool_choice: { type: "function", function: { name: input.toolName } }
+        tool_choice: { type: "function", function: { name: input.toolName } },
+        ...(this.options.temperature !== undefined ? { temperature: this.options.temperature } : {}),
+        ...(this.options.seed !== undefined ? { seed: this.options.seed } : {})
       })
     });
     if (!response.ok) throw new Error(`LiteLLM request failed with ${response.status}.`);

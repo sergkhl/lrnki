@@ -24,7 +24,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-v3";
+const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-admit-temp0-v5";
 
 import { existsSync } from "node:fs";
 
@@ -54,11 +54,24 @@ function buildContext() {
     new HtmlStructuredDocumentParser(),
     new TextStructuredDocumentParser()
   ]);
-  const client = new LiteLlmForcedToolClient({
+  const baseClient = {
     baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
     apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
     timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "300") * 1000
-  });
+  };
+  // Discovery stays at default sampling. It is the recall stage and, empirically,
+  // greedy decoding (temperature 0) makes DeepSeek emit a MORE exhaustive candidate
+  // list (~26 → ~40 candidates), which inflates downstream over-admission of generic
+  // primitives. Determinism here is also moot: discovery output is not reproducible
+  // across processes even at temperature 0 (MoE non-determinism), and the replayable
+  // unit is the graph-version build, not the extraction run (ADR-0017).
+  const discoveryClient = new LiteLlmForcedToolClient(baseClient);
+  // Determinism lever (TODO 1, ADR-0018) applied where it is both effective and
+  // beneficial: admission is the precision gate and, GIVEN a fixed candidate set,
+  // greedy decoding collapses its core-set drift (probe: spread 3→1/4→0/1→0 across
+  // the three fixtures); claims are per-subject and benefit from stable text. Not
+  // bit-exact on DeepSeek's MoE, so a small residual remains.
+  const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
   return {
     sql,
     registrationStore,
@@ -66,9 +79,9 @@ function buildContext() {
     graphStore,
     artifacts,
     parsers,
-    discovery: new LiteLlmConceptDiscoveryAdapter(client),
-    admission: new LiteLlmConceptAdmissionAdapter(client),
-    claimExtraction: new LiteLlmClaimExtractionAdapter(client)
+    discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
+    admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
+    claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient)
   };
 }
 

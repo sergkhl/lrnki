@@ -17,3 +17,4 @@
 - [0015-deterministic-cross-source-identity](./0015-deterministic-cross-source-identity.md)
 - [0016-closed-six-relation-registry](./0016-closed-six-relation-registry.md)
 - [0017-split-extraction-runs-from-graph-version-builds](./0017-split-extraction-runs-from-graph-version-builds.md)
+- [0018-deterministic-extraction-sampling](./0018-deterministic-extraction-sampling.md)
