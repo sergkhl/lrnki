@@ -1,12 +1,18 @@
 # TODO
 
-1. **Economics-domain relation precision (follow-up to the relation-typing fix).**
-   - Soft-prose causal statements ("X gives occasion to Y") still type as `uses` in the
-     Wealth of Nations run despite the sharpened prompt. Rust/biology are clean. Decide
-     between a domain-aware prompt arm or treating causal relations as a measured Gate 2
-     relation rather than forcing them into the closed set. Evidence is already verbatim.
+1. **Admission stability check before Gate 1 sign-off.**
+   - Core-concept counts swing across re-runs of the unchanged admission stage (Rust
+     24→14 between published versions). Quantify the variance over a few repeated runs
+     per source and decide whether admission needs a determinism lever (e.g. lower
+     temperature, self-consistency vote) before the human makes the Gate 1 call.
 
-2. **Gate 2 (only after Gate 1 passes).**
+2. **Residual economics limiting-relation prose (low priority).**
+   - The causal-suppression gate cleared soft-prose `uses` over-application, but a couple
+     of "limited by / gives occasion to" sentences still type as `part-of`/`uses` in the
+     Wealth of Nations run. Likely needs a measured `limits`/`causes` relation in Gate 2
+     rather than more prompt pressure. Evidence is verbatim; not corruption.
+
+3. **Gate 2 (only after Gate 1 passes).**
    - Version-pinned Docling adapter; add PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format oracle suite.
    - Oracle independence triangle (DeepSeek extracts, MiniMax authors references, Mistral audits);
      benchmark arms and quantitative metrics.
@@ -42,21 +48,26 @@
 - **Relation-typing precision + throughput hardening**: per-relation prompt guidance with examples
   and a "no fitting relation → no claim" rule; self-referential claim guard in the app boundary;
   bounded-concurrency (4) claim extraction replacing the serial per-concept loop.
+- **Causal-relation suppression gate**: claim schema now carries a required `evidenceLinkNature`
+  enum; the app boundary drops `causal-or-motivational`-labelled claims fail-closed, keeping
+  soft-prose "X gives occasion to Y" statements out of `uses`/`part-of` (ADR-0016 defers `causes`).
 
 ## VALIDATION
 
 Latest re-run (2026-06-11) end-to-end with real DeepSeek V4 Flash (thinking disabled) across all
-three Gate 1 fixtures; published graph version `3c483ea6-…` = **41 concepts, 138 claims**. Full
-note: `tmp/relation-precision-quality-evaluation.md`. Recommendation: **PASS** (one caveat).
+three Gate 1 fixtures under pipeline config `…-v3`; published graph version `bd7c5203-…` =
+**26 concepts, 66 claims**. Full note: `tmp/causal-relation-gate-quality-evaluation.md`.
+Recommendation: **PASS** (residual narrowed).
 
-- Per-source runs (latest): Rust 33 cand → 24 core, 91/2 verified/rejected; Biology 23 → 10 core,
-  24/17; Economics 20 → 7 core, 26/2. Latency dropped to ~40–70s/source under bounded concurrency.
-- Relation typing sharpened: published `is-a` 21→10, all now genuine taxonomy; component relations
-  moved to `part-of`; **zero self-referential and zero evidence-free** published claims.
-- Admin Lab verified against the running server (:3000, DATABASE_URL set): all five routes 200; Run
-  Inspector and Source Explorer render live data (tiers, reason codes, evidence quotes, blocks).
-- Remaining caveat: economics soft-prose still types some causal statements as `uses` (TODO 1);
-  evidence verbatim. Cost not captured (by design).
-- Static checks: `pnpm -r typecheck` clean, `pnpm lint` clean, `pnpm build` (Next) succeeds.
-- Migration regenerated: stale `artifact_admission_decisions` view replaced by the two
-  `extraction_run.v1` JSON_TABLE views; applies on a fresh database.
+- Per-source runs (latest): Rust 26 cand → 14 core, 35/1 verified/rejected; Biology 26 → 8 core,
+  29/3; Economics 34 → 4 core, 5/1. Latency ~45–73s/source.
+- Causal gate effective: economics verified claims 29→5, soft-prose causal `uses`/`part-of`
+  eliminated; Rust/biology relation richness preserved (genuine taxonomy, structural, contrast,
+  mechanism). Published distribution: part-of 24, uses 17, contrasts-with 15, is-a 6,
+  asserted-prerequisite-of 2, defined-as 2.
+- Integrity: **zero self-referential and zero evidence-free** published claims (verified by SQL
+  against the published version).
+- Remaining caveats: two economics "limited by / gives occasion to" sentences still type
+  structurally (TODO 2); admission core-count variance across re-runs (TODO 1). Cost not captured.
+- Static checks: `pnpm -r typecheck` clean, `pnpm lint` clean. No package-level unit tests exist;
+  this layer is validated by the real-use-quality-evaluation skill, not assertions.

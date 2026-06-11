@@ -112,16 +112,20 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
   }): Promise<ClaimExtractionResult> {
     const system = [
       "You extract typed, evidence-backed claims for one subject concept only.",
+      "HARD EXCLUSION — apply this to the evidence sentence BEFORE choosing any relation:",
+      "If the link between subject and object in the quoted sentence is causal, genetic-origin, or motivational, the statement fits NO relation in the closed set. Emit no claim. Do NOT retype it as 'uses', 'part-of', 'is-a', or 'contrasts-with'.",
+      "Causal/origin connectives that trigger this exclusion include: 'gives occasion to', 'occasions', 'is the (necessary) consequence of', 'is the effect of', 'is not the effect of', 'arises from', 'leads to', 'in consequence of', 'owing to', 'encourages', 'derives from'.",
+      "WRONG: from 'it is this same trucking disposition which originally gives occasion to the division of labour', emitting 'Division of Labour uses Propensity to Exchange' or 'Propensity to Exchange part-of Division of Labour' — both are causal-origin statements wearing a relation costume. The correct output for that sentence is NO claim.",
       "Allowed relations (closed set), each with a strict test — apply the test before choosing:",
       "- 'is-a': strict taxonomy ONLY. The sentence 'every <subject> is a <object>' must read as true; the object must be a broader category or kind. WRONG: 'drop function is-a ownership' (drop is part of the ownership system, not a kind of ownership). WRONG: 'pointer is-a stack and heap'. RIGHT: 'conservative replication model is-a DNA replication model'.",
-      "- 'part-of': the subject is a component, member, step, or sub-mechanism of the object. Use this when a concept belongs to a system or topic area ('drop function part-of ownership').",
-      "- 'uses': the subject employs or relies on the object as a mechanism or tool ('string type uses heap allocation').",
+      "- 'part-of': the subject is a structural component, member, step, or sub-mechanism of the object. The test: 'the <object> consists of / includes the <subject>' must read as true ('drop function part-of ownership'). Causing, enabling, or motivating the object is NOT membership.",
+      "- 'uses': the subject actively employs the object as a tool or mechanism while it operates ('string type uses heap allocation'). The test: 'the <subject> works by employing the <object>'. Being caused by, arising from, or being motivated by the object is NOT using it.",
       "- 'asserted-prerequisite-of': ONLY when the source explicitly states that understanding the subject is required before the object.",
-      "- 'contrasts-with': ONLY when the source explicitly contrasts or distinguishes the two concepts.",
+      "- 'contrasts-with': ONLY when the source explicitly contrasts or distinguishes the two concepts as alternatives or opposites. Denying that one concept caused another ('X is not the effect of Y') is a causal statement, not a contrast.",
       "- 'defined-as': the object is a literal definition string quoted from the source; never a concept.",
       "Never emit a claim whose object is the subject concept itself.",
-      "Causal or motivational statements ('X gives occasion to Y', 'X leads to Y') fit NONE of these relations — emit no claim for them.",
       "If no relation in the closed set fits precisely, emit no claim; fewer precise claims beat many loose ones.",
+      "For every claim, classify evidenceLinkNature honestly from the quoted sentence alone. Claims whose evidence link is 'causal-or-motivational' are discarded by the system, so label them truthfully rather than forcing a structural reading.",
       "Concept objects MUST be one of the admitted concepts listed; reference them by candidateKey. If you need a concept that is not admitted, do NOT invent a claim — record it under missingConceptProposals instead.",
       "Every claim requires a verbatim evidence quote copied exactly from a cited block. No quote, no claim."
     ].join("\n");
@@ -152,6 +156,10 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
     const admittedKeys = new Set(input.admittedConcepts.map((concept) => concept.candidateKey));
     const claims: ExtractedClaim[] = [];
     for (const claim of result.claims) {
+      // Symbolic gate: the model labels how the evidence sentence links the two
+      // concepts; causal/motivational links fit no relation in the closed
+      // registry (ADR-0016 defers `causes`), so they are dropped fail-closed.
+      if (claim.evidenceLinkNature === "causal-or-motivational") continue;
       if (claim.objectKind === "concept") {
         // Concept objects must reference an admitted concept; otherwise it is not a valid claim here.
         if (!claim.objectCandidateKey || !admittedKeys.has(claim.objectCandidateKey)) continue;

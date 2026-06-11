@@ -101,9 +101,14 @@ export const conceptClaimSchema: JsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["predicate", "objectKind", "objectCandidateKey", "objectLiteralValue", "evidence", "confidence"],
+        required: ["predicate", "evidenceLinkNature", "objectKind", "objectCandidateKey", "objectLiteralValue", "evidence", "confidence"],
         properties: {
           predicate: { type: "string", enum: [...RELATION_ENUM] },
+          evidenceLinkNature: {
+            type: "string",
+            enum: ["taxonomic", "structural", "mechanism-employment", "explicit-contrast", "explicit-prerequisite", "definitional", "causal-or-motivational"],
+            description: "How the EVIDENCE SENTENCE links subject and object. 'causal-or-motivational' = the sentence says one gives rise to, occasions, results from, explains, or motivates the other."
+          },
           objectKind: { type: "string", enum: ["concept", "literal"] },
           objectCandidateKey: { type: ["string", "null"], description: "For concept objects: the candidateKey of an ADMITTED concept. Null for literal objects." },
           objectLiteralValue: { type: ["string", "null"], description: "For 'defined-as' literal objects only. Null otherwise." },
@@ -132,6 +137,7 @@ export const conceptClaimSchema: JsonSchema = {
 export const conceptClaimValidator = z.object({
   claims: z.array(z.object({
     predicate: z.enum(RELATION_ENUM),
+    evidenceLinkNature: z.enum(["taxonomic", "structural", "mechanism-employment", "explicit-contrast", "explicit-prerequisite", "definitional", "causal-or-motivational"]),
     objectKind: z.enum(["concept", "literal"]),
     objectCandidateKey: z.string().nullable(),
     objectLiteralValue: z.string().nullable(),
