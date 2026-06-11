@@ -14,3 +14,6 @@
 - [0012-measure-embedding-sidecars](./0012-measure-embedding-sidecars.md)
 - [0013-use-mixed-format-oracle-suite](./0013-use-mixed-format-oracle-suite.md)
 - [0014-defer-learner-modeling](./0014-defer-learner-modeling.md)
+- [0015-deterministic-cross-source-identity](./0015-deterministic-cross-source-identity.md)
+- [0016-closed-six-relation-registry](./0016-closed-six-relation-registry.md)
+- [0017-split-extraction-runs-from-graph-version-builds](./0017-split-extraction-runs-from-graph-version-builds.md)
