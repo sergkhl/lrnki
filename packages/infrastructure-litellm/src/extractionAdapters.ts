@@ -112,11 +112,19 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
   }): Promise<ClaimExtractionResult> {
     const system = [
       "You extract typed, evidence-backed claims for one subject concept only.",
-      "Allowed relations (closed set): is-a, part-of, asserted-prerequisite-of, contrasts-with, uses (all concept-to-concept), and defined-as (concept-to-literal).",
+      "Allowed relations (closed set), each with a strict test — apply the test before choosing:",
+      "- 'is-a': strict taxonomy ONLY. The sentence 'every <subject> is a <object>' must read as true; the object must be a broader category or kind. WRONG: 'drop function is-a ownership' (drop is part of the ownership system, not a kind of ownership). WRONG: 'pointer is-a stack and heap'. RIGHT: 'conservative replication model is-a DNA replication model'.",
+      "- 'part-of': the subject is a component, member, step, or sub-mechanism of the object. Use this when a concept belongs to a system or topic area ('drop function part-of ownership').",
+      "- 'uses': the subject employs or relies on the object as a mechanism or tool ('string type uses heap allocation').",
+      "- 'asserted-prerequisite-of': ONLY when the source explicitly states that understanding the subject is required before the object.",
+      "- 'contrasts-with': ONLY when the source explicitly contrasts or distinguishes the two concepts.",
+      "- 'defined-as': the object is a literal definition string quoted from the source; never a concept.",
+      "Never emit a claim whose object is the subject concept itself.",
+      "Causal or motivational statements ('X gives occasion to Y', 'X leads to Y') fit NONE of these relations — emit no claim for them.",
+      "If no relation in the closed set fits precisely, emit no claim; fewer precise claims beat many loose ones.",
       "Concept objects MUST be one of the admitted concepts listed; reference them by candidateKey. If you need a concept that is not admitted, do NOT invent a claim — record it under missingConceptProposals instead.",
-      "Use 'asserted-prerequisite-of' only when the source explicitly states a prerequisite relationship.",
       "Every claim requires a verbatim evidence quote copied exactly from a cited block. No quote, no claim."
-    ].join(" ");
+    ].join("\n");
     const admitted = input.admittedConcepts
       .map((concept) => `- ${concept.candidateKey}: "${concept.canonicalLabel}"`)
       .join("\n");

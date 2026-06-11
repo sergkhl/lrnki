@@ -7,6 +7,8 @@ Manual actions and unresolved external dependencies. Remove entries once resolve
   generate` expecting a clean diff — it would regenerate against the old `0000_snapshot.json`. Reset
   local state with `scripts/reset-db.sh`.
 
-- **Claim extraction is slow (one LLM call per core concept).** A large source (e.g. the Rust chapter
-  with ~25 core concepts) takes several minutes per run. No correctness blocker; see TODO item 3 for
-  throughput hardening before scaling fixture count.
+- **Admin Lab server bind requires DATABASE_URL in the process env.** `next start` does not load the
+  monorepo-root `.env`; launch the admin-lab server with `DATABASE_URL` exported (e.g.
+  `DATABASE_URL=… pnpm exec next start -p 3000`) or the inspectors fall back to "database unavailable".
+  Backgrounded dev servers must use a process-group-detached launch that survives the shell (the
+  sandbox reaps plain `nohup &` children when the foreground command returns).

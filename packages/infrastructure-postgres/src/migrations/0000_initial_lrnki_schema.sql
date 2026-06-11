@@ -230,17 +230,46 @@ CREATE TABLE artifact_versions (
 -- JSON_TABLE inspection surface (ADR-0003, Postgres 18)
 -- ---------------------------------------------------------------------------
 
--- Flatten admission-decision artifact payloads for Admin Lab run inspection.
-CREATE VIEW artifact_admission_decisions AS
-SELECT a.artifact_id, a.run_id, decision.candidate_key, decision.tier, decision.confidence
+-- Flatten extraction-run artifact payloads: one row per candidate with its
+-- admission decision, for the Admin Lab Run Inspector.
+CREATE VIEW artifact_run_candidates AS
+SELECT a.run_id, c.candidate_key, c.canonical_label, c.aliases, c.mention_count,
+       c.tier, c.reason_codes, c.confidence
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
-  '$.decisions[*]'
+  '$.candidates[*]'
   COLUMNS (
-    candidate_key text PATH '$.candidateId',
-    tier text PATH '$.tier',
-    confidence numeric PATH '$.confidence'
+    candidate_key text PATH '$.candidateKey',
+    canonical_label text PATH '$.canonicalLabel',
+    aliases jsonb PATH '$.aliases',
+    mention_count integer PATH '$.mentions.size()',
+    tier text PATH '$.admission.tier',
+    reason_codes jsonb PATH '$.admission.reasonCodes',
+    confidence numeric PATH '$.admission.confidence'
   )
-) AS decision
-WHERE a.artifact_type = 'concept_admission.v1';
+) AS c
+WHERE a.artifact_type = 'extraction_run.v1';
+
+-- Flatten extraction-run artifact payloads: one row per extracted claim with
+-- its validation outcome, for the Admin Lab Run Inspector.
+CREATE VIEW artifact_run_claims AS
+SELECT a.run_id, cl.subject_candidate_key, cl.predicate, cl.object_kind,
+       cl.object_candidate_key, cl.object_literal, cl.validation_outcome,
+       cl.evidence_count, cl.model_confidence
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.claims[*]'
+  COLUMNS (
+    subject_candidate_key text PATH '$.subjectCandidateKey',
+    predicate text PATH '$.predicate',
+    object_kind text PATH '$.object.kind',
+    object_candidate_key text PATH '$.object.candidateKey',
+    object_literal text PATH '$.object.value',
+    validation_outcome text PATH '$.validationOutcome',
+    evidence_count integer PATH '$.evidenceCount',
+    model_confidence numeric PATH '$.modelConfidence'
+  )
+) AS cl
+WHERE a.artifact_type = 'extraction_run.v1';

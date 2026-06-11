@@ -1,0 +1,20 @@
+{
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "driver": "PostgreSQL",
+      "name": "lrnki_review",
+      "connectString": "postgresql://lrnki:lrnki@localhost:5432/lrnki_review"
+    },
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "driver": "PostgreSQL",
+      "name": "lrnki",
+      "connectString": "postgresql://lrnki:lrnki@localhost:5432/lrnki"
+    }
+  ]
+}

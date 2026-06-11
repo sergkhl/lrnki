@@ -34,6 +34,7 @@ For VALIDATION
 
 ### Blockers
 
-Record unresolved manual actions in @docs/plans/blockers.md.
+Record unresolved manual actions required from the user in @docs/plans/blockers.md.
+Do not write in manual actions something that you can complete yourself.
 
 Remove resolved blockers.

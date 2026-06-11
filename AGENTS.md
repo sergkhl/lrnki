@@ -23,3 +23,5 @@
 11. Keep Admin Lab minimal and graph-focused. It may inspect and trigger explicit versioned operations. It must never silently mutate a published graph.
 
 12. After every important behavior-changing milestone, apply @.agents/skills/real-use-quality-evaluation/SKILL.md before adding downstream complexity. Passing tests alone is not sufficient; inspect representative real-use output, fix foundational quality defects early, and state explicit caveats when intended quality cannot be verified.
+
+13. When developing Web UI, use shadcn base-ui components, apply instructions from @.agents/skills/shadcn/SKILL.md. For graph visualization use cytoscape library.

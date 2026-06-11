@@ -69,27 +69,32 @@ export async function executeExtractionRun(input: {
   const coreKeys = new Set(coreCandidates.map((candidate) => candidate.candidateKey));
 
   // Stage 3 — concept-conditioned claim extraction with deterministic evidence validation.
+  // One LLM call per core concept, through a bounded pool; results are collected in
+  // subject order so the persisted run is deterministic regardless of completion order.
   const claims: RunClaim[] = [];
   const proposals: ExtractionRunResult["proposals"] = [];
-  for (const subject of coreCandidates) {
-    const neighborhood = evidenceNeighborhood(document, subject);
-    let result;
+  const extractionResults = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
     try {
-      result = await input.claimExtraction.extract({
+      return await input.claimExtraction.extract({
         document,
         declaredDomain,
         subject: { candidateKey: subject.candidateKey, canonicalLabel: subject.canonicalLabel },
         admittedConcepts,
-        evidenceNeighborhood: neighborhood
+        evidenceNeighborhood: evidenceNeighborhood(document, subject)
       });
     } catch {
       // Fail closed for this concept after the client's retry budget: no claims,
       // rather than aborting the whole source run. Observable as missing claims.
-      continue;
+      return null;
     }
+  });
+  for (const result of extractionResults) {
+    if (result === null) continue;
     for (const claim of result.claims) {
       // Object concept must be an admitted core concept; otherwise drop (fail closed).
       if (claim.object.kind === "concept" && !coreKeys.has(claim.object.candidateKey)) continue;
+      // A claim whose object is its own subject is structurally meaningless; drop (fail closed).
+      if (claim.object.kind === "concept" && claim.object.candidateKey === claim.subjectCandidateKey) continue;
       // Keep only evidence that verifies verbatim against a real block; the model
       // sometimes emits placeholder block ids. No verifiable quote => rejected claim.
       const verifiableEvidence = claim.evidence.filter((evidence) => isVerifiable(evidence, blockText));
@@ -131,6 +136,22 @@ export async function executeExtractionRun(input: {
     payload: runResult
   });
   return runResult;
+}
+
+// Bounded so a large source cannot fan out unbounded parallel LLM calls through the proxy.
+const CLAIM_EXTRACTION_CONCURRENCY = 4;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
 }
 
 // Evidence check: the cited block exists and contains the quote (ADR-0007),
