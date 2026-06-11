@@ -1,11 +1,43 @@
 import Link from "next/link";
-import { AdminShell } from "../../../../../components/AdminShell";
-import { getRunInspection } from "../../../../../lib/inspection";
+import { FileQuestionIcon } from "lucide-react";
+import { AdminShell } from "@/components/AdminShell";
+import { Badge } from "@/components/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator
+} from "@/components/ui/breadcrumb";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { getRunInspection } from "@/lib/inspection";
 
-// Server component: read-only Run Inspector over one Extraction Run — candidates
-// with admission decisions, claims with validation outcomes and evidence quotes,
-// and missing-concept proposals (ADR-0011, ADR-0017).
 export const dynamic = "force-dynamic";
+
+function tierVariant(tier: string): "default" | "secondary" | "destructive" | "outline" {
+  if (tier === "core") return "default";
+  if (tier === "reject") return "destructive";
+  if (tier === "quarantine") return "secondary";
+  return "outline";
+}
 
 export default async function RunInspectorPage({ params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
@@ -13,77 +45,145 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
   if (!inspection) {
     return (
       <AdminShell active="runs">
-        <section className="panel"><h2>Run not found</h2><p className="muted">No extraction run {runId}. <Link href="/admin/lab/runs">Back to runs</Link>.</p></section>
+        <Empty className="min-h-[28rem] border bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><FileQuestionIcon /></EmptyMedia>
+            <EmptyTitle>Run not found</EmptyTitle>
+            <EmptyDescription>No extraction run exists for <code className="font-mono">{runId}</code>.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Link className="text-sm font-medium underline underline-offset-4" href="/admin/lab/runs">Back to runs</Link>
+          </EmptyContent>
+        </Empty>
       </AdminShell>
     );
   }
+
   const { run, candidates, claims, proposals } = inspection;
   return (
     <AdminShell active="runs">
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>{run.sourceTitle}</h2>
-          <span className="badge">{run.declaredDomain} · {run.status}</span>
-        </div>
-        <dl className="run-facts">
-          <dt>Run</dt><dd>{run.runId}</dd>
-          <dt>Config</dt><dd>{inspection.pipelineConfigHash}</dd>
-          <dt>Latency</dt><dd>{run.latencyMs !== null ? `${Math.round(run.latencyMs / 1000)}s` : "—"}</dd>
-          <dt>Counts</dt><dd>{run.candidateCount} candidates · {run.coreCount} core · {run.verifiedClaimCount} verified / {run.rejectedClaimCount} rejected claims · {run.proposalCount} proposals</dd>
-        </dl>
+      <div className="flex flex-col gap-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem><BreadcrumbLink render={<Link href="/admin/lab/runs" />}>Runs</BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem><BreadcrumbPage>{run.sourceTitle}</BreadcrumbPage></BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-        <h3>Candidates and admission decisions</h3>
-        <table className="data">
-          <thead><tr><th>Tier</th><th>Label</th><th>Aliases</th><th>Mentions</th><th>Reason codes</th><th>Confidence</th></tr></thead>
-          <tbody>
-            {candidates.map((candidate) => (
-              <tr key={candidate.candidateKey} className={`tier-${candidate.tier}`}>
-                <td>{candidate.tier}</td>
-                <td>{candidate.canonicalLabel}</td>
-                <td>{candidate.aliases.join(", ") || "—"}</td>
-                <td>{candidate.mentionCount}</td>
-                <td>{candidate.reasonCodes.join(", ")}</td>
-                <td>{candidate.confidence.toFixed(2)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>{run.sourceTitle}</CardTitle>
+            <CardDescription className="font-mono">{run.runId}</CardDescription>
+            <CardAction className="flex flex-wrap gap-2">
+              <Badge variant="outline">{run.declaredDomain}</Badge>
+              <Badge variant={run.status === "failed" ? "destructive" : "default"}>{run.status}</Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Pipeline config</dt><dd className="break-all font-mono text-xs">{inspection.pipelineConfigHash}</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Latency</dt><dd>{run.latencyMs !== null ? `${Math.round(run.latencyMs / 1000)}s` : "—"}</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Candidates</dt><dd>{run.candidateCount} total / {run.coreCount} core</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Claims and proposals</dt><dd>{run.verifiedClaimCount} verified / {run.rejectedClaimCount} rejected / {run.proposalCount} proposals</dd></div>
+            </dl>
+          </CardContent>
+        </Card>
 
-        <h3>Claims</h3>
-        <table className="data">
-          <thead><tr><th>Outcome</th><th>Subject</th><th>Relation</th><th>Object</th><th>Confidence</th><th>Evidence</th></tr></thead>
-          <tbody>
-            {claims.map((claim, index) => (
-              <tr key={index} className={claim.validationOutcome === "rejected" ? "rejected" : ""}>
-                <td>{claim.validationOutcome}</td>
-                <td>{claim.subjectLabel}</td>
-                <td>{claim.predicate}</td>
-                <td>{claim.objectLabel}</td>
-                <td>{claim.modelConfidence.toFixed(2)}</td>
-                <td className="quote">{claim.evidenceQuotes.length > 0 ? claim.evidenceQuotes.map((quote, i) => <p key={i}>“{quote}”</p>) : <span className="muted">no verifiable quote</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Candidates and admission decisions</CardTitle>
+            <CardDescription>Model candidates with the application boundary&apos;s admission outcome.</CardDescription>
+            <CardAction><Badge variant="outline">{candidates.length}</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow><TableHead>Tier</TableHead><TableHead>Label</TableHead><TableHead>Aliases</TableHead><TableHead>Mentions</TableHead><TableHead>Reason codes</TableHead><TableHead>Confidence</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {candidates.map((candidate) => (
+                  <TableRow key={candidate.candidateKey}>
+                    <TableCell><Badge variant={tierVariant(candidate.tier)}>{candidate.tier}</Badge></TableCell>
+                    <TableCell className="font-medium">{candidate.canonicalLabel}</TableCell>
+                    <TableCell className="max-w-72 whitespace-normal">{candidate.aliases.join(", ") || "—"}</TableCell>
+                    <TableCell>{candidate.mentionCount}</TableCell>
+                    <TableCell className="max-w-80 whitespace-normal">{candidate.reasonCodes.join(", ")}</TableCell>
+                    <TableCell>{candidate.confidence.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-        <h3>Missing-concept proposals</h3>
-        {proposals.length > 0 ? (
-          <table className="data">
-            <thead><tr><th>Proposed label</th><th>Rationale</th><th>Evidence</th></tr></thead>
-            <tbody>
-              {proposals.map((proposal, index) => (
-                <tr key={index}>
-                  <td>{proposal.proposedLabel}</td>
-                  <td>{proposal.rationale}</td>
-                  <td className="quote">{proposal.evidenceQuote ? `“${proposal.evidenceQuote}”` : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="muted">No missing-concept proposals for this run.</p>
-        )}
-      </section>
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Claims</CardTitle>
+            <CardDescription>Validation outcomes with exact source evidence retained for inspection.</CardDescription>
+            <CardAction><Badge variant="outline">{claims.length}</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow><TableHead>Outcome</TableHead><TableHead>Subject</TableHead><TableHead>Relation</TableHead><TableHead>Object</TableHead><TableHead>Confidence</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {claims.map((claim, index) => (
+                  <TableRow key={`${claim.subjectLabel}-${claim.predicate}-${index}`}>
+                    <TableCell><Badge variant={claim.validationOutcome === "rejected" ? "destructive" : "default"}>{claim.validationOutcome}</Badge></TableCell>
+                    <TableCell className="font-medium">{claim.subjectLabel}</TableCell>
+                    <TableCell><Badge variant="outline">{claim.predicate}</Badge></TableCell>
+                    <TableCell className="max-w-64 whitespace-normal">{claim.objectLabel}</TableCell>
+                    <TableCell>{claim.modelConfidence.toFixed(2)}</TableCell>
+                    <TableCell className="min-w-80 whitespace-normal">
+                      {claim.evidenceQuotes.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {claim.evidenceQuotes.map((quote, quoteIndex) => (
+                            <blockquote key={quoteIndex} className="border-l-2 pl-3 text-sm text-muted-foreground">&ldquo;{quote}&rdquo;</blockquote>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">No verifiable quote</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Missing-concept proposals</CardTitle>
+            <CardDescription>Run-scoped proposals remain outside the published core graph.</CardDescription>
+            <CardAction><Badge variant="outline">{proposals.length}</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
+            {proposals.length > 0 ? (
+              <Table>
+                <TableHeader><TableRow><TableHead>Proposed label</TableHead><TableHead>Rationale</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {proposals.map((proposal, index) => (
+                    <TableRow key={`${proposal.proposedLabel}-${index}`}>
+                      <TableCell className="font-medium">{proposal.proposedLabel}</TableCell>
+                      <TableCell className="max-w-xl whitespace-normal">{proposal.rationale}</TableCell>
+                      <TableCell className="max-w-xl whitespace-normal text-muted-foreground">{proposal.evidenceQuote ? `“${proposal.evidenceQuote}”` : "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <>
+                <Separator />
+                <Empty className="min-h-40">
+                  <EmptyHeader>
+                    <EmptyTitle>No missing-concept proposals</EmptyTitle>
+                    <EmptyDescription>This run did not produce any proposals.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </AdminShell>
   );
 }

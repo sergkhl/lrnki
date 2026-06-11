@@ -1,10 +1,34 @@
 import Link from "next/link";
-import { AdminShell } from "../../../../../components/AdminShell";
-import { getSourceInspection } from "../../../../../lib/inspection";
+import { FileQuestionIcon } from "lucide-react";
+import { AdminShell } from "@/components/AdminShell";
+import { Badge } from "@/components/ui/badge";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator
+} from "@/components/ui/breadcrumb";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { getSourceInspection } from "@/lib/inspection";
 
-// Server component: read-only Source Explorer over one registered source —
-// identity, parser provenance, and the parsed block structure that evidence
-// quotes resolve against (ADR-0004, ADR-0011).
 export const dynamic = "force-dynamic";
 
 export default async function SourceExplorerPage({ params }: { params: Promise<{ sourceResourceId: string }> }) {
@@ -13,40 +37,74 @@ export default async function SourceExplorerPage({ params }: { params: Promise<{
   if (!inspection) {
     return (
       <AdminShell active="sources">
-        <section className="panel"><h2>Source not found</h2><p className="muted">No registered source {sourceResourceId}. <Link href="/admin/lab/sources">Back to sources</Link>.</p></section>
+        <Empty className="min-h-[28rem] border bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><FileQuestionIcon /></EmptyMedia>
+            <EmptyTitle>Source not found</EmptyTitle>
+            <EmptyDescription>No registered source exists for <code className="font-mono">{sourceResourceId}</code>.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Link className="text-sm font-medium underline underline-offset-4" href="/admin/lab/sources">Back to sources</Link>
+          </EmptyContent>
+        </Empty>
       </AdminShell>
     );
   }
+
   const { source, blocks } = inspection;
   return (
     <AdminShell active="sources">
-      <section className="panel">
-        <div className="panel-heading">
-          <h2>{source.title}</h2>
-          <span className="badge">{source.declaredDomain} · {source.contentType}</span>
-        </div>
-        <dl className="run-facts">
-          <dt>Source</dt><dd>{source.sourceResourceId}</dd>
-          <dt>Hash</dt><dd className="mono">{source.contentHash}</dd>
-          <dt>Parser</dt><dd>{inspection.parserName} {inspection.parserVersion}</dd>
-          <dt>Blocks</dt><dd>{source.blockCount} blocks · {source.runCount} extraction runs</dd>
-        </dl>
+      <div className="flex flex-col gap-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem><BreadcrumbLink render={<Link href="/admin/lab/sources" />}>Sources</BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem><BreadcrumbPage>{source.title}</BreadcrumbPage></BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
-        <h3>Parsed blocks</h3>
-        <table className="data">
-          <thead><tr><th>Block</th><th>Type</th><th>Heading path</th><th>Text</th></tr></thead>
-          <tbody>
-            {blocks.map((block) => (
-              <tr key={block.blockId}>
-                <td className="mono">{block.blockId}</td>
-                <td>{block.blockType}</td>
-                <td>{block.headingPath.join(" › ") || "—"}</td>
-                <td className="quote">{block.text}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>{source.title}</CardTitle>
+            <CardDescription className="font-mono">{source.sourceResourceId}</CardDescription>
+            <CardAction className="flex flex-wrap gap-2">
+              <Badge variant="outline">{source.declaredDomain}</Badge>
+              <Badge variant="secondary">{source.contentType}</Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Content hash</dt><dd className="break-all font-mono text-xs">{source.contentHash}</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Parser</dt><dd>{inspection.parserName} {inspection.parserVersion}</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Parsed blocks</dt><dd>{source.blockCount}</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Extraction runs</dt><dd>{source.runCount}</dd></div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Parsed blocks</CardTitle>
+            <CardDescription>Stable block identities and text used to verify claim evidence.</CardDescription>
+            <CardAction><Badge variant="outline">{blocks.length}</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader><TableRow><TableHead>Block</TableHead><TableHead>Type</TableHead><TableHead>Heading path</TableHead><TableHead>Text</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {blocks.map((block) => (
+                  <TableRow key={block.blockId}>
+                    <TableCell className="font-mono text-xs">{block.blockId}</TableCell>
+                    <TableCell><Badge variant="outline">{block.blockType}</Badge></TableCell>
+                    <TableCell className="max-w-64 whitespace-normal">{block.headingPath.join(" / ") || "—"}</TableCell>
+                    <TableCell className="min-w-96 max-w-4xl whitespace-normal text-muted-foreground">{block.text}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
     </AdminShell>
   );
 }

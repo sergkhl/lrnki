@@ -7,5 +7,9 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminLabPage() {
   const { snapshot, live } = await loadPublishedSnapshot();
-  return <AdminShell><GraphExplorer snapshot={snapshot} key={live ? snapshot.graphVersionId : "demo"} /></AdminShell>;
+  return (
+    <AdminShell>
+      <GraphExplorer snapshot={snapshot} live={live} key={live ? snapshot.graphVersionId : "demo"} />
+    </AdminShell>
+  );
 }

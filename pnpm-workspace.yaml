@@ -37,6 +37,7 @@ catalog:
   typescript: 6.0.3
   zod: 4.4.3
   cytoscape: 3.33.4
+  '@types/cytoscape': 3.21.9
 
 allowBuilds:
   esbuild: true

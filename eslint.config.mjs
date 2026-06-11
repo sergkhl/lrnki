@@ -29,7 +29,6 @@ const eslintConfig = [
         "error",
         {
           patterns: [
-            "@/*",
             "@lrnki/*/src/*",
             "../../packages/*",
             "../../../packages/*",
