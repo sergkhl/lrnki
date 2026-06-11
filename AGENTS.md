@@ -14,7 +14,7 @@
 
 7. Use PostgreSQL 18 with JSONB artifact envelopes and JSON_TABLE query surfaces from the start.
 
-8. Keep only one initial database migration. Reset local state and simplify scripts aggressively.
+8. The app is unreleased. Do not preserve backward compatibility unless explicitly requested. Keep only the single initial database migration. You may reset DB state aggressively without asking for an approval.
 
 9. Store stable curated sources under fixtures/. Store generated artifacts, reports, and scratch outputs under disposable gitignored tmp/.
 

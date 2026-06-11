@@ -1,0 +1,34 @@
+{
+  "$comment": "Gate 1 fixture registration manifest. Declared Domain (ADR-0015) is human-assigned here, never parsed from file content. The kg-worker register-source command reads this to register each curated source with its domain and content hash.",
+  "fixtures": [
+    {
+      "fixtureId": "rust-book-ch04-01",
+      "path": "fixtures/markdown/rust-book-ch04-01-what-is-ownership.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "software engineering",
+      "title": "The Rust Programming Language, ch. 4.1 \"What Is Ownership?\"",
+      "source": "https://github.com/rust-lang/book (src/ch04-01-what-is-ownership.md)",
+      "license": "MIT OR Apache-2.0"
+    },
+    {
+      "fixtureId": "openstax-bio-14-3",
+      "path": "fixtures/html/openstax-biology-2e-14-3-dna-replication.html",
+      "contentType": "text/html",
+      "declaredDomain": "molecular biology",
+      "title": "OpenStax Biology 2e, §14.3 \"Basics of DNA Replication\"",
+      "source": "https://openstax.org/books/biology-2e/pages/14-3-basics-of-dna-replication",
+      "license": "CC BY 4.0",
+      "curation": "Extracted the published page <main> article region; SPA shell and navigation removed."
+    },
+    {
+      "fixtureId": "wealth-of-nations-bk1-ch1-3",
+      "path": "fixtures/plaintext/wealth-of-nations-book1-ch1-3.txt",
+      "contentType": "text/plain",
+      "declaredDomain": "economics",
+      "title": "Adam Smith, The Wealth of Nations, Book I, Chapters I-III",
+      "source": "Project Gutenberg eBook #3300 (https://www.gutenberg.org/ebooks/3300)",
+      "license": "Public domain",
+      "curation": "Extracted Book I chapters I-III from the Gutenberg plaintext; deliberate robustness probe (long-paragraph 18th-century prose, no structural markup)."
+    }
+  ]
+}

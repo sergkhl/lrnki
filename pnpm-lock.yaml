@@ -62,6 +62,9 @@ importers:
       eslint-config-next:
         specifier: 'catalog:'
         version: 16.2.6(@typescript-eslint/parser@8.61.0(eslint@9.39.1)(typescript@6.0.3))(eslint@9.39.1)(typescript@6.0.3)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -71,6 +74,12 @@ importers:
       '@lrnki/domain-core':
         specifier: workspace:*
         version: link:../../packages/domain-core
+      '@lrnki/infrastructure-postgres':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure-postgres
+      '@lrnki/ports':
+        specifier: workspace:*
+        version: link:../../packages/ports
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -99,6 +108,24 @@ importers:
       '@lrnki/application':
         specifier: workspace:*
         version: link:../../packages/application
+      '@lrnki/domain-core':
+        specifier: workspace:*
+        version: link:../../packages/domain-core
+      '@lrnki/infrastructure-ingestion':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure-ingestion
+      '@lrnki/infrastructure-litellm':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure-litellm
+      '@lrnki/infrastructure-postgres':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure-postgres
+      '@lrnki/infrastructure-storage-local':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure-storage-local
+      '@lrnki/ports':
+        specifier: workspace:*
+        version: link:../../packages/ports
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -153,6 +180,12 @@ importers:
 
   packages/infrastructure-litellm:
     dependencies:
+      '@lrnki/domain-core':
+        specifier: workspace:*
+        version: link:../domain-core
+      '@lrnki/ports':
+        specifier: workspace:*
+        version: link:../ports
       zod:
         specifier: 'catalog:'
         version: 4.4.3

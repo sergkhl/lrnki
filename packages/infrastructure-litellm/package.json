@@ -9,6 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@lrnki/domain-core": "workspace:*",
+    "@lrnki/ports": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

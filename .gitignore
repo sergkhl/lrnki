@@ -15,4 +15,9 @@ test-results/
 .pnpm-store/
 .DS_Store
 next-env.d.ts
-fixtures/
+
+# Curated text fixtures are version-controlled (AGENTS rule 9). Large binary
+# formats (Gate 2 Docling sources) stay out of git; they are re-downloadable.
+fixtures/pdf/
+fixtures/docx/
+fixtures/pptx/

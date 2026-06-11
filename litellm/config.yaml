@@ -168,8 +168,9 @@ general_settings:
 
 litellm_settings:
   # Logging / monitoring
-  success_callback: ["langfuse"]
-  failure_callback: ["langfuse"]
+  # disabled while in dev
+  # success_callback: ["langfuse"]
+  # failure_callback: ["langfuse"]
   # callbacks: ["prometheus"]
   redact_user_api_key_info: true
   # service_callbacks: ["prometheus"]
@@ -187,7 +188,7 @@ litellm_settings:
   # ttl: 600  # cache TTL
 
 router_settings:
-  routing_strategy: "usage-based-routing"
+  routing_strategy: "usage-based-routing-v2"
   num_retries: 0
   retry_after: 5
   # allowed_fails: 1

@@ -24,6 +24,7 @@
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "eslint-config-next": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }
