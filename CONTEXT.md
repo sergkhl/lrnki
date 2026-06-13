@@ -63,13 +63,25 @@ _Avoid_: pipeline run (ambiguous), build
 The deterministic, LLM-free assembly of a publishable graph version from selected Extraction Runs: refinement, IRI minting, quality gates, atomic publication with recorded run memberships. When selected runs identify the same Candidate in the same Declared Domain, one evidence-supported `core` decision establishes eligibility even if other runs classify it as `optional` or `reject`; those decisions do not veto the establishing evidence. A `quarantine` decision blocks publication until its identity or meaning conflict is resolved. All run decisions remain auditable, and publication retains the establishing source's criterion evidence. A pure function of (runs + rules) — replayable without model calls.
 _Avoid_: extraction (this stage never extracts), rebuild-with-recrawl
 
+**Graph Enrichment**:
+The third decoupled orchestration operation, alongside Extraction Run and Graph-Version Build. It takes one published graph version plus an enrichment configuration and produces a Derived Graph Layer keyed to that version: graph-global structure that no single source asserted — currently the `inferred-prerequisite-of` DAG and baseline node difficulty — proposed by bounded LLM judgment and constrained by deterministic symbolic machinery (cycle checks, transitive reduction, contradiction detection). It never mutates the authoritative asserted graph and never reuses an asserted relation name. Replayable as (published version + enrichment config + captured judgments), mirroring the Graph-Version Build's replay guarantee one layer up.
+_Avoid_: enrichment as graph mutation, inference folded into the build, neuro-symbolic refinement (as a module name)
+
+**Derived Graph Layer**:
+The immutable output of Graph Enrichment: inferred edges and node scores attached to — but stored separately from — a published asserted graph version. Downstream stages (projection, learner path) read it as graph structure, while the asserted core remains provenance-pure and independently queryable. Distinct from an embedding sidecar (ADR-0012), which is inspection-only and never traversed as graph structure.
+_Avoid_: mixing inferred edges into the asserted version, sidecar (when the layer is traversable)
+
 **Missing-Concept Proposal**:
 A claim extractor's escape hatch: a concept it needed that admission didn't promote, recorded with evidence as a run artifact for inspection. In MVP, proposals are inspected in Admin Lab only — there is no automated re-admission loop until real proposals prove worth re-admitting.
 _Avoid_: auto-admission, feedback loop (as if built)
 
 **Static Graph Refinement**:
 The conservative post-extraction stage that reorganizes and scores what sources already said — alias normalization, homograph quarantine, duplicate-claim collapse, contradiction recording. In MVP it never adds edges that lack source evidence. Only elements transferable to a future inference-capable stage are built; non-transferable refinement is skipped entirely.
-_Avoid_: neuro-symbolic refinement (as a module name), graph enrichment
+_Avoid_: neuro-symbolic refinement (as a module name); do not conflate with **Graph Enrichment**, the separate LLM-heavy third operation (ADR-0019) — Static Graph Refinement is the LLM-free reorganization *inside* the build
+
+**Concept Canonicalization**:
+The cascading matcher that decides cross-source concept identity (ADR-0012, ADR-0015). Tier 1 deterministic normalized-label match within a Declared Domain is the only auto-merge authority; tier 2 contextual embeddings (over definition and evidence, never bare labels) propose and cluster merge candidates for recall only; tier 3 LLM verification with reversible aliases disposes them. No embedding ever merges on its own; embedding-proposed merges stay `EXPERIMENT_ONLY` until measured.
+_Avoid_: embedding merge, neural dedup, similarity-threshold merge
 
 **Neuro-symbolic pattern**:
 A descriptive term for the system-wide split where a neural model proposes (candidates, admissions, claims) and deterministic symbolic machinery validates and constrains (evidence checks, schema validation, relation constraints, fail-closed gates). It names a pattern, not a module; symbolic *inference* that derives new edges is a deferred measured experiment.
@@ -82,8 +94,12 @@ _Avoid_: smoke test, demo run
 The frozen mixed-format oracle suite of ADR-0013: ≥5 fixtures including Docling formats (PDF, DOCX, PPTX), independent oracle and judge models, benchmark arms, and quantitative metrics. Opens only after Gate 1 passes.
 _Avoid_: "the benchmark" (before it is frozen)
 
+**Learner Path**:
+The vertical slice's projection output: for one target Concept and a LearnerState, the difficulty-ordered chain of prerequisite Concepts — drawn from the Derived Graph Layer's `inferred-prerequisite-of` DAG — needed to reach the target, with Concepts the LearnerState reports as mastered pruned out. The LearnerState is a real port whose only MVP implementation is a mock ("knows nothing"); real IRT/KT later replaces the implementation without changing the port. Computed by a CLI operation and rendered read-only (Cytoscape) in Admin Lab — never computed in the UI.
+_Avoid_: course (when meaning one learner's path), personalized graph (reserved for the post-MVP stage)
+
 **North-star chain**:
-The long-term vision `Core Concept Graph → Graph Refinement → Learner Model (IRT/KT) → Projection Engine → Personalized Course Graph`. Only the first stage (through atomic publication, with minimal refinement) is in build scope; later stages shape interfaces but are not built (ADR-0014).
+The long-term vision `Core Concept Graph → Graph Refinement → Learner Model (IRT/KT) → Projection Engine → Personalized Course Graph`. Build scope is a thin end-to-end vertical slice: real extraction and atomic publication, a real but small Graph Enrichment layer (`inferred-prerequisite-of` DAG), and a *mocked* difficulty heuristic and *mocked* learner-state projection that emit a minimal learner path. The mocks exist to exercise the whole chain before any stage is deepened; real learner modeling (IRT/KT) and real difficulty calibration (Bradley-Terry) remain deferred (ADR-0014) and replace mocks stage by stage.
 _Avoid_: roadmap stages described as current scope
 
 ## Flagged ambiguities

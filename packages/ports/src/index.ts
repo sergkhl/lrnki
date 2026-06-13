@@ -3,9 +3,15 @@ import type {
   ArtifactEnvelope,
   ClaimExtractionFeedback,
   ClaimExtractionResult,
+  Concept,
+  ConceptDifficulty,
+  DerivedGraphLayer,
   DiscoveredCandidate,
   ExtractionRunResult,
   GraphSnapshot,
+  InferredPrerequisiteEdge,
+  LearnerPath,
+  PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
   RunForBuild,
@@ -93,4 +99,65 @@ export interface GraphVersionStorePort {
 export interface SourceObjectStoragePort {
   putObject(input: { bucket: string; objectKey: string; bytes: Uint8Array; contentType: string }): Promise<void>;
   getObject(input: { bucket: string; objectKey: string }): Promise<{ bytes: Uint8Array; contentType?: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Graph Enrichment ports (ADR-0019). The third operation: LLM proposes, symbolic
+// machinery disposes, over one published graph version. Mocked stages sit behind
+// REAL ports so Bradley-Terry / IRT-KT drop in later with no upstream change.
+// ---------------------------------------------------------------------------
+
+// Contextual embeddings as a propose-only blocking/clustering tier (ADR-0012).
+// Computed over a concept's definition + evidence text, NEVER its bare label, and
+// never an identity or merge authority — output only narrows candidate pairs and
+// forms clusters that gate which prerequisite pairs the LLM judges.
+export interface EmbeddingPort {
+  readonly model: string;
+  embed(input: { texts: string[] }): Promise<number[][]>;
+}
+
+// Bounded LLM prerequisite judgment over ONE gated, evidence-packed concept pair
+// (ADR-0019). Forced named tool schema; the application boundary validates the
+// arguments and maps "uncertain" to a flagged, path-excluded edge. The judge
+// proposes; deterministic cycle removal + transitive reduction dispose.
+export interface PrerequisiteJudgmentPort {
+  judge(input: {
+    declaredDomain: string;
+    a: { conceptId: string; canonicalLabel: string; definition?: string };
+    b: { conceptId: string; canonicalLabel: string; definition?: string };
+    evidencePacket: SourceBlock[];
+  }): Promise<PrerequisiteJudgment>;
+}
+
+// Baseline node difficulty (ADR-0019). MVP impl = deterministic DAG-depth mock
+// behind this port; Bradley-Terry pairwise calibration replaces the impl without
+// changing the port. Reads concepts + the inferred prereq DAG; one score each.
+export interface DifficultyPort {
+  readonly method: string;
+  score(input: { concepts: Concept[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
+}
+
+// Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock
+// ("knows nothing"): mastery() === 0 for every concept. Real IRT/KT later
+// implements the SAME port, so the projection upstream never changes. Pure/sync:
+// the projection is a deterministic CLI operation (ADR-0011).
+export interface LearnerStatePort {
+  readonly learnerStateRef: string;
+  mastery(conceptId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
+}
+
+// Graph Enrichment persistence (ADR-0019). Immutable, keyed to (graphVersionId +
+// enrichmentConfigHash); refuses to mutate an existing enrichment. Persists the
+// layer as queryable normalized rows AND appends an artifact envelope for replay.
+export interface DerivedGraphLayerStorePort {
+  persist(layer: DerivedGraphLayer): Promise<void>;
+  getLayer(input: { graphVersionId: string; enrichmentConfigHash: string }): Promise<DerivedGraphLayer | undefined>;
+  getLatestLayer(graphVersionId: string): Promise<DerivedGraphLayer | undefined>;
+}
+
+// Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the
+// Cytoscape view renders; the CLI computes and persists, the UI never computes.
+export interface LearnerPathStorePort {
+  persist(path: LearnerPath): Promise<void>;
+  getPath(input: { enrichmentId: string; targetConceptId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
 }

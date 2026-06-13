@@ -400,3 +400,90 @@ export type ArtifactEnvelope<TPayload = unknown> = {
   createdAt: string;
   payload: TPayload;
 };
+
+// ---------------------------------------------------------------------------
+// Graph Enrichment — the third operation (ADR-0019). Produces a Derived Graph
+// Layer keyed to a published version: graph-global structure no single source
+// asserted. LLM-proposed, symbolically constrained, never mutates the asserted
+// core. The inferred-relation vocabulary is SEPARATE from the closed asserted
+// RelationPredicate registry (ADR-0016) — these names must never collide.
+// ---------------------------------------------------------------------------
+
+export type InferredRelationPredicate = "inferred-prerequisite-of";
+
+export type ConceptCluster = {
+  clusterId: string;
+  // Contextual-embedding cluster used only to GATE which pairs the LLM judges
+  // (ADR-0012 tier 2: propose-only, never an edge/merge authority).
+  conceptIds: string[];
+  embeddingModel: string;
+};
+
+// One bounded LLM prerequisite judgment over a gated, evidence-packed pair.
+// "uncertain" is flagged for review and excluded from the path, never silently
+// promoted to an edge (concept-first method stack §4; goal 1.6/4).
+export type PrerequisiteJudgment = {
+  prerequisiteConceptId: string;
+  dependentConceptId: string;
+  outcome: "directed" | "none" | "uncertain";
+  confidence: number;
+  rationale: string;
+};
+
+// An edge of the inferred prerequisite DAG: prerequisite must precede dependent.
+// Survives only after deterministic cycle removal + transitive reduction +
+// weak-edge cut (ADR-0019). `uncertain` edges are retained for inspection but
+// excluded from path traversal.
+export type InferredPrerequisiteEdge = {
+  prerequisiteConceptId: string;
+  dependentConceptId: string;
+  predicate: InferredRelationPredicate;
+  confidence: number;
+  uncertain: boolean;
+  clusterId?: string;
+  provenance: { judgmentRationale: string; evidencePacketRef?: string };
+};
+
+// Baseline node difficulty. MVP `method` is "dag-depth-mock" (topological depth);
+// Bradley-Terry calibration replaces the producer later behind the same shape.
+export type ConceptDifficulty = {
+  conceptId: string;
+  score: number;
+  method: string;
+  components: Record<string, number>;
+};
+
+// The immutable output of Graph Enrichment, keyed to (graphVersionId +
+// enrichmentConfigHash) and replayable from that key plus captured judgments.
+export type DerivedGraphLayer = {
+  enrichmentId: string;
+  graphVersionId: string;
+  enrichmentConfigHash: string;
+  embeddingModel: string;
+  clusters: ConceptCluster[];
+  prerequisiteEdges: InferredPrerequisiteEdge[];
+  difficulties: ConceptDifficulty[];
+};
+
+// ---------------------------------------------------------------------------
+// Learner Path — the vertical slice's projection output (ADR-0019). A real port
+// boundary (LearnerState) with a mock impl; real IRT/KT (ADR-0014) replaces the
+// impl, never the shape. Computed by a CLI op, rendered read-only (ADR-0011).
+// ---------------------------------------------------------------------------
+
+export type LearnerPathStep = {
+  position: number;
+  conceptId: string;
+  difficulty: number;
+  includedReason: "prerequisite" | "target";
+};
+
+export type LearnerPath = {
+  learnerPathId: string;
+  graphVersionId: string;
+  enrichmentId: string;
+  targetConceptId: string;
+  // Identifies the learner state used; the mock is "mock:empty" (knows nothing).
+  learnerStateRef: string;
+  steps: LearnerPathStep[];
+};

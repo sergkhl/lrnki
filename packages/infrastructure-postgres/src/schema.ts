@@ -228,3 +228,89 @@ export const artifactVersions = pgTable("artifact_versions", {
   payload: jsonb("payload").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
+
+// ---------------------------------------------------------------------------
+// Graph Enrichment — third operation, derived layer keyed to a published
+// version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
+// asserted core. Normalized rows below are the query/traversal surface; the
+// immutable replay copy is an `artifact_versions` envelope (artifact_type
+// 'graph-enrichment', graph_version_id set). Inferred relations live in their
+// OWN namespace and intentionally do NOT reference relation_definitions, whose
+// closed asserted registry (ADR-0016) the published_claims FK enforces.
+// ---------------------------------------------------------------------------
+
+export const graphEnrichments = pgTable("graph_enrichments", {
+  enrichmentId: uuid("enrichment_id").primaryKey(),
+  graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
+  // Replay identity: same (version + config) re-derives the same layer (ADR-0019).
+  enrichmentConfigHash: text("enrichment_config_hash").notNull(),
+  status: text("status").notNull(),
+  embeddingModel: text("embedding_model").notNull(),
+  judgeModel: text("judge_model").notNull(),
+  difficultyMethod: text("difficulty_method").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true })
+}, (table) => [unique().on(table.graphVersionId, table.enrichmentConfigHash)]);
+
+// Contextual-embedding cluster membership — provenance for how prerequisite pairs
+// were gated (ADR-0012 tier 2). Inspection/audit only; never an edge authority.
+export const enrichmentConceptClusters = pgTable("enrichment_concept_clusters", {
+  enrichmentConceptClusterId: uuid("enrichment_concept_cluster_id").primaryKey(),
+  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
+  clusterId: text("cluster_id").notNull(),
+  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId)
+}, (table) => [unique().on(table.enrichmentId, table.conceptId)]);
+
+// The inferred prerequisite DAG: prerequisite must precede dependent. Survives
+// only after deterministic cycle removal + transitive reduction + weak-edge cut.
+// `uncertain` rows are kept for inspection but excluded from path traversal.
+// Acyclicity and self-loop exclusion are app-enforced (symbolic half); the
+// unique key forbids duplicate directed edges per enrichment.
+export const inferredPrerequisiteEdges = pgTable("inferred_prerequisite_edges", {
+  inferredPrerequisiteEdgeId: uuid("inferred_prerequisite_edge_id").primaryKey(),
+  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
+  // Separate inferred namespace — intentionally NOT an FK to relation_definitions.
+  predicate: text("predicate").notNull().default("inferred-prerequisite-of"),
+  prerequisiteConceptId: uuid("prerequisite_concept_id").notNull().references(() => concepts.conceptId),
+  dependentConceptId: uuid("dependent_concept_id").notNull().references(() => concepts.conceptId),
+  confidence: real("confidence").notNull(),
+  uncertain: boolean("uncertain").notNull().default(false),
+  clusterId: text("cluster_id"),
+  provenance: jsonb("provenance").notNull()
+}, (table) => [unique().on(table.enrichmentId, table.prerequisiteConceptId, table.dependentConceptId)]);
+
+// Baseline node difficulty per enrichment. `method` = 'dag-depth-mock' in the
+// slice; Bradley-Terry later. `components` keeps the interpretable inputs
+// (e.g. { topoDepth, fanIn }) so the score is never an opaque number.
+export const conceptDifficulties = pgTable("concept_difficulties", {
+  conceptDifficultyId: uuid("concept_difficulty_id").primaryKey(),
+  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
+  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId),
+  score: real("score").notNull(),
+  method: text("method").notNull(),
+  components: jsonb("components").notNull()
+}, (table) => [unique().on(table.enrichmentId, table.conceptId)]);
+
+// ---------------------------------------------------------------------------
+// Learner Path — vertical-slice projection output (ADR-0019). CLI computes and
+// persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).
+// learner_state_ref identifies the (mock) learner; real IRT/KT reuses the shape.
+// ---------------------------------------------------------------------------
+
+export const learnerPaths = pgTable("learner_paths", {
+  learnerPathId: uuid("learner_path_id").primaryKey(),
+  graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
+  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
+  targetConceptId: uuid("target_concept_id").notNull().references(() => concepts.conceptId),
+  learnerStateRef: text("learner_state_ref").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+}, (table) => [unique().on(table.enrichmentId, table.targetConceptId, table.learnerStateRef)]);
+
+export const learnerPathSteps = pgTable("learner_path_steps", {
+  learnerPathStepId: uuid("learner_path_step_id").primaryKey(),
+  learnerPathId: uuid("learner_path_id").notNull().references(() => learnerPaths.learnerPathId),
+  position: integer("position").notNull(),
+  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId),
+  difficulty: real("difficulty").notNull(),
+  includedReason: text("included_reason").notNull()
+}, (table) => [unique().on(table.learnerPathId, table.position), unique().on(table.learnerPathId, table.conceptId)]);

@@ -11,18 +11,49 @@
      retain this as an explicit sparsity caveat and do not manufacture edges.
    - Evidence: `tmp/claim-boundary-quality-evaluation.md`.
 
-2. **Complete Gate 1 only after the Economics admission defect is fixed.**
+2. **Publish graph version v1 (all 4 fixtures) once Economics is fixed.**
    - Inspect every core, claim, rejection, proposal, and quarantine decision in the replacement Rust,
-     Biology, and Economics runs.
-   - Publish one atomic graph version only from those explicitly selected inspected run IDs.
+     Biology, Economics, and InstructKG runs.
+   - Publish one atomic version from those explicitly selected inspected run IDs (ADR-0017).
 
-3. **Gate 2 (only after Gate 1 publication succeeds).**
-   - Version-pinned Docling adapter; add PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format oracle suite.
+3. **Implement the vertical slice over the drafted boundaries (Graph Enrichment → Learner Path).**
+   Seams + the tested symbolic spine are already drafted (see COMPLETED). Remaining work-slice steps,
+   in dependency order:
+   - Regenerate the single migration from the new schema tables and reset the DB (rule 8/9). The
+     `drizzle-kit` schema is updated; the SQL migration is NOT yet regenerated.
+   - Adapters: `EmbeddingPort` (`qwen3-embedding-8b` via LiteLLM, contextual text only — propose-only,
+     `EXPERIMENT_ONLY` until measured), `PrerequisiteJudgmentPort` (forced named tool schema,
+     fail-closed), Postgres `DerivedGraphLayerStorePort` / `LearnerPathStorePort` (normalized rows +
+     replay envelope).
+   - Wire evidence-packet assembly in `runGraphEnrichment` (currently `TODO(work-slice)`): pass each
+     gated pair's cited source blocks to the judge so it reasons over text, not labels (InstructKG packets).
+   - Tune clustering threshold + pair gating on the published v1 graph; verify the embedding tier adds
+     recall without degrading precision before trusting it.
+   - kg-worker CLI: `enrich-graph-version <graphVersionId>`, `compute-learner-path <versionId> <targetConceptId>`.
+   - Admin Lab: read-only Cytoscape view over the persisted learner-path artifact (UI never computes).
+   - If the first DAG is too sparse to walk, add 2–3 more native-format fixtures (no Gate 2 machinery).
+
+4. **Slice real-use evaluation (rule 14) before any deepening.**
+   - Inspect one target path per domain: topologically valid, difficulty-sensible, every step
+     traceable to a published concept and (for asserted links) verbatim evidence. Record caveats.
+
+5. **Gate 2 — DEFERRED until the slice validates the chain.**
+   - Version-pinned Docling adapter; PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format oracle suite.
    - Oracle independence triangle (DeepSeek extracts, MiniMax authors references, Mistral audits);
-     benchmark arms and quantitative metrics. Add a non-CS domain fixture for diversity (both new
-     arXiv fixtures lean CS/ed-tech).
+     benchmark arms + quantitative metrics. Add a non-CS domain fixture for diversity.
 
 ## COMPLETED
+
+- **Vertical-slice boundaries drafted (2026-06-13 reevaluation).** ADR-0019 (Graph Enrichment third
+  operation) + ADR-0012 reframe (cascading embeddings) recorded; CONTEXT.md terms added. Code seams:
+  `domain-core` derived-layer + learner-path types; `ports` (`EmbeddingPort`, `PrerequisiteJudgmentPort`,
+  `DifficultyPort`, `LearnerStatePort`, `DerivedGraphLayerStorePort`, `LearnerPathStorePort`); Postgres
+  `schema.ts` tables (`graph_enrichments`, `inferred_prerequisite_edges` in a separate inferred namespace —
+  intentionally not FK'd to the closed asserted registry, `concept_difficulties`,
+  `enrichment_concept_clusters`, `learner_paths`/`learner_path_steps`); operation skeletons
+  `runGraphEnrichment` / `computeLearnerPath`; and the **tested** symbolic spine (`prerequisiteDag`:
+  weak-edge cut, deterministic cycle removal, transitive reduction, DAG-depth difficulty, topological
+  order/depth/ancestors) + `projectLearnerPath`. Migration regeneration deferred to the implementation slice.
 
 - **Single initial migration regenerated** for the session decisions: `declared_domain` on source
   registration, run-scoped extraction tables (candidates → admission → run_claims referencing
@@ -92,8 +123,10 @@
 ## VALIDATION
 
 Latest validation (2026-06-13):
-- **Static: 31 tests pass** (24 application + 7 parser); full typecheck, ESLint, and Next.js
-  production build pass.
+- **Static: 38 application tests pass** (incl. 14 new symbolic-spine + projection tests:
+  `prerequisiteDag`, `learnerPathProjection`); typecheck green for `domain-core`, `ports`,
+  `infrastructure-postgres`, `application` after the slice scaffolding. Parser tests (7) unchanged.
+  Full ESLint + Next.js build NOT re-run since the scaffolding — run `pnpm check` before publishing.
 - **Real DeepSeek / InstructKG, v22: PASS.** The inspected run retains Instructor-Aligned Knowledge
   Graphs, Temporal Signal, and Semantic Signal and verifies the two useful framework-to-signal
   `uses` claims with no accepted reversed or unsupported claims.
