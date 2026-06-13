@@ -138,6 +138,29 @@ test("demotes a selected candidate whose organizing evidence is confined to illu
   assert.ok(result.admission.boundaryReasonCodes.includes("illustrative_only_source_treatment"));
 });
 
+test("demotes a proposition-shaped canonical label to optional fail-closed", () => {
+  const result = applyAdmissionPolicy({
+    candidate,
+    proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour Limited by the Extent of the Market" }),
+    blockText
+  });
+
+  assert.equal(result.admission.tier, "optional");
+  assert.ok(result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
+  assert.ok(result.admission.boundaryReasonCodes.includes("effective_tier_corrected"));
+});
+
+test("keeps a multi-word nominal label core (no false proposition demotion)", () => {
+  const result = applyAdmissionPolicy({
+    candidate,
+    proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour" }),
+    blockText
+  });
+
+  assert.equal(result.admission.tier, "core");
+  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
+});
+
 test("does not count motivation or examples as organizing aspects", () => {
   const proposal = eligibleProposal();
   proposal.organizingPower.aspects[1] = {

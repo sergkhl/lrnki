@@ -1,24 +1,9 @@
 # TODO
 
-1. **Fix proposition-shaped Concept admission before Gate 1 publication.**
-   - Claim recall now passes on inspected InstructKG v22 and Rust v22 runs without weakening
-     endpoint, direction, conflict, or lexical-entailment gates.
-   - Economics v22 incorrectly admits `Division of Labour Limited by the Extent of the Market` as a
-     core Concept. It is a proposition-shaped chapter claim, not a durable Concept. Tighten admission
-     precision without suppressing valid independently teachable principles, then re-run all official
-     Gate 1 fixtures under one identical configuration.
-   - Biology v22 is substantively clean but has zero verified claims under the strict relation gates;
-     retain this as an explicit sparsity caveat and do not manufacture edges.
-   - Evidence: `tmp/claim-boundary-quality-evaluation.md`.
-
-2. **Publish graph version v1 (all 4 fixtures) once Economics is fixed.**
-   - Inspect every core, claim, rejection, proposal, and quarantine decision in the replacement Rust,
-     Biology, Economics, and InstructKG runs.
-   - Publish one atomic version from those explicitly selected inspected run IDs (ADR-0017).
-
-3. **Implement the vertical slice over the drafted boundaries (Graph Enrichment → Learner Path).**
-   Seams + the tested symbolic spine are already drafted (see COMPLETED). Remaining work-slice steps,
-   in dependency order:
+1. **Implement the vertical slice over the drafted boundaries (Graph Enrichment → Learner Path).**
+   Seams + the tested symbolic spine are already drafted (see COMPLETED). Gate 1 graph version
+   `3096ec52-9e50-41e1-b142-6ef75dbf5078` (15 concepts, 4 claims) is published and is the target
+   input for enrichment. Remaining work-slice steps, in dependency order:
    - Regenerate the single migration from the new schema tables and reset the DB (rule 8/9). The
      `drizzle-kit` schema is updated; the SQL migration is NOT yet regenerated.
    - Adapters: `EmbeddingPort` (`qwen3-embedding-8b` via LiteLLM, contextual text only — propose-only,
@@ -33,16 +18,27 @@
    - Admin Lab: read-only Cytoscape view over the persisted learner-path artifact (UI never computes).
    - If the first DAG is too sparse to walk, add 2–3 more native-format fixtures (no Gate 2 machinery).
 
-4. **Slice real-use evaluation (rule 14) before any deepening.**
+2. **Slice real-use evaluation (rule 14) before any deepening.**
    - Inspect one target path per domain: topologically valid, difficulty-sensible, every step
      traceable to a published concept and (for asserted links) verbatim evidence. Record caveats.
 
-5. **Gate 2 — DEFERRED until the slice validates the chain.**
+3. **Gate 2 — DEFERRED until the slice validates the chain.**
    - Version-pinned Docling adapter; PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format oracle suite.
    - Oracle independence triangle (DeepSeek extracts, MiniMax authors references, Mistral audits);
      benchmark arms + quantitative metrics. Add a non-CS domain fixture for diversity.
 
 ## COMPLETED
+
+- **Gate 1 published (graph version `3096ec52`, 2026-06-13).** Two FIX_FIRST admission/claim precision
+  defects closed with deterministic fail-closed boundaries: (1) proposition-shaped canonical labels
+  (`looksLikePropositionLabel` in `domain-core` + `proposition_shaped_label` demotion in
+  `applyAdmissionPolicy`) keep chapter-claim titles like "Division of Labour Limited by the Extent of
+  the Market" out of core; (2) `lexicallyEntailsDefinition` now requires the definitional copula to be
+  adjacent to the literal and rejects causal-origin complements, stopping "X seem to have been the
+  effects of Y" from verifying as a `defined-as`. Prompts reinforce both. All four fixtures re-run
+  under one unified config and inspected; one atomic version published from the named run IDs (Rust
+  `6fd12447`, Biology `b033e736`, InstructKG `87724c03`, Economics `a3dbcca5`): 15 core concepts,
+  4 evidence-backed claims, 0 quarantines, IRIs minted. Evidence: `tmp/gate1-publication-quality-evaluation.md`.
 
 - **Vertical-slice boundaries drafted (2026-06-13 reevaluation).** ADR-0019 (Graph Enrichment third
   operation) + ADR-0012 reframe (cascading embeddings) recorded; CONTEXT.md terms added. Code seams:
@@ -122,19 +118,20 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-13):
-- **Static: 38 application tests pass** (incl. 14 new symbolic-spine + projection tests:
-  `prerequisiteDag`, `learnerPathProjection`); typecheck green for `domain-core`, `ports`,
-  `infrastructure-postgres`, `application` after the slice scaffolding. Parser tests (7) unchanged.
-  Full ESLint + Next.js build NOT re-run since the scaffolding — run `pnpm check` before publishing.
-- **Real DeepSeek / InstructKG, v22: PASS.** The inspected run retains Instructor-Aligned Knowledge
-  Graphs, Temporal Signal, and Semantic Signal and verifies the two useful framework-to-signal
-  `uses` claims with no accepted reversed or unsupported claims.
-- **Real DeepSeek / Rust, v22: PASS.** Exact Ownership and Variable Scope definitions verify; no
-  unsupported structural claims pass.
-- **Real DeepSeek / Biology, v22: sparse PASS with caveat.** Seven substantive core concepts; zero
-  accepted claims because all proposals fail strict endpoint or lexical entailment.
-- **Real DeepSeek / Economics, v22: FIX_FIRST.** Pin examples remain rejected and causal claims stay
-  out, but a proposition-shaped chapter claim enters core.
-- PostgreSQL 18 + LiteLLM healthy. **No graph version published; Gate 2 remains closed.**
-  Evidence: `tmp/claim-boundary-quality-evaluation.md`.
+Latest validation (2026-06-13, post Gate 1 publication):
+- **Static: full `pnpm check` green** — typecheck across all packages, ESLint clean, 43 application
+  tests pass (incl. 3 new precision tests: proposition demotion, nominal-label non-demotion,
+  causal-origin definition rejection), parser tests unchanged, Next.js build succeeds.
+- **Real DeepSeek, all 4 fixtures re-run under one unified config and published as version
+  `3096ec52`:**
+  - Rust `6fd12447`: PASS — 3 noun-phrase core concepts; exact Ownership and Variable Scope
+    `defined-as` claims verify (confirms the definition-adjacency fix preserves valid definitions).
+  - InstructKG `87724c03`: PASS — InstructKG + temporal/semantic signal; two correctly-directed
+    framework→signal `uses` claims with verbatim evidence.
+  - Biology `b033e736`: sparse PASS — 6 substantive replication concepts; 0 claims (descriptive prose).
+  - Economics `a3dbcca5`: PASS (was FIX_FIRST) — clean noun-phrase core set; the proposition-shaped
+    chapter claim no longer enters core; 0 claims, all `defined-as` rejections were genuine
+    causal-origin prose (no over-rejection of valid definitions).
+- Admin Lab Graph Explorer renders published v1 (HTTP 200) across all four domains.
+- PostgreSQL 18 + LiteLLM healthy. **Gate 1 PASSED and published; Gate 2 remains closed.**
+  Evidence: `tmp/gate1-publication-quality-evaluation.md`.

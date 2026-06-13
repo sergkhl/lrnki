@@ -204,14 +204,26 @@ function hasAnyTermBetween(text: string, left: number[], right: number[], terms:
   );
 }
 
+// A `defined-as` literal is only entailed when a definitional copula DIRECTLY
+// links the subject to the literal — the literal is the copula's complement.
+// Requiring mere presence of " is " anywhere between subject and literal admits
+// false definitions from long sentences (an unrelated "with which it is …" clause
+// satisfies it). A definition also states what the subject IS, never what it is an
+// effect/consequence/result of, so causal-origin complements are rejected.
+const DEFINITION_CONNECTIVES = [" is ", " are ", " means ", " refers to ", " is defined as ", " is the ", " is a ", " is an "];
+
 function lexicallyEntailsDefinition(evidenceQuote: string, subjectLabels: string[], literalValue: string): boolean {
   const text = ` ${normalizeForMention(evidenceQuote)} `;
   const literal = normalizeForMention(literalValue);
-  if (!literal || !text.includes(literal)) return false;
-  const literalPosition = text.indexOf(literal);
-  return labelPositions(text, subjectLabels).some((subjectPosition) => {
-    if (subjectPosition >= literalPosition) return false;
-    const between = text.slice(subjectPosition, literalPosition);
-    return [" is ", " means ", " refers to ", " is defined as "].some((term) => between.includes(term));
+  if (!literal) return false;
+  if (/^(the\s+)?(effects?|consequences?|results?|causes?)\s+of\s+/.test(literal)) return false;
+  const subjectPositions = labelPositions(text, subjectLabels);
+  if (subjectPositions.length === 0) return false;
+  return labelPositions(text, [literalValue]).some((literalPosition) => {
+    const before = text.slice(0, literalPosition);
+    const connective = DEFINITION_CONNECTIVES.find((term) => before.endsWith(term));
+    if (!connective) return false;
+    const connectiveStart = before.length - connective.length;
+    return subjectPositions.some((subjectPosition) => subjectPosition < connectiveStart);
   });
 }

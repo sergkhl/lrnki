@@ -64,6 +64,38 @@ export function normalizeConceptLabel(label: string): string {
     .replace(/\s+/g, " ");
 }
 
+// A durable Concept label is a noun phrase. A proposition-shaped label instead
+// states a full assertion about a concept — a chapter-claim title such as
+// "Division of Labour Limited by the Extent of the Market". Such a label is a
+// Claim (subject + predicate + object), never a Concept; the underlying noun
+// phrase ("Division of Labour") may still be core on its own. This deterministic
+// gate is high-precision by construction: it fires only on clause structure
+// (a copula, a finite verb with a complement, or a passive participle + "by"),
+// never on a multi-word nominal label, so a core candidate is demoted fail-closed
+// rather than contaminating the published graph (AGENTS rule 6, neuro-symbolic).
+const PROPOSITION_COPULA = new Set(["is", "are", "was", "were", "be", "been", "being"]);
+const PROPOSITION_FINITE_VERBS = new Set([
+  "depends", "leads", "causes", "determines", "governs", "limits",
+  "increases", "decreases", "affects", "requires", "enables", "explains"
+]);
+const PROPOSITION_PARTICIPLES = new Set([
+  "limited", "determined", "caused", "governed", "driven", "led",
+  "increased", "decreased", "affected", "required", "enabled", "explained", "constrained", "bounded"
+]);
+
+export function looksLikePropositionLabel(label: string): boolean {
+  const tokens = normalizeConceptLabel(label).split(" ").filter(Boolean);
+  if (tokens.length < 3) return false; // short nominal labels are concepts, never propositions
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const hasComplement = i < tokens.length - 1; // a predication needs something after the verb
+    if (hasComplement && PROPOSITION_COPULA.has(token)) return true;
+    if (hasComplement && PROPOSITION_FINITE_VERBS.has(token)) return true;
+    if (PROPOSITION_PARTICIPLES.has(token) && tokens.slice(i + 1, i + 3).includes("by")) return true;
+  }
+  return false;
+}
+
 // Readable slug minted once at first publication (ADR-0015). Collisions get a
 // numeric suffix supplied by the caller; the slug is never re-derived afterward.
 export function slugifyConceptLabel(label: string): string {

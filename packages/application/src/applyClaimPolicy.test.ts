@@ -143,6 +143,25 @@ test("accepts an explicit literal definition", () => {
   assert.equal(result.validationOutcome, "verified");
 });
 
+test("rejects a causal-origin statement miscast as a literal definition", () => {
+  const quote = "The greatest improvements in the productive powers of labour, and the greater part of the skill, dexterity, and judgment, with which it is anywhere directed, or applied, seem to have been the effects of the division of labour.";
+  const [result] = applyClaimPolicy({
+    claims: [claim({
+      subjectCandidateKey: "ownership",
+      predicate: "defined-as",
+      object: { kind: "literal", value: "the effects of the division of labour" },
+      evidenceLinkNature: "definitional",
+      evidenceDirection: "subject-defined-by-literal",
+      evidence: [{ blockId: "block-4", evidenceQuote: quote }]
+    })],
+    coreCandidateKeys: new Set(["ownership"]),
+    labelsByCandidateKey: new Map([["ownership", ["productive powers of labour"]]]),
+    blockText: new Map([["block-4", quote]])
+  });
+  assert.equal(result.validationOutcome, "rejected");
+  assert.ok(result.boundaryReasonCodes.includes("evidence_does_not_lexically_entail_definition"));
+});
+
 test("accepts explicit INSTRUCTKG evidence using the active leveraging inflection", () => {
   const quote = "INSTRUCTKG works by leveraging temporal signals to infer learning dependencies.";
   const [result] = applyClaimPolicy({

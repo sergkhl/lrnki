@@ -1,5 +1,6 @@
 import {
   evidenceQuoteMatches,
+  looksLikePropositionLabel,
   normalizeConceptLabel,
   type AdmissionCriterionProposal,
   type AdmissionProposal,
@@ -76,9 +77,14 @@ export function applyAdmissionPolicy(input: {
     organizingPower.aspects.length > 0 &&
     organizingPower.aspects.every((aspect) => input.illustrativeBlockIds?.has(aspect.evidence.blockId));
   if (illustrativeOnly) boundaryReasonCodes.push("illustrative_only_source_treatment");
+  // A proposition-shaped canonical label is a Claim, not a Concept (e.g. the
+  // chapter title "Division of Labour Limited by the Extent of the Market").
+  // Demote it fail-closed; its underlying noun phrase is admitted on its own.
+  const propositionShaped = proposal.coreSelected && looksLikePropositionLabel(proposedCanonicalLabel);
+  if (propositionShaped) boundaryReasonCodes.push("proposition_shaped_label");
   const tier = proposal.tier === "quarantine"
     ? "quarantine"
-    : eligible && proposal.coreSelected && !illustrativeOnly
+    : eligible && proposal.coreSelected && !illustrativeOnly && !propositionShaped
       ? "core"
       : proposal.tier === "reject"
         ? "reject"
