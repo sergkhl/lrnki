@@ -76,6 +76,7 @@ CREATE TABLE concept_candidates (
   concept_candidate_id uuid PRIMARY KEY,
   run_id uuid NOT NULL REFERENCES extraction_runs(run_id),
   candidate_key text NOT NULL,
+  discovered_label text NOT NULL,
   canonical_label text NOT NULL,
   normalized_label text NOT NULL,
   aliases jsonb NOT NULL,
@@ -93,11 +94,16 @@ CREATE TABLE concept_candidate_mentions (
 CREATE TABLE concept_admission_decisions (
   concept_admission_decision_id uuid PRIMARY KEY,
   concept_candidate_id uuid NOT NULL REFERENCES concept_candidates(concept_candidate_id),
+  model_tier text NOT NULL CHECK (model_tier IN ('core', 'optional', 'reject', 'quarantine')),
   tier text NOT NULL CHECK (tier IN ('core', 'optional', 'reject', 'quarantine')),
-  independently_meaningful boolean NOT NULL,
-  independently_teachable boolean NOT NULL,
-  durable_beyond_source boolean NOT NULL,
+  proposed_canonical_label text NOT NULL,
+  standalone_learning_objective jsonb NOT NULL,
+  established_domain_meaning jsonb NOT NULL,
+  organizing_power jsonb NOT NULL,
+  core_selected boolean NOT NULL,
+  selection_reason_code text NOT NULL,
   reason_codes jsonb NOT NULL,
+  boundary_reason_codes jsonb NOT NULL,
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1)
 );
 
@@ -112,6 +118,7 @@ CREATE TABLE run_claims (
   model_confidence real NOT NULL CHECK (model_confidence >= 0 AND model_confidence <= 1),
   evidence_count integer NOT NULL,
   validation_outcome text NOT NULL CHECK (validation_outcome IN ('verified', 'rejected')),
+  boundary_reason_codes jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((object_kind = 'concept' AND object_candidate_id IS NOT NULL) OR (object_kind = 'literal' AND object_literal IS NOT NULL))
 );
@@ -231,32 +238,45 @@ CREATE TABLE artifact_versions (
 -- ---------------------------------------------------------------------------
 
 -- Flatten extraction-run artifact payloads: one row per candidate with its
--- admission decision, for the Admin Lab Run Inspector.
+-- admission proposal and effective decision, for the Admin Lab Run Inspector.
 CREATE VIEW artifact_run_candidates AS
-SELECT a.run_id, c.candidate_key, c.canonical_label, c.aliases, c.mention_count,
-       c.tier, c.reason_codes, c.confidence
+SELECT a.run_id, c.candidate_key, c.discovered_label, c.canonical_label,
+       c.aliases, c.mention_count, c.model_tier, c.tier,
+       c.proposed_canonical_label, c.standalone_learning_objective,
+       c.established_domain_meaning, c.organizing_power, c.core_selected,
+       c.selection_reason_code,
+       c.reason_codes, c.boundary_reason_codes, c.confidence
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
   '$.candidates[*]'
   COLUMNS (
     candidate_key text PATH '$.candidateKey',
+    discovered_label text PATH '$.discoveredLabel',
     canonical_label text PATH '$.canonicalLabel',
     aliases jsonb PATH '$.aliases',
     mention_count integer PATH '$.mentions.size()',
+    model_tier text PATH '$.admission.modelTier',
     tier text PATH '$.admission.tier',
+    proposed_canonical_label text PATH '$.admission.proposedCanonicalLabel',
+    standalone_learning_objective jsonb PATH '$.admission.standaloneLearningObjective',
+    established_domain_meaning jsonb PATH '$.admission.establishedDomainMeaning',
+    organizing_power jsonb PATH '$.admission.organizingPower',
+    core_selected boolean PATH '$.admission.coreSelected',
+    selection_reason_code text PATH '$.admission.selectionReasonCode',
     reason_codes jsonb PATH '$.admission.reasonCodes',
+    boundary_reason_codes jsonb PATH '$.admission.boundaryReasonCodes',
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type = 'extraction_run.v1';
+WHERE a.artifact_type = 'extraction_run.v3';
 
 -- Flatten extraction-run artifact payloads: one row per extracted claim with
 -- its validation outcome, for the Admin Lab Run Inspector.
 CREATE VIEW artifact_run_claims AS
 SELECT a.run_id, cl.subject_candidate_key, cl.predicate, cl.object_kind,
        cl.object_candidate_key, cl.object_literal, cl.validation_outcome,
-       cl.evidence_count, cl.model_confidence
+       cl.evidence_count, cl.model_confidence, cl.boundary_reason_codes
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -269,7 +289,8 @@ JSON_TABLE(
     object_literal text PATH '$.object.value',
     validation_outcome text PATH '$.validationOutcome',
     evidence_count integer PATH '$.evidenceCount',
-    model_confidence numeric PATH '$.modelConfidence'
+    model_confidence numeric PATH '$.modelConfidence',
+    boundary_reason_codes jsonb FORMAT JSON PATH '$.boundaryReasonCodes'
   )
 ) AS cl
-WHERE a.artifact_type = 'extraction_run.v1';
+WHERE a.artifact_type = 'extraction_run.v3';

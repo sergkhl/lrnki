@@ -70,6 +70,7 @@ export const conceptCandidates = pgTable("concept_candidates", {
   conceptCandidateId: uuid("concept_candidate_id").primaryKey(),
   runId: uuid("run_id").notNull().references(() => extractionRuns.runId),
   candidateKey: text("candidate_key").notNull(),
+  discoveredLabel: text("discovered_label").notNull(),
   canonicalLabel: text("canonical_label").notNull(),
   normalizedLabel: text("normalized_label").notNull(),
   aliases: jsonb("aliases").notNull(),
@@ -86,11 +87,16 @@ export const conceptCandidateMentions = pgTable("concept_candidate_mentions", {
 export const conceptAdmissionDecisions = pgTable("concept_admission_decisions", {
   conceptAdmissionDecisionId: uuid("concept_admission_decision_id").primaryKey(),
   conceptCandidateId: uuid("concept_candidate_id").notNull().references(() => conceptCandidates.conceptCandidateId),
+  modelTier: text("model_tier").notNull(),
   tier: text("tier").notNull(),
-  independentlyMeaningful: boolean("independently_meaningful").notNull(),
-  independentlyTeachable: boolean("independently_teachable").notNull(),
-  durableBeyondSource: boolean("durable_beyond_source").notNull(),
+  proposedCanonicalLabel: text("proposed_canonical_label").notNull(),
+  standaloneLearningObjective: jsonb("standalone_learning_objective").notNull(),
+  establishedDomainMeaning: jsonb("established_domain_meaning").notNull(),
+  organizingPower: jsonb("organizing_power").notNull(),
+  coreSelected: boolean("core_selected").notNull(),
+  selectionReasonCode: text("selection_reason_code").notNull(),
   reasonCodes: jsonb("reason_codes").notNull(),
+  boundaryReasonCodes: jsonb("boundary_reason_codes").notNull(),
   // Raw model confidence signal only; no composite score (concept-first plan §1).
   confidence: real("confidence").notNull()
 });
@@ -109,6 +115,7 @@ export const runClaims = pgTable("run_claims", {
   modelConfidence: real("model_confidence").notNull(),
   evidenceCount: integer("evidence_count").notNull(),
   validationOutcome: text("validation_outcome").notNull(),
+  boundaryReasonCodes: jsonb("boundary_reason_codes").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 

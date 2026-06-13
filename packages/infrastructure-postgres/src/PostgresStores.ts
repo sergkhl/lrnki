@@ -123,8 +123,8 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         const candidateId = randomUUID();
         candidateIdByKey.set(candidate.candidateKey, candidateId);
         await tx`
-          INSERT INTO concept_candidates (concept_candidate_id, run_id, candidate_key, canonical_label, normalized_label, aliases)
-          VALUES (${candidateId}, ${result.runId}, ${candidate.candidateKey}, ${candidate.canonicalLabel}, ${candidate.normalizedLabel}, ${tx.json(candidate.aliases)})`;
+          INSERT INTO concept_candidates (concept_candidate_id, run_id, candidate_key, discovered_label, canonical_label, normalized_label, aliases)
+          VALUES (${candidateId}, ${result.runId}, ${candidate.candidateKey}, ${candidate.discoveredLabel}, ${candidate.canonicalLabel}, ${candidate.normalizedLabel}, ${tx.json(candidate.aliases)})`;
         for (const mention of candidate.mentions) {
           await tx`
             INSERT INTO concept_candidate_mentions (concept_candidate_mention_id, concept_candidate_id, source_block_id, evidence_quote)
@@ -132,8 +132,20 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         }
         const admission = candidate.admission;
         await tx`
-          INSERT INTO concept_admission_decisions (concept_admission_decision_id, concept_candidate_id, tier, independently_meaningful, independently_teachable, durable_beyond_source, reason_codes, confidence)
-          VALUES (${randomUUID()}, ${candidateId}, ${admission.tier}, ${admission.independentlyMeaningful}, ${admission.independentlyTeachable}, ${admission.durableBeyondSource}, ${tx.json(admission.reasonCodes)}, ${admission.confidence})`;
+          INSERT INTO concept_admission_decisions (
+            concept_admission_decision_id, concept_candidate_id, model_tier, tier,
+            proposed_canonical_label, standalone_learning_objective,
+            established_domain_meaning, organizing_power, core_selected,
+            selection_reason_code, reason_codes, boundary_reason_codes, confidence
+          )
+          VALUES (
+            ${randomUUID()}, ${candidateId}, ${admission.modelTier}, ${admission.tier},
+            ${admission.proposedCanonicalLabel}, ${tx.json(admission.standaloneLearningObjective)},
+            ${tx.json(admission.establishedDomainMeaning)}, ${tx.json(admission.organizingPower)},
+            ${admission.coreSelected}, ${admission.selectionReasonCode},
+            ${tx.json(admission.reasonCodes)}, ${tx.json(admission.boundaryReasonCodes)},
+            ${admission.confidence}
+          )`;
       }
 
       for (const claim of result.claims) {
@@ -143,8 +155,8 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         if (claim.object.kind === "concept" && !objectCandidateId) continue;
         const runClaimId = randomUUID();
         await tx`
-          INSERT INTO run_claims (run_claim_id, run_id, subject_candidate_id, predicate, object_kind, object_candidate_id, object_literal, model_confidence, evidence_count, validation_outcome)
-          VALUES (${runClaimId}, ${result.runId}, ${subjectId}, ${claim.predicate}, ${claim.object.kind}, ${objectCandidateId}, ${claim.object.kind === "literal" ? tx.json({ value: claim.object.value }) : null}, ${claim.modelConfidence}, ${claim.evidenceCount}, ${claim.validationOutcome})`;
+          INSERT INTO run_claims (run_claim_id, run_id, subject_candidate_id, predicate, object_kind, object_candidate_id, object_literal, model_confidence, evidence_count, validation_outcome, boundary_reason_codes)
+          VALUES (${runClaimId}, ${result.runId}, ${subjectId}, ${claim.predicate}, ${claim.object.kind}, ${objectCandidateId}, ${claim.object.kind === "literal" ? tx.json({ value: claim.object.value }) : null}, ${claim.modelConfidence}, ${claim.evidenceCount}, ${claim.validationOutcome}, ${tx.json(claim.boundaryReasonCodes)})`;
         for (const evidence of claim.evidence) {
           await tx`
             INSERT INTO run_claim_evidence (run_claim_evidence_id, run_claim_id, source_block_id, evidence_quote)
@@ -161,21 +173,40 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
     });
   }
 
-  async latestSucceededRunsForBuild(): Promise<RunForBuild[]> {
-    const runs = await this.sql<{ run_id: string; source_resource_id: string; declared_domain: string }[]>`
-      SELECT DISTINCT ON (er.source_resource_id) er.run_id, er.source_resource_id, sr.declared_domain
+  // Publication selects runs explicitly (no automatic 'latest succeeded'): the
+  // operator names the runs they inspected. Fails closed if any requested id is
+  // unknown or has not reached 'succeeded', naming the offenders rather than
+  // silently dropping them. Returns runs in the requested order.
+  async runsForBuildByIds(runIds: string[]): Promise<RunForBuild[]> {
+    if (runIds.length === 0) throw new Error("runsForBuildByIds requires at least one run id.");
+    const runs = await this.sql<{ run_id: string; source_resource_id: string; declared_domain: string; status: string }[]>`
+      SELECT er.run_id, er.source_resource_id, sr.declared_domain, er.status
       FROM extraction_runs er
       JOIN source_resources sr ON sr.source_resource_id = er.source_resource_id
-      WHERE er.status = 'succeeded'
-      ORDER BY er.source_resource_id, er.started_at DESC`;
+      WHERE er.run_id::text = ANY(${runIds})`;
+    const byId = new Map(runs.map((run) => [run.run_id, run] as const));
+    const missing = runIds.filter((id) => !byId.has(id));
+    if (missing.length) throw new Error(`Unknown extraction run id(s): ${missing.join(", ")}`);
+    const notSucceeded = runs.filter((run) => run.status !== "succeeded");
+    if (notSucceeded.length) {
+      throw new Error(`Refusing to build: run(s) not in 'succeeded' status: ${notSucceeded.map((run) => `${run.run_id} (${run.status})`).join(", ")}`);
+    }
 
     const result: RunForBuild[] = [];
-    for (const run of runs) {
+    for (const run of runIds.map((id) => byId.get(id)!)) {
       const coreRows = await this.sql<{ candidate_key: string; canonical_label: string; normalized_label: string; aliases: string[] }[]>`
         SELECT cc.candidate_key, cc.canonical_label, cc.normalized_label, cc.aliases
         FROM concept_candidates cc
         JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
         WHERE cc.run_id = ${run.run_id} AND ad.tier = 'core'`;
+
+      // Quarantine decisions block publication (CONTEXT.md). Surfaced to the
+      // build so it can fail closed rather than silently dropping them.
+      const quarantineRows = await this.sql<{ candidate_key: string; canonical_label: string }[]>`
+        SELECT cc.candidate_key, cc.canonical_label
+        FROM concept_candidates cc
+        JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
+        WHERE cc.run_id = ${run.run_id} AND ad.tier = 'quarantine'`;
 
       const claimRows = await this.sql<{
         run_claim_id: string; subject_key: string; predicate: string; object_kind: string;
@@ -211,6 +242,7 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         sourceResourceId: run.source_resource_id,
         declaredDomain: run.declared_domain,
         coreCandidates: coreRows.map((row) => ({ candidateKey: row.candidate_key, canonicalLabel: row.canonical_label, normalizedLabel: row.normalized_label, aliases: row.aliases })),
+        quarantinedCandidates: quarantineRows.map((row) => ({ candidateKey: row.candidate_key, canonicalLabel: row.canonical_label })),
         verifiedClaims
       });
     }

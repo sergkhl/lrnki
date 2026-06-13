@@ -15,9 +15,13 @@ static-graph publication (ADR-0014 stands); the five-stage north-star chain shap
    `kg-concept-discovery`), recall-oriented, with structural context (heading paths, block types,
    first-occurrence positions) in the prompt. No deterministic NLP feature pipeline in MVP —
    that is a deferred benchmark arm.
-4. Concept Admission: separate precision-first forced-tool call; persist `core`, `optional`,
-   `reject`, `quarantine` decisions with reason codes. Discovery and admission are never collapsed
-   into one prompt.
+4. Concept Admission: separate precision-first forced-tool call proposes a canonical label, tier,
+   and evidence-cited judgments for standalone learning objective, established domain meaning, and
+   organizing power. The application boundary verifies criterion evidence and derives the effective
+   tier fail-closed; organizing power requires two distinct verified aspects. A compact source-level
+   Core Set Selection then keeps a small but explanatorily sufficient set while removing redundant
+   facets, incidental supporting mechanisms, illustrative examples, and pseudo-concepts from the
+   eligible set. Discovery and admission are never collapsed into one prompt.
 5. Concept-conditioned claim extraction: closed six-relation enum in the tool schema; claim shapes
    are concept→relation→concept and concept→`defined-as`→literal only. Scoped empirical claims are
    deferred. Missing-concept proposals are recorded as run artifacts; no automated re-admission loop.
@@ -39,11 +43,19 @@ static-graph publication (ADR-0014 stands); the five-stage north-star chain shap
     - Mechanical floor (zero tolerance): all three fixtures publish end-to-end; zero evidence-quote
       verification failures at publication; no schema-invalid tool output silently accepted; cost
       and latency recorded per run.
-    - Agent inspection of every core concept and claim, with soft threshold ≈80% admission
-      precision and zero tolerance for the three poison categories: bibliography entries, document
-      metadata, source-local implementation details admitted as core.
-    - Per-fixture trap checks: Rust API trivia rejected; Smith's pin factory stays evidence;
-      biology enzymes carry verbatim `defined-as` evidence.
+    - Admission contract (zero tolerance): every effective `core` has all three application-verified
+      eligibility judgments, exact evidence for each judgment, at least two distinct verified
+      organizing aspects, and a precise evidence-preserving canonical label. Model/effective tier
+      corrections are visible and auditable.
+    - Agent inspection of every core concept with zero incidental or vocabulary-sized concepts in
+      the authoritative graph. A core Concept must be a credible standalone learning objective and
+      not merely a role, component, property, API/operation name, example, or source-local composite.
+    - Per-fixture trap checks: Rust `Owner`, bare `Clone`, and bare `drop` are not core; an eligible
+      move concept is labeled precisely (for example, `Rust move semantics`). Smith's pin factory
+      stays evidence rather than a Concept. Biology experiment details remain optional unless the
+      source establishes all three eligibility judgments.
+    - Claim inspection remains mandatory: every published claim is useful, correctly typed, and
+      supported by verbatim evidence. Passing schema and evidence checks alone is insufficient.
     - Every FIX_FIRST defect is fixed or explicitly waived in writing before Gate 2 work starts;
       findings recorded under `tmp/` with run IDs.
 

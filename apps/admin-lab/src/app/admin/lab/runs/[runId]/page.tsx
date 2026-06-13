@@ -39,6 +39,10 @@ function tierVariant(tier: string): "default" | "secondary" | "destructive" | "o
   return "outline";
 }
 
+function CriterionBadge({ label, passed }: { label: string; passed: boolean }) {
+  return <Badge variant={passed ? "default" : "outline"}>{label}: {passed ? "pass" : "fail"}</Badge>;
+}
+
 export default async function RunInspectorPage({ params }: { params: Promise<{ runId: string }> }) {
   const { runId } = await params;
   const inspection = await getRunInspection(runId);
@@ -98,15 +102,68 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Tier</TableHead><TableHead>Label</TableHead><TableHead>Aliases</TableHead><TableHead>Mentions</TableHead><TableHead>Reason codes</TableHead><TableHead>Confidence</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Decision</TableHead><TableHead>Labels</TableHead><TableHead>Eligibility</TableHead><TableHead>Criterion evidence</TableHead><TableHead>Reason codes</TableHead><TableHead>Confidence</TableHead></TableRow></TableHeader>
               <TableBody>
                 {candidates.map((candidate) => (
                   <TableRow key={candidate.candidateKey}>
-                    <TableCell><Badge variant={tierVariant(candidate.tier)}>{candidate.tier}</Badge></TableCell>
-                    <TableCell className="font-medium">{candidate.canonicalLabel}</TableCell>
-                    <TableCell className="max-w-72 whitespace-normal">{candidate.aliases.join(", ") || "—"}</TableCell>
-                    <TableCell>{candidate.mentionCount}</TableCell>
-                    <TableCell className="max-w-80 whitespace-normal">{candidate.reasonCodes.join(", ")}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col items-start gap-2">
+                        <Badge variant={tierVariant(candidate.tier)}>{candidate.tier}</Badge>
+                        {candidate.modelTier !== candidate.tier ? <Badge variant="secondary">model: {candidate.modelTier}</Badge> : null}
+                        <Badge variant={candidate.coreSelected ? "default" : "outline"}>core set: {candidate.coreSelected ? "selected" : "not selected"}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-72 whitespace-normal">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium">{candidate.canonicalLabel}</span>
+                        {candidate.discoveredLabel !== candidate.canonicalLabel ? <span className="text-muted-foreground">Discovered: {candidate.discoveredLabel}</span> : null}
+                        {candidate.proposedCanonicalLabel !== candidate.canonicalLabel ? <span className="text-muted-foreground">Proposed: {candidate.proposedCanonicalLabel}</span> : null}
+                        <span className="text-muted-foreground">{candidate.mentionCount} mentions; aliases: {candidate.aliases.join(", ") || "none"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-80 whitespace-normal">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap gap-2">
+                          <CriterionBadge label="Standalone" passed={candidate.standaloneLearningObjective.passed} />
+                          <CriterionBadge label="Domain meaning" passed={candidate.establishedDomainMeaning.passed} />
+                          <CriterionBadge label="Organizing power" passed={candidate.organizingPower.passed} />
+                        </div>
+                        <span className="text-muted-foreground">
+                          Verified evidence: {candidate.standaloneLearningObjective.evidence.length}/{candidate.standaloneLearningObjective.submittedEvidence.length} standalone,{" "}
+                          {candidate.establishedDomainMeaning.evidence.length}/{candidate.establishedDomainMeaning.submittedEvidence.length} domain meaning,{" "}
+                          {candidate.organizingPower.aspects.length}/{candidate.organizingPower.submittedAspects.length} organizing aspects
+                        </span>
+                        <p className="text-muted-foreground">{candidate.standaloneLearningObjective.rationale || "No standalone-objective rationale."}</p>
+                        <p className="text-muted-foreground">{candidate.establishedDomainMeaning.rationale || "No domain-meaning rationale."}</p>
+                        <p className="text-muted-foreground">{candidate.organizingPower.rationale || "No organizing-power rationale."}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-96 whitespace-normal">
+                      <div className="flex flex-col gap-3">
+                        {candidate.standaloneLearningObjective.evidence.map((evidence, index) => (
+                          <blockquote key={`standalone-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                            Standalone [{evidence.blockId}]: &ldquo;{evidence.evidenceQuote}&rdquo;
+                          </blockquote>
+                        ))}
+                        {candidate.establishedDomainMeaning.evidence.map((evidence, index) => (
+                          <blockquote key={`meaning-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                            Domain meaning [{evidence.blockId}]: &ldquo;{evidence.evidenceQuote}&rdquo;
+                          </blockquote>
+                        ))}
+                        {candidate.organizingPower.aspects.map((aspect, index) => (
+                          <blockquote key={`aspect-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                            {aspect.nature}: {aspect.summary} [{aspect.evidence.blockId}]: &ldquo;{aspect.evidence.evidenceQuote}&rdquo;
+                          </blockquote>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-80 whitespace-normal">
+                      <div className="flex flex-col gap-1">
+                        <span>{candidate.reasonCodes.join(", ") || "—"}</span>
+                        <span className="text-muted-foreground">Core selection: {candidate.selectionReasonCode}</span>
+                        {candidate.boundaryReasonCodes.length > 0 ? <span className="text-muted-foreground">Boundary: {candidate.boundaryReasonCodes.join(", ")}</span> : null}
+                      </div>
+                    </TableCell>
                     <TableCell>{candidate.confidence.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
@@ -127,7 +184,12 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
               <TableBody>
                 {claims.map((claim, index) => (
                   <TableRow key={`${claim.subjectLabel}-${claim.predicate}-${index}`}>
-                    <TableCell><Badge variant={claim.validationOutcome === "rejected" ? "destructive" : "default"}>{claim.validationOutcome}</Badge></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col items-start gap-2">
+                        <Badge variant={claim.validationOutcome === "rejected" ? "destructive" : "default"}>{claim.validationOutcome}</Badge>
+                        {claim.boundaryReasonCodes.map((reason) => <Badge key={reason} variant="outline">{reason}</Badge>)}
+                      </div>
+                    </TableCell>
                     <TableCell className="font-medium">{claim.subjectLabel}</TableCell>
                     <TableCell><Badge variant="outline">{claim.predicate}</Badge></TableCell>
                     <TableCell className="max-w-64 whitespace-normal">{claim.objectLabel}</TableCell>

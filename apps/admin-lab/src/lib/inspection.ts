@@ -1,10 +1,11 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
+import type { RunCandidate } from "@lrnki/domain-core";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
 // Server-only, read-only inspection loaders for the Admin Lab Run Inspector and
 // Source Explorer (ADR-0011). Candidate and claim lists read the JSON_TABLE
-// projections over the immutable extraction_run.v1 artifact envelopes
+// projections over the immutable extraction_run.v3 artifact envelopes
 // (ADR-0003); evidence quotes and proposals read the relational run tables.
 
 export interface RunSummary {
@@ -26,11 +27,20 @@ export interface RunInspection {
   pipelineConfigHash: string;
   candidates: {
     candidateKey: string;
+    discoveredLabel: string;
     canonicalLabel: string;
     aliases: string[];
     mentionCount: number;
+    modelTier: string;
     tier: string;
+    proposedCanonicalLabel: string;
+    standaloneLearningObjective: RunCandidate["admission"]["standaloneLearningObjective"];
+    establishedDomainMeaning: RunCandidate["admission"]["establishedDomainMeaning"];
+    organizingPower: RunCandidate["admission"]["organizingPower"];
+    coreSelected: boolean;
+    selectionReasonCode: string;
     reasonCodes: string[];
+    boundaryReasonCodes: string[];
     confidence: number;
   }[];
   claims: {
@@ -38,6 +48,7 @@ export interface RunInspection {
     predicate: string;
     objectLabel: string;
     validationOutcome: string;
+    boundaryReasonCodes: string[];
     modelConfidence: number;
     evidenceQuotes: string[];
   }[];
@@ -114,14 +125,36 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
     const header = headers[0];
 
     // JSON_TABLE projection over the immutable run artifact (ADR-0003).
-    const candidates = await sql<{ candidate_key: string; canonical_label: string; aliases: string[]; mention_count: number; tier: string; reason_codes: string[]; confidence: number }[]>`
-      SELECT candidate_key, canonical_label, aliases, mention_count, tier, reason_codes, confidence
+    const candidates = await sql<{
+      candidate_key: string;
+      discovered_label: string;
+      canonical_label: string;
+      aliases: string[];
+      mention_count: number;
+      model_tier: string;
+      tier: string;
+      proposed_canonical_label: string;
+      standalone_learning_objective: RunCandidate["admission"]["standaloneLearningObjective"];
+      established_domain_meaning: RunCandidate["admission"]["establishedDomainMeaning"];
+      organizing_power: RunCandidate["admission"]["organizingPower"];
+      core_selected: boolean;
+      selection_reason_code: string;
+      reason_codes: string[];
+      boundary_reason_codes: string[];
+      confidence: number;
+    }[]>`
+      SELECT candidate_key, discovered_label, canonical_label, aliases, mention_count,
+             model_tier, tier, proposed_canonical_label, standalone_learning_objective,
+             established_domain_meaning, organizing_power, core_selected,
+             selection_reason_code, reason_codes,
+             boundary_reason_codes, confidence
       FROM artifact_run_candidates WHERE run_id = ${runId}
       ORDER BY CASE tier WHEN 'core' THEN 0 WHEN 'quarantine' THEN 1 WHEN 'optional' THEN 2 ELSE 3 END, canonical_label`;
 
-    const claims = await sql<{ run_claim_id: string; subject_label: string; predicate: string; object_kind: string; object_label: string | null; object_literal: { value: string } | null; validation_outcome: string; model_confidence: number }[]>`
+    const claims = await sql<{ run_claim_id: string; subject_label: string; predicate: string; object_kind: string; object_label: string | null; object_literal: { value: string } | null; validation_outcome: string; boundary_reason_codes: string[]; model_confidence: number }[]>`
       SELECT rc.run_claim_id, subj.canonical_label AS subject_label, rc.predicate, rc.object_kind,
-             obj.canonical_label AS object_label, rc.object_literal, rc.validation_outcome, rc.model_confidence
+             obj.canonical_label AS object_label, rc.object_literal, rc.validation_outcome,
+             rc.boundary_reason_codes, rc.model_confidence
       FROM run_claims rc
       JOIN concept_candidates subj ON subj.concept_candidate_id = rc.subject_candidate_id
       LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = rc.object_candidate_id
@@ -143,11 +176,20 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
       pipelineConfigHash: header.pipeline_config_hash,
       candidates: candidates.map((row) => ({
         candidateKey: row.candidate_key,
+        discoveredLabel: row.discovered_label,
         canonicalLabel: row.canonical_label,
         aliases: row.aliases,
         mentionCount: row.mention_count,
+        modelTier: row.model_tier,
         tier: row.tier,
+        proposedCanonicalLabel: row.proposed_canonical_label,
+        standaloneLearningObjective: row.standalone_learning_objective,
+        establishedDomainMeaning: row.established_domain_meaning,
+        organizingPower: row.organizing_power,
+        coreSelected: row.core_selected,
+        selectionReasonCode: row.selection_reason_code,
         reasonCodes: row.reason_codes,
+        boundaryReasonCodes: row.boundary_reason_codes,
         confidence: Number(row.confidence)
       })),
       claims: claims.map((row) => ({
@@ -155,6 +197,7 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
         predicate: row.predicate,
         objectLabel: row.object_kind === "concept" ? row.object_label ?? "?" : `"${row.object_literal?.value ?? ""}"`,
         validationOutcome: row.validation_outcome,
+        boundaryReasonCodes: row.boundary_reason_codes,
         modelConfidence: Number(row.model_confidence),
         evidenceQuotes: quotesByClaim.get(row.run_claim_id) ?? []
       })),

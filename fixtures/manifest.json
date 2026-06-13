@@ -29,6 +29,16 @@
       "source": "Project Gutenberg eBook #3300 (https://www.gutenberg.org/ebooks/3300)",
       "license": "Public domain",
       "curation": "Extracted Book I chapters I-III from the Gutenberg plaintext; deliberate robustness probe (long-paragraph 18th-century prose, no structural markup)."
+    },
+    {
+      "fixtureId": "instructkg-2602-17111v1",
+      "path": "fixtures/markdown/datalab-output-2602.17111v1.pdf.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "educational technology",
+      "title": "AlRabah et al., InstructKG: Instructor-Aligned Knowledge Graphs for Personalized Learning (arXiv 2602.17111v1)",
+      "source": "arXiv:2602.17111v1, datalab/marker PDF-to-Markdown conversion",
+      "license": "arXiv preprint (per-paper terms; likely CC BY)",
+      "curation": "Full marker Markdown. The native-markdown parser (v1) runs a deterministic structure pass scoping discovery to the teachable body, excluding references, appendices (prompt templates / hyperparameters), figure placeholders, and tables. Concept-rich stress fixture; domain kept distinct from 'software engineering' to avoid cross-source identity merges (ADR-0015)."
     }
   ]
 }

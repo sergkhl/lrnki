@@ -28,6 +28,22 @@ export type StructuredDocument = {
   blocks: SourceBlock[];
 };
 
+// Block types that carry the source's teachable body. The single source of truth
+// for what discovery, admission, and claim extraction may see: non-teachable
+// regions (bibliography, appendices, figure/table placeholders, captions) are
+// stored for provenance but never fed to an LLM stage. Evidence verification
+// still spans every stored block — prompts only expose body text, so a kept
+// quote can only come from a body block anyway.
+export const EXTRACTABLE_BLOCK_TYPES: SourceBlockType[] = ["title", "abstract", "heading", "paragraph", "list_item", "code"];
+
+export function isExtractableBlock(block: SourceBlock): boolean {
+  return EXTRACTABLE_BLOCK_TYPES.includes(block.blockType);
+}
+
+export function extractableBlocks(blocks: SourceBlock[]): SourceBlock[] {
+  return blocks.filter(isExtractableBlock);
+}
+
 export type EvidenceReference = {
   sourceResourceId: string;
   sourceBlockId: string;
@@ -66,6 +82,10 @@ function normalizeEvidenceText(text: string): string {
     .replace(/[‘’ʼ]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/[–—]/g, "-")
+    .replace(/["']/g, "")
+    .replace(/([([])\s+/g, "$1")
+    .replace(/\s+([)\],.;:!?%])/g, "$1")
+    .replace(/(\d)\s+([a-zA-Z])/g, "$1$2")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -97,12 +117,52 @@ export type DiscoveredCandidate = {
   mentions: BlockEvidence[];
 };
 
-export type AdmissionDecision = {
+export type AdmissionCriterionProposal = {
+  passed: boolean;
+  rationale: string;
+  evidence: BlockEvidence[];
+};
+
+export type OrganizingPowerAspectProposal = {
+  summary: string;
+  nature:
+    | "definition-or-property"
+    | "mechanism"
+    | "structural-relationship"
+    | "contrast"
+    | "constraint"
+    | "causal-or-limiting"
+    | "empirical-evidence"
+    | "motivation-or-example";
+  evidence: BlockEvidence;
+};
+
+export type OrganizingPowerProposal = {
+  passed: boolean;
+  rationale: string;
+  aspects: OrganizingPowerAspectProposal[];
+};
+
+export type CoreSelectionReasonCode =
+  | "source_level_core"
+  | "reducible_to_broader_candidate"
+  | "supporting_mechanism"
+  | "example_or_application"
+  | "pseudo_concept_or_heading"
+  | "insufficient_source_treatment"
+  | "redundant_granularity"
+  | "failed_model_eligibility"
+  | "missing_core_selection";
+
+export type AdmissionProposal = {
   candidateKey: string;
+  proposedCanonicalLabel: string;
   tier: CandidateTier;
-  independentlyMeaningful: boolean;
-  independentlyTeachable: boolean;
-  durableBeyondSource: boolean;
+  standaloneLearningObjective: AdmissionCriterionProposal;
+  establishedDomainMeaning: AdmissionCriterionProposal;
+  organizingPower: OrganizingPowerProposal;
+  coreSelected: boolean;
+  selectionReasonCode: CoreSelectionReasonCode;
   reasonCodes: string[];
   confidence: number;
 };
@@ -111,10 +171,33 @@ export type ExtractedClaimObject =
   | { kind: "concept"; candidateKey: string }
   | { kind: "literal"; value: string };
 
+export type ClaimEvidenceLinkNature =
+  | "taxonomic"
+  | "structural"
+  | "mechanism-employment"
+  | "explicit-contrast"
+  | "explicit-prerequisite"
+  | "definitional"
+  | "causal-or-motivational";
+
+export type ClaimEvidenceDirection =
+  | "subject-is-kind-of-object"
+  | "subject-is-part-of-object"
+  | "object-is-part-of-subject"
+  | "subject-uses-object"
+  | "object-uses-subject"
+  | "subject-contrasts-with-object"
+  | "subject-prerequisite-of-object"
+  | "object-prerequisite-of-subject"
+  | "subject-defined-by-literal"
+  | "causal-or-motivational";
+
 export type ExtractedClaim = {
   subjectCandidateKey: string;
   predicate: RelationPredicate;
   object: ExtractedClaimObject;
+  evidenceLinkNature: ClaimEvidenceLinkNature;
+  evidenceDirection: ClaimEvidenceDirection;
   evidence: BlockEvidence[];
   confidence: number;
 };
@@ -148,16 +231,40 @@ export type ValidationOutcome = "verified" | "rejected";
 
 export type RunCandidate = {
   candidateKey: string;
+  discoveredLabel: string;
   canonicalLabel: string;
   normalizedLabel: string;
   aliases: string[];
   mentions: BlockEvidence[];
   admission: {
+    modelTier: CandidateTier;
     tier: CandidateTier;
-    independentlyMeaningful: boolean;
-    independentlyTeachable: boolean;
-    durableBeyondSource: boolean;
+    proposedCanonicalLabel: string;
+    standaloneLearningObjective: {
+      modelPassed: boolean;
+      passed: boolean;
+      rationale: string;
+      submittedEvidence: BlockEvidence[];
+      evidence: BlockEvidence[];
+    };
+    establishedDomainMeaning: {
+      modelPassed: boolean;
+      passed: boolean;
+      rationale: string;
+      submittedEvidence: BlockEvidence[];
+      evidence: BlockEvidence[];
+    };
+    organizingPower: {
+      modelPassed: boolean;
+      passed: boolean;
+      rationale: string;
+      submittedAspects: OrganizingPowerAspectProposal[];
+      aspects: OrganizingPowerAspectProposal[];
+    };
+    coreSelected: boolean;
+    selectionReasonCode: CoreSelectionReasonCode;
     reasonCodes: string[];
+    boundaryReasonCodes: string[];
     confidence: number;
   };
 };
@@ -170,6 +277,7 @@ export type RunClaim = {
   modelConfidence: number;
   evidenceCount: number;
   validationOutcome: ValidationOutcome;
+  boundaryReasonCodes: string[];
 };
 
 export type ExtractionRunResult = {
@@ -246,6 +354,10 @@ export type RunForBuild = {
   sourceResourceId: string;
   declaredDomain: string;
   coreCandidates: BuildCandidate[];
+  // Quarantine decisions in a selected run block publication until resolved
+  // (CONTEXT.md Graph-Version Build). Carried so the deterministic build can
+  // fail closed and name the unresolved conflict rather than silently publish.
+  quarantinedCandidates: { candidateKey: string; canonicalLabel: string }[];
   verifiedClaims: BuildClaim[];
 };
 

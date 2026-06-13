@@ -1,5 +1,5 @@
 import type {
-  AdmissionDecision,
+  AdmissionProposal,
   ArtifactEnvelope,
   ClaimExtractionResult,
   DiscoveredCandidate,
@@ -24,7 +24,7 @@ export interface ConceptDiscoveryPort {
 
 export interface ConceptAdmissionPort {
   // Precision-first; a separate stage from discovery, never collapsed into one prompt.
-  admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionDecision[]>;
+  admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionProposal[]>;
 }
 
 export interface ConceptConditionedClaimExtractionPort {
@@ -68,8 +68,12 @@ export interface SourceRegistrationStorePort {
 // Extraction Run persistence — run-scoped, never publishes (ADR-0017).
 export interface ExtractionRunStorePort {
   persist(result: ExtractionRunResult): Promise<void>;
-  // Latest succeeded run per source, reduced to the deterministic build read model.
-  latestSucceededRunsForBuild(): Promise<RunForBuild[]>;
+  // Explicitly selected runs, reduced to the deterministic build read model.
+  // Publication never auto-selects "latest succeeded": the operator names the
+  // runs to publish, so a mechanically-valid but semantically-bad run cannot
+  // silently mutate the graph (AGENTS rule 11). Fails closed on unknown or
+  // not-yet-succeeded ids.
+  runsForBuildByIds(runIds: string[]): Promise<RunForBuild[]>;
 }
 
 // Atomic graph-version publication (ADR-0010). Refuses to mutate a published version.

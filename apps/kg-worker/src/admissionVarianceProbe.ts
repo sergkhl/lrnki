@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { existsSync } from "node:fs";
+import { applyAdmissionPolicy } from "@lrnki/application";
 import {
   HtmlStructuredDocumentParser,
   MarkdownStructuredDocumentParser,
@@ -85,7 +86,12 @@ async function runArm(
 
   for (let i = 0; i < runs; i++) {
     const decisions = await admission.admit({ document, declaredDomain, candidates });
-    const coreKeys = decisions.filter((d) => d.tier === "core").map((d) => d.candidateKey);
+    const decisionByKey = new Map(decisions.map((decision) => [decision.candidateKey, decision] as const));
+    const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
+    const coreKeys = candidates
+      .map((candidate) => applyAdmissionPolicy({ candidate, proposal: decisionByKey.get(candidate.candidateKey), blockText }))
+      .filter((candidate) => candidate.admission.tier === "core")
+      .map((candidate) => candidate.candidateKey);
     coreCounts.push(coreKeys.length);
     for (const key of coreKeys) coreFrequency[key] = (coreFrequency[key] ?? 0) + 1;
     console.log(`   [${arm}] run ${i + 1}/${runs}: core=${coreKeys.length}`);

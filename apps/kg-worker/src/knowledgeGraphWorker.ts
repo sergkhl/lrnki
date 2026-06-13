@@ -24,7 +24,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-admit-temp0-v5";
+const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-definition-recall-v20";
 
 import { existsSync } from "node:fs";
 
@@ -140,10 +140,21 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
   }
 }
 
-async function buildVersion(ctx: Context) {
+async function buildVersion(ctx: Context, runIds: string[]) {
+  // Publication selects Extraction Runs explicitly by id. A run passing the
+  // mechanical/evidence gates ('succeeded') is not automatically publishable —
+  // the operator must name the runs they inspected and judged sound, so a
+  // semantically-bad-but-valid run never silently mutates the graph (AGENTS
+  // rule 11; ADR-0017 builds are a pure function of the selected runs).
+  if (runIds.length === 0) {
+    console.error("! build-graph-version requires one or more explicit run IDs (no automatic 'latest succeeded' selection).");
+    console.error("  Inspect runs first, then: worker:kg build-graph-version <runId> [<runId> ...]");
+    process.exitCode = 1;
+    return;
+  }
   const graphVersionId = randomUUID();
-  const snapshot = await buildGraphVersion({ graphVersionId, runStore: ctx.runStore, graphStore: ctx.graphStore, artifacts: ctx.artifacts });
-  console.log(`\n>> published graph version ${graphVersionId}: concepts=${snapshot.concepts.length} claims=${snapshot.claims.length}`);
+  const snapshot = await buildGraphVersion({ graphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, artifacts: ctx.artifacts });
+  console.log(`\n>> published graph version ${graphVersionId} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} claims=${snapshot.claims.length}`);
 }
 
 async function listSources(ctx: Context) {
@@ -153,7 +164,7 @@ async function listSources(ctx: Context) {
 }
 
 async function main() {
-  const [command, arg] = process.argv.slice(2);
+  const [command, arg, ...rest] = process.argv.slice(2);
   const ctx = buildContext();
   try {
     switch (command) {
@@ -164,13 +175,14 @@ async function main() {
         await runExtraction(ctx, arg === "--all" || arg === undefined ? undefined : arg);
         break;
       case "build-graph-version":
-        await buildVersion(ctx);
+        // All positional args after the command are run IDs to publish.
+        await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
         break;
       case "list-sources":
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

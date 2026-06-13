@@ -1,16 +1,20 @@
 import type {
-  AdmissionDecision,
+  AdmissionProposal,
   ClaimExtractionResult,
   DiscoveredCandidate,
   ExtractedClaim,
   SourceBlock,
   StructuredDocument
 } from "@lrnki/domain-core";
+import { extractableBlocks } from "@lrnki/domain-core";
+import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
 import type { ConceptAdmissionPort, ConceptConditionedClaimExtractionPort, ConceptDiscoveryPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
-  conceptAdmissionSchema,
+  conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidator,
+  conceptCoreSelectionSchemaForCandidateKeys,
+  conceptCoreSelectionValidator,
   conceptClaimSchema,
   conceptClaimValidator,
   conceptDiscoverySchema,
@@ -46,7 +50,7 @@ export class LiteLlmConceptDiscoveryAdapter implements ConceptDiscoveryPort {
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
       "Source blocks:",
-      renderBlocks(input.document.blocks),
+      renderBlocks(extractableBlocks(input.document.blocks)),
       "",
       "Call submit_concept_candidates with the candidates you find."
     ].join("\n");
@@ -66,39 +70,164 @@ export class LiteLlmConceptDiscoveryAdapter implements ConceptDiscoveryPort {
 export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
   constructor(private readonly client: LiteLlmForcedToolClient, private readonly model: string = ADMISSION_MODEL) {}
 
-  async admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionDecision[]> {
+  async admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionProposal[]> {
     const system = [
       "You perform precision-first concept admission for an authoritative learner-neutral concept graph.",
       "Classify each candidate as 'core', 'optional', 'reject', or 'quarantine'. Be strict: in a typical source only a MINORITY of candidates are 'core'.",
-      "A 'core' concept must pass ALL of these: (1) a domain glossary or textbook index would list it as a key term; (2) it is independently teachable as its own unit, not merely a step, property, or restatement of another concept; (3) it is durable and reusable across sources, not specific to this document's examples or narration.",
-      "Mark 'optional' when a candidate is a real but secondary/granular facet of a core concept (e.g. a single sub-step, a property, or a narrower special case) — useful but not its own authoritative node.",
-      "Reject (zero tolerance for admitting these as core): bibliography entries; document or section metadata; section/subsection HEADINGS turned into pseudo-concepts (e.g. 'Pushing onto the Stack', 'Ownership and Functions'); procedural micro-steps; and source-local implementation details (specific variable names, example-only identifiers).",
-      "A useful test: if the candidate's label reads like a how-to step or a section title rather than a noun a learner could look up, it is NOT core.",
+      "CORE CONCEPT ELIGIBILITY has three independent tests. A candidate is core only when ALL THREE pass with exact source evidence:",
+      "(1) standaloneLearningObjective: a learner could study and be assessed on this as its own objective. It is not reducible to a role, component, property, API name, operation name, or vocabulary item inside a broader concept.",
+      "(2) establishedDomainMeaning: the source uses it as a coherent concept with an established meaning in the Declared Domain, not as narration, an improvised phrase, or a source-local composite.",
+      "(3) organizingPower: the source demonstrates at least TWO DISTINCT substantive explanatory aspects or relationships organized by the concept. Return each aspect separately with its own verbatim evidence.",
+      "Classify each organizing aspect's nature honestly. 'motivation-or-example' does not count toward organizing power and is discarded by the application boundary.",
+      "Both organizing aspects must directly explain the candidate itself. A problem it motivates, a consequence it causes, or a teaser for later material is not a second aspect of the candidate.",
+      "The selected source must teach enough about the candidate to support assessment. Domain knowledge that the source merely mentions or promises to explain later remains optional.",
+      "A mechanism or operation is not automatically optional: it may be core when it passes all three tests. Grammatical form never decides eligibility.",
+      "Use 'optional' for real, evidence-supported domain knowledge useful for explaining a core concept but not independently eligible.",
+      "Use 'reject' for headings, examples, malformed composites, bibliography or document metadata, and source-local details that are not durable domain knowledge.",
+      "Use 'quarantine' for genuine identity or meaning ambiguity.",
+      "Do not silently make exceptions for concise sources or concepts that seem foundational. If this source cannot evidence all three tests, the candidate is not core in this run.",
+      "For every candidate propose one precise canonical label. Keep the discovered label if already precise. You may clarify a vague surface label without broadening or changing its evidenced meaning: for example 'Move' may become 'Rust move semantics'. Never merge candidates.",
+      "Reject an invented umbrella or conjunction label such as 'Memory and Allocation' unless the source itself establishes that exact coherent concept; prefer a precise established label or keep it optional.",
+      "Examples: 'Ownership' may be core; 'Owner' is normally an optional role within ownership. 'Clone' and 'drop' are normally optional operation names unless the source independently establishes broader teachable concepts with two substantive aspects.",
       "Quarantine genuinely ambiguous or homographic candidates rather than guessing.",
-      "Give terse reason codes (e.g. 'glossary_key_term', 'durable_core', 'section_heading', 'procedural_step', 'facet_of_core', 'source_local_detail', 'too_generic', 'bibliographic')."
+      "Every evidenceQuote must be copied verbatim from its blockId. The application verifies every positive criterion and derives the effective tier fail-closed.",
+      "Keep each rationale to one terse sentence. Return at most two evidence quotes for each of the first two criteria and at most three organizing aspects.",
+      "Give terse reason codes (e.g. 'standalone_objective', 'established_domain_meaning', 'organizes_multiple_aspects', 'role_of_broader_concept', 'operation_of_broader_concept', 'section_heading', 'malformed_composite', 'source_local_detail', 'too_generic', 'bibliographic')."
     ].join(" ");
-    const candidateList = input.candidates
-      .map((candidate) => `- ${candidate.candidateKey}: "${candidate.canonicalLabel}" (aliases: ${candidate.aliases.join(", ") || "none"}); evidence: ${candidate.mentions.map((mention) => `"${mention.evidenceQuote}"`).slice(0, 3).join(" | ")}`)
+    const allCandidateLabels = input.candidates
+      .map((candidate) => `- ${candidate.candidateKey}: "${candidate.canonicalLabel}"`)
       .join("\n");
-    const user = [
-      `Declared domain: ${input.declaredDomain}.`,
-      "Candidates to classify:",
-      candidateList,
-      "",
-      "Call submit_admission_decisions with exactly one decision per candidateKey."
-    ].join("\n");
+    type ToolAdmissionProposal = Omit<AdmissionProposal, "coreSelected" | "selectionReasonCode">;
+    const decisions: ToolAdmissionProposal[] = [];
+    for (let start = 0; start < input.candidates.length; start += ADMISSION_BATCH_SIZE) {
+      const batch = input.candidates.slice(start, start + ADMISSION_BATCH_SIZE);
+      const candidateList = batch
+        .map((candidate) => `- ${candidate.candidateKey}: "${candidate.canonicalLabel}" (aliases: ${candidate.aliases.join(", ") || "none"}); evidence: ${candidate.mentions.map((mention) => `"${mention.evidenceQuote}"`).slice(0, 3).join(" | ")}`)
+        .join("\n");
+      const user = [
+        `Declared domain: ${input.declaredDomain}.`,
+        "All discovered candidates (context only; do not decide candidates outside the batch):",
+        allCandidateLabels,
+        "",
+        "Candidate batch to classify:",
+        candidateList,
+        "",
+        "Source blocks for criterion evidence:",
+        renderBlocks(extractableBlocks(input.document.blocks)),
+        "",
+        "Call submit_admission_decisions with exactly one decision for each candidateKey in the batch and no others."
+      ].join("\n");
 
-    const result = await this.client.call({
+      const result = await this.client.call({
+        model: this.model,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        toolName: "submit_admission_decisions",
+        toolDescription: "Submit one precision-first admission decision per candidate in the requested batch.",
+        parameters: conceptAdmissionSchemaForCandidateKeys(batch.map((candidate) => candidate.candidateKey)),
+        validator: conceptAdmissionValidator
+      });
+      const batchKeys = new Set(batch.map((candidate) => candidate.candidateKey));
+      const counts = new Map<string, number>();
+      for (const decision of result.decisions) {
+        if (batchKeys.has(decision.candidateKey)) counts.set(decision.candidateKey, (counts.get(decision.candidateKey) ?? 0) + 1);
+      }
+      decisions.push(...result.decisions.filter((decision) => batchKeys.has(decision.candidateKey) && counts.get(decision.candidateKey) === 1));
+    }
+
+    const individuallyEligible = decisions.filter((decision) =>
+      decision.tier !== "quarantine" &&
+      decision.standaloneLearningObjective.passed &&
+      decision.establishedDomainMeaning.passed &&
+      decision.organizingPower.passed
+    );
+    if (individuallyEligible.length === 0) {
+      return decisions.map((decision) => ({
+        ...decision,
+        coreSelected: false,
+        selectionReasonCode: "failed_model_eligibility"
+      }));
+    }
+
+    // blockId -> heading path, so the selector can see WHERE a candidate's
+    // evidence sits (e.g. a "5.2 Case Study" section signals illustrative-only
+    // treatment that must be demoted, not substantive teaching).
+    const blockHeading = new Map(input.document.blocks.map((block) => [block.blockId, block.headingPath] as const));
+    const headingFor = (blockId: string): string => {
+      const path = blockHeading.get(blockId);
+      return path && path.length ? path.join(" › ") : "(no heading)";
+    };
+    const selectionUser = [
+      `Declared domain: ${input.declaredDomain}.`,
+      "You are performing source-level Core Set Selection after individual eligibility review.",
+      "Passing individual eligibility is necessary but not sufficient for core.",
+      "Select a small but sufficient non-redundant set that preserves the source's principal explanatory structure.",
+      "The result must retain enough distinct concepts to express the central mechanism, model, evidence, contrasts, or constraints taught by the source; a single top-level topic is usually insufficient.",
+      "A broader concept and its key mechanism, model, or landmark experiment may all be core when they answer different learner questions and each receives substantive treatment.",
+      "Keep a candidate named by an explicit source learning objective when the source treats it substantively.",
+      "Demote narrow facets, incidental supporting mechanisms, examples used only for illustration, pseudo-concepts, headings, and labels whose teaching is genuinely duplicated by another selected candidate.",
+      "Demote generic graph-role vocabulary such as 'Concept', 'Educational Concept', 'Node', 'Edge', or bare 'Relationship' unless the source explicitly teaches that notion as an independent learning objective. A method paper saying it extracts concepts as nodes does not teach Educational Concept as a core concept.",
+      "CRITICAL — illustrative-example demotion: read each candidate's evidence quotes and the heading they come from. Demote any candidate whose substantive evidence comes only from the source's OWN illustrative output, worked example, or case study (e.g. a method paper that merely lists 'Dynamic Programming' or 'Greedy Algorithms' as nodes in its §5 case-study graph). Such a candidate is a vehicle for demonstrating the source's contribution, not a concept this source teaches. The heading path is the strongest signal: evidence drawn only from a case-study / example / evaluation / demo section is illustrative.",
+      "Do not demote a candidate merely because it is part of, used by, or evidence for a broader concept.",
+      "Do not keep a candidate merely because it is independently teachable in the wider domain; this selected source must treat it substantively.",
+      "There is no fixed count target, but do not decompose one lesson into vocabulary-sized core concepts.",
+      "Calibration examples: ownership and move semantics can both be core, while owner/drop/clone remain supporting vocabulary; DNA replication, its accepted replication model, and the experiment establishing that model can all be core, while individual isotopes and band positions remain optional.",
+      "For every selection return the final precise canonical label. Domain-qualify vague labels such as 'Move' as 'Rust move semantics'; do not preserve section-style labels such as 'Ownership and Functions' as Concepts.",
+      "",
+      "Individually eligible candidates (with verbatim source evidence and the heading each quote came from):",
+      ...individuallyEligible.map((decision) => [
+        `- ${decision.candidateKey}: discovered="${input.candidates.find((candidate) => candidate.candidateKey === decision.candidateKey)?.canonicalLabel ?? decision.candidateKey}", proposed="${decision.proposedCanonicalLabel}"`,
+        `  standalone: ${decision.standaloneLearningObjective.rationale}`,
+        ...decision.standaloneLearningObjective.evidence.map((evidence) => `  standalone evidence [${headingFor(evidence.blockId)}]: "${evidence.evidenceQuote}"`),
+        ...decision.organizingPower.aspects.map((aspect) => `  aspect (${aspect.nature}) [${headingFor(aspect.evidence.blockId)}]: ${aspect.summary} — "${aspect.evidence.evidenceQuote}"`)
+      ].join("\n")),
+      "",
+      "Call submit_core_selection exactly once for every listed candidate."
+    ].join("\n");
+    const selectionResult = await this.client.call({
       model: this.model,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_admission_decisions",
-      toolDescription: "Submit one precision-first admission decision per candidate.",
-      parameters: conceptAdmissionSchema,
-      validator: conceptAdmissionValidator
+      messages: [
+        {
+          role: "system",
+          content: "You perform precision-first source-level Core Set Selection for a learner-neutral graph. Keep a small but explanatorily sufficient, non-redundant set of durable learning concepts."
+        },
+        { role: "user", content: selectionUser }
+      ],
+      toolName: "submit_core_selection",
+      toolDescription: "Select or demote every individually eligible candidate at source level.",
+      parameters: conceptCoreSelectionSchemaForCandidateKeys(individuallyEligible.map((decision) => decision.candidateKey)),
+      validator: conceptCoreSelectionValidator
     });
-    return result.decisions;
+    const selectionCounts = new Map<string, number>();
+    for (const selection of selectionResult.selections) {
+      selectionCounts.set(selection.candidateKey, (selectionCounts.get(selection.candidateKey) ?? 0) + 1);
+    }
+    const selectionByKey = new Map(
+      selectionResult.selections
+        .filter((selection) => selectionCounts.get(selection.candidateKey) === 1)
+        .map((selection) => [selection.candidateKey, selection] as const)
+    );
+    const individuallyEligibleKeys = new Set(individuallyEligible.map((decision) => decision.candidateKey));
+
+    return decisions.map((decision) => {
+      if (!individuallyEligibleKeys.has(decision.candidateKey)) {
+        return {
+          ...decision,
+          coreSelected: false,
+          selectionReasonCode: "failed_model_eligibility" as const
+        };
+      }
+      const selection = selectionByKey.get(decision.candidateKey);
+      return {
+        ...decision,
+        proposedCanonicalLabel: selection?.canonicalLabel ?? decision.proposedCanonicalLabel,
+        coreSelected: selection?.selected ?? false,
+        selectionReasonCode: (selection?.reasonCode ?? "missing_core_selection") as CoreSelectionReasonCode
+      };
+    });
   }
 }
+
+const ADMISSION_BATCH_SIZE = 5;
 
 export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExtractionPort {
   constructor(private readonly client: LiteLlmForcedToolClient, private readonly model: string = CLAIM_MODEL) {}
@@ -123,10 +252,24 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
       "- 'asserted-prerequisite-of': ONLY when the source explicitly states that understanding the subject is required before the object.",
       "- 'contrasts-with': ONLY when the source explicitly contrasts or distinguishes the two concepts as alternatives or opposites. Denying that one concept caused another ('X is not the effect of Y') is a causal statement, not a contrast.",
       "- 'defined-as': the object is a literal definition string quoted from the source; never a concept.",
+      "Always scan the evidence neighborhood for explicit definition sentences before considering concept-to-concept relations. RIGHT: from 'Ownership is a set of rules that govern how a Rust program manages memory', emit Ownership defined-as the literal 'a set of rules that govern how a Rust program manages memory'. The literal must be copied from the same evidence quote.",
+      "DIRECTION GATE — classify evidenceDirection from the quoted sentence independently of predicate. The fixed subject concept must occupy the subject role in the relation:",
+      "- is-a requires subject-is-kind-of-object.",
+      "- part-of requires subject-is-part-of-object. If the evidence says the object is inside the subject, report object-is-part-of-subject and emit no claim.",
+      "- uses requires subject-uses-object. If the evidence says the object/framework uses the subject/signal, report object-uses-subject and emit no claim.",
+      "- asserted-prerequisite-of requires subject-prerequisite-of-object.",
+      "- defined-as requires subject-defined-by-literal.",
+      "Never reverse a sentence to manufacture a claim for the current subject. A later concept-conditioned call can extract the correctly directed claim for the other subject.",
+      "For a given subject/object pair choose at most ONE of is-a, part-of, or uses. If two seem plausible, emit neither.",
+      "The evidence must lexically state the selected relation in the claimed direction: is-a needs explicit category language; part-of needs explicit membership/component language; uses needs an active use/employ/leverage verb with the subject as actor. Mere co-occurrence, support, signal-for-inference, or node/edge listing is insufficient.",
+      "For defined-as, the quote must explicitly name the subject, use definition language such as 'is', 'means', or 'refers to', and contain the exact literal value.",
+      "WRONG: 'Rust move semantics is-a Rust ownership system'; move semantics is not a kind of ownership system. WRONG: 'DNA double helix uses DNA replication'; replication operates on or uses the double helix, not vice versa.",
+      "WRONG: 'Semantic Signal uses Instructor-Aligned KG'; the framework uses the signal. For the Semantic Signal subject call, emit no reversed uses claim.",
       "Never emit a claim whose object is the subject concept itself.",
       "If no relation in the closed set fits precisely, emit no claim; fewer precise claims beat many loose ones.",
-      "For every claim, classify evidenceLinkNature honestly from the quoted sentence alone. Claims whose evidence link is 'causal-or-motivational' are discarded by the system, so label them truthfully rather than forcing a structural reading.",
+      "For every claim, classify evidenceLinkNature and evidenceDirection honestly from the quoted sentence alone. The application rejects any predicate/nature/direction mismatch.",
       "Concept objects MUST be one of the admitted concepts listed; reference them by candidateKey. If you need a concept that is not admitted, do NOT invent a claim — record it under missingConceptProposals instead.",
+      "Every concept-to-concept claim needs at least one verbatim quote that explicitly names BOTH the fixed subject concept (or listed alias) and the object concept (or listed alias). Do not rely on pronouns, implied subjects, or broad phrases such as 'dependency inference'.",
       "Every claim requires a verbatim evidence quote copied exactly from a cited block. No quote, no claim."
     ].join("\n");
     const admitted = input.admittedConcepts
@@ -156,10 +299,6 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
     const admittedKeys = new Set(input.admittedConcepts.map((concept) => concept.candidateKey));
     const claims: ExtractedClaim[] = [];
     for (const claim of result.claims) {
-      // Symbolic gate: the model labels how the evidence sentence links the two
-      // concepts; causal/motivational links fit no relation in the closed
-      // registry (ADR-0016 defers `causes`), so they are dropped fail-closed.
-      if (claim.evidenceLinkNature === "causal-or-motivational") continue;
       if (claim.objectKind === "concept") {
         // Concept objects must reference an admitted concept; otherwise it is not a valid claim here.
         if (!claim.objectCandidateKey || !admittedKeys.has(claim.objectCandidateKey)) continue;
@@ -168,6 +307,8 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
           subjectCandidateKey: input.subject.candidateKey,
           predicate: claim.predicate,
           object: { kind: "concept", candidateKey: claim.objectCandidateKey },
+          evidenceLinkNature: claim.evidenceLinkNature,
+          evidenceDirection: claim.evidenceDirection,
           evidence: claim.evidence,
           confidence: claim.confidence
         });
@@ -178,6 +319,8 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
           subjectCandidateKey: input.subject.candidateKey,
           predicate: claim.predicate,
           object: { kind: "literal", value: claim.objectLiteralValue },
+          evidenceLinkNature: claim.evidenceLinkNature,
+          evidenceDirection: claim.evidenceDirection,
           evidence: claim.evidence,
           confidence: claim.confidence
         });

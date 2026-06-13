@@ -16,18 +16,32 @@ const REFINEMENT_CONFIG_HASH = "gate1-conservative-refinement-v1";
 type IdentityKey = string; // `${declaredDomain}::${normalizedLabel}`
 const identityKey = (declaredDomain: string, normalizedLabel: string): IdentityKey => `${declaredDomain}::${normalizedLabel}`;
 
-// Deterministic, LLM-free Graph-Version Build (ADR-0017): latest succeeded run per
-// source -> conservative Static Graph Refinement (ADR-0009, ADR-0015) -> IRI minting
+// Deterministic, LLM-free Graph-Version Build (ADR-0017): explicitly selected
+// runs -> conservative Static Graph Refinement (ADR-0009, ADR-0015) -> IRI minting
 // at first publication -> quality gates -> atomic publication (ADR-0010). A pure
 // function of (selected runs + refinement rules); replayable without model calls.
+// Runs are chosen by the operator, never auto-selected — multiple runs per source
+// are allowed (cross-source establishment per CONTEXT.md).
 export async function buildGraphVersion(input: {
   graphVersionId: string;
+  runIds: string[];
   runStore: ExtractionRunStorePort;
   graphStore: GraphVersionStorePort;
   artifacts: ArtifactRepositoryPort;
 }): Promise<GraphSnapshot> {
-  const runs = await input.runStore.latestSucceededRunsForBuild();
-  if (runs.length === 0) throw new Error("No succeeded extraction runs available to build a graph version.");
+  if (input.runIds.length === 0) throw new Error("buildGraphVersion requires explicit run IDs to publish.");
+  const runs = await input.runStore.runsForBuildByIds(input.runIds);
+  if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
+
+  // Quarantine gate (CONTEXT.md Graph-Version Build): a quarantine decision in any
+  // selected run blocks publication until its identity or meaning conflict is
+  // resolved. Fail closed before any assembly and name the offenders, rather than
+  // silently publishing around them (AGENTS rule 11).
+  const quarantined = runs
+    .flatMap((run) => run.quarantinedCandidates.map((candidate) => `${run.runId}:${candidate.canonicalLabel}`));
+  if (quarantined.length) {
+    throw new Error(`Refusing to build: selected run(s) contain unresolved quarantine decisions: ${quarantined.join(", ")}`);
+  }
 
   const existingIdentities = await input.graphStore.existingConceptIdentities();
   const refinementDecisions: RefinementDecisionRecord[] = [];

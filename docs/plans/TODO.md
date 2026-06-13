@@ -1,22 +1,27 @@
 # TODO
 
-1. **Gate 1 human sign-off.**
-   - Determinism investigation is complete (see
-     `tmp/admission-determinism-quality-evaluation.md`). Authoritative graph version
-     `0137a32b-…` = 26 concepts / 99 claims, single clean version, zero evidence-free and
-     zero self-referential claims. Awaiting the human's PASS/FIX_FIRST call. The agent
-     recommends PASS.
+1. **Claim recall remains FIX_FIRST after the relation-precision boundary passed real-use inspection.**
+   - Config `…-definition-recall-v20` accepts an exact Rust definition and rejects unsupported
+     `part-of` / `uses` claims; config `…-illustrative-boundary-v19` rejects all six loose InstructKG
+     claims. Reversed and competing relations no longer pass the application boundary.
+   - InstructKG now has zero accepted claims even though the source explicitly states that the
+     framework leverages temporal and semantic signals. Improve extraction recall without weakening
+     endpoint, direction, or lexical-entailment gates (for example, retry a subject once with rejected
+     claim feedback and explicit endpoint aliases).
+   - Re-run Rust + InstructKG and require useful accepted claims with zero reversed/unsupported claims.
+     Evidence: `tmp/claim-boundary-quality-evaluation.md`.
 
-2. **Residual economics limiting-relation prose (low priority).**
-   - The causal-suppression gate cleared soft-prose `uses` over-application, but a couple
-     of "limited by / gives occasion to" sentences still type as `part-of`/`uses` in the
-     Wealth of Nations run. Likely needs a measured `limits`/`causes` relation in Gate 2
-     rather than more prompt pressure. Evidence is verbatim; not corruption.
+2. **Complete Gate 1 only after claim recall passes.**
+   - Run the final config on Biology and Economics, inspect every core and claim, then select the
+     inspected run IDs explicitly for one deterministic graph-version build.
+   - Keep publication blocked if any fixture has incidental core concepts, unsupported claims,
+     evidence failures, or quarantine decisions.
 
 3. **Gate 2 (only after Gate 1 passes).**
    - Version-pinned Docling adapter; add PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format oracle suite.
    - Oracle independence triangle (DeepSeek extracts, MiniMax authors references, Mistral audits);
-     benchmark arms and quantitative metrics.
+     benchmark arms and quantitative metrics. Add a non-CS domain fixture for diversity (both new
+     arXiv fixtures lean CS/ed-tech).
 
 ## COMPLETED
 
@@ -45,9 +50,12 @@
   snapshot; Run Inspector lists runs and, per run, candidates by admission tier with reason codes,
   claims with verified/rejected outcome and verbatim evidence, and missing-concept proposals; Source
   Explorer lists registered sources and renders parsed block structure. Candidate/claim listings read
-  the `artifact_run_candidates` / `artifact_run_claims` JSON_TABLE views over `extraction_run.v1`.
+  the `artifact_run_candidates` / `artifact_run_claims` JSON_TABLE views over `extraction_run.v3`.
 - **Relation-typing precision + throughput hardening**: per-relation prompt guidance with examples
-  and a "no fitting relation → no claim" rule; self-referential claim guard in the app boundary;
+  and a "no fitting relation → no claim" rule; forced evidence-nature/direction classification;
+  application-boundary rejection of direction mismatches, competing structural predicates,
+  reciprocal asymmetric claims, non-explicit endpoints, and non-entailed relation wording; exact
+  definition validation; rejected-claim reason codes in Postgres artifacts and Admin Lab;
   bounded-concurrency (4) claim extraction replacing the serial per-concept loop.
 - **Causal-relation suppression gate**: claim schema now carries a required `evidenceLinkNature`
   enum; the app boundary drops `causal-or-motivational`-labelled claims fail-closed, keeping
@@ -58,28 +66,36 @@
   A frozen-candidate probe (`apps/kg-worker/src/admissionVarianceProbe.ts`) proved the
   lever collapses admission's per-stage drift; end-to-end variance was found to be
   discovery-driven and irreducible (resolved architecturally by ADR-0017 builds).
+- **Two-phase admission (Core Set Selection)**: per-candidate eligibility (batched) + a separate
+  source-level `submit_core_selection` call; the app boundary derives the effective tier fail-closed
+  (`applyAdmissionPolicy`). Explicitly illustrative blocks now trigger deterministic demotion when
+  all organizing evidence is confined to them. Targets the v13/v14 over-admission; ADR-0005 reframed
+  accordingly.
+- **Document structure extraction (native-markdown parser v1)**: deterministic region pass classifies
+  abstract/references/appendix/figure/table/caption and types non-teachable tail matter so discovery,
+  admission, and claims see only the body (`extractableBlocks` in domain-core). Tail fenced code
+  (appendix prompt templates) is typed by region, not as `code`, so it never reaches an LLM. On the
+  InstructKG arXiv fixture this excludes the references/appendix tail — zero tail concepts entered as
+  core. Parser unit tests added (incl. stray-`#`- and fenced-code-in-appendix guards).
+- **Explicit-run-ID publication + quarantine gate**: removed automatic "latest succeeded" selection;
+  `runsForBuildByIds` (fail-closed on unknown/non-succeeded) and `build-graph-version <runId…>`
+  require the operator to name inspected runs, so a mechanically-valid but semantically-bad run never
+  silently mutates the graph (AGENTS rule 11). The build now also loads `quarantine` decisions and
+  refuses to publish (naming the offending run/candidate) when any selected run carries one, matching
+  CONTEXT.md's Graph-Version Build rule.
 
 ## VALIDATION
 
-Latest re-run (2026-06-11) end-to-end with real DeepSeek V4 Flash (thinking disabled) across all
-three Gate 1 fixtures under pipeline config `…-admit-temp0-v5` (admission/claims at temperature 0
-+ seed, discovery at default sampling — ADR-0018). Single authoritative published graph version
-`0137a32b-f905-474b-8e0b-e28ea7e1b6b5` = **26 concepts, 99 claims**.
-Full note: `tmp/admission-determinism-quality-evaluation.md`. Recommendation: **PASS**.
-
-- Per-source runs (v5): Rust 35 cand → 14 core, 65/2 verified/rejected; Biology 23 → 8 core,
-  34/0; Economics 30 → 4 core, 9/0. Latency ~40–70s/source.
-- Determinism: frozen-candidate probe shows the lever collapses admission drift (Rust spread
-  3→1, Biology 4→0, Economics 1→0 across 5 re-runs). End-to-end core count still varies
-  run-to-run because discovery output is non-deterministic across processes even at temperature 0
-  (DeepSeek MoE); this is handled by run versioning + deterministic builds (ADR-0017), not at the
-  extraction layer. Global temperature 0 on discovery was reverted because it inflated recall and
-  over-admitted generic primitives (Rust 14 → 23–29 core).
-- Integrity: **zero self-referential and zero evidence-free** published claims (verified by SQL
-  against the published version); 102 evidence rows for 99 claims. Predicate distribution: uses 39,
-  part-of 29, contrasts-with 26, is-a 3, asserted-prerequisite-of 1, defined-as 1.
-- Remaining caveats: two economics "limited by / gives occasion to" sentences still type
-  structurally (TODO 2); `uses` is the most common predicate (Gate 2 should measure relation
-  precision). Cost not captured.
-- Static checks: `pnpm -r typecheck` clean, `pnpm lint` clean. No package-level unit tests exist;
-  this layer is validated by the real-use-quality-evaluation skill, not assertions.
+Latest validation (2026-06-13):
+- **Static: 26 tests pass** (19 application + 7 parser); full typecheck, ESLint, and Next.js
+  production build pass.
+- **Real DeepSeek / InstructKG, v19: precision PASS, recall FIX_FIRST.** Core is
+  `{Instructor-Aligned Knowledge Graphs, Temporal Signals, Semantic Signals}`. Dynamic Programming,
+  Greedy Algorithms, Optimization Problem, and Student Error Mapping are optional. All 6 loose or
+  reversed `uses` claims are rejected with visible boundary reasons; 0 claims accepted.
+- **Real DeepSeek / Rust, v20: narrow useful output PASS.** Core is
+  `{Rust Ownership, Rust move semantics, Memory Safety}`. Exact `Rust Ownership defined-as "a set of
+  rules that govern how a Rust program manages memory"` is verified; 2 unsupported structural claims
+  are rejected.
+- PostgreSQL 18 + LiteLLM healthy; Admin Lab serves on port 3000 and renders both inspected runs.
+  **No graph version published.** Evidence: `tmp/claim-boundary-quality-evaluation.md`.

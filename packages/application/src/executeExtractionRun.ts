@@ -1,10 +1,8 @@
 import {
-  evidenceQuoteMatches,
-  normalizeConceptLabel,
-  type BlockEvidence,
+  extractableBlocks,
+  type ExtractedClaim,
   type ExtractionRunResult,
   type RunCandidate,
-  type RunClaim,
   type StructuredDocument
 } from "@lrnki/domain-core";
 import type {
@@ -14,9 +12,11 @@ import type {
   ConceptDiscoveryPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
+import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
+import { applyClaimPolicy } from "./applyClaimPolicy";
 
 const PRODUCER = "@lrnki/application";
-const PRODUCER_VERSION = "0.2.0";
+const PRODUCER_VERSION = "0.4.0";
 
 // One Extraction Run over one registered source (ADR-0017): discovery, admission,
 // concept-conditioned claim extraction, and deterministic evidence validation.
@@ -34,44 +34,47 @@ export async function executeExtractionRun(input: {
   const startedAt = Date.now();
   const { document, declaredDomain } = input.source;
   const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
+  const illustrativeBlockIds = new Set(
+    document.blocks
+      .filter((block) => isExplicitlyIllustrative(block.headingPath, block.text))
+      .map((block) => block.blockId)
+  );
 
   // Stage 1 — recall-oriented Candidate Discovery.
   const discovered = await input.discovery.discover({ document, declaredDomain });
 
   // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
-  const decisions = await input.admission.admit({ document, declaredDomain, candidates: discovered });
-  const decisionByKey = new Map(decisions.map((decision) => [decision.candidateKey, decision] as const));
+  const admissionProposals = await input.admission.admit({ document, declaredDomain, candidates: discovered });
+  const proposalByKey = new Map<string, (typeof admissionProposals)[number]>();
+  const duplicateKeys = new Set<string>();
+  const discoveredKeys = new Set(discovered.map((candidate) => candidate.candidateKey));
+  for (const proposal of admissionProposals) {
+    if (!discoveredKeys.has(proposal.candidateKey)) continue;
+    if (proposalByKey.has(proposal.candidateKey)) duplicateKeys.add(proposal.candidateKey);
+    else proposalByKey.set(proposal.candidateKey, proposal);
+  }
 
-  const candidates: RunCandidate[] = discovered.map((candidate) => {
-    const decision = decisionByKey.get(candidate.candidateKey);
-    return {
-      candidateKey: candidate.candidateKey,
-      canonicalLabel: candidate.canonicalLabel,
-      normalizedLabel: normalizeConceptLabel(candidate.canonicalLabel),
-      aliases: candidate.aliases,
-      mentions: candidate.mentions.filter((mention) => isVerifiable(mention, blockText)),
-      admission: decision
-        ? {
-            tier: decision.tier,
-            independentlyMeaningful: decision.independentlyMeaningful,
-            independentlyTeachable: decision.independentlyTeachable,
-            durableBeyondSource: decision.durableBeyondSource,
-            reasonCodes: decision.reasonCodes,
-            confidence: decision.confidence
-          }
-        // A discovered candidate the admitter never ruled on is failed closed to reject.
-        : { tier: "reject", independentlyMeaningful: false, independentlyTeachable: false, durableBeyondSource: false, reasonCodes: ["no_admission_decision"], confidence: 0 }
-    };
-  });
+  const candidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
+    candidate,
+    proposal: duplicateKeys.has(candidate.candidateKey) ? undefined : proposalByKey.get(candidate.candidateKey),
+    blockText,
+    illustrativeBlockIds,
+    initialBoundaryReasonCodes: duplicateKeys.has(candidate.candidateKey) ? ["duplicate_admission_decision"] : []
+  }));
 
   const coreCandidates = candidates.filter((candidate) => candidate.admission.tier === "core");
   const admittedConcepts = coreCandidates.map((candidate) => ({ candidateKey: candidate.candidateKey, canonicalLabel: candidate.canonicalLabel }));
   const coreKeys = new Set(coreCandidates.map((candidate) => candidate.candidateKey));
+  const labelsByCandidateKey = new Map<string, string[]>(
+    coreCandidates.map((candidate) => [
+      candidate.candidateKey,
+      [candidate.discoveredLabel, candidate.canonicalLabel, ...candidate.aliases]
+    ])
+  );
 
   // Stage 3 — concept-conditioned claim extraction with deterministic evidence validation.
   // One LLM call per core concept, through a bounded pool; results are collected in
   // subject order so the persisted run is deterministic regardless of completion order.
-  const claims: RunClaim[] = [];
   const proposals: ExtractionRunResult["proposals"] = [];
   const extractionResults = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
     try {
@@ -88,28 +91,18 @@ export async function executeExtractionRun(input: {
       return null;
     }
   });
+  const extractedClaims: ExtractedClaim[] = [];
   for (const result of extractionResults) {
     if (result === null) continue;
-    for (const claim of result.claims) {
-      // Object concept must be an admitted core concept; otherwise drop (fail closed).
-      if (claim.object.kind === "concept" && !coreKeys.has(claim.object.candidateKey)) continue;
-      // A claim whose object is its own subject is structurally meaningless; drop (fail closed).
-      if (claim.object.kind === "concept" && claim.object.candidateKey === claim.subjectCandidateKey) continue;
-      // Keep only evidence that verifies verbatim against a real block; the model
-      // sometimes emits placeholder block ids. No verifiable quote => rejected claim.
-      const verifiableEvidence = claim.evidence.filter((evidence) => isVerifiable(evidence, blockText));
-      claims.push({
-        subjectCandidateKey: claim.subjectCandidateKey,
-        predicate: claim.predicate,
-        object: claim.object,
-        evidence: verifiableEvidence,
-        modelConfidence: claim.confidence,
-        evidenceCount: verifiableEvidence.length,
-        validationOutcome: verifiableEvidence.length > 0 ? "verified" : "rejected"
-      });
-    }
+    extractedClaims.push(...result.claims);
     for (const proposal of result.proposals) proposals.push(proposal);
   }
+  const claims = applyClaimPolicy({
+    claims: extractedClaims,
+    coreCandidateKeys: coreKeys,
+    labelsByCandidateKey,
+    blockText
+  });
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,
@@ -126,8 +119,8 @@ export async function executeExtractionRun(input: {
   await input.store.persist(runResult);
   await input.artifacts.append({
     artifactId: `${input.runId}:run`,
-    artifactType: "extraction_run.v1",
-    schemaVersion: "1",
+    artifactType: "extraction_run.v3",
+    schemaVersion: "3",
     runId: input.runId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,
@@ -154,17 +147,18 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-// Evidence check: the cited block exists and contains the quote (ADR-0007),
-// tolerating only source-formatting noise via evidenceQuoteMatches.
-function isVerifiable(evidence: BlockEvidence, blockText: Map<string, string>): boolean {
-  const text = blockText.get(evidence.blockId);
-  return text !== undefined && evidenceQuoteMatches(text, evidence.evidenceQuote);
-}
-
 // Evidence neighborhood: the candidate's own mention blocks plus any block whose
-// text contains the concept label. Keeps the claim prompt focused on relevant source.
+// text contains the concept label. Scoped to extractable body blocks so claims
+// can never cite references, appendices, captions, or table/figure placeholders.
 function evidenceNeighborhood(document: StructuredDocument, subject: RunCandidate) {
   const mentionBlockIds = new Set(subject.mentions.map((mention) => mention.blockId));
   const label = subject.canonicalLabel.toLowerCase();
-  return document.blocks.filter((block) => mentionBlockIds.has(block.blockId) || block.text.toLowerCase().includes(label));
+  return extractableBlocks(document.blocks).filter((block) => mentionBlockIds.has(block.blockId) || block.text.toLowerCase().includes(label));
+}
+
+function isExplicitlyIllustrative(headingPath: string[], text: string): boolean {
+  const heading = headingPath.join(" ").toLowerCase();
+  const opening = text.slice(0, 240).toLowerCase();
+  return /\b(case study|worked example|illustrative example|demonstration|demo|downstream application)\b/.test(heading) ||
+    /\b(to illustrate|as an illustrative example|as a worked example|we demonstrate how|downstream application)\b/.test(opening);
 }
