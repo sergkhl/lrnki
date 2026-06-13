@@ -1,8 +1,10 @@
 # Plans
 
+## Live plans
+Stale planning docs should be removed.
+
 - [TODO](./TODO.md)
 - [BLOCKERS](./BLOCKERS.md)
-- [Initial greenfield scaffold](./initial-greenfield-scaffold.md)
 - [Concept-first implementation sequence](./concept-first-implementation.md)
 
 ## Progress report instructions
