@@ -142,3 +142,46 @@ test("accepts an explicit literal definition", () => {
   });
   assert.equal(result.validationOutcome, "verified");
 });
+
+test("accepts explicit INSTRUCTKG evidence using the active leveraging inflection", () => {
+  const quote = "INSTRUCTKG works by leveraging temporal signals to infer learning dependencies.";
+  const [result] = applyClaimPolicy({
+    claims: [claim({
+      subjectCandidateKey: "instructkg",
+      predicate: "uses",
+      object: { kind: "concept", candidateKey: "temporal" },
+      evidenceLinkNature: "mechanism-employment",
+      evidenceDirection: "subject-uses-object",
+      evidence: [{ blockId: "block-4", evidenceQuote: quote }]
+    })],
+    coreCandidateKeys: new Set(["instructkg", "temporal"]),
+    labelsByCandidateKey: new Map([
+      ["instructkg", ["Instructor-Aligned Knowledge Graphs", "INSTRUCTKG"]],
+      ["temporal", ["Temporal Signals", "temporal signals"]]
+    ]),
+    blockText: new Map([["block-4", quote]])
+  });
+  assert.equal(result.validationOutcome, "verified");
+});
+
+test("rejects the reversed interpretation of INSTRUCTKG leveraging temporal signals", () => {
+  const quote = "INSTRUCTKG works by leveraging temporal signals to infer learning dependencies.";
+  const [result] = applyClaimPolicy({
+    claims: [claim({
+      subjectCandidateKey: "temporal",
+      predicate: "uses",
+      object: { kind: "concept", candidateKey: "instructkg" },
+      evidenceLinkNature: "mechanism-employment",
+      evidenceDirection: "subject-uses-object",
+      evidence: [{ blockId: "block-4", evidenceQuote: quote }]
+    })],
+    coreCandidateKeys: new Set(["instructkg", "temporal"]),
+    labelsByCandidateKey: new Map([
+      ["instructkg", ["Instructor-Aligned Knowledge Graphs", "INSTRUCTKG"]],
+      ["temporal", ["Temporal Signals", "temporal signals"]]
+    ]),
+    blockText: new Map([["block-4", quote]])
+  });
+  assert.equal(result.validationOutcome, "rejected");
+  assert.ok(result.boundaryReasonCodes.includes("evidence_does_not_lexically_entail_relation"));
+});

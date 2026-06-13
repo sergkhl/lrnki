@@ -5,7 +5,18 @@
 - [Initial greenfield scaffold](./initial-greenfield-scaffold.md)
 - [Concept-first implementation sequence](./concept-first-implementation.md)
 
-## Mandatory progress report instructions
+## Progress report instructions
+
+### ADRs
+
+Update @docs/adr/README.md and linked ADRs only when a durable architectural decision changed.
+
+ADR rules:
+- one durable decision per ADR,
+- policy-level decisions only,
+- no implementation details,
+- no speculative or pending decisions,
+- no duplicate decisions.
 
 ### TODO
 

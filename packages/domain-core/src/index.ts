@@ -200,12 +200,23 @@ export type ExtractedClaim = {
   evidenceDirection: ClaimEvidenceDirection;
   evidence: BlockEvidence[];
   confidence: number;
+  extractionAttempt?: number;
+};
+
+export type ClaimExtractionFeedback = {
+  rejectedClaims: {
+    predicate: RelationPredicate;
+    object: ExtractedClaimObject;
+    evidence: BlockEvidence[];
+    boundaryReasonCodes: string[];
+  }[];
 };
 
 export type MissingConceptProposal = {
   proposedLabel: string;
   rationale: string;
   evidence?: BlockEvidence;
+  extractionAttempt: number;
 };
 
 export type ClaimExtractionResult = {
@@ -278,6 +289,7 @@ export type RunClaim = {
   evidenceCount: number;
   validationOutcome: ValidationOutcome;
   boundaryReasonCodes: string[];
+  extractionAttempt: number;
 };
 
 export type ExtractionRunResult = {
@@ -331,7 +343,7 @@ export type GraphSnapshot = {
 };
 
 // Read model the deterministic Graph-Version Build consumes (ADR-0017): the
-// latest succeeded run per source, reduced to admitted-core concepts and
+// explicitly selected succeeded runs, reduced to admitted-core concepts and
 // evidence-verified claims with resolved source_block_id references.
 export type BuildCandidate = {
   candidateKey: string;

@@ -24,7 +24,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-definition-recall-v20";
+const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-claim-retry-v22";
 
 import { existsSync } from "node:fs";
 

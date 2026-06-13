@@ -155,8 +155,8 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         if (claim.object.kind === "concept" && !objectCandidateId) continue;
         const runClaimId = randomUUID();
         await tx`
-          INSERT INTO run_claims (run_claim_id, run_id, subject_candidate_id, predicate, object_kind, object_candidate_id, object_literal, model_confidence, evidence_count, validation_outcome, boundary_reason_codes)
-          VALUES (${runClaimId}, ${result.runId}, ${subjectId}, ${claim.predicate}, ${claim.object.kind}, ${objectCandidateId}, ${claim.object.kind === "literal" ? tx.json({ value: claim.object.value }) : null}, ${claim.modelConfidence}, ${claim.evidenceCount}, ${claim.validationOutcome}, ${tx.json(claim.boundaryReasonCodes)})`;
+          INSERT INTO run_claims (run_claim_id, run_id, subject_candidate_id, predicate, object_kind, object_candidate_id, object_literal, model_confidence, evidence_count, validation_outcome, boundary_reason_codes, extraction_attempt)
+          VALUES (${runClaimId}, ${result.runId}, ${subjectId}, ${claim.predicate}, ${claim.object.kind}, ${objectCandidateId}, ${claim.object.kind === "literal" ? tx.json({ value: claim.object.value }) : null}, ${claim.modelConfidence}, ${claim.evidenceCount}, ${claim.validationOutcome}, ${tx.json(claim.boundaryReasonCodes)}, ${claim.extractionAttempt})`;
         for (const evidence of claim.evidence) {
           await tx`
             INSERT INTO run_claim_evidence (run_claim_evidence_id, run_claim_id, source_block_id, evidence_quote)
@@ -167,8 +167,8 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
       for (const proposal of result.proposals) {
         const proposalBlockId = proposal.evidence ? resolveBlockOptional(proposal.evidence.blockId) : null;
         await tx`
-          INSERT INTO missing_concept_proposals (missing_concept_proposal_id, run_id, proposed_label, rationale, source_block_id, evidence_quote)
-          VALUES (${randomUUID()}, ${result.runId}, ${proposal.proposedLabel}, ${proposal.rationale}, ${proposalBlockId}, ${proposalBlockId ? proposal.evidence?.evidenceQuote ?? null : null})`;
+          INSERT INTO missing_concept_proposals (missing_concept_proposal_id, run_id, proposed_label, rationale, source_block_id, evidence_quote, extraction_attempt)
+          VALUES (${randomUUID()}, ${result.runId}, ${proposal.proposedLabel}, ${proposal.rationale}, ${proposalBlockId}, ${proposalBlockId ? proposal.evidence?.evidenceQuote ?? null : null}, ${proposal.extractionAttempt})`;
       }
     });
   }

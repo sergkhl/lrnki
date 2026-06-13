@@ -63,7 +63,11 @@ export async function executeExtractionRun(input: {
   }));
 
   const coreCandidates = candidates.filter((candidate) => candidate.admission.tier === "core");
-  const admittedConcepts = coreCandidates.map((candidate) => ({ candidateKey: candidate.candidateKey, canonicalLabel: candidate.canonicalLabel }));
+  const admittedConcepts = coreCandidates.map((candidate) => ({
+    candidateKey: candidate.candidateKey,
+    canonicalLabel: candidate.canonicalLabel,
+    aliases: exactAliases(candidate)
+  }));
   const coreKeys = new Set(coreCandidates.map((candidate) => candidate.candidateKey));
   const labelsByCandidateKey = new Map<string, string[]>(
     coreCandidates.map((candidate) => [
@@ -73,36 +77,78 @@ export async function executeExtractionRun(input: {
   );
 
   // Stage 3 — concept-conditioned claim extraction with deterministic evidence validation.
-  // One LLM call per core concept, through a bounded pool; results are collected in
-  // subject order so the persisted run is deterministic regardless of completion order.
+  // Retry once only when a subject's first attempt has no verified claim. Superseded
+  // first-pass claims remain auditable, but are excluded from the final conflict pass.
   const proposals: ExtractionRunResult["proposals"] = [];
-  const extractionResults = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
-    try {
-      return await input.claimExtraction.extract({
-        document,
-        declaredDomain,
-        subject: { candidateKey: subject.candidateKey, canonicalLabel: subject.canonicalLabel },
-        admittedConcepts,
-        evidenceNeighborhood: evidenceNeighborhood(document, subject)
-      });
-    } catch {
-      // Fail closed for this concept after the client's retry budget: no claims,
-      // rather than aborting the whole source run. Observable as missing claims.
-      return null;
+  const subjectAttempts = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
+    const extract = async (feedback?: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0]["feedback"]) => {
+      try {
+        return await input.claimExtraction.extract({
+          document,
+          declaredDomain,
+          subject: {
+            candidateKey: subject.candidateKey,
+            canonicalLabel: subject.canonicalLabel,
+            aliases: exactAliases(subject)
+          },
+          admittedConcepts,
+          evidenceNeighborhood: evidenceNeighborhood(document, subject),
+          feedback
+        });
+      } catch {
+        return null;
+      }
+    };
+    const first = await extract();
+    const firstClaims = applyClaimPolicy({
+      claims: first?.claims ?? [],
+      extractionAttempt: 1,
+      coreCandidateKeys: coreKeys,
+      labelsByCandidateKey,
+      blockText
+    });
+    if (firstClaims.some((claim) => claim.validationOutcome === "verified")) {
+      return { first, firstClaims, retry: null };
     }
+    const retry = await extract({
+      rejectedClaims: firstClaims.map((claim) => ({
+        predicate: claim.predicate,
+        object: claim.object,
+        evidence: claim.evidence,
+        boundaryReasonCodes: claim.boundaryReasonCodes
+      }))
+    });
+    return { first, firstClaims, retry };
   });
-  const extractedClaims: ExtractedClaim[] = [];
-  for (const result of extractionResults) {
-    if (result === null) continue;
-    extractedClaims.push(...result.claims);
-    for (const proposal of result.proposals) proposals.push(proposal);
+
+  const effectiveExtractedClaims: ExtractedClaim[] = [];
+  const supersededClaims: ExtractionRunResult["claims"] = [];
+  for (const attempts of subjectAttempts) {
+    if (attempts.first) proposals.push(...attempts.first.proposals);
+    if (attempts.retry) {
+      proposals.push(...attempts.retry.proposals);
+      supersededClaims.push(...attempts.firstClaims.map((claim) => ({
+        ...claim,
+        validationOutcome: "rejected" as const,
+        boundaryReasonCodes: claim.boundaryReasonCodes.includes("superseded_by_retry")
+          ? claim.boundaryReasonCodes
+          : [...claim.boundaryReasonCodes, "superseded_by_retry"]
+      })));
+      effectiveExtractedClaims.push(...attempts.retry.claims.map((claim) => ({ ...claim, extractionAttempt: 2 })));
+    } else if (attempts.first) {
+      effectiveExtractedClaims.push(...attempts.first.claims.map((claim) => ({ ...claim, extractionAttempt: 1 })));
+    }
   }
-  const claims = applyClaimPolicy({
-    claims: extractedClaims,
-    coreCandidateKeys: coreKeys,
-    labelsByCandidateKey,
-    blockText
-  });
+
+  const claims = [
+    ...supersededClaims,
+    ...applyClaimPolicy({
+      claims: effectiveExtractedClaims,
+      coreCandidateKeys: coreKeys,
+      labelsByCandidateKey,
+      blockText
+    })
+  ];
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,
@@ -119,8 +165,8 @@ export async function executeExtractionRun(input: {
   await input.store.persist(runResult);
   await input.artifacts.append({
     artifactId: `${input.runId}:run`,
-    artifactType: "extraction_run.v3",
-    schemaVersion: "3",
+    artifactType: "extraction_run.v4",
+    schemaVersion: "4",
     runId: input.runId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,
@@ -129,6 +175,10 @@ export async function executeExtractionRun(input: {
     payload: runResult
   });
   return runResult;
+}
+
+function exactAliases(candidate: RunCandidate): string[] {
+  return [...new Set([candidate.discoveredLabel, candidate.canonicalLabel, ...candidate.aliases])];
 }
 
 // Bounded so a large source cannot fan out unbounded parallel LLM calls through the proxy.

@@ -5,7 +5,7 @@ type Sql = ReturnType<typeof createDatabaseClient>;
 
 // Server-only, read-only inspection loaders for the Admin Lab Run Inspector and
 // Source Explorer (ADR-0011). Candidate and claim lists read the JSON_TABLE
-// projections over the immutable extraction_run.v3 artifact envelopes
+// projections over the immutable extraction_run.v4 artifact envelopes
 // (ADR-0003); evidence quotes and proposals read the relational run tables.
 
 export interface RunSummary {
@@ -51,8 +51,9 @@ export interface RunInspection {
     boundaryReasonCodes: string[];
     modelConfidence: number;
     evidenceQuotes: string[];
+    extractionAttempt: number;
   }[];
-  proposals: { proposedLabel: string; rationale: string; evidenceQuote: string | null }[];
+  proposals: { proposedLabel: string; rationale: string; evidenceQuote: string | null; extractionAttempt: number }[];
 }
 
 export interface SourceSummary {
@@ -151,10 +152,10 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
       FROM artifact_run_candidates WHERE run_id = ${runId}
       ORDER BY CASE tier WHEN 'core' THEN 0 WHEN 'quarantine' THEN 1 WHEN 'optional' THEN 2 ELSE 3 END, canonical_label`;
 
-    const claims = await sql<{ run_claim_id: string; subject_label: string; predicate: string; object_kind: string; object_label: string | null; object_literal: { value: string } | null; validation_outcome: string; boundary_reason_codes: string[]; model_confidence: number }[]>`
+    const claims = await sql<{ run_claim_id: string; subject_label: string; predicate: string; object_kind: string; object_label: string | null; object_literal: { value: string } | null; validation_outcome: string; boundary_reason_codes: string[]; model_confidence: number; extraction_attempt: number }[]>`
       SELECT rc.run_claim_id, subj.canonical_label AS subject_label, rc.predicate, rc.object_kind,
              obj.canonical_label AS object_label, rc.object_literal, rc.validation_outcome,
-             rc.boundary_reason_codes, rc.model_confidence
+             rc.boundary_reason_codes, rc.model_confidence, rc.extraction_attempt
       FROM run_claims rc
       JOIN concept_candidates subj ON subj.concept_candidate_id = rc.subject_candidate_id
       LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = rc.object_candidate_id
@@ -168,8 +169,8 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
     const quotesByClaim = new Map<string, string[]>();
     for (const row of evidence) quotesByClaim.set(row.run_claim_id, [...(quotesByClaim.get(row.run_claim_id) ?? []), row.evidence_quote]);
 
-    const proposals = await sql<{ proposed_label: string; rationale: string; evidence_quote: string | null }[]>`
-      SELECT proposed_label, rationale, evidence_quote FROM missing_concept_proposals WHERE run_id = ${runId} ORDER BY proposed_label`;
+    const proposals = await sql<{ proposed_label: string; rationale: string; evidence_quote: string | null; extraction_attempt: number }[]>`
+      SELECT proposed_label, rationale, evidence_quote, extraction_attempt FROM missing_concept_proposals WHERE run_id = ${runId} ORDER BY extraction_attempt, proposed_label`;
 
     return {
       run: toRunSummary(header),
@@ -199,9 +200,15 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
         validationOutcome: row.validation_outcome,
         boundaryReasonCodes: row.boundary_reason_codes,
         modelConfidence: Number(row.model_confidence),
-        evidenceQuotes: quotesByClaim.get(row.run_claim_id) ?? []
+        evidenceQuotes: quotesByClaim.get(row.run_claim_id) ?? [],
+        extractionAttempt: row.extraction_attempt
       })),
-      proposals: proposals.map((row) => ({ proposedLabel: row.proposed_label, rationale: row.rationale, evidenceQuote: row.evidence_quote }))
+      proposals: proposals.map((row) => ({
+        proposedLabel: row.proposed_label,
+        rationale: row.rationale,
+        evidenceQuote: row.evidence_quote,
+        extractionAttempt: row.extraction_attempt
+      }))
     };
   });
 }

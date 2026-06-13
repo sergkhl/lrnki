@@ -1,23 +1,22 @@
 # TODO
 
-1. **Claim recall remains FIX_FIRST after the relation-precision boundary passed real-use inspection.**
-   - Config `…-definition-recall-v20` accepts an exact Rust definition and rejects unsupported
-     `part-of` / `uses` claims; config `…-illustrative-boundary-v19` rejects all six loose InstructKG
-     claims. Reversed and competing relations no longer pass the application boundary.
-   - InstructKG now has zero accepted claims even though the source explicitly states that the
-     framework leverages temporal and semantic signals. Improve extraction recall without weakening
-     endpoint, direction, or lexical-entailment gates (for example, retry a subject once with rejected
-     claim feedback and explicit endpoint aliases).
-   - Re-run Rust + InstructKG and require useful accepted claims with zero reversed/unsupported claims.
-     Evidence: `tmp/claim-boundary-quality-evaluation.md`.
+1. **Fix proposition-shaped Concept admission before Gate 1 publication.**
+   - Claim recall now passes on inspected InstructKG v22 and Rust v22 runs without weakening
+     endpoint, direction, conflict, or lexical-entailment gates.
+   - Economics v22 incorrectly admits `Division of Labour Limited by the Extent of the Market` as a
+     core Concept. It is a proposition-shaped chapter claim, not a durable Concept. Tighten admission
+     precision without suppressing valid independently teachable principles, then re-run all official
+     Gate 1 fixtures under one identical configuration.
+   - Biology v22 is substantively clean but has zero verified claims under the strict relation gates;
+     retain this as an explicit sparsity caveat and do not manufacture edges.
+   - Evidence: `tmp/claim-boundary-quality-evaluation.md`.
 
-2. **Complete Gate 1 only after claim recall passes.**
-   - Run the final config on Biology and Economics, inspect every core and claim, then select the
-     inspected run IDs explicitly for one deterministic graph-version build.
-   - Keep publication blocked if any fixture has incidental core concepts, unsupported claims,
-     evidence failures, or quarantine decisions.
+2. **Complete Gate 1 only after the Economics admission defect is fixed.**
+   - Inspect every core, claim, rejection, proposal, and quarantine decision in the replacement Rust,
+     Biology, and Economics runs.
+   - Publish one atomic graph version only from those explicitly selected inspected run IDs.
 
-3. **Gate 2 (only after Gate 1 passes).**
+3. **Gate 2 (only after Gate 1 publication succeeds).**
    - Version-pinned Docling adapter; add PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format oracle suite.
    - Oracle independence triangle (DeepSeek extracts, MiniMax authors references, Mistral audits);
      benchmark arms and quantitative metrics. Add a non-CS domain fixture for diversity (both new
@@ -83,19 +82,26 @@
   silently mutates the graph (AGENTS rule 11). The build now also loads `quarantine` decisions and
   refuses to publish (naming the offending run/candidate) when any selected run carries one, matching
   CONTEXT.md's Graph-Version Build rule.
+- **Precision-preserving claim retry**: claim extraction receives exact subject/object aliases and
+  retries once only when a subject produced no verified claim. Retry prompts include structured
+  rejected predicates, evidence, and boundary reasons and prominently surface endpoint-explicit
+  evidence blocks. Superseded attempts remain auditable but cannot invalidate corrected retry claims.
+  Claims and missing-concept proposals carry `extractionAttempt` through `extraction_run.v4`,
+  PostgreSQL, JSON_TABLE inspection, and Admin Lab.
 
 ## VALIDATION
 
 Latest validation (2026-06-13):
-- **Static: 26 tests pass** (19 application + 7 parser); full typecheck, ESLint, and Next.js
+- **Static: 31 tests pass** (24 application + 7 parser); full typecheck, ESLint, and Next.js
   production build pass.
-- **Real DeepSeek / InstructKG, v19: precision PASS, recall FIX_FIRST.** Core is
-  `{Instructor-Aligned Knowledge Graphs, Temporal Signals, Semantic Signals}`. Dynamic Programming,
-  Greedy Algorithms, Optimization Problem, and Student Error Mapping are optional. All 6 loose or
-  reversed `uses` claims are rejected with visible boundary reasons; 0 claims accepted.
-- **Real DeepSeek / Rust, v20: narrow useful output PASS.** Core is
-  `{Rust Ownership, Rust move semantics, Memory Safety}`. Exact `Rust Ownership defined-as "a set of
-  rules that govern how a Rust program manages memory"` is verified; 2 unsupported structural claims
-  are rejected.
-- PostgreSQL 18 + LiteLLM healthy; Admin Lab serves on port 3000 and renders both inspected runs.
-  **No graph version published.** Evidence: `tmp/claim-boundary-quality-evaluation.md`.
+- **Real DeepSeek / InstructKG, v22: PASS.** The inspected run retains Instructor-Aligned Knowledge
+  Graphs, Temporal Signal, and Semantic Signal and verifies the two useful framework-to-signal
+  `uses` claims with no accepted reversed or unsupported claims.
+- **Real DeepSeek / Rust, v22: PASS.** Exact Ownership and Variable Scope definitions verify; no
+  unsupported structural claims pass.
+- **Real DeepSeek / Biology, v22: sparse PASS with caveat.** Seven substantive core concepts; zero
+  accepted claims because all proposals fail strict endpoint or lexical entailment.
+- **Real DeepSeek / Economics, v22: FIX_FIRST.** Pin examples remain rejected and causal claims stay
+  out, but a proposition-shaped chapter claim enters core.
+- PostgreSQL 18 + LiteLLM healthy. **No graph version published; Gate 2 remains closed.**
+  Evidence: `tmp/claim-boundary-quality-evaluation.md`.

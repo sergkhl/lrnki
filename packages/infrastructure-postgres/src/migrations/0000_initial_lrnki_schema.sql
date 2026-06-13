@@ -119,6 +119,7 @@ CREATE TABLE run_claims (
   evidence_count integer NOT NULL,
   validation_outcome text NOT NULL CHECK (validation_outcome IN ('verified', 'rejected')),
   boundary_reason_codes jsonb NOT NULL,
+  extraction_attempt integer NOT NULL CHECK (extraction_attempt IN (1, 2)),
   created_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((object_kind = 'concept' AND object_candidate_id IS NOT NULL) OR (object_kind = 'literal' AND object_literal IS NOT NULL))
 );
@@ -137,6 +138,7 @@ CREATE TABLE missing_concept_proposals (
   rationale text NOT NULL,
   source_block_id uuid REFERENCES source_blocks(source_block_id),
   evidence_quote text,
+  extraction_attempt integer NOT NULL CHECK (extraction_attempt IN (1, 2)),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -269,14 +271,15 @@ JSON_TABLE(
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type = 'extraction_run.v3';
+WHERE a.artifact_type = 'extraction_run.v4';
 
 -- Flatten extraction-run artifact payloads: one row per extracted claim with
 -- its validation outcome, for the Admin Lab Run Inspector.
 CREATE VIEW artifact_run_claims AS
 SELECT a.run_id, cl.subject_candidate_key, cl.predicate, cl.object_kind,
        cl.object_candidate_key, cl.object_literal, cl.validation_outcome,
-       cl.evidence_count, cl.model_confidence, cl.boundary_reason_codes
+       cl.evidence_count, cl.model_confidence, cl.boundary_reason_codes,
+       cl.extraction_attempt
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -290,7 +293,8 @@ JSON_TABLE(
     validation_outcome text PATH '$.validationOutcome',
     evidence_count integer PATH '$.evidenceCount',
     model_confidence numeric PATH '$.modelConfidence',
-    boundary_reason_codes jsonb FORMAT JSON PATH '$.boundaryReasonCodes'
+    boundary_reason_codes jsonb FORMAT JSON PATH '$.boundaryReasonCodes',
+    extraction_attempt integer PATH '$.extractionAttempt'
   )
 ) AS cl
-WHERE a.artifact_type = 'extraction_run.v3';
+WHERE a.artifact_type = 'extraction_run.v4';

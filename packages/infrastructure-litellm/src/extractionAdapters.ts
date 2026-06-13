@@ -1,5 +1,6 @@
 import type {
   AdmissionProposal,
+  ClaimExtractionFeedback,
   ClaimExtractionResult,
   DiscoveredCandidate,
   ExtractedClaim,
@@ -80,6 +81,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       "(3) organizingPower: the source demonstrates at least TWO DISTINCT substantive explanatory aspects or relationships organized by the concept. Return each aspect separately with its own verbatim evidence.",
       "Classify each organizing aspect's nature honestly. 'motivation-or-example' does not count toward organizing power and is discarded by the application boundary.",
       "Both organizing aspects must directly explain the candidate itself. A problem it motivates, a consequence it causes, or a teaser for later material is not a second aspect of the candidate.",
+      "Each organizing aspect must cite a different evidence reference. Do not reuse the same blockId + evidenceQuote for two aspects; the application discards duplicate references and will fail the criterion closed.",
       "The selected source must teach enough about the candidate to support assessment. Domain knowledge that the source merely mentions or promises to explain later remains optional.",
       "A mechanism or operation is not automatically optional: it may be core when it passes all three tests. Grammatical form never decides eligibility.",
       "Use 'optional' for real, evidence-supported domain knowledge useful for explaining a core concept but not independently eligible.",
@@ -235,9 +237,10 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
   async extract(input: {
     document: StructuredDocument;
     declaredDomain: string;
-    subject: { candidateKey: string; canonicalLabel: string };
-    admittedConcepts: { candidateKey: string; canonicalLabel: string }[];
+    subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
+    admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
+    feedback?: ClaimExtractionFeedback;
   }): Promise<ClaimExtractionResult> {
     const system = [
       "You extract typed, evidence-backed claims for one subject concept only.",
@@ -273,16 +276,38 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
       "Every claim requires a verbatim evidence quote copied exactly from a cited block. No quote, no claim."
     ].join("\n");
     const admitted = input.admittedConcepts
-      .map((concept) => `- ${concept.candidateKey}: "${concept.canonicalLabel}"`)
+      .map((concept) => `- ${concept.candidateKey}: "${concept.canonicalLabel}" (exact aliases: ${renderAliases(concept.aliases)})`)
       .join("\n");
+    const endpointExplicitBlocks = input.evidenceNeighborhood.filter((block) =>
+      mentionsAlias(block.text, input.subject.aliases) &&
+      input.admittedConcepts.some((concept) =>
+        concept.candidateKey !== input.subject.candidateKey && mentionsAlias(block.text, concept.aliases)
+      )
+    );
+    const retryFeedback = input.feedback
+      ? [
+          "",
+          "This is one bounded retry after the previous attempt produced no verified claims.",
+          "Do not repeat an unchanged rejected proposal. Correct its predicate, direction, endpoints, or evidence, or omit it.",
+          "Previous rejected proposals:",
+          ...input.feedback.rejectedClaims.map((claim) =>
+            `- ${claim.predicate} -> ${renderClaimObject(claim.object)}; rejected because: ${claim.boundaryReasonCodes.join(", ") || "unspecified"}; evidence: ${claim.evidence.map((item) => `"${item.evidenceQuote}"`).join(" | ") || "none"}`
+          )
+        ]
+      : [];
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
       `Subject concept: ${input.subject.candidateKey} = "${input.subject.canonicalLabel}".`,
+      `Subject exact aliases: ${renderAliases(input.subject.aliases)}.`,
       "Admitted concepts available as claim objects:",
       admitted,
       "",
       "Evidence blocks (quote verbatim from these):",
       renderBlocks(input.evidenceNeighborhood),
+      "",
+      "Endpoint-explicit evidence candidates (prefer these when they state a valid relation in the required direction):",
+      endpointExplicitBlocks.length > 0 ? renderBlocks(endpointExplicitBlocks) : "(none)",
+      ...retryFeedback,
       "",
       "Call submit_concept_claims. Each claim's subject is the subject concept above."
     ].join("\n");
@@ -334,8 +359,22 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
         rationale: proposal.rationale,
         evidence: proposal.evidenceBlockId && proposal.evidenceQuote
           ? { blockId: proposal.evidenceBlockId, evidenceQuote: proposal.evidenceQuote }
-          : undefined
+          : undefined,
+        extractionAttempt: input.feedback ? 2 : 1
       }))
     };
   }
+}
+
+function renderAliases(aliases: string[]): string {
+  return aliases.length > 0 ? aliases.map((alias) => `"${alias}"`).join(", ") : "none";
+}
+
+function renderClaimObject(object: ExtractedClaim["object"]): string {
+  return object.kind === "concept" ? object.candidateKey : `"${object.value}"`;
+}
+
+function mentionsAlias(text: string, aliases: string[]): boolean {
+  const normalizedText = text.toLowerCase();
+  return aliases.some((alias) => alias.length > 0 && normalizedText.includes(alias.toLowerCase()));
 }

@@ -180,7 +180,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
           </CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Outcome</TableHead><TableHead>Subject</TableHead><TableHead>Relation</TableHead><TableHead>Object</TableHead><TableHead>Confidence</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Outcome</TableHead><TableHead>Attempt</TableHead><TableHead>Subject</TableHead><TableHead>Relation</TableHead><TableHead>Object</TableHead><TableHead>Confidence</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
               <TableBody>
                 {claims.map((claim, index) => (
                   <TableRow key={`${claim.subjectLabel}-${claim.predicate}-${index}`}>
@@ -190,6 +190,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
                         {claim.boundaryReasonCodes.map((reason) => <Badge key={reason} variant="outline">{reason}</Badge>)}
                       </div>
                     </TableCell>
+                    <TableCell><Badge variant="secondary">{claim.extractionAttempt}</Badge></TableCell>
                     <TableCell className="font-medium">{claim.subjectLabel}</TableCell>
                     <TableCell><Badge variant="outline">{claim.predicate}</Badge></TableCell>
                     <TableCell className="max-w-64 whitespace-normal">{claim.objectLabel}</TableCell>
@@ -221,10 +222,11 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
           <CardContent>
             {proposals.length > 0 ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Proposed label</TableHead><TableHead>Rationale</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Attempt</TableHead><TableHead>Proposed label</TableHead><TableHead>Rationale</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {proposals.map((proposal, index) => (
                     <TableRow key={`${proposal.proposedLabel}-${index}`}>
+                      <TableCell><Badge variant="secondary">{proposal.extractionAttempt}</Badge></TableCell>
                       <TableCell className="font-medium">{proposal.proposedLabel}</TableCell>
                       <TableCell className="max-w-xl whitespace-normal">{proposal.rationale}</TableCell>
                       <TableCell className="max-w-xl whitespace-normal text-muted-foreground">{proposal.evidenceQuote ? `“${proposal.evidenceQuote}”` : "—"}</TableCell>

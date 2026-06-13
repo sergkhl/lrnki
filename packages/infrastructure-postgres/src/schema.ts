@@ -116,6 +116,7 @@ export const runClaims = pgTable("run_claims", {
   evidenceCount: integer("evidence_count").notNull(),
   validationOutcome: text("validation_outcome").notNull(),
   boundaryReasonCodes: jsonb("boundary_reason_codes").notNull(),
+  extractionAttempt: integer("extraction_attempt").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
@@ -134,6 +135,7 @@ export const missingConceptProposals = pgTable("missing_concept_proposals", {
   rationale: text("rationale").notNull(),
   sourceBlockId: uuid("source_block_id").references(() => sourceBlocks.sourceBlockId),
   evidenceQuote: text("evidence_quote"),
+  extractionAttempt: integer("extraction_attempt").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 

@@ -28,7 +28,7 @@ static-graph publication (ADR-0014 stands); the five-stage north-star chain shap
 6. Deterministic evidence validation: verbatim quote checks against stored source blocks, schema
    validation, relation domain/range checks; fail closed after the retry budget.
 7. Persist all of the above as per-source Extraction Runs (ADR-0017). Runs never publish.
-8. Graph-Version Build (deterministic, LLM-free): latest successful run per source → minimal
+8. Graph-Version Build (deterministic, LLM-free): explicitly selected, inspected successful run IDs → minimal
    Static Graph Refinement (textual variant normalization, conservative alias merge, ADR-0015
    domain-scoped merge/quarantine, duplicate-claim collapse, contradiction recording) → IRI minting
    at first publication (frozen slugs, ADR-0015) → quality gates → atomic publication with run

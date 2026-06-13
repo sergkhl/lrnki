@@ -28,6 +28,7 @@ const ASYMMETRIC_PREDICATES = new Set<RelationPredicate>(["is-a", "part-of", "as
 
 export function applyClaimPolicy(input: {
   claims: ExtractedClaim[];
+  extractionAttempt?: number;
   coreCandidateKeys: Set<string>;
   labelsByCandidateKey: Map<string, string[]>;
   blockText: Map<string, string>;
@@ -108,7 +109,8 @@ export function applyClaimPolicy(input: {
     modelConfidence: claim.confidence,
     evidenceCount: evidence.length,
     validationOutcome: boundaryReasonCodes.length === 0 ? "verified" : "rejected",
-    boundaryReasonCodes
+    boundaryReasonCodes,
+    extractionAttempt: claim.extractionAttempt ?? input.extractionAttempt ?? 1
   }));
 }
 
@@ -165,7 +167,7 @@ function lexicallyEntailsRelation(
       return ordered(subjectPositions, ["is part of", "forms part of", "is a component of", "is a step in"], objectPositions) ||
         ordered(objectPositions, ["includes", "contains", "comprises", "consists of"], subjectPositions);
     case "uses":
-      return ordered(subjectPositions, ["uses", "use", "employs", "employ", "leverages", "leverage", "utilizes", "utilize", "synergizes"], objectPositions);
+      return ordered(subjectPositions, ["uses", "use", "using", "employs", "employ", "employing", "leverages", "leverage", "leveraging", "utilizes", "utilize", "utilizing", "synergizes", "synergizing"], objectPositions);
     case "asserted-prerequisite-of":
       return ordered(subjectPositions, ["is a prerequisite for", "is required before", "must be understood before"], objectPositions);
     case "contrasts-with":

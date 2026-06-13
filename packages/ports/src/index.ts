@@ -1,6 +1,7 @@
 import type {
   AdmissionProposal,
   ArtifactEnvelope,
+  ClaimExtractionFeedback,
   ClaimExtractionResult,
   DiscoveredCandidate,
   ExtractionRunResult,
@@ -33,9 +34,10 @@ export interface ConceptConditionedClaimExtractionPort {
   extract(input: {
     document: StructuredDocument;
     declaredDomain: string;
-    subject: { candidateKey: string; canonicalLabel: string };
-    admittedConcepts: { candidateKey: string; canonicalLabel: string }[];
+    subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
+    admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
+    feedback?: ClaimExtractionFeedback;
   }): Promise<ClaimExtractionResult>;
 }
 
