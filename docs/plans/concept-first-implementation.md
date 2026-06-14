@@ -18,7 +18,7 @@ Durable architecture is defined in [ADRs](../adr/README.md), domain language in 
    - Make graph-version snapshots immutable.
    - Make Enrichment Runs append-only, explicit, and auditable.
 4. **Gate 2: mixed-format oracle suite — next**
-   - Complete PDF, DOCX, and PPTX curated fixtures.
+   - PDF curated fixtures (DOCX and PPTX de-scoped).
    - Freeze independent oracle and judge outputs.
    - Measure benchmark arms before promotion.
 5. **Measured deepening — deferred**
