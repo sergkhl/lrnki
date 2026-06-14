@@ -1,49 +1,34 @@
 # TODO
 
-1. **Gate 2 — frozen mixed-format oracle suite (ADR-0013). IN PROGRESS** (the vertical slice
-   validated the chain end-to-end on real output — see COMPLETED + VALIDATION).
-   - Prioritized Decision Notes: no need to ingest DOCX/PPTX formats (move it out of scope).
-   - Need research if we should ingest both pdf and markdown through Docling to use same DoclingDocument structure and remove current markdown structure parser. Check if it gives us benefits or have any drawbacks.
-   - DONE: version-pinned Docling adapter (PDF/DOCX/PPTX → Markdown over the async Docling HTTP API,
-     OCR off, table structure off for speed); PDF fixture #4 (`2507.02554v2.pdf`, ML systems)
-     ingested and extracted end-to-end (run `9b92bd64`), evidence verbatim-verifiable against stored
-     blocks. Evidence: `tmp/gate2-docling-ingestion-quality-evaluation.md`.
-   - Add DOCX fixture #5 and PPTX fixture #6 from real curated sources (the adapter already supports
-     both MIME types; only the curated files are missing). Prefer a non-CS domain for diversity.
-   - Freeze the mixed-format oracle suite once #5–#6 land.
+1. **Gate 2 — frozen mixed-format oracle suite (ADR-0013). NOW UNBLOCKED — highest value.**
+   The admission defect that would distort oracle scores is fixed (see COMPLETED), so run this now.
+   - DONE: Docling adapter (PDF/DOCX/PPTX → Markdown, async API, OCR/table-structure off); PDF
+     fixture #4 (`2507.02554v2.pdf`) ingested + extracted (run `9b92bd64`), evidence verbatim.
+   - DOCX/PPTX fixtures are OUT OF SCOPE (de-scoped).
+   - Optional research: ingest markdown through Docling too, to share one DoclingDocument structure
+     and retire the native markdown parser — only if it earns its keep.
    - Oracle independence triangle (DeepSeek extracts, MiniMax M3 authors references via
      `kg-oracle-reference`, Mistral Small audits via `kg-oracle-judge`); quarantine disagreements.
-     Aliases already exist in LiteLLM; wiring does not.
+     Aliases exist in LiteLLM; wiring does not.
    - Benchmark arms + quantitative metrics; promote only measured improvements.
-   - Claim over-rejection that distorted oracle scores is now resolved (see COMPLETED:
-     semantic claim-entailment judge). Remaining claim-quality lever is extractor RECALL,
-     not the gate: the ML PDF still emits few usable concept claims.
 
-2. **Measure the embedding tier before trusting it as a hard gate (ADR-0012 tier 2).**
+2. **Improve claim extractor RECALL (claim-side lever; the next bottleneck).**
+   - Admission no longer starves the claim space (core 6→12/14 on the ML PDF), but concept-to-
+     concept extraction is still sparse on some sources (ML PDF: 2 verified) even with more core
+     endpoints. Diagnose extractor recall.
+   - Address the borderline `is-a` direction case (general is-a specific) from the judge eval via
+     extraction direction-prompt tightening.
+
+3. **Measure the embedding tier before trusting it as a hard gate (ADR-0012 tier 2).**
    The slice keeps the Declared-Domain gate primary and exhaustive (`exhaustiveDomainMaxConcepts`),
    with cosine clustering only an additive escape valve for large domains — embeddings are still
    `EXPERIMENT_ONLY`. Re-measure on a larger per-domain graph (>14 concepts) that recall is added
    without precision loss before letting clustering reduce the candidate set.
 
-3. **Build and measure the embedding-assisted Concept Canonicalization cascade (ADR-0012).**
+4. **Build and measure the embedding-assisted Concept Canonicalization cascade (ADR-0012).**
    - Keep normalized-label match within Declared Domain as the only automatic merge authority.
    - Use contextual embeddings to propose identity candidates and an LLM to verify reversible aliases.
    - Keep the cascade outside publication until curated fixtures show added recall without precision loss.
-
-4. **Improve claim RECALL (the new claim bottleneck, now that the gate is fixed).**
-   - The semantic judge admits genuinely-supported claims, but concept-to-concept extraction
-     remains sparse on some sources. The v28 ML PDF run produced seven valid definitions but only
-     one verified concept relation. Diagnose extractor recall before adding oracle arms.
-   - Address the borderline `is-a` direction case (general is-a specific) surfaced in the
-     judge quality eval via extraction direction-prompt tightening.
-   - **ADMISSION SELECTION DEFECT.** The v28 ML run improved to 6 core of 69 candidates and retained
-     source-grounded labels, but still selected the proposition-like
-     "Operator Set as Bottleneck to Performance" while established domain concepts such as Monte
-     Carlo Tree Search, Evolutionary Search, AutoML, and Overfitting remained optional. This
-     starves the concept-to-concept claim space. Likely in the Core Set Selection prompt
-     (`extractionAdapters.ts` `LiteLlmConceptAdmissionAdapter`, the `submit_core_selection` stage):
-     proposition demotion is incomplete and established multi-aspect domain concepts are treated
-     as illustrative/case-study only. Needs measured prompt work and re-run inspection.
 
 5. **Slice deepening (replace mocks behind unchanged ports; do not start before Gate 2 signal).**
    - Real difficulty: Bradley-Terry pairwise calibration replaces `dagDepthDifficultyPort`
@@ -51,9 +36,26 @@
    - Real learner modeling: IRT/KT `LearnerStatePort` impl replaces `emptyLearnerState`.
    - Improve embedding signal in claim-sparse domains (e.g. include candidate-mention evidence,
      not only published-claim evidence) so contextual text is not label-dominated.
+   - Possible rule-16 follow-up: fold the `isExplicitlyIllustrative` lexical heuristic
+     (`executeExtractionRun.ts`) into the admission judge or a measured module.
 
 ## COMPLETED
 
+- **Admission recall + measured concept-vs-proposition judge (2026-06-14, ADR-0021).** Admission
+  was the binding recall bottleneck. Two independent axes: (recall) a strengthened Core Set
+  Selection prompt that RETAINS established, substantively-taught domain concepts on method/survey
+  papers and narrows the illustrative-only demotion; (precision) a measured, downgrade-only neural
+  concept-vs-proposition judge (`AdmissionLabelJudgmentPort` + forced-tool
+  `LiteLlmAdmissionLabelJudgmentAdapter` on `kg-oracle-judge`, fail-closed grounding =
+  preserve-recall) composed as `applyAdmissionLabelJudge` after the deterministic boundary. The
+  deterministic `looksLikePropositionLabel` lexical veto and its `PROPOSITION_*` constant sets were
+  DELETED (AGENTS rule 16); label source-grounding stays deterministic (a provable substring
+  property). Frozen agent-authored oracle (`tmp/admission-oracle/`, needs human review): judge
+  precision-first at 8/8 concepts kept (0 false demotions, incl. surface-trap negatives the lexical
+  matcher mishandled) and 2/2 propositions recovered. Real v29 re-runs: ML PDF core 6→12/14 (MCTS /
+  evolutionary search / overfitting recovered; AutoML legitimately optional via eligibility), no
+  proposition core label; concept→concept claims ML 1→2, biology 1→4 (3 genuine contrasts), rust
+  core clean. Evidence: `tmp/admission-recall-quality-evaluation.md`.
 - **Semantic claim-entailment judge replaces lexical claim gates (2026-06-14, ADR-0020).** Removed
   hardcoded surface-matcher vetoes (`evidence_does_not_name_both_endpoints`,
   `evidence_does_not_lexically_entail_relation`,
@@ -136,13 +138,18 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-14, definition entailment / pipeline v28):
-- **Static:** full `pnpm check` green; 57 application, 9 ingestion, and 3 LiteLLM adapter tests pass;
+Latest validation (2026-06-14, admission recall + concept-vs-proposition judge / pipeline v29):
+- **Static:** full `pnpm check` green; 59 application, 9 ingestion, and 8 LiteLLM adapter tests pass;
   ESLint and the Next.js production build succeed.
-- **Real model probe:** appositive `Generalization Gap` definition accepted; anonymous-agent evidence
-  rejected for `graph-based search framework`; `MLE-bench lite` rejected for `MLE-bench`.
-- **Real extraction:** ML PDF run `8c6868f1` → 8 verified / 7 rejected; Rust run `304351ed` →
-  4 verified / 6 rejected; biology run `256a73bc` → 1 verified / 11 rejected. All 13 verified
-  claims were inspected and source-supported. Result: **PASS** for definition entailment.
-- **Caveat:** admission selection remains noisy and concept-relation recall remains sparse; both stay
-  in TODO and no new graph version was published from these runs.
+- **Promotion gate (frozen oracle `tmp/admission-oracle/`):** the concept-vs-proposition judge is
+  precision-first — 8/8 concepts kept (0 false demotions, incl. surface-trap negatives "Right to Be
+  Forgotten" / "Survival of the Fittest" / "Bounded Rationality") and 2/2 propositions recovered
+  ("Operator Set as Bottleneck to Performance" → "Operator Set"); precision/recall 1.00.
+- **Real extraction:** ML PDF runs `7de8a8fc` (core 12, 2 concept + 2 def verified) and `0e0d7c0b`
+  (core 14, 2 concept + 8 def) — established concepts MCTS / evolutionary search / overfitting now
+  core (6→12/14), no proposition core label; Rust run `f7727458` → core 3 (clean) / 2 definitions;
+  biology run `895c1c5f` → core 6 / 4 verified incl. 3 genuine `contrasts-with`. All verified claims
+  inspected and source-supported. Result: **PASS**.
+- **Caveat:** selection stability Jaccard ≈0.73 across the two ML runs (established-concept core
+  stable, periphery varies; not engineered, KTD6); concept-to-concept claim recall is now the next
+  lever (TODO #2); AutoML lost to upstream eligibility; no new graph version was published.

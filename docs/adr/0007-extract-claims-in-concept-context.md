@@ -1,6 +1,8 @@
 # Extract typed claims in admitted-concept context
 
-Status: Accepted
+Status: Accepted. The lexical-entailment portion of the deterministic claim
+validation is superseded by [ADR-0020](./0020-semantic-claim-entailment-judge.md);
+the verbatim-evidence floor below remains in force.
 
 ## Decision
 
