@@ -289,6 +289,40 @@ export const conceptClaimSchema: JsonSchema = {
   }
 };
 
+// --- Prerequisite judgment: submit_prerequisite_judgment ------------------
+// One bounded judgment over a single gated concept pair (ADR-0019). The model
+// returns a DIRECTION between the two named concepts, not free-form edges; the
+// application boundary maps it to a directed/none/uncertain edge fail-closed.
+
+const PREREQUISITE_OUTCOME = [
+  "a-is-prerequisite-of-b",
+  "b-is-prerequisite-of-a",
+  "none",
+  "uncertain"
+] as const;
+
+export const prerequisiteJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["outcome", "confidence", "rationale"],
+  properties: {
+    outcome: {
+      type: "string",
+      enum: [...PREREQUISITE_OUTCOME],
+      description:
+        "Directed prerequisite relation between the two concepts. 'a-is-prerequisite-of-b' means a learner must understand concept A before concept B. Use 'none' when neither is a learning prerequisite of the other; use 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+  }
+};
+
+export const prerequisiteJudgmentValidator = z.object({
+  outcome: z.enum(PREREQUISITE_OUTCOME),
+  confidence: z.number().min(0).max(1),
+  rationale: z.string().min(1)
+}).strict();
+
 export const conceptClaimValidator = z.object({
   claims: z.array(z.object({
     predicate: z.enum(RELATION_ENUM),

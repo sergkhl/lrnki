@@ -298,3 +298,81 @@ JSON_TABLE(
   )
 ) AS cl
 WHERE a.artifact_type = 'extraction_run.v4';
+
+-- ---------------------------------------------------------------------------
+-- Graph Enrichment — third operation, derived layer keyed to a published
+-- version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
+-- asserted core. Inferred relations live in their OWN namespace and intentionally
+-- do NOT reference relation_definitions (the closed asserted registry, ADR-0016).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE graph_enrichments (
+  enrichment_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_config_hash text NOT NULL,
+  status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
+  embedding_model text NOT NULL,
+  judge_model text NOT NULL,
+  difficulty_method text NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  UNIQUE (graph_version_id, enrichment_config_hash)
+);
+
+CREATE TABLE enrichment_concept_clusters (
+  enrichment_concept_cluster_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  cluster_id text NOT NULL,
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  UNIQUE (enrichment_id, concept_id)
+);
+
+CREATE TABLE inferred_prerequisite_edges (
+  inferred_prerequisite_edge_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  predicate text NOT NULL DEFAULT 'inferred-prerequisite-of',
+  prerequisite_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  dependent_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+  uncertain boolean NOT NULL DEFAULT false,
+  cluster_id text,
+  provenance jsonb NOT NULL,
+  UNIQUE (enrichment_id, prerequisite_concept_id, dependent_concept_id),
+  CHECK (prerequisite_concept_id <> dependent_concept_id)
+);
+
+CREATE TABLE concept_difficulties (
+  concept_difficulty_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  score real NOT NULL,
+  method text NOT NULL,
+  components jsonb NOT NULL,
+  UNIQUE (enrichment_id, concept_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Learner Path — vertical-slice projection output (ADR-0019). CLI computes and
+-- persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE learner_paths (
+  learner_path_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  target_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  learner_state_ref text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (enrichment_id, target_concept_id, learner_state_ref)
+);
+
+CREATE TABLE learner_path_steps (
+  learner_path_step_id uuid PRIMARY KEY,
+  learner_path_id uuid NOT NULL REFERENCES learner_paths(learner_path_id),
+  position integer NOT NULL,
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  difficulty real NOT NULL,
+  included_reason text NOT NULL CHECK (included_reason IN ('prerequisite', 'target')),
+  UNIQUE (learner_path_id, position),
+  UNIQUE (learner_path_id, concept_id)
+);

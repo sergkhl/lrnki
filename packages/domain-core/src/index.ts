@@ -492,6 +492,9 @@ export type DerivedGraphLayer = {
   graphVersionId: string;
   enrichmentConfigHash: string;
   embeddingModel: string;
+  // The bounded prerequisite-judge model (provenance for the inferred DAG). Stored
+  // alongside embeddingModel so a layer fully records which models proposed it.
+  judgeModel: string;
   clusters: ConceptCluster[];
   prerequisiteEdges: InferredPrerequisiteEdge[];
   difficulties: ConceptDifficulty[];

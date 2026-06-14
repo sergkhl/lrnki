@@ -9,7 +9,9 @@ export {
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidator,
   conceptClaimSchema,
-  conceptClaimValidator
+  conceptClaimValidator,
+  prerequisiteJudgmentSchema,
+  prerequisiteJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmConceptDiscoveryAdapter,
@@ -19,3 +21,9 @@ export {
   ADMISSION_MODEL,
   CLAIM_MODEL
 } from "./extractionAdapters";
+export {
+  LiteLlmEmbeddingAdapter,
+  LiteLlmPrerequisiteJudgmentAdapter,
+  EMBEDDING_MODEL,
+  PREREQUISITE_JUDGE_MODEL
+} from "./enrichmentAdapters";

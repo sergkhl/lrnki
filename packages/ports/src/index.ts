@@ -121,6 +121,7 @@ export interface EmbeddingPort {
 // arguments and maps "uncertain" to a flagged, path-excluded edge. The judge
 // proposes; deterministic cycle removal + transitive reduction dispose.
 export interface PrerequisiteJudgmentPort {
+  readonly model: string;
   judge(input: {
     declaredDomain: string;
     a: { conceptId: string; canonicalLabel: string; definition?: string };

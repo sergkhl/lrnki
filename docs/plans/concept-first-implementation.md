@@ -64,7 +64,15 @@ Real learner modeling (IRT/KT) stays deferred (ADR-0014).
     - Every FIX_FIRST defect is fixed or explicitly waived in writing before Gate 2 work starts;
       findings recorded under `tmp/` with run IDs.
 
-## Phase 2 — Vertical slice: enrichment → Learner Path (2026-06-13 reevaluation)
+## Phase 2 — Vertical slice: enrichment → Learner Path (2026-06-13 reevaluation) — DONE
+
+> **Status (2026-06-13): COMPLETE.** Steps 11–17 implemented and validated end-to-end on real LLM
+> calls over published version `3096ec52` (enrichment `4efd5d1d`, learner path `d94ee025`). One
+> tuning decision vs. the plan below: the embedding cluster (step 12/13) does **not** hard-gate
+> pairs — the Declared-Domain gate is primary and exhaustive at slice scale, and the cosine cluster
+> is an additive escape valve for large domains only, keeping tier 2 `EXPERIMENT_ONLY` (ADR-0012)
+> until measured to add recall without precision loss. Evidence:
+> `tmp/vertical-slice-enrichment-quality-evaluation.md`. Next phase: Gate 2.
 
 The slice runs after the first atomic publication and before Gate 2, exercising the whole goal chain
 once with expensive stages mocked behind real ports. Decisions: ADR-0019 (Graph Enrichment),
