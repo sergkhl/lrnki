@@ -145,7 +145,6 @@ export type BlockEvidence = { blockId: string; evidenceQuote: string };
 export type DiscoveredCandidate = {
   candidateKey: string;
   canonicalLabel: string;
-  aliases: string[];
   mentions: BlockEvidence[];
 };
 

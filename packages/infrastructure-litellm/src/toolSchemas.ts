@@ -27,11 +27,10 @@ export const conceptDiscoverySchema: JsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["candidateKey", "canonicalLabel", "aliases", "mentions"],
+        required: ["candidateKey", "canonicalLabel", "mentions"],
         properties: {
           candidateKey: { type: "string", description: "Short stable slug unique within this document, e.g. 'ownership'." },
           canonicalLabel: { type: "string" },
-          aliases: { type: "array", items: { type: "string" } },
           mentions: { type: "array", items: blockEvidenceSchema }
         }
       }
@@ -43,7 +42,6 @@ export const conceptDiscoveryValidator = z.object({
   candidates: z.array(z.object({
     candidateKey: z.string().min(1),
     canonicalLabel: z.string().min(1),
-    aliases: z.array(z.string()),
     mentions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
   }).strict())
 }).strict();
@@ -351,6 +349,36 @@ export const claimEntailmentJudgmentSchema: JsonSchema = {
 
 export const claimEntailmentJudgmentValidator = z.object({
   entailed: z.boolean(),
+  entailingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
+export const definitionEntailmentJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["subjectMatch", "subjectSpan", "definitionEntailed", "entailingSpan", "rationale"],
+  properties: {
+    subjectMatch: {
+      type: "string",
+      enum: ["exact_or_interchangeable", "qualified_variant", "different_or_absent"]
+    },
+    subjectSpan: {
+      type: "string",
+      description: "Minimal exact sub-quote that identifies the subject; empty when different or absent."
+    },
+    definitionEntailed: { type: "boolean" },
+    entailingSpan: {
+      type: "string",
+      description: "Minimal exact sub-quote that states the candidate definition; empty when unsupported."
+    },
+    rationale: { type: "string" }
+  }
+};
+
+export const definitionEntailmentJudgmentValidator = z.object({
+  subjectMatch: z.enum(["exact_or_interchangeable", "qualified_variant", "different_or_absent"]),
+  subjectSpan: z.string(),
+  definitionEntailed: z.boolean(),
   entailingSpan: z.string(),
   rationale: z.string().min(1)
 }).strict();

@@ -31,11 +31,19 @@
    - Keep the cascade outside publication until curated fixtures show added recall without precision loss.
 
 4. **Improve claim RECALL (the new claim bottleneck, now that the gate is fixed).**
-   - The semantic judge admits genuinely-supported claims, but the extractor still emits
-     few usable concept claims on some sources (the ML PDF produced none — all
-     superseded-by-retry or literal). Diagnose extractor recall before adding oracle arms.
+   - The semantic judge admits genuinely-supported claims, but concept-to-concept extraction
+     remains sparse on some sources. The v28 ML PDF run produced seven valid definitions but only
+     one verified concept relation. Diagnose extractor recall before adding oracle arms.
    - Address the borderline `is-a` direction case (general is-a specific) surfaced in the
      judge quality eval via extraction direction-prompt tightening.
+   - **ADMISSION SELECTION DEFECT.** The v28 ML run improved to 6 core of 69 candidates and retained
+     source-grounded labels, but still selected the proposition-like
+     "Operator Set as Bottleneck to Performance" while established domain concepts such as Monte
+     Carlo Tree Search, Evolutionary Search, AutoML, and Overfitting remained optional. This
+     starves the concept-to-concept claim space. Likely in the Core Set Selection prompt
+     (`extractionAdapters.ts` `LiteLlmConceptAdmissionAdapter`, the `submit_core_selection` stage):
+     proposition demotion is incomplete and established multi-aspect domain concepts are treated
+     as illustrative/case-study only. Needs measured prompt work and re-run inspection.
 
 5. **Slice deepening (replace mocks behind unchanged ports; do not start before Gate 2 signal).**
    - Real difficulty: Bradley-Terry pairwise calibration replaces `dagDepthDifficultyPort`
@@ -46,13 +54,18 @@
 
 ## COMPLETED
 
-- **Semantic claim-entailment judge replaces the lexical gate (2026-06-14, ADR-0020).** Removed both
+- **Semantic claim-entailment judge replaces lexical claim gates (2026-06-14, ADR-0020).** Removed
   hardcoded surface-matcher vetoes (`evidence_does_not_name_both_endpoints`,
-  `evidence_does_not_lexically_entail_relation`) from `applyClaimPolicy` — AGENTS rule 16 — keeping
-  only the verbatim floor, nature/direction self-report gates, the `defined-as` literal gate, and the
-  aggregate structural gates. Added `ClaimEntailmentJudgmentPort` + forced-tool
+  `evidence_does_not_lexically_entail_relation`,
+  `evidence_does_not_lexically_entail_definition`) from `applyClaimPolicy` under AGENTS rule 16,
+  keeping the verbatim floor, nature/direction self-report gates, and aggregate structural gates.
+  Added `ClaimEntailmentJudgmentPort` + forced-tool
   `LiteLlmClaimEntailmentJudgmentAdapter` (`kg-oracle-judge` = Mistral Small, fail-closed span
-  grounding) + downgrade-only `applyEntailmentJudge` composed stage wired into `executeExtractionRun`.
+  grounding) + downgrade-only `applyEntailmentJudge` for concept relations and paraphrased
+  definitions. Definition judgments separately classify subject identity and meaning support;
+  qualified variants and absent subjects fail closed. Retry eligibility now uses the semantic
+  verdict. Discovery aliases are non-authoritative, and admission relabels apply only when
+  source-grounded, preventing `MLE-bench lite`/`MLE-bench` and narrowed-label conflation.
   Frozen agent-authored oracle (9 concept claims, 1 genuine TRUE; `tmp/claim-oracle/`,
   needs human review) measured the judge at precision 1.00 / recall 1.00 / 0 false positives — it even
   distinguishes the same claim under entailing vs non-entailing evidence. Re-runs: biology 0/11→2/10,
@@ -123,21 +136,13 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-14, claim-entailment judge / ADR-0020):
-- **Static: full `pnpm check` green** — typecheck across all packages, ESLint clean, ingestion tests
-  and **50 application tests** pass (added 5 `applyEntailmentJudge` cases: entail/downgrade,
-  never-re-examine-rejected, skip-literal, fail-closed; removed 4 obsolete lexical-gate cases),
-  Next.js build succeeds.
-- **Judge measurement (frozen oracle, real LLM):** `kg-oracle-judge` over the 9-claim hand-labeled
-  oracle scored **precision 1.00 / recall 1.00 / 0 false positives** (TP=1 TN=8 FN=0 FP=0). The judge
-  recovers the one genuine `is-a` and rejects all 8 mis-typed/mis-targeted/causal claims, including
-  the same claim under entailing vs non-entailing evidence. Promotion gate: PASS.
-- **Real extraction with the integrated judge (pipeline `…entailment-judge-v23`):** Biology §14.3 run
-  `123415f5-fba2-438d-bd72-fe167aff3d3f` → **2 verified / 10 rejected** (was 0/11); Rust ch.4.1 run
-  `93a72176-eb51-4395-92a3-5e3361298e71` → **2 verified / 3 rejected** (was 1/3). New rejections are
-  `evidence_does_not_entail_relation` (judge), `competing_structural_predicates`,
-  `reciprocal_asymmetric_relation`; the two old surface-matcher codes no longer appear. Four verified
-  claims inspected — three clearly correct, one borderline `is-a` direction (true fact, debatable
-  taxonomy). Result: **PASS**.
-- Caveat: oracle is small and agent-authored (needs human review). The new claim bottleneck is
-  extractor RECALL, not the gate — the ML PDF still emits no usable concept claims.
+Latest validation (2026-06-14, definition entailment / pipeline v28):
+- **Static:** full `pnpm check` green; 57 application, 9 ingestion, and 3 LiteLLM adapter tests pass;
+  ESLint and the Next.js production build succeed.
+- **Real model probe:** appositive `Generalization Gap` definition accepted; anonymous-agent evidence
+  rejected for `graph-based search framework`; `MLE-bench lite` rejected for `MLE-bench`.
+- **Real extraction:** ML PDF run `8c6868f1` → 8 verified / 7 rejected; Rust run `304351ed` →
+  4 verified / 6 rejected; biology run `256a73bc` → 1 verified / 11 rejected. All 13 verified
+  claims were inspected and source-supported. Result: **PASS** for definition entailment.
+- **Caveat:** admission selection remains noisy and concept-relation recall remains sparse; both stay
+  in TODO and no new graph version was published from these runs.

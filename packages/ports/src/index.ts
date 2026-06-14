@@ -51,11 +51,14 @@ export interface ConceptConditionedClaimExtractionPort {
 }
 
 // Semantic claim-entailment judge (ADR-0020). A bounded, forced-tool LLM judgment
-// over ONE concept-to-concept claim whose evidence already verifies verbatim. It
-// answers the semantic question the deterministic lexical gate got wrong: does the
-// quoted evidence actually assert this typed relation in this direction between
-// these two concepts? Used only to DOWNGRADE a deterministically-surviving claim;
-// the verbatim floor and structural gates remain deterministic and authoritative.
+// over ONE claim whose evidence already verifies verbatim. It answers the semantic
+// question the deterministic lexical gates got wrong: does the quoted evidence
+// actually assert this claim? Used only to DOWNGRADE a deterministically-surviving
+// claim; the verbatim floor and structural gates remain deterministic and
+// authoritative. Two claim shapes are judged by separate methods because their
+// questions differ: `judge` for a concept-to-concept typed relation in a direction,
+// `judgeDefinition` for a `defined-as` literal (the extractor PARAPHRASES the
+// definition, so no surface matcher can verify it — only entailment can).
 export interface ClaimEntailmentJudgmentPort {
   readonly model: string;
   judge(input: {
@@ -63,6 +66,16 @@ export interface ClaimEntailmentJudgmentPort {
     subject: { canonicalLabel: string; aliases: string[] };
     predicate: RelationPredicate;
     object: { canonicalLabel: string; aliases: string[] };
+    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
+  }): Promise<ClaimEntailmentJudgment>;
+  // Does the verbatim evidence support DEFINING the subject as this literal? The
+  // literal is model-authored prose, not a source substring; judge meaning, not
+  // wording. `entailingSpan` is the minimal source-grounded sub-quote that carries
+  // the definition.
+  judgeDefinition(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    definition: string;
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
   }): Promise<ClaimEntailmentJudgment>;
 }

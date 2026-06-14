@@ -9,7 +9,7 @@ import type {
   SourceBlock,
   StructuredDocument
 } from "@lrnki/domain-core";
-import { extractableBlocks } from "@lrnki/domain-core";
+import { evidenceQuoteMatches, extractableBlocks } from "@lrnki/domain-core";
 import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
 import type {
   ClaimEntailmentJudgmentPort,
@@ -28,7 +28,9 @@ import {
   conceptClaimSchema,
   conceptClaimValidator,
   conceptDiscoverySchema,
-  conceptDiscoveryValidator
+  conceptDiscoveryValidator,
+  definitionEntailmentJudgmentSchema,
+  definitionEntailmentJudgmentValidator
 } from "./toolSchemas";
 
 // LiteLLM aliases (litellm/config.yaml router model_group_alias). Production
@@ -72,6 +74,7 @@ export class LiteLlmConceptDiscoveryAdapter implements ConceptDiscoveryPort {
       "You perform recall-oriented concept discovery for a learner-neutral concept graph.",
       "Surface every plausibly-important, independently-teachable domain concept in the source.",
       "Instruction: do not miss anything plausibly important; precision is handled by a later stage.",
+      "Return one source label per candidate. Do not propose aliases or group qualified variants, subsets, editions, or specialized forms under a broader candidate; alias identity is not a discovery decision.",
       "Do NOT surface bibliography entries, author names, document metadata, or source-local variable/code identifiers as concepts.",
       "Every candidate needs at least one verbatim mention quote copied exactly from the cited block."
     ].join(" ");
@@ -132,7 +135,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
     for (let start = 0; start < input.candidates.length; start += ADMISSION_BATCH_SIZE) {
       const batch = input.candidates.slice(start, start + ADMISSION_BATCH_SIZE);
       const candidateList = batch
-        .map((candidate) => `- ${candidate.candidateKey}: "${candidate.canonicalLabel}" (aliases: ${candidate.aliases.join(", ") || "none"}); evidence: ${candidate.mentions.map((mention) => `"${mention.evidenceQuote}"`).slice(0, 3).join(" | ")}`)
+        .map((candidate) => `- ${candidate.candidateKey}: "${candidate.canonicalLabel}"; evidence: ${candidate.mentions.map((mention) => `"${mention.evidenceQuote}"`).slice(0, 3).join(" | ")}`)
         .join("\n");
       const user = [
         `Declared domain: ${input.declaredDomain}.`,
@@ -284,7 +287,7 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
       "- 'asserted-prerequisite-of': ONLY when the source explicitly states that understanding the subject is required before the object.",
       "- 'contrasts-with': ONLY when the source explicitly contrasts or distinguishes the two concepts as alternatives or opposites. Denying that one concept caused another ('X is not the effect of Y') is a causal statement, not a contrast.",
       "- 'defined-as': the object is a literal definition string quoted from the source; never a concept.",
-      "Always scan the evidence neighborhood for explicit definition sentences before considering concept-to-concept relations. RIGHT: from 'Ownership is a set of rules that govern how a Rust program manages memory', emit Ownership defined-as the literal 'a set of rules that govern how a Rust program manages memory'. The literal must be copied from the same evidence quote.",
+      "Always scan the evidence neighborhood for explicit definition sentences before considering concept-to-concept relations. RIGHT: from 'Ownership is a set of rules that govern how a Rust program manages memory', emit Ownership defined-as the literal 'a set of rules that govern how a Rust program manages memory'. The literal should be a faithful, concise definition GROUNDED IN the evidence quote — you may smooth wording, resolve apposition, or normalise word order, but never add meaning the quote does not support. RIGHT: from 'a discrepancy known as the generalization gap', define 'generalization gap' as 'the discrepancy between ...' even though the quote phrases it as apposition.",
       "DIRECTION GATE — classify evidenceDirection from the quoted sentence independently of predicate. The fixed subject concept must occupy the subject role in the relation:",
       "- is-a requires subject-is-kind-of-object.",
       "- part-of requires subject-is-part-of-object. If the evidence says the object is inside the subject, report object-is-part-of-subject and emit no claim.",
@@ -295,7 +298,7 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
       "For a given subject/object pair choose at most ONE of is-a, part-of, or uses. If two seem plausible, emit neither.",
       "Never emit a symmetric pair: if you emit '<subject> part-of <object>' do not also emit '<object> part-of <subject>'; the same holds for is-a and asserted-prerequisite-of. These relations are one-directional.",
       "The evidence must lexically state the selected relation in the claimed direction: is-a needs explicit category language; part-of needs explicit membership/component language; uses needs an active use/employ/leverage verb with the subject as actor. Mere co-occurrence, support, signal-for-inference, or node/edge listing is insufficient.",
-      "For defined-as, the quote must explicitly name the subject, use definition language such as 'is', 'means', or 'refers to', and contain the exact literal value.",
+      "For defined-as, the quote must explicitly name the subject and state its meaning (via a copula, apposition, 'means', 'refers to', 'known as', or an equivalent definitional construction). The literal value must be entailed by the quote, but need NOT be a verbatim substring of it — a downstream semantic judge checks the definition against the evidence.",
       "WRONG: 'Rust move semantics is-a Rust ownership system'; move semantics is not a kind of ownership system. WRONG: 'DNA double helix uses DNA replication'; replication operates on or uses the double helix, not vice versa.",
       "WRONG: 'Semantic Signal uses Instructor-Aligned KG'; the framework uses the signal. For the Semantic Signal subject call, emit no reversed uses claim.",
       "Never emit a claim whose object is the subject concept itself.",
@@ -401,8 +404,9 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
 // The judge sees the two concept labels (+aliases), the typed relation and its
 // strict test, and the already-verbatim evidence quotes. It decides whether the
 // evidence actually asserts that relation in that direction. Fail closed: a
-// non-substring `entailingSpan` is treated as not-entailed so the judge cannot
-// "support" a claim with text that is not in the cited evidence.
+// ungrounded `entailingSpan` is treated as not-entailed so the judge cannot
+// "support" a claim with text that is not in the cited evidence. Grounding uses
+// the same formatting-noise normalization as the deterministic evidence floor.
 export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJudgmentPort {
   readonly model: string;
   constructor(private readonly client: LiteLlmForcedToolClient, model: string = CLAIM_ENTAILMENT_JUDGE_MODEL) {
@@ -446,15 +450,85 @@ export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJud
       validator: claimEntailmentJudgmentValidator
     });
 
-    // Fail closed: an entailing span must be grounded in the provided evidence.
-    const grounded = result.entailingSpan.trim().length > 0 &&
-      input.evidenceQuotes.some((quote) => quote.includes(result.entailingSpan.trim()));
+    return groundedJudgment(result, input.evidenceQuotes);
+  }
+
+  // Definition entailment for a `defined-as` literal. The literal is model-authored
+  // PARAPHRASE, not a source substring, so no surface matcher can verify it (the old
+  // deterministic `evidence_does_not_lexically_entail_definition` gate was a
+  // false-negative machine, AGENTS rule 16). The judge decides whether the verbatim
+  // evidence actually states this meaning for the subject. Same fail-closed span
+  // grounding: `entailingSpan` must match a provided quote under the deterministic
+  // evidence normalizer.
+  async judgeDefinition(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    definition: string;
+    evidenceQuotes: string[];
+  }): Promise<ClaimEntailmentJudgment> {
+    const system = [
+      "You judge whether quoted source evidence ACTUALLY DEFINES a domain concept as a given meaning, for a learner-neutral concept graph.",
+      "The evidence quotes are already verified verbatim from the source. Judge ONLY what the quotes assert — do not use outside knowledge to fill gaps.",
+      "The candidate definition is a faithful PARAPHRASE, not a verbatim copy; real prose defines through apposition ('—a discrepancy known as X'), reversed order, copulas, and synonyms. Judge meaning, not wording: do not require the definition string to appear verbatim.",
+      "Make TWO independent decisions. First classify subjectMatch: exact_or_interchangeable only when the quotes identify the requested subject itself; qualified_variant when they identify a narrower, broader, suffixed, or specialized form (for example 'MLE-bench lite' is not 'MLE-bench'); different_or_absent when they define another referent or never identify the requested subject.",
+      "For subjectSpan, copy the minimal exact sub-quote that identifies the subject. An anonymous noun such as 'an agent' does NOT identify a requested subject named 'graph-based search framework'. Do not infer subject identity from document context absent from the quotes.",
+      "Negative example: requested subject 'graph-based search framework', quote 'We consider an agent that operates by searching a directed graph' => subjectMatch=different_or_absent, because the quote identifies only an anonymous agent and never links it to the requested term.",
+      "Qualified example: requested subject 'MLE-bench', quote 'MLE-bench lite—a curated subset' => subjectMatch=qualified_variant, because the suffixed subset is not interchangeable with the full benchmark.",
+      "Second set definitionEntailed=true only when the quotes state the candidate meaning without adding, narrowing, or distorting it, independent of whether the correct subject was identified.",
+      "For entailingSpan, copy the minimal exact sub-quote that carries the definition. Both spans must be verbatim substrings of a provided quote; use an empty span when its decision is negative."
+    ].join("\n");
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Subject concept: "${input.subject.canonicalLabel}" (aliases: ${renderAliases(input.subject.aliases)}).`,
+      `Candidate definition: "${input.definition}".`,
+      "",
+      "Verbatim evidence quotes:",
+      ...input.evidenceQuotes.map((quote, index) => `[${index + 1}] "${quote}"`),
+      "",
+      "Call submit_definition_entailment_judgment: first classify subject identity, then judge whether the candidate meaning is stated."
+    ].join("\n");
+
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_definition_entailment_judgment",
+      toolDescription: "Submit the subject-identity classification and whether the candidate definition is stated.",
+      parameters: definitionEntailmentJudgmentSchema,
+      validator: definitionEntailmentJudgmentValidator
+    });
+
+    const subjectSpan = result.subjectSpan.trim();
+    const entailingSpan = result.entailingSpan.trim();
+    const subjectGrounded = subjectSpan.length > 0 &&
+      input.evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, subjectSpan));
+    const definitionGrounded = entailingSpan.length > 0 &&
+      input.evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, entailingSpan));
+    const entailed =
+      result.subjectMatch === "exact_or_interchangeable" &&
+      subjectGrounded &&
+      result.definitionEntailed &&
+      definitionGrounded;
     return {
-      entailed: result.entailed && grounded,
-      entailingSpan: grounded ? result.entailingSpan.trim() : "",
-      rationale: result.rationale
+      entailed,
+      entailingSpan: entailed ? entailingSpan : "",
+      rationale: `${result.rationale} [subjectMatch=${result.subjectMatch}; subjectSpan=${JSON.stringify(subjectSpan)}; subjectGrounded=${subjectGrounded}; definitionEntailed=${result.definitionEntailed}; entailingSpan=${JSON.stringify(entailingSpan)}; definitionGrounded=${definitionGrounded}]`
     };
   }
+}
+
+// Fail closed: an entailing span must be grounded in the provided evidence, so the
+// judge can never "support" a claim with text absent from the cited quotes.
+function groundedJudgment(
+  result: { entailed: boolean; entailingSpan: string; rationale: string },
+  evidenceQuotes: string[]
+): ClaimEntailmentJudgment {
+  const span = result.entailingSpan.trim();
+  const grounded = span.length > 0 && evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, span));
+  return {
+    entailed: result.entailed && grounded,
+    entailingSpan: grounded ? span : "",
+    rationale: result.rationale
+  };
 }
 
 function renderAliases(aliases: string[]): string {

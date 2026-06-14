@@ -72,20 +72,15 @@ export async function executeExtractionRun(input: {
     aliases: exactAliases(candidate)
   }));
   const coreKeys = new Set(coreCandidates.map((candidate) => candidate.candidateKey));
-  const labelsByCandidateKey = new Map<string, string[]>(
-    coreCandidates.map((candidate) => [
-      candidate.candidateKey,
-      [candidate.discoveredLabel, candidate.canonicalLabel, ...candidate.aliases]
-    ])
-  );
   // Canonical label + exact aliases per concept, for the semantic entailment judge.
   const conceptsByKey = new Map<string, { canonicalLabel: string; aliases: string[] }>(
     admittedConcepts.map((concept) => [concept.candidateKey, { canonicalLabel: concept.canonicalLabel, aliases: concept.aliases }])
   );
 
-  // Stage 3 — concept-conditioned claim extraction with deterministic evidence validation.
-  // Retry once only when a subject's first attempt has no verified claim. Superseded
-  // first-pass claims remain auditable, but are excluded from the final conflict pass.
+  // Stage 3 — concept-conditioned claim extraction with deterministic evidence
+  // validation and semantic entailment. Retry once only when a subject's first
+  // attempt has no fully verified claim. Superseded first-pass claims remain
+  // auditable, but are excluded from the final conflict pass.
   const proposals: ExtractionRunResult["proposals"] = [];
   const subjectAttempts = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
     const extract = async (feedback?: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0]["feedback"]) => {
@@ -107,12 +102,20 @@ export async function executeExtractionRun(input: {
       }
     };
     const first = await extract();
-    const firstClaims = applyClaimPolicy({
+    const firstPolicyClaims = applyClaimPolicy({
       claims: first?.claims ?? [],
       extractionAttempt: 1,
       coreCandidateKeys: coreKeys,
-      labelsByCandidateKey,
       blockText
+    });
+    // Retry eligibility must use the complete claim verdict. Otherwise a claim
+    // that passes structural checks but fails semantic entailment suppresses the
+    // one precision-preserving retry.
+    const firstClaims = await applyEntailmentJudge({
+      claims: firstPolicyClaims,
+      declaredDomain,
+      conceptsByKey,
+      judge: input.claimEntailmentJudge
     });
     if (firstClaims.some((claim) => claim.validationOutcome === "verified")) {
       return { first, firstClaims, retry: null };
@@ -154,7 +157,6 @@ export async function executeExtractionRun(input: {
   const policyClaims = applyClaimPolicy({
     claims: effectiveExtractedClaims,
     coreCandidateKeys: coreKeys,
-    labelsByCandidateKey,
     blockText
   });
   const judgedClaims = await applyEntailmentJudge({

@@ -28,7 +28,7 @@ export function applyAdmissionPolicy(input: {
       discoveredLabel: candidate.canonicalLabel,
       canonicalLabel: candidate.canonicalLabel,
       normalizedLabel: normalizeConceptLabel(candidate.canonicalLabel),
-      aliases: unique(candidate.aliases),
+      aliases: [],
       mentions,
       admission: {
         modelTier: "reject",
@@ -66,6 +66,14 @@ export function applyAdmissionPolicy(input: {
   const proposedCanonicalLabel = proposal.proposedCanonicalLabel.trim();
   const canonicalLabelValid = normalizeConceptLabel(proposedCanonicalLabel).length > 0;
   if (!canonicalLabelValid) boundaryReasonCodes.push("invalid_proposed_canonical_label");
+  const proposedCanonicalLabelGrounded =
+    canonicalLabelValid &&
+    [...blockText.values()].some((text) =>
+      normalizeConceptLabel(text).includes(normalizeConceptLabel(proposedCanonicalLabel))
+    );
+  if (canonicalLabelValid && !proposedCanonicalLabelGrounded) {
+    boundaryReasonCodes.push("proposed_canonical_label_not_source_grounded");
+  }
 
   const eligible =
     standaloneLearningObjective.passed &&
@@ -91,11 +99,15 @@ export function applyAdmissionPolicy(input: {
         : "optional";
   if (tier !== proposal.tier) boundaryReasonCodes.push("effective_tier_corrected");
 
-  const canonicalLabel = tier === "core" ? proposedCanonicalLabel : candidate.canonicalLabel;
-  const aliases = unique([
-    ...candidate.aliases,
-    ...(canonicalLabel !== candidate.canonicalLabel ? [candidate.canonicalLabel] : [])
-  ]).filter((alias) => alias !== canonicalLabel);
+  const canonicalLabel =
+    tier === "core" && proposedCanonicalLabelGrounded
+      ? proposedCanonicalLabel
+      : candidate.canonicalLabel;
+  // Candidate Discovery is recall-oriented and has no authority to merge labels
+  // as aliases. Preserve only the discovered source label when admission assigns
+  // a more precise canonical label; qualified variants require a later explicit
+  // identity decision.
+  const aliases = canonicalLabel !== candidate.canonicalLabel ? [candidate.canonicalLabel] : [];
 
   return {
     candidateKey: candidate.candidateKey,
