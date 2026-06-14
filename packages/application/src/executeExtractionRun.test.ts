@@ -9,11 +9,30 @@ import type {
   StructuredDocument
 } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   ArtifactRepositoryPort,
+  ClaimEntailmentJudgmentPort,
   ConceptConditionedClaimExtractionPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
+
+// Default judge entails everything so these tests exercise the deterministic +
+// orchestration behavior; entailment downgrades are covered in
+// applyEntailmentJudge.test.ts.
+const entailEverything: ClaimEntailmentJudgmentPort = {
+  model: "test-judge",
+  judge: async () => ({ entailed: true, entailingSpan: "", rationale: "test" }),
+  judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+};
+
+// Default admission judge calls every label a concept, so candidates stay core and
+// these orchestration tests are unaffected; proposition demotion is covered in
+// applyAdmissionLabelJudge.test.ts.
+const everythingIsAConcept: AdmissionLabelJudgmentPort = {
+  model: "test-admission-judge",
+  judge: async () => ({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "test" })
+};
 
 const frameworkQuote = "INSTRUCTKG is part of Signal Systems and INSTRUCTKG works by leveraging temporal signals.";
 const signalQuote = "Temporal signals organize teaching order and reveal prerequisite structure.";
@@ -32,13 +51,11 @@ const candidates: DiscoveredCandidate[] = [
   {
     candidateKey: "framework",
     canonicalLabel: "Instructor-Aligned Knowledge Graphs",
-    aliases: ["INSTRUCTKG"],
     mentions: [{ blockId: "block-1", evidenceQuote: "INSTRUCTKG" }]
   },
   {
     candidateKey: "signals",
     canonicalLabel: "Temporal Signals",
-    aliases: ["temporal signals"],
     mentions: [{ blockId: "block-2", evidenceQuote: "Temporal signals" }]
   }
 ];
@@ -79,7 +96,11 @@ function usesClaim(): ExtractedClaim {
   };
 }
 
-function harness(extract: ConceptConditionedClaimExtractionPort["extract"], selectedCandidates = candidates) {
+function harness(
+  extract: ConceptConditionedClaimExtractionPort["extract"],
+  selectedCandidates = candidates,
+  claimEntailmentJudge = entailEverything
+) {
   let persisted: ExtractionRunResult | undefined;
   const store: ExtractionRunStorePort = {
     persist: async (result) => { persisted = result; },
@@ -99,6 +120,8 @@ function harness(extract: ConceptConditionedClaimExtractionPort["extract"], sele
       discovery: { discover: async () => selectedCandidates },
       admission: { admit: async () => selectedCandidates.map(admission) },
       claimExtraction: { extract },
+      claimEntailmentJudge,
+      admissionLabelJudge: everythingIsAConcept,
       store,
       artifacts
     }),
@@ -133,7 +156,7 @@ test("retries once with aliases and rejected feedback, preserving both attempts 
   const retryClaim = frameworkClaims.find((claim) => claim.extractionAttempt === 2);
   assert.equal(retryClaim?.validationOutcome, "verified");
   const firstFrameworkCall = calls.find((call) => call.subject.candidateKey === "framework" && !call.feedback);
-  assert.deepEqual(firstFrameworkCall?.subject.aliases, ["Instructor-Aligned Knowledge Graphs", "INSTRUCTKG"]);
+  assert.deepEqual(firstFrameworkCall?.subject.aliases, ["Instructor-Aligned Knowledge Graphs"]);
   const retryCall = calls.find((call) => call.subject.candidateKey === "framework" && call.feedback);
   assert.equal(retryCall?.feedback?.rejectedClaims.length, 2);
   assert.equal(calls.filter((call) => call.subject.candidateKey === "framework").length, 2);
@@ -149,6 +172,40 @@ test("does not retry a subject after a verified first-attempt claim", async () =
   const result = await run();
   assert.equal(result.claims.find((claim) => claim.subjectCandidateKey === "framework")?.extractionAttempt, 1);
   assert.equal(calls, 3, "framework runs once; the claimless signals subject runs twice");
+});
+
+test("retries when a structurally valid first-attempt claim fails semantic entailment", async () => {
+  const calls: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0][] = [];
+  const extract: ConceptConditionedClaimExtractionPort["extract"] = async (input) => {
+    calls.push(input);
+    if (input.subject.candidateKey === "signals") return { claims: [], proposals: [] };
+    return { claims: [usesClaim()], proposals: [] };
+  };
+  let frameworkJudgments = 0;
+  const judge: ClaimEntailmentJudgmentPort = {
+    model: "test-judge",
+    judge: async () => {
+      frameworkJudgments += 1;
+      return frameworkJudgments === 1
+        ? { entailed: false, entailingSpan: "", rationale: "first attempt unsupported" }
+        : { entailed: true, entailingSpan: "leveraging temporal signals", rationale: "retry supported" };
+    },
+    judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+  };
+
+  const result = await harness(extract, candidates, judge).run();
+  const frameworkClaims = result.claims.filter((claim) => claim.subjectCandidateKey === "framework");
+  assert.equal(calls.filter((call) => call.subject.candidateKey === "framework").length, 2);
+  const retryCall = calls.find((call) => call.subject.candidateKey === "framework" && call.feedback);
+  assert.deepEqual(retryCall?.feedback?.rejectedClaims[0]?.boundaryReasonCodes, ["evidence_does_not_entail_relation"]);
+  assert.equal(frameworkClaims.some((claim) =>
+    claim.extractionAttempt === 1 &&
+    claim.boundaryReasonCodes.includes("evidence_does_not_entail_relation") &&
+    claim.boundaryReasonCodes.includes("superseded_by_retry")
+  ), true);
+  assert.equal(frameworkClaims.some((claim) =>
+    claim.extractionAttempt === 2 && claim.validationOutcome === "verified"
+  ), true);
 });
 
 test("fails closed after exactly one retry when the model errors", async () => {

@@ -1,12 +1,16 @@
 import type {
+  AdmissionLabelJudgment,
   AdmissionProposal,
   ArtifactEnvelope,
+  ClaimEntailmentJudgment,
   ClaimExtractionFeedback,
   ClaimExtractionResult,
   Concept,
+  RelationPredicate,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
+  EnrichmentRunTrace,
   ExtractionRunResult,
   GraphSnapshot,
   InferredPrerequisiteEdge,
@@ -45,6 +49,55 @@ export interface ConceptConditionedClaimExtractionPort {
     evidenceNeighborhood: SourceBlock[];
     feedback?: ClaimExtractionFeedback;
   }): Promise<ClaimExtractionResult>;
+}
+
+// Semantic claim-entailment judge (ADR-0020). A bounded, forced-tool LLM judgment
+// over ONE claim whose evidence already verifies verbatim. It answers the semantic
+// question the deterministic lexical gates got wrong: does the quoted evidence
+// actually assert this claim? Used only to DOWNGRADE a deterministically-surviving
+// claim; the verbatim floor and structural gates remain deterministic and
+// authoritative. Two claim shapes are judged by separate methods because their
+// questions differ: `judge` for a concept-to-concept typed relation in a direction,
+// `judgeDefinition` for a `defined-as` literal (the extractor PARAPHRASES the
+// definition, so no surface matcher can verify it — only entailment can).
+export interface ClaimEntailmentJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    predicate: RelationPredicate;
+    object: { canonicalLabel: string; aliases: string[] };
+    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
+  }): Promise<ClaimEntailmentJudgment>;
+  // Does the verbatim evidence support DEFINING the subject as this literal? The
+  // literal is model-authored prose, not a source substring; judge meaning, not
+  // wording. `entailingSpan` is the minimal source-grounded sub-quote that carries
+  // the definition.
+  judgeDefinition(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    definition: string;
+    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
+  }): Promise<ClaimEntailmentJudgment>;
+}
+
+// Concept-vs-proposition admission judge (ADR-0021). A bounded, forced-tool LLM
+// judgment over ONE admitted-`core` label, run on an independent model family
+// (`kg-oracle-judge`) so the judge is not the admission extractor grading its own
+// homework. It answers the semantic question the deterministic lexical veto got
+// wrong: does this label NAME a concept, or ASSERT a claim about one? Used only
+// to DOWNGRADE a `core` candidate whose label is a proposition; it never promotes
+// or resurrects. The adapter grounds its verdict fail-closed (an ungrounded
+// positive is returned as `concept`), so the application stage reads `labelKind`
+// and demotes only on a confident, source-grounded positive.
+export interface AdmissionLabelJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    label: string; // proposed canonical label of the admitted-core candidate
+    aliases: string[];
+    evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
+  }): Promise<AdmissionLabelJudgment>;
 }
 
 export interface ArtifactRepositoryPort {
@@ -93,7 +146,8 @@ export interface GraphVersionStorePort {
     runMemberships: { runId: string; sourceResourceId: string }[];
     refinementDecisions: RefinementDecisionRecord[];
   }): Promise<void>;
-  getPublishedSnapshot(): Promise<GraphSnapshot | undefined>;
+  getPublishedSnapshot(graphVersionId: string): Promise<GraphSnapshot | undefined>;
+  getLatestPublishedSnapshot(): Promise<GraphSnapshot | undefined>;
 }
 
 export interface SourceObjectStoragePort {
@@ -121,6 +175,7 @@ export interface EmbeddingPort {
 // arguments and maps "uncertain" to a flagged, path-excluded edge. The judge
 // proposes; deterministic cycle removal + transitive reduction dispose.
 export interface PrerequisiteJudgmentPort {
+  readonly model: string;
   judge(input: {
     declaredDomain: string;
     a: { conceptId: string; canonicalLabel: string; definition?: string };
@@ -146,13 +201,16 @@ export interface LearnerStatePort {
   mastery(conceptId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
 }
 
-// Graph Enrichment persistence (ADR-0019). Immutable, keyed to (graphVersionId +
-// enrichmentConfigHash); refuses to mutate an existing enrichment. Persists the
-// layer as queryable normalized rows AND appends an artifact envelope for replay.
-export interface DerivedGraphLayerStorePort {
-  persist(layer: DerivedGraphLayer): Promise<void>;
-  getLayer(input: { graphVersionId: string; enrichmentConfigHash: string }): Promise<DerivedGraphLayer | undefined>;
-  getLatestLayer(graphVersionId: string): Promise<DerivedGraphLayer | undefined>;
+// Graph Enrichment persistence (ADR-0019). Append-only; each run has its own
+// enrichmentId, so repeated runs over the same graph version and configuration
+// remain independently queryable. Persists normalized rows plus one immutable
+// JSONB judgment/disposition trace.
+export interface EnrichmentRunStorePort {
+  persist(input: {
+    layer: DerivedGraphLayer;
+    artifact: ArtifactEnvelope<EnrichmentRunTrace>;
+  }): Promise<void>;
+  getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined>;
 }
 
 // Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the

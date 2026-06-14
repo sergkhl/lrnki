@@ -24,11 +24,19 @@ content, so the content hash stays stable.
 
 | # | Source | Domain | Format | License | Status |
 |---|--------|--------|--------|---------|--------|
-| 4 | CoDA: Towards Effective Cross-domain Knowledge Transfer via CoT-guided Domain Adaptation | Computer science | PDF | arXiv | `pdf/2604.19488v1.pdf` ✓ |
+| 4 | Toledo et al., *AI Research Agents for Machine Learning* (arXiv 2507.02554v2) | Machine learning systems | PDF | arXiv preprint | `pdf/2507.02554v2.pdf` ✓ (Docling-ingested, run `9b92bd64`) |
 | 5 | FEMA Independent Study course document (or GOV.UK statutory-guidance DOCX) | Emergency management / law | DOCX | Public domain / OGL | to add |
 | 6 | CDC *Principles of Epidemiology in Public Health Practice* lecture slides | Healthcare | PPTX | Public domain (US gov) | to add |
 
-Caveat: fixture 4 is an ML paper processed by an ML pipeline — extractor familiarity makes its scores a best-case bound, never the headline number.
+Fixtures 4–6 are converted by the version-pinned Docling adapter (`docling-serve-cpu` v1.23.0 +
+`docling` 2.102.1) over HTTP: async submit→poll→fetch, OCR off, table structure off (tables are
+non-teachable placeholders), figures as `<!-- image -->` placeholders. The converted Markdown runs
+through the same shared structure pass as the native parsers. Conversion is one-time per fixture;
+extraction/build/enrichment replay off the stored blocks.
+
+Caveat: fixture 4 is an ML paper processed by an LLM extraction pipeline — extractor familiarity
+makes its scores a best-case bound, never the headline number. PDF→Markdown of math-heavy text also
+introduces token-spacing artifacts, an inherent layout-extraction limit.
 
 ## Layout
 

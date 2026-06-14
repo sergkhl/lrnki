@@ -6,3 +6,7 @@ export {
   PostgresGraphVersionStore
 } from "./PostgresStores";
 export { PostgresArtifactRepository } from "./PostgresArtifactRepository";
+export {
+  PostgresEnrichmentRunStore,
+  PostgresLearnerPathStore
+} from "./PostgresEnrichmentStores";

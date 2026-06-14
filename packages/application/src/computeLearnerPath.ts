@@ -1,7 +1,7 @@
 import type { LearnerPath } from "@lrnki/domain-core";
 import type {
   ArtifactRepositoryPort,
-  DerivedGraphLayerStorePort,
+  EnrichmentRunStorePort,
   LearnerPathStorePort,
   LearnerStatePort
 } from "@lrnki/ports";
@@ -18,18 +18,18 @@ const PRODUCER_VERSION = "0.5.0";
 // a different LearnerStatePort; nothing here changes.
 export async function computeLearnerPath(input: {
   learnerPathId: string;
-  graphVersionId: string;
+  enrichmentId: string;
   targetConceptId: string;
-  layerStore: DerivedGraphLayerStorePort;
+  enrichmentStore: EnrichmentRunStorePort;
   learnerState: LearnerStatePort;
   pathStore: LearnerPathStorePort;
   artifacts: ArtifactRepositoryPort;
   masteryThreshold?: number;
 }): Promise<LearnerPath> {
-  const layer = await input.layerStore.getLatestLayer(input.graphVersionId);
-  if (!layer) throw new Error(`computeLearnerPath: no enrichment layer for version ${input.graphVersionId}.`);
+  const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
+  if (!layer) throw new Error(`computeLearnerPath: enrichment ${input.enrichmentId} not found.`);
   if (!layer.difficulties.some((difficulty) => difficulty.conceptId === input.targetConceptId)) {
-    throw new Error(`computeLearnerPath: target ${input.targetConceptId} is not in version ${input.graphVersionId}.`);
+    throw new Error(`computeLearnerPath: target ${input.targetConceptId} is not in enrichment ${input.enrichmentId}.`);
   }
 
   const steps = projectLearnerPath({
@@ -42,7 +42,7 @@ export async function computeLearnerPath(input: {
 
   const path: LearnerPath = {
     learnerPathId: input.learnerPathId,
-    graphVersionId: input.graphVersionId,
+    graphVersionId: layer.graphVersionId,
     enrichmentId: layer.enrichmentId,
     targetConceptId: input.targetConceptId,
     learnerStateRef: input.learnerState.learnerStateRef,
@@ -54,7 +54,7 @@ export async function computeLearnerPath(input: {
     artifactId: `${input.learnerPathId}:learner-path`,
     artifactType: "learner_path.v1",
     schemaVersion: "1",
-    graphVersionId: input.graphVersionId,
+    graphVersionId: layer.graphVersionId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,
     configHash: layer.enrichmentConfigHash,

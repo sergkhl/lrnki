@@ -10,7 +10,7 @@ export async function loadPublishedSnapshot(): Promise<{ snapshot: GraphSnapshot
   const sql = createDatabaseClient();
   try {
     const store = new PostgresGraphVersionStore(sql);
-    const published = await store.getPublishedSnapshot();
+    const published = await store.getLatestPublishedSnapshot();
     return published ? { snapshot: published, live: true } : { snapshot: demoSnapshot, live: false };
   } catch {
     return { snapshot: demoSnapshot, live: false };

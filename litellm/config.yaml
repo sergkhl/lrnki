@@ -203,6 +203,11 @@ router_settings:
     kg-concept-discovery: deepseek/deepseek-v4-flash-no-thinking
     kg-concept-admission: deepseek/deepseek-v4-flash-no-thinking
     kg-claim-extraction: deepseek/deepseek-v4-flash-no-thinking
+    # Graph Enrichment, third operation (ADR-0019): contextual embeddings gate
+    # prerequisite pairs (ADR-0012 tier 2, propose-only); the bounded judge
+    # proposes the inferred DAG using the same no-thinking extractor.
+    kg-concept-embedding: openrouter/qwen/qwen3-embedding-8b
+    kg-prerequisite-judgment: deepseek/deepseek-v4-flash-no-thinking
     # Oracle roles must be independent of the production extractor (ADR-0013:
     # "the production extraction model must not grade itself"). Three families:
     # DeepSeek extracts, MiniMax authors references, Mistral audits.

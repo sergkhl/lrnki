@@ -1,3 +1,3 @@
 # Blockers
 
-- None
+_No unresolved blockers._

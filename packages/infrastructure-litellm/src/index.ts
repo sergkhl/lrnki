@@ -9,13 +9,29 @@ export {
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidator,
   conceptClaimSchema,
-  conceptClaimValidator
+  conceptClaimValidator,
+  prerequisiteJudgmentSchema,
+  prerequisiteJudgmentValidator,
+  claimEntailmentJudgmentSchema,
+  claimEntailmentJudgmentValidator,
+  admissionLabelJudgmentSchema,
+  admissionLabelJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmClaimExtractionAdapter,
+  LiteLlmClaimEntailmentJudgmentAdapter,
+  LiteLlmAdmissionLabelJudgmentAdapter,
   DISCOVERY_MODEL,
   ADMISSION_MODEL,
-  CLAIM_MODEL
+  CLAIM_MODEL,
+  CLAIM_ENTAILMENT_JUDGE_MODEL,
+  ADMISSION_LABEL_JUDGE_MODEL
 } from "./extractionAdapters";
+export {
+  LiteLlmEmbeddingAdapter,
+  LiteLlmPrerequisiteJudgmentAdapter,
+  EMBEDDING_MODEL,
+  PREREQUISITE_JUDGE_MODEL
+} from "./enrichmentAdapters";

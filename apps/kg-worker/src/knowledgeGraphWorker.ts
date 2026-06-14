@@ -1,30 +1,44 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { buildGraphVersion, executeExtractionRun } from "@lrnki/application";
 import {
+  buildGraphVersion,
+  computeLearnerPath,
+  dagDepthDifficultyPort,
+  emptyLearnerState,
+  executeExtractionRun,
+  runGraphEnrichment
+} from "@lrnki/application";
+import {
+  DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
   MarkdownStructuredDocumentParser,
   StructuredDocumentParserRegistry,
   TextStructuredDocumentParser
 } from "@lrnki/infrastructure-ingestion";
 import {
+  LiteLlmAdmissionLabelJudgmentAdapter,
+  LiteLlmClaimEntailmentJudgmentAdapter,
   LiteLlmClaimExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmConceptDiscoveryAdapter,
-  LiteLlmForcedToolClient
+  LiteLlmEmbeddingAdapter,
+  LiteLlmForcedToolClient,
+  LiteLlmPrerequisiteJudgmentAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
+  PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
   PostgresGraphVersionStore,
+  PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-claim-retry-v22";
+const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-admission-label-judge-v29";
 
 import { existsSync } from "node:fs";
 
@@ -52,7 +66,14 @@ function buildContext() {
   const parsers = new StructuredDocumentParserRegistry([
     new MarkdownStructuredDocumentParser(),
     new HtmlStructuredDocumentParser(),
-    new TextStructuredDocumentParser()
+    new TextStructuredDocumentParser(),
+    // Mixed-format ingestion (Gate 2, ADR-0013). The image tag is pinned in the
+    // parser config hash so the layout contract is reproducible across the
+    // frozen oracle suite; bump DOCLING_IMAGE_TAG when docker/Dockerfile changes.
+    new DoclingStructuredDocumentParser({
+      baseUrl: process.env.DOCLING_BASE_URL ?? "http://localhost:5001",
+      imageTag: process.env.DOCLING_IMAGE_TAG ?? "docling-serve-cpu-v1.23.0+docling-2.102.1"
+    })
   ]);
   const baseClient = {
     baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
@@ -81,7 +102,24 @@ function buildContext() {
     parsers,
     discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
     admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
-    claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient)
+    claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient),
+    // Semantic claim-entailment judge (ADR-0020). Independent model (Mistral
+    // Small via kg-oracle-judge) so the judge is not the extractor re-grading
+    // itself; deterministic decoding for stable re-derivation.
+    claimEntailmentJudge: new LiteLlmClaimEntailmentJudgmentAdapter(deterministicClient),
+    // Concept-vs-proposition admission judge (ADR-0021). Same independent family
+    // (kg-oracle-judge) and deterministic decoding; downgrade-only stage that
+    // replaces the removed looksLikePropositionLabel lexical veto.
+    admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
+    // Graph Enrichment ports (ADR-0019). Embedding clusters/gates pairs; the
+    // bounded judge proposes the inferred DAG (deterministic decoding for stable
+    // re-derivation); difficulty + learner state are mocks behind real ports.
+    embedding: new LiteLlmEmbeddingAdapter(baseClient),
+    prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
+    difficulty: dagDepthDifficultyPort,
+    enrichmentStore: new PostgresEnrichmentRunStore(sql),
+    learnerState: emptyLearnerState,
+    pathStore: new PostgresLearnerPathStore(sql)
   };
 }
 
@@ -130,6 +168,8 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
       discovery: ctx.discovery,
       admission: ctx.admission,
       claimExtraction: ctx.claimExtraction,
+      claimEntailmentJudge: ctx.claimEntailmentJudge,
+      admissionLabelJudge: ctx.admissionLabelJudge,
       store: ctx.runStore,
       artifacts: ctx.artifacts
     });
@@ -157,6 +197,64 @@ async function buildVersion(ctx: Context, runIds: string[]) {
   console.log(`\n>> published graph version ${graphVersionId} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} claims=${snapshot.claims.length}`);
 }
 
+async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
+  // Graph Enrichment is the third operation (ADR-0019): published version +
+  // enrichment config -> immutable Derived Graph Layer. It never mutates the
+  // asserted core. Default to the latest published version when none is named.
+  let targetVersionId = graphVersionId;
+  if (!targetVersionId) {
+    const snapshot = await ctx.graphStore.getLatestPublishedSnapshot();
+    if (!snapshot) {
+      console.error("! no published graph version to enrich.");
+      process.exitCode = 1;
+      return;
+    }
+    targetVersionId = snapshot.graphVersionId;
+  }
+  const enrichmentId = randomUUID();
+  console.log(`\n>> graph enrichment ${enrichmentId} over version ${targetVersionId}`);
+  const layer = await runGraphEnrichment({
+    enrichmentId,
+    graphVersionId: targetVersionId,
+    graphStore: ctx.graphStore,
+    embedding: ctx.embedding,
+    prerequisiteJudge: ctx.prerequisiteJudge,
+    difficulty: ctx.difficulty,
+    enrichmentStore: ctx.enrichmentStore
+  });
+  const certain = layer.prerequisiteEdges.filter((edge) => !edge.uncertain).length;
+  const uncertain = layer.prerequisiteEdges.length - certain;
+  console.log(
+    `   candidateGroups=${layer.prerequisiteCandidateGroups.length} edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} embedding=${layer.embeddingModel} judge=${layer.judgeModel}`
+  );
+  for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
+    console.log(`   edge: ${edge.prerequisiteConceptId} -> ${edge.dependentConceptId} (conf=${edge.confidence.toFixed(2)})`);
+  }
+}
+
+async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string) {
+  if (!enrichmentId || !targetConceptId) {
+    console.error("! compute-learner-path requires <enrichmentId> <targetConceptId>.");
+    process.exitCode = 1;
+    return;
+  }
+  const learnerPathId = randomUUID();
+  console.log(`\n>> learner path ${learnerPathId} for target ${targetConceptId} from enrichment ${enrichmentId}`);
+  const path = await computeLearnerPath({
+    learnerPathId,
+    enrichmentId,
+    targetConceptId,
+    enrichmentStore: ctx.enrichmentStore,
+    learnerState: ctx.learnerState,
+    pathStore: ctx.pathStore,
+    artifacts: ctx.artifacts
+  });
+  console.log(`   learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
+  for (const step of path.steps) {
+    console.log(`   #${step.position} [${step.includedReason}] ${step.conceptId} (difficulty=${step.difficulty.toFixed(2)})`);
+  }
+}
+
 async function listSources(ctx: Context) {
   for (const source of await ctx.registrationStore.listSources()) {
     console.log(`${source.sourceResourceId}  [${source.declaredDomain}]  ${source.title}`);
@@ -178,11 +276,17 @@ async function main() {
         // All positional args after the command are run IDs to publish.
         await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
         break;
+      case "enrich-graph-version":
+        await enrichGraphVersion(ctx, arg);
+        break;
+      case "compute-learner-path":
+        await computeLearnerPathCommand(ctx, arg, rest[0]);
+        break;
       case "list-sources":
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

@@ -6,14 +6,18 @@ import {
   type StructuredDocument
 } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   ArtifactRepositoryPort,
+  ClaimEntailmentJudgmentPort,
   ConceptAdmissionPort,
   ConceptConditionedClaimExtractionPort,
   ConceptDiscoveryPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
+import { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 import { applyClaimPolicy } from "./applyClaimPolicy";
+import { applyEntailmentJudge } from "./applyEntailmentJudge";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.4.0";
@@ -28,6 +32,8 @@ export async function executeExtractionRun(input: {
   discovery: ConceptDiscoveryPort;
   admission: ConceptAdmissionPort;
   claimExtraction: ConceptConditionedClaimExtractionPort;
+  claimEntailmentJudge: ClaimEntailmentJudgmentPort;
+  admissionLabelJudge: AdmissionLabelJudgmentPort;
   store: ExtractionRunStorePort;
   artifacts: ArtifactRepositoryPort;
 }): Promise<ExtractionRunResult> {
@@ -54,13 +60,25 @@ export async function executeExtractionRun(input: {
     else proposalByKey.set(proposal.candidateKey, proposal);
   }
 
-  const candidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
+  const policyCandidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
     candidate,
     proposal: duplicateKeys.has(candidate.candidateKey) ? undefined : proposalByKey.get(candidate.candidateKey),
     blockText,
     illustrativeBlockIds,
     initialBoundaryReasonCodes: duplicateKeys.has(candidate.candidateKey) ? ["duplicate_admission_decision"] : []
   }));
+
+  // Concept-vs-proposition admission judge (ADR-0021). A downgrade-only neural
+  // stage after the deterministic boundary: it demotes a `core` candidate whose
+  // label asserts a proposition rather than naming a concept, replacing the
+  // removed `looksLikePropositionLabel` lexical veto (AGENTS rule 16). Fail-closed
+  // = preserve recall, so it never demotes on judge failure or an ungrounded
+  // verdict. Runs only on the handful of `core` candidates, so cost is bounded.
+  const candidates = await applyAdmissionLabelJudge({
+    candidates: policyCandidates,
+    declaredDomain,
+    judge: input.admissionLabelJudge
+  });
 
   const coreCandidates = candidates.filter((candidate) => candidate.admission.tier === "core");
   const admittedConcepts = coreCandidates.map((candidate) => ({
@@ -69,16 +87,15 @@ export async function executeExtractionRun(input: {
     aliases: exactAliases(candidate)
   }));
   const coreKeys = new Set(coreCandidates.map((candidate) => candidate.candidateKey));
-  const labelsByCandidateKey = new Map<string, string[]>(
-    coreCandidates.map((candidate) => [
-      candidate.candidateKey,
-      [candidate.discoveredLabel, candidate.canonicalLabel, ...candidate.aliases]
-    ])
+  // Canonical label + exact aliases per concept, for the semantic entailment judge.
+  const conceptsByKey = new Map<string, { canonicalLabel: string; aliases: string[] }>(
+    admittedConcepts.map((concept) => [concept.candidateKey, { canonicalLabel: concept.canonicalLabel, aliases: concept.aliases }])
   );
 
-  // Stage 3 — concept-conditioned claim extraction with deterministic evidence validation.
-  // Retry once only when a subject's first attempt has no verified claim. Superseded
-  // first-pass claims remain auditable, but are excluded from the final conflict pass.
+  // Stage 3 — concept-conditioned claim extraction with deterministic evidence
+  // validation and semantic entailment. Retry once only when a subject's first
+  // attempt has no fully verified claim. Superseded first-pass claims remain
+  // auditable, but are excluded from the final conflict pass.
   const proposals: ExtractionRunResult["proposals"] = [];
   const subjectAttempts = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
     const extract = async (feedback?: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0]["feedback"]) => {
@@ -100,12 +117,20 @@ export async function executeExtractionRun(input: {
       }
     };
     const first = await extract();
-    const firstClaims = applyClaimPolicy({
+    const firstPolicyClaims = applyClaimPolicy({
       claims: first?.claims ?? [],
       extractionAttempt: 1,
       coreCandidateKeys: coreKeys,
-      labelsByCandidateKey,
       blockText
+    });
+    // Retry eligibility must use the complete claim verdict. Otherwise a claim
+    // that passes structural checks but fails semantic entailment suppresses the
+    // one precision-preserving retry.
+    const firstClaims = await applyEntailmentJudge({
+      claims: firstPolicyClaims,
+      declaredDomain,
+      conceptsByKey,
+      judge: input.claimEntailmentJudge
     });
     if (firstClaims.some((claim) => claim.validationOutcome === "verified")) {
       return { first, firstClaims, retry: null };
@@ -140,15 +165,22 @@ export async function executeExtractionRun(input: {
     }
   }
 
-  const claims = [
-    ...supersededClaims,
-    ...applyClaimPolicy({
-      claims: effectiveExtractedClaims,
-      coreCandidateKeys: coreKeys,
-      labelsByCandidateKey,
-      blockText
-    })
-  ];
+  // Deterministic pass first (verbatim floor, nature/direction, aggregate
+  // structural gates), then the semantic entailment judge downgrades any
+  // surviving concept claim whose evidence does not actually assert the relation
+  // (ADR-0020). The judge only DOWNGRADES, so the deterministic guarantees hold.
+  const policyClaims = applyClaimPolicy({
+    claims: effectiveExtractedClaims,
+    coreCandidateKeys: coreKeys,
+    blockText
+  });
+  const judgedClaims = await applyEntailmentJudge({
+    claims: policyClaims,
+    declaredDomain,
+    conceptsByKey,
+    judge: input.claimEntailmentJudge
+  });
+  const claims = [...supersededClaims, ...judgedClaims];
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,

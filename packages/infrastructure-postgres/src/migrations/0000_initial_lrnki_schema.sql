@@ -156,27 +156,28 @@ CREATE TABLE graph_versions (
 CREATE TABLE concepts (
   concept_id uuid PRIMARY KEY,
   iri text NOT NULL UNIQUE,
-  canonical_label text NOT NULL,
   normalized_label text NOT NULL,
   declared_domain text NOT NULL,
-  trust_tier text NOT NULL,
-  homograph boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (normalized_label, declared_domain)
 );
 
-CREATE TABLE concept_aliases (
-  concept_alias_id uuid PRIMARY KEY,
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
-  label text NOT NULL,
-  UNIQUE (concept_id, label)
-);
-
-CREATE TABLE graph_version_concept_memberships (
-  graph_version_concept_membership_id uuid PRIMARY KEY,
+CREATE TABLE graph_version_concepts (
+  graph_version_concept_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  canonical_label text NOT NULL,
+  trust_tier text NOT NULL,
+  homograph boolean NOT NULL DEFAULT false,
   UNIQUE (graph_version_id, concept_id)
+);
+
+CREATE TABLE graph_version_concept_aliases (
+  graph_version_concept_alias_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  label text NOT NULL,
+  UNIQUE (graph_version_id, concept_id, label)
 );
 
 CREATE TABLE graph_version_run_memberships (
@@ -298,3 +299,80 @@ JSON_TABLE(
   )
 ) AS cl
 WHERE a.artifact_type = 'extraction_run.v4';
+
+-- ---------------------------------------------------------------------------
+-- Graph Enrichment — third operation, derived layer keyed to a published
+-- version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
+-- asserted core. Inferred relations live in their OWN namespace and intentionally
+-- do NOT reference relation_definitions (the closed asserted registry, ADR-0016).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE graph_enrichments (
+  enrichment_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_config_hash text NOT NULL,
+  status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
+  embedding_model text NOT NULL,
+  judge_model text NOT NULL,
+  difficulty_method text NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz
+);
+
+CREATE TABLE enrichment_prerequisite_candidate_groups (
+  enrichment_prerequisite_candidate_group_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  group_id text NOT NULL,
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  UNIQUE (enrichment_id, concept_id)
+);
+
+CREATE TABLE inferred_prerequisite_edges (
+  inferred_prerequisite_edge_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  predicate text NOT NULL DEFAULT 'inferred-prerequisite-of',
+  prerequisite_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  dependent_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+  uncertain boolean NOT NULL DEFAULT false,
+  candidate_group_id text,
+  provenance jsonb NOT NULL,
+  UNIQUE (enrichment_id, prerequisite_concept_id, dependent_concept_id),
+  CHECK (prerequisite_concept_id <> dependent_concept_id)
+);
+
+CREATE TABLE concept_difficulties (
+  concept_difficulty_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  score real NOT NULL,
+  method text NOT NULL,
+  components jsonb NOT NULL,
+  UNIQUE (enrichment_id, concept_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Learner Path — vertical-slice projection output (ADR-0019). CLI computes and
+-- persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE learner_paths (
+  learner_path_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  target_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  learner_state_ref text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (enrichment_id, target_concept_id, learner_state_ref)
+);
+
+CREATE TABLE learner_path_steps (
+  learner_path_step_id uuid PRIMARY KEY,
+  learner_path_id uuid NOT NULL REFERENCES learner_paths(learner_path_id),
+  position integer NOT NULL,
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  difficulty real NOT NULL,
+  included_reason text NOT NULL CHECK (included_reason IN ('prerequisite', 'target')),
+  UNIQUE (learner_path_id, position),
+  UNIQUE (learner_path_id, concept_id)
+);

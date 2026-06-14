@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   EyeIcon,
   GitForkIcon,
+  RouteIcon,
   SearchCodeIcon
 } from "lucide-react";
 import {
@@ -30,7 +31,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const VIEWS = [
   { key: "graph", label: "Graph Explorer", href: "/admin/lab", icon: GitForkIcon },
   { key: "runs", label: "Run Inspector", href: "/admin/lab/runs", icon: SearchCodeIcon },
-  { key: "sources", label: "Source Explorer", href: "/admin/lab/sources", icon: DatabaseIcon }
+  { key: "sources", label: "Source Explorer", href: "/admin/lab/sources", icon: DatabaseIcon },
+  { key: "paths", label: "Learner Paths", href: "/admin/lab/paths", icon: RouteIcon }
 ] as const;
 
 export type AdminView = (typeof VIEWS)[number]["key"];

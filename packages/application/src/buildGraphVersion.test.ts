@@ -27,7 +27,8 @@ function fakes(runs: RunForBuild[]) {
   const graphStore: GraphVersionStorePort = {
     existingConceptIdentities: async (): Promise<PublishedConceptIdentity[]> => [],
     publish: async (input) => { published = input.snapshot; },
-    getPublishedSnapshot: async () => published
+    getPublishedSnapshot: async (graphVersionId) => published?.graphVersionId === graphVersionId ? published : undefined,
+    getLatestPublishedSnapshot: async () => published
   };
   const artifacts: ArtifactRepositoryPort = { append: async () => {} };
   return { runStore, graphStore, artifacts, getPublished: () => published };
@@ -57,4 +58,34 @@ test("buildGraphVersion publishes when no selected run is quarantined", async ()
   assert.equal(snapshot.concepts.length, 1);
   assert.equal(snapshot.concepts[0].canonicalLabel, "Rust ownership");
   assert.ok(getPublished(), "a clean run set should publish");
+});
+
+test("buildGraphVersion publishes cross-domain homographs separately without quarantined trust", async () => {
+  const rustRun = runForBuild({
+    runId: "run-rust",
+    declaredDomain: "rust programming",
+    coreCandidates: [
+      { candidateKey: "ownership", canonicalLabel: "Ownership", normalizedLabel: "ownership", aliases: [] }
+    ]
+  });
+  const economicsRun = runForBuild({
+    runId: "run-econ",
+    declaredDomain: "economics",
+    coreCandidates: [
+      { candidateKey: "ownership", canonicalLabel: "Ownership", normalizedLabel: "ownership", aliases: [] }
+    ]
+  });
+  const { runStore, graphStore, artifacts } = fakes([rustRun, economicsRun]);
+
+  const snapshot = await buildGraphVersion({
+    graphVersionId: "gv-homographs",
+    runIds: ["run-rust", "run-econ"],
+    runStore,
+    graphStore,
+    artifacts
+  });
+
+  assert.equal(snapshot.concepts.length, 2);
+  assert.ok(snapshot.concepts.every((concept) => concept.homograph));
+  assert.ok(snapshot.concepts.every((concept) => concept.trustTier === "curated_source_grounded"));
 });

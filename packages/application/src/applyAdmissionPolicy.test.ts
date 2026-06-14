@@ -6,9 +6,18 @@ import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 const candidate: DiscoveredCandidate = {
   candidateKey: "move",
   canonicalLabel: "Move",
-  aliases: [],
   mentions: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules." }]
 };
+
+test("does not accept unadjudicated discovery aliases", () => {
+  const unsafeCandidate = {
+    ...candidate,
+    aliases: ["Move subset"]
+  } as DiscoveredCandidate & { aliases: string[] };
+  const result = applyAdmissionPolicy({ candidate: unsafeCandidate, proposal: eligibleProposal(), blockText });
+
+  assert.deepEqual(result.aliases, []);
+});
 
 const blockText = new Map([
   ["block-1", "Ownership is a set of rules. Assigning a value to another variable moves it."],
@@ -58,9 +67,20 @@ test("admits core only with all verified eligibility criteria", () => {
   const result = applyAdmissionPolicy({ candidate, proposal: eligibleProposal(), blockText });
 
   assert.equal(result.admission.tier, "core");
+  assert.equal(result.canonicalLabel, "Move");
+  assert.deepEqual(result.aliases, []);
+  assert.ok(result.admission.boundaryReasonCodes.includes("proposed_canonical_label_not_source_grounded"));
+  assert.equal(result.admission.organizingPower.aspects.length, 2);
+});
+
+test("accepts an admission canonical label that is explicitly source-grounded", () => {
+  const groundedBlockText = new Map(blockText);
+  groundedBlockText.set("block-3", "Rust move semantics transfers ownership and invalidates the source binding.");
+  const result = applyAdmissionPolicy({ candidate, proposal: eligibleProposal(), blockText: groundedBlockText });
+
   assert.equal(result.canonicalLabel, "Rust move semantics");
   assert.deepEqual(result.aliases, ["Move"]);
-  assert.equal(result.admission.organizingPower.aspects.length, 2);
+  assert.equal(result.admission.boundaryReasonCodes.includes("proposed_canonical_label_not_source_grounded"), false);
 });
 
 test("corrects model core to optional when organizing power lacks two distinct evidence references", () => {
@@ -138,19 +158,22 @@ test("demotes a selected candidate whose organizing evidence is confined to illu
   assert.ok(result.admission.boundaryReasonCodes.includes("illustrative_only_source_treatment"));
 });
 
-test("demotes a proposition-shaped canonical label to optional fail-closed", () => {
+test("no longer demotes a proposition-shaped label by lexical policy (now the admission judge's job)", () => {
+  // The deterministic looksLikePropositionLabel veto was removed (ADR-0021,
+  // AGENTS rule 16). Concept-vs-proposition is a semantic call made downstream by
+  // the measured admission-label judge, so the pure policy must NOT demote here.
   const result = applyAdmissionPolicy({
     candidate,
     proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour Limited by the Extent of the Market" }),
     blockText
   });
 
-  assert.equal(result.admission.tier, "optional");
-  assert.ok(result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
-  assert.ok(result.admission.boundaryReasonCodes.includes("effective_tier_corrected"));
+  assert.equal(result.admission.tier, "core");
+  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
+  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_label_judged"));
 });
 
-test("keeps a multi-word nominal label core (no false proposition demotion)", () => {
+test("keeps a multi-word nominal label core", () => {
   const result = applyAdmissionPolicy({
     candidate,
     proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour" }),
@@ -158,7 +181,6 @@ test("keeps a multi-word nominal label core (no false proposition demotion)", ()
   });
 
   assert.equal(result.admission.tier, "core");
-  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
 });
 
 test("does not count motivation or examples as organizing aspects", () => {

@@ -27,11 +27,10 @@ export const conceptDiscoverySchema: JsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["candidateKey", "canonicalLabel", "aliases", "mentions"],
+        required: ["candidateKey", "canonicalLabel", "mentions"],
         properties: {
           candidateKey: { type: "string", description: "Short stable slug unique within this document, e.g. 'ownership'." },
           canonicalLabel: { type: "string" },
-          aliases: { type: "array", items: { type: "string" } },
           mentions: { type: "array", items: blockEvidenceSchema }
         }
       }
@@ -43,7 +42,6 @@ export const conceptDiscoveryValidator = z.object({
   candidates: z.array(z.object({
     candidateKey: z.string().min(1),
     canonicalLabel: z.string().min(1),
-    aliases: z.array(z.string()),
     mentions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
   }).strict())
 }).strict();
@@ -288,6 +286,142 @@ export const conceptClaimSchema: JsonSchema = {
     }
   }
 };
+
+// --- Prerequisite judgment: submit_prerequisite_judgment ------------------
+// One bounded judgment over a single gated concept pair (ADR-0019). The model
+// returns a DIRECTION between the two named concepts, not free-form edges; the
+// application boundary maps it to a directed/none/uncertain edge fail-closed.
+
+const PREREQUISITE_OUTCOME = [
+  "a-is-prerequisite-of-b",
+  "b-is-prerequisite-of-a",
+  "none",
+  "uncertain"
+] as const;
+
+export const prerequisiteJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["outcome", "confidence", "rationale"],
+  properties: {
+    outcome: {
+      type: "string",
+      enum: [...PREREQUISITE_OUTCOME],
+      description:
+        "Directed prerequisite relation between the two concepts. 'a-is-prerequisite-of-b' means a learner must understand concept A before concept B. Use 'none' when neither is a learning prerequisite of the other; use 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+  }
+};
+
+export const prerequisiteJudgmentValidator = z.object({
+  outcome: z.enum(PREREQUISITE_OUTCOME),
+  confidence: z.number().min(0).max(1),
+  rationale: z.string().min(1)
+}).strict();
+
+// --- Claim entailment judgment: submit_claim_entailment_judgment ----------
+// One bounded judgment over a single concept-to-concept claim (ADR-0020). The
+// model decides whether the verbatim evidence actually asserts the typed relation
+// in the stated direction between the two named concepts. `entailingSpan` is the
+// minimal sub-quote that carries the relation; the application boundary fails
+// closed to entailed:false when it is not a substring of any provided quote.
+
+export const claimEntailmentJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["entailed", "entailingSpan", "rationale"],
+  properties: {
+    entailed: {
+      type: "boolean",
+      description:
+        "True only if the quoted evidence actually asserts the stated relation in the stated direction between the two named concepts. False for unrelated, wrongly-directed, wrong-relation, or merely-co-mentioned pairs."
+    },
+    entailingSpan: {
+      type: "string",
+      description:
+        "The minimal verbatim sub-quote (copied exactly from one of the provided quotes) that carries the relation. Empty string when entailed is false."
+    },
+    rationale: { type: "string", description: "One terse sentence grounded in the quoted evidence." }
+  }
+};
+
+export const claimEntailmentJudgmentValidator = z.object({
+  entailed: z.boolean(),
+  entailingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
+export const definitionEntailmentJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["subjectMatch", "subjectSpan", "definitionEntailed", "entailingSpan", "rationale"],
+  properties: {
+    subjectMatch: {
+      type: "string",
+      enum: ["exact_or_interchangeable", "qualified_variant", "different_or_absent"]
+    },
+    subjectSpan: {
+      type: "string",
+      description: "Minimal exact sub-quote that identifies the subject; empty when different or absent."
+    },
+    definitionEntailed: { type: "boolean" },
+    entailingSpan: {
+      type: "string",
+      description: "Minimal exact sub-quote that states the candidate definition; empty when unsupported."
+    },
+    rationale: { type: "string" }
+  }
+};
+
+export const definitionEntailmentJudgmentValidator = z.object({
+  subjectMatch: z.enum(["exact_or_interchangeable", "qualified_variant", "different_or_absent"]),
+  subjectSpan: z.string(),
+  definitionEntailed: z.boolean(),
+  entailingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
+// --- Admission label judgment: submit_admission_label_judgment ------------
+// One bounded judgment over a single admitted-`core` label (ADR-0021). The model
+// decides whether the label NAMES a concept or ASSERTS a proposition/claim about
+// one, and (when a proposition) names the underlying noun phrase it reduces to.
+// `groundingSpan` is the minimal verbatim sub-quote that shows the predication;
+// the application boundary fails closed to `concept` when the span or the noun
+// phrase is not source-grounded, so the judge cannot demote on absent text.
+
+export const admissionLabelJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["labelKind", "underlyingNounPhrase", "groundingSpan", "rationale"],
+  properties: {
+    labelKind: {
+      type: "string",
+      enum: ["concept", "proposition_or_claim"],
+      description:
+        "'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as 'Operator Set as Bottleneck to Performance' or 'Division of Labour Limited by the Extent of the Market'. A long nominal label is still a concept."
+    },
+    underlyingNounPhrase: {
+      type: "string",
+      description:
+        "When proposition_or_claim, the noun-phrase concept the label reduces to (e.g. 'Operator Set' for 'Operator Set as Bottleneck to Performance'), copied verbatim from the label/evidence. Empty string when labelKind is concept."
+    },
+    groundingSpan: {
+      type: "string",
+      description:
+        "When proposition_or_claim, the minimal verbatim sub-quote (copied exactly from one provided evidence quote) showing the label asserts a predication. Empty string when labelKind is concept."
+    },
+    rationale: { type: "string", description: "One terse sentence." }
+  }
+};
+
+export const admissionLabelJudgmentValidator = z.object({
+  labelKind: z.enum(["concept", "proposition_or_claim"]),
+  underlyingNounPhrase: z.string(),
+  groundingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
 
 export const conceptClaimValidator = z.object({
   claims: z.array(z.object({

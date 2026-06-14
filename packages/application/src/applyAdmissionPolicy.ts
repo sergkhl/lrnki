@@ -1,6 +1,5 @@
 import {
   evidenceQuoteMatches,
-  looksLikePropositionLabel,
   normalizeConceptLabel,
   type AdmissionCriterionProposal,
   type AdmissionProposal,
@@ -28,7 +27,7 @@ export function applyAdmissionPolicy(input: {
       discoveredLabel: candidate.canonicalLabel,
       canonicalLabel: candidate.canonicalLabel,
       normalizedLabel: normalizeConceptLabel(candidate.canonicalLabel),
-      aliases: unique(candidate.aliases),
+      aliases: [],
       mentions,
       admission: {
         modelTier: "reject",
@@ -66,6 +65,14 @@ export function applyAdmissionPolicy(input: {
   const proposedCanonicalLabel = proposal.proposedCanonicalLabel.trim();
   const canonicalLabelValid = normalizeConceptLabel(proposedCanonicalLabel).length > 0;
   if (!canonicalLabelValid) boundaryReasonCodes.push("invalid_proposed_canonical_label");
+  const proposedCanonicalLabelGrounded =
+    canonicalLabelValid &&
+    [...blockText.values()].some((text) =>
+      normalizeConceptLabel(text).includes(normalizeConceptLabel(proposedCanonicalLabel))
+    );
+  if (canonicalLabelValid && !proposedCanonicalLabelGrounded) {
+    boundaryReasonCodes.push("proposed_canonical_label_not_source_grounded");
+  }
 
   const eligible =
     standaloneLearningObjective.passed &&
@@ -77,25 +84,29 @@ export function applyAdmissionPolicy(input: {
     organizingPower.aspects.length > 0 &&
     organizingPower.aspects.every((aspect) => input.illustrativeBlockIds?.has(aspect.evidence.blockId));
   if (illustrativeOnly) boundaryReasonCodes.push("illustrative_only_source_treatment");
-  // A proposition-shaped canonical label is a Claim, not a Concept (e.g. the
-  // chapter title "Division of Labour Limited by the Extent of the Market").
-  // Demote it fail-closed; its underlying noun phrase is admitted on its own.
-  const propositionShaped = proposal.coreSelected && looksLikePropositionLabel(proposedCanonicalLabel);
-  if (propositionShaped) boundaryReasonCodes.push("proposition_shaped_label");
+  // Concept-vs-proposition is a SEMANTIC judgment, not a provable property, so it
+  // is decided by the measured neural admission-label judge (ADR-0021), a separate
+  // downgrade-only stage AFTER this boundary — never a hardcoded lexical matcher
+  // here (AGENTS rule 16). The label source-grounding above stays deterministic
+  // because it IS a provable substring property.
   const tier = proposal.tier === "quarantine"
     ? "quarantine"
-    : eligible && proposal.coreSelected && !illustrativeOnly && !propositionShaped
+    : eligible && proposal.coreSelected && !illustrativeOnly
       ? "core"
       : proposal.tier === "reject"
         ? "reject"
         : "optional";
   if (tier !== proposal.tier) boundaryReasonCodes.push("effective_tier_corrected");
 
-  const canonicalLabel = tier === "core" ? proposedCanonicalLabel : candidate.canonicalLabel;
-  const aliases = unique([
-    ...candidate.aliases,
-    ...(canonicalLabel !== candidate.canonicalLabel ? [candidate.canonicalLabel] : [])
-  ]).filter((alias) => alias !== canonicalLabel);
+  const canonicalLabel =
+    tier === "core" && proposedCanonicalLabelGrounded
+      ? proposedCanonicalLabel
+      : candidate.canonicalLabel;
+  // Candidate Discovery is recall-oriented and has no authority to merge labels
+  // as aliases. Preserve only the discovered source label when admission assigns
+  // a more precise canonical label; qualified variants require a later explicit
+  // identity decision.
+  const aliases = canonicalLabel !== candidate.canonicalLabel ? [candidate.canonicalLabel] : [];
 
   return {
     candidateKey: candidate.candidateKey,

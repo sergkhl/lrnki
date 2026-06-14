@@ -12,6 +12,7 @@ or relationships. Passing those tests makes a Candidate eligible, not automatica
 source-level Core Set Selection keeps a small but sufficient non-redundant set representing the source's
 principal durable learning structure while retaining enough mechanisms, models, and evidence
 concepts to preserve its explanatory structure. Admission may propose a more precise evidence-preserving
-canonical label, but may not merge Candidates. `optional` remains run-scoped supporting knowledge;
+canonical label, but the application applies it only when the label itself is source-grounded;
+otherwise the discovered label remains canonical. Admission may not merge Candidates. `optional` remains run-scoped supporting knowledge;
 only selected eligible `core` Candidates proceed to claim extraction and publication. There is no
 fixed concept-count target.
