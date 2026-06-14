@@ -4,5 +4,7 @@
 export {
   buildAdmissionOracle,
   scoreAdmissionOracle,
+  scoreAdmissionOracleAligned,
+  alignAdmissionLabels,
   type AdmissionOracleSource
 } from "./admissionOracle";

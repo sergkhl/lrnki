@@ -21,3 +21,4 @@
 - [0019-graph-enrichment-derived-layer](./0019-graph-enrichment-derived-layer.md)
 - [0020-semantic-claim-entailment-judge](./0020-semantic-claim-entailment-judge.md) — supersedes the lexical-entailment portion of 0007
 - [0021-measured-concept-vs-proposition-admission-judge](./0021-measured-concept-vs-proposition-admission-judge.md) — supersedes the proposition-label portion of 0005
+- [0022-measured-label-aligner-for-oracle-scoring](./0022-measured-label-aligner-for-oracle-scoring.md) — scoring-only concept identity for Gate 2; does not change graph identity (0015)

@@ -521,3 +521,40 @@ export const oracleAdmissionAuditValidator = z.object({
   correctedTier: z.enum(["core", "optional"]).nullable(),
   rationale: z.string().min(1)
 }).strict();
+
+// Gate 2 measured label-aligner: submit_label_alignment (TODO #1, rule 16). One
+// bounded call that returns the production labels which are the SAME concept as a
+// reference label in a different SURFACE FORM. It returns only matched pairs (an
+// unmatched production label is simply absent); the application boundary checks
+// both labels exist in the provided sets and keeps at most one reference per
+// production label, fail-closed. Identity for SCORING ONLY — never relabels the graph.
+export const oracleLabelAlignmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["pairs"],
+  properties: {
+    pairs: {
+      type: "array",
+      description:
+        "Each production label that denotes the SAME concept as exactly one reference label under a different surface form. Omit a production label entirely when it is a distinct concept (even if it shares words with a reference label).",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["productionLabel", "referenceLabel", "rationale"],
+        properties: {
+          productionLabel: { type: "string", description: "A label copied EXACTLY from the production list." },
+          referenceLabel: { type: "string", description: "The reference label, copied EXACTLY, that names the SAME concept." },
+          rationale: { type: "string", description: "One terse phrase naming the surface difference, e.g. 'plural', 'acronym in parentheses', 'hyphenation'." }
+        }
+      }
+    }
+  }
+};
+
+export const oracleLabelAlignmentValidator = z.object({
+  pairs: z.array(z.object({
+    productionLabel: z.string().min(1),
+    referenceLabel: z.string().min(1),
+    rationale: z.string().min(1)
+  }).strict())
+}).strict();

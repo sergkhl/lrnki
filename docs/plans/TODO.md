@@ -1,17 +1,16 @@
 # TODO
 
-1. **Gate 2 — extend the oracle benchmark + make cross-author scores trustworthy (ADR-0013).**
-   The oracle independence triangle is now wired and runs end-to-end (see COMPLETED). Remaining:
-   - **Measured label alignment before scoring (highest value here).** Exact `normalizeConceptLabel`
-     matching understates agreement: on the ML arm, core P/R=0.50 is a lower bound because misses
-     vs extras are the SAME concept in different surface forms (`AI research agent`/`agents`,
-     `Monte Carlo Tree Search`/`...(MCTS)`, `tradeoff`/`trade-off`, `Operator`/`operators`). Do NOT
-     hardcode a plural/hyphen/alias matcher (AGENTS rule 16); add a measured alias-aware and/or
-     bounded neural label-aligner so scores reflect concept identity, not surface form.
-   - Run the triangle across all curated fixtures (rust, biology, economics, InstructKG, ML PDF) and
-     report metrics per source; promote only measured improvements.
-   - Human-review the frozen oracle references (`tmp/gate2-oracle/oracle-*.json`,
-     `needsHumanReview: true`) before treating any score as gold (AGENTS rule 11).
+1. **Gate 2 — extend the oracle benchmark across fixtures + make references trustworthy (ADR-0013).**
+   The oracle triangle is wired and the surface-form scoring confound is now lifted by a measured
+   neural label-aligner (ADR-0022, see COMPLETED). Remaining:
+   - Run the triangle + aligner across all curated fixtures (rust, biology, economics, InstructKG,
+     ML PDF) and report exact-vs-aligned metrics per source; promote only measured improvements.
+   - Human-review the frozen oracle references (`tmp/gate2-oracle/oracle-*.json`) AND the frozen
+     alignments (`tmp/gate2-oracle/alignment-*.json`), both `needsHumanReview: true`, before treating
+     any score as gold (AGENTS rule 11).
+   - Inspect the residual post-alignment disagreements now that they are real signal (ML: `Operator`/
+     `operators`, `AIRA operator set (O_AIRA)`/`Operator set` qualified-variant boundary; `AIDE` core
+     vs optional tier mismatch). Decide whether to tune extractor labeling or the reference rubric.
    - Optional research: ingest markdown through Docling too, to share one DoclingDocument structure
      and retire the native markdown parser — only if it earns its keep.
 
@@ -44,6 +43,19 @@
 
 ## COMPLETED
 
+- **Gate 2 measured label-aligner lifts the surface-form scoring confound (2026-06-14, ADR-0022,
+  rules 11/16).** Exact `normalizeConceptLabel` scoring double-penalized surface variants (same
+  concept counted as both a miss and an extra). A hardcoded plural/hyphen matcher is forbidden, so
+  concept identity for SCORING ONLY is now a bounded forced-tool neural aligner
+  (`OracleLabelAlignmentPort` + `LiteLlmOracleLabelAlignmentAdapter` on `kg-oracle-judge`), run off
+  the publication path; `alignAdmissionLabels` freezes the auditable surface-variant merges and pure
+  `scoreAdmissionOracleAligned` reports the exact baseline BESIDE the aligned score (a wrong merge
+  inflating agreement stays visible). Graph identity is untouched (publication keeps exact normalized
+  identity, ADR-0015); the aligner only ever merges production → reference, never reference →
+  reference, so distinct concepts sharing words never collapse. Real runs (temp 0 + seed): ML arm
+  **core F1 0.50→0.71, admit recall 0.79→0.90**, biology **admit recall 0.67→1.00** — both with ZERO
+  wrong merges and conservative on ambiguous qualified variants (`operators`/`Operator`, `AIRA
+  operator set`/`Operator set` left unmerged). Evidence: `tmp/gate2-oracle-label-aligner-quality-evaluation.md`.
 - **Gate 2 oracle independence triangle wired + run (2026-06-14, ADR-0013, rule 11).** Durable
   benchmark surface in `@lrnki/quality-lab`, off the publication path: `OracleAdmissionReferencePort`
   (author) + `OracleAdmissionAuditPort` (second judge) with forced-tool adapters on independent
@@ -154,18 +166,19 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-14, Gate 2 oracle independence triangle):
-- **Static:** all source-package typechecks pass; tests green — quality-lab 5, infrastructure-litellm
-  8, infrastructure-ingestion 9, application 59; ESLint clean. (One typecheck error is in
-  `apps/admin-lab/.next/dev/types/validator.ts`, a Next.js dev-server-generated file unrelated to
-  this change; the production build regenerates it.)
-- **Real oracle runs (all three vertices, real LLM calls):** biology fixture (run `895c1c5f`) —
-  reference authored by Xiaomi MiMo, 0 quarantined, **core P/R/F1≈0.83** vs the production DeepSeek
-  run (re-confirmed on the final gpt-oss-120b judge). ML PDF (run `0e0d7c0b`, interim Mistral judge)
-  — 30 authored, **1 quarantined** (`AIRA-dojo`, audit disagreement: a proper-noun artifact, not a
-  durable concept), admit R=0.79; core P/R=0.50 is a LOWER BOUND (misses vs extras are the same
-  concept in different surface forms). Result: **PASS** for the harness; the label-alignment confound
-  is the next measurement lever (TODO #1).
-- **Caveat:** oracle references are model-authored, not human gold (`needsHumanReview: true`); treat
-  scores as directional until reviewed. Exact-label scoring understates cross-author agreement until
-  a measured label-aligner lands (TODO #1). No new graph version was published.
+Latest validation (2026-06-14, Gate 2 measured label-aligner, ADR-0022):
+- **Static:** all source-package typechecks pass; tests green — quality-lab 8 (+3 aligned-scoring
+  cases), infrastructure-litellm 8, infrastructure-ingestion 9, application 59; ESLint clean. (One
+  typecheck error is in `apps/admin-lab/.next/dev/types/validator.ts`, a Next.js dev-server-generated
+  file unrelated to this change; the production build regenerates it.)
+- **Real aligner runs (real LLM calls, `kg-oracle-judge`, temp 0 + seed 7):** reuse the frozen
+  oracles, run only the new scoring-side aligner. **ML PDF** (run `0e0d7c0b`): 3 correct surface-
+  variant merges, 0 wrong → **core F1 0.50→0.71**, admit recall **0.79→0.90**; residual missed/extra
+  is now genuine disagreement (qualified-variant boundary, `AIDE` tier mismatch). **Biology** (run
+  `895c1c5f`): 2 correct merges → **admit recall 0.67→1.00**. The aligner stayed conservative on
+  ambiguous cases (`operators`/`Operator` left unmerged — the safe under-count direction). Result:
+  **PASS** — the surface-form scoring confound is lifted without any fabricated agreement.
+- **Caveat:** oracle references AND alignments are model-authored, not human gold
+  (`needsHumanReview: true`); exact-vs-aligned deltas are valid against a fixed reference but absolute
+  numbers stay directional until human-reviewed (rule 11). Aligner not yet run across rust /
+  economics / InstructKG arms (TODO #1). No new graph version was published.

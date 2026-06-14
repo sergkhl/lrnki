@@ -372,6 +372,71 @@ export type AdmissionOracleScore = {
 };
 
 // ---------------------------------------------------------------------------
+// Measured neural label-aligner for Gate 2 SCORING ONLY (TODO #1, AGENTS rule 16).
+//
+// Exact normalizedLabel matching is the graph's identity key (ADR-0015) and stays
+// authoritative for publication — but as a SCORER it UNDER-counts oracle agreement:
+// a reference "Monte Carlo Tree Search" and a production "Monte Carlo Tree Search
+// (MCTS)" are the SAME concept in different surface forms, yet exact matching
+// scores each as both a miss AND an extra, halving precision/recall on identity it
+// actually has. A hardcoded plural/hyphen/acronym matcher is forbidden (rule 16) —
+// and would wrongly merge genuinely distinct concepts that share surface words
+// ("Operator" vs "Operator set" vs "Operator policy"). So concept identity for
+// scoring is decided by a bounded neural aligner, run OFF the publication path.
+//
+// Discipline that keeps this honest (rules 11/16): the aligner only ever MERGES a
+// production label into the reference concept it is a surface variant of (it never
+// relabels the graph); merging the wrong thing INFLATES the score, so the exact
+// baseline is always reported beside the aligned score and the frozen alignment is
+// human-reviewable. The aligner earns its keep only while it raises measured recall
+// without merging distinct concepts.
+// ---------------------------------------------------------------------------
+
+export type OracleLabelAlignmentPair = {
+  productionLabel: string;
+  productionNormalizedLabel: string;
+  referenceLabel: string;
+  referenceNormalizedLabel: string;
+  rationale: string;
+};
+
+export type OracleLabelAlignmentDraft = {
+  pairs: OracleLabelAlignmentPair[];
+};
+
+export type FrozenOracleLabelAlignment = {
+  meta: {
+    sourceResourceId: string;
+    runId: string;
+    declaredDomain: string;
+    alignmentModel: string;
+    promptVersion: string;
+    alignedAt: string;
+    needsHumanReview: true;
+  };
+  // Only SURFACE-VARIANT merges (productionNormalizedLabel != referenceNormalizedLabel);
+  // exact-equal labels already match and need no alignment. Each production label
+  // appears at most once (a production label denotes at most one reference concept).
+  pairs: OracleLabelAlignmentPair[];
+};
+
+export type AlignedAdmissionOracleScore = {
+  sourceResourceId: string;
+  runId: string;
+  quarantinedReferenceLabels: number;
+  // Deterministic exact-normalized baseline (the provable floor) — always reported.
+  exact: { core: OracleTierMetrics; admit: OracleTierMetrics };
+  // Same metric after the measured aligner merges production surface variants into
+  // the reference concept they name. Reported BESIDE exact so any inflation is visible.
+  aligned: { core: OracleTierMetrics; admit: OracleTierMetrics };
+  // The surface-variant merges actually applied (the agreement exact matching missed).
+  surfaceVariantMatches: OracleLabelAlignmentPair[];
+  // Genuinely missing/extra core AFTER alignment (surface variants no longer counted).
+  missedCore: string[];
+  extraCore: string[];
+};
+
+// ---------------------------------------------------------------------------
 // Persistable Extraction Run aggregate (ADR-0017). Assembled in the application
 // boundary after discovery, admission, claim extraction, and deterministic
 // evidence validation; persisted once, run-scoped. References blocks by blockId

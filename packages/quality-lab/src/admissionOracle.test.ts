@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { FrozenAdmissionOracle, FrozenOracleLabel, ProductionAdmittedConcept } from "@lrnki/domain-core";
-import { scoreAdmissionOracle } from "./admissionOracle";
+import type {
+  FrozenAdmissionOracle,
+  FrozenOracleLabel,
+  FrozenOracleLabelAlignment,
+  OracleLabelAlignmentPair,
+  ProductionAdmittedConcept
+} from "@lrnki/domain-core";
+import { scoreAdmissionOracle, scoreAdmissionOracleAligned } from "./admissionOracle";
+
+function norm(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
 
 function refLabel(label: string, tier: "core" | "optional", status: "agreed" | "quarantined"): FrozenOracleLabel {
   return {
@@ -97,4 +107,79 @@ test("empty trusted reference does not divide by zero", () => {
   assert.equal(score.core.recall, 1);
   assert.equal(score.core.precision, 0);
   assert.deepEqual(score.extraCore, ["Mitosis"]);
+});
+
+function pair(productionLabel: string, referenceLabel: string): OracleLabelAlignmentPair {
+  return {
+    productionLabel,
+    productionNormalizedLabel: norm(productionLabel),
+    referenceLabel,
+    referenceNormalizedLabel: norm(referenceLabel),
+    rationale: "surface variant"
+  };
+}
+
+function alignment(pairs: OracleLabelAlignmentPair[]): FrozenOracleLabelAlignment {
+  return {
+    meta: {
+      sourceResourceId: "src", runId: "run", declaredDomain: "d", alignmentModel: "kg-oracle-judge",
+      promptVersion: "p", alignedAt: "2026-06-14T00:00:00Z", needsHumanReview: true
+    },
+    pairs
+  };
+}
+
+test("aligned scoring recovers surface-variant agreement the exact baseline misses", () => {
+  // Production says the same concept with an acronym parenthetical + a plural; exact
+  // matching scores each as both a miss and an extra (P=R=0). Alignment recovers it.
+  const score = scoreAdmissionOracleAligned({
+    sourceResourceId: "src",
+    runId: "run",
+    production: [prod("Monte Carlo Tree Search (MCTS)", "core"), prod("AI research agents", "core")],
+    oracle: oracle([refLabel("Monte Carlo Tree Search", "core", "agreed"), refLabel("AI research agent", "core", "agreed")]),
+    alignment: alignment([
+      pair("Monte Carlo Tree Search (MCTS)", "Monte Carlo Tree Search"),
+      pair("AI research agents", "AI research agent")
+    ])
+  });
+  assert.equal(score.exact.core.precision, 0);
+  assert.equal(score.exact.core.recall, 0);
+  assert.equal(score.aligned.core.precision, 1);
+  assert.equal(score.aligned.core.recall, 1);
+  assert.deepEqual(score.missedCore, []);
+  assert.deepEqual(score.extraCore, []);
+  assert.equal(score.surfaceVariantMatches.length, 2);
+});
+
+test("alignment never merges distinct reference concepts that share words", () => {
+  // "Operator" and "Operator set" are distinct refs. Production has both, exactly.
+  // An (erroneous) alignment edge pointing one production label at the OTHER reference
+  // must not collapse the two reference concepts — edges are production->reference only.
+  const score = scoreAdmissionOracleAligned({
+    sourceResourceId: "src",
+    runId: "run",
+    production: [prod("Operator", "core"), prod("Operator set", "core")],
+    oracle: oracle([refLabel("Operator", "core", "agreed"), refLabel("Operator set", "core", "agreed")]),
+    // No surface-variant edges needed (both match exactly); an empty alignment is fine.
+    alignment: alignment([])
+  });
+  assert.equal(score.aligned.core.precision, 1);
+  assert.equal(score.aligned.core.recall, 1);
+  assert.equal(score.aligned.core.referenceCount, 2);
+});
+
+test("two production surface variants of one concept collapse to a single match", () => {
+  // Production emitted the same concept twice in different forms. Aligned scoring
+  // counts it once: one matched ref, production core count drops to 1, precision 1.
+  const score = scoreAdmissionOracleAligned({
+    sourceResourceId: "src",
+    runId: "run",
+    production: [prod("trade-off", "core"), prod("tradeoff", "core")],
+    oracle: oracle([refLabel("trade-off", "core", "agreed")]),
+    alignment: alignment([pair("tradeoff", "trade-off")])
+  });
+  assert.equal(score.aligned.core.productionCount, 1);
+  assert.equal(score.aligned.core.precision, 1);
+  assert.equal(score.aligned.core.recall, 1);
+  assert.deepEqual(score.extraCore, []);
 });

@@ -18,6 +18,7 @@ import type {
   OracleAdmissionReferenceDraft,
   OracleAdmissionTier,
   OracleAuditVerdict,
+  OracleLabelAlignmentDraft,
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
@@ -133,6 +134,26 @@ export interface OracleAdmissionAuditPort {
     evidenceQuotes: string[];
     sourceBlocks: SourceBlock[];
   }): Promise<OracleAuditVerdict>;
+}
+
+// Measured neural label-aligner for Gate 2 scoring (TODO #1, AGENTS rule 16). A
+// bounded, forced-tool judgment that decides, for SCORING ONLY, which production
+// labels are the SAME concept as a trusted reference label under a different
+// SURFACE FORM (plural, hyphenation, casing, acronym expansion/parenthetical) —
+// distinguished from genuinely distinct concepts that merely share surface words
+// ("Operator" vs "Operator set"). It never relabels the graph (publication keeps
+// exact normalized identity, ADR-0015); it only lets the benchmark count agreement
+// it already has. Runs on an independent family (`kg-oracle-judge`), off the
+// publication path. The application boundary validates membership and one-reference-
+// per-production-label fail-closed; the exact-match baseline is always reported
+// beside the aligned score so a wrong merge is visible (rule 11).
+export interface OracleLabelAlignmentPort {
+  readonly model: string;
+  align(input: {
+    declaredDomain: string;
+    referenceLabels: { label: string; tier: OracleAdmissionTier; rationale: string }[];
+    productionLabels: string[];
+  }): Promise<OracleLabelAlignmentDraft>;
 }
 
 export interface ArtifactRepositoryPort {

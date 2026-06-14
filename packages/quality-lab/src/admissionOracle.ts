@@ -1,13 +1,16 @@
 import {
   evidenceQuoteMatches,
   type AdmissionOracleScore,
+  type AlignedAdmissionOracleScore,
   type FrozenAdmissionOracle,
   type FrozenOracleLabel,
+  type FrozenOracleLabelAlignment,
+  type OracleLabelAlignmentPair,
   type OracleTierMetrics,
   type ProductionAdmittedConcept,
   type SourceBlock
 } from "@lrnki/domain-core";
-import type { OracleAdmissionAuditPort, OracleAdmissionReferencePort } from "@lrnki/ports";
+import type { OracleAdmissionAuditPort, OracleAdmissionReferencePort, OracleLabelAlignmentPort } from "@lrnki/ports";
 
 // Gate 2 oracle independence triangle (ADR-0013, AGENTS rule 11). This module is
 // the durable composition: it drives the reference author + second judge through
@@ -118,9 +121,45 @@ function tierMetrics(referenceNorms: Set<string>, productionNorms: Set<string>):
   return { referenceCount: referenceNorms.size, productionCount: productionNorms.size, matched, precision, recall, f1 };
 }
 
+// Core of both scorers: compare the trusted reference against production tiers,
+// where a production concept's identity is its EFFECTIVE normalized label. Exact
+// scoring uses the concept's own normalized label; aligned scoring remaps surface
+// variants onto the reference concept they name (see `effectiveNorm`).
+function scoreTiers(
+  trusted: FrozenOracleLabel[],
+  production: ProductionAdmittedConcept[],
+  effectiveNorm: (concept: ProductionAdmittedConcept) => string
+): { core: OracleTierMetrics; admit: OracleTierMetrics; missedCore: string[]; extraCore: string[] } {
+  const trustedCore = trusted.filter((label) => label.expectedTier === "core");
+  const trustedCoreNorms = new Set(trustedCore.map((label) => label.normalizedLabel));
+  const trustedAdmitNorms = new Set(trusted.map((label) => label.normalizedLabel));
+
+  const prodCore = production.filter((concept) => concept.tier === "core");
+  const prodCoreNorms = new Set(prodCore.map(effectiveNorm));
+  const prodAdmitNorms = new Set(
+    production.filter((concept) => concept.tier === "core" || concept.tier === "optional").map(effectiveNorm)
+  );
+
+  const missedCore = trustedCore.filter((label) => !prodCoreNorms.has(label.normalizedLabel)).map((label) => label.label);
+  // Report each extra core concept once, keyed by its effective norm so two surface
+  // variants of one production concept are not double-reported.
+  const extraByNorm = new Map<string, string>();
+  for (const concept of prodCore) {
+    const norm = effectiveNorm(concept);
+    if (!trustedCoreNorms.has(norm) && !extraByNorm.has(norm)) extraByNorm.set(norm, concept.canonicalLabel);
+  }
+
+  return {
+    core: tierMetrics(trustedCoreNorms, prodCoreNorms),
+    admit: tierMetrics(trustedAdmitNorms, prodAdmitNorms),
+    missedCore,
+    extraCore: [...extraByNorm.values()]
+  };
+}
+
 // Pure scorer: production DeepSeek admission tiers vs the TRUSTED (agreed) oracle
 // reference. Quarantined reference labels are excluded entirely (rule 11). Matching
-// is by normalized label, the same identity key publication uses.
+// is by normalized label, the same identity key publication uses (ADR-0015).
 export function scoreAdmissionOracle(input: {
   sourceResourceId: string;
   runId: string;
@@ -128,28 +167,110 @@ export function scoreAdmissionOracle(input: {
   oracle: FrozenAdmissionOracle;
 }): AdmissionOracleScore {
   const trusted = input.oracle.labels.filter((label) => label.secondJudgeStatus === "agreed");
-  const quarantined = input.oracle.labels.length - trusted.length;
+  const tiers = scoreTiers(trusted, input.production, (concept) => concept.normalizedLabel);
+  return {
+    sourceResourceId: input.sourceResourceId,
+    runId: input.runId,
+    quarantinedReferenceLabels: input.oracle.labels.length - trusted.length,
+    ...tiers
+  };
+}
 
-  const trustedCore = trusted.filter((label) => label.expectedTier === "core");
-  const trustedCoreNorms = new Set(trustedCore.map((label) => label.normalizedLabel));
-  const trustedAdmitNorms = new Set(trusted.map((label) => label.normalizedLabel));
+// Build the SCORING identity map from a frozen alignment: production normalized
+// label -> the reference normalized label it is a surface variant of. Used only to
+// remap production identity; reference labels stay distinct (an alignment edge only
+// points production -> reference, never reference -> reference), so genuinely
+// distinct reference concepts ("Operator" vs "Operator set") never merge.
+function alignmentMap(alignment: FrozenOracleLabelAlignment): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const pair of alignment.pairs) {
+    if (pair.productionNormalizedLabel === pair.referenceNormalizedLabel) continue; // exact already matches
+    if (!map.has(pair.productionNormalizedLabel)) map.set(pair.productionNormalizedLabel, pair.referenceNormalizedLabel);
+  }
+  return map;
+}
 
-  const prodCore = input.production.filter((concept) => concept.tier === "core");
-  const prodCoreNorms = new Set(prodCore.map((concept) => concept.normalizedLabel));
-  const prodAdmitNorms = new Set(
-    input.production.filter((concept) => concept.tier === "core" || concept.tier === "optional").map((concept) => concept.normalizedLabel)
-  );
+// Pure aligned scorer (TODO #1, rule 16). Reports the deterministic exact baseline
+// AND the aligned score side by side, so a wrong merge inflating the aligned number
+// is visible against the floor. The frozen alignment carries the (auditable) merges.
+export function scoreAdmissionOracleAligned(input: {
+  sourceResourceId: string;
+  runId: string;
+  production: ProductionAdmittedConcept[];
+  oracle: FrozenAdmissionOracle;
+  alignment: FrozenOracleLabelAlignment;
+}): AlignedAdmissionOracleScore {
+  const trusted = input.oracle.labels.filter((label) => label.secondJudgeStatus === "agreed");
+  const map = alignmentMap(input.alignment);
+  const effectiveNorm = (concept: ProductionAdmittedConcept) => map.get(concept.normalizedLabel) ?? concept.normalizedLabel;
 
-  const missedCore = trustedCore.filter((label) => !prodCoreNorms.has(label.normalizedLabel)).map((label) => label.label);
-  const extraCore = prodCore.filter((concept) => !trustedCoreNorms.has(concept.normalizedLabel)).map((concept) => concept.canonicalLabel);
+  const exact = scoreTiers(trusted, input.production, (concept) => concept.normalizedLabel);
+  const aligned = scoreTiers(trusted, input.production, effectiveNorm);
 
   return {
     sourceResourceId: input.sourceResourceId,
     runId: input.runId,
-    quarantinedReferenceLabels: quarantined,
-    core: tierMetrics(trustedCoreNorms, prodCoreNorms),
-    admit: tierMetrics(trustedAdmitNorms, prodAdmitNorms),
-    missedCore,
-    extraCore
+    quarantinedReferenceLabels: input.oracle.labels.length - trusted.length,
+    exact: { core: exact.core, admit: exact.admit },
+    aligned: { core: aligned.core, admit: aligned.admit },
+    surfaceVariantMatches: input.alignment.pairs.filter((pair) => pair.productionNormalizedLabel !== pair.referenceNormalizedLabel),
+    missedCore: aligned.missedCore,
+    extraCore: aligned.extraCore
+  };
+}
+
+// Orchestrator: drive the injected aligner over the TRUSTED reference set and the
+// production admitted labels, then freeze the surface-variant merges (rule 11). The
+// aligner runs OFF the publication path and never relabels the graph. Membership and
+// one-reference-per-production-label are re-checked here, fail closed, independent of
+// the adapter, so the frozen alignment cannot reference an invented label.
+export async function alignAdmissionLabels(input: {
+  sourceResourceId: string;
+  runId: string;
+  declaredDomain: string;
+  oracle: FrozenAdmissionOracle;
+  production: ProductionAdmittedConcept[];
+  alignmentPort: OracleLabelAlignmentPort;
+  promptVersion: string;
+}): Promise<FrozenOracleLabelAlignment> {
+  const trusted = input.oracle.labels.filter((label) => label.secondJudgeStatus === "agreed");
+  const referenceLabels = trusted.map((label) => ({ label: label.label, tier: label.expectedTier, rationale: label.rationale }));
+  const referenceByLabel = new Set(referenceLabels.map((entry) => entry.label));
+  const productionLabels = [
+    ...new Set(
+      input.production
+        .filter((concept) => concept.tier === "core" || concept.tier === "optional")
+        .map((concept) => concept.canonicalLabel)
+    )
+  ];
+  const productionSet = new Set(productionLabels);
+
+  const draft = await input.alignmentPort.align({
+    declaredDomain: input.declaredDomain,
+    referenceLabels,
+    productionLabels
+  });
+
+  const claimed = new Set<string>();
+  const pairs: OracleLabelAlignmentPair[] = [];
+  for (const pair of draft.pairs) {
+    if (!productionSet.has(pair.productionLabel) || !referenceByLabel.has(pair.referenceLabel)) continue;
+    if (pair.productionNormalizedLabel === pair.referenceNormalizedLabel) continue; // exact already matches
+    if (claimed.has(pair.productionLabel)) continue;
+    claimed.add(pair.productionLabel);
+    pairs.push(pair);
+  }
+
+  return {
+    meta: {
+      sourceResourceId: input.sourceResourceId,
+      runId: input.runId,
+      declaredDomain: input.declaredDomain,
+      alignmentModel: input.alignmentPort.model,
+      promptVersion: input.promptVersion,
+      alignedAt: new Date().toISOString(),
+      needsHumanReview: true
+    },
+    pairs
   };
 }
