@@ -7,6 +7,7 @@ import {
 } from "@lrnki/domain-core";
 import type {
   ArtifactRepositoryPort,
+  ClaimEntailmentJudgmentPort,
   ConceptAdmissionPort,
   ConceptConditionedClaimExtractionPort,
   ConceptDiscoveryPort,
@@ -14,6 +15,7 @@ import type {
 } from "@lrnki/ports";
 import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 import { applyClaimPolicy } from "./applyClaimPolicy";
+import { applyEntailmentJudge } from "./applyEntailmentJudge";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.4.0";
@@ -28,6 +30,7 @@ export async function executeExtractionRun(input: {
   discovery: ConceptDiscoveryPort;
   admission: ConceptAdmissionPort;
   claimExtraction: ConceptConditionedClaimExtractionPort;
+  claimEntailmentJudge: ClaimEntailmentJudgmentPort;
   store: ExtractionRunStorePort;
   artifacts: ArtifactRepositoryPort;
 }): Promise<ExtractionRunResult> {
@@ -74,6 +77,10 @@ export async function executeExtractionRun(input: {
       candidate.candidateKey,
       [candidate.discoveredLabel, candidate.canonicalLabel, ...candidate.aliases]
     ])
+  );
+  // Canonical label + exact aliases per concept, for the semantic entailment judge.
+  const conceptsByKey = new Map<string, { canonicalLabel: string; aliases: string[] }>(
+    admittedConcepts.map((concept) => [concept.candidateKey, { canonicalLabel: concept.canonicalLabel, aliases: concept.aliases }])
   );
 
   // Stage 3 — concept-conditioned claim extraction with deterministic evidence validation.
@@ -140,15 +147,23 @@ export async function executeExtractionRun(input: {
     }
   }
 
-  const claims = [
-    ...supersededClaims,
-    ...applyClaimPolicy({
-      claims: effectiveExtractedClaims,
-      coreCandidateKeys: coreKeys,
-      labelsByCandidateKey,
-      blockText
-    })
-  ];
+  // Deterministic pass first (verbatim floor, nature/direction, aggregate
+  // structural gates), then the semantic entailment judge downgrades any
+  // surviving concept claim whose evidence does not actually assert the relation
+  // (ADR-0020). The judge only DOWNGRADES, so the deterministic guarantees hold.
+  const policyClaims = applyClaimPolicy({
+    claims: effectiveExtractedClaims,
+    coreCandidateKeys: coreKeys,
+    labelsByCandidateKey,
+    blockText
+  });
+  const judgedClaims = await applyEntailmentJudge({
+    claims: policyClaims,
+    declaredDomain,
+    conceptsByKey,
+    judge: input.claimEntailmentJudge
+  });
+  const claims = [...supersededClaims, ...judgedClaims];
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,

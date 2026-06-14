@@ -256,6 +256,21 @@ export type ClaimExtractionResult = {
   proposals: MissingConceptProposal[];
 };
 
+// Semantic claim-entailment judgment (ADR-0020). One bounded LLM judgment over a
+// single concept-to-concept claim whose evidence already verifies verbatim. It
+// replaces the brittle deterministic lexical-entailment veto (AGENTS rule 16):
+// real prose entails relations through pronouns, apposition, lists, and synonym
+// verbs that no hardcoded surface matcher can enumerate. The judge can ONLY
+// downgrade a deterministically-surviving claim — it never resurrects one that
+// failed the verbatim floor or a structural gate. `entailingSpan` must be a
+// substring of a provided (already-verbatim) quote; the application boundary
+// fails closed to `entailed: false` when it is not.
+export type ClaimEntailmentJudgment = {
+  entailed: boolean;
+  entailingSpan: string;
+  rationale: string;
+};
+
 export type ConceptCandidate = {
   candidateId: string;
   canonicalLabel: string;

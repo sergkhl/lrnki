@@ -11,15 +11,19 @@ export {
   conceptClaimSchema,
   conceptClaimValidator,
   prerequisiteJudgmentSchema,
-  prerequisiteJudgmentValidator
+  prerequisiteJudgmentValidator,
+  claimEntailmentJudgmentSchema,
+  claimEntailmentJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmClaimExtractionAdapter,
+  LiteLlmClaimEntailmentJudgmentAdapter,
   DISCOVERY_MODEL,
   ADMISSION_MODEL,
-  CLAIM_MODEL
+  CLAIM_MODEL,
+  CLAIM_ENTAILMENT_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
   LiteLlmEmbeddingAdapter,

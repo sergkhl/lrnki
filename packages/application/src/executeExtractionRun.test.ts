@@ -10,10 +10,19 @@ import type {
 } from "@lrnki/domain-core";
 import type {
   ArtifactRepositoryPort,
+  ClaimEntailmentJudgmentPort,
   ConceptConditionedClaimExtractionPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
+
+// Default judge entails everything so these tests exercise the deterministic +
+// orchestration behavior; entailment downgrades are covered in
+// applyEntailmentJudge.test.ts.
+const entailEverything: ClaimEntailmentJudgmentPort = {
+  model: "test-judge",
+  judge: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+};
 
 const frameworkQuote = "INSTRUCTKG is part of Signal Systems and INSTRUCTKG works by leveraging temporal signals.";
 const signalQuote = "Temporal signals organize teaching order and reveal prerequisite structure.";
@@ -99,6 +108,7 @@ function harness(extract: ConceptConditionedClaimExtractionPort["extract"], sele
       discovery: { discover: async () => selectedCandidates },
       admission: { admit: async () => selectedCandidates.map(admission) },
       claimExtraction: { extract },
+      claimEntailmentJudge: entailEverything,
       store,
       artifacts
     }),

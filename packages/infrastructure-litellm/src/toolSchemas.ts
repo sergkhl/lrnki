@@ -323,6 +323,38 @@ export const prerequisiteJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Claim entailment judgment: submit_claim_entailment_judgment ----------
+// One bounded judgment over a single concept-to-concept claim (ADR-0020). The
+// model decides whether the verbatim evidence actually asserts the typed relation
+// in the stated direction between the two named concepts. `entailingSpan` is the
+// minimal sub-quote that carries the relation; the application boundary fails
+// closed to entailed:false when it is not a substring of any provided quote.
+
+export const claimEntailmentJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["entailed", "entailingSpan", "rationale"],
+  properties: {
+    entailed: {
+      type: "boolean",
+      description:
+        "True only if the quoted evidence actually asserts the stated relation in the stated direction between the two named concepts. False for unrelated, wrongly-directed, wrong-relation, or merely-co-mentioned pairs."
+    },
+    entailingSpan: {
+      type: "string",
+      description:
+        "The minimal verbatim sub-quote (copied exactly from one of the provided quotes) that carries the relation. Empty string when entailed is false."
+    },
+    rationale: { type: "string", description: "One terse sentence grounded in the quoted evidence." }
+  }
+};
+
+export const claimEntailmentJudgmentValidator = z.object({
+  entailed: z.boolean(),
+  entailingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
 export const conceptClaimValidator = z.object({
   claims: z.array(z.object({
     predicate: z.enum(RELATION_ENUM),

@@ -41,19 +41,18 @@ export function applyClaimPolicy(input: {
     const evidence = claim.evidence.filter((item) => isVerifiable(item, input.blockText));
     const boundaryReasonCodes: string[] = [];
     if (evidence.length === 0) boundaryReasonCodes.push("no_verifiable_evidence");
-    if (claim.object.kind === "concept" && evidence.length > 0) {
-      const subjectLabels = input.labelsByCandidateKey.get(claim.subjectCandidateKey) ?? [];
-      const objectLabels = input.labelsByCandidateKey.get(claim.object.candidateKey) ?? [];
-      const hasExplicitEndpointEvidence = evidence.some((item) =>
-        mentionsAnyLabel(item.evidenceQuote, subjectLabels) &&
-        mentionsAnyLabel(item.evidenceQuote, objectLabels)
-      );
-      if (!hasExplicitEndpointEvidence) boundaryReasonCodes.push("evidence_does_not_name_both_endpoints");
-      const hasLexicalEntailment = evidence.some((item) =>
-        lexicallyEntailsRelation(item.evidenceQuote, claim.predicate, subjectLabels, objectLabels)
-      );
-      if (!hasLexicalEntailment) boundaryReasonCodes.push("evidence_does_not_lexically_entail_relation");
-    } else if (claim.object.kind === "literal" && evidence.length > 0) {
+    // Concept-to-concept entailment is NO LONGER decided here. The previous
+    // `evidence_does_not_name_both_endpoints` and
+    // `evidence_does_not_lexically_entail_relation` vetoes were hardcoded surface
+    // matchers (contiguous-substring label match + an English-phrase, surface-order
+    // whitelist). Both produced false negatives on ordinary prose — lists,
+    // apposition, pronouns, synonym verbs — discarding genuinely-supported claims
+    // (AGENTS rule 16). A concept claim that clears the verbatim floor below, the
+    // nature/direction self-report gates, and the aggregate structural gates is
+    // emitted "verified" here PENDING the semantic claim-entailment judge, which the
+    // application runs as a separate composed async stage (ADR-0020). The judge can
+    // only DOWNGRADE such a claim; it never resurrects one rejected here.
+    if (claim.object.kind === "literal" && evidence.length > 0) {
       const subjectLabels = input.labelsByCandidateKey.get(claim.subjectCandidateKey) ?? [];
       const literalValue = claim.object.value;
       const hasDefinitionEvidence = evidence.some((item) =>
@@ -123,14 +122,6 @@ function addReason(reasons: string[], reason: string): void {
   if (!reasons.includes(reason)) reasons.push(reason);
 }
 
-function mentionsAnyLabel(text: string, labels: string[]): boolean {
-  const normalizedText = normalizeForMention(text);
-  return labels.some((label) => {
-    const normalizedLabel = normalizeForMention(label);
-    return normalizedLabel.length > 0 && normalizedText.includes(normalizedLabel);
-  });
-}
-
 function normalizeForMention(text: string): string {
   return text
     .normalize("NFKD")
@@ -139,43 +130,6 @@ function normalizeForMention(text: string): string {
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
-}
-
-function lexicallyEntailsRelation(
-  evidenceQuote: string,
-  predicate: RelationPredicate,
-  subjectLabels: string[],
-  objectLabels: string[]
-): boolean {
-  const text = ` ${normalizeForMention(evidenceQuote)} `;
-  const subjectPositions = labelPositions(text, subjectLabels);
-  const objectPositions = labelPositions(text, objectLabels);
-  if (subjectPositions.length === 0 || objectPositions.length === 0) return false;
-
-  const ordered = (left: number[], terms: string[], right: number[]) =>
-    left.some((leftPosition) =>
-      terms.some((term) => {
-        const termPosition = text.indexOf(` ${term} `, leftPosition);
-        return termPosition >= 0 && right.some((rightPosition) => rightPosition > termPosition);
-      })
-    );
-
-  switch (predicate) {
-    case "is-a":
-      return ordered(subjectPositions, ["is a", "is an", "is one of", "is a type of", "is a kind of"], objectPositions);
-    case "part-of":
-      return ordered(subjectPositions, ["is part of", "forms part of", "is a component of", "is a step in"], objectPositions) ||
-        ordered(objectPositions, ["includes", "contains", "comprises", "consists of"], subjectPositions);
-    case "uses":
-      return ordered(subjectPositions, ["uses", "use", "using", "employs", "employ", "employing", "leverages", "leverage", "leveraging", "utilizes", "utilize", "utilizing", "synergizes", "synergizing"], objectPositions);
-    case "asserted-prerequisite-of":
-      return ordered(subjectPositions, ["is a prerequisite for", "is required before", "must be understood before"], objectPositions);
-    case "contrasts-with":
-      return hasAnyTermBetween(text, subjectPositions, objectPositions, ["contrasts with", "contrast with", "unlike", "versus", "rather than", "distinguishes"]) ||
-        hasAnyTermBetween(text, objectPositions, subjectPositions, ["contrasts with", "contrast with", "unlike", "versus", "rather than", "distinguishes"]);
-    case "defined-as":
-      return false;
-  }
 }
 
 function labelPositions(text: string, labels: string[]): number[] {
@@ -192,16 +146,6 @@ function labelPositions(text: string, labels: string[]): number[] {
     }
   }
   return positions;
-}
-
-function hasAnyTermBetween(text: string, left: number[], right: number[], terms: string[]): boolean {
-  return left.some((leftPosition) =>
-    right.some((rightPosition) => {
-      if (rightPosition <= leftPosition) return false;
-      const between = text.slice(leftPosition, rightPosition);
-      return terms.some((term) => between.includes(` ${term} `));
-    })
-  );
 }
 
 // A `defined-as` literal is only entailed when a definitional copula DIRECTLY

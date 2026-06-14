@@ -72,7 +72,17 @@ test("rejects reciprocal asymmetric claims in both directions", () => {
   assert.equal(results.every((result) => result.boundaryReasonCodes.includes("reciprocal_asymmetric_relation")), true);
 });
 
-test("rejects a concept claim whose verified quote does not explicitly name both endpoints", () => {
+// NOTE: concept-to-concept entailment is no longer decided here (ADR-0020). The
+// former `evidence_does_not_name_both_endpoints` and
+// `evidence_does_not_lexically_entail_relation` vetoes were hardcoded surface
+// matchers that produced false negatives on ordinary prose (AGENTS rule 16); the
+// semantic judge now decides entailment as a composed stage. The deterministic
+// layer marks a structurally-valid concept claim "verified" PENDING that judge —
+// see applyEntailmentJudge.test.ts for the entailment cases that used to live here.
+
+test("marks a structurally-valid concept claim verified pending the entailment judge", () => {
+  // Object label deliberately absent from the quote: the deterministic layer no
+  // longer vetoes on surface co-mention — that is the judge's job downstream.
   const [result] = applyClaimPolicy({
     claims: [claim({ evidence: [{ blockId: "block-1", evidenceQuote: "Move semantics is part of the Rust ownership system." }] })],
     coreCandidateKeys,
@@ -82,47 +92,8 @@ test("rejects a concept claim whose verified quote does not explicitly name both
     ]),
     blockText
   });
-  assert.equal(result.validationOutcome, "rejected");
-  assert.ok(result.boundaryReasonCodes.includes("evidence_does_not_name_both_endpoints"));
-});
-
-test("rejects endpoint-naming evidence that does not explicitly state the chosen relation", () => {
-  const [result] = applyClaimPolicy({
-    claims: [claim({
-      subjectCandidateKey: "move",
-      predicate: "uses",
-      object: { kind: "concept", candidateKey: "ownership" },
-      evidenceLinkNature: "mechanism-employment",
-      evidenceDirection: "subject-uses-object",
-      evidence: [{ blockId: "block-1", evidenceQuote: "Move semantics is part of the Rust ownership system." }]
-    })],
-    coreCandidateKeys,
-    labelsByCandidateKey,
-    blockText
-  });
-  assert.equal(result.validationOutcome, "rejected");
-  assert.ok(result.boundaryReasonCodes.includes("evidence_does_not_lexically_entail_relation"));
-});
-
-test("rejects a loose signal-for-inference statement as uses", () => {
-  const [result] = applyClaimPolicy({
-    claims: [claim({
-      subjectCandidateKey: "temporal",
-      predicate: "uses",
-      object: { kind: "concept", candidateKey: "prerequisite" },
-      evidenceLinkNature: "mechanism-employment",
-      evidenceDirection: "subject-uses-object",
-      evidence: [{ blockId: "block-2", evidenceQuote: "Temporal signals support prerequisite inference." }]
-    })],
-    coreCandidateKeys: new Set(["temporal", "prerequisite"]),
-    labelsByCandidateKey: new Map([
-      ["temporal", ["Temporal signal"]],
-      ["prerequisite", ["Prerequisite"]]
-    ]),
-    blockText
-  });
-  assert.equal(result.validationOutcome, "rejected");
-  assert.ok(result.boundaryReasonCodes.includes("evidence_does_not_lexically_entail_relation"));
+  assert.equal(result.validationOutcome, "verified");
+  assert.deepEqual(result.boundaryReasonCodes, []);
 });
 
 test("accepts an explicit literal definition", () => {
@@ -181,26 +152,4 @@ test("accepts explicit INSTRUCTKG evidence using the active leveraging inflectio
     blockText: new Map([["block-4", quote]])
   });
   assert.equal(result.validationOutcome, "verified");
-});
-
-test("rejects the reversed interpretation of INSTRUCTKG leveraging temporal signals", () => {
-  const quote = "INSTRUCTKG works by leveraging temporal signals to infer learning dependencies.";
-  const [result] = applyClaimPolicy({
-    claims: [claim({
-      subjectCandidateKey: "temporal",
-      predicate: "uses",
-      object: { kind: "concept", candidateKey: "instructkg" },
-      evidenceLinkNature: "mechanism-employment",
-      evidenceDirection: "subject-uses-object",
-      evidence: [{ blockId: "block-4", evidenceQuote: quote }]
-    })],
-    coreCandidateKeys: new Set(["instructkg", "temporal"]),
-    labelsByCandidateKey: new Map([
-      ["instructkg", ["Instructor-Aligned Knowledge Graphs", "INSTRUCTKG"]],
-      ["temporal", ["Temporal Signals", "temporal signals"]]
-    ]),
-    blockText: new Map([["block-4", quote]])
-  });
-  assert.equal(result.validationOutcome, "rejected");
-  assert.ok(result.boundaryReasonCodes.includes("evidence_does_not_lexically_entail_relation"));
 });

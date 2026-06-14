@@ -19,3 +19,4 @@
 - [0017-split-extraction-runs-from-graph-version-builds](./0017-split-extraction-runs-from-graph-version-builds.md)
 - [0018-deterministic-extraction-sampling](./0018-deterministic-extraction-sampling.md)
 - [0019-graph-enrichment-derived-layer](./0019-graph-enrichment-derived-layer.md)
+- [0020-semantic-claim-entailment-judge](./0020-semantic-claim-entailment-judge.md)

@@ -1,17 +1,26 @@
 import type {
   AdmissionProposal,
+  ClaimEntailmentJudgment,
   ClaimExtractionFeedback,
   ClaimExtractionResult,
   DiscoveredCandidate,
   ExtractedClaim,
+  RelationPredicate,
   SourceBlock,
   StructuredDocument
 } from "@lrnki/domain-core";
 import { extractableBlocks } from "@lrnki/domain-core";
 import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
-import type { ConceptAdmissionPort, ConceptConditionedClaimExtractionPort, ConceptDiscoveryPort } from "@lrnki/ports";
+import type {
+  ClaimEntailmentJudgmentPort,
+  ConceptAdmissionPort,
+  ConceptConditionedClaimExtractionPort,
+  ConceptDiscoveryPort
+} from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
+  claimEntailmentJudgmentSchema,
+  claimEntailmentJudgmentValidator,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidator,
   conceptCoreSelectionSchemaForCandidateKeys,
@@ -27,6 +36,24 @@ import {
 export const DISCOVERY_MODEL = "kg-concept-discovery";
 export const ADMISSION_MODEL = "kg-concept-admission";
 export const CLAIM_MODEL = "kg-claim-extraction";
+// Independent second model for the semantic claim-entailment judge (ADR-0020).
+// A different family than the extractor (Mistral Small vs DeepSeek) so the judge
+// is not just re-running the same model's reasoning over its own output.
+export const CLAIM_ENTAILMENT_JUDGE_MODEL = "kg-oracle-judge";
+
+// Per-predicate strict entailment test, shared by the judge. These are the SAME
+// natural-language tests the extraction prompt applies; the judge re-checks them
+// against the verbatim evidence so a wrong-relation/wrong-direction claim that
+// slipped past the extractor's self-report is caught semantically rather than by
+// a hardcoded surface matcher (AGENTS rule 16).
+const PREDICATE_ENTAILMENT_TEST: Record<RelationPredicate, string> = {
+  "is-a": "'is-a' (strict taxonomy): the evidence must assert that the SUBJECT is a kind/type/category-member of the OBJECT, i.e. 'every <subject> is a <object>' reads as true. A list that places the subject among instances of the object's category counts (e.g. 'three models: conservative, semi-conservative, dispersive' entails 'semi-conservative is-a model'). Component-of, causes, or uses do NOT count.",
+  "part-of": "'part-of': the evidence must assert that the SUBJECT is a structural component, member, step, or sub-mechanism of the OBJECT — 'the <object> consists of / includes / contains the <subject>' reads as true. Causing, enabling, or motivating the object is NOT membership.",
+  "uses": "'uses': the evidence must assert that the SUBJECT actively employs the OBJECT as a tool or mechanism while it operates — 'the <subject> works by employing the <object>'. Being caused by, arising from, or motivated by the object is NOT using it.",
+  "asserted-prerequisite-of": "'asserted-prerequisite-of': the evidence must EXPLICITLY state that understanding the SUBJECT is required before the OBJECT. Mere topical ordering is not enough.",
+  "contrasts-with": "'contrasts-with': the evidence must explicitly contrast or distinguish the SUBJECT and OBJECT as alternatives or opposites. Denying causation ('X is not the effect of Y') is not a contrast.",
+  "defined-as": "'defined-as': the evidence must define the SUBJECT as the given literal using definitional language ('is', 'means', 'refers to')."
+};
 
 function renderBlocks(blocks: SourceBlock[]): string {
   return blocks
@@ -266,6 +293,7 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
       "- defined-as requires subject-defined-by-literal.",
       "Never reverse a sentence to manufacture a claim for the current subject. A later concept-conditioned call can extract the correctly directed claim for the other subject.",
       "For a given subject/object pair choose at most ONE of is-a, part-of, or uses. If two seem plausible, emit neither.",
+      "Never emit a symmetric pair: if you emit '<subject> part-of <object>' do not also emit '<object> part-of <subject>'; the same holds for is-a and asserted-prerequisite-of. These relations are one-directional.",
       "The evidence must lexically state the selected relation in the claimed direction: is-a needs explicit category language; part-of needs explicit membership/component language; uses needs an active use/employ/leverage verb with the subject as actor. Mere co-occurrence, support, signal-for-inference, or node/edge listing is insufficient.",
       "For defined-as, the quote must explicitly name the subject, use definition language such as 'is', 'means', or 'refers to', and contain the exact literal value.",
       "WRONG: 'Rust move semantics is-a Rust ownership system'; move semantics is not a kind of ownership system. WRONG: 'DNA double helix uses DNA replication'; replication operates on or uses the double helix, not vice versa.",
@@ -364,6 +392,67 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
           : undefined,
         extractionAttempt: input.feedback ? 2 : 1
       }))
+    };
+  }
+}
+
+// Semantic claim-entailment judge (ADR-0020). Mirrors the prerequisite-judgment
+// adapter: forced named tool, temp 0, one bounded judgment per concept claim.
+// The judge sees the two concept labels (+aliases), the typed relation and its
+// strict test, and the already-verbatim evidence quotes. It decides whether the
+// evidence actually asserts that relation in that direction. Fail closed: a
+// non-substring `entailingSpan` is treated as not-entailed so the judge cannot
+// "support" a claim with text that is not in the cited evidence.
+export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJudgmentPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = CLAIM_ENTAILMENT_JUDGE_MODEL) {
+    this.model = model;
+  }
+
+  async judge(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    predicate: RelationPredicate;
+    object: { canonicalLabel: string; aliases: string[] };
+    evidenceQuotes: string[];
+  }): Promise<ClaimEntailmentJudgment> {
+    const system = [
+      "You judge whether quoted source evidence ACTUALLY ASSERTS a specific typed relation between two domain concepts, for a learner-neutral concept graph.",
+      "The evidence quotes are already verified verbatim from the source. Judge ONLY what the quotes assert — do not use outside knowledge to fill gaps.",
+      "Real prose asserts relations through pronouns, apposition, lists, passive voice, and synonym verbs; do not require a fixed surface phrasing. Judge meaning, not wording.",
+      "Be precision-first. Return entailed=false when the quotes only co-mention the concepts, assert a DIFFERENT relation, assert the relation in the REVERSE direction, or merely relate them causally/motivationally.",
+      "The relation has a fixed direction: SUBJECT then OBJECT. A correct relation stated with the roles reversed is NOT entailed for this claim.",
+      "When entailed=true, copy the minimal exact sub-quote that carries the relation into entailingSpan; it must be a verbatim substring of one provided quote. When entailed=false, return an empty entailingSpan."
+    ].join("\n");
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Subject concept: "${input.subject.canonicalLabel}" (aliases: ${renderAliases(input.subject.aliases)}).`,
+      `Object concept: "${input.object.canonicalLabel}" (aliases: ${renderAliases(input.object.aliases)}).`,
+      `Claimed relation: ${input.subject.canonicalLabel} ${input.predicate} ${input.object.canonicalLabel}.`,
+      `Relation test: ${PREDICATE_ENTAILMENT_TEST[input.predicate]}`,
+      "",
+      "Verbatim evidence quotes:",
+      ...input.evidenceQuotes.map((quote, index) => `[${index + 1}] "${quote}"`),
+      "",
+      "Call submit_claim_entailment_judgment: does the evidence assert this relation in this direction between these two concepts?"
+    ].join("\n");
+
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_claim_entailment_judgment",
+      toolDescription: "Submit whether the verbatim evidence entails the claimed typed relation in the claimed direction.",
+      parameters: claimEntailmentJudgmentSchema,
+      validator: claimEntailmentJudgmentValidator
+    });
+
+    // Fail closed: an entailing span must be grounded in the provided evidence.
+    const grounded = result.entailingSpan.trim().length > 0 &&
+      input.evidenceQuotes.some((quote) => quote.includes(result.entailingSpan.trim()));
+    return {
+      entailed: result.entailed && grounded,
+      entailingSpan: grounded ? result.entailingSpan.trim() : "",
+      rationale: result.rationale
     };
   }
 }
