@@ -97,7 +97,7 @@ export const conceptAdmissionDecisions = pgTable("concept_admission_decisions", 
   selectionReasonCode: text("selection_reason_code").notNull(),
   reasonCodes: jsonb("reason_codes").notNull(),
   boundaryReasonCodes: jsonb("boundary_reason_codes").notNull(),
-  // Raw model confidence signal only; no composite score (concept-first plan §1).
+  // Raw model confidence signal only; no composite score.
   confidence: real("confidence").notNull()
 });
 
@@ -150,29 +150,30 @@ export const graphVersions = pgTable("graph_versions", {
   publishedAt: timestamp("published_at", { withTimezone: true })
 });
 
-// Durable published concepts. IRI minted once at first publication, never re-derived (ADR-0015).
+// Stable Concept identity. Presentation belongs to immutable graph-version snapshots.
 export const concepts = pgTable("concepts", {
   conceptId: uuid("concept_id").primaryKey(),
   iri: text("iri").notNull().unique(),
-  canonicalLabel: text("canonical_label").notNull(),
   normalizedLabel: text("normalized_label").notNull(),
   declaredDomain: text("declared_domain").notNull(),
-  trustTier: text("trust_tier").notNull(),
-  homograph: boolean("homograph").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 }, (table) => [unique().on(table.normalizedLabel, table.declaredDomain)]);
 
-export const conceptAliases = pgTable("concept_aliases", {
-  conceptAliasId: uuid("concept_alias_id").primaryKey(),
+export const graphVersionConcepts = pgTable("graph_version_concepts", {
+  graphVersionConceptId: uuid("graph_version_concept_id").primaryKey(),
+  graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
+  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId),
+  canonicalLabel: text("canonical_label").notNull(),
+  trustTier: text("trust_tier").notNull(),
+  homograph: boolean("homograph").notNull().default(false)
+}, (table) => [unique().on(table.graphVersionId, table.conceptId)]);
+
+export const graphVersionConceptAliases = pgTable("graph_version_concept_aliases", {
+  graphVersionConceptAliasId: uuid("graph_version_concept_alias_id").primaryKey(),
+  graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
   conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId),
   label: text("label").notNull()
-}, (table) => [unique().on(table.conceptId, table.label)]);
-
-export const graphVersionConceptMemberships = pgTable("graph_version_concept_memberships", {
-  graphVersionConceptMembershipId: uuid("graph_version_concept_membership_id").primaryKey(),
-  graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
-  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId)
-}, (table) => [unique().on(table.graphVersionId, table.conceptId)]);
+}, (table) => [unique().on(table.graphVersionId, table.conceptId, table.label)]);
 
 export const graphVersionRunMemberships = pgTable("graph_version_run_memberships", {
   graphVersionRunMembershipId: uuid("graph_version_run_membership_id").primaryKey(),
@@ -234,7 +235,7 @@ export const artifactVersions = pgTable("artifact_versions", {
 // version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
 // asserted core. Normalized rows below are the query/traversal surface; the
 // immutable replay copy is an `artifact_versions` envelope (artifact_type
-// 'graph-enrichment', graph_version_id set). Inferred relations live in their
+// 'enrichment_run.v2', graph_version_id set). Inferred relations live in their
 // OWN namespace and intentionally do NOT reference relation_definitions, whose
 // closed asserted registry (ADR-0016) the published_claims FK enforces.
 // ---------------------------------------------------------------------------
@@ -242,7 +243,6 @@ export const artifactVersions = pgTable("artifact_versions", {
 export const graphEnrichments = pgTable("graph_enrichments", {
   enrichmentId: uuid("enrichment_id").primaryKey(),
   graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
-  // Replay identity: same (version + config) re-derives the same layer (ADR-0019).
   enrichmentConfigHash: text("enrichment_config_hash").notNull(),
   status: text("status").notNull(),
   embeddingModel: text("embedding_model").notNull(),
@@ -250,14 +250,13 @@ export const graphEnrichments = pgTable("graph_enrichments", {
   difficultyMethod: text("difficulty_method").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true })
-}, (table) => [unique().on(table.graphVersionId, table.enrichmentConfigHash)]);
+});
 
-// Contextual-embedding cluster membership — provenance for how prerequisite pairs
-// were gated (ADR-0012 tier 2). Inspection/audit only; never an edge authority.
-export const enrichmentConceptClusters = pgTable("enrichment_concept_clusters", {
-  enrichmentConceptClusterId: uuid("enrichment_concept_cluster_id").primaryKey(),
+// Prerequisite Candidate Selection groups. These never decide Concept identity.
+export const enrichmentPrerequisiteCandidateGroups = pgTable("enrichment_prerequisite_candidate_groups", {
+  enrichmentPrerequisiteCandidateGroupId: uuid("enrichment_prerequisite_candidate_group_id").primaryKey(),
   enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
-  clusterId: text("cluster_id").notNull(),
+  groupId: text("group_id").notNull(),
   conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId)
 }, (table) => [unique().on(table.enrichmentId, table.conceptId)]);
 
@@ -275,7 +274,7 @@ export const inferredPrerequisiteEdges = pgTable("inferred_prerequisite_edges", 
   dependentConceptId: uuid("dependent_concept_id").notNull().references(() => concepts.conceptId),
   confidence: real("confidence").notNull(),
   uncertain: boolean("uncertain").notNull().default(false),
-  clusterId: text("cluster_id"),
+  candidateGroupId: text("candidate_group_id"),
   provenance: jsonb("provenance").notNull()
 }, (table) => [unique().on(table.enrichmentId, table.prerequisiteConceptId, table.dependentConceptId)]);
 

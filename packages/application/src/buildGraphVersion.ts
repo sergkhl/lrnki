@@ -49,7 +49,8 @@ export async function buildGraphVersion(input: {
   // --- Identity resolution: domain-scoped merge (ADR-0015) -----------------
   // Group every core candidate by (declaredDomain, normalizedLabel). Candidates
   // sharing a key across runs merge into one concept; the same normalizedLabel
-  // across different domains is quarantined as a homograph.
+  // across different domains is flagged as a cross-domain homograph and
+  // published separately, not quarantined.
   type Cluster = {
     declaredDomain: string;
     normalizedLabel: string;
@@ -90,7 +91,9 @@ export async function buildGraphVersion(input: {
     }
   }
 
-  // Homograph detection: same normalized label across distinct domains.
+  // Homograph detection: same normalized label across distinct domains. Declared
+  // Domain keeps these identities separate, so this is an inspection flag rather
+  // than a quarantine or publication blocker (ADR-0015).
   const domainsByLabel = new Map<string, Set<string>>();
   for (const cluster of clusters.values()) {
     const set = domainsByLabel.get(cluster.normalizedLabel) ?? new Set<string>();
@@ -109,10 +112,10 @@ export async function buildGraphVersion(input: {
     const isHomograph = homographLabels.has(cluster.normalizedLabel);
     if (isHomograph) {
       refinementDecisions.push({
-        decisionType: "homograph_quarantine",
+        decisionType: "cross_domain_homograph_flag",
         subject: { normalizedLabel: cluster.normalizedLabel, declaredDomain: cluster.declaredDomain },
-        outcome: "quarantined",
-        rationale: "Same normalized label appears in more than one Declared Domain (ADR-0015).",
+        outcome: "flagged",
+        rationale: "Same normalized label appears in more than one Declared Domain; identities remain separate (ADR-0015).",
         provenance: { domains: [...(domainsByLabel.get(cluster.normalizedLabel) ?? [])] }
       });
     }
@@ -127,7 +130,7 @@ export async function buildGraphVersion(input: {
       normalizedLabel: cluster.normalizedLabel,
       declaredDomain: cluster.declaredDomain,
       aliases: [...cluster.aliases].filter((alias) => alias !== cluster.canonicalLabel),
-      trustTier: isHomograph ? "quarantined" : trustTier,
+      trustTier,
       homograph: isHomograph
     };
     conceptByIdentity.set(key, concept);

@@ -272,22 +272,20 @@ export class PostgresGraphVersionStore implements GraphVersionStorePort {
         VALUES (${snapshot.graphVersionId}, 'published', ${input.refinementConfigHash}, now())`;
 
       for (const concept of snapshot.concepts) {
-        // Reuse the durable concept row when its identity already exists; IRI is frozen (ADR-0015).
+        // Reuse stable identity while storing presentation in this immutable version.
         await tx`
-          INSERT INTO concepts (concept_id, iri, canonical_label, normalized_label, declared_domain, trust_tier, homograph)
-          VALUES (${concept.conceptId}, ${concept.iri}, ${concept.canonicalLabel}, ${concept.normalizedLabel}, ${concept.declaredDomain}, ${concept.trustTier}, ${concept.homograph})
+          INSERT INTO concepts (concept_id, iri, normalized_label, declared_domain)
+          VALUES (${concept.conceptId}, ${concept.iri}, ${concept.normalizedLabel}, ${concept.declaredDomain})
           ON CONFLICT (normalized_label, declared_domain)
-          DO UPDATE SET canonical_label = EXCLUDED.canonical_label, trust_tier = EXCLUDED.trust_tier, homograph = EXCLUDED.homograph`;
+          DO NOTHING`;
+        await tx`
+          INSERT INTO graph_version_concepts (graph_version_concept_id, graph_version_id, concept_id, canonical_label, trust_tier, homograph)
+          VALUES (${randomUUID()}, ${snapshot.graphVersionId}, ${concept.conceptId}, ${concept.canonicalLabel}, ${concept.trustTier}, ${concept.homograph})`;
         for (const alias of concept.aliases) {
           await tx`
-            INSERT INTO concept_aliases (concept_alias_id, concept_id, label)
-            VALUES (${randomUUID()}, ${concept.conceptId}, ${alias})
-            ON CONFLICT (concept_id, label) DO NOTHING`;
+            INSERT INTO graph_version_concept_aliases (graph_version_concept_alias_id, graph_version_id, concept_id, label)
+            VALUES (${randomUUID()}, ${snapshot.graphVersionId}, ${concept.conceptId}, ${alias})`;
         }
-        await tx`
-          INSERT INTO graph_version_concept_memberships (graph_version_concept_membership_id, graph_version_id, concept_id)
-          VALUES (${randomUUID()}, ${snapshot.graphVersionId}, ${concept.conceptId})
-          ON CONFLICT (graph_version_id, concept_id) DO NOTHING`;
       }
 
       for (const claim of snapshot.claims) {
@@ -319,21 +317,31 @@ export class PostgresGraphVersionStore implements GraphVersionStorePort {
     });
   }
 
-  async getPublishedSnapshot(): Promise<GraphSnapshot | undefined> {
+  async getPublishedSnapshot(graphVersionId: string): Promise<GraphSnapshot | undefined> {
+    const versions = await this.sql<{ graph_version_id: string }[]>`
+      SELECT graph_version_id FROM graph_versions
+      WHERE graph_version_id = ${graphVersionId} AND status = 'published'
+      LIMIT 1`;
+    if (versions.length === 0) return undefined;
+    return this.hydratePublishedSnapshot(graphVersionId);
+  }
+
+  async getLatestPublishedSnapshot(): Promise<GraphSnapshot | undefined> {
     const versions = await this.sql<{ graph_version_id: string }[]>`
       SELECT graph_version_id FROM graph_versions WHERE status = 'published' ORDER BY published_at DESC LIMIT 1`;
     if (versions.length === 0) return undefined;
-    const graphVersionId = versions[0].graph_version_id;
+    return this.hydratePublishedSnapshot(versions[0].graph_version_id);
+  }
 
+  private async hydratePublishedSnapshot(graphVersionId: string): Promise<GraphSnapshot> {
     const conceptRows = await this.sql<{ concept_id: string; iri: string; canonical_label: string; normalized_label: string; declared_domain: string; trust_tier: string; homograph: boolean }[]>`
-      SELECT c.concept_id, c.iri, c.canonical_label, c.normalized_label, c.declared_domain, c.trust_tier, c.homograph
+      SELECT c.concept_id, c.iri, gvc.canonical_label, c.normalized_label, c.declared_domain, gvc.trust_tier, gvc.homograph
       FROM concepts c
-      JOIN graph_version_concept_memberships m ON m.concept_id = c.concept_id
-      WHERE m.graph_version_id = ${graphVersionId}`;
+      JOIN graph_version_concepts gvc ON gvc.concept_id = c.concept_id
+      WHERE gvc.graph_version_id = ${graphVersionId}`;
     const aliasRows = await this.sql<{ concept_id: string; label: string }[]>`
-      SELECT ca.concept_id, ca.label FROM concept_aliases ca
-      JOIN graph_version_concept_memberships m ON m.concept_id = ca.concept_id
-      WHERE m.graph_version_id = ${graphVersionId}`;
+      SELECT concept_id, label FROM graph_version_concept_aliases
+      WHERE graph_version_id = ${graphVersionId}`;
     const aliasesByConcept = new Map<string, string[]>();
     for (const row of aliasRows) aliasesByConcept.set(row.concept_id, [...(aliasesByConcept.get(row.concept_id) ?? []), row.label]);
 

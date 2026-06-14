@@ -443,10 +443,10 @@ export type ArtifactEnvelope<TPayload = unknown> = {
 
 export type InferredRelationPredicate = "inferred-prerequisite-of";
 
-export type ConceptCluster = {
-  clusterId: string;
-  // Contextual-embedding cluster used only to GATE which pairs the LLM judges
-  // (ADR-0012 tier 2: propose-only, never an edge/merge authority).
+export type PrerequisiteCandidateGroup = {
+  groupId: string;
+  // Contextual-embedding group used only for Prerequisite Candidate Selection.
+  // It never decides Concept identity or creates an edge.
   conceptIds: string[];
   embeddingModel: string;
 };
@@ -472,8 +472,30 @@ export type InferredPrerequisiteEdge = {
   predicate: InferredRelationPredicate;
   confidence: number;
   uncertain: boolean;
-  clusterId?: string;
+  candidateGroupId?: string;
   provenance: { judgmentRationale: string; evidencePacketRef?: string };
+};
+
+export type PrerequisiteJudgmentTrace = {
+  declaredDomain: string;
+  a: { conceptId: string; canonicalLabel: string; definition?: string };
+  b: { conceptId: string; canonicalLabel: string; definition?: string };
+  evidencePacket: SourceBlock[];
+  judgment: PrerequisiteJudgment;
+};
+
+export type InferredEdgeDisposition = {
+  prerequisiteConceptId: string;
+  dependentConceptId: string;
+  disposition: "insufficient_evidence" | "uncertain" | "weak_cut" | "cycle_removed" | "transitive_reduction" | "kept";
+};
+
+export type EnrichmentRunTrace = {
+  enrichmentId: string;
+  graphVersionId: string;
+  enrichmentConfigHash: string;
+  judgments: PrerequisiteJudgmentTrace[];
+  dispositions: InferredEdgeDisposition[];
 };
 
 // Baseline node difficulty. MVP `method` is "dag-depth-mock" (topological depth);
@@ -495,7 +517,7 @@ export type DerivedGraphLayer = {
   // The bounded prerequisite-judge model (provenance for the inferred DAG). Stored
   // alongside embeddingModel so a layer fully records which models proposed it.
   judgeModel: string;
-  clusters: ConceptCluster[];
+  prerequisiteCandidateGroups: PrerequisiteCandidateGroup[];
   prerequisiteEdges: InferredPrerequisiteEdge[];
   difficulties: ConceptDifficulty[];
 };

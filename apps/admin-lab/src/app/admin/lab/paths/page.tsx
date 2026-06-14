@@ -57,7 +57,7 @@ export default async function LearnerPathListPage() {
                 <EmptyTitle>No learner paths</EmptyTitle>
                 <EmptyDescription>
                   Run <code className="font-mono">worker:kg enrich-graph-version</code> then{" "}
-                  <code className="font-mono">worker:kg compute-learner-path</code> to persist a path.
+                  <code className="font-mono">worker:kg compute-learner-path &lt;enrichmentId&gt; &lt;targetConceptId&gt;</code>.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>

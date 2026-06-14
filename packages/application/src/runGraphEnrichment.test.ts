@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type {
   DerivedGraphLayer,
+  EnrichmentRunTrace,
   GraphSnapshot,
   PrerequisiteJudgment,
   SourceBlock
 } from "@lrnki/domain-core";
 import type {
-  ArtifactRepositoryPort,
-  DerivedGraphLayerStorePort,
   DifficultyPort,
   EmbeddingPort,
+  EnrichmentRunStorePort,
   GraphVersionStorePort,
   PrerequisiteJudgmentPort
 } from "@lrnki/ports";
@@ -63,15 +63,31 @@ const snapshot: GraphSnapshot = {
       modelConfidence: 0.8,
       evidenceCount: 1,
       contradictionState: "none"
-    }
+    },
+    ...[
+      ["cx2", "X Two"],
+      ["cx3", "X Three"],
+      ["cy1", "Y One"],
+      ["cy2", "Y Two"]
+    ].map(([conceptId, label], index) => ({
+      claimId: `definition-${index}`,
+      subjectConceptId: conceptId,
+      predicate: "defined-as" as const,
+      object: { kind: "literal" as const, value: `the definition of ${label}` },
+      evidence: [{ sourceResourceId: "s1", sourceBlockId: `definition-block-${index}`, evidenceQuote: `${label} is the definition of ${label}` }],
+      trustTier: "curated_source_grounded" as const,
+      modelConfidence: 0.9,
+      evidenceCount: 1,
+      contradictionState: "none" as const
+    }))
   ]
 };
 
 function buildPorts() {
   const judgedPairs: { a: string; b: string; packet: SourceBlock[]; aDef?: string }[] = [];
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
-    async getPublishedSnapshot() {
-      return snapshot;
+    async getPublishedSnapshot(graphVersionId) {
+      return graphVersionId === snapshot.graphVersionId ? snapshot : undefined;
     }
   };
   const embedding: EmbeddingPort = {
@@ -105,18 +121,26 @@ function buildPorts() {
     }
   };
   let persisted: DerivedGraphLayer | undefined;
-  const layerStore: Pick<DerivedGraphLayerStorePort, "persist"> = {
-    async persist(layer) {
-      persisted = layer;
+  let trace: EnrichmentRunTrace | undefined;
+  let artifactType: string | undefined;
+  const enrichmentStore: Pick<EnrichmentRunStorePort, "persist"> = {
+    async persist(input) {
+      persisted = input.layer;
+      trace = input.artifact.payload;
+      artifactType = input.artifact.artifactType;
     }
   };
-  const appended: string[] = [];
-  const artifacts: ArtifactRepositoryPort = {
-    async append(artifact) {
-      appended.push(artifact.artifactType);
-    }
+  return {
+    judgedPairs,
+    graphStore,
+    embedding,
+    prerequisiteJudge,
+    difficulty,
+    enrichmentStore,
+    getPersisted: () => persisted,
+    getTrace: () => trace,
+    getArtifactType: () => artifactType
   };
-  return { judgedPairs, graphStore, embedding, prerequisiteJudge, difficulty, layerStore, artifacts, getPersisted: () => persisted, appended };
 }
 
 test("runGraphEnrichment gates pairs by Declared Domain and never judges cross-domain pairs", async () => {
@@ -128,8 +152,7 @@ test("runGraphEnrichment gates pairs by Declared Domain and never judges cross-d
     embedding: ports.embedding,
     prerequisiteJudge: ports.prerequisiteJudge,
     difficulty: ports.difficulty,
-    layerStore: ports.layerStore as DerivedGraphLayerStorePort,
-    artifacts: ports.artifacts
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort
   });
 
   // Exactly the same-domain pairs: C(3,2) for x + C(2,2) for y = 4.
@@ -149,8 +172,7 @@ test("runGraphEnrichment assembles an evidence packet from claim quotes and defi
     embedding: ports.embedding,
     prerequisiteJudge: ports.prerequisiteJudge,
     difficulty: ports.difficulty,
-    layerStore: ports.layerStore as DerivedGraphLayerStorePort,
-    artifacts: ports.artifacts
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort
   });
 
   const cx1Pair = ports.judgedPairs.find((pair) => [pair.a, pair.b].includes("cx1") && [pair.a, pair.b].includes("cx2"));
@@ -171,8 +193,7 @@ test("runGraphEnrichment maps directed judgments to a persisted layer and drops 
     embedding: ports.embedding,
     prerequisiteJudge: ports.prerequisiteJudge,
     difficulty: ports.difficulty,
-    layerStore: ports.layerStore as DerivedGraphLayerStorePort,
-    artifacts: ports.artifacts
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort
   });
 
   // Two directed edges (cx1->cx2, cy1->cy2); the 'none' verdicts are dropped.
@@ -185,5 +206,35 @@ test("runGraphEnrichment maps directed judgments to a persisted layer and drops 
   assert.equal(layer.judgeModel, "mock-judge");
   // Persisted and an artifact envelope appended for replay.
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
-  assert.ok(ports.appended.includes("graph_enrichment.v1"));
+  assert.equal(ports.getArtifactType(), "enrichment_run.v2");
+  assert.equal(ports.getTrace()?.judgments.length, 4);
+  assert.ok(ports.getTrace()?.dispositions.some((item) => item.disposition === "kept"));
+});
+
+test("runGraphEnrichment does not judge or infer from bare labels", async () => {
+  const ports = buildPorts();
+  const ungroundedSnapshot: GraphSnapshot = {
+    graphVersionId: "v-empty",
+    concepts: [concept("a", "A", "x"), concept("b", "B", "x")],
+    claims: []
+  };
+  const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
+    async getPublishedSnapshot(graphVersionId) {
+      return graphVersionId === ungroundedSnapshot.graphVersionId ? ungroundedSnapshot : undefined;
+    }
+  };
+
+  const layer = await runGraphEnrichment({
+    enrichmentId: "e-empty",
+    graphVersionId: "v-empty",
+    graphStore: graphStore as GraphVersionStorePort,
+    embedding: ports.embedding,
+    prerequisiteJudge: ports.prerequisiteJudge,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort
+  });
+
+  assert.equal(ports.judgedPairs.length, 0);
+  assert.equal(layer.prerequisiteEdges.length, 0);
+  assert.deepEqual(ports.getTrace()?.dispositions.map((item) => item.disposition), ["insufficient_evidence"]);
 });

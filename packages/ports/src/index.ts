@@ -7,6 +7,7 @@ import type {
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
+  EnrichmentRunTrace,
   ExtractionRunResult,
   GraphSnapshot,
   InferredPrerequisiteEdge,
@@ -93,7 +94,8 @@ export interface GraphVersionStorePort {
     runMemberships: { runId: string; sourceResourceId: string }[];
     refinementDecisions: RefinementDecisionRecord[];
   }): Promise<void>;
-  getPublishedSnapshot(): Promise<GraphSnapshot | undefined>;
+  getPublishedSnapshot(graphVersionId: string): Promise<GraphSnapshot | undefined>;
+  getLatestPublishedSnapshot(): Promise<GraphSnapshot | undefined>;
 }
 
 export interface SourceObjectStoragePort {
@@ -147,13 +149,16 @@ export interface LearnerStatePort {
   mastery(conceptId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
 }
 
-// Graph Enrichment persistence (ADR-0019). Immutable, keyed to (graphVersionId +
-// enrichmentConfigHash); refuses to mutate an existing enrichment. Persists the
-// layer as queryable normalized rows AND appends an artifact envelope for replay.
-export interface DerivedGraphLayerStorePort {
-  persist(layer: DerivedGraphLayer): Promise<void>;
-  getLayer(input: { graphVersionId: string; enrichmentConfigHash: string }): Promise<DerivedGraphLayer | undefined>;
-  getLatestLayer(graphVersionId: string): Promise<DerivedGraphLayer | undefined>;
+// Graph Enrichment persistence (ADR-0019). Append-only; each run has its own
+// enrichmentId, so repeated runs over the same graph version and configuration
+// remain independently queryable. Persists normalized rows plus one immutable
+// JSONB judgment/disposition trace.
+export interface EnrichmentRunStorePort {
+  persist(input: {
+    layer: DerivedGraphLayer;
+    artifact: ArtifactEnvelope<EnrichmentRunTrace>;
+  }): Promise<void>;
+  getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined>;
 }
 
 // Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the

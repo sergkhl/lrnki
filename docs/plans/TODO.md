@@ -23,7 +23,12 @@
    `EXPERIMENT_ONLY`. Re-measure on a larger per-domain graph (>14 concepts) that recall is added
    without precision loss before letting clustering reduce the candidate set.
 
-3. **Slice deepening (replace mocks behind unchanged ports; do not start before Gate 2 signal).**
+3. **Build and measure the embedding-assisted Concept Canonicalization cascade (ADR-0012).**
+   - Keep normalized-label match within Declared Domain as the only automatic merge authority.
+   - Use contextual embeddings to propose identity candidates and an LLM to verify reversible aliases.
+   - Keep the cascade outside publication until curated fixtures show added recall without precision loss.
+
+4. **Slice deepening (replace mocks behind unchanged ports; do not start before Gate 2 signal).**
    - Real difficulty: Bradley-Terry pairwise calibration replaces `dagDepthDifficultyPort`
      (ADR-0014), `DifficultyPort` unchanged.
    - Real learner modeling: IRT/KT `LearnerStatePort` impl replaces `emptyLearnerState`.
@@ -32,6 +37,16 @@
 
 ## COMPLETED
 
+- **Canonical architecture consolidation (2026-06-14).** Completed
+  the architecture and code-review follow-ups: `CONTEXT.md` is now a domain glossary, ADR ownership
+  is explicit, and stale duplicate definitions were removed. Stable Concept identity is separated
+  from immutable graph-version presentation; graph reads and Learner Paths select explicit
+  version/run IDs; Enrichment Runs are append-only with relational query surfaces plus complete JSONB
+  judgment/disposition traces. Enrichment artifact persistence now reuses the canonical envelope
+  writer inside the transaction. Cross-domain homographs publish separately with normal trust and an
+  inspection flag, while genuine quarantine still blocks. Real-use inspection also added a
+  fail-closed evidence gate so enrichment cannot infer from labels alone. Evidence:
+  `tmp/canonical-architecture-consolidation-quality-evaluation.md`.
 - **Gate 2 mixed-format ingestion: Docling adapter live (2026-06-14).** `DoclingStructuredDocumentParser`
   (PDF/DOCX/PPTX) behind the existing `StructuredDocumentParserPort`; markdown block-walking extracted
   into a shared `extractMarkdownBlocks` so native-markdown and Docling share one region-classification
@@ -49,7 +64,7 @@
   cut / cycle removal / transitive reduction; mock DAG-depth difficulty). `computeLearnerPath`
   persists a deterministic difficulty-ordered prerequisite chain (path `d94ee025`, biology target,
   6 steps). New LiteLLM aliases; `EmbeddingPort` + `PrerequisiteJudgmentPort` adapters;
-  `PostgresDerivedGraphLayerStore` + `PostgresLearnerPathStore`; evidence-packet assembly wired in
+  `PostgresEnrichmentRunStore` + `PostgresLearnerPathStore`; evidence-packet assembly wired in
   `runGraphEnrichment`; pair gating retuned to domain-primary (ADR-0012 EXPERIMENT_ONLY honored);
   CLI `enrich-graph-version` / `compute-learner-path`; Admin Lab read-only Cytoscape Learner Paths
   view. Six enrichment tables appended to the single migration. Evidence:
@@ -70,7 +85,7 @@
   claim guidance, direction/nature gates, exact definition validation, causal-relation suppression;
   precision-preserving single retry; determinism lever (temperature 0 + seed) on admission/claims.
 - **Application operations split (ADR-0017).** `executeExtractionRun` (run-scoped, never publishes)
-  and `buildGraphVersion` (deterministic, LLM-free: domain-scoped merge, homograph quarantine,
+  and `buildGraphVersion` (deterministic, LLM-free: domain-scoped merge, homograph flagging,
   frozen IRI minting, dedupe, quality gates, atomic publish). Explicit-run-ID publication with
   quarantine-blocks-publication gate (AGENTS rule 11).
 - **Ingestion + sources.** Native Markdown/HTML/plaintext parsers emit block-level source blocks
@@ -87,17 +102,20 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-14, post Docling ingestion adapter):
+Latest validation (2026-06-14, post code-review cleanup):
 - **Static: full `pnpm check` green** — typecheck across all packages, ESLint clean, **9 ingestion
   tests** (7 prior + 2 new shared-extractor tests: HTML-comment placeholder handling, depth-2 title)
-  and **46 application tests** pass, Next.js build succeeds.
-- **Real conversion + LLM calls, Gate 2 PDF fixture #4 (`2507.02554v2.pdf`):** Docling converted the
-  raw PDF to 273 blocks with correct region classification (84 body paragraphs; 127 references+appendix
-  typed out; 12 `<!-- image -->` placeholders caught). Extraction run `9b92bd64`: 48 candidates → 5
-  core concepts (3 clean ML learning objectives); the one verified claim
-  (`Search Policy --[defined-as]--> "used to navigate the space of candidate solutions"`) has its
-  evidence quote matched verbatim in a stored `paragraph` block. Result: **PASS** (ingestion layer).
-- Caveats: only the PDF arm of Gate 2 exercised (DOCX/PPTX fixtures pending); concept/claim precision
-  noise (proposition-shaped label; 1/37 claim verification) is a pre-existing pipeline defect, not a
-  Docling artifact; PDF→Markdown spacing artifacts on math-heavy text (ADR-0013 bound caveat).
-  Evidence: `tmp/gate2-docling-ingestion-quality-evaluation.md`.
+  and **48 application tests** pass, Next.js build succeeds.
+- **PostgreSQL 18:** the single initial migration resets cleanly. A real OpenStax extraction run
+  (`7f987c33-65c3-4001-a883-23597b20f1ba`) published twice with the same four stable Concept IDs.
+  Enrichment Run `84a0f853-0a5d-4405-940d-d4d09bbd24fb` persisted exactly one
+  `enrichment_run.v2` artifact through the canonical envelope writer, and Learner Path
+  `ba2c4ef0-9fe6-4130-83ca-2a2db7c63b9f` persisted from that explicit run.
+- **Real extraction + enrichment:** OpenStax Biology run
+  `7f987c33-65c3-4001-a883-23597b20f1ba` produced 20 Candidates, 4 core Concepts, and 0 verified /
+  11 rejected Claims. Enrichment over graph version `a9df3ea6-2164-4fa3-9128-dceac5114c7b`
+  produced 0 unsupported edges; the resulting target-only Learner Path confirms explicit-run
+  projection and persistence. Result: **PASS** for cleanup, transaction-bound persistence, and
+  end-to-end wiring.
+- Caveat: claim recall remains poor on this fixture (0 verified / 11 rejected), so claim-sparse
+  enrichment is intentionally empty and not yet useful for Learner Paths.

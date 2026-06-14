@@ -26,7 +26,7 @@ import {
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
-  PostgresDerivedGraphLayerStore,
+  PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
@@ -107,7 +107,7 @@ function buildContext() {
     embedding: new LiteLlmEmbeddingAdapter(baseClient),
     prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
     difficulty: dagDepthDifficultyPort,
-    layerStore: new PostgresDerivedGraphLayerStore(sql),
+    enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
     pathStore: new PostgresLearnerPathStore(sql)
   };
@@ -191,7 +191,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
   // asserted core. Default to the latest published version when none is named.
   let targetVersionId = graphVersionId;
   if (!targetVersionId) {
-    const snapshot = await ctx.graphStore.getPublishedSnapshot();
+    const snapshot = await ctx.graphStore.getLatestPublishedSnapshot();
     if (!snapshot) {
       console.error("! no published graph version to enrich.");
       process.exitCode = 1;
@@ -208,32 +208,31 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     embedding: ctx.embedding,
     prerequisiteJudge: ctx.prerequisiteJudge,
     difficulty: ctx.difficulty,
-    layerStore: ctx.layerStore,
-    artifacts: ctx.artifacts
+    enrichmentStore: ctx.enrichmentStore
   });
   const certain = layer.prerequisiteEdges.filter((edge) => !edge.uncertain).length;
   const uncertain = layer.prerequisiteEdges.length - certain;
   console.log(
-    `   clusters=${layer.clusters.length} edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} embedding=${layer.embeddingModel} judge=${layer.judgeModel}`
+    `   candidateGroups=${layer.prerequisiteCandidateGroups.length} edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} embedding=${layer.embeddingModel} judge=${layer.judgeModel}`
   );
   for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
     console.log(`   edge: ${edge.prerequisiteConceptId} -> ${edge.dependentConceptId} (conf=${edge.confidence.toFixed(2)})`);
   }
 }
 
-async function computeLearnerPathCommand(ctx: Context, graphVersionId?: string, targetConceptId?: string) {
-  if (!graphVersionId || !targetConceptId) {
-    console.error("! compute-learner-path requires <graphVersionId> <targetConceptId>.");
+async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string) {
+  if (!enrichmentId || !targetConceptId) {
+    console.error("! compute-learner-path requires <enrichmentId> <targetConceptId>.");
     process.exitCode = 1;
     return;
   }
   const learnerPathId = randomUUID();
-  console.log(`\n>> learner path ${learnerPathId} for target ${targetConceptId} in version ${graphVersionId}`);
+  console.log(`\n>> learner path ${learnerPathId} for target ${targetConceptId} from enrichment ${enrichmentId}`);
   const path = await computeLearnerPath({
     learnerPathId,
-    graphVersionId,
+    enrichmentId,
     targetConceptId,
-    layerStore: ctx.layerStore,
+    enrichmentStore: ctx.enrichmentStore,
     learnerState: ctx.learnerState,
     pathStore: ctx.pathStore,
     artifacts: ctx.artifacts
@@ -275,7 +274,7 @@ async function main() {
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <graphVersionId> <targetConceptId> | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

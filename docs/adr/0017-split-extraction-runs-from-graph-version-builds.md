@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Decision
 
-Orchestration has two decoupled operations. An Extraction Run processes one registered source with one pipeline configuration (discovery, admission, claim extraction, evidence validation) and persists run-scoped artifacts — it never publishes. A Graph-Version Build is deterministic and LLM-free: an operator explicitly selects inspected successful run IDs, then the build applies Static Graph Refinement (including ADR-0015 merge/quarantine), mints IRIs for first-published concepts, runs quality gates, and publishes the complete version atomically (ADR-0010), recording its run memberships. Publication never auto-selects the latest run.
+An Extraction Run processes one registered source with one pipeline configuration and persists run-scoped artifacts; it never publishes. A Graph-Version Build is deterministic and LLM-free: an operator explicitly selects inspected successful run IDs, then the build applies Static Graph Refinement, mints stable Concept identities when needed, runs quality gates, and publishes an immutable asserted graph-version snapshot atomically (ADR-0010). Publication never auto-selects the latest run.
 
 ## Context
 

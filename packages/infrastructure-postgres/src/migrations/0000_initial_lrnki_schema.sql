@@ -156,27 +156,28 @@ CREATE TABLE graph_versions (
 CREATE TABLE concepts (
   concept_id uuid PRIMARY KEY,
   iri text NOT NULL UNIQUE,
-  canonical_label text NOT NULL,
   normalized_label text NOT NULL,
   declared_domain text NOT NULL,
-  trust_tier text NOT NULL,
-  homograph boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (normalized_label, declared_domain)
 );
 
-CREATE TABLE concept_aliases (
-  concept_alias_id uuid PRIMARY KEY,
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
-  label text NOT NULL,
-  UNIQUE (concept_id, label)
-);
-
-CREATE TABLE graph_version_concept_memberships (
-  graph_version_concept_membership_id uuid PRIMARY KEY,
+CREATE TABLE graph_version_concepts (
+  graph_version_concept_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  canonical_label text NOT NULL,
+  trust_tier text NOT NULL,
+  homograph boolean NOT NULL DEFAULT false,
   UNIQUE (graph_version_id, concept_id)
+);
+
+CREATE TABLE graph_version_concept_aliases (
+  graph_version_concept_alias_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  label text NOT NULL,
+  UNIQUE (graph_version_id, concept_id, label)
 );
 
 CREATE TABLE graph_version_run_memberships (
@@ -315,14 +316,13 @@ CREATE TABLE graph_enrichments (
   judge_model text NOT NULL,
   difficulty_method text NOT NULL,
   started_at timestamptz NOT NULL DEFAULT now(),
-  completed_at timestamptz,
-  UNIQUE (graph_version_id, enrichment_config_hash)
+  completed_at timestamptz
 );
 
-CREATE TABLE enrichment_concept_clusters (
-  enrichment_concept_cluster_id uuid PRIMARY KEY,
+CREATE TABLE enrichment_prerequisite_candidate_groups (
+  enrichment_prerequisite_candidate_group_id uuid PRIMARY KEY,
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
-  cluster_id text NOT NULL,
+  group_id text NOT NULL,
   concept_id uuid NOT NULL REFERENCES concepts(concept_id),
   UNIQUE (enrichment_id, concept_id)
 );
@@ -335,7 +335,7 @@ CREATE TABLE inferred_prerequisite_edges (
   dependent_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
-  cluster_id text,
+  candidate_group_id text,
   provenance jsonb NOT NULL,
   UNIQUE (enrichment_id, prerequisite_concept_id, dependent_concept_id),
   CHECK (prerequisite_concept_id <> dependent_concept_id)

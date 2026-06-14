@@ -53,7 +53,7 @@ function proseType(region: Region): SourceBlockType {
 const HTML_COMMENT_PLACEHOLDER = /^<!--.*-->$/;
 
 // Block-level Markdown extractor. Tracks the heading path so every block knows
-// its section context (concept-first plan §3); maintains character offsets so
+// its section context; maintains character offsets so
 // evidence quotes resolve to a specific block, not the whole document.
 export function extractMarkdownBlocks(text: string): SourceBlock[] {
   const lines = text.split("\n");

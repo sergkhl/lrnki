@@ -1,24 +1,25 @@
 import type {
   Concept,
-  ConceptCluster,
   DerivedGraphLayer,
+  EnrichmentRunTrace,
   GraphSnapshot,
   InferredPrerequisiteEdge,
+  PrerequisiteCandidateGroup,
   PrerequisiteJudgment,
+  PrerequisiteJudgmentTrace,
   SourceBlock
 } from "@lrnki/domain-core";
 import type {
-  ArtifactRepositoryPort,
-  DerivedGraphLayerStorePort,
   DifficultyPort,
   EmbeddingPort,
+  EnrichmentRunStorePort,
   PrerequisiteJudgmentPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { cutWeakEdges, removeCycles, transitiveReduction } from "./prerequisiteDag";
 
 const PRODUCER = "@lrnki/application";
-const PRODUCER_VERSION = "0.5.0";
+const PRODUCER_VERSION = "0.6.0";
 
 export type GraphEnrichmentConfig = {
   // Part of enrichment identity (ADR-0019): changing a knob re-derives the layer.
@@ -48,12 +49,9 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
 // embeddings cluster concepts to gate pairs; a bounded judge rules on each gated
 // pair); the symbolic helpers dispose (weak-edge cut -> cycle removal -> transitive
 // reduction); difficulty is mocked behind DifficultyPort. Produces an immutable
-// Derived Graph Layer keyed to (graphVersionId + config) and never touches the
-// asserted core. Replayable from (version + config + captured judgments).
-//
-// SKELETON: the deterministic assembly + persistence are complete; the embedding,
-// clustering, and judge calls go through real ports, and the evidence-packet
-// assembly (marked TODO) is the remaining InstructKG wiring for the work slice.
+// Derived Graph Layer; each append-only run has its own enrichmentId and never
+// touches the asserted core. Replayable from (version + config + captured
+// judgments).
 export async function runGraphEnrichment(input: {
   enrichmentId: string;
   graphVersionId: string;
@@ -61,13 +59,12 @@ export async function runGraphEnrichment(input: {
   embedding: EmbeddingPort;
   prerequisiteJudge: PrerequisiteJudgmentPort;
   difficulty: DifficultyPort;
-  layerStore: DerivedGraphLayerStorePort;
-  artifacts: ArtifactRepositoryPort;
+  enrichmentStore: EnrichmentRunStorePort;
   config?: GraphEnrichmentConfig;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
-  const snapshot = await input.graphStore.getPublishedSnapshot();
-  if (!snapshot || snapshot.graphVersionId !== input.graphVersionId) {
+  const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
+  if (!snapshot) {
     throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
   }
   const concepts = snapshot.concepts;
@@ -76,12 +73,12 @@ export async function runGraphEnrichment(input: {
   // label (ADR-0012 tier 2). Embedding then clusters; clustering only gates pairs.
   const texts = concepts.map((concept) => conceptContextText(concept, snapshot));
   const vectors = await input.embedding.embed({ texts });
-  const clusters = clusterByCosine(concepts, vectors, config.clusterCosineThreshold, input.embedding.model);
+  const candidateGroups = groupByCosine(concepts, vectors, config.clusterCosineThreshold, input.embedding.model);
 
   // Step 2 — gate candidate pairs. The Declared-Domain gate is primary; the
   // embedding cluster only further restricts domains above the exhaustive size
   // budget (ADR-0012 additive-for-recall: it never removes a small domain's pairs).
-  const pairs = gatedPairs(concepts, clusters, config.exhaustiveDomainMaxConcepts);
+  const pairs = gatedPairs(concepts, candidateGroups, config.exhaustiveDomainMaxConcepts);
 
   // Step 3 — bounded LLM prerequisite judgment per gated pair (neural proposes).
   // Each pair gets an InstructKG-style evidence packet: the concepts' definition
@@ -92,15 +89,30 @@ export async function runGraphEnrichment(input: {
   const definitionOf = definitionsByConcept(snapshot);
   const evidenceOf = evidenceBlocksByConcept(snapshot);
   const judgments: PrerequisiteJudgment[] = [];
+  const judgmentTraces: PrerequisiteJudgmentTrace[] = [];
+  const insufficientEvidence: EnrichmentRunTrace["dispositions"][number][] = [];
   for (const [a, b] of pairs) {
-    judgments.push(
-      await input.prerequisiteJudge.judge({
-        declaredDomain: a.declaredDomain,
-        a: { conceptId: a.conceptId, canonicalLabel: a.canonicalLabel, definition: definitionOf.get(a.conceptId) },
-        b: { conceptId: b.conceptId, canonicalLabel: b.canonicalLabel, definition: definitionOf.get(b.conceptId) },
-        evidencePacket: dedupeBlocks([...(evidenceOf.get(a.conceptId) ?? []), ...(evidenceOf.get(b.conceptId) ?? [])])
-      })
-    );
+    const evidenceA = evidenceOf.get(a.conceptId) ?? [];
+    const evidenceB = evidenceOf.get(b.conceptId) ?? [];
+    const definitionA = definitionOf.get(a.conceptId);
+    const definitionB = definitionOf.get(b.conceptId);
+    if ((!definitionA && evidenceA.length === 0) || (!definitionB && evidenceB.length === 0)) {
+      insufficientEvidence.push({
+        prerequisiteConceptId: a.conceptId,
+        dependentConceptId: b.conceptId,
+        disposition: "insufficient_evidence" as const
+      });
+      continue;
+    }
+    const judgeInput = {
+      declaredDomain: a.declaredDomain,
+      a: { conceptId: a.conceptId, canonicalLabel: a.canonicalLabel, definition: definitionA },
+      b: { conceptId: b.conceptId, canonicalLabel: b.canonicalLabel, definition: definitionB },
+      evidencePacket: dedupeBlocks([...evidenceA, ...evidenceB])
+    };
+    const judgment = await input.prerequisiteJudge.judge(judgeInput);
+    judgments.push(judgment);
+    judgmentTraces.push({ ...judgeInput, judgment });
   }
 
   // Step 4 — map judgments to raw edges. "none" is dropped; "uncertain" is flagged
@@ -113,18 +125,18 @@ export async function runGraphEnrichment(input: {
       predicate: "inferred-prerequisite-of",
       confidence: judgment.confidence,
       uncertain: judgment.outcome === "uncertain",
-      clusterId: clusterIdFor(judgment.prerequisiteConceptId, clusters),
+      candidateGroupId: candidateGroupIdFor(judgment.prerequisiteConceptId, candidateGroups),
       provenance: { judgmentRationale: judgment.rationale }
     }));
 
   // Step 5 — symbolic disposal over CERTAIN edges only (symbolic constrains).
   const uncertainEdges = rawEdges.filter((edge) => edge.uncertain);
-  const { kept: strongEdges } = cutWeakEdges(
+  const { kept: strongEdges, cut: weakEdges } = cutWeakEdges(
     rawEdges.filter((edge) => !edge.uncertain),
     config.minEdgeConfidence
   );
-  const { edges: acyclicEdges } = removeCycles(strongEdges);
-  const { edges: reducedEdges } = transitiveReduction(acyclicEdges);
+  const { edges: acyclicEdges, removed: cycleRemovedEdges } = removeCycles(strongEdges);
+  const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(acyclicEdges);
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
   // Step 6 — baseline difficulty over the reduced DAG (mock behind the port).
@@ -136,24 +148,51 @@ export async function runGraphEnrichment(input: {
     enrichmentConfigHash: config.enrichmentConfigHash,
     embeddingModel: input.embedding.model,
     judgeModel: input.prerequisiteJudge.model,
-    clusters,
+    prerequisiteCandidateGroups: candidateGroups,
     prerequisiteEdges,
     difficulties
   };
 
-  await input.layerStore.persist(layer);
-  await input.artifacts.append({
-    artifactId: `${input.enrichmentId}:derived-layer`,
-    artifactType: "graph_enrichment.v1",
-    schemaVersion: "1",
+  const trace: EnrichmentRunTrace = {
+    enrichmentId: input.enrichmentId,
     graphVersionId: input.graphVersionId,
-    producer: PRODUCER,
-    producerVersion: PRODUCER_VERSION,
-    configHash: config.enrichmentConfigHash,
-    createdAt: new Date().toISOString(),
-    payload: layer
+    enrichmentConfigHash: config.enrichmentConfigHash,
+    judgments: judgmentTraces,
+    dispositions: [
+      ...insufficientEvidence,
+      ...uncertainEdges.map((edge) => disposition(edge, "uncertain")),
+      ...weakEdges.map((edge) => disposition(edge, "weak_cut")),
+      ...cycleRemovedEdges.map((edge) => disposition(edge, "cycle_removed")),
+      ...transitiveEdges.map((edge) => disposition(edge, "transitive_reduction")),
+      ...reducedEdges.map((edge) => disposition(edge, "kept"))
+    ]
+  };
+  await input.enrichmentStore.persist({
+    layer,
+    artifact: {
+      artifactId: `${input.enrichmentId}:enrichment-run`,
+      artifactType: "enrichment_run.v2",
+      schemaVersion: "2",
+      graphVersionId: input.graphVersionId,
+      producer: PRODUCER,
+      producerVersion: PRODUCER_VERSION,
+      configHash: config.enrichmentConfigHash,
+      createdAt: new Date().toISOString(),
+      payload: trace
+    }
   });
   return layer;
+}
+
+function disposition(
+  edge: InferredPrerequisiteEdge,
+  value: EnrichmentRunTrace["dispositions"][number]["disposition"]
+): EnrichmentRunTrace["dispositions"][number] {
+  return {
+    prerequisiteConceptId: edge.prerequisiteConceptId,
+    dependentConceptId: edge.dependentConceptId,
+    disposition: value
+  };
 }
 
 // --- Deterministic, model-free helpers (tunable, not yet unit-tested) ---------
@@ -246,12 +285,12 @@ function cosine(a: number[], b: number[]): number {
 
 // Greedy single-link clustering by cosine threshold — deterministic given a stable
 // concept order. Propose-only (ADR-0012): clusters gate pairs, never create edges.
-function clusterByCosine(
+function groupByCosine(
   concepts: Concept[],
   vectors: number[][],
   threshold: number,
   embeddingModel: string
-): ConceptCluster[] {
+): PrerequisiteCandidateGroup[] {
   const clusterIndex = new Map<string, number>();
   const groups: string[][] = [];
   for (let i = 0; i < concepts.length; i++) {
@@ -267,11 +306,11 @@ function clusterByCosine(
     groups[assigned].push(concepts[i].conceptId);
     clusterIndex.set(concepts[i].conceptId, assigned);
   }
-  return groups.map((conceptIds, index) => ({ clusterId: `c${index}`, conceptIds, embeddingModel }));
+  return groups.map((conceptIds, index) => ({ groupId: `g${index}`, conceptIds, embeddingModel }));
 }
 
-function clusterIdFor(conceptId: string, clusters: ConceptCluster[]): string | undefined {
-  return clusters.find((cluster) => cluster.conceptIds.includes(conceptId))?.clusterId;
+function candidateGroupIdFor(conceptId: string, groups: PrerequisiteCandidateGroup[]): string | undefined {
+  return groups.find((group) => group.conceptIds.includes(conceptId))?.groupId;
 }
 
 // Unordered candidate pairs. The Declared-Domain gate (ADR-0015) is mandatory:
@@ -281,11 +320,11 @@ function clusterIdFor(conceptId: string, clusters: ConceptCluster[]): string | u
 // within a pair is irrelevant (concepts sorted by id for replay determinism).
 function gatedPairs(
   concepts: Concept[],
-  clusters: ConceptCluster[],
+  groups: PrerequisiteCandidateGroup[],
   exhaustiveDomainMaxConcepts: number
 ): [Concept, Concept][] {
-  const clusterOf = new Map<string, string>();
-  for (const cluster of clusters) for (const id of cluster.conceptIds) clusterOf.set(id, cluster.clusterId);
+  const groupOf = new Map<string, string>();
+  for (const group of groups) for (const id of group.conceptIds) groupOf.set(id, group.groupId);
 
   const byDomain = new Map<string, Concept[]>();
   for (const concept of concepts) {
@@ -301,7 +340,7 @@ function gatedPairs(
     for (let i = 0; i < sorted.length; i++) {
       for (let j = i + 1; j < sorted.length; j++) {
         // Large domains: additionally require the same embedding cluster (cost bound).
-        if (exhaustive || clusterOf.get(sorted[i].conceptId) === clusterOf.get(sorted[j].conceptId)) {
+        if (exhaustive || groupOf.get(sorted[i].conceptId) === groupOf.get(sorted[j].conceptId)) {
           pairs.push([sorted[i], sorted[j]]);
         }
       }
