@@ -41,6 +41,29 @@ services:
       retries: 5
       start_period: 90s
 
+  # Mixed-format ingestion for Gate 2 (ADR-0013): PDF/DOCX/PPTX → structured
+  # document via the Docling HTTP API. Version-pinned so the parsed-layout
+  # contract stays reproducible across the frozen oracle suite.
+  docling:
+    build:
+      context: ./docling
+      dockerfile: Dockerfile
+    container_name: lrnki-docling
+    networks:
+      - lrnki
+    ports:
+      - "5001:5001"
+    environment:
+      DOCLING_SERVE_ENABLE_UI: "1"
+      DOCLING_DEVICE: "cpu"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
 networks:
   lrnki:
     name: lrnki

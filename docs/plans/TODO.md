@@ -1,12 +1,21 @@
 # TODO
 
-1. **Gate 2 — frozen mixed-format oracle suite (ADR-0013). NOW UNBLOCKED** (the vertical slice
+1. **Gate 2 — frozen mixed-format oracle suite (ADR-0013). IN PROGRESS** (the vertical slice
    validated the chain end-to-end on real output — see COMPLETED + VALIDATION).
-   - Version-pinned Docling adapter; add PDF/DOCX/PPTX fixtures 4–6; freeze the mixed-format
-     oracle suite. Add a non-CS domain fixture for diversity.
+   - DONE: version-pinned Docling adapter (PDF/DOCX/PPTX → Markdown over the async Docling HTTP API,
+     OCR off, table structure off for speed); PDF fixture #4 (`2507.02554v2.pdf`, ML systems)
+     ingested and extracted end-to-end (run `9b92bd64`), evidence verbatim-verifiable against stored
+     blocks. Evidence: `tmp/gate2-docling-ingestion-quality-evaluation.md`.
+   - Add DOCX fixture #5 and PPTX fixture #6 from real curated sources (the adapter already supports
+     both MIME types; only the curated files are missing). Prefer a non-CS domain for diversity.
+   - Freeze the mixed-format oracle suite once #5–#6 land.
    - Oracle independence triangle (DeepSeek extracts, MiniMax M3 authors references via
      `kg-oracle-reference`, Mistral Small audits via `kg-oracle-judge`); quarantine disagreements.
+     Aliases already exist in LiteLLM; wiring does not.
    - Benchmark arms + quantitative metrics; promote only measured improvements.
+   - Address pre-existing admission/claim precision noise surfaced again on fixture #4
+     (proposition-shaped labels; high claim over-rejection, 1 verified / 37 rejected) — orthogonal
+     to ingestion but it will distort oracle scores if left.
 
 2. **Measure the embedding tier before trusting it as a hard gate (ADR-0012 tier 2).**
    The slice keeps the Declared-Domain gate primary and exhaustive (`exhaustiveDomainMaxConcepts`),
@@ -23,6 +32,15 @@
 
 ## COMPLETED
 
+- **Gate 2 mixed-format ingestion: Docling adapter live (2026-06-14).** `DoclingStructuredDocumentParser`
+  (PDF/DOCX/PPTX) behind the existing `StructuredDocumentParserPort`; markdown block-walking extracted
+  into a shared `extractMarkdownBlocks` so native-markdown and Docling share one region-classification
+  contract (incl. a new `<!-- image -->`/`<!-- formula -->` placeholder rule). Async submit→poll→fetch
+  flow (the sync endpoint's 120s cap 504'd on a large PDF); conversion simplified to
+  `do_table_structure=false` (~45% faster, tables are discarded placeholders anyway). PDF fixture #4
+  ingested + extracted end-to-end with real LLM calls; evidence verbatim-verifiable against stored
+  blocks. Docling docker service builds and runs healthy. Evidence:
+  `tmp/gate2-docling-ingestion-quality-evaluation.md`.
 - **Vertical slice: Graph Enrichment → Learner Path live end-to-end (2026-06-13).** The third
   operation (ADR-0019) runs over published version `3096ec52` with real LLM calls
   (`kg-concept-embedding` = qwen3-embedding-8b 4096-dim; `kg-prerequisite-judgment` =
@@ -69,17 +87,17 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-13, post vertical-slice implementation):
-- **Static: full `pnpm check` green** — typecheck across all 11 packages, ESLint clean, **46
-  application tests pass** (43 prior + 3 new `runGraphEnrichment` orchestration tests: domain
-  gating, evidence-packet assembly, directed-edge mapping), parser tests unchanged, Next.js build
-  succeeds (all routes incl. new `/admin/lab/paths` + `/admin/lab/paths/[learnerPathId]`).
-- **Real LLM calls, enrichment over published `3096ec52`:** enrichment `4efd5d1d` produced a
-  coherent inferred-prerequisite DAG per domain (biology 6-concept chain; Rust scope→ownership→move;
-  economics ambiguous edge correctly flagged uncertain). Learner path `d94ee025` returns the full
-  biology chain in topological + difficulty order to target `models of DNA replication`.
-- **Admin Lab:** `/admin/lab/paths` and detail render HTTP 200 with correct target label, ordered
-  steps, and difficulty badges. Result: **PASS** (slice validates the chain).
-- Caveats: embedding tier `EXPERIMENT_ONLY` (domain gate primary at this scale); difficulty +
-  learner state are mocks behind real ports; Cytoscape screenshot not captured (no chromium binary).
-  Evidence: `tmp/vertical-slice-enrichment-quality-evaluation.md`.
+Latest validation (2026-06-14, post Docling ingestion adapter):
+- **Static: full `pnpm check` green** — typecheck across all packages, ESLint clean, **9 ingestion
+  tests** (7 prior + 2 new shared-extractor tests: HTML-comment placeholder handling, depth-2 title)
+  and **46 application tests** pass, Next.js build succeeds.
+- **Real conversion + LLM calls, Gate 2 PDF fixture #4 (`2507.02554v2.pdf`):** Docling converted the
+  raw PDF to 273 blocks with correct region classification (84 body paragraphs; 127 references+appendix
+  typed out; 12 `<!-- image -->` placeholders caught). Extraction run `9b92bd64`: 48 candidates → 5
+  core concepts (3 clean ML learning objectives); the one verified claim
+  (`Search Policy --[defined-as]--> "used to navigate the space of candidate solutions"`) has its
+  evidence quote matched verbatim in a stored `paragraph` block. Result: **PASS** (ingestion layer).
+- Caveats: only the PDF arm of Gate 2 exercised (DOCX/PPTX fixtures pending); concept/claim precision
+  noise (proposition-shaped label; 1/37 claim verification) is a pre-existing pipeline defect, not a
+  Docling artifact; PDF→Markdown spacing artifacts on math-heavy text (ADR-0013 bound caveat).
+  Evidence: `tmp/gate2-docling-ingestion-quality-evaluation.md`.

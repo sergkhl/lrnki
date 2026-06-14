@@ -10,6 +10,7 @@ import {
   runGraphEnrichment
 } from "@lrnki/application";
 import {
+  DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
   MarkdownStructuredDocumentParser,
   StructuredDocumentParserRegistry,
@@ -63,7 +64,14 @@ function buildContext() {
   const parsers = new StructuredDocumentParserRegistry([
     new MarkdownStructuredDocumentParser(),
     new HtmlStructuredDocumentParser(),
-    new TextStructuredDocumentParser()
+    new TextStructuredDocumentParser(),
+    // Mixed-format ingestion (Gate 2, ADR-0013). The image tag is pinned in the
+    // parser config hash so the layout contract is reproducible across the
+    // frozen oracle suite; bump DOCLING_IMAGE_TAG when docker/Dockerfile changes.
+    new DoclingStructuredDocumentParser({
+      baseUrl: process.env.DOCLING_BASE_URL ?? "http://localhost:5001",
+      imageTag: process.env.DOCLING_IMAGE_TAG ?? "docling-serve-cpu-v1.23.0+docling-2.102.1"
+    })
   ]);
   const baseClient = {
     baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
