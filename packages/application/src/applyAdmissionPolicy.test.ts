@@ -158,19 +158,22 @@ test("demotes a selected candidate whose organizing evidence is confined to illu
   assert.ok(result.admission.boundaryReasonCodes.includes("illustrative_only_source_treatment"));
 });
 
-test("demotes a proposition-shaped canonical label to optional fail-closed", () => {
+test("no longer demotes a proposition-shaped label by lexical policy (now the admission judge's job)", () => {
+  // The deterministic looksLikePropositionLabel veto was removed (ADR-0021,
+  // AGENTS rule 16). Concept-vs-proposition is a semantic call made downstream by
+  // the measured admission-label judge, so the pure policy must NOT demote here.
   const result = applyAdmissionPolicy({
     candidate,
     proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour Limited by the Extent of the Market" }),
     blockText
   });
 
-  assert.equal(result.admission.tier, "optional");
-  assert.ok(result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
-  assert.ok(result.admission.boundaryReasonCodes.includes("effective_tier_corrected"));
+  assert.equal(result.admission.tier, "core");
+  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
+  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_label_judged"));
 });
 
-test("keeps a multi-word nominal label core (no false proposition demotion)", () => {
+test("keeps a multi-word nominal label core", () => {
   const result = applyAdmissionPolicy({
     candidate,
     proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour" }),
@@ -178,7 +181,6 @@ test("keeps a multi-word nominal label core (no false proposition demotion)", ()
   });
 
   assert.equal(result.admission.tier, "core");
-  assert.ok(!result.admission.boundaryReasonCodes.includes("proposition_shaped_label"));
 });
 
 test("does not count motivation or examples as organizing aspects", () => {

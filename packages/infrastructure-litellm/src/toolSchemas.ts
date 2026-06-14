@@ -383,6 +383,46 @@ export const definitionEntailmentJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Admission label judgment: submit_admission_label_judgment ------------
+// One bounded judgment over a single admitted-`core` label (ADR-0021). The model
+// decides whether the label NAMES a concept or ASSERTS a proposition/claim about
+// one, and (when a proposition) names the underlying noun phrase it reduces to.
+// `groundingSpan` is the minimal verbatim sub-quote that shows the predication;
+// the application boundary fails closed to `concept` when the span or the noun
+// phrase is not source-grounded, so the judge cannot demote on absent text.
+
+export const admissionLabelJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["labelKind", "underlyingNounPhrase", "groundingSpan", "rationale"],
+  properties: {
+    labelKind: {
+      type: "string",
+      enum: ["concept", "proposition_or_claim"],
+      description:
+        "'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as 'Operator Set as Bottleneck to Performance' or 'Division of Labour Limited by the Extent of the Market'. A long nominal label is still a concept."
+    },
+    underlyingNounPhrase: {
+      type: "string",
+      description:
+        "When proposition_or_claim, the noun-phrase concept the label reduces to (e.g. 'Operator Set' for 'Operator Set as Bottleneck to Performance'), copied verbatim from the label/evidence. Empty string when labelKind is concept."
+    },
+    groundingSpan: {
+      type: "string",
+      description:
+        "When proposition_or_claim, the minimal verbatim sub-quote (copied exactly from one provided evidence quote) showing the label asserts a predication. Empty string when labelKind is concept."
+    },
+    rationale: { type: "string", description: "One terse sentence." }
+  }
+};
+
+export const admissionLabelJudgmentValidator = z.object({
+  labelKind: z.enum(["concept", "proposition_or_claim"]),
+  underlyingNounPhrase: z.string(),
+  groundingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
 export const conceptClaimValidator = z.object({
   claims: z.array(z.object({
     predicate: z.enum(RELATION_ENUM),

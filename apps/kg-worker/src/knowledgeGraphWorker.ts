@@ -17,6 +17,7 @@ import {
   TextStructuredDocumentParser
 } from "@lrnki/infrastructure-ingestion";
 import {
+  LiteLlmAdmissionLabelJudgmentAdapter,
   LiteLlmClaimEntailmentJudgmentAdapter,
   LiteLlmClaimExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
@@ -37,7 +38,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-definition-judge-v28";
+const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-admission-label-judge-v29";
 
 import { existsSync } from "node:fs";
 
@@ -106,6 +107,10 @@ function buildContext() {
     // Small via kg-oracle-judge) so the judge is not the extractor re-grading
     // itself; deterministic decoding for stable re-derivation.
     claimEntailmentJudge: new LiteLlmClaimEntailmentJudgmentAdapter(deterministicClient),
+    // Concept-vs-proposition admission judge (ADR-0021). Same independent family
+    // (kg-oracle-judge) and deterministic decoding; downgrade-only stage that
+    // replaces the removed looksLikePropositionLabel lexical veto.
+    admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
     // Graph Enrichment ports (ADR-0019). Embedding clusters/gates pairs; the
     // bounded judge proposes the inferred DAG (deterministic decoding for stable
     // re-derivation); difficulty + learner state are mocks behind real ports.
@@ -164,6 +169,7 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
       admission: ctx.admission,
       claimExtraction: ctx.claimExtraction,
       claimEntailmentJudge: ctx.claimEntailmentJudge,
+      admissionLabelJudge: ctx.admissionLabelJudge,
       store: ctx.runStore,
       artifacts: ctx.artifacts
     });

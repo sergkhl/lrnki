@@ -13,17 +13,21 @@ export {
   prerequisiteJudgmentSchema,
   prerequisiteJudgmentValidator,
   claimEntailmentJudgmentSchema,
-  claimEntailmentJudgmentValidator
+  claimEntailmentJudgmentValidator,
+  admissionLabelJudgmentSchema,
+  admissionLabelJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmClaimExtractionAdapter,
   LiteLlmClaimEntailmentJudgmentAdapter,
+  LiteLlmAdmissionLabelJudgmentAdapter,
   DISCOVERY_MODEL,
   ADMISSION_MODEL,
   CLAIM_MODEL,
-  CLAIM_ENTAILMENT_JUDGE_MODEL
+  CLAIM_ENTAILMENT_JUDGE_MODEL,
+  ADMISSION_LABEL_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
   LiteLlmEmbeddingAdapter,

@@ -1,4 +1,5 @@
 import type {
+  AdmissionLabelJudgment,
   AdmissionProposal,
   ArtifactEnvelope,
   ClaimEntailmentJudgment,
@@ -78,6 +79,25 @@ export interface ClaimEntailmentJudgmentPort {
     definition: string;
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
   }): Promise<ClaimEntailmentJudgment>;
+}
+
+// Concept-vs-proposition admission judge (ADR-0021). A bounded, forced-tool LLM
+// judgment over ONE admitted-`core` label, run on an independent model family
+// (`kg-oracle-judge`) so the judge is not the admission extractor grading its own
+// homework. It answers the semantic question the deterministic lexical veto got
+// wrong: does this label NAME a concept, or ASSERT a claim about one? Used only
+// to DOWNGRADE a `core` candidate whose label is a proposition; it never promotes
+// or resurrects. The adapter grounds its verdict fail-closed (an ungrounded
+// positive is returned as `concept`), so the application stage reads `labelKind`
+// and demotes only on a confident, source-grounded positive.
+export interface AdmissionLabelJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    label: string; // proposed canonical label of the admitted-core candidate
+    aliases: string[];
+    evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
+  }): Promise<AdmissionLabelJudgment>;
 }
 
 export interface ArtifactRepositoryPort {

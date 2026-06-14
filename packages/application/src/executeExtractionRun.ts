@@ -6,6 +6,7 @@ import {
   type StructuredDocument
 } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   ArtifactRepositoryPort,
   ClaimEntailmentJudgmentPort,
   ConceptAdmissionPort,
@@ -13,6 +14,7 @@ import type {
   ConceptDiscoveryPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
+import { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 import { applyClaimPolicy } from "./applyClaimPolicy";
 import { applyEntailmentJudge } from "./applyEntailmentJudge";
@@ -31,6 +33,7 @@ export async function executeExtractionRun(input: {
   admission: ConceptAdmissionPort;
   claimExtraction: ConceptConditionedClaimExtractionPort;
   claimEntailmentJudge: ClaimEntailmentJudgmentPort;
+  admissionLabelJudge: AdmissionLabelJudgmentPort;
   store: ExtractionRunStorePort;
   artifacts: ArtifactRepositoryPort;
 }): Promise<ExtractionRunResult> {
@@ -57,13 +60,25 @@ export async function executeExtractionRun(input: {
     else proposalByKey.set(proposal.candidateKey, proposal);
   }
 
-  const candidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
+  const policyCandidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
     candidate,
     proposal: duplicateKeys.has(candidate.candidateKey) ? undefined : proposalByKey.get(candidate.candidateKey),
     blockText,
     illustrativeBlockIds,
     initialBoundaryReasonCodes: duplicateKeys.has(candidate.candidateKey) ? ["duplicate_admission_decision"] : []
   }));
+
+  // Concept-vs-proposition admission judge (ADR-0021). A downgrade-only neural
+  // stage after the deterministic boundary: it demotes a `core` candidate whose
+  // label asserts a proposition rather than naming a concept, replacing the
+  // removed `looksLikePropositionLabel` lexical veto (AGENTS rule 16). Fail-closed
+  // = preserve recall, so it never demotes on judge failure or an ungrounded
+  // verdict. Runs only on the handful of `core` candidates, so cost is bounded.
+  const candidates = await applyAdmissionLabelJudge({
+    candidates: policyCandidates,
+    declaredDomain,
+    judge: input.admissionLabelJudge
+  });
 
   const coreCandidates = candidates.filter((candidate) => candidate.admission.tier === "core");
   const admittedConcepts = coreCandidates.map((candidate) => ({

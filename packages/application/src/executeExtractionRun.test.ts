@@ -9,6 +9,7 @@ import type {
   StructuredDocument
 } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   ArtifactRepositoryPort,
   ClaimEntailmentJudgmentPort,
   ConceptConditionedClaimExtractionPort,
@@ -23,6 +24,14 @@ const entailEverything: ClaimEntailmentJudgmentPort = {
   model: "test-judge",
   judge: async () => ({ entailed: true, entailingSpan: "", rationale: "test" }),
   judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+};
+
+// Default admission judge calls every label a concept, so candidates stay core and
+// these orchestration tests are unaffected; proposition demotion is covered in
+// applyAdmissionLabelJudge.test.ts.
+const everythingIsAConcept: AdmissionLabelJudgmentPort = {
+  model: "test-admission-judge",
+  judge: async () => ({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "test" })
 };
 
 const frameworkQuote = "INSTRUCTKG is part of Signal Systems and INSTRUCTKG works by leveraging temporal signals.";
@@ -112,6 +121,7 @@ function harness(
       admission: { admit: async () => selectedCandidates.map(admission) },
       claimExtraction: { extract },
       claimEntailmentJudge,
+      admissionLabelJudge: everythingIsAConcept,
       store,
       artifacts
     }),

@@ -1,6 +1,7 @@
 export { executeExtractionRun } from "./executeExtractionRun";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { applyAdmissionPolicy } from "./applyAdmissionPolicy";
+export { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 export { applyClaimPolicy } from "./applyClaimPolicy";
 export { applyEntailmentJudge } from "./applyEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";

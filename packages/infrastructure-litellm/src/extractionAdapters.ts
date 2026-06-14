@@ -1,4 +1,5 @@
 import type {
+  AdmissionLabelJudgment,
   AdmissionProposal,
   ClaimEntailmentJudgment,
   ClaimExtractionFeedback,
@@ -12,6 +13,7 @@ import type {
 import { evidenceQuoteMatches, extractableBlocks } from "@lrnki/domain-core";
 import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
 import type {
+  AdmissionLabelJudgmentPort,
   ClaimEntailmentJudgmentPort,
   ConceptAdmissionPort,
   ConceptConditionedClaimExtractionPort,
@@ -19,6 +21,8 @@ import type {
 } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
+  admissionLabelJudgmentSchema,
+  admissionLabelJudgmentValidator,
   claimEntailmentJudgmentSchema,
   claimEntailmentJudgmentValidator,
   conceptAdmissionSchemaForCandidateKeys,
@@ -42,6 +46,10 @@ export const CLAIM_MODEL = "kg-claim-extraction";
 // A different family than the extractor (Mistral Small vs DeepSeek) so the judge
 // is not just re-running the same model's reasoning over its own output.
 export const CLAIM_ENTAILMENT_JUDGE_MODEL = "kg-oracle-judge";
+// Independent second model for the concept-vs-proposition admission judge
+// (ADR-0021). Same independent family rationale as the claim judge (KTD3): the
+// judge must not be the admission extractor (DeepSeek) re-deciding its own label.
+export const ADMISSION_LABEL_JUDGE_MODEL = "kg-oracle-judge";
 
 // Per-predicate strict entailment test, shared by the judge. These are the SAME
 // natural-language tests the extraction prompt applies; the judge re-checks them
@@ -514,6 +522,84 @@ export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJud
       rationale: `${result.rationale} [subjectMatch=${result.subjectMatch}; subjectSpan=${JSON.stringify(subjectSpan)}; subjectGrounded=${subjectGrounded}; definitionEntailed=${result.definitionEntailed}; entailingSpan=${JSON.stringify(entailingSpan)}; definitionGrounded=${definitionGrounded}]`
     };
   }
+}
+
+// Concept-vs-proposition admission judge (ADR-0021). Mirrors the claim-entailment
+// adapter: forced named tool, independent model family, one bounded judgment per
+// admitted-`core` label. The judge sees the proposed canonical label (+aliases)
+// and the candidate's already-verbatim evidence. It decides whether the label
+// NAMES a concept or ASSERTS a proposition about one. Fail closed: a
+// proposition verdict whose `groundingSpan` or `underlyingNounPhrase` is not
+// grounded in the cited evidence is coerced to `concept`, so the judge can never
+// demote a candidate on text absent from its evidence. Grounding uses the same
+// formatting-noise normalization as the deterministic evidence floor.
+export class LiteLlmAdmissionLabelJudgmentAdapter implements AdmissionLabelJudgmentPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = ADMISSION_LABEL_JUDGE_MODEL) {
+    this.model = model;
+  }
+
+  async judge(input: {
+    declaredDomain: string;
+    label: string;
+    aliases: string[];
+    evidenceQuotes: string[];
+  }): Promise<AdmissionLabelJudgment> {
+    const system = [
+      "You judge whether a candidate concept LABEL names a durable domain concept or instead asserts a full proposition/claim about one, for a learner-neutral concept graph.",
+      "A Concept label is a NOUN PHRASE — a durable unit of domain knowledge — however long. 'Monte Carlo Tree Search', 'AutoML', 'Right to Be Forgotten', and 'Survival of the Fittest' are all concept labels: they NAME things, even though some contain verbs or read like sentences.",
+      "A proposition/claim label asserts a full predication ABOUT a concept: subject + relation + object. 'Operator Set as Bottleneck to Performance' and 'Division of Labour Limited by the Extent of the Market' are propositions — each states a claim, and the real concept is the underlying noun phrase ('Operator Set', 'Division of Labour').",
+      "Decide from the LABEL's structure and the evidence's meaning, never from a fixed list of verbs or copulas. Being long, or containing a participle or 'as'/'by', does NOT by itself make a label a proposition. Precision-first: when unsure, return 'concept' (do not strip a legitimate concept).",
+      "When labelKind is 'proposition_or_claim': set underlyingNounPhrase to the noun-phrase concept the label reduces to (copied verbatim from the label or evidence), and set groundingSpan to the minimal exact sub-quote from the evidence that shows the predication. Both must be verbatim substrings of a provided quote.",
+      "When labelKind is 'concept': return empty underlyingNounPhrase and empty groundingSpan."
+    ].join("\n");
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Candidate label: "${input.label}" (aliases: ${renderAliases(input.aliases)}).`,
+      "",
+      "Verbatim evidence quotes from the source:",
+      ...input.evidenceQuotes.map((quote, index) => `[${index + 1}] "${quote}"`),
+      "",
+      "Call submit_admission_label_judgment: does this label NAME a concept, or ASSERT a proposition about one?"
+    ].join("\n");
+
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_admission_label_judgment",
+      toolDescription: "Submit whether the candidate label names a concept or asserts a proposition, with the underlying noun phrase when it is a proposition.",
+      parameters: admissionLabelJudgmentSchema,
+      validator: admissionLabelJudgmentValidator
+    });
+
+    return groundedAdmissionLabelJudgment(result, input.evidenceQuotes);
+  }
+}
+
+// Fail closed = preserve recall (KTD5): a `proposition_or_claim` verdict may demote
+// a `core` candidate ONLY when both the predication span and the underlying noun
+// phrase are grounded in the candidate's cited evidence. An ungrounded positive is
+// returned as `concept`, so an absent-text or hallucinated verdict never demotes.
+function groundedAdmissionLabelJudgment(
+  result: AdmissionLabelJudgment,
+  evidenceQuotes: string[]
+): AdmissionLabelJudgment {
+  if (result.labelKind !== "proposition_or_claim") {
+    return { labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: result.rationale };
+  }
+  const span = result.groundingSpan.trim();
+  const nounPhrase = result.underlyingNounPhrase.trim();
+  const spanGrounded = span.length > 0 && evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, span));
+  const nounPhraseGrounded = nounPhrase.length > 0 && evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, nounPhrase));
+  if (spanGrounded && nounPhraseGrounded) {
+    return { labelKind: "proposition_or_claim", underlyingNounPhrase: nounPhrase, groundingSpan: span, rationale: result.rationale };
+  }
+  return {
+    labelKind: "concept",
+    underlyingNounPhrase: "",
+    groundingSpan: "",
+    rationale: `${result.rationale} [ungrounded proposition verdict kept core: spanGrounded=${spanGrounded}; nounPhraseGrounded=${nounPhraseGrounded}]`
+  };
 }
 
 // Fail closed: an entailing span must be grounded in the provided evidence, so the
