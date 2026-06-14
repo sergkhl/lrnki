@@ -1,1 +1,8 @@
-export type OracleReference = { sourceResourceId: string; oracleModel: string; promptVersion: string; rubricVersion: string; conceptLabels: Array<{ label: string; expectedTier: "core" | "optional" | "reject" | "quarantine"; evidenceQuotes: string[] }>; secondJudgeStatus: "agreed" | "quarantined" };
+// Quality Lab: off-core measurement modules (ADR-0013, AGENTS rule 11). Nothing
+// here ever publishes or mutates a graph; it measures the production pipeline
+// against frozen, model-authored oracle references and quarantines disagreements.
+export {
+  buildAdmissionOracle,
+  scoreAdmissionOracle,
+  type AdmissionOracleSource
+} from "./admissionOracle";

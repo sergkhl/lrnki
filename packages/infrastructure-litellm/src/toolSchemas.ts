@@ -452,3 +452,72 @@ export const conceptClaimValidator = z.object({
     evidenceQuote: z.string().nullable()
   }).strict())
 }).strict();
+
+// Gate 2 oracle reference author (ADR-0013). MiniMax M3 authors the admission
+// reference: the set of concepts the source teaches that a learner-neutral graph
+// should admit, each at `core` or `optional`, with verbatim evidence. Precision
+// AND recall matter here (it is the reference, not the system under test), but the
+// second judge audits it and disagreements are quarantined (AGENTS rule 11).
+export const oracleAdmissionReferenceSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["labels"],
+  properties: {
+    labels: {
+      type: "array",
+      description: "The concepts this source teaches that belong in a learner-neutral concept graph. Omit incidental mentions, examples used only to illustrate, author/metadata, and bibliography.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "expectedTier", "evidenceQuotes", "rationale"],
+        properties: {
+          label: { type: "string", description: "The canonical concept name as a NOUN PHRASE (not a sentence/claim). Domain-qualified when the bare term is ambiguous." },
+          expectedTier: {
+            type: "string",
+            enum: ["core", "optional"],
+            description: "'core' = a standalone learning objective with established domain meaning that carries the source's principal learning structure. 'optional' = a genuine but supporting/peripheral concept (a mechanism, application, or finer-grained variant)."
+          },
+          evidenceQuotes: {
+            type: "array",
+            description: "1-3 verbatim sub-quotes copied EXACTLY from the provided source blocks that show the source teaches this concept.",
+            items: { type: "string" }
+          },
+          rationale: { type: "string", description: "One terse sentence on why it is admit-worthy at this tier." }
+        }
+      }
+    }
+  }
+};
+
+export const oracleAdmissionReferenceValidator = z.object({
+  labels: z.array(z.object({
+    label: z.string().min(1),
+    expectedTier: z.enum(["core", "optional"]),
+    evidenceQuotes: z.array(z.string().min(1)).min(1),
+    rationale: z.string().min(1)
+  }).strict())
+}).strict();
+
+// Gate 2 oracle second-judge audit (ADR-0013, rule 11). Mistral Small audits ONE
+// reference label: does the source teach it as an admit-worthy concept at the
+// claimed tier? `agrees:false` quarantines the label out of the trusted oracle.
+export const oracleAdmissionAuditSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["agrees", "correctedTier", "rationale"],
+  properties: {
+    agrees: { type: "boolean", description: "true if the source genuinely teaches this as an admit-worthy concept at (or close to) the claimed tier; false to quarantine it (not a concept, not taught here, or a proposition/example)." },
+    correctedTier: {
+      type: ["string", "null"],
+      enum: ["core", "optional", null],
+      description: "If you agree it is admit-worthy but at a different tier, the tier you would assign; otherwise null. Advisory only."
+    },
+    rationale: { type: "string", description: "One terse sentence." }
+  }
+};
+
+export const oracleAdmissionAuditValidator = z.object({
+  agrees: z.boolean(),
+  correctedTier: z.enum(["core", "optional"]).nullable(),
+  rationale: z.string().min(1)
+}).strict();

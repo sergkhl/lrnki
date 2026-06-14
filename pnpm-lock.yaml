@@ -341,10 +341,16 @@ importers:
       '@lrnki/domain-core':
         specifier: workspace:*
         version: link:../domain-core
+      '@lrnki/ports':
+        specifier: workspace:*
+        version: link:../ports
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.2
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

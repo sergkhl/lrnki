@@ -15,8 +15,20 @@ export {
   claimEntailmentJudgmentSchema,
   claimEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
-  admissionLabelJudgmentValidator
+  admissionLabelJudgmentValidator,
+  oracleAdmissionReferenceSchema,
+  oracleAdmissionReferenceValidator,
+  oracleAdmissionAuditSchema,
+  oracleAdmissionAuditValidator
 } from "./toolSchemas";
+export {
+  LiteLlmOracleAdmissionReferenceAdapter,
+  LiteLlmOracleAdmissionAuditAdapter,
+  ORACLE_REFERENCE_MODEL,
+  ORACLE_AUDIT_MODEL,
+  ORACLE_PROMPT_VERSION,
+  ORACLE_RUBRIC_VERSION
+} from "./oracleAdapters";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,

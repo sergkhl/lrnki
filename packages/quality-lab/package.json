@@ -6,13 +6,16 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@lrnki/domain-core": "workspace:*"
+    "@lrnki/domain-core": "workspace:*",
+    "@lrnki/ports": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }

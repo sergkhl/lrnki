@@ -15,6 +15,9 @@ import type {
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
+  OracleAdmissionReferenceDraft,
+  OracleAdmissionTier,
+  OracleAuditVerdict,
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
@@ -98,6 +101,38 @@ export interface AdmissionLabelJudgmentPort {
     aliases: string[];
     evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
   }): Promise<AdmissionLabelJudgment>;
+}
+
+// Gate 2 oracle independence triangle (ADR-0013, AGENTS rule 11). Two off-core
+// ports used only by the quality lab; they never touch the publication path.
+//
+// The reference AUTHOR runs on an independent model family (`kg-oracle-reference`
+// = MiniMax M3) so the oracle is not the production extractor (DeepSeek) grading
+// its own homework. It reads the source and authors which concepts a
+// learner-neutral graph should admit and at which tier, with verbatim evidence.
+// Model-authored, NOT human gold.
+export interface OracleAdmissionReferencePort {
+  readonly model: string;
+  author(input: {
+    declaredDomain: string;
+    title: string;
+    sourceBlocks: SourceBlock[];
+  }): Promise<OracleAdmissionReferenceDraft>;
+}
+
+// The second JUDGE runs on a third, independent model family (`kg-oracle-judge`
+// = Mistral Small). It audits ONE reference label against the source: does the
+// source teach this as an admit-worthy concept at the claimed tier? A
+// disagreement quarantines the label out of the trusted oracle (rule 11).
+export interface OracleAdmissionAuditPort {
+  readonly model: string;
+  audit(input: {
+    declaredDomain: string;
+    label: string;
+    expectedTier: OracleAdmissionTier;
+    evidenceQuotes: string[];
+    sourceBlocks: SourceBlock[];
+  }): Promise<OracleAuditVerdict>;
 }
 
 export interface ArtifactRepositoryPort {

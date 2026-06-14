@@ -1,16 +1,19 @@
 # TODO
 
-1. **Gate 2 — frozen mixed-format oracle suite (ADR-0013). NOW UNBLOCKED — highest value.**
-   The admission defect that would distort oracle scores is fixed (see COMPLETED), so run this now.
-   - DONE: Docling adapter (PDF/DOCX/PPTX → Markdown, async API, OCR/table-structure off); PDF
-     fixture #4 (`2507.02554v2.pdf`) ingested + extracted (run `9b92bd64`), evidence verbatim.
-   - DOCX/PPTX fixtures are OUT OF SCOPE (de-scoped).
+1. **Gate 2 — extend the oracle benchmark + make cross-author scores trustworthy (ADR-0013).**
+   The oracle independence triangle is now wired and runs end-to-end (see COMPLETED). Remaining:
+   - **Measured label alignment before scoring (highest value here).** Exact `normalizeConceptLabel`
+     matching understates agreement: on the ML arm, core P/R=0.50 is a lower bound because misses
+     vs extras are the SAME concept in different surface forms (`AI research agent`/`agents`,
+     `Monte Carlo Tree Search`/`...(MCTS)`, `tradeoff`/`trade-off`, `Operator`/`operators`). Do NOT
+     hardcode a plural/hyphen/alias matcher (AGENTS rule 16); add a measured alias-aware and/or
+     bounded neural label-aligner so scores reflect concept identity, not surface form.
+   - Run the triangle across all curated fixtures (rust, biology, economics, InstructKG, ML PDF) and
+     report metrics per source; promote only measured improvements.
+   - Human-review the frozen oracle references (`tmp/gate2-oracle/oracle-*.json`,
+     `needsHumanReview: true`) before treating any score as gold (AGENTS rule 11).
    - Optional research: ingest markdown through Docling too, to share one DoclingDocument structure
      and retire the native markdown parser — only if it earns its keep.
-   - Oracle independence triangle (DeepSeek extracts, MiniMax M3 authors references via
-     `kg-oracle-reference`, Mistral Small audits via `kg-oracle-judge`); quarantine disagreements.
-     Aliases exist in LiteLLM; wiring does not.
-   - Benchmark arms + quantitative metrics; promote only measured improvements.
 
 2. **Improve claim extractor RECALL (claim-side lever; the next bottleneck).**
    - Admission no longer starves the claim space (core 6→12/14 on the ML PDF), but concept-to-
@@ -41,6 +44,19 @@
 
 ## COMPLETED
 
+- **Gate 2 oracle independence triangle wired + run (2026-06-14, ADR-0013, rule 11).** Durable
+  benchmark surface in `@lrnki/quality-lab`, off the publication path: `OracleAdmissionReferencePort`
+  (author) + `OracleAdmissionAuditPort` (second judge) with forced-tool adapters on independent
+  aliases; `buildAdmissionOracle` (author → verbatim-ground → audit → freeze with model/prompt/
+  rubric/source-hash/per-label outcome + `needsHumanReview`) and pure `scoreAdmissionOracle`
+  (precision/recall vs the trusted, non-quarantined reference). DeepSeek extracts, **Xiaomi MiMo
+  v2.5 Pro** authors (`kg-oracle-reference`; MiniMax M3 dropped — cannot do forced `tool_choice` on
+  OpenRouter), **gpt-oss-120b** audits (`kg-oracle-judge`; cheap + cross-family independent, chosen
+  over rate-limited Mistral and expensive Nemotron). Client made 429-aware (`LiteLlmHttpError`, exp
+  backoff) + harness `auditPacingMs` + determinism (temp 0 + seed) for reproducible frozen refs.
+  Real runs: biology core P/R/F1≈0.83 (0 quarantines); ML PDF 30 authored / 1 quarantined
+  (`AIRA-dojo`), core P/R=0.50 lower-bounded by surface-form label variance (the next lever,
+  TODO #1). Evidence: `tmp/gate2-oracle-quality-evaluation.md`.
 - **Admission recall + measured concept-vs-proposition judge (2026-06-14, ADR-0021).** Admission
   was the binding recall bottleneck. Two independent axes: (recall) a strengthened Core Set
   Selection prompt that RETAINS established, substantively-taught domain concepts on method/survey
@@ -138,18 +154,18 @@
 
 ## VALIDATION
 
-Latest validation (2026-06-14, admission recall + concept-vs-proposition judge / pipeline v29):
-- **Static:** full `pnpm check` green; 59 application, 9 ingestion, and 8 LiteLLM adapter tests pass;
-  ESLint and the Next.js production build succeed.
-- **Promotion gate (frozen oracle `tmp/admission-oracle/`):** the concept-vs-proposition judge is
-  precision-first — 8/8 concepts kept (0 false demotions, incl. surface-trap negatives "Right to Be
-  Forgotten" / "Survival of the Fittest" / "Bounded Rationality") and 2/2 propositions recovered
-  ("Operator Set as Bottleneck to Performance" → "Operator Set"); precision/recall 1.00.
-- **Real extraction:** ML PDF runs `7de8a8fc` (core 12, 2 concept + 2 def verified) and `0e0d7c0b`
-  (core 14, 2 concept + 8 def) — established concepts MCTS / evolutionary search / overfitting now
-  core (6→12/14), no proposition core label; Rust run `f7727458` → core 3 (clean) / 2 definitions;
-  biology run `895c1c5f` → core 6 / 4 verified incl. 3 genuine `contrasts-with`. All verified claims
-  inspected and source-supported. Result: **PASS**.
-- **Caveat:** selection stability Jaccard ≈0.73 across the two ML runs (established-concept core
-  stable, periphery varies; not engineered, KTD6); concept-to-concept claim recall is now the next
-  lever (TODO #2); AutoML lost to upstream eligibility; no new graph version was published.
+Latest validation (2026-06-14, Gate 2 oracle independence triangle):
+- **Static:** all source-package typechecks pass; tests green — quality-lab 5, infrastructure-litellm
+  8, infrastructure-ingestion 9, application 59; ESLint clean. (One typecheck error is in
+  `apps/admin-lab/.next/dev/types/validator.ts`, a Next.js dev-server-generated file unrelated to
+  this change; the production build regenerates it.)
+- **Real oracle runs (all three vertices, real LLM calls):** biology fixture (run `895c1c5f`) —
+  reference authored by Xiaomi MiMo, 0 quarantined, **core P/R/F1≈0.83** vs the production DeepSeek
+  run (re-confirmed on the final gpt-oss-120b judge). ML PDF (run `0e0d7c0b`, interim Mistral judge)
+  — 30 authored, **1 quarantined** (`AIRA-dojo`, audit disagreement: a proper-noun artifact, not a
+  durable concept), admit R=0.79; core P/R=0.50 is a LOWER BOUND (misses vs extras are the same
+  concept in different surface forms). Result: **PASS** for the harness; the label-alignment confound
+  is the next measurement lever (TODO #1).
+- **Caveat:** oracle references are model-authored, not human gold (`needsHumanReview: true`); treat
+  scores as directional until reviewed. Exact-label scoring understates cross-author agreement until
+  a measured label-aligner lands (TODO #1). No new graph version was published.

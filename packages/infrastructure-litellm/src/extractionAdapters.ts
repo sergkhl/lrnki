@@ -65,7 +65,7 @@ const PREDICATE_ENTAILMENT_TEST: Record<RelationPredicate, string> = {
   "defined-as": "'defined-as': the evidence must define the SUBJECT as the given literal using definitional language ('is', 'means', 'refers to')."
 };
 
-function renderBlocks(blocks: SourceBlock[]): string {
+export function renderBlocks(blocks: SourceBlock[]): string {
   return blocks
     .map((block) => {
       const path = block.headingPath.length ? ` heading="${block.headingPath.join(" › ")}"` : "";

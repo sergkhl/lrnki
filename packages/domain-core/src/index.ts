@@ -279,6 +279,99 @@ export type ConceptCandidate = {
 };
 
 // ---------------------------------------------------------------------------
+// Gate 2 oracle independence triangle (ADR-0013, AGENTS rule 11). Three model
+// families with disjoint roles so no model grades its own homework: DeepSeek
+// EXTRACTS (the system under test), MiniMax M3 (`kg-oracle-reference`) AUTHORS
+// the admission reference, Mistral Small (`kg-oracle-judge`) AUDITS each
+// reference label. Disagreements are quarantined out of the trusted set. The
+// frozen reference is a MODEL-authored oracle, never human gold — it carries
+// `needsHumanReview` and freezes model/prompt/rubric/evidence/source-hash so it
+// can be replayed and inspected before it is trusted.
+// ---------------------------------------------------------------------------
+
+// The reference only authors admit-worthy tiers; reject/quarantine are not a
+// reference author's call (a source not teaching a concept is simply an absence).
+export type OracleAdmissionTier = "core" | "optional";
+
+export type OracleReferenceLabel = {
+  label: string;
+  normalizedLabel: string;
+  expectedTier: OracleAdmissionTier;
+  evidenceQuotes: string[]; // verbatim sub-quotes copied from the source blocks
+  rationale: string;
+};
+
+export type OracleAdmissionReferenceDraft = {
+  labels: OracleReferenceLabel[];
+};
+
+// One second-judge verdict over a single reference label. `agrees` keeps the
+// label in the trusted set; a disagreement quarantines it. `correctedTier` is
+// advisory provenance only — the trusted set uses the reference author's tier
+// for agreed labels and excludes quarantined ones (no silent relabel).
+export type OracleAuditVerdict = {
+  agrees: boolean;
+  correctedTier?: OracleAdmissionTier;
+  rationale: string;
+};
+
+export type OracleSecondJudgeStatus = "agreed" | "quarantined";
+
+export type FrozenOracleLabel = OracleReferenceLabel & {
+  secondJudgeStatus: OracleSecondJudgeStatus;
+  // Why the label was kept or quarantined: an audit disagreement, or a
+  // fail-closed grounding failure (evidence not verbatim in the source).
+  quarantineReason?: "audit_disagreement" | "evidence_not_grounded";
+  auditRationale: string;
+};
+
+export type FrozenAdmissionOracle = {
+  meta: {
+    sourceResourceId: string;
+    declaredDomain: string;
+    title: string;
+    sourceContentHash: string;
+    referenceModel: string;
+    auditModel: string;
+    promptVersion: string;
+    rubricVersion: string;
+    authoredAt: string;
+    authoredBy: "oracle-triangle";
+    needsHumanReview: true;
+  };
+  // Every authored label, including quarantined ones (kept for inspection); the
+  // scorer trusts only the `agreed` subset.
+  labels: FrozenOracleLabel[];
+};
+
+// One production candidate's admitted tier, the minimal projection the scorer
+// compares against the trusted reference set.
+export type ProductionAdmittedConcept = {
+  canonicalLabel: string;
+  normalizedLabel: string;
+  tier: CandidateTier;
+};
+
+export type OracleTierMetrics = {
+  referenceCount: number; // trusted (agreed) reference labels at/above this tier
+  productionCount: number; // production candidates at/above this tier
+  matched: number; // reference labels a production candidate covers
+  precision: number;
+  recall: number;
+  f1: number;
+};
+
+export type AdmissionOracleScore = {
+  sourceResourceId: string;
+  runId: string;
+  quarantinedReferenceLabels: number;
+  core: OracleTierMetrics; // core-set agreement
+  admit: OracleTierMetrics; // core ∪ optional agreement
+  missedCore: string[]; // trusted core references no production core covers
+  extraCore: string[]; // production core labels absent from the trusted reference
+};
+
+// ---------------------------------------------------------------------------
 // Persistable Extraction Run aggregate (ADR-0017). Assembled in the application
 // boundary after discovery, admission, claim extraction, and deterministic
 // evidence validation; persisted once, run-scoped. References blocks by blockId
