@@ -42,14 +42,15 @@ import {
 export const DISCOVERY_MODEL = "kg-concept-discovery";
 export const ADMISSION_MODEL = "kg-concept-admission";
 export const CLAIM_MODEL = "kg-claim-extraction";
-// Independent second model for the semantic claim-entailment judge (ADR-0007).
-// A different family than the extractor (Mistral Small vs DeepSeek) so the judge
-// is not just re-running the same model's reasoning over its own output.
-export const CLAIM_ENTAILMENT_JUDGE_MODEL = "kg-oracle-judge";
-// Independent second model for the concept-vs-proposition admission judge
-// (ADR-0005). Same independent family rationale as the claim judge (KTD3): the
-// judge must not be the admission extractor (DeepSeek) re-deciding its own label.
-export const ADMISSION_LABEL_JUDGE_MODEL = "kg-oracle-judge";
+// Independent production judge alias (ADR-0007/0005). A different family than the
+// DeepSeek extractor (gpt-oss-120b via `kg-independent-judge`) so the judge is not
+// re-running the extractor's own reasoning over its own output. This is a standing
+// production judge, not benchmark machinery — the off-core oracle triangle is gone.
+export const CLAIM_ENTAILMENT_JUDGE_MODEL = "kg-independent-judge";
+// Same independent production judge for the concept-vs-proposition admission judge
+// (ADR-0005): the judge must not be the admission extractor (DeepSeek) re-deciding
+// its own label.
+export const ADMISSION_LABEL_JUDGE_MODEL = "kg-independent-judge";
 
 // Per-predicate strict entailment test, shared by the judge. These are the SAME
 // natural-language tests the extraction prompt applies; the judge re-checks them

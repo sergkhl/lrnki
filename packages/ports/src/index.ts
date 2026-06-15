@@ -15,10 +15,6 @@ import type {
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
-  OracleAdmissionReferenceDraft,
-  OracleAdmissionTier,
-  OracleAuditVerdict,
-  OracleLabelAlignmentDraft,
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
@@ -87,8 +83,8 @@ export interface ClaimEntailmentJudgmentPort {
 
 // Concept-vs-proposition admission judge (ADR-0005). A bounded, forced-tool LLM
 // judgment over ONE admitted-`core` label, run on an independent model family
-// (`kg-oracle-judge`) so the judge is not the admission extractor grading its own
-// homework. It answers the semantic question the deterministic lexical veto got
+// (`kg-independent-judge`) so the judge is not the admission extractor grading its
+// own homework. It answers the semantic question the deterministic lexical veto got
 // wrong: does this label NAME a concept, or ASSERT a claim about one? Used only
 // to DOWNGRADE a `core` candidate whose label is a proposition; it never promotes
 // or resurrects. The adapter grounds its verdict fail-closed (an ungrounded
@@ -102,58 +98,6 @@ export interface AdmissionLabelJudgmentPort {
     aliases: string[];
     evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
   }): Promise<AdmissionLabelJudgment>;
-}
-
-// Gate 2 oracle independence triangle (ADR-0013, AGENTS rule 11). Two off-core
-// ports used only by the quality lab; they never touch the publication path.
-//
-// The reference AUTHOR runs on an independent model family (`kg-oracle-reference`
-// = MiniMax M3) so the oracle is not the production extractor (DeepSeek) grading
-// its own homework. It reads the source and authors which concepts a
-// learner-neutral graph should admit and at which tier, with verbatim evidence.
-// Model-authored, NOT human gold.
-export interface OracleAdmissionReferencePort {
-  readonly model: string;
-  author(input: {
-    declaredDomain: string;
-    title: string;
-    sourceBlocks: SourceBlock[];
-  }): Promise<OracleAdmissionReferenceDraft>;
-}
-
-// The second JUDGE runs on a third, independent model family (`kg-oracle-judge`
-// = Mistral Small). It audits ONE reference label against the source: does the
-// source teach this as an admit-worthy concept at the claimed tier? A
-// disagreement quarantines the label out of the trusted oracle (rule 11).
-export interface OracleAdmissionAuditPort {
-  readonly model: string;
-  audit(input: {
-    declaredDomain: string;
-    label: string;
-    expectedTier: OracleAdmissionTier;
-    evidenceQuotes: string[];
-    sourceBlocks: SourceBlock[];
-  }): Promise<OracleAuditVerdict>;
-}
-
-// Measured neural label-aligner for Gate 2 scoring (TODO #1, AGENTS rule 16). A
-// bounded, forced-tool judgment that decides, for SCORING ONLY, which production
-// labels are the SAME concept as a trusted reference label under a different
-// SURFACE FORM (plural, hyphenation, casing, acronym expansion/parenthetical) —
-// distinguished from genuinely distinct concepts that merely share surface words
-// ("Operator" vs "Operator set"). It never relabels the graph (publication keeps
-// exact normalized identity, ADR-0015); it only lets the benchmark count agreement
-// it already has. Runs on an independent family (`kg-oracle-judge`), off the
-// publication path. The application boundary validates membership and one-reference-
-// per-production-label fail-closed; the exact-match baseline is always reported
-// beside the aligned score so a wrong merge is visible (rule 11).
-export interface OracleLabelAlignmentPort {
-  readonly model: string;
-  align(input: {
-    declaredDomain: string;
-    referenceLabels: { label: string; tier: OracleAdmissionTier; rationale: string }[];
-    productionLabels: string[];
-  }): Promise<OracleLabelAlignmentDraft>;
 }
 
 export interface ArtifactRepositoryPort {

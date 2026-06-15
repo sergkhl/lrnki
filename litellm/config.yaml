@@ -145,22 +145,14 @@ model_list:
   # MiniMax M3 advertises tool_choice on its Minimax endpoint but OpenRouter
   # rejects FORCED tool_choice for it in practice (named, required, provider-
   # pinned, and thinking-off all 404 "No endpoints found that support the
-  # provided 'tool_choice' value"). Unusable as a forced-tool oracle author
-  # (AGENTS rule 6); kept here only for non-forced use. See ADR-0013.
+  # provided 'tool_choice' value"). Unusable for forced-tool roles (AGENTS rule 6);
+  # kept here only for non-forced use.
   - model_name: "openrouter/minimax/minimax-m3"
     litellm_params:
       model: "openrouter/minimax/minimax-m3"
       api_key: os.environ/OPENROUTER_API_KEY
       input_cost_per_token: 0.0000003
       output_cost_per_token: 0.0000012
-
-  # Oracle reference author (ADR-0013). Independent of the DeepSeek extractor and
-  # the Mistral judge; all of Xiaomi's OpenRouter providers support forced
-  # tool_choice, so the reference author honors AGENTS rule 6.
-  - model_name: "openrouter/xiaomi/mimo-v2.5-pro"
-    litellm_params:
-      model: "openrouter/xiaomi/mimo-v2.5-pro"
-      api_key: os.environ/OPENROUTER_API_KEY
 
   # NOTE: tencent/hy3-preview advertises tool_choice but its backend only accepts
   # tool_choice="auto" (not forced/named) — unusable for forced tools (rule 6).
@@ -169,9 +161,8 @@ model_list:
       model: "openrouter/tencent/hy3-preview"
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # Oracle second judge (kg-oracle-judge), and the ADR-0007/0005 production judges.
-  # gpt-oss-120b is cross-family independent of BOTH the DeepSeek extractor and the
-  # Xiaomi reference author (true triangle independence), forced tool_choice works,
+  # Independent production judge (kg-independent-judge, ADR-0007/0005). gpt-oss-120b
+  # is cross-family independent of the DeepSeek extractor, forced tool_choice works,
   # and it is the cheapest option ($0.039/$0.18 per Mtok). Replaces Mistral Small
   # (free-tier rate-limited) and Nemotron (too expensive at $2.5/Mtok out).
   - model_name: "openrouter/openai/gpt-oss-120b"
@@ -252,15 +243,10 @@ router_settings:
     # proposes the inferred DAG using the same no-thinking extractor.
     kg-concept-embedding: openrouter/qwen/qwen3-embedding-8b
     kg-prerequisite-judgment: deepseek/deepseek-v4-flash-no-thinking
-    # Oracle roles must be independent of the production extractor (ADR-0013:
-    # "the production extraction model must not grade itself"). Three families:
-    # DeepSeek extracts, Xiaomi MiMo authors references, Mistral audits.
-    # (MiniMax M3 was the intended author but cannot do forced tool_choice via
-    # OpenRouter; Xiaomi MiMo v2.5 Pro is the independent forced-tool substitute.)
-    # Oracle roles keep default reasoning enabled; the no-thinking discipline
-    # applies to production extraction cost, not rare benchmark runs.
-    kg-oracle-reference: openrouter/xiaomi/mimo-v2.5-pro
-    # gpt-oss-120b: cheap ($0.039/$0.18) and cross-family independent of both the
-    # extractor (DeepSeek) and the author (Xiaomi). Replaces Mistral (rate-limited)
-    # and Nemotron (expensive). Also backs the ADR-0007/0005 production judges.
-    kg-oracle-judge: openrouter/openai/gpt-oss-120b
+    # Independent production judge (ADR-0007/0005): the concept-vs-proposition
+    # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
+    # cross-family independent of the DeepSeek extractor, supports forced
+    # tool_choice, and is cheap ($0.039/$0.18 per Mtok), so the judge is never the
+    # extractor grading its own output. (The off-core oracle triangle and label
+    # aligner were retired after the admission-precision fix; see ADR-0013/0022.)
+    kg-independent-judge: openrouter/openai/gpt-oss-120b

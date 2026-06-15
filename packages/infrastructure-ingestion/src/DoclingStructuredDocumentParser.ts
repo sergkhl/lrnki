@@ -17,7 +17,7 @@ const SUPPORTED: Record<string, string> = {
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
 };
 
-// Conversion options pinned for a reproducible frozen oracle suite, chosen to be
+// Conversion options pinned for a reproducible curated source suite, chosen to be
 // as fast as possible without losing anything the pipeline consumes:
 //   - do_ocr=false: the curated Gate 2 fixtures are digital-born (selectable
 //     text), so OCR adds latency and nondeterminism without benefit; a scanned
@@ -101,7 +101,7 @@ export class DoclingStructuredDocumentParser implements StructuredDocumentParser
   // Async conversion: submit → poll task status → fetch result. The synchronous
   // endpoint holds the connection open for the whole CPU conversion and caps at
   // the server's DOCLING_SERVE_MAX_SYNC_WAIT (120s); the async flow decouples the
-  // client from that cap, which a frozen oracle suite with large documents needs.
+  // client from that cap, which a curated source suite with large documents needs.
   private async convert(bytes: Uint8Array, contentType: string, format: string): Promise<string> {
     const deadline = Date.now() + (this.config.timeoutMs ?? 900_000);
 

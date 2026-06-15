@@ -14,7 +14,6 @@ A minimal scaffold for building a Learner-Neutral Core Concept Graph from curate
 - `packages/infrastructure-postgres`: PostgreSQL schema and initial migration with JSONB artifacts and JSON_TABLE inspection view
 - `packages/infrastructure-storage-local`: local curated-source object store adapter
 - `packages/infrastructure-rdf-export`: JSON-LD export sidecar
-- `packages/quality-lab`: oracle-reference and fixture contracts
 
 ## Commands
 

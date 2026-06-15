@@ -69,7 +69,7 @@ function buildContext() {
     new TextStructuredDocumentParser(),
     // Mixed-format ingestion (Gate 2, ADR-0013). The image tag is pinned in the
     // parser config hash so the layout contract is reproducible across the
-    // frozen oracle suite; bump DOCLING_IMAGE_TAG when docker/Dockerfile changes.
+    // curated source suite; bump DOCLING_IMAGE_TAG when docker/Dockerfile changes.
     new DoclingStructuredDocumentParser({
       baseUrl: process.env.DOCLING_BASE_URL ?? "http://localhost:5001",
       imageTag: process.env.DOCLING_IMAGE_TAG ?? "docling-serve-cpu-v1.23.0+docling-2.102.1"
@@ -103,13 +103,13 @@ function buildContext() {
     discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
     admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
     claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient),
-    // Semantic claim-entailment judge (ADR-0007). Independent model (Mistral
-    // Small via kg-oracle-judge) so the judge is not the extractor re-grading
-    // itself; deterministic decoding for stable re-derivation.
+    // Semantic claim-entailment judge (ADR-0007). Independent production judge
+    // (gpt-oss-120b via kg-independent-judge) so the judge is not the extractor
+    // re-grading itself; deterministic decoding for stable re-derivation.
     claimEntailmentJudge: new LiteLlmClaimEntailmentJudgmentAdapter(deterministicClient),
-    // Concept-vs-proposition admission judge (ADR-0005). Same independent family
-    // (kg-oracle-judge) and deterministic decoding; downgrade-only stage that
-    // replaces the removed looksLikePropositionLabel lexical veto.
+    // Concept-vs-proposition admission judge (ADR-0005). Same independent
+    // production judge (kg-independent-judge) and deterministic decoding;
+    // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
     // Graph Enrichment ports (ADR-0019). Embedding clusters/gates pairs; the
     // bounded judge proposes the inferred DAG (deterministic decoding for stable
