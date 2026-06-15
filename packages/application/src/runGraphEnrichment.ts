@@ -197,63 +197,50 @@ function disposition(
 
 // --- Deterministic, model-free helpers (tunable, not yet unit-tested) ---------
 
-// Contextual text used for embedding (ADR-0012 tier 2): canonical label + aliases
-// + any defined-as literal definitions + the verbatim evidence quotes from claims
-// touching the concept. Prefers definition/evidence text over the bare label; the
-// label degrades to a fallback only when the published graph has no claims for the
-// concept (sparse-domain limitation, recorded as a slice caveat).
+// Contextual text per concept (ADR-0012 tier 2): canonical label + aliases + the
+// concept's CEP definition and mention passages (ADR-0007 reset). Prefers
+// source-grounded evidence text over the bare label; the label degrades to a
+// fallback only when a Concept's CEP is unexpectedly empty.
 function conceptContextText(concept: Concept, snapshot: GraphSnapshot): string {
-  const definitions = snapshot.claims
-    .filter((claim) => claim.subjectConceptId === concept.conceptId && claim.object.kind === "literal")
-    .map((claim) => (claim.object.kind === "literal" ? claim.object.value : ""))
-    .filter((value) => value.length > 0);
-  const evidence = snapshot.claims
-    .filter((claim) =>
-      claim.subjectConceptId === concept.conceptId ||
-      (claim.object.kind === "concept" && claim.object.conceptId === concept.conceptId)
-    )
-    .flatMap((claim) => claim.evidence.map((reference) => reference.evidenceQuote))
-    .filter((quote) => quote.length > 0);
-  return [concept.canonicalLabel, ...concept.aliases, ...definitions, ...evidence].join(". ");
+  const profile = profileOf(snapshot, concept.conceptId);
+  const quotes = [
+    ...(profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
+    ...(profile?.mentions ?? []).map((passage) => passage.evidenceQuote)
+  ].filter((quote) => quote.length > 0);
+  return [concept.canonicalLabel, ...concept.aliases, ...quotes].join(". ");
 }
 
-// First `defined-as` literal published for each concept — the concept's meaning
-// anchor, surfaced to the judge separately from the broader evidence packet.
+// The concept's meaning anchor: prefer a guarded `defines` literal, else the first
+// CEP definition passage. Surfaced to the judge separately from the wider packet.
 function definitionsByConcept(snapshot: GraphSnapshot): Map<string, string> {
   const byConcept = new Map<string, string>();
-  for (const claim of snapshot.claims) {
-    if (claim.object.kind !== "literal") continue;
-    if (byConcept.has(claim.subjectConceptId)) continue;
-    byConcept.set(claim.subjectConceptId, claim.object.value);
+  for (const profile of snapshot.evidenceProfiles) {
+    const defines = profile.assertions.find((assertion) => assertion.type === "defines");
+    const anchor = defines && defines.type === "defines" ? defines.literalValue : profile.definitions[0]?.evidenceQuote;
+    if (anchor) byConcept.set(profile.conceptId, anchor);
   }
   return byConcept;
 }
 
-// Every verbatim claim-evidence quote that names a concept (as subject or object),
-// reconstructed as a minimal SourceBlock so the judge sees real source text. We
-// only have the published quote + its block id here, which is exactly the verbatim
-// span — sufficient grounding without re-reading the full source document.
+// Every verbatim CEP passage for a concept, reconstructed as a SourceBlock so the
+// judge sees real source text with its heading path and locator (ADR-0007 reset).
 function evidenceBlocksByConcept(snapshot: GraphSnapshot): Map<string, SourceBlock[]> {
   const byConcept = new Map<string, SourceBlock[]>();
-  const add = (conceptId: string, block: SourceBlock) => {
-    const existing = byConcept.get(conceptId);
-    if (existing) existing.push(block);
-    else byConcept.set(conceptId, [block]);
-  };
-  for (const claim of snapshot.claims) {
-    for (const evidence of claim.evidence) {
-      const block: SourceBlock = {
-        blockId: evidence.sourceBlockId,
-        blockType: "paragraph",
-        text: evidence.evidenceQuote,
-        headingPath: [],
-        locator: {}
-      };
-      add(claim.subjectConceptId, block);
-      if (claim.object.kind === "concept") add(claim.object.conceptId, block);
-    }
+  for (const profile of snapshot.evidenceProfiles) {
+    const blocks: SourceBlock[] = [...profile.definitions, ...profile.mentions].map((passage) => ({
+      blockId: passage.sourceBlockId,
+      blockType: "paragraph",
+      text: passage.evidenceQuote,
+      headingPath: passage.headingPath,
+      locator: passage.locator
+    }));
+    if (blocks.length) byConcept.set(profile.conceptId, blocks);
   }
   return byConcept;
+}
+
+function profileOf(snapshot: GraphSnapshot, conceptId: string) {
+  return snapshot.evidenceProfiles.find((profile) => profile.conceptId === conceptId);
 }
 
 // Deduplicate evidence blocks by (blockId, text) so a claim touching both paired

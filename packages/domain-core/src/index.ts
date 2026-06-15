@@ -1,5 +1,4 @@
 export type CandidateTier = "core" | "optional" | "reject" | "quarantine";
-export type ClaimScope = "durable_domain_knowledge" | "scoped_empirical_result" | "reference_expansion" | "inferred_relationship";
 export type TrustTier = "curated_source_grounded" | "cross_source_synthesized" | "reference_expansion" | "inferred_relationship" | "model_proposed" | "quarantined";
 
 export type SourceLocator = {
@@ -107,11 +106,6 @@ export function evidenceQuoteMatches(blockText: string, evidenceQuote: string): 
   if (quote.length === 0) return false;
   return normalizeEvidenceText(blockText).includes(quote);
 }
-
-// Closed six-relation registry (ADR-0016). Models choose from this enum; only humans extend it.
-export type RelationPredicate = "is-a" | "part-of" | "asserted-prerequisite-of" | "contrasts-with" | "uses" | "defined-as";
-export const CONCEPT_RELATIONS: RelationPredicate[] = ["is-a", "part-of", "asserted-prerequisite-of", "contrasts-with", "uses"];
-export const LITERAL_RELATIONS: RelationPredicate[] = ["defined-as"];
 
 // ---------------------------------------------------------------------------
 // Run-scoped extraction artifacts (ADR-0017). These reference CANDIDATES by a
@@ -376,26 +370,50 @@ export type Concept = {
   homograph: boolean;
 };
 
-export type PublishedClaimObject =
-  | { kind: "concept"; conceptId: string }
-  | { kind: "literal"; value: string };
+// ---------------------------------------------------------------------------
+// Published Concept Evidence Profile (ADR-0007 reset, R1/R2/R5/R6). The CEP is
+// the published Concept context: there is NO sibling asserted-edge collection, so
+// a published snapshot exposes zero asserted relations (R5, AE1/AE4). Each element
+// carries full provenance — source, block, verbatim quote, heading path, and
+// locator — so the Admin Lab and enrichment inspect a Concept's meaning without
+// reconstructing it from claims (R2). Evidence accumulates across graph versions:
+// publication UNIONS the base version's CEP with newly selected runs' evidence and
+// exact-deduplicates, so a later version never replaces previously published
+// evidence (R3, AE2).
+// ---------------------------------------------------------------------------
 
-export type PublishedClaim = {
-  claimId: string;
-  subjectConceptId: string;
-  predicate: RelationPredicate;
-  object: PublishedClaimObject;
-  evidence: EvidenceReference[];
-  trustTier: TrustTier;
-  modelConfidence: number;
-  evidenceCount: number;
-  contradictionState: "none" | "possible" | "material";
+export type PublishedEvidencePassage = {
+  sourceResourceId: string;
+  sourceBlockId: string;
+  evidenceQuote: string;
+  headingPath: string[];
+  locator: SourceLocator;
 };
 
+// The only two guarded typed assertions (R6). Both stay EVIDENCE inside the CEP,
+// never authoritative edges or numeric priors. `explicit-prerequisite-hint` names
+// the published Concept it points at; a hint whose target is not published in the
+// same graph version is omitted at build time (R9 publication discipline).
+export type PublishedTypedAssertion =
+  | { type: "defines"; literalValue: string; evidence: PublishedEvidencePassage[] }
+  | { type: "explicit-prerequisite-hint"; objectConceptId: string; evidence: PublishedEvidencePassage[] };
+
+export type PublishedConceptEvidenceProfile = {
+  conceptId: string;
+  definitions: PublishedEvidencePassage[];
+  mentions: PublishedEvidencePassage[];
+  assertions: PublishedTypedAssertion[];
+};
+
+// An immutable published graph version: stable Concepts plus one CEP each, and no
+// asserted edges (R5). `baseGraphVersionId` names the version this build extends
+// (`null` only for the initial build, KTD); the snapshot's evidence is the union
+// of that base plus the newly selected runs.
 export type GraphSnapshot = {
   graphVersionId: string;
+  baseGraphVersionId: string | null;
   concepts: Concept[];
-  claims: PublishedClaim[];
+  evidenceProfiles: PublishedConceptEvidenceProfile[];
 };
 
 // Read model the deterministic Graph-Version Build consumes (ADR-0017): the
@@ -408,20 +426,28 @@ export type BuildCandidate = {
   aliases: string[];
 };
 
-// Object of a build/published claim: a concept by run-local key, or a literal. The
-// asserted-claim publication path (BuildClaim, PublishedClaim) is retired in U4;
-// retained here only so the publication layer keeps compiling until then.
-export type ClaimObject =
-  | { kind: "concept"; candidateKey: string }
-  | { kind: "literal"; value: string };
+// Run-scoped CEP evidence reduced to the deterministic build read model (ADR-0017).
+// Passages carry full resolved provenance (the store maps run-local blockIds to
+// persisted source_block_id, heading path, and locator); typed assertions still
+// reference the OTHER admitted Concept by run-local candidateKey, which the build
+// resolves to a published Concept identity and omits when the target is absent.
+export type BuildEvidencePassage = {
+  sourceBlockId: string;
+  evidenceQuote: string;
+  headingPath: string[];
+  locator: SourceLocator;
+};
 
-export type BuildClaim = {
-  subjectCandidateKey: string;
-  predicate: RelationPredicate;
-  object: ClaimObject;
-  evidence: EvidenceReference[];
-  modelConfidence: number;
-  evidenceCount: number;
+export type BuildTypedAssertion =
+  | { type: "defines"; literalValue: string; evidence: BuildEvidencePassage[] }
+  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BuildEvidencePassage[] };
+
+export type BuildEvidenceProfile = {
+  candidateKey: string;
+  definitions: BuildEvidencePassage[];
+  mentions: BuildEvidencePassage[];
+  assertions: BuildTypedAssertion[];
+  complete: boolean;
 };
 
 export type RunForBuild = {
@@ -433,7 +459,9 @@ export type RunForBuild = {
   // (CONTEXT.md Graph-Version Build). Carried so the deterministic build can
   // fail closed and name the unresolved conflict rather than silently publish.
   quarantinedCandidates: { candidateKey: string; canonicalLabel: string }[];
-  verifiedClaims: BuildClaim[];
+  // One CEP per admitted core Concept in this run (ADR-0007 reset). Replaces the
+  // retired verifiedClaims: publication unions these by Concept identity.
+  evidenceProfiles: BuildEvidenceProfile[];
 };
 
 export type PublishedConceptIdentity = {

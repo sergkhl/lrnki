@@ -34,6 +34,7 @@ function concept(id: string, label: string, domain: string) {
 
 const snapshot: GraphSnapshot = {
   graphVersionId: "v1",
+  baseGraphVersionId: null,
   concepts: [
     concept("cx1", "X One", "x"),
     concept("cx2", "X Two", "x"),
@@ -41,28 +42,12 @@ const snapshot: GraphSnapshot = {
     concept("cy1", "Y One", "y"),
     concept("cy2", "Y Two", "y")
   ],
-  claims: [
+  evidenceProfiles: [
     {
-      claimId: "cl1",
-      subjectConceptId: "cx1",
-      predicate: "defined-as",
-      object: { kind: "literal", value: "the definition of X One" },
-      evidence: [{ sourceResourceId: "s1", sourceBlockId: "b1", evidenceQuote: "X One is the definition of X One" }],
-      trustTier: "curated_source_grounded",
-      modelConfidence: 0.9,
-      evidenceCount: 1,
-      contradictionState: "none"
-    },
-    {
-      claimId: "cl2",
-      subjectConceptId: "cx1",
-      predicate: "uses",
-      object: { kind: "concept", conceptId: "cx2" },
-      evidence: [{ sourceResourceId: "s1", sourceBlockId: "b2", evidenceQuote: "X One uses X Two" }],
-      trustTier: "curated_source_grounded",
-      modelConfidence: 0.8,
-      evidenceCount: 1,
-      contradictionState: "none"
+      conceptId: "cx1",
+      definitions: [{ sourceResourceId: "s1", sourceBlockId: "b1", evidenceQuote: "X One is the definition of X One", headingPath: ["X"], locator: {} }],
+      mentions: [{ sourceResourceId: "s1", sourceBlockId: "b2", evidenceQuote: "X One uses X Two", headingPath: ["X"], locator: {} }],
+      assertions: []
     },
     ...[
       ["cx2", "X Two"],
@@ -70,15 +55,10 @@ const snapshot: GraphSnapshot = {
       ["cy1", "Y One"],
       ["cy2", "Y Two"]
     ].map(([conceptId, label], index) => ({
-      claimId: `definition-${index}`,
-      subjectConceptId: conceptId,
-      predicate: "defined-as" as const,
-      object: { kind: "literal" as const, value: `the definition of ${label}` },
-      evidence: [{ sourceResourceId: "s1", sourceBlockId: `definition-block-${index}`, evidenceQuote: `${label} is the definition of ${label}` }],
-      trustTier: "curated_source_grounded" as const,
-      modelConfidence: 0.9,
-      evidenceCount: 1,
-      contradictionState: "none" as const
+      conceptId,
+      definitions: [{ sourceResourceId: "s1", sourceBlockId: `definition-block-${index}`, evidenceQuote: `${label} is the definition of ${label}`, headingPath: ["X"], locator: {} }],
+      mentions: [],
+      assertions: []
     }))
   ]
 };
@@ -177,11 +157,11 @@ test("runGraphEnrichment assembles an evidence packet from claim quotes and defi
 
   const cx1Pair = ports.judgedPairs.find((pair) => [pair.a, pair.b].includes("cx1") && [pair.a, pair.b].includes("cx2"));
   assert.ok(cx1Pair, "expected the cx1/cx2 pair to be judged");
-  // cx1's defined-as literal is surfaced as the concept definition.
-  assert.equal(cx1Pair.aDef, "the definition of X One");
-  // The verbatim claim evidence quote reaches the judge as a source block.
+  // cx1's CEP definition passage is surfaced as the concept definition anchor.
+  assert.equal(cx1Pair.aDef, "X One is the definition of X One");
+  // The verbatim CEP mention passage reaches the judge as a source block.
   const quotes = cx1Pair.packet.map((block) => block.text);
-  assert.ok(quotes.includes("X One uses X Two"), "expected the claim evidence quote in the packet");
+  assert.ok(quotes.includes("X One uses X Two"), "expected the CEP mention quote in the packet");
 });
 
 test("runGraphEnrichment maps directed judgments to a persisted layer and drops 'none'", async () => {
@@ -215,8 +195,9 @@ test("runGraphEnrichment does not judge or infer from bare labels", async () => 
   const ports = buildPorts();
   const ungroundedSnapshot: GraphSnapshot = {
     graphVersionId: "v-empty",
+    baseGraphVersionId: null,
     concepts: [concept("a", "A", "x"), concept("b", "B", "x")],
-    claims: []
+    evidenceProfiles: []
   };
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
     async getPublishedSnapshot(graphVersionId) {

@@ -138,7 +138,11 @@ export interface ExtractionRunStorePort {
   runsForBuildByIds(runIds: string[]): Promise<RunForBuild[]>;
 }
 
-// Atomic graph-version publication (ADR-0010). Refuses to mutate a published version.
+// Atomic graph-version publication (ADR-0010, ADR-0007 reset). Refuses to mutate a
+// published version. `publish` accepts the immutable graph-snapshot artifact so
+// PostgreSQL writes the graph-version rows, the unioned CEP evidence, and the
+// artifact envelope in ONE transaction — no authoritative relational state without
+// its immutable artifact (matches the extraction transaction in U3).
 export interface GraphVersionStorePort {
   existingConceptIdentities(): Promise<PublishedConceptIdentity[]>;
   publish(input: {
@@ -146,6 +150,7 @@ export interface GraphVersionStorePort {
     refinementConfigHash: string;
     runMemberships: { runId: string; sourceResourceId: string }[];
     refinementDecisions: RefinementDecisionRecord[];
+    artifact: ArtifactEnvelope<GraphSnapshot>;
   }): Promise<void>;
   getPublishedSnapshot(graphVersionId: string): Promise<GraphSnapshot | undefined>;
   getLatestPublishedSnapshot(): Promise<GraphSnapshot | undefined>;

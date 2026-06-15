@@ -13,9 +13,9 @@ publication); U5 = item 2 (enrichment over CEP pairs); U6 = Admin Lab reshape (f
 bullet); U7 = item 3 (ADRs/CONTEXT) + finalizing this TODO. Items track product intent; the plan's U-IDs
 track execution.
 
-**Next entry point: U3** — replace claim extraction with Concept Evidence Profile extraction (item 1,
-first bullet). U3 ends in a mandatory rule-14 gate (inspect real CEPs from Rust/biology/economics) BEFORE
-U4's persistence rewrite — same FIX_FIRST discipline that closed the InstructKG leak in U1.
+**Next entry point: U5** — feed enrichment prerequisite judgment over CEP pairs (item 2); delete the
+embedding/candidate-group blocking tier and judge all same-domain pairs. U3 (CEP extraction, `d612f16`)
+and U4 (CEP publication + append-only union, this branch) are DONE with rule-14 PASS — see COMPLETED.
 
 Operational notes for the next agent:
 - LiteLLM proxy serves the renamed judge alias **`kg-independent-judge`** (gpt-oss-120b); any alias
@@ -54,6 +54,23 @@ Operational notes for the next agent:
 
 ## COMPLETED
 
+- **Reset milestone 2 — CEP extraction + publication (U3+U4, branch `refactor/cep-core-reset`).**
+  U3 (`d612f16`): replaced claim extraction with concept-conditioned Concept Evidence Profile extraction
+  (`applyEvidenceProfilePolicy` + `applyAssertionEntailmentJudge`), retired the broad relation surface,
+  claim-recall retries, conflict pass, and missing-concept escape hatch; run-scoped CEP rows + immutable
+  artifact persisted in one transaction. U4 (this branch): rewrote the publication layer around CEP
+  unions — `GraphSnapshot` carries Concepts + one CEP each and ZERO asserted edges (R5); `buildGraphVersion`
+  takes `baseGraphVersionId` + selected runs, resolves identities (ADR-0015), unions base + new source
+  evidence and exact-deduplicates (R3/AE2), remaps `explicit-prerequisite-hint` targets and omits absent
+  ones (R9/U4.9); `GraphVersionStorePort.publish` writes graph-version rows, CEP evidence, and the
+  `graph_snapshot.v2` artifact in one transaction. Migration rewritten (dropped relation_definitions +
+  published_claims/evidence; added graph-version CEP tables + JSON_TABLE views over the snapshot artifact)
+  and DB reset. Static green (typecheck + 67 application/postgres tests + 5 live-PG integration tests +
+  lint). rule-14 PASS over two real biology runs: initial VA (4 atomic concepts, verbatim defs w/ heading
+  paths, 3 faithful `defines`, 0 edges) + incremental VB `--base VA` (identity reuse, 22→41 passage union,
+  0 duplicates, base untouched). See `tmp/u4-cep-publication-quality-evaluation.md`. Admin Lab Graph
+  Explorer reshaped to a zero-edge CEP evidence inspector; enrichment helpers + demoSnapshot adapted to
+  the new snapshot shape (full Admin Lab/enrichment-page reshape is U6).
 - **Reset milestone 1 — atomic admission precision + oracle teardown (U1+U2, branch `refactor/cep-core-reset`).**
   U1 (`5b2e819`, `9b1bb62`): admission emits one-or-many ATOMIC proposals per discovered candidate
   (`parentCandidateKey` + run-local `atomicKey`); Core Set Selection runs over atoms; the deterministic

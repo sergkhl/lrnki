@@ -183,21 +183,32 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
   }
 }
 
-async function buildVersion(ctx: Context, runIds: string[]) {
+async function buildVersion(ctx: Context, args: string[]) {
   // Publication selects Extraction Runs explicitly by id. A run passing the
   // mechanical/evidence gates ('succeeded') is not automatically publishable —
   // the operator must name the runs they inspected and judged sound, so a
   // semantically-bad-but-valid run never silently mutates the graph (AGENTS
-  // rule 11; ADR-0017 builds are a pure function of the selected runs).
+  // rule 11; ADR-0017 builds are a pure function of the base version + runs).
+  // `--base <graphVersionId>` extends a published version, unioning its CEP
+  // evidence with the newly selected runs (ADR-0007 reset R3); omit it for the
+  // initial build.
+  let baseGraphVersionId: string | null = null;
+  const runIds: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--base") { baseGraphVersionId = args[++i] ?? null; continue; }
+    runIds.push(args[i]);
+  }
   if (runIds.length === 0) {
     console.error("! build-graph-version requires one or more explicit run IDs (no automatic 'latest succeeded' selection).");
-    console.error("  Inspect runs first, then: worker:kg build-graph-version <runId> [<runId> ...]");
+    console.error("  Inspect runs first, then: worker:kg build-graph-version [--base <graphVersionId>] <runId> [<runId> ...]");
     process.exitCode = 1;
     return;
   }
   const graphVersionId = randomUUID();
-  const snapshot = await buildGraphVersion({ graphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, artifacts: ctx.artifacts });
-  console.log(`\n>> published graph version ${graphVersionId} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} claims=${snapshot.claims.length}`);
+  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore });
+  const passages = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
+  const assertions = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
+  console.log(`\n>> published graph version ${graphVersionId}${baseGraphVersionId ? ` (base ${baseGraphVersionId})` : ""} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
 }
 
 async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
