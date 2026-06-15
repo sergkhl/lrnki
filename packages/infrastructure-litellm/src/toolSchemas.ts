@@ -302,23 +302,30 @@ export const conceptEvidenceProfileValidator = z.object({
 // returns a DIRECTION between the two named concepts, not free-form edges; the
 // application boundary maps it to a directed/none/uncertain edge fail-closed.
 
-const PREREQUISITE_OUTCOME = [
-  "a-is-prerequisite-of-b",
-  "b-is-prerequisite-of-a",
-  "none",
-  "uncertain"
-] as const;
+const PREREQUISITE_RELATION = ["prerequisite", "none", "uncertain"] as const;
 
+// The judge NAMES the prerequisite concept rather than emitting a positional
+// 'a-is-prerequisite-of-b' token. A real run showed the model reasons correctly but
+// systematically anchors the positional token on the A-side, producing edges that
+// contradict their own rationale. Copying the verbatim label of the concept that
+// must be understood FIRST removes the positional mapping the model gets wrong; the
+// application matches the label against the two provided concepts and fails closed
+// to 'uncertain' (flagged, path-excluded) when it names neither — never a guess.
 export const prerequisiteJudgmentSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["outcome", "confidence", "rationale"],
+  required: ["relation", "prerequisiteLabel", "confidence", "rationale"],
   properties: {
-    outcome: {
+    relation: {
       type: "string",
-      enum: [...PREREQUISITE_OUTCOME],
+      enum: [...PREREQUISITE_RELATION],
       description:
-        "Directed prerequisite relation between the two concepts. 'a-is-prerequisite-of-b' means a learner must understand concept A before concept B. Use 'none' when neither is a learning prerequisite of the other; use 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
+        "'prerequisite' when one concept must be understood before the other; 'none' when neither is a learning prerequisite of the other; 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
+    },
+    prerequisiteLabel: {
+      type: "string",
+      description:
+        "When relation='prerequisite', the EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. It must equal one of the two provided concept labels. Empty string for 'none' or 'uncertain'."
     },
     confidence: { type: "number", minimum: 0, maximum: 1 },
     rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
@@ -326,7 +333,8 @@ export const prerequisiteJudgmentSchema: JsonSchema = {
 };
 
 export const prerequisiteJudgmentValidator = z.object({
-  outcome: z.enum(PREREQUISITE_OUTCOME),
+  relation: z.enum(PREREQUISITE_RELATION),
+  prerequisiteLabel: z.string(),
   confidence: z.number().min(0).max(1),
   rationale: z.string().min(1)
 }).strict();

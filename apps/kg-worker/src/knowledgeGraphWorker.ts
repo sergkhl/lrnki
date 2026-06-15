@@ -22,7 +22,6 @@ import {
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmConceptDiscoveryAdapter,
-  LiteLlmEmbeddingAdapter,
   LiteLlmForcedToolClient,
   LiteLlmPrerequisiteJudgmentAdapter
 } from "@lrnki/infrastructure-litellm";
@@ -112,10 +111,10 @@ function buildContext() {
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
-    // Graph Enrichment ports (ADR-0019). Embedding clusters/gates pairs; the
-    // bounded judge proposes the inferred DAG (deterministic decoding for stable
-    // re-derivation); difficulty + learner state are mocks behind real ports.
-    embedding: new LiteLlmEmbeddingAdapter(baseClient),
+    // Graph Enrichment ports (ADR-0019 reset). Every same-domain CEP pair is judged
+    // exhaustively — no embedding clustering tier; the bounded judge proposes the
+    // inferred DAG (deterministic decoding for stable re-derivation); difficulty +
+    // learner state are mocks behind real ports.
     prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
     difficulty: dagDepthDifficultyPort,
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
@@ -231,7 +230,6 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     enrichmentId,
     graphVersionId: targetVersionId,
     graphStore: ctx.graphStore,
-    embedding: ctx.embedding,
     prerequisiteJudge: ctx.prerequisiteJudge,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore
@@ -239,7 +237,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
   const certain = layer.prerequisiteEdges.filter((edge) => !edge.uncertain).length;
   const uncertain = layer.prerequisiteEdges.length - certain;
   console.log(
-    `   candidateGroups=${layer.prerequisiteCandidateGroups.length} edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} embedding=${layer.embeddingModel} judge=${layer.judgeModel}`
+    `   edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} judge=${layer.judgeModel}`
   );
   for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
     console.log(`   edge: ${edge.prerequisiteConceptId} -> ${edge.dependentConceptId} (conf=${edge.confidence.toFixed(2)})`);

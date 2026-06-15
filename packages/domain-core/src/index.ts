@@ -502,15 +502,22 @@ export type ArtifactEnvelope<TPayload = unknown> = {
 
 export type InferredRelationPredicate = "inferred-prerequisite-of";
 
-export type PrerequisiteCandidateGroup = {
-  groupId: string;
-  // Contextual-embedding group used only for Prerequisite Candidate Selection.
-  // It never decides Concept identity or creates an edge.
-  conceptIds: string[];
-  embeddingModel: string;
+// Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
+// meaning-bearing definition passages, bounded salience-ordered mention passages,
+// and LABELED optional typed assertions. An `explicit-prerequisite-hint` appears
+// here as labeled evidence the neural judge MAY weigh — never a deterministic edge,
+// numeric prior, or direction override (KTD). The exhaustive same-domain design
+// (ADR-0019 reset) removed contextual-embedding clustering and candidate groups.
+export type PrerequisiteConceptContext = {
+  conceptId: string;
+  canonicalLabel: string;
+  aliases: string[];
+  definitions: string[];
+  mentions: string[];
+  assertions: { type: OptionalAssertionType; detail: string }[];
 };
 
-// One bounded LLM prerequisite judgment over a gated, evidence-packed pair.
+// One bounded LLM prerequisite judgment over an evidence-packed same-domain pair.
 // "uncertain" is flagged for review and excluded from the path, never silently
 // promoted to an edge (concept-first method stack §4; goal 1.6/4).
 export type PrerequisiteJudgment = {
@@ -531,15 +538,13 @@ export type InferredPrerequisiteEdge = {
   predicate: InferredRelationPredicate;
   confidence: number;
   uncertain: boolean;
-  candidateGroupId?: string;
-  provenance: { judgmentRationale: string; evidencePacketRef?: string };
+  provenance: { judgmentRationale: string };
 };
 
 export type PrerequisiteJudgmentTrace = {
   declaredDomain: string;
-  a: { conceptId: string; canonicalLabel: string; definition?: string };
-  b: { conceptId: string; canonicalLabel: string; definition?: string };
-  evidencePacket: SourceBlock[];
+  a: PrerequisiteConceptContext;
+  b: PrerequisiteConceptContext;
   judgment: PrerequisiteJudgment;
 };
 
@@ -572,11 +577,10 @@ export type DerivedGraphLayer = {
   enrichmentId: string;
   graphVersionId: string;
   enrichmentConfigHash: string;
-  embeddingModel: string;
-  // The bounded prerequisite-judge model (provenance for the inferred DAG). Stored
-  // alongside embeddingModel so a layer fully records which models proposed it.
+  // The bounded prerequisite-judge model (provenance for the inferred DAG). The
+  // embedding model and candidate groups were removed with the embedding tier
+  // (ADR-0019 reset): every same-domain CEP pair is judged exhaustively.
   judgeModel: string;
-  prerequisiteCandidateGroups: PrerequisiteCandidateGroup[];
   prerequisiteEdges: InferredPrerequisiteEdge[];
   difficulties: ConceptDifficulty[];
 };

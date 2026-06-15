@@ -30,8 +30,6 @@ export {
   ADMISSION_LABEL_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
-  LiteLlmEmbeddingAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
-  EMBEDDING_MODEL,
   PREREQUISITE_JUDGE_MODEL
 } from "./enrichmentAdapters";

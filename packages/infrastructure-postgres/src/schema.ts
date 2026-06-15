@@ -258,20 +258,11 @@ export const graphEnrichments = pgTable("graph_enrichments", {
   graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
   enrichmentConfigHash: text("enrichment_config_hash").notNull(),
   status: text("status").notNull(),
-  embeddingModel: text("embedding_model").notNull(),
   judgeModel: text("judge_model").notNull(),
   difficultyMethod: text("difficulty_method").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true })
 });
-
-// Prerequisite Candidate Selection groups. These never decide Concept identity.
-export const enrichmentPrerequisiteCandidateGroups = pgTable("enrichment_prerequisite_candidate_groups", {
-  enrichmentPrerequisiteCandidateGroupId: uuid("enrichment_prerequisite_candidate_group_id").primaryKey(),
-  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
-  groupId: text("group_id").notNull(),
-  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId)
-}, (table) => [unique().on(table.enrichmentId, table.conceptId)]);
 
 // The inferred prerequisite DAG: prerequisite must precede dependent. Survives
 // only after deterministic cycle removal + transitive reduction + weak-edge cut.
@@ -287,7 +278,6 @@ export const inferredPrerequisiteEdges = pgTable("inferred_prerequisite_edges", 
   dependentConceptId: uuid("dependent_concept_id").notNull().references(() => concepts.conceptId),
   confidence: real("confidence").notNull(),
   uncertain: boolean("uncertain").notNull().default(false),
-  candidateGroupId: text("candidate_group_id"),
   provenance: jsonb("provenance").notNull()
 }, (table) => [unique().on(table.enrichmentId, table.prerequisiteConceptId, table.dependentConceptId)]);
 

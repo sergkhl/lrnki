@@ -381,19 +381,10 @@ CREATE TABLE graph_enrichments (
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_config_hash text NOT NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
-  embedding_model text NOT NULL,
   judge_model text NOT NULL,
   difficulty_method text NOT NULL,
   started_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz
-);
-
-CREATE TABLE enrichment_prerequisite_candidate_groups (
-  enrichment_prerequisite_candidate_group_id uuid PRIMARY KEY,
-  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
-  group_id text NOT NULL,
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
-  UNIQUE (enrichment_id, concept_id)
 );
 
 CREATE TABLE inferred_prerequisite_edges (
@@ -404,7 +395,6 @@ CREATE TABLE inferred_prerequisite_edges (
   dependent_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
-  candidate_group_id text,
   provenance jsonb NOT NULL,
   UNIQUE (enrichment_id, prerequisite_concept_id, dependent_concept_id),
   CHECK (prerequisite_concept_id <> dependent_concept_id)

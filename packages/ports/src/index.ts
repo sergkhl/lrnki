@@ -13,6 +13,7 @@ import type {
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
+  PrerequisiteConceptContext,
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
@@ -167,26 +168,21 @@ export interface SourceObjectStoragePort {
 // REAL ports so Bradley-Terry / IRT-KT drop in later with no upstream change.
 // ---------------------------------------------------------------------------
 
-// Contextual embeddings as a propose-only blocking/clustering tier (ADR-0012).
-// Computed over a concept's definition + evidence text, NEVER its bare label, and
-// never an identity or merge authority — output only narrows candidate pairs and
-// forms clusters that gate which prerequisite pairs the LLM judges.
-export interface EmbeddingPort {
-  readonly model: string;
-  embed(input: { texts: string[] }): Promise<number[][]>;
-}
-
-// Bounded LLM prerequisite judgment over ONE gated, evidence-packed concept pair
-// (ADR-0019). Forced named tool schema; the application boundary validates the
-// arguments and maps "uncertain" to a flagged, path-excluded edge. The judge
-// proposes; deterministic cycle removal + transitive reduction dispose.
+// Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
+// reset). Every same-domain CEP pair is judged exhaustively — there is no
+// embedding clustering or candidate-group gate. Each side carries its published
+// CEP (definitions, bounded mentions, labeled typed assertions); an
+// explicit-prerequisite-hint is labeled evidence the judge MAY weigh, never a
+// deterministic edge or direction override (R11, KTD). Forced named tool schema;
+// the application validates arguments and maps "uncertain" to a flagged,
+// path-excluded edge. The judge proposes; cycle removal + transitive reduction
+// dispose.
 export interface PrerequisiteJudgmentPort {
   readonly model: string;
   judge(input: {
     declaredDomain: string;
-    a: { conceptId: string; canonicalLabel: string; definition?: string };
-    b: { conceptId: string; canonicalLabel: string; definition?: string };
-    evidencePacket: SourceBlock[];
+    a: PrerequisiteConceptContext;
+    b: PrerequisiteConceptContext;
   }): Promise<PrerequisiteJudgment>;
 }
 
