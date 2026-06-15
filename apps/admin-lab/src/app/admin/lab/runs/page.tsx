@@ -38,7 +38,7 @@ export default async function RunListPage() {
       <Card>
         <CardHeader className="border-b">
           <CardTitle>Extraction runs</CardTitle>
-          <CardDescription>Read-only inspection of concept discovery, admission, and claim extraction.</CardDescription>
+          <CardDescription>Read-only inspection of concept discovery, admission, and Concept Evidence Profiles.</CardDescription>
           <CardAction>
             <Badge variant={runs ? "outline" : "destructive"}>
               {runs ? `${runs.length} runs` : "Database unavailable"}
@@ -71,8 +71,8 @@ export default async function RunListPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Candidates</TableHead>
                   <TableHead>Core</TableHead>
-                  <TableHead>Claims verified / rejected</TableHead>
-                  <TableHead>Proposals</TableHead>
+                  <TableHead>Profiles complete / total</TableHead>
+                  <TableHead>Def / mention / assert</TableHead>
                   <TableHead>Latency</TableHead>
                   <TableHead>Started</TableHead>
                 </TableRow>
@@ -89,8 +89,8 @@ export default async function RunListPage() {
                     <TableCell><Badge variant={statusVariant(run.status)}>{run.status}</Badge></TableCell>
                     <TableCell>{run.candidateCount}</TableCell>
                     <TableCell>{run.coreCount}</TableCell>
-                    <TableCell>{run.verifiedClaimCount} / {run.rejectedClaimCount}</TableCell>
-                    <TableCell>{run.proposalCount}</TableCell>
+                    <TableCell>{run.completeProfileCount} / {run.profileCount}</TableCell>
+                    <TableCell>{run.definitionCount} / {run.mentionCount} / {run.assertionCount}</TableCell>
                     <TableCell>{run.latencyMs !== null ? `${Math.round(run.latencyMs / 1000)}s` : "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{run.startedAt.slice(0, 19).replace("T", " ")}</TableCell>
                   </TableRow>

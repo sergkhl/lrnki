@@ -63,7 +63,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
     );
   }
 
-  const { run, candidates, claims, proposals } = inspection;
+  const { run, candidates, profiles } = inspection;
   return (
     <AdminShell active="runs">
       <div className="flex flex-col gap-4">
@@ -89,7 +89,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Pipeline config</dt><dd className="break-all font-mono text-xs">{inspection.pipelineConfigHash}</dd></div>
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Latency</dt><dd>{run.latencyMs !== null ? `${Math.round(run.latencyMs / 1000)}s` : "—"}</dd></div>
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Candidates</dt><dd>{run.candidateCount} total / {run.coreCount} core</dd></div>
-              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Claims and proposals</dt><dd>{run.verifiedClaimCount} verified / {run.rejectedClaimCount} rejected / {run.proposalCount} proposals</dd></div>
+              <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Evidence profiles</dt><dd>{run.completeProfileCount} complete / {run.profileCount} total · {run.definitionCount} def / {run.mentionCount} mention / {run.assertionCount} assert</dd></div>
             </dl>
           </CardContent>
         </Card>
@@ -174,62 +174,69 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
 
         <Card>
           <CardHeader className="border-b">
-            <CardTitle>Claims</CardTitle>
-            <CardDescription>Validation outcomes with exact source evidence retained for inspection.</CardDescription>
-            <CardAction><Badge variant="outline">{claims.length}</Badge></CardAction>
+            <CardTitle>Concept Evidence Profiles</CardTitle>
+            <CardDescription>One CEP per admitted Concept (ADR-0007 reset): a verified definition, salience-ordered mentions, and guarded optional assertions — all verbatim, all source-grounded.</CardDescription>
+            <CardAction><Badge variant="outline">{profiles.length}</Badge></CardAction>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader><TableRow><TableHead>Outcome</TableHead><TableHead>Attempt</TableHead><TableHead>Subject</TableHead><TableHead>Relation</TableHead><TableHead>Object</TableHead><TableHead>Confidence</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
-              <TableBody>
-                {claims.map((claim, index) => (
-                  <TableRow key={`${claim.subjectLabel}-${claim.predicate}-${index}`}>
-                    <TableCell>
-                      <div className="flex flex-col items-start gap-2">
-                        <Badge variant={claim.validationOutcome === "rejected" ? "destructive" : "default"}>{claim.validationOutcome}</Badge>
-                        {claim.boundaryReasonCodes.map((reason) => <Badge key={reason} variant="outline">{reason}</Badge>)}
-                      </div>
-                    </TableCell>
-                    <TableCell><Badge variant="secondary">{claim.extractionAttempt}</Badge></TableCell>
-                    <TableCell className="font-medium">{claim.subjectLabel}</TableCell>
-                    <TableCell><Badge variant="outline">{claim.predicate}</Badge></TableCell>
-                    <TableCell className="max-w-64 whitespace-normal">{claim.objectLabel}</TableCell>
-                    <TableCell>{claim.modelConfidence.toFixed(2)}</TableCell>
-                    <TableCell className="min-w-80 whitespace-normal">
-                      {claim.evidenceQuotes.length > 0 ? (
-                        <div className="flex flex-col gap-2">
-                          {claim.evidenceQuotes.map((quote, quoteIndex) => (
-                            <blockquote key={quoteIndex} className="border-l-2 pl-3 text-sm text-muted-foreground">&ldquo;{quote}&rdquo;</blockquote>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">No verifiable quote</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="border-b">
-            <CardTitle>Missing-concept proposals</CardTitle>
-            <CardDescription>Run-scoped proposals remain outside the published core graph.</CardDescription>
-            <CardAction><Badge variant="outline">{proposals.length}</Badge></CardAction>
-          </CardHeader>
-          <CardContent>
-            {proposals.length > 0 ? (
+            {profiles.length > 0 ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Attempt</TableHead><TableHead>Proposed label</TableHead><TableHead>Rationale</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Concept</TableHead><TableHead>Completeness</TableHead><TableHead>Definitions</TableHead><TableHead>Mentions (salience order)</TableHead><TableHead>Optional assertions</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {proposals.map((proposal, index) => (
-                    <TableRow key={`${proposal.proposedLabel}-${index}`}>
-                      <TableCell><Badge variant="secondary">{proposal.extractionAttempt}</Badge></TableCell>
-                      <TableCell className="font-medium">{proposal.proposedLabel}</TableCell>
-                      <TableCell className="max-w-xl whitespace-normal">{proposal.rationale}</TableCell>
-                      <TableCell className="max-w-xl whitespace-normal text-muted-foreground">{proposal.evidenceQuote ? `“${proposal.evidenceQuote}”` : "—"}</TableCell>
+                  {profiles.map((profile) => (
+                    <TableRow key={profile.candidateKey}>
+                      <TableCell className="max-w-56 whitespace-normal">
+                        <div className="flex flex-col items-start gap-2">
+                          <span className="font-medium">{profile.conceptLabel}</span>
+                          <Badge variant={tierVariant(profile.tier)}>{profile.tier}</Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={profile.complete ? "default" : "destructive"}>{profile.complete ? "complete" : "no definition"}</Badge>
+                      </TableCell>
+                      <TableCell className="min-w-80 whitespace-normal">
+                        {profile.definitions.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {profile.definitions.map((passage, index) => (
+                              <blockquote key={`def-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                                &ldquo;{passage.evidenceQuote}&rdquo;
+                                <span className="mt-1 block font-mono text-[0.7rem]">{passage.headingPath.join(" / ") || "(root)"}</span>
+                              </blockquote>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-destructive">No definition passage</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-80 whitespace-normal">
+                        {profile.mentions.length > 0 ? (
+                          <ol className="flex flex-col gap-2">
+                            {profile.mentions.map((passage, index) => (
+                              <li key={`mention-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                                <span className="font-mono text-[0.7rem]">#{passage.salienceRank}</span> &ldquo;{passage.evidenceQuote}&rdquo;
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-72 whitespace-normal">
+                        {profile.assertions.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {profile.assertions.map((assertion, index) => (
+                              <div key={`assert-${index}`} className="flex flex-col gap-1">
+                                <span><Badge variant="outline">{assertion.assertionType}</Badge> <span className="font-medium">{assertion.target}</span></span>
+                                {assertion.evidenceQuotes.map((quote, quoteIndex) => (
+                                  <blockquote key={quoteIndex} className="border-l-2 pl-3 text-xs text-muted-foreground">&ldquo;{quote}&rdquo;</blockquote>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -239,8 +246,8 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
                 <Separator />
                 <Empty className="min-h-40">
                   <EmptyHeader>
-                    <EmptyTitle>No missing-concept proposals</EmptyTitle>
-                    <EmptyDescription>This run did not produce any proposals.</EmptyDescription>
+                    <EmptyTitle>No evidence profiles</EmptyTitle>
+                    <EmptyDescription>This run admitted no Concepts, so it produced no Concept Evidence Profiles.</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               </>

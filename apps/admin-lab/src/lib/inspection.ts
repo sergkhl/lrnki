@@ -4,9 +4,10 @@ import type { RunCandidate } from "@lrnki/domain-core";
 type Sql = ReturnType<typeof createDatabaseClient>;
 
 // Server-only, read-only inspection loaders for the Admin Lab Run Inspector and
-// Source Explorer (ADR-0011). Candidate and claim lists read the JSON_TABLE
-// projections over the immutable extraction_run.v4 artifact envelopes
-// (ADR-0003); evidence quotes and proposals read the relational run tables.
+// Source Explorer (ADR-0011). Candidate lists read the JSON_TABLE projection over
+// the immutable extraction_run artifact envelope (ADR-0003); Concept Evidence
+// Profiles (ADR-0007 reset) read the relational run-scoped CEP tables. Claim and
+// missing-concept-proposal inspection was removed with the asserted-claim layer.
 
 export interface RunSummary {
   runId: string;
@@ -17,9 +18,38 @@ export interface RunSummary {
   startedAt: string;
   candidateCount: number;
   coreCount: number;
-  verifiedClaimCount: number;
-  rejectedClaimCount: number;
-  proposalCount: number;
+  // CEP completeness replaces the retired verified/rejected claim counts (R9).
+  profileCount: number;
+  completeProfileCount: number;
+  definitionCount: number;
+  mentionCount: number;
+  assertionCount: number;
+}
+
+export interface ProfilePassage {
+  kind: "definition" | "mention";
+  sourceBlockId: string;
+  headingPath: string[];
+  evidenceQuote: string;
+  salienceRank: number;
+}
+
+export interface ProfileAssertion {
+  assertionType: string;
+  // `defines` carries a literal; `explicit-prerequisite-hint` names another
+  // admitted Concept by its candidate label.
+  target: string;
+  evidenceQuotes: string[];
+}
+
+export interface RunProfile {
+  candidateKey: string;
+  conceptLabel: string;
+  tier: string;
+  complete: boolean;
+  definitions: ProfilePassage[];
+  mentions: ProfilePassage[];
+  assertions: ProfileAssertion[];
 }
 
 export interface RunInspection {
@@ -43,17 +73,7 @@ export interface RunInspection {
     boundaryReasonCodes: string[];
     confidence: number;
   }[];
-  claims: {
-    subjectLabel: string;
-    predicate: string;
-    objectLabel: string;
-    validationOutcome: string;
-    boundaryReasonCodes: string[];
-    modelConfidence: number;
-    evidenceQuotes: string[];
-    extractionAttempt: number;
-  }[];
-  proposals: { proposedLabel: string; rationale: string; evidenceQuote: string | null; extractionAttempt: number }[];
+  profiles: RunProfile[];
 }
 
 export interface SourceSummary {
@@ -85,19 +105,32 @@ async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefine
   }
 }
 
+// Counts a run's CEPs into the summary surface. Subqueries keep the list query a
+// single round-trip; `definition`/`mention` are the only passage kinds (ADR-0007).
+const RUN_SUMMARY_COLUMNS = (sql: Sql) => sql`
+  er.run_id, sr.title, sr.declared_domain, er.status, er.latency_ms, er.started_at,
+  (SELECT count(*) FROM concept_candidates cc WHERE cc.run_id = er.run_id) AS candidate_count,
+  (SELECT count(*) FROM concept_candidates cc JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
+    WHERE cc.run_id = er.run_id AND ad.tier = 'core') AS core_count,
+  (SELECT count(*) FROM run_concept_evidence_profiles p WHERE p.run_id = er.run_id) AS profile_count,
+  (SELECT count(*) FROM run_concept_evidence_profiles p WHERE p.run_id = er.run_id AND p.complete) AS complete_profile_count,
+  (SELECT count(*) FROM run_evidence_passages ep JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = ep.run_concept_evidence_profile_id
+    WHERE p.run_id = er.run_id AND ep.kind = 'definition') AS definition_count,
+  (SELECT count(*) FROM run_evidence_passages ep JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = ep.run_concept_evidence_profile_id
+    WHERE p.run_id = er.run_id AND ep.kind = 'mention') AS mention_count,
+  (SELECT count(*) FROM run_optional_assertions a JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = a.run_concept_evidence_profile_id
+    WHERE p.run_id = er.run_id) AS assertion_count`;
+
+type RunSummaryRow = {
+  run_id: string; title: string; declared_domain: string; status: string; latency_ms: number | null; started_at: string;
+  candidate_count: number; core_count: number; profile_count: number; complete_profile_count: number;
+  definition_count: number; mention_count: number; assertion_count: number;
+};
+
 export async function listRuns(): Promise<RunSummary[] | undefined> {
   return withClient(async (sql) => {
-    const rows = await sql<{
-      run_id: string; title: string; declared_domain: string; status: string; latency_ms: number | null; started_at: string;
-      candidate_count: number; core_count: number; verified_claim_count: number; rejected_claim_count: number; proposal_count: number;
-    }[]>`
-      SELECT er.run_id, sr.title, sr.declared_domain, er.status, er.latency_ms, er.started_at,
-        (SELECT count(*) FROM concept_candidates cc WHERE cc.run_id = er.run_id) AS candidate_count,
-        (SELECT count(*) FROM concept_candidates cc JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
-          WHERE cc.run_id = er.run_id AND ad.tier = 'core') AS core_count,
-        (SELECT count(*) FROM run_claims rc WHERE rc.run_id = er.run_id AND rc.validation_outcome = 'verified') AS verified_claim_count,
-        (SELECT count(*) FROM run_claims rc WHERE rc.run_id = er.run_id AND rc.validation_outcome = 'rejected') AS rejected_claim_count,
-        (SELECT count(*) FROM missing_concept_proposals mp WHERE mp.run_id = er.run_id) AS proposal_count
+    const rows = await sql<RunSummaryRow[]>`
+      SELECT ${RUN_SUMMARY_COLUMNS(sql)}
       FROM extraction_runs er
       JOIN source_resources sr ON sr.source_resource_id = er.source_resource_id
       ORDER BY er.started_at DESC`;
@@ -107,18 +140,8 @@ export async function listRuns(): Promise<RunSummary[] | undefined> {
 
 export async function getRunInspection(runId: string): Promise<RunInspection | undefined> {
   return withClient(async (sql) => {
-    const headers = await sql<{
-      run_id: string; title: string; declared_domain: string; status: string; latency_ms: number | null; started_at: string;
-      pipeline_config_hash: string;
-      candidate_count: number; core_count: number; verified_claim_count: number; rejected_claim_count: number; proposal_count: number;
-    }[]>`
-      SELECT er.run_id, sr.title, sr.declared_domain, er.status, er.latency_ms, er.started_at, er.pipeline_config_hash,
-        (SELECT count(*) FROM concept_candidates cc WHERE cc.run_id = er.run_id) AS candidate_count,
-        (SELECT count(*) FROM concept_candidates cc JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
-          WHERE cc.run_id = er.run_id AND ad.tier = 'core') AS core_count,
-        (SELECT count(*) FROM run_claims rc WHERE rc.run_id = er.run_id AND rc.validation_outcome = 'verified') AS verified_claim_count,
-        (SELECT count(*) FROM run_claims rc WHERE rc.run_id = er.run_id AND rc.validation_outcome = 'rejected') AS rejected_claim_count,
-        (SELECT count(*) FROM missing_concept_proposals mp WHERE mp.run_id = er.run_id) AS proposal_count
+    const headers = await sql<(RunSummaryRow & { pipeline_config_hash: string })[]>`
+      SELECT ${RUN_SUMMARY_COLUMNS(sql)}, er.pipeline_config_hash
       FROM extraction_runs er
       JOIN source_resources sr ON sr.source_resource_id = er.source_resource_id
       WHERE er.run_id = ${runId}`;
@@ -152,25 +175,33 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
       FROM artifact_run_candidates WHERE run_id = ${runId}
       ORDER BY CASE tier WHEN 'core' THEN 0 WHEN 'quarantine' THEN 1 WHEN 'optional' THEN 2 ELSE 3 END, canonical_label`;
 
-    const claims = await sql<{ run_claim_id: string; subject_label: string; predicate: string; object_kind: string; object_label: string | null; object_literal: { value: string } | null; validation_outcome: string; boundary_reason_codes: string[]; model_confidence: number; extraction_attempt: number }[]>`
-      SELECT rc.run_claim_id, subj.canonical_label AS subject_label, rc.predicate, rc.object_kind,
-             obj.canonical_label AS object_label, rc.object_literal, rc.validation_outcome,
-             rc.boundary_reason_codes, rc.model_confidence, rc.extraction_attempt
-      FROM run_claims rc
-      JOIN concept_candidates subj ON subj.concept_candidate_id = rc.subject_candidate_id
-      LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = rc.object_candidate_id
-      WHERE rc.run_id = ${runId}
-      ORDER BY rc.validation_outcome DESC, subj.canonical_label, rc.predicate`;
-    const evidence = await sql<{ run_claim_id: string; evidence_quote: string }[]>`
-      SELECT rce.run_claim_id, rce.evidence_quote
-      FROM run_claim_evidence rce
-      JOIN run_claims rc ON rc.run_claim_id = rce.run_claim_id
-      WHERE rc.run_id = ${runId}`;
-    const quotesByClaim = new Map<string, string[]>();
-    for (const row of evidence) quotesByClaim.set(row.run_claim_id, [...(quotesByClaim.get(row.run_claim_id) ?? []), row.evidence_quote]);
-
-    const proposals = await sql<{ proposed_label: string; rationale: string; evidence_quote: string | null; extraction_attempt: number }[]>`
-      SELECT proposed_label, rationale, evidence_quote, extraction_attempt FROM missing_concept_proposals WHERE run_id = ${runId} ORDER BY extraction_attempt, proposed_label`;
+    // Concept Evidence Profiles: one CEP per admitted Concept (ADR-0007 reset).
+    const profileRows = await sql<{ profile_id: string; candidate_key: string; canonical_label: string; tier: string; complete: boolean }[]>`
+      SELECT p.run_concept_evidence_profile_id AS profile_id, cc.candidate_key, cc.canonical_label, p.tier, p.complete
+      FROM run_concept_evidence_profiles p
+      JOIN concept_candidates cc ON cc.concept_candidate_id = p.concept_candidate_id
+      WHERE p.run_id = ${runId}
+      ORDER BY p.complete DESC, CASE p.tier WHEN 'core' THEN 0 ELSE 1 END, cc.canonical_label`;
+    const passageRows = await sql<{ profile_id: string; kind: string; source_block_id: string; heading_path: string[]; evidence_quote: string; salience_rank: number }[]>`
+      SELECT ep.run_concept_evidence_profile_id AS profile_id, ep.kind, ep.source_block_id, sb.heading_path, ep.evidence_quote, ep.salience_rank
+      FROM run_evidence_passages ep
+      JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = ep.run_concept_evidence_profile_id
+      JOIN source_blocks sb ON sb.source_block_id = ep.source_block_id
+      WHERE p.run_id = ${runId}
+      ORDER BY ep.kind, ep.salience_rank`;
+    const assertionRows = await sql<{ assertion_id: string; profile_id: string; assertion_type: string; literal_value: string | null; object_label: string | null }[]>`
+      SELECT a.run_optional_assertion_id AS assertion_id, a.run_concept_evidence_profile_id AS profile_id,
+             a.assertion_type, a.literal_value, obj.canonical_label AS object_label
+      FROM run_optional_assertions a
+      JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = a.run_concept_evidence_profile_id
+      LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = a.object_candidate_id
+      WHERE p.run_id = ${runId}`;
+    const assertionEvidenceRows = await sql<{ assertion_id: string; evidence_quote: string }[]>`
+      SELECT ae.run_optional_assertion_id AS assertion_id, ae.evidence_quote
+      FROM run_optional_assertion_evidence ae
+      JOIN run_optional_assertions a ON a.run_optional_assertion_id = ae.run_optional_assertion_id
+      JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = a.run_concept_evidence_profile_id
+      WHERE p.run_id = ${runId}`;
 
     return {
       run: toRunSummary(header),
@@ -193,22 +224,54 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
         boundaryReasonCodes: row.boundary_reason_codes,
         confidence: Number(row.confidence)
       })),
-      claims: claims.map((row) => ({
-        subjectLabel: row.subject_label,
-        predicate: row.predicate,
-        objectLabel: row.object_kind === "concept" ? row.object_label ?? "?" : `"${row.object_literal?.value ?? ""}"`,
-        validationOutcome: row.validation_outcome,
-        boundaryReasonCodes: row.boundary_reason_codes,
-        modelConfidence: Number(row.model_confidence),
-        evidenceQuotes: quotesByClaim.get(row.run_claim_id) ?? [],
-        extractionAttempt: row.extraction_attempt
-      })),
-      proposals: proposals.map((row) => ({
-        proposedLabel: row.proposed_label,
-        rationale: row.rationale,
+      profiles: assembleProfiles(profileRows, passageRows, assertionRows, assertionEvidenceRows)
+    };
+  });
+}
+
+// Pure stitch of normalized CEP rows into the inspection view model. Exported so
+// the row-shaping logic is unit-testable without a live database.
+export function assembleProfiles(
+  profileRows: { profile_id: string; candidate_key: string; canonical_label: string; tier: string; complete: boolean }[],
+  passageRows: { profile_id: string; kind: string; source_block_id: string; heading_path: string[]; evidence_quote: string; salience_rank: number }[],
+  assertionRows: { assertion_id: string; profile_id: string; assertion_type: string; literal_value: string | null; object_label: string | null }[],
+  assertionEvidenceRows: { assertion_id: string; evidence_quote: string }[]
+): RunProfile[] {
+  const quotesByAssertion = new Map<string, string[]>();
+  for (const row of assertionEvidenceRows) {
+    quotesByAssertion.set(row.assertion_id, [...(quotesByAssertion.get(row.assertion_id) ?? []), row.evidence_quote]);
+  }
+  const assertionsByProfile = new Map<string, ProfileAssertion[]>();
+  for (const row of assertionRows) {
+    const target = row.assertion_type === "defines" ? row.literal_value ?? "" : row.object_label ?? "?";
+    assertionsByProfile.set(row.profile_id, [
+      ...(assertionsByProfile.get(row.profile_id) ?? []),
+      { assertionType: row.assertion_type, target, evidenceQuotes: quotesByAssertion.get(row.assertion_id) ?? [] }
+    ]);
+  }
+  const passagesByProfile = new Map<string, ProfilePassage[]>();
+  for (const row of passageRows) {
+    passagesByProfile.set(row.profile_id, [
+      ...(passagesByProfile.get(row.profile_id) ?? []),
+      {
+        kind: row.kind === "definition" ? "definition" : "mention",
+        sourceBlockId: row.source_block_id,
+        headingPath: row.heading_path,
         evidenceQuote: row.evidence_quote,
-        extractionAttempt: row.extraction_attempt
-      }))
+        salienceRank: row.salience_rank
+      }
+    ]);
+  }
+  return profileRows.map((row) => {
+    const passages = passagesByProfile.get(row.profile_id) ?? [];
+    return {
+      candidateKey: row.candidate_key,
+      conceptLabel: row.canonical_label,
+      tier: row.tier,
+      complete: row.complete,
+      definitions: passages.filter((passage) => passage.kind === "definition"),
+      mentions: passages.filter((passage) => passage.kind === "mention"),
+      assertions: assertionsByProfile.get(row.profile_id) ?? []
     };
   });
 }
@@ -266,10 +329,7 @@ export async function getSourceInspection(sourceResourceId: string): Promise<Sou
   });
 }
 
-function toRunSummary(row: {
-  run_id: string; title: string; declared_domain: string; status: string; latency_ms: number | null; started_at: string;
-  candidate_count: number; core_count: number; verified_claim_count: number; rejected_claim_count: number; proposal_count: number;
-}): RunSummary {
+export function toRunSummary(row: RunSummaryRow): RunSummary {
   return {
     runId: row.run_id,
     sourceTitle: row.title,
@@ -279,8 +339,10 @@ function toRunSummary(row: {
     startedAt: new Date(row.started_at).toISOString(),
     candidateCount: Number(row.candidate_count),
     coreCount: Number(row.core_count),
-    verifiedClaimCount: Number(row.verified_claim_count),
-    rejectedClaimCount: Number(row.rejected_claim_count),
-    proposalCount: Number(row.proposal_count)
+    profileCount: Number(row.profile_count),
+    completeProfileCount: Number(row.complete_profile_count),
+    definitionCount: Number(row.definition_count),
+    mentionCount: Number(row.mention_count),
+    assertionCount: Number(row.assertion_count)
   };
 }

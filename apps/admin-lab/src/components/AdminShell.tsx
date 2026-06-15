@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   EyeIcon,
   GitForkIcon,
+  NetworkIcon,
   RouteIcon,
   SearchCodeIcon
 } from "lucide-react";
@@ -32,6 +33,7 @@ const VIEWS = [
   { key: "graph", label: "Graph Explorer", href: "/admin/lab", icon: GitForkIcon },
   { key: "runs", label: "Run Inspector", href: "/admin/lab/runs", icon: SearchCodeIcon },
   { key: "sources", label: "Source Explorer", href: "/admin/lab/sources", icon: DatabaseIcon },
+  { key: "enrichments", label: "Enrichment Runs", href: "/admin/lab/enrichments", icon: NetworkIcon },
   { key: "paths", label: "Learner Paths", href: "/admin/lab/paths", icon: RouteIcon }
 ] as const;
 

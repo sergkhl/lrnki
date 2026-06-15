@@ -165,6 +165,9 @@ importers:
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.0
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -309,6 +312,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.9.2
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

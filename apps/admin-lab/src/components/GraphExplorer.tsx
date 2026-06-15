@@ -1,8 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { GraphSnapshot, PublishedConceptEvidenceProfile, PublishedEvidencePassage, PublishedTypedAssertion } from "@lrnki/domain-core";
+import type { GraphSnapshot, PublishedEvidencePassage, PublishedTypedAssertion } from "@lrnki/domain-core";
 import { FocusIcon, NetworkIcon, SearchIcon } from "lucide-react";
+import {
+  conceptLabel,
+  filterConcepts,
+  groupPassagesBySource,
+  profileFor,
+  summarizeSnapshot
+} from "@/lib/publishedView";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,15 +38,10 @@ type GraphExplorerProps = Readonly<{ snapshot: GraphSnapshot; live: boolean }>;
 // inspector — no Cytoscape canvas. Prerequisite edges appear only in a Derived
 // Graph Layer (AE4), rendered by a separate view.
 
-function conceptLabel(snapshot: GraphSnapshot, conceptId: string): string {
-  return snapshot.concepts.find((concept) => concept.conceptId === conceptId)?.canonicalLabel ?? conceptId;
-}
-
 function PassageList({ title, passages }: Readonly<{ title: string; passages: PublishedEvidencePassage[] }>) {
   // Group by source so a multi-source CEP shows its provenance without losing
   // heading paths or locators (U6 test scenario 2).
-  const bySource = new Map<string, PublishedEvidencePassage[]>();
-  for (const passage of passages) bySource.set(passage.sourceResourceId, [...(bySource.get(passage.sourceResourceId) ?? []), passage]);
+  const bySource = groupPassagesBySource(passages);
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
@@ -49,7 +51,7 @@ function PassageList({ title, passages }: Readonly<{ title: string; passages: Pu
       {passages.length === 0 ? (
         <p className="text-sm text-muted-foreground">None</p>
       ) : (
-        [...bySource.entries()].map(([sourceResourceId, sourcePassages]) => (
+        bySource.map(({ sourceResourceId, passages: sourcePassages }) => (
           <div key={sourceResourceId} className="flex flex-col gap-2">
             <p className="font-mono text-[0.7rem] text-muted-foreground">{sourceResourceId}</p>
             {sourcePassages.map((passage, index) => (
@@ -99,28 +101,16 @@ function AssertionList({ snapshot, assertions }: Readonly<{ snapshot: GraphSnaps
   );
 }
 
-const EMPTY_PROFILE: Omit<PublishedConceptEvidenceProfile, "conceptId"> = { definitions: [], mentions: [], assertions: [] };
-
 export function GraphExplorer({ snapshot, live }: GraphExplorerProps) {
   const [selectedId, setSelectedId] = useState(snapshot.concepts[0]?.conceptId);
   const [query, setQuery] = useState("");
 
   const selected = snapshot.concepts.find((concept) => concept.conceptId === selectedId);
-  const matches = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return snapshot.concepts;
-    return snapshot.concepts.filter(
-      (concept) =>
-        concept.canonicalLabel.toLowerCase().includes(normalizedQuery) ||
-        concept.aliases.some((alias) => alias.toLowerCase().includes(normalizedQuery))
-    );
-  }, [query, snapshot.concepts]);
+  const matches = useMemo(() => filterConcepts(snapshot, query), [query, snapshot]);
 
-  const selectedProfile = selected
-    ? snapshot.evidenceProfiles.find((profile) => profile.conceptId === selected.conceptId) ?? { conceptId: selected.conceptId, ...EMPTY_PROFILE }
-    : undefined;
+  const selectedProfile = selected ? profileFor(snapshot, selected.conceptId) : undefined;
 
-  const passageCount = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
+  const { passageCount } = summarizeSnapshot(snapshot);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[24rem_minmax(0,1fr)]">
