@@ -8,7 +8,7 @@ The product critical path is **concept admission → enrichment prerequisite inf
 
 1. **Gate 1: asserted graph pipeline — complete**
    - Native curated-source ingestion.
-   - Extraction Runs for discovery, admission, claims, and evidence validation.
+   - Extraction Runs for discovery, admission, and (post-reset) Concept Evidence Profile extraction with verbatim-evidence verification.
    - Deterministic Graph-Version Builds and atomic asserted publication.
    - Read-only Admin Lab inspection.
 2. **Vertical slice: Graph Enrichment to Learner Path — complete**
@@ -23,11 +23,12 @@ The product critical path is **concept admission → enrichment prerequisite inf
    - PDF curated fixtures (DOCX and PPTX de-scoped).
    - Five human-reviewed admission arms via independence triangle + second-judge audit.
    - Its durable output is the admission-precision diagnoses; the harness is retired in milestone 5.
-5. **Complexity reset — next**
-   - Fix Concept Admission precision (cross-domain optional leak, core-poor under-tiering, conflated labels), then delete the oracle triangle + label aligner + frozen references.
-   - Replace asserted claims with Concept Evidence Profiles; retire the broad relation registry (keep only `defines` + `explicit-prerequisite-hint` as guarded CEP evidence); published asserted graph carries no edges.
-   - Feed enrichment prerequisite judgment over CEP pairs.
-   - Rewrite ADR-0002/0005/0007/0013/0016/0022 and the CONTEXT vocabulary in place.
+5. **Complexity reset — complete**
+   - Fixed Concept Admission precision (cross-domain optional leak, core-poor under-tiering, conflated labels via atomic admission), then deleted the oracle triangle + label aligner + frozen references.
+   - Replaced asserted claims with Concept Evidence Profiles; retired the relation registry (keeping only `defines` + `explicit-prerequisite-hint` as guarded CEP evidence); the published asserted graph carries no edges.
+   - Enrichment prerequisite judgment now reads exhaustive same-domain CEP pairs; the embedding blocking tier is removed.
+   - Admin Lab, RDF export, and the worker reshaped around the asserted/derived split.
+   - Rewrote ADR-0002/0005/0007/0009/0012/0013/0016/0019/0022 and the CONTEXT vocabulary in place.
 6. **Measured deepening — deferred (mocked behind ports)**
    - Bradley-Terry difficulty replaces the DAG-depth mock; IRT/KT Learner State replaces the empty mock.
    - Cut from the roadmap: embedding canonicalization cascade, embedding blocking tier, interpretable non-LLM prerequisite signals, clustering, anomaly detection, synthetic priors.

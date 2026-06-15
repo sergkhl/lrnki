@@ -1,29 +1,26 @@
-# Score admission agreement by a measured neural label-aligner, not exact-label matching
+# Retire the measured label-aligner with the standing oracle harness
 
-Status: Accepted
+Status: Accepted (reset 2026-06-15 — aligner removed after one-time use)
 
 ## Context
 
-Gate 2 scores a production Extraction Run against a frozen, second-judge-audited
-admission reference (ADR-0013). Agreement was counted by exact `normalizeConceptLabel`
-equality — the same deterministic identity key publication uses (ADR-0015). As a
-*scorer* that key under-counts agreement: a reference `Monte Carlo Tree Search` and a
-production `Monte Carlo Tree Search (MCTS)` are the same concept in different surface
-forms, yet exact matching scores each as both a miss and an extra, halving precision and
-recall on identity the run actually has. A hardcoded plural/hyphen/acronym matcher is
-forbidden (AGENTS rule 16) and would also wrongly merge genuinely distinct concepts that
-share surface words (`Operator` vs `Operator set` vs `Operator policy`).
+During Gate 2, admission agreement was scored against a frozen, second-judge-audited reference
+(ADR-0013, pre-reset). Exact `normalizeConceptLabel` equality under-counted agreement because a
+reference `Monte Carlo Tree Search` and a production `Monte Carlo Tree Search (MCTS)` are the same
+concept in different surface forms. A bounded, measured neural **label-aligner**, run off the
+publication path, resolved that scoring-only confound by merging production labels into the reference
+concept they were surface variants of (production → reference only), always reported beside the
+exact-match baseline so a wrong merge stayed visible, and never relabelled, merged, or mutated a
+graph.
 
 ## Decision
 
-Concept identity for Gate 2 **scoring** is decided by a bounded, measured neural
-label-aligner, run off the publication path. It only ever merges a production label into
-the reference concept it is a surface variant of (production → reference edges only;
-reference concepts never merge with each other), and the exact-match baseline is always
-reported beside the aligned score so a wrong merge that inflates agreement stays visible.
-The frozen alignment is model-authored and carries `needsHumanReview` (rule 11).
+The label-aligner was a one-time scoring aid for the frozen admission benchmark. With the standing
+oracle/aligner harness retired in the complexity reset (ADR-0013), the aligner — its model alias,
+schemas, scoring code, and frozen alignment artifacts — is **removed**. Quality is now verified by
+real-source inspection (rule 14) and the retained inline production judges, so no off-path scoring
+identity exists.
 
-Graph identity is unchanged: publication keeps exact normalized identity (ADR-0015). The
-aligner never relabels, merges, or mutates a graph; it only lets the benchmark count
-agreement a run already has. It is kept only while it raises measured recall without
-merging distinct concepts.
+Graph identity is and always was unchanged: publication keeps exact, deterministic, domain-scoped
+normalized identity (ADR-0015). This record is retained to document why the aligner existed and why it
+no longer does.

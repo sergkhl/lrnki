@@ -1,41 +1,40 @@
-# Extract typed claims in admitted-concept context
+# Extract Concept Evidence Profiles in admitted-concept context
 
-Status: Accepted
+Status: Accepted (reset 2026-06-15 — replaces asserted-claim extraction)
 
 ## Decision
 
-Extract typed claims only in the context of admitted Concepts. A Concept needed during claim
-extraction but absent from the admitted set is persisted as a Missing-Concept Proposal for
-inspection. It does not automatically re-enter admission; any later admission is an explicit
-separate operation.
+For every admitted atomic Concept, extract one **Concept Evidence Profile (CEP)** in that Concept's
+context through a single forced named tool schema. A CEP contains at least one verified
+meaning-bearing **definition passage**, up to a configured number of salience-ordered **mention
+passages** per source (default six, recorded in the extraction configuration hash), and optional
+**typed assertions**. Every CEP element carries the curated source, source block, verbatim quote,
+heading path, and locator. There is no broad claim extraction, no relation-recall retry, no
+missing-concept proposal, and no claim conflict gate; a relationship the model wants to express that
+is not one of the two guarded assertion types survives only as an untyped mention passage.
 
-Every published claim must carry a quote that exists verbatim in a cited source block. Deterministic
-validation also enforces predicate/link-nature and predicate/direction self-report consistency, plus
-the aggregate structural gates `competing_structural_predicates` and
-`reciprocal_asymmetric_relation`, which require a global multi-claim view.
+The only two typed assertions are `defines` (object is a literal) and `explicit-prerequisite-hint`
+(object is another admitted Concept). Both remain **evidence inside the CEP** and never become
+authoritative graph edges or numeric priors (ADR-0016). Every passage and assertion quote must exist
+verbatim in its cited source block; an admitted Concept left without a verified definition passage
+makes the run unsuccessful.
 
-Claim entailment is decided by a bounded LLM **claim-entailment judge**, using a forced named tool
-schema and the independent `kg-oracle-judge` model alias, rather than by hardcoded lexical pattern
-matching. The judge runs as a composed application stage after deterministic validation and may only
-downgrade a surviving claim; it can never resurrect a rejected one. Separate methods judge
-Concept-to-Concept claims for the typed relation in its stated direction and `defined-as` literals
-for definition entailment. Definition judgments classify both subject identity and definition
-support because extracted definitions may paraphrase their evidence.
+Optional-assertion entailment is decided by a bounded LLM **assertion-entailment judge** using a
+forced named tool schema and the independent `kg-independent-judge` model alias, run as a composed
+application stage after deterministic verbatim verification. It may only reject a typed assertion;
+rejection drops the type label but preserves the underlying verified passage as untyped CEP evidence.
+The judge fails closed on transport failure, invalid tool arguments, or spans that do not match the
+cited evidence under the same formatting-noise normalization as the deterministic evidence floor.
 
-The judge fails closed on transport failure, invalid tool arguments, missing endpoint labels, or
-when its subject or entailment spans do not match the cited evidence under the same formatting-noise
-normalization as the deterministic evidence floor. Qualified variants and absent or different
-definition subjects fail closed.
-
-The judge enters the authoritative core only after measurement against a frozen oracle reference
-shows precision-first behavior: it must recover genuine entailments without accepting false or noise
-claims.
+Quality is verified by representative real-source inspection (rule 14), the retained inline
+production judge, and deterministic verbatim-evidence verification — not by a standing oracle harness
+(ADR-0013).
 
 ## Context
 
-The former deterministic vetoes `evidence_does_not_name_both_endpoints`,
-`evidence_does_not_lexically_entail_relation`, and
-`evidence_does_not_lexically_entail_definition` were surface matchers. They produced false negatives
-on ordinary prose including lists, apposition, pronouns, synonym verbs, and paraphrased or reversed
-definitions. Their removal leaves deterministic validation responsible only for provable guarantees
-and self-report consistency while semantic acceptance belongs to a measured neural judge.
+The previous architecture spent most of its complexity on broad asserted claims, a six-relation
+registry, relation-recall retries, and a missing-concept escape hatch that the learner path never
+consumed. The reset makes the product path explicit: admission decides the small Concept set, the CEP
+preserves what curated sources teach about each Concept, and Graph Enrichment owns all prerequisite
+structure. Verbatim grounding stays a provable deterministic guarantee; semantic acceptance of the
+two optional assertion types belongs to a measured neural judge.

@@ -1,11 +1,11 @@
 # Lrnki Greenfield Context
 
-Lrnki converts curated learning resources into one authoritative, learner-neutral graph of durable domain concepts and evidence-backed claims. Learner-specific structures consume that graph without changing it.
+Lrnki converts curated learning resources into one authoritative, learner-neutral graph of durable domain Concepts, each carrying a source-grounded Concept Evidence Profile. The published asserted layer has no asserted edges; all prerequisite structure is derived separately. Learner-specific structures consume that graph without changing it.
 
 ## Language
 
 **Learner-Neutral Core Concept Graph**:
-The authoritative published graph of durable **Concepts** and source-asserted, evidence-backed **Claims**, independent of learner goals and mastery.
+The authoritative published graph of durable **Concepts**, each with one source-grounded **Concept Evidence Profile**, independent of learner goals and mastery. The asserted layer exposes no asserted edges.
 _Avoid_: neutral KG, fact graph, knowledge base
 
 **Concept**:
@@ -21,34 +21,40 @@ The recall-oriented stage that surfaces Candidates from a Structured Document.
 _Avoid_: Concept Admission, keyword extraction
 
 **Core Concept Eligibility**:
-The evidence-backed judgment that a Candidate is a standalone learning objective with established meaning in its Declared Domain and substantive organizing power.
+The evidence-backed judgment that an atomic Candidate is a standalone learning objective with established meaning in its Declared Domain and substantive organizing power.
 _Avoid_: concept importance, prominence, mention frequency
 
+**Atomic Admission Proposal**:
+One atomic admission decision derived from a discovered Candidate. A single Candidate may yield several atomic proposals, each with a stable run-local key, a shared parent-candidate key, and its own source-grounded label and evidence.
+_Avoid_: conflated label, multi-concept candidate
+
 **Core Set Selection**:
-The source-level choice of a small, non-redundant set of eligible Candidates that preserves the source's principal learning structure.
+The source-level choice of a small, non-redundant set of eligible atomic proposals that preserves the source's principal learning structure.
 _Avoid_: top-k selection, fixed concept-count target
 
 **Concept Admission**:
-The precision-first stage that applies Core Concept Eligibility and Core Set Selection to classify a Candidate as `core`, `optional`, `reject`, or `quarantine`.
-_Avoid_: filtering, ranking, scoring
+The precision-first stage that applies Core Concept Eligibility and Core Set Selection to classify an atomic proposal as `core`, `optional`, `reject`, or `quarantine`, including a neural source-role and Declared-Domain relevance judgment that rejects out-of-domain illustrative material.
+_Avoid_: filtering, ranking, scoring, lexical illustrative-section veto
 
 **Canonical Concept Label**:
 The precise, evidence-preserving, domain-qualified label assigned to an admitted Concept while retaining source labels as aliases.
 _Avoid_: display-name cleanup, free rewrite
 
-**Claim**:
-A typed assertion from an admitted Concept to another Concept or a literal, backed by source evidence.
-_Avoid_: fact, triple, edge when referring to the assertion
+**Concept Evidence Profile (CEP)**:
+The published context for one Concept: at least one verified **Definition Passage**, up to a configured number of salience-ordered **Mention Passages** per source, and optional guarded **Optional Typed Assertions**. Every element carries the curated source, source block, verbatim quote, heading path, and locator. The CEP is the published Concept context; there is no sibling asserted-edge collection.
+_Avoid_: claim, fact, triple, edge
 
-**Relation Registry**:
-The human-governed closed vocabulary from which claim extraction selects relation types.
-_Avoid_: open relation vocabulary, `related-to`
+**Definition Passage**:
+A verbatim source passage that establishes a Concept's meaning. It need not use a lexical "X is Y" form but must be meaning-bearing. An admitted Concept with no verified Definition Passage cannot enter a successful run.
+_Avoid_: copula whitelist, connective list
 
-**Asserted Relation**:
-A relation explicitly supported by source evidence and published in the Learner-Neutral Core Concept Graph.
+**Mention Passage**:
+A verbatim source passage that substantively mentions a Concept, kept in neural salience order up to the configured per-source bound (default six). General relationships a source states in prose survive here as untyped evidence.
+_Avoid_: claim, asserted relation
 
-**Inferred Relation**:
-A relation produced by Graph Enrichment rather than asserted by a source. Its name must not collide with an Asserted Relation.
+**Optional Typed Assertion**:
+One of exactly two guarded CEP evidence types — `defines` (object is a literal) or `explicit-prerequisite-hint` (object is another admitted Concept). Both require verbatim evidence and assertion entailment, and both remain evidence inside a CEP, never an authoritative edge or a numeric prior.
+_Avoid_: relation registry, asserted relation, edge
 
 **Declared Domain**:
 A human-assigned domain attached to a curated source and used to scope deterministic Concept identity.
@@ -59,40 +65,32 @@ The stable readable identifier minted for a Concept at first publication and ret
 _Avoid_: recomputable label-derived ID
 
 **Extraction Run**:
-One source processed by one pipeline configuration into run-scoped Candidates, admission decisions, Claims, and validation outcomes. It never publishes.
-_Avoid_: build, publication
+One source processed by one pipeline configuration into run-scoped Candidates, admission decisions, and one Concept Evidence Profile per admitted Concept. It never publishes.
+_Avoid_: build, publication, claim extraction
 
 **Graph-Version Build**:
-The deterministic assembly and atomic publication of an asserted graph version from explicitly selected Extraction Runs.
+The deterministic assembly and atomic publication of an asserted graph version from an explicit base version plus explicitly selected Extraction Runs, unioning their CEP evidence.
 _Avoid_: extraction, enrichment
 
 **Static Graph Refinement**:
-The Graph-Version Build activity that conservatively resolves identity and reorganizes asserted material without creating inferred graph facts.
+The Graph-Version Build activity that conservatively resolves identity and unions CEP evidence across the base version and selected runs without creating inferred graph facts or asserted edges.
 _Avoid_: Graph Enrichment, inference
 
 **Concept Canonicalization**:
-The process that decides whether Candidates from different sources represent one Concept.
-_Avoid_: prerequisite candidate selection, embedding merge
-
-**Missing-Concept Proposal**:
-A run-scoped record that claim extraction needed a Concept not present in the admitted set.
-_Avoid_: automatic re-admission
+The deterministic, domain-scoped normalized-label process that decides whether Candidates from different sources represent one Concept. It is the sole merge authority; no embeddings participate.
+_Avoid_: embedding merge, identity clustering
 
 **Graph Enrichment**:
-The operation that derives learner-neutral graph facts not asserted by a source from one published graph version.
-_Avoid_: graph mutation, Static Graph Refinement
+The operation that derives learner-neutral graph facts not asserted by a source from one published graph version, by judging every same-domain Concept-Evidence-Profile pair exhaustively.
+_Avoid_: graph mutation, Static Graph Refinement, embedding blocking
 
 **Enrichment Run**:
-One execution of Graph Enrichment against one published graph version and one enrichment configuration, retaining its judgments and dispositions.
+One execution of Graph Enrichment against one published graph version and one enrichment configuration, retaining its pair judgments and dispositions.
 _Avoid_: Derived Graph Layer
 
 **Derived Graph Layer**:
-The immutable inferred graph structure generated by one Enrichment Run and stored separately from the asserted graph version.
-_Avoid_: asserted graph mutation, embedding sidecar
-
-**Prerequisite Candidate Selection**:
-The bounded selection of Concept pairs that Graph Enrichment may judge for an inferred prerequisite relation.
-_Avoid_: Concept Canonicalization, identity clustering
+The immutable inferred prerequisite DAG generated by one Enrichment Run and stored separately from the asserted graph version. Its only predicate is `inferred-prerequisite-of`.
+_Avoid_: asserted graph mutation, embedding sidecar, asserted edge
 
 **Learner Path**:
 A projection of one Derived Graph Layer for one target Concept and Learner State, ordered by prerequisite structure and difficulty.
@@ -103,8 +101,8 @@ A learner-specific account of mastery consumed by projection and never stored in
 
 ## Flagged Ambiguities
 
-- "Refinement" is ambiguous. Use **Static Graph Refinement** for asserted graph assembly and **Graph Enrichment** for inferred facts.
-- "Cluster" is ambiguous. Use **Prerequisite Candidate Selection** for enrichment pair selection and **Concept Canonicalization** for identity matching.
+- "Refinement" is ambiguous. Use **Static Graph Refinement** for asserted graph assembly and CEP-evidence union, and **Graph Enrichment** for inferred prerequisite facts.
+- "Prerequisite" is ambiguous. An **Optional Typed Assertion** (`explicit-prerequisite-hint`) is CEP evidence inside the asserted layer; an `inferred-prerequisite-of` edge is a derived fact owned only by a Derived Graph Layer. The two names must never collide.
 - "Quarantine" means an unresolved identity or meaning conflict that blocks publication. A cross-domain homograph is flagged, not quarantined.
 
 ## Example Dialogue
@@ -112,8 +110,8 @@ A learner-specific account of mastery consumed by projection and never stored in
 > **Dev:** Discovery found "PageRank." Is it already a Concept?
 > **Expert:** No. It is a Candidate until Concept Admission establishes eligibility and selects it into the core set.
 >
-> **Dev:** Can the Graph-Version Build infer that eigenvector centrality is its prerequisite?
-> **Expert:** No. The build publishes asserted material. A separate Enrichment Run may propose that Inferred Relation in a Derived Graph Layer.
+> **Dev:** The source says "ranking builds on eigenvector centrality." Is that a published prerequisite edge?
+> **Expert:** No. That prose is a Mention Passage in PageRank's Concept Evidence Profile. The asserted layer has no edges. A separate Enrichment Run may infer an `inferred-prerequisite-of` edge in a Derived Graph Layer.
 >
 > **Dev:** Two domains contain a Concept labeled "Mercury." Must publication stop?
 > **Expert:** No. Declared Domain keeps their identities separate. Flag the homograph for inspection; quarantine only an unresolved identity or meaning conflict.

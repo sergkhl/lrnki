@@ -4,4 +4,4 @@ Status: Accepted
 
 ## Decision
 
-Store durable reusable concepts, typed claims, provenance, confidence, and refinement decisions. Exclude learner-specific state.
+Store durable reusable Concepts, each carrying a source-grounded **Concept Evidence Profile** (definition passages, salience-ordered mention passages, and optional guarded typed assertions), together with provenance, confidence, stable cross-source identity, and refinement decisions. The published asserted layer exposes **no asserted edges**: all prerequisite structure is derived separately by Graph Enrichment (ADR-0019). Exclude learner-specific state.

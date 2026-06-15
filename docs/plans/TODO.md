@@ -2,134 +2,92 @@
 
 Roadmap reset 2026-06-15 (`docs/brainstorms/2026-06-15-kg-core-complexity-reset-requirements.md`):
 the product critical path is concept admission → enrichment prerequisite inference → learner path.
-Asserted claims move off that path and are replaced by Concept Evidence Profiles; measurement becomes
-disposable scaffolding.
+Asserted claims moved off that path and are replaced by Concept Evidence Profiles; standing
+measurement became disposable scaffolding and is retired.
 
 ## EXECUTION STATUS (plan `docs/plans/2026-06-15-001-refactor-concept-evidence-profile-core-plan.md`)
 
-Executing on branch **`refactor/cep-core-reset`** (off `main`). Plan units map to this TODO:
-U1+U2 = item below "Fix admission … retire oracle" (**DONE**, see COMPLETED); U3+U4 = item 1 (CEP +
-publication); U5 = item 2 (enrichment over CEP pairs); U6 = Admin Lab reshape (folded into item 1's last
-bullet); U7 = item 3 (ADRs/CONTEXT) + finalizing this TODO. Items track product intent; the plan's U-IDs
-track execution.
+The 7-unit complexity reset is **complete** on branch **`refactor/cep-core-reset`** (off `main`):
+U1 atomic admission + neural source-role, U2 oracle/aligner teardown, U3 CEP extraction, U4 append-only
+zero-edge CEP publication, U5 exhaustive same-domain CEP-pair enrichment, U6 worker/Admin Lab/export
+reshape, U7 ADR + CONTEXT + docs rewrite. Each behavior-changing unit recorded a rule-14 PASS (see
+COMPLETED). Only the deferred, port-mocked deepening below remains.
 
-**Next entry point: U5** — feed enrichment prerequisite judgment over CEP pairs (item 2); delete the
-embedding/candidate-group blocking tier and judge all same-domain pairs. U3 (CEP extraction, `d612f16`)
-and U4 (CEP publication + append-only union, this branch) are DONE with rule-14 PASS — see COMPLETED.
-
-Operational notes for the next agent:
-- LiteLLM proxy serves the renamed judge alias **`kg-independent-judge`** (gpt-oss-120b); any alias
-  change in `litellm/config.yaml` requires `docker restart lrnki-litellm` to take effect.
+Operational notes:
+- LiteLLM proxy serves the judge alias **`kg-independent-judge`** (gpt-oss-120b); any alias change in
+  `litellm/config.yaml` requires `docker restart lrnki-litellm`.
 - Worker pipeline config hash is at **`...-atomic-admission-source-role-v31`**; bump it whenever
   admission/CEP/judge prompts or schemas change.
 - Postgres 18 + Docling + LiteLLM are reachable; 5 fixtures registered (`worker:kg list-sources`).
-- The migration is still the claim-era schema; U3/U4 rewrite it and reset the DB.
+- The single migration is the CEP-era schema (no claim/relation tables); reset with `scripts/reset-db.sh`.
 
-1. **Replace asserted claims with Concept Evidence Profiles (the core redefinition).**
-   - CEP per admitted Concept: verbatim definition snippet(s) + bounded (salience-capped) mention
-     passages + per-source provenance; append-only union across sources.
-   - Retire the six-relation registry. Keep only `defines` + `explicit-prerequisite-hint` as guarded
-     typed evidence INSIDE CEPs (verbatim + entailment checks); never publish them as authoritative
-     relations.
-   - Stop publishing asserted claims as a headline artifact: published asserted graph = Concepts + CEPs,
-     no asserted edges. Remove claim-recall logic and the broad relation-extraction surface.
-   - Update Admin Lab Graph Explorer to show Concepts + evidence; edges appear only in Derived Graph
-     Layers.
+## REMAINING WORK
 
-2. **Feed enrichment prerequisite judgment over CEP pairs (promotes the old enrichment-evidence task).**
-   - Prerequisite judgment reasons over pairs of CEPs (definitions + bounded mentions), not over labels
-     or published claims. Validate by rule-14 inspection of the inferred DAG and learner path.
-
-3. **Rewrite affected ADRs in place + CONTEXT.md vocabulary.**
-   - Rewrite ADR-0002, 0005, 0007, 0013, 0016, 0022 in place (no superseding ADRs).
-   - CONTEXT.md: revise `Claim` / `Relation Registry` / `Asserted Relation`; add `Concept Evidence
-     Profile` and the two optional-assertion types. ADR-0015 and ADR-0019 are unchanged and preserved.
-
-4. **Deferred — mocks stay behind ports; do not build.**
+1. **Deferred — mocks stay behind ports; do not build until measured need.**
    - Difficulty stays the DAG-depth mock (`DifficultyPort`); learner state stays the empty mock
      (`LearnerStatePort`). No Bradley-Terry, IRT/KT, anomaly detection, or synthetic priors.
-   - Cut: embedding canonicalization cascade + embedding blocking tier; deterministic identity
-     (ADR-0015) stays the sole merge authority. Interpretable non-LLM prerequisite signals and
-     clustering remain deferred.
+   - Cut and kept cut: embedding canonicalization cascade + embedding blocking tier; deterministic
+     identity (ADR-0015) stays the sole merge authority. Any future cost-bound pair-selection mechanism
+     must be measured against exhaustive same-domain judgment before it can veto pairs.
+   - DOCX and PPTX curated-source expansion (Docling adapter already supports them).
 
 ## COMPLETED
 
-- **Reset milestone 2 — CEP extraction + publication (U3+U4, branch `refactor/cep-core-reset`).**
-  U3 (`d612f16`): replaced claim extraction with concept-conditioned Concept Evidence Profile extraction
-  (`applyEvidenceProfilePolicy` + `applyAssertionEntailmentJudge`), retired the broad relation surface,
-  claim-recall retries, conflict pass, and missing-concept escape hatch; run-scoped CEP rows + immutable
-  artifact persisted in one transaction. U4 (this branch): rewrote the publication layer around CEP
-  unions — `GraphSnapshot` carries Concepts + one CEP each and ZERO asserted edges (R5); `buildGraphVersion`
-  takes `baseGraphVersionId` + selected runs, resolves identities (ADR-0015), unions base + new source
-  evidence and exact-deduplicates (R3/AE2), remaps `explicit-prerequisite-hint` targets and omits absent
-  ones (R9/U4.9); `GraphVersionStorePort.publish` writes graph-version rows, CEP evidence, and the
-  `graph_snapshot.v2` artifact in one transaction. Migration rewritten (dropped relation_definitions +
-  published_claims/evidence; added graph-version CEP tables + JSON_TABLE views over the snapshot artifact)
-  and DB reset. Static green (typecheck + 67 application/postgres tests + 5 live-PG integration tests +
-  lint). rule-14 PASS over two real biology runs: initial VA (4 atomic concepts, verbatim defs w/ heading
-  paths, 3 faithful `defines`, 0 edges) + incremental VB `--base VA` (identity reuse, 22→41 passage union,
-  0 duplicates, base untouched). See `tmp/u4-cep-publication-quality-evaluation.md`. Admin Lab Graph
-  Explorer reshaped to a zero-edge CEP evidence inspector; enrichment helpers + demoSnapshot adapted to
-  the new snapshot shape (full Admin Lab/enrichment-page reshape is U6).
-- **Reset milestone 1 — atomic admission precision + oracle teardown (U1+U2, branch `refactor/cep-core-reset`).**
-  U1 (`5b2e819`, `9b1bb62`): admission emits one-or-many ATOMIC proposals per discovered candidate
-  (`parentCandidateKey` + run-local `atomicKey`); Core Set Selection runs over atoms; the deterministic
-  illustrative-section regex is replaced by a neural `sourceRole` (AGENTS rule 16) that rejects
-  out-of-domain illustration. rule-14 PASS over real DeepSeek runs of Rust/InstructKG/MLE-bench: atomic
-  split fired live ("Stack and Heap" → two parented atoms), established ML concepts stayed core in a
-  method paper, and the InstructKG cross-domain CS/SQL leak was closed (`tmp/u1-admission-atomic-source-role-quality-evaluation.md`).
-  U2 (`85c083c`): deleted the `quality-lab` package, LiteLLM oracle adapters, oracle/aligner domain types
-  + ports + tool schemas, and the frozen oracle/alignment artifacts under `tmp/`; renamed the retained
-  inline judges to the `kg-independent-judge` production alias. Durable quality bar is now rule-14 +
-  inline judges + the verbatim-evidence floor. Full suite green (typecheck + 81 tests + lint).
-- **Gate 1 asserted-graph pipeline published (graph version `3096ec52`).** Native curated-source
-  ingestion (Markdown/HTML/plaintext block-level parsing with locators + deterministic region
-  classification); discovery → two-phase admission (source-level Core Set Selection) → claims with
-  forced named tool schemas + zod fail-closed validation; deterministic LLM-free `buildGraphVersion`
-  (domain-scoped merge, homograph flagging, frozen IRI minting, quality gates, atomic publish,
-  quarantine-blocks-publication); explicit run/version IDs (ADR-0017, 0010). 15 core concepts /
-  4 claims / 0 quarantines.
-- **Vertical slice: Graph Enrichment → Learner Path live end-to-end (ADR-0019).** Immutable Derived
-  Graph Layer over a published version with real LLM calls (qwen3-embedding-8b + deepseek-v4-flash
-  forced-tool prerequisite judgment): weak-edge cut / cycle removal / transitive reduction; mock
-  DAG-depth difficulty + mock empty learner state behind `DifficultyPort` / `LearnerStatePort`;
-  persisted difficulty-ordered Learner Path; Admin Lab read-only Cytoscape views. This is the engine
-  the reset preserves and builds on.
-- **Canonical architecture consolidation.** Stable Concept identity separated from immutable
-  graph-version presentation; reads select explicit version/run IDs; Enrichment Runs append-only with
-  relational query surfaces + full JSONB traces; cross-domain homographs publish separately with an
-  inspection flag; fail-closed evidence gate so enrichment cannot infer from labels alone.
-- **Inline production judges (the durable neuro-symbolic gates, AGENTS rule 16).** Semantic
-  claim-entailment judge replaced lexical claim vetoes (`ClaimEntailmentJudgmentPort`, downgrade-only,
-  fail-closed span grounding); measured downgrade-only concept-vs-proposition admission judge
-  (`AdmissionLabelJudgmentPort`) replaced the deleted `looksLikePropositionLabel` lexical veto. These
-  gates and the verbatim-evidence floor are retained as the durable quality bar.
-- **Gate 2 mixed-format ingestion (Docling).** `DoclingStructuredDocumentParser` (PDF/DOCX/PPTX) behind
-  `StructuredDocumentParserPort`; shared `extractMarkdownBlocks`; async submit→poll→fetch; PDF fixture
-  ingested + extracted end-to-end, evidence verbatim-verifiable. (DOCX/PPTX fixtures de-scoped.)
-- **Gate 2 oracle benchmark — complete, now superseded as standing infra (ADR-0013, rule 11).** Five
-  human-reviewed arms (biology, ML, rust, economics, InstructKG) via independence triangle (Xiaomi MiMo
-  author + gpt-oss-120b audit) + scoring-only label aligner (ADR-0022). Its durable value is the
-  diagnoses feeding TODO #1 (cross-domain optional precision leak, core-poor under-tiering, conflated
-  labels). Per the reset, the harness + frozen references are scheduled for deletion in TODO #1 once the
-  admission-precision fix lands; results archived under `tmp/`.
-- **Persistence (PostgreSQL 18, ADR-0003).** Single initial migration: seeded relation registry,
-  run-scoped extraction tables, deterministic publication tables with frozen IRIs, enrichment +
-  learner-path tables, JSONB artifact envelopes, JSON_TABLE inspection views; `scripts/reset-db.sh`.
-  (Migration to be rewritten for the CEP model + claim-table removal under TODO #2.)
-- **Admin Lab read-only views (ADR-0011).** Graph Explorer, Run Inspector, Source Explorer, Learner
-  Paths (Cytoscape). CLI-triggered operations; the UI mutates nothing. (Graph Explorer to be reshaped
-  to Concepts + evidence under TODO #2.)
+- **Reset milestone 4 — worker/Admin Lab/export reshape + docs (U6+U7, branch `refactor/cep-core-reset`).**
+  U6: Run Inspector + run list now report CEP completeness and definition/mention/assertion counts (no
+  claim/proposal reads); the published Graph Explorer is a zero-edge CEP evidence inspector with no graph
+  canvas; new read-only Enrichment Run list + detail render the Derived Graph Layer's prerequisite DAG in
+  Cytoscape with an equivalent textual view, independent of learner paths; RDF export emits only Concept
+  identity/labels/aliases; the orphan admission-variance probe is deleted. rule-14 PASS over the live Rust
+  DB rendered via `next start` (published view 0 edges/0 canvases, derived chain Variable scope → Ownership
+  → Move semantics → Copy trait); see `tmp/u6-admin-lab-quality-evaluation.md`. U7: rewrote
+  ADR-0002/0005/0007/0009/0012/0013/0016/0019/0022, the ADR README, CONTEXT.md vocabulary, README,
+  fixtures notes, and this roadmap to describe only the post-reset architecture.
+- **Reset milestone 3 — exhaustive same-domain CEP-pair enrichment (U5, `a1e32b5`).** Removed the
+  embedding-clustering / candidate-group tier; every unordered same-domain Concept pair is judged from both
+  Concepts' published CEPs; `explicit-prerequisite-hint` is labeled evidence, never a deterministic edge;
+  bounded concurrency (default 4), deterministic order, atomic failure on retry exhaustion. The judge names
+  the prerequisite concept by verbatim label to kill a positional direction bias. rule-14 PASS: real Rust
+  DAG expert-correct.
+- **Reset milestone 2 — CEP extraction + publication (U3+U4).** U3 (`d612f16`): replaced claim extraction
+  with concept-conditioned CEP extraction (`applyEvidenceProfilePolicy` + `applyAssertionEntailmentJudge`),
+  retired the broad relation surface, claim-recall retries, conflict pass, and missing-concept escape
+  hatch; run-scoped CEP rows + immutable artifact in one transaction. U4 (`72ebde6`): publication unions CEP
+  evidence — `GraphSnapshot` carries Concepts + one CEP each and ZERO asserted edges; `buildGraphVersion`
+  takes `baseGraphVersionId` + selected runs, resolves identities (ADR-0015), unions and exact-deduplicates
+  cumulative source evidence (R3/AE2), remaps/omits `explicit-prerequisite-hint` targets; migration rewritten
+  and DB reset. rule-14 PASS; see `tmp/u4-cep-publication-quality-evaluation.md`.
+- **Reset milestone 1 — atomic admission precision + oracle teardown (U1+U2).** U1: admission emits
+  one-or-many ATOMIC proposals per discovered candidate; Core Set Selection runs over atoms; a neural
+  `sourceRole` (AGENTS rule 16) replaced the deterministic illustrative-section regex and closed the
+  InstructKG cross-domain CS/SQL leak. rule-14 PASS over Rust/InstructKG/MLE-bench. U2 (`85c083c`): deleted
+  the `quality-lab` package, LiteLLM oracle adapters, oracle/aligner types + ports + schemas, and frozen
+  artifacts; renamed retained inline judges to `kg-independent-judge`. Durable quality bar = rule-14 +
+  inline judges + verbatim-evidence floor.
+- **Gate 1 asserted-graph pipeline (historical).** Native ingestion → discovery → two-phase admission →
+  (pre-reset) claims → deterministic LLM-free `buildGraphVersion` with frozen IRIs, quality gates, atomic
+  publish, quarantine-blocks-publication; explicit run/version IDs (ADR-0017, 0010).
+- **Vertical slice: Graph Enrichment → Learner Path (ADR-0019).** Immutable Derived Graph Layer over a
+  published version with real LLM forced-tool prerequisite judgment; weak-edge cut / cycle removal /
+  transitive reduction; mock DAG-depth difficulty + mock empty learner state behind ports; persisted
+  difficulty-ordered Learner Path; Admin Lab read-only Cytoscape views.
+- **Canonical architecture consolidation.** Stable Concept identity separated from immutable graph-version
+  presentation; reads select explicit version/run IDs; Enrichment Runs append-only with relational query
+  surfaces + full JSONB traces; cross-domain homographs publish separately with an inspection flag.
+- **Gate 2 mixed-format ingestion (Docling) + retired oracle benchmark.** `DoclingStructuredDocumentParser`
+  (PDF/DOCX/PPTX) behind `StructuredDocumentParserPort`; shared `extractMarkdownBlocks`; PDF fixture
+  end-to-end with verbatim-verifiable evidence. The Gate 2 oracle benchmark (independence triangle +
+  scoring-only label aligner) yielded the admission-precision diagnoses that drove U1, then was deleted with
+  the rest of the standing harness in U2 (ADR-0013/0022).
 
 ## VALIDATION
 
-Latest validation (2026-06-15) is **after reset milestone 1 (U1+U2)** on branch `refactor/cep-core-reset`:
+Latest validation (2026-06-15) is **after the full U1–U7 reset** on branch `refactor/cep-core-reset`:
 
-- **Static:** all source-package typechecks pass; tests green — infrastructure-litellm 8,
-  infrastructure-ingestion 9, application 64 (81 total, 0 fail; quality-lab's 8 removed with the
-  package); ESLint clean. Clear the Next.js dev-generated `apps/admin-lab/.next` before typechecking if a
-  stale `validator.ts` error appears.
-- **Real-use (rule-14):** U1 PASS over live DeepSeek runs of Rust/InstructKG/MLE-bench (see COMPLETED).
-  No new graph version published; the published Gate 1 graph (`3096ec52`) is untouched.
-- Re-validate after each remaining unit lands — U3/U4 rewrite the migration and reset the DB, U5 removes
-  the embedding path, U6 reshapes the Admin Lab.
+- **Static:** all workspace typechecks pass; tests green (application 67, infrastructure-litellm 13,
+  infrastructure-ingestion 9, admin-lab 9, infrastructure-rdf-export 2; live-PG integration tests no-op
+  without `DATABASE_URL`); ESLint clean; `next build` compiles all routes. Clear `apps/admin-lab/.next`
+  and run `next typegen` if stale typed-route errors appear.
+- **Real-use (rule-14):** U1–U6 each recorded a PASS over real model/DB runs (see COMPLETED and the
+  `tmp/u*-quality-evaluation.md` notes). The published Gate 1 graph identity is preserved (ADR-0015).
+- The reset is complete; re-validate only when the deferred mocks (difficulty, learner state) are replaced.
