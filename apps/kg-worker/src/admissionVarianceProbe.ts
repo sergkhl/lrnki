@@ -86,10 +86,12 @@ async function runArm(
 
   for (let i = 0; i < runs; i++) {
     const decisions = await admission.admit({ document, declaredDomain, candidates });
-    const decisionByKey = new Map(decisions.map((decision) => [decision.candidateKey, decision] as const));
+    // Probe approximation: group atomic decisions by parent candidate (this
+    // disposable probe is removed in U6 and does not model atomic splitting).
+    const decisionByKey = new Map(decisions.map((decision) => [decision.parentCandidateKey, decision] as const));
     const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
     const coreKeys = candidates
-      .map((candidate) => applyAdmissionPolicy({ candidate, proposal: decisionByKey.get(candidate.candidateKey), blockText }))
+      .map((candidate) => applyAdmissionPolicy({ parentCandidate: candidate, proposal: decisionByKey.get(candidate.candidateKey), blockText }))
       .filter((candidate) => candidate.admission.tier === "core")
       .map((candidate) => candidate.candidateKey);
     coreCounts.push(coreKeys.length);

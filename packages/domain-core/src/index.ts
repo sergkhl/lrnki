@@ -164,10 +164,27 @@ export type CoreSelectionReasonCode =
   | "failed_model_eligibility"
   | "missing_core_selection";
 
+// Source-role / Declared-Domain relevance (R12, ADR-0005). A SEMANTIC judgment
+// the admission prompt makes per atomic proposal, replacing the deterministic
+// illustrative-section regex (AGENTS rule 16). `out_of_domain_illustration`
+// material — an algorithm or SQL example used only to illustrate an
+// educational-technology source — must REJECT, never linger as `optional`; the
+// application boundary forces the effective tier to `reject` on that role so a
+// neural decision, not a lexical heading matcher, removes off-domain noise.
+export type AdmissionSourceRole = "declared_domain_concept" | "out_of_domain_illustration";
+
+// Atomic admission proposal (R13, ADR-0005). One discovered Candidate may be a
+// CONFLATED label ("The stack and the heap") that yields MULTIPLE atomic
+// proposals, each naming a single concept. `parentCandidateKey` is the discovered
+// Candidate this atom was split from (provenance); `atomicKey` is a run-local
+// stable key unique across all proposals. Core Set Selection operates over the
+// atomic proposals, not the discovered candidates.
 export type AdmissionProposal = {
-  candidateKey: string;
+  atomicKey: string;
+  parentCandidateKey: string;
   proposedCanonicalLabel: string;
   tier: CandidateTier;
+  sourceRole: AdmissionSourceRole;
   standaloneLearningObjective: AdmissionCriterionProposal;
   establishedDomainMeaning: AdmissionCriterionProposal;
   organizingPower: OrganizingPowerProposal;
@@ -446,7 +463,13 @@ export type AlignedAdmissionOracleScore = {
 export type ValidationOutcome = "verified" | "rejected";
 
 export type RunCandidate = {
+  // The atomic concept's run-local key (the unit of identity downstream). For an
+  // unsplit candidate this equals the discovered candidateKey; for a split one it
+  // is the atomic proposal's key.
   candidateKey: string;
+  // The discovered Candidate this atom was split from (provenance for R13). Equals
+  // candidateKey when admission did not split the candidate.
+  parentCandidateKey: string;
   discoveredLabel: string;
   canonicalLabel: string;
   normalizedLabel: string;
@@ -455,6 +478,7 @@ export type RunCandidate = {
   admission: {
     modelTier: CandidateTier;
     tier: CandidateTier;
+    sourceRole: AdmissionSourceRole;
     proposedCanonicalLabel: string;
     standaloneLearningObjective: {
       modelPassed: boolean;

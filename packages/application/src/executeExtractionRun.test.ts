@@ -64,9 +64,11 @@ function admission(candidate: DiscoveredCandidate): AdmissionProposal {
   const quote = candidate.candidateKey === "framework" ? frameworkQuote : signalQuote;
   const blockId = candidate.candidateKey === "framework" ? "block-1" : "block-2";
   return {
-    candidateKey: candidate.candidateKey,
+    atomicKey: candidate.candidateKey,
+    parentCandidateKey: candidate.candidateKey,
     proposedCanonicalLabel: candidate.canonicalLabel,
     tier: "core",
+    sourceRole: "declared_domain_concept",
     standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId, evidenceQuote: quote }] },
     establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId, evidenceQuote: quote }] },
     organizingPower: {
@@ -219,4 +221,105 @@ test("fails closed after exactly one retry when the model errors", async () => {
   assert.equal(calls, 2);
   assert.deepEqual(result.claims, []);
   assert.equal(persisted()?.runId, "run-1");
+});
+
+// --- U1: atomic admission splitting and fail-closed atom validation -----------
+
+const splitDocument: StructuredDocument = {
+  sourceResourceId: "source-2",
+  parserName: "test",
+  parserVersion: "1",
+  parserConfigHash: "test",
+  blocks: [
+    {
+      blockId: "block-1",
+      blockType: "paragraph",
+      text: "The stack and the heap are two regions of memory. The stack stores values in order; the heap stores data of unknown size.",
+      headingPath: [],
+      locator: {}
+    }
+  ]
+};
+
+const conflatedCandidate: DiscoveredCandidate = {
+  candidateKey: "stack_heap",
+  canonicalLabel: "The stack and the heap",
+  mentions: [{ blockId: "block-1", evidenceQuote: "The stack and the heap are two regions of memory." }]
+};
+
+function atom(atomicKey: string, label: string, defQuote: string, overrides: Partial<AdmissionProposal> = {}): AdmissionProposal {
+  return {
+    atomicKey,
+    parentCandidateKey: "stack_heap",
+    proposedCanonicalLabel: label,
+    tier: "core",
+    sourceRole: "declared_domain_concept",
+    standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
+    establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
+    organizingPower: {
+      passed: true,
+      rationale: "organizes",
+      aspects: [
+        { summary: "memory region", nature: "definition-or-property", evidence: { blockId: "block-1", evidenceQuote: "The stack and the heap are two regions of memory." } },
+        { summary: "storage behavior", nature: "mechanism", evidence: { blockId: "block-1", evidenceQuote: defQuote } }
+      ]
+    },
+    coreSelected: true,
+    selectionReasonCode: "source_level_core",
+    reasonCodes: ["source_level_core"],
+    confidence: 0.9,
+    ...overrides
+  };
+}
+
+function runSplit(admitProposals: AdmissionProposal[]): Promise<ExtractionRunResult> {
+  const store: ExtractionRunStorePort = { persist: async () => {}, runsForBuildByIds: async () => [] };
+  const artifacts: ArtifactRepositoryPort = { append: async () => {} };
+  return executeExtractionRun({
+    runId: "run-split",
+    source: { sourceResourceId: "source-2", sourceDocumentId: "document-2", declaredDomain: "rust", document: splitDocument },
+    pipelineConfigHash: "test-v1",
+    discovery: { discover: async () => [conflatedCandidate] },
+    admission: { admit: async () => admitProposals },
+    claimExtraction: { extract: async () => ({ claims: [], proposals: [] }) },
+    claimEntailmentJudge: entailEverything,
+    admissionLabelJudge: everythingIsAConcept,
+    store,
+    artifacts
+  });
+}
+
+test("splits one conflated candidate into independently-tiered atomic concepts retaining the parent key", async () => {
+  const result = await runSplit([
+    atom("stack_heap__stack", "The stack", "The stack stores values in order"),
+    atom("stack_heap__heap", "The heap", "the heap stores data of unknown size", { coreSelected: false, selectionReasonCode: "supporting_mechanism", tier: "optional" })
+  ]);
+  const core = result.candidates.filter((c) => c.admission.tier === "core");
+  const optional = result.candidates.filter((c) => c.admission.tier === "optional");
+  assert.equal(core.length, 1);
+  assert.equal(core[0].candidateKey, "stack_heap__stack");
+  assert.equal(core[0].canonicalLabel, "The stack");
+  assert.equal(core[0].parentCandidateKey, "stack_heap");
+  assert.equal(optional[0].candidateKey, "stack_heap__heap");
+  assert.equal(optional[0].parentCandidateKey, "stack_heap");
+});
+
+test("drops duplicate atomic keys fail-closed so neither publishes a core concept", async () => {
+  const result = await runSplit([
+    atom("dup", "The stack", "The stack stores values in order"),
+    atom("dup", "The heap", "the heap stores data of unknown size")
+  ]);
+  // Both dropped; the parent falls back to a single reject candidate.
+  assert.equal(result.candidates.filter((c) => c.admission.tier === "core").length, 0);
+  assert.ok(result.candidates.every((c) => c.candidateKey !== "dup" || c.admission.tier === "reject"));
+});
+
+test("drops an atom whose parent candidate is unknown", async () => {
+  const orphan: AdmissionProposal = { ...atom("orphan", "The stack", "The stack stores values in order"), parentCandidateKey: "does-not-exist" };
+  const result = await runSplit([
+    atom("stack_heap__stack", "The stack", "The stack stores values in order"),
+    orphan
+  ]);
+  assert.equal(result.candidates.some((c) => c.candidateKey === "orphan"), false);
+  assert.equal(result.candidates.filter((c) => c.admission.tier === "core").length, 1);
 });

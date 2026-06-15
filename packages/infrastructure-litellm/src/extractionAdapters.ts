@@ -112,7 +112,9 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
   async admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionProposal[]> {
     const system = [
       "You perform precision-first concept admission for an authoritative learner-neutral concept graph.",
-      "Classify each candidate as 'core', 'optional', 'reject', or 'quarantine'. Be strict: in a typical source only a MINORITY of candidates are 'core'.",
+      "ATOMIC CONCEPTS: each decision must describe exactly ONE concept. When a discovered candidate CONFLATES several concepts (e.g. 'The stack and the heap', 'Ownership and Functions'), SPLIT it: emit one decision per atomic concept, each with the SAME parentCandidateKey and a DISTINCT atomicKey (e.g. parent 'stack_heap' -> atoms 'stack_heap__stack' and 'stack_heap__heap'). When a candidate already names one concept, emit a single decision whose atomicKey equals its parentCandidateKey.",
+      "SOURCE ROLE: set sourceRole to 'declared_domain_concept' for a genuine concept of the Declared Domain the source teaches; set it to 'out_of_domain_illustration' for material from another domain that appears ONLY to illustrate this source (e.g. a generic sorting algorithm or a raw SQL query inside an educational-technology paper). Out-of-domain illustrative material is rejected, never kept optional.",
+      "Classify each atomic concept as 'core', 'optional', 'reject', or 'quarantine'. Be strict: in a typical source only a MINORITY of concepts are 'core'.",
       "CORE CONCEPT ELIGIBILITY has three independent tests. A candidate is core only when ALL THREE pass with exact source evidence:",
       "(1) standaloneLearningObjective: a learner could study and be assessed on this as its own objective. It is not reducible to a role, component, property, API name, operation name, or vocabulary item inside a broader concept.",
       "A candidate label must name a CONCEPT (a noun phrase), not assert a PROPOSITION. A label that states a full claim — e.g. a chapter title such as 'Division of Labour Limited by the Extent of the Market', or any 'X is/depends on/is limited by/is determined by Y' assertion — is a claim, not a concept; reject it and rely on the underlying noun phrase ('Division of Labour') as the concept instead. Use reason code 'proposition_or_claim_label'.",
@@ -156,7 +158,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
         "Source blocks for criterion evidence:",
         renderBlocks(extractableBlocks(input.document.blocks)),
         "",
-        "Call submit_admission_decisions with exactly one decision for each candidateKey in the batch and no others."
+        "Call submit_admission_decisions. Emit one or more atomic decisions per candidateKey in the batch (split conflated candidates), set each decision's parentCandidateKey to a candidateKey in the batch, and give every decision a distinct atomicKey."
       ].join("\n");
 
       const result = await this.client.call({
@@ -168,15 +170,15 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
         validator: conceptAdmissionValidator
       });
       const batchKeys = new Set(batch.map((candidate) => candidate.candidateKey));
-      const counts = new Map<string, number>();
-      for (const decision of result.decisions) {
-        if (batchKeys.has(decision.candidateKey)) counts.set(decision.candidateKey, (counts.get(decision.candidateKey) ?? 0) + 1);
-      }
-      decisions.push(...result.decisions.filter((decision) => batchKeys.has(decision.candidateKey) && counts.get(decision.candidateKey) === 1));
+      // Keep every atomic decision whose parent is in this batch. One parent may
+      // yield several atoms (R13); duplicate atomicKeys and unknown parents are
+      // dropped fail-closed by the application boundary, not here.
+      decisions.push(...result.decisions.filter((decision) => batchKeys.has(decision.parentCandidateKey)));
     }
 
     const individuallyEligible = decisions.filter((decision) =>
       decision.tier !== "quarantine" &&
+      decision.sourceRole === "declared_domain_concept" &&
       decision.standaloneLearningObjective.passed &&
       decision.establishedDomainMeaning.passed &&
       decision.organizingPower.passed
@@ -217,15 +219,15 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       "Calibration examples (method/survey paper): on a paper proposing an automated-search method, established concepts it teaches and uses — Monte Carlo Tree Search, Evolutionary Search, AutoML, Overfitting — are CORE, not optional, because they are real domain concepts the source substantively explains even though its own contribution uses them. By contrast 'Operator Set as Bottleneck to Performance' is a PROPOSITION (a claim), not a concept: demote it and let the underlying noun phrase 'Operator Set' stand as the concept.",
       "For every selection return the final precise canonical label. Domain-qualify vague labels such as 'Move' as 'Rust move semantics'; do not preserve section-style labels such as 'Ownership and Functions' as Concepts.",
       "",
-      "Individually eligible candidates (with verbatim source evidence and the heading each quote came from):",
+      "Individually eligible atomic concepts (with verbatim source evidence and the heading each quote came from):",
       ...individuallyEligible.map((decision) => [
-        `- ${decision.candidateKey}: discovered="${input.candidates.find((candidate) => candidate.candidateKey === decision.candidateKey)?.canonicalLabel ?? decision.candidateKey}", proposed="${decision.proposedCanonicalLabel}"`,
+        `- ${decision.atomicKey}: parent="${input.candidates.find((candidate) => candidate.candidateKey === decision.parentCandidateKey)?.canonicalLabel ?? decision.parentCandidateKey}", proposed="${decision.proposedCanonicalLabel}"`,
         `  standalone: ${decision.standaloneLearningObjective.rationale}`,
         ...decision.standaloneLearningObjective.evidence.map((evidence) => `  standalone evidence [${headingFor(evidence.blockId)}]: "${evidence.evidenceQuote}"`),
         ...decision.organizingPower.aspects.map((aspect) => `  aspect (${aspect.nature}) [${headingFor(aspect.evidence.blockId)}]: ${aspect.summary} — "${aspect.evidence.evidenceQuote}"`)
       ].join("\n")),
       "",
-      "Call submit_core_selection exactly once for every listed candidate."
+      "Call submit_core_selection exactly once for every listed atomic concept."
     ].join("\n");
     const selectionResult = await this.client.call({
       model: this.model,
@@ -238,7 +240,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       ],
       toolName: "submit_core_selection",
       toolDescription: "Select or demote every individually eligible candidate at source level.",
-      parameters: conceptCoreSelectionSchemaForCandidateKeys(individuallyEligible.map((decision) => decision.candidateKey)),
+      parameters: conceptCoreSelectionSchemaForCandidateKeys(individuallyEligible.map((decision) => decision.atomicKey)),
       validator: conceptCoreSelectionValidator
     });
     const selectionCounts = new Map<string, number>();
@@ -250,17 +252,17 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
         .filter((selection) => selectionCounts.get(selection.candidateKey) === 1)
         .map((selection) => [selection.candidateKey, selection] as const)
     );
-    const individuallyEligibleKeys = new Set(individuallyEligible.map((decision) => decision.candidateKey));
+    const individuallyEligibleKeys = new Set(individuallyEligible.map((decision) => decision.atomicKey));
 
     return decisions.map((decision) => {
-      if (!individuallyEligibleKeys.has(decision.candidateKey)) {
+      if (!individuallyEligibleKeys.has(decision.atomicKey)) {
         return {
           ...decision,
           coreSelected: false,
           selectionReasonCode: "failed_model_eligibility" as const
         };
       }
-      const selection = selectionByKey.get(decision.candidateKey);
+      const selection = selectionByKey.get(decision.atomicKey);
       return {
         ...decision,
         proposedCanonicalLabel: selection?.canonicalLabel ?? decision.proposedCanonicalLabel,

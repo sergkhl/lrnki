@@ -9,16 +9,6 @@ const candidate: DiscoveredCandidate = {
   mentions: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules." }]
 };
 
-test("does not accept unadjudicated discovery aliases", () => {
-  const unsafeCandidate = {
-    ...candidate,
-    aliases: ["Move subset"]
-  } as DiscoveredCandidate & { aliases: string[] };
-  const result = applyAdmissionPolicy({ candidate: unsafeCandidate, proposal: eligibleProposal(), blockText });
-
-  assert.deepEqual(result.aliases, []);
-});
-
 const blockText = new Map([
   ["block-1", "Ownership is a set of rules. Assigning a value to another variable moves it."],
   ["block-2", "After a move, the first variable is no longer valid."]
@@ -26,9 +16,11 @@ const blockText = new Map([
 
 function eligibleProposal(overrides: Partial<AdmissionProposal> = {}): AdmissionProposal {
   return {
-    candidateKey: "move",
+    atomicKey: "move",
+    parentCandidateKey: "move",
     proposedCanonicalLabel: "Rust move semantics",
     tier: "core",
+    sourceRole: "declared_domain_concept",
     standaloneLearningObjective: {
       passed: true,
       rationale: "The source teaches move behavior as a distinct rule.",
@@ -63,11 +55,23 @@ function eligibleProposal(overrides: Partial<AdmissionProposal> = {}): Admission
   };
 }
 
+test("does not accept unadjudicated discovery aliases", () => {
+  const unsafeCandidate = {
+    ...candidate,
+    aliases: ["Move subset"]
+  } as DiscoveredCandidate & { aliases: string[] };
+  const result = applyAdmissionPolicy({ parentCandidate: unsafeCandidate, proposal: eligibleProposal(), blockText });
+
+  assert.deepEqual(result.aliases, []);
+});
+
 test("admits core only with all verified eligibility criteria", () => {
-  const result = applyAdmissionPolicy({ candidate, proposal: eligibleProposal(), blockText });
+  const result = applyAdmissionPolicy({ parentCandidate: candidate, proposal: eligibleProposal(), blockText });
 
   assert.equal(result.admission.tier, "core");
   assert.equal(result.canonicalLabel, "Move");
+  assert.equal(result.candidateKey, "move");
+  assert.equal(result.parentCandidateKey, "move");
   assert.deepEqual(result.aliases, []);
   assert.ok(result.admission.boundaryReasonCodes.includes("proposed_canonical_label_not_source_grounded"));
   assert.equal(result.admission.organizingPower.aspects.length, 2);
@@ -76,7 +80,7 @@ test("admits core only with all verified eligibility criteria", () => {
 test("accepts an admission canonical label that is explicitly source-grounded", () => {
   const groundedBlockText = new Map(blockText);
   groundedBlockText.set("block-3", "Rust move semantics transfers ownership and invalidates the source binding.");
-  const result = applyAdmissionPolicy({ candidate, proposal: eligibleProposal(), blockText: groundedBlockText });
+  const result = applyAdmissionPolicy({ parentCandidate: candidate, proposal: eligibleProposal(), blockText: groundedBlockText });
 
   assert.equal(result.canonicalLabel, "Rust move semantics");
   assert.deepEqual(result.aliases, ["Move"]);
@@ -102,7 +106,7 @@ test("corrects model core to optional when organizing power lacks two distinct e
       ]
     }
   });
-  const result = applyAdmissionPolicy({ candidate, proposal, blockText });
+  const result = applyAdmissionPolicy({ parentCandidate: candidate, proposal, blockText });
 
   assert.equal(result.admission.tier, "optional");
   assert.equal(result.canonicalLabel, "Move");
@@ -112,7 +116,7 @@ test("corrects model core to optional when organizing power lacks two distinct e
 
 test("promotes an eligible model-optional proposal because criteria are authoritative", () => {
   const result = applyAdmissionPolicy({
-    candidate,
+    parentCandidate: candidate,
     proposal: eligibleProposal({ tier: "optional" }),
     blockText
   });
@@ -124,7 +128,7 @@ test("promotes an eligible model-optional proposal because criteria are authorit
 
 test("preserves quarantine even when all criteria pass", () => {
   const result = applyAdmissionPolicy({
-    candidate,
+    parentCandidate: candidate,
     proposal: eligibleProposal({ tier: "quarantine" }),
     blockText
   });
@@ -134,7 +138,7 @@ test("preserves quarantine even when all criteria pass", () => {
 
 test("keeps an individually eligible but source-level-demoted candidate optional", () => {
   const result = applyAdmissionPolicy({
-    candidate,
+    parentCandidate: candidate,
     proposal: eligibleProposal({
       coreSelected: false,
       selectionReasonCode: "supporting_mechanism"
@@ -146,16 +150,77 @@ test("keeps an individually eligible but source-level-demoted candidate optional
   assert.equal(result.admission.selectionReasonCode, "supporting_mechanism");
 });
 
-test("demotes a selected candidate whose organizing evidence is confined to illustrative blocks", () => {
+test("rejects out-of-domain illustrative material rather than keeping it optional (neural source-role, no regex)", () => {
+  // R12: the deterministic illustrative-section regex is gone. An algorithm/SQL
+  // example used only to illustrate an ed-tech source is rejected by the model's
+  // neural sourceRole, and can never linger as optional.
   const result = applyAdmissionPolicy({
-    candidate,
-    proposal: eligibleProposal(),
-    blockText,
-    illustrativeBlockIds: new Set(["block-1", "block-2"])
+    parentCandidate: candidate,
+    proposal: eligibleProposal({ sourceRole: "out_of_domain_illustration" }),
+    blockText
   });
 
-  assert.equal(result.admission.tier, "optional");
-  assert.ok(result.admission.boundaryReasonCodes.includes("illustrative_only_source_treatment"));
+  assert.equal(result.admission.tier, "reject");
+  assert.ok(result.admission.boundaryReasonCodes.includes("out_of_domain_illustration"));
+});
+
+test("carries atomic identity and parent provenance for a split atom", () => {
+  // R13: a conflated parent ('stack_heap') splits into an atom ('Heap') whose
+  // grounded atomic label is the published identity, with the parent retained.
+  const splitBlockText = new Map([
+    ["block-1", "The stack and the heap are two regions of memory. The heap stores data of unknown size."]
+  ]);
+  const parent: DiscoveredCandidate = {
+    candidateKey: "stack_heap",
+    canonicalLabel: "The stack and the heap",
+    mentions: [{ blockId: "block-1", evidenceQuote: "The stack and the heap are two regions of memory." }]
+  };
+  const result = applyAdmissionPolicy({
+    parentCandidate: parent,
+    proposal: eligibleProposal({
+      atomicKey: "stack_heap__heap",
+      parentCandidateKey: "stack_heap",
+      proposedCanonicalLabel: "The heap",
+      standaloneLearningObjective: { passed: true, rationale: "heap as its own objective", evidence: [{ blockId: "block-1", evidenceQuote: "The heap stores data of unknown size." }] },
+      establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "block-1", evidenceQuote: "The heap stores data of unknown size." }] },
+      organizingPower: {
+        passed: true,
+        rationale: "organizes",
+        aspects: [
+          { summary: "memory region", nature: "definition-or-property", evidence: { blockId: "block-1", evidenceQuote: "The stack and the heap are two regions of memory." } },
+          { summary: "stores unknown size", nature: "mechanism", evidence: { blockId: "block-1", evidenceQuote: "The heap stores data of unknown size." } }
+        ]
+      }
+    }),
+    blockText: splitBlockText
+  });
+
+  assert.equal(result.candidateKey, "stack_heap__heap");
+  assert.equal(result.parentCandidateKey, "stack_heap");
+  assert.equal(result.canonicalLabel, "The heap");
+  assert.equal(result.admission.tier, "core");
+});
+
+test("fails an ungrounded split-atom label closed so it cannot reach core", () => {
+  // R13 scenario 2: a split atom whose label is not source-grounded has no
+  // discovered label to fall back to, so it fails closed and never publishes core.
+  const parent: DiscoveredCandidate = {
+    candidateKey: "stack_heap",
+    canonicalLabel: "The stack and the heap",
+    mentions: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules." }]
+  };
+  const result = applyAdmissionPolicy({
+    parentCandidate: parent,
+    proposal: eligibleProposal({
+      atomicKey: "stack_heap__ghost",
+      parentCandidateKey: "stack_heap",
+      proposedCanonicalLabel: "Quantum Entanglement"
+    }),
+    blockText
+  });
+
+  assert.notEqual(result.admission.tier, "core");
+  assert.ok(result.admission.boundaryReasonCodes.includes("atomic_label_not_source_grounded"));
 });
 
 test("no longer demotes a proposition-shaped label by lexical policy (now the admission judge's job)", () => {
@@ -163,7 +228,7 @@ test("no longer demotes a proposition-shaped label by lexical policy (now the ad
   // AGENTS rule 16). Concept-vs-proposition is a semantic call made downstream by
   // the measured admission-label judge, so the pure policy must NOT demote here.
   const result = applyAdmissionPolicy({
-    candidate,
+    parentCandidate: candidate,
     proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour Limited by the Extent of the Market" }),
     blockText
   });
@@ -175,7 +240,7 @@ test("no longer demotes a proposition-shaped label by lexical policy (now the ad
 
 test("keeps a multi-word nominal label core", () => {
   const result = applyAdmissionPolicy({
-    candidate,
+    parentCandidate: candidate,
     proposal: eligibleProposal({ proposedCanonicalLabel: "Division of Labour" }),
     blockText
   });
@@ -191,16 +256,17 @@ test("does not count motivation or examples as organizing aspects", () => {
     evidence: { blockId: "block-2", evidenceQuote: "After a move, the first variable is no longer valid." }
   };
 
-  const result = applyAdmissionPolicy({ candidate, proposal, blockText });
+  const result = applyAdmissionPolicy({ parentCandidate: candidate, proposal, blockText });
 
   assert.equal(result.admission.organizingPower.passed, false);
   assert.equal(result.admission.tier, "optional");
 });
 
 test("fails a missing decision closed to reject", () => {
-  const result = applyAdmissionPolicy({ candidate, blockText });
+  const result = applyAdmissionPolicy({ parentCandidate: candidate, blockText });
 
   assert.equal(result.admission.tier, "reject");
+  assert.equal(result.parentCandidateKey, "move");
   assert.ok(result.admission.boundaryReasonCodes.includes("no_admission_decision"));
 });
 

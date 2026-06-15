@@ -82,7 +82,7 @@ const organizingPowerAspectSchema: JsonSchema = {
   }
 };
 
-export function conceptAdmissionSchemaForCandidateKeys(candidateKeys?: string[]): JsonSchema {
+export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: string[]): JsonSchema {
   return {
     type: "object",
     additionalProperties: false,
@@ -90,14 +90,17 @@ export function conceptAdmissionSchemaForCandidateKeys(candidateKeys?: string[])
     properties: {
       decisions: {
         type: "array",
-        ...(candidateKeys ? { maxItems: candidateKeys.length } : {}),
+        // No maxItems: one discovered Candidate may be split into several atomic
+        // proposals (R13), so decisions can exceed the candidate count.
         items: {
           type: "object",
           additionalProperties: false,
           required: [
-            "candidateKey",
+            "parentCandidateKey",
+            "atomicKey",
             "proposedCanonicalLabel",
             "tier",
+            "sourceRole",
             "standaloneLearningObjective",
             "establishedDomainMeaning",
             "organizingPower",
@@ -105,15 +108,25 @@ export function conceptAdmissionSchemaForCandidateKeys(candidateKeys?: string[])
             "confidence"
           ],
           properties: {
-            candidateKey: {
+            parentCandidateKey: {
               type: "string",
-              ...(candidateKeys ? { enum: candidateKeys } : {})
+              description: "The discovered candidateKey this atomic concept was split from.",
+              ...(parentCandidateKeys ? { enum: parentCandidateKeys } : {})
+            },
+            atomicKey: {
+              type: "string",
+              description: "Run-local key for this ATOMIC concept, unique across all decisions. Use the parentCandidateKey verbatim when the candidate names exactly one concept; append a distinct suffix per atom when splitting a conflated candidate (e.g. 'stack_heap__stack', 'stack_heap__heap')."
             },
             proposedCanonicalLabel: {
               type: "string",
-              description: "Precise domain-qualified label. Keep the discovered label when it is already precise."
+              description: "Precise domain-qualified label for this single atomic concept. Keep the discovered label when it is already precise and atomic."
             },
             tier: { type: "string", enum: ["core", "optional", "reject", "quarantine"] },
+            sourceRole: {
+              type: "string",
+              enum: ["declared_domain_concept", "out_of_domain_illustration"],
+              description: "'declared_domain_concept' when this is a genuine concept of the Declared Domain that the source teaches. 'out_of_domain_illustration' when it belongs to another domain and appears ONLY to illustrate this source (e.g. a generic sorting algorithm or SQL query inside an educational-technology paper); such material is rejected, never kept optional."
+            },
             standaloneLearningObjective: admissionCriterionSchema,
             establishedDomainMeaning: admissionCriterionSchema,
             organizingPower: {
@@ -139,9 +152,11 @@ export const conceptAdmissionSchema = conceptAdmissionSchemaForCandidateKeys();
 
 export const conceptAdmissionValidator = z.object({
   decisions: z.array(z.object({
-    candidateKey: z.string().min(1),
+    parentCandidateKey: z.string().min(1),
+    atomicKey: z.string().min(1),
     proposedCanonicalLabel: z.string().min(1),
     tier: z.enum(["core", "optional", "reject", "quarantine"]),
+    sourceRole: z.enum(["declared_domain_concept", "out_of_domain_illustration"]),
     standaloneLearningObjective: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),

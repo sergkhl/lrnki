@@ -40,33 +40,43 @@ export async function executeExtractionRun(input: {
   const startedAt = Date.now();
   const { document, declaredDomain } = input.source;
   const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
-  const illustrativeBlockIds = new Set(
-    document.blocks
-      .filter((block) => isExplicitlyIllustrative(block.headingPath, block.text))
-      .map((block) => block.blockId)
-  );
 
   // Stage 1 — recall-oriented Candidate Discovery.
   const discovered = await input.discovery.discover({ document, declaredDomain });
 
   // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
+  // Admission may SPLIT one discovered Candidate into several atomic proposals
+  // (R13). Each proposal names its parent Candidate plus a run-local atomicKey.
+  // Fail closed: an atom whose parent is unknown, or whose atomicKey collides with
+  // another atom, is dropped before policy so it can never publish a core Concept
+  // (scenario 2). A discovered Candidate with no surviving atom yields a single
+  // reject RunCandidate for provenance.
   const admissionProposals = await input.admission.admit({ document, declaredDomain, candidates: discovered });
-  const proposalByKey = new Map<string, (typeof admissionProposals)[number]>();
-  const duplicateKeys = new Set<string>();
   const discoveredKeys = new Set(discovered.map((candidate) => candidate.candidateKey));
+  const atomicKeyCounts = new Map<string, number>();
   for (const proposal of admissionProposals) {
-    if (!discoveredKeys.has(proposal.candidateKey)) continue;
-    if (proposalByKey.has(proposal.candidateKey)) duplicateKeys.add(proposal.candidateKey);
-    else proposalByKey.set(proposal.candidateKey, proposal);
+    atomicKeyCounts.set(proposal.atomicKey, (atomicKeyCounts.get(proposal.atomicKey) ?? 0) + 1);
+  }
+  const proposalsByParent = new Map<string, typeof admissionProposals>();
+  for (const proposal of admissionProposals) {
+    if (!discoveredKeys.has(proposal.parentCandidateKey)) continue; // unknown parent: drop
+    if (atomicKeyCounts.get(proposal.atomicKey) !== 1) continue; // duplicate atomic key: drop
+    const group = proposalsByParent.get(proposal.parentCandidateKey) ?? [];
+    group.push(proposal);
+    proposalsByParent.set(proposal.parentCandidateKey, group);
   }
 
-  const policyCandidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
-    candidate,
-    proposal: duplicateKeys.has(candidate.candidateKey) ? undefined : proposalByKey.get(candidate.candidateKey),
-    blockText,
-    illustrativeBlockIds,
-    initialBoundaryReasonCodes: duplicateKeys.has(candidate.candidateKey) ? ["duplicate_admission_decision"] : []
-  }));
+  const policyCandidates: RunCandidate[] = [];
+  for (const candidate of discovered) {
+    const group = proposalsByParent.get(candidate.candidateKey) ?? [];
+    if (group.length === 0) {
+      policyCandidates.push(applyAdmissionPolicy({ parentCandidate: candidate, blockText }));
+      continue;
+    }
+    for (const proposal of group) {
+      policyCandidates.push(applyAdmissionPolicy({ parentCandidate: candidate, proposal, blockText }));
+    }
+  }
 
   // Concept-vs-proposition admission judge (ADR-0005). A downgrade-only neural
   // stage after the deterministic boundary: it demotes a `core` candidate whose
@@ -236,11 +246,4 @@ function evidenceNeighborhood(document: StructuredDocument, subject: RunCandidat
   const mentionBlockIds = new Set(subject.mentions.map((mention) => mention.blockId));
   const label = subject.canonicalLabel.toLowerCase();
   return extractableBlocks(document.blocks).filter((block) => mentionBlockIds.has(block.blockId) || block.text.toLowerCase().includes(label));
-}
-
-function isExplicitlyIllustrative(headingPath: string[], text: string): boolean {
-  const heading = headingPath.join(" ").toLowerCase();
-  const opening = text.slice(0, 240).toLowerCase();
-  return /\b(case study|worked example|illustrative example|demonstration|demo|downstream application)\b/.test(heading) ||
-    /\b(to illustrate|as an illustrative example|as a worked example|we demonstrate how|downstream application)\b/.test(opening);
 }
