@@ -163,8 +163,7 @@ model_list:
 
   # Independent production judge (kg-independent-judge, ADR-0007/0005). gpt-oss-120b
   # is cross-family independent of the DeepSeek extractor, forced tool_choice works,
-  # and it is the cheapest option ($0.039/$0.18 per Mtok). Replaces Mistral Small
-  # (free-tier rate-limited) and Nemotron (too expensive at $2.5/Mtok out).
+  # and it is the cheapest option ($0.039/$0.18 per Mtok). Replaces Mistral Small (free-tier rate-limited).
   - model_name: "openrouter/openai/gpt-oss-120b"
     litellm_params:
       model: "openrouter/openai/gpt-oss-120b"
@@ -175,13 +174,6 @@ model_list:
   - model_name: "openrouter/xiaomi/mimo-v2.5"
     litellm_params:
       model: "openrouter/xiaomi/mimo-v2.5"
-      api_key: os.environ/OPENROUTER_API_KEY
-
-  # Available but UNUSED: Nemotron is independent + forced-tool capable but its
-  # output is expensive ($2.5/Mtok); not aliased to any role.
-  - model_name: "openrouter/nvidia/nemotron-3-ultra-550b-a55b"
-    litellm_params:
-      model: "openrouter/nvidia/nemotron-3-ultra-550b-a55b"
       api_key: os.environ/OPENROUTER_API_KEY
 
   # - model_name: "openrouter/mistralai/mistral-small-2603"

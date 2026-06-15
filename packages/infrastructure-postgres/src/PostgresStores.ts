@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  ArtifactEnvelope,
   ExtractionRunResult,
   GraphSnapshot,
   PublishedConceptIdentity,
@@ -100,7 +101,7 @@ export class PostgresSourceRegistrationStore implements SourceRegistrationStoreP
 export class PostgresExtractionRunStore implements ExtractionRunStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(result: ExtractionRunResult): Promise<void> {
+  async persist(result: ExtractionRunResult, artifact: ArtifactEnvelope<ExtractionRunResult>): Promise<void> {
     await this.sql.begin(async (tx) => {
       // blockId (parser-local) -> source_block_id (uuid) for this run's document.
       const blockRows = await tx<{ block_id: string; source_block_id: string }[]>`
@@ -111,12 +112,10 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         if (!id) throw new Error(`Run ${result.runId} references unknown blockId ${blockId}.`);
         return id;
       };
-      // Optional resolution for model-supplied references that may be placeholders.
-      const resolveBlockOptional = (blockId: string) => blockMap.get(blockId) ?? null;
 
       await tx`
         INSERT INTO extraction_runs (run_id, source_resource_id, source_document_id, pipeline_config_hash, status, cost_usd, latency_ms, completed_at)
-        VALUES (${result.runId}, ${result.sourceResourceId}, ${result.sourceDocumentId}, ${result.pipelineConfigHash}, 'succeeded', ${result.costUsd ?? null}, ${result.latencyMs ?? null}, now())`;
+        VALUES (${result.runId}, ${result.sourceResourceId}, ${result.sourceDocumentId}, ${result.pipelineConfigHash}, ${result.status}, ${result.costUsd ?? null}, ${result.latencyMs ?? null}, now())`;
 
       const candidateIdByKey = new Map<string, string>();
       for (const candidate of result.candidates) {
@@ -148,28 +147,48 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
           )`;
       }
 
-      for (const claim of result.claims) {
-        const subjectId = candidateIdByKey.get(claim.subjectCandidateKey);
-        if (!subjectId) continue;
-        const objectCandidateId = claim.object.kind === "concept" ? candidateIdByKey.get(claim.object.candidateKey) ?? null : null;
-        if (claim.object.kind === "concept" && !objectCandidateId) continue;
-        const runClaimId = randomUUID();
+      // Run-scoped Concept Evidence Profiles: definition/mention passages and
+      // optional typed assertions, each verbatim-grounded at the application
+      // boundary. References the run-local candidate id.
+      for (const profile of result.evidenceProfiles) {
+        const candidateId = candidateIdByKey.get(profile.candidateKey);
+        if (!candidateId) continue;
+        const profileId = randomUUID();
         await tx`
-          INSERT INTO run_claims (run_claim_id, run_id, subject_candidate_id, predicate, object_kind, object_candidate_id, object_literal, model_confidence, evidence_count, validation_outcome, boundary_reason_codes, extraction_attempt)
-          VALUES (${runClaimId}, ${result.runId}, ${subjectId}, ${claim.predicate}, ${claim.object.kind}, ${objectCandidateId}, ${claim.object.kind === "literal" ? tx.json({ value: claim.object.value }) : null}, ${claim.modelConfidence}, ${claim.evidenceCount}, ${claim.validationOutcome}, ${tx.json(claim.boundaryReasonCodes)}, ${claim.extractionAttempt})`;
-        for (const evidence of claim.evidence) {
+          INSERT INTO run_concept_evidence_profiles (run_concept_evidence_profile_id, run_id, concept_candidate_id, tier, complete)
+          VALUES (${profileId}, ${result.runId}, ${candidateId}, ${profile.tier}, ${profile.complete})`;
+        let rank = 0;
+        for (const definition of profile.definitions) {
           await tx`
-            INSERT INTO run_claim_evidence (run_claim_evidence_id, run_claim_id, source_block_id, evidence_quote)
-            VALUES (${randomUUID()}, ${runClaimId}, ${resolveBlock(evidence.blockId)}, ${evidence.evidenceQuote})`;
+            INSERT INTO run_evidence_passages (run_evidence_passage_id, run_concept_evidence_profile_id, kind, source_block_id, evidence_quote, salience_rank)
+            VALUES (${randomUUID()}, ${profileId}, 'definition', ${resolveBlock(definition.blockId)}, ${definition.evidenceQuote}, ${rank++})`;
+        }
+        rank = 0;
+        for (const mention of profile.mentions) {
+          await tx`
+            INSERT INTO run_evidence_passages (run_evidence_passage_id, run_concept_evidence_profile_id, kind, source_block_id, evidence_quote, salience_rank)
+            VALUES (${randomUUID()}, ${profileId}, 'mention', ${resolveBlock(mention.blockId)}, ${mention.evidenceQuote}, ${rank++})`;
+        }
+        for (const assertion of profile.assertions) {
+          const assertionId = randomUUID();
+          const objectCandidateId = assertion.type === "explicit-prerequisite-hint" ? candidateIdByKey.get(assertion.objectCandidateKey) ?? null : null;
+          if (assertion.type === "explicit-prerequisite-hint" && !objectCandidateId) continue;
+          await tx`
+            INSERT INTO run_optional_assertions (run_optional_assertion_id, run_concept_evidence_profile_id, assertion_type, literal_value, object_candidate_id)
+            VALUES (${assertionId}, ${profileId}, ${assertion.type}, ${assertion.type === "defines" ? assertion.literalValue : null}, ${objectCandidateId})`;
+          for (const evidence of assertion.evidence) {
+            await tx`
+              INSERT INTO run_optional_assertion_evidence (run_optional_assertion_evidence_id, run_optional_assertion_id, source_block_id, evidence_quote)
+              VALUES (${randomUUID()}, ${assertionId}, ${resolveBlock(evidence.blockId)}, ${evidence.evidenceQuote})`;
+          }
         }
       }
 
-      for (const proposal of result.proposals) {
-        const proposalBlockId = proposal.evidence ? resolveBlockOptional(proposal.evidence.blockId) : null;
-        await tx`
-          INSERT INTO missing_concept_proposals (missing_concept_proposal_id, run_id, proposed_label, rationale, source_block_id, evidence_quote, extraction_attempt)
-          VALUES (${randomUUID()}, ${result.runId}, ${proposal.proposedLabel}, ${proposal.rationale}, ${proposalBlockId}, ${proposalBlockId ? proposal.evidence?.evidenceQuote ?? null : null}, ${proposal.extractionAttempt})`;
-      }
+      // The immutable run artifact is written in the SAME transaction, so no
+      // authoritative relational state exists without its artifact envelope.
+      await tx`
+        INSERT INTO artifact_versions (artifact_id, artifact_type, schema_version, run_id, producer, producer_version, config_hash, payload)
+        VALUES (${artifact.artifactId}, ${artifact.artifactType}, ${artifact.schemaVersion}, ${result.runId}, ${artifact.producer}, ${artifact.producerVersion}, ${artifact.configHash}, ${tx.json(artifact.payload as Parameters<Sql["json"]>[0])})`;
     });
   }
 
@@ -208,42 +227,15 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
         WHERE cc.run_id = ${run.run_id} AND ad.tier = 'quarantine'`;
 
-      const claimRows = await this.sql<{
-        run_claim_id: string; subject_key: string; predicate: string; object_kind: string;
-        object_key: string | null; object_literal: { value: string } | null; model_confidence: number; evidence_count: number;
-      }[]>`
-        SELECT rc.run_claim_id, subj.candidate_key AS subject_key, rc.predicate, rc.object_kind,
-               obj.candidate_key AS object_key, rc.object_literal, rc.model_confidence, rc.evidence_count
-        FROM run_claims rc
-        JOIN concept_candidates subj ON subj.concept_candidate_id = rc.subject_candidate_id
-        LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = rc.object_candidate_id
-        WHERE rc.run_id = ${run.run_id} AND rc.validation_outcome = 'verified'`;
-
-      const verifiedClaims: RunForBuild["verifiedClaims"] = [];
-      for (const claim of claimRows) {
-        const evidenceRows = await this.sql<{ source_block_id: string; evidence_quote: string }[]>`
-          SELECT source_block_id, evidence_quote FROM run_claim_evidence WHERE run_claim_id = ${claim.run_claim_id}`;
-        const object = claim.object_kind === "concept"
-          ? (claim.object_key ? { kind: "concept" as const, candidateKey: claim.object_key } : null)
-          : { kind: "literal" as const, value: claim.object_literal?.value ?? "" };
-        if (!object) continue;
-        verifiedClaims.push({
-          subjectCandidateKey: claim.subject_key,
-          predicate: claim.predicate as RunForBuild["verifiedClaims"][number]["predicate"],
-          object,
-          evidence: evidenceRows.map((row) => ({ sourceResourceId: run.source_resource_id, sourceBlockId: row.source_block_id, evidenceQuote: row.evidence_quote })),
-          modelConfidence: claim.model_confidence,
-          evidenceCount: claim.evidence_count
-        });
-      }
-
+      // Published CEP unions replace asserted claims in U4; until then the build
+      // read model carries no claims, so a published snapshot has zero edges.
       result.push({
         runId: run.run_id,
         sourceResourceId: run.source_resource_id,
         declaredDomain: run.declared_domain,
         coreCandidates: coreRows.map((row) => ({ candidateKey: row.candidate_key, canonicalLabel: row.canonical_label, normalizedLabel: row.normalized_label, aliases: row.aliases })),
         quarantinedCandidates: quarantineRows.map((row) => ({ candidateKey: row.candidate_key, canonicalLabel: row.canonical_label })),
-        verifiedClaims
+        verifiedClaims: []
       });
     }
     return result;

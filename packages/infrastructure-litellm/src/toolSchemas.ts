@@ -239,68 +239,63 @@ export const conceptCoreSelectionValidator = z.object({
   }).strict())
 }).strict();
 
-// --- Claim Extraction: submit_concept_claims -----------------------------
+// --- CEP Extraction: submit_concept_evidence_profile ----------------------
+// One Concept Evidence Profile for the subject Concept: meaning-bearing definition
+// passages, salience-ordered mention passages, and zero or more optional typed
+// assertions. Only `defines` (literal) and `explicit-prerequisite-hint` (admitted
+// Concept) are typed; every other relationship is an untyped mention passage.
 
-const RELATION_ENUM = ["is-a", "part-of", "asserted-prerequisite-of", "contrasts-with", "uses", "defined-as"] as const;
-
-export const conceptClaimSchema: JsonSchema = {
+const optionalTypedAssertionSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["claims", "missingConceptProposals"],
+  required: ["type", "objectKind", "objectCandidateKey", "literalValue", "evidence"],
   properties: {
-    claims: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["predicate", "evidenceLinkNature", "evidenceDirection", "objectKind", "objectCandidateKey", "objectLiteralValue", "evidence", "confidence"],
-        properties: {
-          predicate: { type: "string", enum: [...RELATION_ENUM] },
-          evidenceLinkNature: {
-            type: "string",
-            enum: ["taxonomic", "structural", "mechanism-employment", "explicit-contrast", "explicit-prerequisite", "definitional", "causal-or-motivational"],
-            description: "How the EVIDENCE SENTENCE links subject and object. 'causal-or-motivational' = the sentence says one gives rise to, occasions, results from, explains, or motivates the other."
-          },
-          evidenceDirection: {
-            type: "string",
-            enum: [
-              "subject-is-kind-of-object",
-              "subject-is-part-of-object",
-              "object-is-part-of-subject",
-              "subject-uses-object",
-              "object-uses-subject",
-              "subject-contrasts-with-object",
-              "subject-prerequisite-of-object",
-              "object-prerequisite-of-subject",
-              "subject-defined-by-literal",
-              "causal-or-motivational"
-            ],
-            description: "Direction stated by the evidence, classified independently of predicate. Subject is the fixed subject concept in the prompt."
-          },
-          objectKind: { type: "string", enum: ["concept", "literal"] },
-          objectCandidateKey: { type: ["string", "null"], description: "For concept objects: the candidateKey of an ADMITTED concept. Null for literal objects." },
-          objectLiteralValue: { type: ["string", "null"], description: "For 'defined-as' literal objects only. Null otherwise." },
-          evidence: { type: "array", items: blockEvidenceSchema },
-          confidence: { type: "number", minimum: 0, maximum: 1 }
-        }
-      }
+    type: {
+      type: "string",
+      enum: ["defines", "explicit-prerequisite-hint"],
+      description: "'defines' = the evidence defines the subject (objectKind=literal, literalValue set). 'explicit-prerequisite-hint' = the evidence EXPLICITLY states the subject must be understood before another ADMITTED concept (objectKind=concept, objectCandidateKey set)."
     },
-    missingConceptProposals: {
+    objectKind: { type: "string", enum: ["literal", "concept"] },
+    objectCandidateKey: { type: ["string", "null"], description: "For explicit-prerequisite-hint: the candidateKey of an ADMITTED concept the subject is needed before. Null for defines." },
+    literalValue: { type: ["string", "null"], description: "For defines: a faithful, concise definition grounded in the evidence quote. Null for explicit-prerequisite-hint." },
+    evidence: { type: "array", items: blockEvidenceSchema }
+  }
+};
+
+export const conceptEvidenceProfileSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["definitions", "mentions", "assertions"],
+  properties: {
+    definitions: {
       type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["proposedLabel", "rationale", "evidenceBlockId", "evidenceQuote"],
-        properties: {
-          proposedLabel: { type: "string" },
-          rationale: { type: "string" },
-          evidenceBlockId: { type: ["string", "null"] },
-          evidenceQuote: { type: ["string", "null"] }
-        }
-      }
+      description: "Verbatim passages that establish the subject concept's meaning. Need NOT use a literal 'X is Y' form, but each must be a meaning-bearing quote. At least one is required.",
+      items: blockEvidenceSchema
+    },
+    mentions: {
+      type: "array",
+      description: "Verbatim passages where the source substantively teaches, applies, relates, or constrains the subject concept (taxonomy, structure, contrast, employment, mechanism). ORDER THEM from most to least useful for understanding the concept and its prerequisites; the application keeps the first few.",
+      items: blockEvidenceSchema
+    },
+    assertions: {
+      type: "array",
+      description: "Optional typed assertions. Emit only when the evidence explicitly supports a definition literal or an explicit prerequisite hint to an admitted concept. Everything else belongs in mentions.",
+      items: optionalTypedAssertionSchema
     }
   }
 };
+
+export const conceptEvidenceProfileValidator = z.object({
+  definitions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
+  mentions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
+  assertions: z.array(z.object({
+    type: z.enum(["defines", "explicit-prerequisite-hint"]),
+    objectKind: z.enum(["literal", "concept"]),
+    objectCandidateKey: z.string().nullable(),
+    literalValue: z.string().nullable(),
+    evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
+  }).strict())
+}).strict();
 
 // --- Prerequisite judgment: submit_prerequisite_judgment ------------------
 // One bounded judgment over a single gated concept pair (ADR-0019). The model
@@ -336,14 +331,15 @@ export const prerequisiteJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
-// --- Claim entailment judgment: submit_claim_entailment_judgment ----------
-// One bounded judgment over a single concept-to-concept claim (ADR-0007). The
-// model decides whether the verbatim evidence actually asserts the typed relation
-// in the stated direction between the two named concepts. `entailingSpan` is the
-// minimal sub-quote that carries the relation; the application boundary fails
-// closed to entailed:false when it is not a substring of any provided quote.
+// --- Assertion entailment judgment: submit_assertion_entailment_judgment --
+// One bounded judgment over a single optional typed assertion (ADR-0007 reset).
+// For an explicit-prerequisite-hint the model decides whether the verbatim
+// evidence EXPLICITLY states the subject is needed before the object concept.
+// `entailingSpan` is the minimal sub-quote that carries the assertion; the
+// application boundary fails closed to entailed:false when it is not a substring
+// of any provided quote.
 
-export const claimEntailmentJudgmentSchema: JsonSchema = {
+export const assertionEntailmentJudgmentSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
   required: ["entailed", "entailingSpan", "rationale"],
@@ -351,18 +347,18 @@ export const claimEntailmentJudgmentSchema: JsonSchema = {
     entailed: {
       type: "boolean",
       description:
-        "True only if the quoted evidence actually asserts the stated relation in the stated direction between the two named concepts. False for unrelated, wrongly-directed, wrong-relation, or merely-co-mentioned pairs."
+        "True only if the quoted evidence actually asserts the stated assertion between the two named concepts. False for unrelated, wrongly-directed, or merely-co-mentioned pairs."
     },
     entailingSpan: {
       type: "string",
       description:
-        "The minimal verbatim sub-quote (copied exactly from one of the provided quotes) that carries the relation. Empty string when entailed is false."
+        "The minimal verbatim sub-quote (copied exactly from one of the provided quotes) that carries the assertion. Empty string when entailed is false."
     },
     rationale: { type: "string", description: "One terse sentence grounded in the quoted evidence." }
   }
 };
 
-export const claimEntailmentJudgmentValidator = z.object({
+export const assertionEntailmentJudgmentValidator = z.object({
   entailed: z.boolean(),
   entailingSpan: z.string(),
   rationale: z.string().min(1)
@@ -436,35 +432,5 @@ export const admissionLabelJudgmentValidator = z.object({
   underlyingNounPhrase: z.string(),
   groundingSpan: z.string(),
   rationale: z.string().min(1)
-}).strict();
-
-export const conceptClaimValidator = z.object({
-  claims: z.array(z.object({
-    predicate: z.enum(RELATION_ENUM),
-    evidenceLinkNature: z.enum(["taxonomic", "structural", "mechanism-employment", "explicit-contrast", "explicit-prerequisite", "definitional", "causal-or-motivational"]),
-    evidenceDirection: z.enum([
-      "subject-is-kind-of-object",
-      "subject-is-part-of-object",
-      "object-is-part-of-subject",
-      "subject-uses-object",
-      "object-uses-subject",
-      "subject-contrasts-with-object",
-      "subject-prerequisite-of-object",
-      "object-prerequisite-of-subject",
-      "subject-defined-by-literal",
-      "causal-or-motivational"
-    ]),
-    objectKind: z.enum(["concept", "literal"]),
-    objectCandidateKey: z.string().nullable(),
-    objectLiteralValue: z.string().nullable(),
-    evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
-    confidence: z.number().min(0).max(1)
-  }).strict()),
-  missingConceptProposals: z.array(z.object({
-    proposedLabel: z.string().min(1),
-    rationale: z.string(),
-    evidenceBlockId: z.string().nullable(),
-    evidenceQuote: z.string().nullable()
-  }).strict())
 }).strict();
 

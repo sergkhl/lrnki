@@ -101,42 +101,44 @@ export const conceptAdmissionDecisions = pgTable("concept_admission_decisions", 
   confidence: real("confidence").notNull()
 });
 
-// Run-scoped claims reference admitted CANDIDATES, not published concepts.
-export const runClaims = pgTable("run_claims", {
-  runClaimId: uuid("run_claim_id").primaryKey(),
+// Run-scoped Concept Evidence Profiles (ADR-0007 reset). One per admitted atomic
+// Concept; references the run-local CANDIDATE, never a published concept. Replaces
+// run_claims. `complete` is true only when a verified definition passage survives.
+export const runConceptEvidenceProfiles = pgTable("run_concept_evidence_profiles", {
+  runConceptEvidenceProfileId: uuid("run_concept_evidence_profile_id").primaryKey(),
   runId: uuid("run_id").notNull().references(() => extractionRuns.runId),
-  subjectCandidateId: uuid("subject_candidate_id").notNull().references(() => conceptCandidates.conceptCandidateId),
-  predicate: text("predicate").notNull().references(() => relationDefinitions.predicate),
-  // For concept-objects, objectCandidateId is set; for literal-objects, objectLiteral holds value/datatype.
-  objectKind: text("object_kind").notNull(),
-  objectCandidateId: uuid("object_candidate_id").references(() => conceptCandidates.conceptCandidateId),
-  objectLiteral: jsonb("object_literal"),
-  // Raw signals (no composite edge-confidence): model confidence, evidence count, validation outcome.
-  modelConfidence: real("model_confidence").notNull(),
-  evidenceCount: integer("evidence_count").notNull(),
-  validationOutcome: text("validation_outcome").notNull(),
-  boundaryReasonCodes: jsonb("boundary_reason_codes").notNull(),
-  extractionAttempt: integer("extraction_attempt").notNull(),
+  conceptCandidateId: uuid("concept_candidate_id").notNull().references(() => conceptCandidates.conceptCandidateId),
+  tier: text("tier").notNull(),
+  complete: boolean("complete").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+}, (table) => [unique().on(table.runId, table.conceptCandidateId)]);
+
+// Definition and mention passages — both are verbatim source quotes. `kind`
+// separates them; `salienceRank` preserves the neural order for mentions.
+export const runEvidencePassages = pgTable("run_evidence_passages", {
+  runEvidencePassageId: uuid("run_evidence_passage_id").primaryKey(),
+  runConceptEvidenceProfileId: uuid("run_concept_evidence_profile_id").notNull().references(() => runConceptEvidenceProfiles.runConceptEvidenceProfileId),
+  kind: text("kind").notNull(),
+  sourceBlockId: uuid("source_block_id").notNull().references(() => sourceBlocks.sourceBlockId),
+  evidenceQuote: text("evidence_quote").notNull(),
+  salienceRank: integer("salience_rank").notNull()
 });
 
-export const runClaimEvidence = pgTable("run_claim_evidence", {
-  runClaimEvidenceId: uuid("run_claim_evidence_id").primaryKey(),
-  runClaimId: uuid("run_claim_id").notNull().references(() => runClaims.runClaimId),
+// Optional typed assertions — guarded evidence, never edges. `defines` carries a
+// literal; `explicit-prerequisite-hint` references an admitted Concept candidate.
+export const runOptionalAssertions = pgTable("run_optional_assertions", {
+  runOptionalAssertionId: uuid("run_optional_assertion_id").primaryKey(),
+  runConceptEvidenceProfileId: uuid("run_concept_evidence_profile_id").notNull().references(() => runConceptEvidenceProfiles.runConceptEvidenceProfileId),
+  assertionType: text("assertion_type").notNull(),
+  literalValue: text("literal_value"),
+  objectCandidateId: uuid("object_candidate_id").references(() => conceptCandidates.conceptCandidateId)
+});
+
+export const runOptionalAssertionEvidence = pgTable("run_optional_assertion_evidence", {
+  runOptionalAssertionEvidenceId: uuid("run_optional_assertion_evidence_id").primaryKey(),
+  runOptionalAssertionId: uuid("run_optional_assertion_id").notNull().references(() => runOptionalAssertions.runOptionalAssertionId),
   sourceBlockId: uuid("source_block_id").notNull().references(() => sourceBlocks.sourceBlockId),
   evidenceQuote: text("evidence_quote").notNull()
-});
-
-// Missing-concept proposals: claim-extractor escape hatch, inspected in Admin Lab only.
-export const missingConceptProposals = pgTable("missing_concept_proposals", {
-  missingConceptProposalId: uuid("missing_concept_proposal_id").primaryKey(),
-  runId: uuid("run_id").notNull().references(() => extractionRuns.runId),
-  proposedLabel: text("proposed_label").notNull(),
-  rationale: text("rationale").notNull(),
-  sourceBlockId: uuid("source_block_id").references(() => sourceBlocks.sourceBlockId),
-  evidenceQuote: text("evidence_quote"),
-  extractionAttempt: integer("extraction_attempt").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
 // ---------------------------------------------------------------------------

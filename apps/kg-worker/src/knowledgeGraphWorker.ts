@@ -18,8 +18,8 @@ import {
 } from "@lrnki/infrastructure-ingestion";
 import {
   LiteLlmAdmissionLabelJudgmentAdapter,
-  LiteLlmClaimEntailmentJudgmentAdapter,
-  LiteLlmClaimExtractionAdapter,
+  LiteLlmAssertionEntailmentJudgmentAdapter,
+  LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmEmbeddingAdapter,
@@ -102,11 +102,12 @@ function buildContext() {
     parsers,
     discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
     admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
-    claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient),
-    // Semantic claim-entailment judge (ADR-0007). Independent production judge
+    evidenceProfileExtraction: new LiteLlmEvidenceProfileExtractionAdapter(deterministicClient),
+    // Assertion-entailment judge (ADR-0007 reset). Independent production judge
     // (gpt-oss-120b via kg-independent-judge) so the judge is not the extractor
-    // re-grading itself; deterministic decoding for stable re-derivation.
-    claimEntailmentJudge: new LiteLlmClaimEntailmentJudgmentAdapter(deterministicClient),
+    // re-grading itself; deterministic decoding for stable re-derivation. Guards
+    // only the optional typed assertions inside a Concept Evidence Profile.
+    assertionEntailmentJudge: new LiteLlmAssertionEntailmentJudgmentAdapter(deterministicClient),
     // Concept-vs-proposition admission judge (ADR-0005). Same independent
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
@@ -167,16 +168,18 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
       pipelineConfigHash: PIPELINE_CONFIG_HASH,
       discovery: ctx.discovery,
       admission: ctx.admission,
-      claimExtraction: ctx.claimExtraction,
-      claimEntailmentJudge: ctx.claimEntailmentJudge,
+      evidenceProfileExtraction: ctx.evidenceProfileExtraction,
+      assertionEntailmentJudge: ctx.assertionEntailmentJudge,
       admissionLabelJudge: ctx.admissionLabelJudge,
-      store: ctx.runStore,
-      artifacts: ctx.artifacts
+      store: ctx.runStore
     });
     const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
-    const verified = result.claims.filter((claim) => claim.validationOutcome === "verified").length;
-    const rejected = result.claims.length - verified;
-    console.log(`   candidates=${result.candidates.length} core=${core} claims(verified/rejected)=${verified}/${rejected} proposals=${result.proposals.length} latency=${result.latencyMs}ms`);
+    const profiles = result.evidenceProfiles;
+    const incomplete = profiles.filter((profile) => !profile.complete).length;
+    const definitions = profiles.reduce((sum, profile) => sum + profile.definitions.length, 0);
+    const mentions = profiles.reduce((sum, profile) => sum + profile.mentions.length, 0);
+    const assertions = profiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
+    console.log(`   status=${result.status} candidates=${result.candidates.length} core=${core} CEPs=${profiles.length}(incomplete=${incomplete}) defs=${definitions} mentions=${mentions} assertions=${assertions} latency=${result.latencyMs}ms`);
   }
 }
 

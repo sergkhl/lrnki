@@ -1,12 +1,10 @@
 import type {
   AdmissionLabelJudgment,
   AdmissionProposal,
-  ClaimEntailmentJudgment,
-  ClaimExtractionFeedback,
-  ClaimExtractionResult,
+  AssertionEntailmentJudgment,
   DiscoveredCandidate,
-  ExtractedClaim,
-  RelationPredicate,
+  ExtractedEvidenceProfile,
+  ExtractedTypedAssertion,
   SourceBlock,
   StructuredDocument
 } from "@lrnki/domain-core";
@@ -14,23 +12,23 @@ import { evidenceQuoteMatches, extractableBlocks } from "@lrnki/domain-core";
 import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
 import type {
   AdmissionLabelJudgmentPort,
-  ClaimEntailmentJudgmentPort,
+  AssertionEntailmentJudgmentPort,
   ConceptAdmissionPort,
-  ConceptConditionedClaimExtractionPort,
+  ConceptConditionedEvidenceProfileExtractionPort,
   ConceptDiscoveryPort
 } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
-  claimEntailmentJudgmentSchema,
-  claimEntailmentJudgmentValidator,
+  assertionEntailmentJudgmentSchema,
+  assertionEntailmentJudgmentValidator,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidator,
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidator,
-  conceptClaimSchema,
-  conceptClaimValidator,
+  conceptEvidenceProfileSchema,
+  conceptEvidenceProfileValidator,
   conceptDiscoverySchema,
   conceptDiscoveryValidator,
   definitionEntailmentJudgmentSchema,
@@ -41,30 +39,19 @@ import {
 // extraction uses DeepSeek V4 Flash with thinking disabled (AGENTS rule 5).
 export const DISCOVERY_MODEL = "kg-concept-discovery";
 export const ADMISSION_MODEL = "kg-concept-admission";
-export const CLAIM_MODEL = "kg-claim-extraction";
+// Concept Evidence Profile extraction (ADR-0007 reset). Routes to the DeepSeek
+// extractor alias; the alias string is unchanged so litellm/config.yaml routing is
+// untouched in this unit.
+export const EVIDENCE_PROFILE_MODEL = "kg-claim-extraction";
 // Independent production judge alias (ADR-0007/0005). A different family than the
 // DeepSeek extractor (gpt-oss-120b via `kg-independent-judge`) so the judge is not
 // re-running the extractor's own reasoning over its own output. This is a standing
 // production judge, not benchmark machinery — the off-core oracle triangle is gone.
-export const CLAIM_ENTAILMENT_JUDGE_MODEL = "kg-independent-judge";
+export const ASSERTION_ENTAILMENT_JUDGE_MODEL = "kg-independent-judge";
 // Same independent production judge for the concept-vs-proposition admission judge
 // (ADR-0005): the judge must not be the admission extractor (DeepSeek) re-deciding
 // its own label.
 export const ADMISSION_LABEL_JUDGE_MODEL = "kg-independent-judge";
-
-// Per-predicate strict entailment test, shared by the judge. These are the SAME
-// natural-language tests the extraction prompt applies; the judge re-checks them
-// against the verbatim evidence so a wrong-relation/wrong-direction claim that
-// slipped past the extractor's self-report is caught semantically rather than by
-// a hardcoded surface matcher (AGENTS rule 16).
-const PREDICATE_ENTAILMENT_TEST: Record<RelationPredicate, string> = {
-  "is-a": "'is-a' (strict taxonomy): the evidence must assert that the SUBJECT is a kind/type/category-member of the OBJECT, i.e. 'every <subject> is a <object>' reads as true. A list that places the subject among instances of the object's category counts (e.g. 'three models: conservative, semi-conservative, dispersive' entails 'semi-conservative is-a model'). Component-of, causes, or uses do NOT count.",
-  "part-of": "'part-of': the evidence must assert that the SUBJECT is a structural component, member, step, or sub-mechanism of the OBJECT — 'the <object> consists of / includes / contains the <subject>' reads as true. Causing, enabling, or motivating the object is NOT membership.",
-  "uses": "'uses': the evidence must assert that the SUBJECT actively employs the OBJECT as a tool or mechanism while it operates — 'the <subject> works by employing the <object>'. Being caused by, arising from, or motivated by the object is NOT using it.",
-  "asserted-prerequisite-of": "'asserted-prerequisite-of': the evidence must EXPLICITLY state that understanding the SUBJECT is required before the OBJECT. Mere topical ordering is not enough.",
-  "contrasts-with": "'contrasts-with': the evidence must explicitly contrast or distinguish the SUBJECT and OBJECT as alternatives or opposites. Denying causation ('X is not the effect of Y') is not a contrast.",
-  "defined-as": "'defined-as': the evidence must define the SUBJECT as the given literal using definitional language ('is', 'means', 'refers to')."
-};
 
 export function renderBlocks(blocks: SourceBlock[]): string {
   return blocks
@@ -277,8 +264,8 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
 
 const ADMISSION_BATCH_SIZE = 5;
 
-export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExtractionPort {
-  constructor(private readonly client: LiteLlmForcedToolClient, private readonly model: string = CLAIM_MODEL) {}
+export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptConditionedEvidenceProfileExtractionPort {
+  constructor(private readonly client: LiteLlmForcedToolClient, private readonly model: string = EVIDENCE_PROFILE_MODEL) {}
 
   async extract(input: {
     document: StructuredDocument;
@@ -286,188 +273,119 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
     subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
     admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
-    feedback?: ClaimExtractionFeedback;
-  }): Promise<ClaimExtractionResult> {
+  }): Promise<ExtractedEvidenceProfile> {
     const system = [
-      "You extract typed, evidence-backed claims for one subject concept only.",
-      "HARD EXCLUSION — apply this to the evidence sentence BEFORE choosing any relation:",
-      "If the link between subject and object in the quoted sentence is causal, genetic-origin, or motivational, the statement fits NO relation in the closed set. Emit no claim. Do NOT retype it as 'uses', 'part-of', 'is-a', or 'contrasts-with'.",
-      "Causal/origin connectives that trigger this exclusion include: 'gives occasion to', 'occasions', 'is the (necessary) consequence of', 'is the effect of', 'is not the effect of', 'arises from', 'leads to', 'in consequence of', 'owing to', 'encourages', 'derives from'.",
-      "WRONG: from 'it is this same trucking disposition which originally gives occasion to the division of labour', emitting 'Division of Labour uses Propensity to Exchange' or 'Propensity to Exchange part-of Division of Labour' — both are causal-origin statements wearing a relation costume. The correct output for that sentence is NO claim.",
-      "Allowed relations (closed set), each with a strict test — apply the test before choosing:",
-      "- 'is-a': strict taxonomy ONLY. The sentence 'every <subject> is a <object>' must read as true; the object must be a broader category or kind. WRONG: 'drop function is-a ownership' (drop is part of the ownership system, not a kind of ownership). WRONG: 'pointer is-a stack and heap'. RIGHT: 'conservative replication model is-a DNA replication model'.",
-      "- 'part-of': the subject is a structural component, member, step, or sub-mechanism of the object. The test: 'the <object> consists of / includes the <subject>' must read as true ('drop function part-of ownership'). Causing, enabling, or motivating the object is NOT membership.",
-      "- 'uses': the subject actively employs the object as a tool or mechanism while it operates ('string type uses heap allocation'). The test: 'the <subject> works by employing the <object>'. Being caused by, arising from, or being motivated by the object is NOT using it.",
-      "- 'asserted-prerequisite-of': ONLY when the source explicitly states that understanding the subject is required before the object.",
-      "- 'contrasts-with': ONLY when the source explicitly contrasts or distinguishes the two concepts as alternatives or opposites. Denying that one concept caused another ('X is not the effect of Y') is a causal statement, not a contrast.",
-      "- 'defined-as': the object is a literal definition string quoted from the source; never a concept.",
-      "Always scan the evidence neighborhood for explicit definition sentences before considering concept-to-concept relations. RIGHT: from 'Ownership is a set of rules that govern how a Rust program manages memory', emit Ownership defined-as the literal 'a set of rules that govern how a Rust program manages memory'. The literal should be a faithful, concise definition GROUNDED IN the evidence quote — you may smooth wording, resolve apposition, or normalise word order, but never add meaning the quote does not support. RIGHT: from 'a discrepancy known as the generalization gap', define 'generalization gap' as 'the discrepancy between ...' even though the quote phrases it as apposition.",
-      "DIRECTION GATE — classify evidenceDirection from the quoted sentence independently of predicate. The fixed subject concept must occupy the subject role in the relation:",
-      "- is-a requires subject-is-kind-of-object.",
-      "- part-of requires subject-is-part-of-object. If the evidence says the object is inside the subject, report object-is-part-of-subject and emit no claim.",
-      "- uses requires subject-uses-object. If the evidence says the object/framework uses the subject/signal, report object-uses-subject and emit no claim.",
-      "- asserted-prerequisite-of requires subject-prerequisite-of-object.",
-      "- defined-as requires subject-defined-by-literal.",
-      "Never reverse a sentence to manufacture a claim for the current subject. A later concept-conditioned call can extract the correctly directed claim for the other subject.",
-      "For a given subject/object pair choose at most ONE of is-a, part-of, or uses. If two seem plausible, emit neither.",
-      "Never emit a symmetric pair: if you emit '<subject> part-of <object>' do not also emit '<object> part-of <subject>'; the same holds for is-a and asserted-prerequisite-of. These relations are one-directional.",
-      "The evidence must lexically state the selected relation in the claimed direction: is-a needs explicit category language; part-of needs explicit membership/component language; uses needs an active use/employ/leverage verb with the subject as actor. Mere co-occurrence, support, signal-for-inference, or node/edge listing is insufficient.",
-      "For defined-as, the quote must explicitly name the subject and state its meaning (via a copula, apposition, 'means', 'refers to', 'known as', or an equivalent definitional construction). The literal value must be entailed by the quote, but need NOT be a verbatim substring of it — a downstream semantic judge checks the definition against the evidence.",
-      "WRONG: 'Rust move semantics is-a Rust ownership system'; move semantics is not a kind of ownership system. WRONG: 'DNA double helix uses DNA replication'; replication operates on or uses the double helix, not vice versa.",
-      "WRONG: 'Semantic Signal uses Instructor-Aligned KG'; the framework uses the signal. For the Semantic Signal subject call, emit no reversed uses claim.",
-      "Never emit a claim whose object is the subject concept itself.",
-      "If no relation in the closed set fits precisely, emit no claim; fewer precise claims beat many loose ones.",
-      "For every claim, classify evidenceLinkNature and evidenceDirection honestly from the quoted sentence alone. The application rejects any predicate/nature/direction mismatch.",
-      "Concept objects MUST be one of the admitted concepts listed; reference them by candidateKey. If you need a concept that is not admitted, do NOT invent a claim — record it under missingConceptProposals instead.",
-      "Every concept-to-concept claim needs at least one verbatim quote that explicitly names BOTH the fixed subject concept (or listed alias) and the object concept (or listed alias). Do not rely on pronouns, implied subjects, or broad phrases such as 'dependency inference'.",
-      "Every claim requires a verbatim evidence quote copied exactly from a cited block. No quote, no claim."
+      "You build a Concept Evidence Profile for ONE subject concept from a curated source, for a learner-neutral concept graph.",
+      "A profile has three parts: definition passages, mention passages, and optional typed assertions. Every passage is a VERBATIM quote copied exactly from a cited block. No verbatim quote, no passage.",
+      "DEFINITION PASSAGES: one or more verbatim passages that establish what the subject concept MEANS. A definition passage need NOT use a literal 'X is Y' form — apposition ('—a discrepancy known as the generalization gap'), a 'means'/'refers to'/'known as' construction, or any meaning-bearing sentence qualifies, as long as the passage conveys the concept's meaning. A bare repetition of the concept's own name, a section heading, or a title is NOT a definition passage — it conveys no meaning; quote the sentence that actually explains the concept instead. Include at least one; a concept the source never gives meaning to does not belong here.",
+      "MENTION PASSAGES: verbatim passages where the source substantively teaches, applies, structures, contrasts, or constrains the concept — its taxonomy, parts, mechanisms it uses, what it is distinguished from, what it depends on. This is where ordinary concept-to-concept relationships live; they are NOT typed. ORDER the mentions from MOST to LEAST useful for understanding the concept and what must be learned before it. The application keeps the most salient few, so put the strongest passages first.",
+      "OPTIONAL TYPED ASSERTIONS — emit ONLY when the evidence explicitly supports one; otherwise leave assertions empty and keep the passage as a mention:",
+      "- 'defines': set objectKind='literal' and literalValue to a faithful, concise definition GROUNDED IN the evidence quote (you may smooth wording, resolve apposition, or normalise order, but add no meaning the quote does not support). Attach the verbatim evidence.",
+      "- 'explicit-prerequisite-hint': set objectKind='concept' and objectCandidateKey to an ADMITTED concept that the source EXPLICITLY states must be understood before the subject. Mere topical ordering or co-mention is NOT a prerequisite hint. Attach the verbatim evidence naming both concepts.",
+      "Do NOT invent assertion types. Taxonomy, part-of, uses, and contrast relationships are mention passages, not assertions.",
+      "Reference admitted concepts only by the candidateKeys listed. Never assert a prerequisite hint to a concept that is not admitted.",
+      "Every definition, mention, and assertion evidence quote must be copied verbatim from a cited block."
     ].join("\n");
     const admitted = input.admittedConcepts
+      .filter((concept) => concept.candidateKey !== input.subject.candidateKey)
       .map((concept) => `- ${concept.candidateKey}: "${concept.canonicalLabel}" (exact aliases: ${renderAliases(concept.aliases)})`)
       .join("\n");
-    const endpointExplicitBlocks = input.evidenceNeighborhood.filter((block) =>
-      mentionsAlias(block.text, input.subject.aliases) &&
-      input.admittedConcepts.some((concept) =>
-        concept.candidateKey !== input.subject.candidateKey && mentionsAlias(block.text, concept.aliases)
-      )
-    );
-    const retryFeedback = input.feedback
-      ? [
-          "",
-          "This is one bounded retry after the previous attempt produced no verified claims.",
-          "Do not repeat an unchanged rejected proposal. Correct its predicate, direction, endpoints, or evidence, or omit it.",
-          "Previous rejected proposals:",
-          ...input.feedback.rejectedClaims.map((claim) =>
-            `- ${claim.predicate} -> ${renderClaimObject(claim.object)}; rejected because: ${claim.boundaryReasonCodes.join(", ") || "unspecified"}; evidence: ${claim.evidence.map((item) => `"${item.evidenceQuote}"`).join(" | ") || "none"}`
-          )
-        ]
-      : [];
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
       `Subject concept: ${input.subject.candidateKey} = "${input.subject.canonicalLabel}".`,
       `Subject exact aliases: ${renderAliases(input.subject.aliases)}.`,
-      "Admitted concepts available as claim objects:",
-      admitted,
+      "Other admitted concepts (valid targets for an explicit-prerequisite-hint):",
+      admitted || "(none)",
       "",
       "Evidence blocks (quote verbatim from these):",
       renderBlocks(input.evidenceNeighborhood),
       "",
-      "Endpoint-explicit evidence candidates (prefer these when they state a valid relation in the required direction):",
-      endpointExplicitBlocks.length > 0 ? renderBlocks(endpointExplicitBlocks) : "(none)",
-      ...retryFeedback,
-      "",
-      "Call submit_concept_claims. Each claim's subject is the subject concept above."
+      "Call submit_concept_evidence_profile with the subject concept's definition passages, salience-ordered mention passages, and any optional typed assertions."
     ].join("\n");
 
     const result = await this.client.call({
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_concept_claims",
-      toolDescription: "Submit typed evidence-backed claims for the subject concept, plus any missing-concept proposals.",
-      parameters: conceptClaimSchema,
-      validator: conceptClaimValidator
+      toolName: "submit_concept_evidence_profile",
+      toolDescription: "Submit the subject concept's definition passages, salience-ordered mention passages, and optional typed assertions.",
+      parameters: conceptEvidenceProfileSchema,
+      validator: conceptEvidenceProfileValidator
     });
 
     const admittedKeys = new Set(input.admittedConcepts.map((concept) => concept.candidateKey));
-    const claims: ExtractedClaim[] = [];
-    for (const claim of result.claims) {
-      if (claim.objectKind === "concept") {
-        // Concept objects must reference an admitted concept; otherwise it is not a valid claim here.
-        if (!claim.objectCandidateKey || !admittedKeys.has(claim.objectCandidateKey)) continue;
-        if (claim.predicate === "defined-as") continue; // defined-as is literal-only
-        claims.push({
-          subjectCandidateKey: input.subject.candidateKey,
-          predicate: claim.predicate,
-          object: { kind: "concept", candidateKey: claim.objectCandidateKey },
-          evidenceLinkNature: claim.evidenceLinkNature,
-          evidenceDirection: claim.evidenceDirection,
-          evidence: claim.evidence,
-          confidence: claim.confidence
-        });
+    const assertions: ExtractedTypedAssertion[] = [];
+    for (const assertion of result.assertions) {
+      if (assertion.type === "defines") {
+        if (assertion.literalValue === null || assertion.literalValue.trim() === "") continue;
+        assertions.push({ type: "defines", literalValue: assertion.literalValue, evidence: assertion.evidence });
       } else {
-        if (claim.objectLiteralValue === null || claim.objectLiteralValue.trim() === "") continue;
-        if (claim.predicate !== "defined-as") continue; // only defined-as takes a literal object
-        claims.push({
-          subjectCandidateKey: input.subject.candidateKey,
-          predicate: claim.predicate,
-          object: { kind: "literal", value: claim.objectLiteralValue },
-          evidenceLinkNature: claim.evidenceLinkNature,
-          evidenceDirection: claim.evidenceDirection,
-          evidence: claim.evidence,
-          confidence: claim.confidence
-        });
+        // explicit-prerequisite-hint must target a distinct admitted concept.
+        if (!assertion.objectCandidateKey || assertion.objectCandidateKey === input.subject.candidateKey) continue;
+        if (!admittedKeys.has(assertion.objectCandidateKey)) continue;
+        assertions.push({ type: "explicit-prerequisite-hint", objectCandidateKey: assertion.objectCandidateKey, evidence: assertion.evidence });
       }
     }
 
     return {
-      claims,
-      proposals: result.missingConceptProposals.map((proposal) => ({
-        proposedLabel: proposal.proposedLabel,
-        rationale: proposal.rationale,
-        evidence: proposal.evidenceBlockId && proposal.evidenceQuote
-          ? { blockId: proposal.evidenceBlockId, evidenceQuote: proposal.evidenceQuote }
-          : undefined,
-        extractionAttempt: input.feedback ? 2 : 1
-      }))
+      definitions: result.definitions,
+      mentions: result.mentions,
+      assertions
     };
   }
 }
 
-// Semantic claim-entailment judge (ADR-0007). Mirrors the prerequisite-judgment
-// adapter: forced named tool, temp 0, one bounded judgment per concept claim.
-// The judge sees the two concept labels (+aliases), the typed relation and its
-// strict test, and the already-verbatim evidence quotes. It decides whether the
-// evidence actually asserts that relation in that direction. Fail closed: a
-// ungrounded `entailingSpan` is treated as not-entailed so the judge cannot
-// "support" a claim with text that is not in the cited evidence. Grounding uses
-// the same formatting-noise normalization as the deterministic evidence floor.
-export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJudgmentPort {
+// Assertion-entailment judge (ADR-0007 reset). Mirrors the prerequisite-judgment
+// adapter: forced named tool, temp 0, one bounded judgment per OPTIONAL typed
+// assertion. It guards only the two assertion shapes — `judgePrerequisiteHint` for
+// an explicit-prerequisite-hint, `judgeDefinition` for a `defines` literal. Fail
+// closed: an ungrounded `entailingSpan` is treated as not-entailed so the judge
+// cannot "support" an assertion with text absent from the cited evidence. Grounding
+// uses the same formatting-noise normalization as the deterministic evidence floor.
+export class LiteLlmAssertionEntailmentJudgmentAdapter implements AssertionEntailmentJudgmentPort {
   readonly model: string;
-  constructor(private readonly client: LiteLlmForcedToolClient, model: string = CLAIM_ENTAILMENT_JUDGE_MODEL) {
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = ASSERTION_ENTAILMENT_JUDGE_MODEL) {
     this.model = model;
   }
 
-  async judge(input: {
+  async judgePrerequisiteHint(input: {
     declaredDomain: string;
     subject: { canonicalLabel: string; aliases: string[] };
-    predicate: RelationPredicate;
     object: { canonicalLabel: string; aliases: string[] };
     evidenceQuotes: string[];
-  }): Promise<ClaimEntailmentJudgment> {
+  }): Promise<AssertionEntailmentJudgment> {
     const system = [
-      "You judge whether quoted source evidence ACTUALLY ASSERTS a specific typed relation between two domain concepts, for a learner-neutral concept graph.",
+      "You judge whether quoted source evidence EXPLICITLY states that one domain concept must be understood BEFORE another, for a learner-neutral concept graph.",
       "The evidence quotes are already verified verbatim from the source. Judge ONLY what the quotes assert — do not use outside knowledge to fill gaps.",
-      "Real prose asserts relations through pronouns, apposition, lists, passive voice, and synonym verbs; do not require a fixed surface phrasing. Judge meaning, not wording.",
-      "Be precision-first. Return entailed=false when the quotes only co-mention the concepts, assert a DIFFERENT relation, assert the relation in the REVERSE direction, or merely relate them causally/motivationally.",
-      "The relation has a fixed direction: SUBJECT then OBJECT. A correct relation stated with the roles reversed is NOT entailed for this claim.",
-      "When entailed=true, copy the minimal exact sub-quote that carries the relation into entailingSpan; it must be a verbatim substring of one provided quote. When entailed=false, return an empty entailingSpan."
+      "Real prose asserts prerequisites through pronouns, apposition, and synonym phrasing ('requires', 'builds on', 'before you can', 'depends on understanding'); do not require a fixed surface phrasing. Judge meaning, not wording.",
+      "Be precision-first. Return entailed=false when the quotes only co-mention the concepts, merely order topics, or state a non-prerequisite relation.",
+      "The hint has a fixed direction: the SUBJECT is the prerequisite of the OBJECT. A prerequisite stated in the REVERSE direction is NOT entailed.",
+      "When entailed=true, copy the minimal exact sub-quote that carries the prerequisite into entailingSpan; it must be a verbatim substring of one provided quote. When entailed=false, return an empty entailingSpan."
     ].join("\n");
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
-      `Subject concept: "${input.subject.canonicalLabel}" (aliases: ${renderAliases(input.subject.aliases)}).`,
-      `Object concept: "${input.object.canonicalLabel}" (aliases: ${renderAliases(input.object.aliases)}).`,
-      `Claimed relation: ${input.subject.canonicalLabel} ${input.predicate} ${input.object.canonicalLabel}.`,
-      `Relation test: ${PREDICATE_ENTAILMENT_TEST[input.predicate]}`,
+      `Subject (claimed prerequisite): "${input.subject.canonicalLabel}" (aliases: ${renderAliases(input.subject.aliases)}).`,
+      `Object (claimed dependent): "${input.object.canonicalLabel}" (aliases: ${renderAliases(input.object.aliases)}).`,
+      `Claimed hint: understanding ${input.subject.canonicalLabel} is needed before ${input.object.canonicalLabel}.`,
       "",
       "Verbatim evidence quotes:",
       ...input.evidenceQuotes.map((quote, index) => `[${index + 1}] "${quote}"`),
       "",
-      "Call submit_claim_entailment_judgment: does the evidence assert this relation in this direction between these two concepts?"
+      "Call submit_assertion_entailment_judgment: does the evidence explicitly state the subject is needed before the object?"
     ].join("\n");
 
     const result = await this.client.call({
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_claim_entailment_judgment",
-      toolDescription: "Submit whether the verbatim evidence entails the claimed typed relation in the claimed direction.",
-      parameters: claimEntailmentJudgmentSchema,
-      validator: claimEntailmentJudgmentValidator
+      toolName: "submit_assertion_entailment_judgment",
+      toolDescription: "Submit whether the verbatim evidence entails the explicit prerequisite hint in the claimed direction.",
+      parameters: assertionEntailmentJudgmentSchema,
+      validator: assertionEntailmentJudgmentValidator
     });
 
     return groundedJudgment(result, input.evidenceQuotes);
   }
 
-  // Definition entailment for a `defined-as` literal. The literal is model-authored
+  // Definition entailment for a `defines` literal. The literal is model-authored
   // PARAPHRASE, not a source substring, so no surface matcher can verify it (the old
   // deterministic `evidence_does_not_lexically_entail_definition` gate was a
   // false-negative machine, AGENTS rule 16). The judge decides whether the verbatim
@@ -479,7 +397,7 @@ export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJud
     subject: { canonicalLabel: string; aliases: string[] };
     definition: string;
     evidenceQuotes: string[];
-  }): Promise<ClaimEntailmentJudgment> {
+  }): Promise<AssertionEntailmentJudgment> {
     const system = [
       "You judge whether quoted source evidence ACTUALLY DEFINES a domain concept as a given meaning, for a learner-neutral concept graph.",
       "The evidence quotes are already verified verbatim from the source. Judge ONLY what the quotes assert — do not use outside knowledge to fill gaps.",
@@ -613,7 +531,7 @@ function groundedAdmissionLabelJudgment(
 function groundedJudgment(
   result: { entailed: boolean; entailingSpan: string; rationale: string },
   evidenceQuotes: string[]
-): ClaimEntailmentJudgment {
+): AssertionEntailmentJudgment {
   const span = result.entailingSpan.trim();
   const grounded = span.length > 0 && evidenceQuotes.some((quote) => evidenceQuoteMatches(quote, span));
   return {
@@ -625,13 +543,4 @@ function groundedJudgment(
 
 function renderAliases(aliases: string[]): string {
   return aliases.length > 0 ? aliases.map((alias) => `"${alias}"`).join(", ") : "none";
-}
-
-function renderClaimObject(object: ExtractedClaim["object"]): string {
-  return object.kind === "concept" ? object.candidateKey : `"${object.value}"`;
-}
-
-function mentionsAlias(text: string, aliases: string[]): boolean {
-  const normalizedText = text.toLowerCase();
-  return aliases.some((alias) => alias.length > 0 && normalizedText.includes(alias.toLowerCase()));
 }

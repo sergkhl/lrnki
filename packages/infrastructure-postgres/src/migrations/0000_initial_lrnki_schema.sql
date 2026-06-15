@@ -107,39 +107,46 @@ CREATE TABLE concept_admission_decisions (
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1)
 );
 
-CREATE TABLE run_claims (
-  run_claim_id uuid PRIMARY KEY,
+-- Run-scoped Concept Evidence Profiles (ADR-0007 reset) replace run claims. One
+-- per admitted atomic Concept; references the run-local candidate, never a
+-- published concept. `complete` requires a verified definition passage.
+CREATE TABLE run_concept_evidence_profiles (
+  run_concept_evidence_profile_id uuid PRIMARY KEY,
   run_id uuid NOT NULL REFERENCES extraction_runs(run_id),
-  subject_candidate_id uuid NOT NULL REFERENCES concept_candidates(concept_candidate_id),
-  predicate text NOT NULL REFERENCES relation_definitions(predicate),
-  object_kind text NOT NULL CHECK (object_kind IN ('concept', 'literal')),
-  object_candidate_id uuid REFERENCES concept_candidates(concept_candidate_id),
-  object_literal jsonb,
-  model_confidence real NOT NULL CHECK (model_confidence >= 0 AND model_confidence <= 1),
-  evidence_count integer NOT NULL,
-  validation_outcome text NOT NULL CHECK (validation_outcome IN ('verified', 'rejected')),
-  boundary_reason_codes jsonb NOT NULL,
-  extraction_attempt integer NOT NULL CHECK (extraction_attempt IN (1, 2)),
+  concept_candidate_id uuid NOT NULL REFERENCES concept_candidates(concept_candidate_id),
+  tier text NOT NULL CHECK (tier IN ('core', 'optional', 'reject', 'quarantine')),
+  complete boolean NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK ((object_kind = 'concept' AND object_candidate_id IS NOT NULL) OR (object_kind = 'literal' AND object_literal IS NOT NULL))
+  UNIQUE (run_id, concept_candidate_id)
 );
 
-CREATE TABLE run_claim_evidence (
-  run_claim_evidence_id uuid PRIMARY KEY,
-  run_claim_id uuid NOT NULL REFERENCES run_claims(run_claim_id),
+-- Definition and mention passages — verbatim source quotes. `kind` separates them;
+-- `salience_rank` preserves the neural order for mentions.
+CREATE TABLE run_evidence_passages (
+  run_evidence_passage_id uuid PRIMARY KEY,
+  run_concept_evidence_profile_id uuid NOT NULL REFERENCES run_concept_evidence_profiles(run_concept_evidence_profile_id),
+  kind text NOT NULL CHECK (kind IN ('definition', 'mention')),
+  source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
+  evidence_quote text NOT NULL,
+  salience_rank integer NOT NULL
+);
+
+-- Optional typed assertions — guarded evidence, never edges. `defines` carries a
+-- literal; `explicit-prerequisite-hint` references an admitted Concept candidate.
+CREATE TABLE run_optional_assertions (
+  run_optional_assertion_id uuid PRIMARY KEY,
+  run_concept_evidence_profile_id uuid NOT NULL REFERENCES run_concept_evidence_profiles(run_concept_evidence_profile_id),
+  assertion_type text NOT NULL CHECK (assertion_type IN ('defines', 'explicit-prerequisite-hint')),
+  literal_value text,
+  object_candidate_id uuid REFERENCES concept_candidates(concept_candidate_id),
+  CHECK ((assertion_type = 'defines' AND literal_value IS NOT NULL) OR (assertion_type = 'explicit-prerequisite-hint' AND object_candidate_id IS NOT NULL))
+);
+
+CREATE TABLE run_optional_assertion_evidence (
+  run_optional_assertion_evidence_id uuid PRIMARY KEY,
+  run_optional_assertion_id uuid NOT NULL REFERENCES run_optional_assertions(run_optional_assertion_id),
   source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
   evidence_quote text NOT NULL
-);
-
-CREATE TABLE missing_concept_proposals (
-  missing_concept_proposal_id uuid PRIMARY KEY,
-  run_id uuid NOT NULL REFERENCES extraction_runs(run_id),
-  proposed_label text NOT NULL,
-  rationale text NOT NULL,
-  source_block_id uuid REFERENCES source_blocks(source_block_id),
-  evidence_quote text,
-  extraction_attempt integer NOT NULL CHECK (extraction_attempt IN (1, 2)),
-  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------------------------
@@ -272,33 +279,27 @@ JSON_TABLE(
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type = 'extraction_run.v4';
+WHERE a.artifact_type = 'extraction_run.v5';
 
--- Flatten extraction-run artifact payloads: one row per extracted claim with
--- its validation outcome, for the Admin Lab Run Inspector.
-CREATE VIEW artifact_run_claims AS
-SELECT a.run_id, cl.subject_candidate_key, cl.predicate, cl.object_kind,
-       cl.object_candidate_key, cl.object_literal, cl.validation_outcome,
-       cl.evidence_count, cl.model_confidence, cl.boundary_reason_codes,
-       cl.extraction_attempt
+-- Flatten extraction-run artifact payloads: one row per Concept Evidence Profile
+-- with its definition/mention/assertion counts, for the Admin Lab Run Inspector.
+CREATE VIEW artifact_run_evidence_profiles AS
+SELECT a.run_id, p.candidate_key, p.tier, p.complete,
+       p.definition_count, p.mention_count, p.assertion_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
-  '$.claims[*]'
+  '$.evidenceProfiles[*]'
   COLUMNS (
-    subject_candidate_key text PATH '$.subjectCandidateKey',
-    predicate text PATH '$.predicate',
-    object_kind text PATH '$.object.kind',
-    object_candidate_key text PATH '$.object.candidateKey',
-    object_literal text PATH '$.object.value',
-    validation_outcome text PATH '$.validationOutcome',
-    evidence_count integer PATH '$.evidenceCount',
-    model_confidence numeric PATH '$.modelConfidence',
-    boundary_reason_codes jsonb FORMAT JSON PATH '$.boundaryReasonCodes',
-    extraction_attempt integer PATH '$.extractionAttempt'
+    candidate_key text PATH '$.candidateKey',
+    tier text PATH '$.tier',
+    complete boolean PATH '$.complete',
+    definition_count integer PATH '$.definitions.size()',
+    mention_count integer PATH '$.mentions.size()',
+    assertion_count integer PATH '$.assertions.size()'
   )
-) AS cl
-WHERE a.artifact_type = 'extraction_run.v4';
+) AS p
+WHERE a.artifact_type = 'extraction_run.v5';
 
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
