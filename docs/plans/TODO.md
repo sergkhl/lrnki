@@ -5,21 +5,27 @@ the product critical path is concept admission → enrichment prerequisite infer
 Asserted claims move off that path and are replaced by Concept Evidence Profiles; measurement becomes
 disposable scaffolding.
 
-1. **Fix Concept Admission precision, then retire the oracle harness.**
-   Admission decides which Concepts enter the prerequisite DAG, so it is on the critical path. Drive
-   these fixes with the existing frozen Gate 2 results — this is their last use, after which the harness
-   is deleted (task is complete only when both the fix and the teardown land).
-   - Cross-domain optional precision leak: out-of-domain illustrative examples (merge sort, recursion,
-     `FOREIGN KEY`, SQL clauses, Dynamic Programming) were admitted `optional` instead of rejected
-     (InstructKG admit P=0.16). Tighten the Declared-Domain relevance signal so illustrative
-     cross-domain mentions reject.
-   - Core-poor under-tiering (rust, InstructKG): apply the Core Set Selection lever that fixed the ML PDF.
-   - Split conflated labels (rust `The stack and the heap`) into atomic Concepts.
-   - Once these pass rule-14 expert inspection, delete the oracle triangle, label aligner,
-     quarantine-of-disagreement, frozen references, and `scoreAdmissionOracle*` in the same change. The
-     durable quality bar becomes rule-14 read + inline judges + the verbatim-evidence floor.
+## EXECUTION STATUS (plan `docs/plans/2026-06-15-001-refactor-concept-evidence-profile-core-plan.md`)
 
-2. **Replace asserted claims with Concept Evidence Profiles (the core redefinition).**
+Executing on branch **`refactor/cep-core-reset`** (off `main`). Plan units map to this TODO:
+U1+U2 = item below "Fix admission … retire oracle" (**DONE**, see COMPLETED); U3+U4 = item 1 (CEP +
+publication); U5 = item 2 (enrichment over CEP pairs); U6 = Admin Lab reshape (folded into item 1's last
+bullet); U7 = item 3 (ADRs/CONTEXT) + finalizing this TODO. Items track product intent; the plan's U-IDs
+track execution.
+
+**Next entry point: U3** — replace claim extraction with Concept Evidence Profile extraction (item 1,
+first bullet). U3 ends in a mandatory rule-14 gate (inspect real CEPs from Rust/biology/economics) BEFORE
+U4's persistence rewrite — same FIX_FIRST discipline that closed the InstructKG leak in U1.
+
+Operational notes for the next agent:
+- LiteLLM proxy serves the renamed judge alias **`kg-independent-judge`** (gpt-oss-120b); any alias
+  change in `litellm/config.yaml` requires `docker restart lrnki-litellm` to take effect.
+- Worker pipeline config hash is at **`...-atomic-admission-source-role-v31`**; bump it whenever
+  admission/CEP/judge prompts or schemas change.
+- Postgres 18 + Docling + LiteLLM are reachable; 5 fixtures registered (`worker:kg list-sources`).
+- The migration is still the claim-era schema; U3/U4 rewrite it and reset the DB.
+
+1. **Replace asserted claims with Concept Evidence Profiles (the core redefinition).**
    - CEP per admitted Concept: verbatim definition snippet(s) + bounded (salience-capped) mention
      passages + per-source provenance; append-only union across sources.
    - Retire the six-relation registry. Keep only `defines` + `explicit-prerequisite-hint` as guarded
@@ -30,16 +36,16 @@ disposable scaffolding.
    - Update Admin Lab Graph Explorer to show Concepts + evidence; edges appear only in Derived Graph
      Layers.
 
-3. **Feed enrichment prerequisite judgment over CEP pairs (promotes the old enrichment-evidence task).**
+2. **Feed enrichment prerequisite judgment over CEP pairs (promotes the old enrichment-evidence task).**
    - Prerequisite judgment reasons over pairs of CEPs (definitions + bounded mentions), not over labels
      or published claims. Validate by rule-14 inspection of the inferred DAG and learner path.
 
-4. **Rewrite affected ADRs in place + CONTEXT.md vocabulary.**
+3. **Rewrite affected ADRs in place + CONTEXT.md vocabulary.**
    - Rewrite ADR-0002, 0005, 0007, 0013, 0016, 0022 in place (no superseding ADRs).
    - CONTEXT.md: revise `Claim` / `Relation Registry` / `Asserted Relation`; add `Concept Evidence
      Profile` and the two optional-assertion types. ADR-0015 and ADR-0019 are unchanged and preserved.
 
-5. **Deferred — mocks stay behind ports; do not build.**
+4. **Deferred — mocks stay behind ports; do not build.**
    - Difficulty stays the DAG-depth mock (`DifficultyPort`); learner state stays the empty mock
      (`LearnerStatePort`). No Bradley-Terry, IRT/KT, anomaly detection, or synthetic priors.
    - Cut: embedding canonicalization cascade + embedding blocking tier; deterministic identity
@@ -48,6 +54,17 @@ disposable scaffolding.
 
 ## COMPLETED
 
+- **Reset milestone 1 — atomic admission precision + oracle teardown (U1+U2, branch `refactor/cep-core-reset`).**
+  U1 (`5b2e819`, `9b1bb62`): admission emits one-or-many ATOMIC proposals per discovered candidate
+  (`parentCandidateKey` + run-local `atomicKey`); Core Set Selection runs over atoms; the deterministic
+  illustrative-section regex is replaced by a neural `sourceRole` (AGENTS rule 16) that rejects
+  out-of-domain illustration. rule-14 PASS over real DeepSeek runs of Rust/InstructKG/MLE-bench: atomic
+  split fired live ("Stack and Heap" → two parented atoms), established ML concepts stayed core in a
+  method paper, and the InstructKG cross-domain CS/SQL leak was closed (`tmp/u1-admission-atomic-source-role-quality-evaluation.md`).
+  U2 (`85c083c`): deleted the `quality-lab` package, LiteLLM oracle adapters, oracle/aligner domain types
+  + ports + tool schemas, and the frozen oracle/alignment artifacts under `tmp/`; renamed the retained
+  inline judges to the `kg-independent-judge` production alias. Durable quality bar is now rule-14 +
+  inline judges + the verbatim-evidence floor. Full suite green (typecheck + 81 tests + lint).
 - **Gate 1 asserted-graph pipeline published (graph version `3096ec52`).** Native curated-source
   ingestion (Markdown/HTML/plaintext block-level parsing with locators + deterministic region
   classification); discovery → two-phase admission (source-level Core Set Selection) → claims with
@@ -89,13 +106,13 @@ disposable scaffolding.
 
 ## VALIDATION
 
-Latest validation (2026-06-15) is the **pre-reset baseline** — this brainstorm/roadmap update touched
-only planning + `tmp/` artifacts, no source code, so the suite matches the prior baseline:
+Latest validation (2026-06-15) is **after reset milestone 1 (U1+U2)** on branch `refactor/cep-core-reset`:
 
-- **Static:** all source-package typechecks pass; tests green — quality-lab 8, infrastructure-litellm 8,
-  infrastructure-ingestion 9, application 59 (84 total, 0 fail); ESLint clean. (The lone typecheck error
-  remains the Next.js dev-server-generated `apps/admin-lab/.next/dev/types/validator.ts`, regenerated by
-  the production build.)
-- **Trust status:** all five Gate 2 admission arms were human-trusted before the reset, with documented
-  scoring caveats (`AIDE`, economics `Self-interest`). No new graph version was published.
-- Re-validate after TODO #1–#2 land, since both remove code paths (oracle harness, claim/registry).
+- **Static:** all source-package typechecks pass; tests green — infrastructure-litellm 8,
+  infrastructure-ingestion 9, application 64 (81 total, 0 fail; quality-lab's 8 removed with the
+  package); ESLint clean. Clear the Next.js dev-generated `apps/admin-lab/.next` before typechecking if a
+  stale `validator.ts` error appears.
+- **Real-use (rule-14):** U1 PASS over live DeepSeek runs of Rust/InstructKG/MLE-bench (see COMPLETED).
+  No new graph version published; the published Gate 1 graph (`3096ec52`) is untouched.
+- Re-validate after each remaining unit lands — U3/U4 rewrite the migration and reset the DB, U5 removes
+  the embedding path, U6 reshapes the Admin Lab.
