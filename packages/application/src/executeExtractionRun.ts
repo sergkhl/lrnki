@@ -68,7 +68,7 @@ export async function executeExtractionRun(input: {
     initialBoundaryReasonCodes: duplicateKeys.has(candidate.candidateKey) ? ["duplicate_admission_decision"] : []
   }));
 
-  // Concept-vs-proposition admission judge (ADR-0021). A downgrade-only neural
+  // Concept-vs-proposition admission judge (ADR-0005). A downgrade-only neural
   // stage after the deterministic boundary: it demotes a `core` candidate whose
   // label asserts a proposition rather than naming a concept, replacing the
   // removed `looksLikePropositionLabel` lexical veto (AGENTS rule 16). Fail-closed
@@ -168,7 +168,7 @@ export async function executeExtractionRun(input: {
   // Deterministic pass first (verbatim floor, nature/direction, aggregate
   // structural gates), then the semantic entailment judge downgrades any
   // surviving concept claim whose evidence does not actually assert the relation
-  // (ADR-0020). The judge only DOWNGRADES, so the deterministic guarantees hold.
+  // (ADR-0007). The judge only DOWNGRADES, so the deterministic guarantees hold.
   const policyClaims = applyClaimPolicy({
     claims: effectiveExtractedClaims,
     coreCandidateKeys: coreKeys,

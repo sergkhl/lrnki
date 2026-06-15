@@ -159,7 +159,7 @@ test("demotes a selected candidate whose organizing evidence is confined to illu
 });
 
 test("no longer demotes a proposition-shaped label by lexical policy (now the admission judge's job)", () => {
-  // The deterministic looksLikePropositionLabel veto was removed (ADR-0021,
+  // The deterministic looksLikePropositionLabel veto was removed (ADR-0005,
   // AGENTS rule 16). Concept-vs-proposition is a semantic call made downstream by
   // the measured admission-label judge, so the pure policy must NOT demote here.
   const result = applyAdmissionPolicy({

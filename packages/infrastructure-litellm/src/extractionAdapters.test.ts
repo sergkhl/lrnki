@@ -78,7 +78,7 @@ test("definition judge rejects a definition of a qualified variant", async () =>
   assert.equal(result.entailed, false);
 });
 
-// --- Concept-vs-proposition admission judge (ADR-0021) --------------------
+// --- Concept-vs-proposition admission judge (ADR-0005) --------------------
 
 function admissionAdapterReturning(result: {
   labelKind: "concept" | "proposition_or_claim";

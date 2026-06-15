@@ -85,7 +85,7 @@ export function applyAdmissionPolicy(input: {
     organizingPower.aspects.every((aspect) => input.illustrativeBlockIds?.has(aspect.evidence.blockId));
   if (illustrativeOnly) boundaryReasonCodes.push("illustrative_only_source_treatment");
   // Concept-vs-proposition is a SEMANTIC judgment, not a provable property, so it
-  // is decided by the measured neural admission-label judge (ADR-0021), a separate
+  // is decided by the measured neural admission-label judge (ADR-0005), a separate
   // downgrade-only stage AFTER this boundary — never a hardcoded lexical matcher
   // here (AGENTS rule 16). The label source-grounding above stays deterministic
   // because it IS a provable substring property.

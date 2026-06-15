@@ -169,7 +169,7 @@ model_list:
       model: "openrouter/tencent/hy3-preview"
       api_key: os.environ/OPENROUTER_API_KEY
 
-  # Oracle second judge (kg-oracle-judge), and the ADR-0020/0021 production judges.
+  # Oracle second judge (kg-oracle-judge), and the ADR-0007/0005 production judges.
   # gpt-oss-120b is cross-family independent of BOTH the DeepSeek extractor and the
   # Xiaomi reference author (true triangle independence), forced tool_choice works,
   # and it is the cheapest option ($0.039/$0.18 per Mtok). Replaces Mistral Small
@@ -262,5 +262,5 @@ router_settings:
     kg-oracle-reference: openrouter/xiaomi/mimo-v2.5-pro
     # gpt-oss-120b: cheap ($0.039/$0.18) and cross-family independent of both the
     # extractor (DeepSeek) and the author (Xiaomi). Replaces Mistral (rate-limited)
-    # and Nemotron (expensive). Also backs the ADR-0020/0021 production judges.
+    # and Nemotron (expensive). Also backs the ADR-0007/0005 production judges.
     kg-oracle-judge: openrouter/openai/gpt-oss-120b

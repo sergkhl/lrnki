@@ -1,7 +1,7 @@
 import type { RunClaim } from "@lrnki/domain-core";
 import type { ClaimEntailmentJudgmentPort } from "@lrnki/ports";
 
-// Composed semantic-entailment stage (ADR-0020). Runs AFTER the pure
+// Composed semantic-entailment stage (ADR-0007). Runs AFTER the pure
 // deterministic `applyClaimPolicy`. A claim that survived the verbatim floor, the
 // nature/direction self-report gates, and the aggregate structural gates arrives
 // here as "verified" PENDING entailment. The judge re-checks, per claim, whether

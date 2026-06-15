@@ -4,7 +4,7 @@
 
 2. Preserve Deep Module Architecture. Keep domain logic isolated from infrastructure, UI, and orchestration. Enforce dependency direction inward. Communicate only through explicit ports.
 
-3. Keep the Learner-Neutral Core Concept Graph intentionally small. Add embeddings, graph databases, schema induction, neuro-symbolic inference, multimodal extraction, and personalization only as explicit measured modules or experiments.
+3. Keep the Learner-Neutral Core Concept Graph intentionally small.
 
 4. Prioritize real curated source fixtures across mixed domains and formats.
 

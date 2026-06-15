@@ -25,7 +25,7 @@ export type AdmissionOracleSource = {
   blocks: SourceBlock[];
 };
 
-// Verbatim-grounding floor (the same deterministic guarantee ADR-0007/0020 keep
+// Verbatim-grounding floor (the same deterministic guarantee ADR-0007 keeps
 // authoritative): an oracle reference may only cite text that exists in the
 // source. Drop non-matching quotes; a label left with no grounded quote is
 // quarantined fail-closed rather than trusted on text absent from the source.

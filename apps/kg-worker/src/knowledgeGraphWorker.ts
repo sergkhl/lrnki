@@ -103,11 +103,11 @@ function buildContext() {
     discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
     admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
     claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient),
-    // Semantic claim-entailment judge (ADR-0020). Independent model (Mistral
+    // Semantic claim-entailment judge (ADR-0007). Independent model (Mistral
     // Small via kg-oracle-judge) so the judge is not the extractor re-grading
     // itself; deterministic decoding for stable re-derivation.
     claimEntailmentJudge: new LiteLlmClaimEntailmentJudgmentAdapter(deterministicClient),
-    // Concept-vs-proposition admission judge (ADR-0021). Same independent family
+    // Concept-vs-proposition admission judge (ADR-0005). Same independent family
     // (kg-oracle-judge) and deterministic decoding; downgrade-only stage that
     // replaces the removed looksLikePropositionLabel lexical veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),

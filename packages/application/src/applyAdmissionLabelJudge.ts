@@ -1,7 +1,7 @@
 import type { RunCandidate } from "@lrnki/domain-core";
 import type { AdmissionLabelJudgmentPort } from "@lrnki/ports";
 
-// Composed concept-vs-proposition admission stage (ADR-0021). Runs AFTER the pure
+// Composed concept-vs-proposition admission stage (ADR-0005). Runs AFTER the pure
 // deterministic `applyAdmissionPolicy`. A candidate that the neural Core Set
 // Selection placed `core` and that survived the deterministic boundary
 // (source-grounding, eligibility, organizing power, illustrative demotion)

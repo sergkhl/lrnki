@@ -59,7 +59,7 @@ export function applyClaimPolicy(input: {
     // supported claims (AGENTS rule 16). A claim that clears the verbatim floor
     // below, the nature/direction self-report gates, and the aggregate structural
     // gates is emitted "verified" here PENDING the semantic claim-entailment judge,
-    // which the application runs as a separate composed async stage (ADR-0020). The
+    // which the application runs as a separate composed async stage (ADR-0007). The
     // judge can only DOWNGRADE such a claim; it never resurrects one rejected here.
     if (claim.evidenceLinkNature === "causal-or-motivational") {
       boundaryReasonCodes.push("causal_or_motivational_link");

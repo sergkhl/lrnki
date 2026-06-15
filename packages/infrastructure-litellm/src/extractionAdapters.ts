@@ -42,12 +42,12 @@ import {
 export const DISCOVERY_MODEL = "kg-concept-discovery";
 export const ADMISSION_MODEL = "kg-concept-admission";
 export const CLAIM_MODEL = "kg-claim-extraction";
-// Independent second model for the semantic claim-entailment judge (ADR-0020).
+// Independent second model for the semantic claim-entailment judge (ADR-0007).
 // A different family than the extractor (Mistral Small vs DeepSeek) so the judge
 // is not just re-running the same model's reasoning over its own output.
 export const CLAIM_ENTAILMENT_JUDGE_MODEL = "kg-oracle-judge";
 // Independent second model for the concept-vs-proposition admission judge
-// (ADR-0021). Same independent family rationale as the claim judge (KTD3): the
+// (ADR-0005). Same independent family rationale as the claim judge (KTD3): the
 // judge must not be the admission extractor (DeepSeek) re-deciding its own label.
 export const ADMISSION_LABEL_JUDGE_MODEL = "kg-oracle-judge";
 
@@ -409,7 +409,7 @@ export class LiteLlmClaimExtractionAdapter implements ConceptConditionedClaimExt
   }
 }
 
-// Semantic claim-entailment judge (ADR-0020). Mirrors the prerequisite-judgment
+// Semantic claim-entailment judge (ADR-0007). Mirrors the prerequisite-judgment
 // adapter: forced named tool, temp 0, one bounded judgment per concept claim.
 // The judge sees the two concept labels (+aliases), the typed relation and its
 // strict test, and the already-verbatim evidence quotes. It decides whether the
@@ -526,7 +526,7 @@ export class LiteLlmClaimEntailmentJudgmentAdapter implements ClaimEntailmentJud
   }
 }
 
-// Concept-vs-proposition admission judge (ADR-0021). Mirrors the claim-entailment
+// Concept-vs-proposition admission judge (ADR-0005). Mirrors the claim-entailment
 // adapter: forced named tool, independent model family, one bounded judgment per
 // admitted-`core` label. The judge sees the proposed canonical label (+aliases)
 // and the candidate's already-verbatim evidence. It decides whether the label

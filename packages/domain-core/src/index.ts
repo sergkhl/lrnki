@@ -66,7 +66,7 @@ export function normalizeConceptLabel(label: string): string {
 
 // Whether a label NAMES a concept or ASSERTS a proposition about one is a SEMANTIC
 // judgment, not a provable property, so it is decided by the measured neural
-// concept-vs-proposition admission judge (ADR-0021, `AdmissionLabelJudgment`),
+// concept-vs-proposition admission judge (ADR-0005, `AdmissionLabelJudgment`),
 // never a hardcoded lexical matcher (AGENTS rule 16). The earlier deterministic
 // `looksLikePropositionLabel` veto was removed: its closed copula/verb/participle
 // list both missed real propositions (no listed verb, e.g. "Operator Set as
@@ -234,7 +234,7 @@ export type ClaimExtractionResult = {
   proposals: MissingConceptProposal[];
 };
 
-// Semantic claim-entailment judgment (ADR-0020). One bounded LLM judgment over a
+// Semantic claim-entailment judgment (ADR-0007). One bounded LLM judgment over a
 // single concept-to-concept claim whose evidence already verifies verbatim. It
 // replaces the brittle deterministic lexical-entailment veto (AGENTS rule 16):
 // real prose entails relations through pronouns, apposition, lists, and synonym
@@ -249,7 +249,7 @@ export type ClaimEntailmentJudgment = {
   rationale: string;
 };
 
-// Concept-vs-proposition admission judgment (ADR-0021). One bounded LLM judgment
+// Concept-vs-proposition admission judgment (ADR-0005). One bounded LLM judgment
 // over a single admitted-`core` label, replacing the brittle deterministic
 // `looksLikePropositionLabel` lexical veto (AGENTS rule 16): "is this label a
 // proposition?" is a semantic judgment, not a provable property, so a hardcoded

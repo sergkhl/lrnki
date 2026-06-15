@@ -66,7 +66,7 @@ test("rejects reciprocal asymmetric claims in both directions", () => {
 });
 
 // NOTE: semantic entailment is no longer decided here for EITHER claim shape
-// (ADR-0020). The former `evidence_does_not_name_both_endpoints` /
+// (ADR-0007). The former `evidence_does_not_name_both_endpoints` /
 // `evidence_does_not_lexically_entail_relation` (concept) and
 // `evidence_does_not_lexically_entail_definition` (literal) vetoes were hardcoded
 // surface matchers that produced false negatives on ordinary prose (AGENTS rule

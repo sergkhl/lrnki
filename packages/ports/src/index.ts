@@ -55,7 +55,7 @@ export interface ConceptConditionedClaimExtractionPort {
   }): Promise<ClaimExtractionResult>;
 }
 
-// Semantic claim-entailment judge (ADR-0020). A bounded, forced-tool LLM judgment
+// Semantic claim-entailment judge (ADR-0007). A bounded, forced-tool LLM judgment
 // over ONE claim whose evidence already verifies verbatim. It answers the semantic
 // question the deterministic lexical gates got wrong: does the quoted evidence
 // actually assert this claim? Used only to DOWNGRADE a deterministically-surviving
@@ -85,7 +85,7 @@ export interface ClaimEntailmentJudgmentPort {
   }): Promise<ClaimEntailmentJudgment>;
 }
 
-// Concept-vs-proposition admission judge (ADR-0021). A bounded, forced-tool LLM
+// Concept-vs-proposition admission judge (ADR-0005). A bounded, forced-tool LLM
 // judgment over ONE admitted-`core` label, run on an independent model family
 // (`kg-oracle-judge`) so the judge is not the admission extractor grading its own
 // homework. It answers the semantic question the deterministic lexical veto got

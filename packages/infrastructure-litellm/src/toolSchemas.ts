@@ -322,7 +322,7 @@ export const prerequisiteJudgmentValidator = z.object({
 }).strict();
 
 // --- Claim entailment judgment: submit_claim_entailment_judgment ----------
-// One bounded judgment over a single concept-to-concept claim (ADR-0020). The
+// One bounded judgment over a single concept-to-concept claim (ADR-0007). The
 // model decides whether the verbatim evidence actually asserts the typed relation
 // in the stated direction between the two named concepts. `entailingSpan` is the
 // minimal sub-quote that carries the relation; the application boundary fails
@@ -384,7 +384,7 @@ export const definitionEntailmentJudgmentValidator = z.object({
 }).strict();
 
 // --- Admission label judgment: submit_admission_label_judgment ------------
-// One bounded judgment over a single admitted-`core` label (ADR-0021). The model
+// One bounded judgment over a single admitted-`core` label (ADR-0005). The model
 // decides whether the label NAMES a concept or ASSERTS a proposition/claim about
 // one, and (when a proposition) names the underlying noun phrase it reduces to.
 // `groundingSpan` is the minimal verbatim sub-quote that shows the predication;
