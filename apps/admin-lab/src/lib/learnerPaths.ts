@@ -63,12 +63,11 @@ export async function listLearnerPaths(): Promise<LearnerPathSummary[] | undefin
       learner_path_id: string; target_concept_id: string; target_label: string; declared_domain: string;
       learner_state_ref: string; step_count: number; graph_version_id: string; enrichment_id: string; created_at: string;
     }[]>`
-      SELECT p.learner_path_id, p.target_concept_id, gvc.canonical_label AS target_label, c.declared_domain,
+      SELECT p.learner_path_id, p.target_derived_node_id AS target_concept_id, tn.canonical_label AS target_label, tn.declared_domain,
              p.learner_state_ref, p.graph_version_id, p.enrichment_id, p.created_at,
              (SELECT count(*) FROM learner_path_steps s WHERE s.learner_path_id = p.learner_path_id) AS step_count
       FROM learner_paths p
-      JOIN concepts c ON c.concept_id = p.target_concept_id
-      JOIN graph_version_concepts gvc ON gvc.graph_version_id = p.graph_version_id AND gvc.concept_id = p.target_concept_id
+      JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
       ORDER BY p.created_at DESC`;
     return rows.map((row) => ({
       learnerPathId: row.learner_path_id,
@@ -90,39 +89,37 @@ export async function getLearnerPathDetail(learnerPathId: string): Promise<Learn
       learner_path_id: string; target_concept_id: string; target_label: string; declared_domain: string;
       learner_state_ref: string; graph_version_id: string; enrichment_id: string; created_at: string;
     }[]>`
-      SELECT p.learner_path_id, p.target_concept_id, gvc.canonical_label AS target_label, c.declared_domain,
+      SELECT p.learner_path_id, p.target_derived_node_id AS target_concept_id, tn.canonical_label AS target_label, tn.declared_domain,
              p.learner_state_ref, p.graph_version_id, p.enrichment_id, p.created_at
       FROM learner_paths p
-      JOIN concepts c ON c.concept_id = p.target_concept_id
-      JOIN graph_version_concepts gvc ON gvc.graph_version_id = p.graph_version_id AND gvc.concept_id = p.target_concept_id
+      JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
       WHERE p.learner_path_id = ${learnerPathId}`;
     if (headers.length === 0) return undefined;
     const header = headers[0];
 
     const stepRows = await sql<{ position: number; concept_id: string; label: string; difficulty: number; included_reason: string }[]>`
-      SELECT s.position, s.concept_id, gvc.canonical_label AS label, s.difficulty, s.included_reason
+      SELECT s.position, s.derived_node_id AS concept_id, sn.canonical_label AS label, s.difficulty, s.included_reason
       FROM learner_path_steps s
-      JOIN learner_paths p ON p.learner_path_id = s.learner_path_id
-      JOIN graph_version_concepts gvc ON gvc.graph_version_id = p.graph_version_id AND gvc.concept_id = s.concept_id
+      JOIN derived_graph_nodes sn ON sn.derived_node_id = s.derived_node_id
       WHERE s.learner_path_id = ${learnerPathId}
       ORDER BY s.position`;
     const positionByConcept = new Map(stepRows.map((row) => [row.concept_id, row.position] as const));
 
-    // DAG context for the enrichment, scoped to the target's Declared Domain.
+    // DAG context for the enrichment, scoped to the target's Declared Domain. Spans
+    // the derived node space (anchors ∪ enrichment nodes, R15).
     const nodeRows = await sql<{ concept_id: string; label: string; score: number | null }[]>`
-      SELECT c.concept_id, gvc.canonical_label AS label, d.score
-      FROM concepts c
-      JOIN graph_version_concepts gvc ON gvc.concept_id = c.concept_id AND gvc.graph_version_id = ${header.graph_version_id}
-      LEFT JOIN concept_difficulties d ON d.concept_id = c.concept_id AND d.enrichment_id = ${header.enrichment_id}
-      WHERE c.declared_domain = ${header.declared_domain}
-      ORDER BY d.score NULLS LAST, gvc.canonical_label`;
+      SELECT n.derived_node_id AS concept_id, n.canonical_label AS label, d.score
+      FROM derived_graph_nodes n
+      LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
+      WHERE n.enrichment_id = ${header.enrichment_id} AND n.declared_domain = ${header.declared_domain}
+      ORDER BY d.score NULLS LAST, n.canonical_label`;
 
     const edgeRows = await sql<{ prerequisite_concept_id: string; dependent_concept_id: string; confidence: number; uncertain: boolean }[]>`
-      SELECT e.prerequisite_concept_id, e.dependent_concept_id, e.confidence, e.uncertain
+      SELECT e.prerequisite_derived_node_id AS prerequisite_concept_id, e.dependent_derived_node_id AS dependent_concept_id, e.confidence, e.uncertain
       FROM inferred_prerequisite_edges e
-      JOIN concepts cp ON cp.concept_id = e.prerequisite_concept_id
+      JOIN derived_graph_nodes cp ON cp.derived_node_id = e.prerequisite_derived_node_id
       WHERE e.enrichment_id = ${header.enrichment_id} AND cp.declared_domain = ${header.declared_domain}
-      ORDER BY e.prerequisite_concept_id, e.dependent_concept_id`;
+      ORDER BY e.prerequisite_derived_node_id, e.dependent_derived_node_id`;
 
     const nodes: LearnerPathNode[] = nodeRows.map((row) => ({
       conceptId: row.concept_id,

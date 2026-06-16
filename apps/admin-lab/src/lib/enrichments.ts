@@ -1,5 +1,5 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary } from "./derivedGraph";
+import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -55,28 +55,80 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     if (headers.length === 0) return undefined;
     const header = headers[0];
 
-    // All Concepts of the enriched graph version, with this enrichment's difficulty.
-    const nodeRows = await sql<{ concept_id: string; label: string; declared_domain: string; score: number | null }[]>`
-      SELECT c.concept_id, gvc.canonical_label AS label, c.declared_domain, d.score
-      FROM concepts c
-      JOIN graph_version_concepts gvc ON gvc.concept_id = c.concept_id AND gvc.graph_version_id = ${header.graph_version_id}
-      LEFT JOIN concept_difficulties d ON d.concept_id = c.concept_id AND d.enrichment_id = ${header.enrichment_id}
-      ORDER BY c.declared_domain, d.score NULLS LAST, gvc.canonical_label`;
-    const edgeRows = await sql<{ prerequisite_concept_id: string; dependent_concept_id: string; confidence: number; uncertain: boolean }[]>`
-      SELECT prerequisite_concept_id, dependent_concept_id, confidence, uncertain
+    // The DERIVED node space: anchor projections + enrichment (minted/rescued) nodes
+    // (R15). Difficulty and edges reference derived_node_id only (KTD2).
+    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null }[]>`
+      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score
+      FROM derived_graph_nodes n
+      LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
+      WHERE n.enrichment_id = ${header.enrichment_id}
+      ORDER BY n.declared_domain, n.node_kind, d.score NULLS LAST, n.canonical_label`;
+    const edgeRows = await sql<{ prerequisite_derived_node_id: string; dependent_derived_node_id: string; confidence: number; uncertain: boolean }[]>`
+      SELECT prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain
       FROM inferred_prerequisite_edges
       WHERE enrichment_id = ${header.enrichment_id}
-      ORDER BY prerequisite_concept_id, dependent_concept_id`;
+      ORDER BY prerequisite_derived_node_id, dependent_derived_node_id`;
+
+    // Grounding bundles + passages for the enrichment nodes (R8, R15). The verbatim
+    // disposition (R9, AE3) is read from the recorded run trace, falling back to the
+    // grounding-origin invariant when the trace is absent.
+    const bundleRows = await sql<{ derived_node_id: string; generating_model: string; rationale: string }[]>`
+      SELECT b.derived_node_id, b.generating_model, b.rationale
+      FROM enrichment_grounding_bundles b
+      JOIN derived_graph_nodes n ON n.derived_node_id = b.derived_node_id
+      WHERE n.enrichment_id = ${header.enrichment_id}`;
+    const bundleByNode = new Map(bundleRows.map((row) => [row.derived_node_id, row]));
+    const passageRows = await sql<{ derived_node_id: string; passage_type: string; grounding_origin: string; generated_text: string | null; evidence_quote: string | null; salience_rank: number }[]>`
+      SELECT p.derived_node_id, p.passage_type, p.grounding_origin, p.generated_text, p.evidence_quote, p.salience_rank
+      FROM enrichment_grounding_passages p
+      JOIN derived_graph_nodes n ON n.derived_node_id = p.derived_node_id
+      WHERE n.enrichment_id = ${header.enrichment_id}
+      ORDER BY p.derived_node_id, p.salience_rank`;
+    const passagesByNode = new Map<string, GroundingPassageView[]>();
+    for (const row of passageRows) {
+      const list = passagesByNode.get(row.derived_node_id) ?? [];
+      list.push({
+        passageType: row.passage_type as GroundingPassageView["passageType"],
+        text: row.generated_text ?? row.evidence_quote ?? "",
+        groundingOrigin: row.grounding_origin as GroundingPassageView["groundingOrigin"]
+      });
+      passagesByNode.set(row.derived_node_id, list);
+    }
+    const dispositionRows = await sql<{ derived_node_id: string; outcome: string }[]>`
+      SELECT d.derived_node_id, d.outcome
+      FROM artifact_versions a,
+      JSON_TABLE(a.payload, '$.groundingDispositions[*]' COLUMNS (
+        derived_node_id text PATH '$.derivedNodeId',
+        outcome text PATH '$.outcome'
+      )) AS d
+      WHERE a.artifact_type = 'enrichment_run.v2' AND a.payload->>'enrichmentId' = ${header.enrichment_id}`;
+    const dispositionByNode = new Map(dispositionRows.map((row) => [row.derived_node_id, row.outcome]));
+
+    const groundingFor = (row: { derived_node_id: string; node_kind: string; grounding_origin: string }): NodeGroundingView | null => {
+      if (row.node_kind !== "enrichment") return null;
+      const bundle = bundleByNode.get(row.derived_node_id);
+      return {
+        generatingModel: bundle?.generating_model ?? null,
+        rationale: bundle?.rationale ?? null,
+        passages: passagesByNode.get(row.derived_node_id) ?? [],
+        verbatimDisposition: dispositionByNode.get(row.derived_node_id)
+          ?? (row.grounding_origin === "llm_grounded" ? "not_applicable_by_grounding" : "verified")
+      };
+    };
 
     const nodes: DerivedGraphNode[] = nodeRows.map((row) => ({
-      conceptId: row.concept_id,
+      conceptId: row.derived_node_id,
       label: row.label,
       declaredDomain: row.declared_domain,
-      difficulty: row.score === null ? null : Number(row.score)
+      difficulty: row.score === null ? null : Number(row.score),
+      nodeKind: row.node_kind as DerivedGraphNode["nodeKind"],
+      groundingOrigin: row.grounding_origin as DerivedGraphNode["groundingOrigin"],
+      role: row.role as DerivedGraphNode["role"],
+      grounding: groundingFor(row)
     }));
     const edges: DerivedGraphEdge[] = edgeRows.map((row) => ({
-      prerequisiteConceptId: row.prerequisite_concept_id,
-      dependentConceptId: row.dependent_concept_id,
+      prerequisiteConceptId: row.prerequisite_derived_node_id,
+      dependentConceptId: row.dependent_derived_node_id,
       confidence: Number(row.confidence),
       uncertain: row.uncertain
     }));

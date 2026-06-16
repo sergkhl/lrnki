@@ -5,11 +5,39 @@
 // `tsx --test` and feed both the Cytoscape render and its required equivalent
 // textual node-and-edge representation (U6 test scenario 8).
 
+export type DerivedNodeKind = "anchor" | "enrichment";
+export type DerivedGroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
+
+// One grounding passage of an enrichment node, as the inspector shows it: generated
+// text for `llm_grounded`, verbatim source quote for `source_mentioned`.
+export interface GroundingPassageView {
+  passageType: "definition" | "mention";
+  text: string;
+  groundingOrigin: DerivedGroundingOrigin;
+}
+
+// The grounding bundle of one enrichment node (R8, R15) plus the recorded verbatim-
+// floor disposition (R9, AE3). `verbatimDisposition` is `not_applicable_by_grounding`
+// for a minted `llm_grounded` node and `verified` for a rescued `source_mentioned`
+// node — surfaced, never silent.
+export interface NodeGroundingView {
+  generatingModel: string | null;
+  rationale: string | null;
+  passages: GroundingPassageView[];
+  verbatimDisposition: string;
+}
+
 export interface DerivedGraphNode {
   conceptId: string;
   label: string;
   declaredDomain: string;
   difficulty: number | null;
+  // Anchor (a projection of an asserted Concept) vs enrichment (minted/rescued, R15).
+  nodeKind: DerivedNodeKind;
+  groundingOrigin: DerivedGroundingOrigin;
+  role: "anchor" | "prerequisite";
+  // Present only for enrichment nodes; anchors carry their CEP in the published view.
+  grounding: NodeGroundingView | null;
 }
 
 export interface DerivedGraphEdge {
@@ -45,11 +73,11 @@ export interface DerivedGraphDetail {
 // inspect the same DAG the canvas draws.
 export interface DerivedGraphView {
   cytoscape: {
-    nodes: { id: string; label: string; domain: string; difficulty: number | null }[];
+    nodes: { id: string; label: string; domain: string; difficulty: number | null; nodeKind: DerivedNodeKind; groundingOrigin: DerivedGroundingOrigin }[];
     edges: { id: string; source: string; target: string; uncertain: "yes" | "no"; confidence: number }[];
   };
   textual: {
-    nodes: { label: string; domain: string; difficulty: number | null }[];
+    nodes: { label: string; domain: string; difficulty: number | null; nodeKind: DerivedNodeKind; groundingOrigin: DerivedGroundingOrigin; grounding: NodeGroundingView | null }[];
     edges: { prerequisiteLabel: string; dependentLabel: string; confidence: number; uncertain: boolean }[];
   };
 }
@@ -65,7 +93,9 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphV
         id: node.conceptId,
         label: node.label,
         domain: node.declaredDomain,
-        difficulty: node.difficulty
+        difficulty: node.difficulty,
+        nodeKind: node.nodeKind,
+        groundingOrigin: node.groundingOrigin
       })),
       edges: detail.edges.map((edge, index) => ({
         id: `e${index}`,
@@ -76,7 +106,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphV
       }))
     },
     textual: {
-      nodes: detail.nodes.map((node) => ({ label: node.label, domain: node.declaredDomain, difficulty: node.difficulty })),
+      nodes: detail.nodes.map((node) => ({ label: node.label, domain: node.declaredDomain, difficulty: node.difficulty, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin, grounding: node.grounding })),
       edges: detail.edges.map((edge) => ({
         prerequisiteLabel: labelFor(detail, edge.prerequisiteConceptId),
         dependentLabel: labelFor(detail, edge.dependentConceptId),
