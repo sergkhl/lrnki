@@ -1,10 +1,10 @@
-# Sample the admission and claim stages deterministically; leave discovery and end-to-end reproducibility to the build layer
+# Sample the admission and CEP-extraction stages deterministically; leave discovery and end-to-end reproducibility to the build layer
 
-Status: Accepted
+Status: Accepted (term updated 2026-06-15 — concept-conditioned extraction now produces Concept Evidence Profiles, ADR-0007)
 
 ## Decision
 
-Concept admission and concept-conditioned claim extraction call the model with `temperature: 0` and a fixed `seed`. Candidate discovery stays at the model's default sampling. Sampling parameters are part of pipeline-configuration identity (ADR-0017), so changing them bumps the pipeline config hash. Determinism here is a *stage lever*, not an end-to-end guarantee: the replayable unit is the deterministic graph-version build (ADR-0017), not the LLM-heavy extraction run. The forced-tool transport stays neutral — it sends `temperature`/`seed` only when the composition root sets them.
+Concept admission and concept-conditioned Concept Evidence Profile extraction call the model with `temperature: 0` and a fixed `seed`. Candidate discovery stays at the model's default sampling. Sampling parameters are part of pipeline-configuration identity (ADR-0017), so changing them bumps the pipeline config hash. Determinism here is a *stage lever*, not an end-to-end guarantee: the replayable unit is the deterministic graph-version build (ADR-0017), not the LLM-heavy extraction run. The forced-tool transport stays neutral — it sends `temperature`/`seed` only when the composition root sets them.
 
 ## Context
 

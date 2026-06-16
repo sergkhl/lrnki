@@ -8,7 +8,7 @@
 
 4. Prioritize real curated source fixtures across mixed domains and formats.
 
-5. Route LLM calls through LiteLLM aliases. Concept discovery, concept admission, and concept-conditioned claim extraction must not bypass their ports. Production extraction uses DeepSeek V4 Flash with thinking explicitly disabled unless an experiment states otherwise.
+5. Route LLM calls through LiteLLM aliases. Concept discovery, concept admission, and concept-conditioned Concept Evidence Profile extraction must not bypass their ports. Production extraction uses DeepSeek V4 Flash with thinking explicitly disabled unless an experiment states otherwise.
 
 6. Structured LLM output must use forced named tool schemas. Do not depend on free-form JSON output. Validate all tool arguments in the application boundary and fail closed.
 
@@ -20,7 +20,7 @@
 
 10. Store stable curated sources under fixtures/. Store generated artifacts, reports, and scratch outputs under disposable gitignored tmp/.
 
-11. Model-authored benchmark labels are oracle references, not human gold. Freeze model, prompt, rubric, evidence, source hashes, and second-judge outcomes. Quarantine disagreements.
+11. Quality validation is real-source inspection (rule 14), the retained inline production judges, and deterministic verbatim-evidence verification. Model-authored measurement is disposable scaffolding, never human gold: build a benchmark or oracle only for a specific fix, keep it only while it earns its keep, and remove it once it has. No standing benchmark harness lives in the core (ADR-0013).
 
 12. Keep Admin Lab minimal and graph-focused. It may inspect and trigger explicit versioned operations. It must never silently mutate a published graph.
 

@@ -5,31 +5,20 @@ the product critical path is concept admission → enrichment prerequisite infer
 Asserted claims moved off that path and are replaced by Concept Evidence Profiles; standing
 measurement became disposable scaffolding and is retired.
 
-## EXECUTION STATUS (plan `docs/plans/2026-06-15-001-refactor-concept-evidence-profile-core-plan.md`)
+## TODO
 
-The 7-unit complexity reset is **complete** on branch **`refactor/cep-core-reset`** (off `main`):
-U1 atomic admission + neural source-role, U2 oracle/aligner teardown, U3 CEP extraction, U4 append-only
-zero-edge CEP publication, U5 exhaustive same-domain CEP-pair enrichment, U6 worker/Admin Lab/export
-reshape, U7 ADR + CONTEXT + docs rewrite. Each behavior-changing unit recorded a rule-14 PASS (see
-COMPLETED). Only the deferred, port-mocked deepening below remains.
+The 7-unit complexity reset is complete and merged to `main`; durable architecture lives in the
+[ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md). Only the work below remains.
 
-Operational notes:
-- LiteLLM proxy serves the judge alias **`kg-independent-judge`** (gpt-oss-120b); any alias change in
-  `litellm/config.yaml` requires `docker restart lrnki-litellm`.
-- Worker pipeline config hash is at **`...-atomic-admission-source-role-v31`**; bump it whenever
-  admission/CEP/judge prompts or schemas change.
-- Postgres 18 + Docling + LiteLLM are reachable; 5 fixtures registered (`worker:kg list-sources`).
-- The single migration is the CEP-era schema (no claim/relation tables); reset with `scripts/reset-db.sh`.
-
-## REMAINING WORK
-
-1. **Deferred — mocks stay behind ports; do not build until measured need.**
-   - Difficulty stays the DAG-depth mock (`DifficultyPort`); learner state stays the empty mock
-     (`LearnerStatePort`). No Bradley-Terry, IRT/KT, anomaly detection, or synthetic priors.
-   - Cut and kept cut: embedding canonicalization cascade + embedding blocking tier; deterministic
-     identity (ADR-0015) stays the sole merge authority. Any future cost-bound pair-selection mechanism
-     must be measured against exhaustive same-domain judgment before it can veto pairs.
-   - DOCX and PPTX curated-source expansion (Docling adapter already supports them).
+1. **DOCX and PPTX curated-source expansion.** The Docling adapter already supports both; register
+   curated DOCX/PPTX fixtures and run them end-to-end with verbatim-evidence verification.
+2. **Deferred measured deepening — keep mocked behind ports until measured need.** Difficulty stays the
+   DAG-depth mock (`DifficultyPort`); learner state stays the empty mock (`LearnerStatePort`). Do not
+   build Bradley-Terry, IRT/KT, anomaly detection, or synthetic priors before a measured need.
+3. **Hold the embedding cut.** Embedding canonicalization cascade and embedding blocking tier stay
+   removed; deterministic identity (ADR-0015) stays the sole merge authority. Any future cost-bound
+   pair-selection mechanism must be measured against exhaustive same-domain judgment before it may veto
+   pairs.
 
 ## COMPLETED
 
@@ -42,7 +31,9 @@ Operational notes:
   DB rendered via `next start` (published view 0 edges/0 canvases, derived chain Variable scope → Ownership
   → Move semantics → Copy trait); see `tmp/u6-admin-lab-quality-evaluation.md`. U7: rewrote
   ADR-0002/0005/0007/0009/0012/0013/0016/0019/0022, the ADR README, CONTEXT.md vocabulary, README,
-  fixtures notes, and this roadmap to describe only the post-reset architecture.
+  fixtures notes, and this roadmap to describe only the post-reset architecture. Operational invariants
+  from the reset: the LiteLLM judge alias is `kg-independent-judge` (gpt-oss-120b); bump the worker
+  pipeline config hash whenever admission/CEP/judge prompts or schemas change.
 - **Reset milestone 3 — exhaustive same-domain CEP-pair enrichment (U5, `a1e32b5`).** Removed the
   embedding-clustering / candidate-group tier; every unordered same-domain Concept pair is judged from both
   Concepts' published CEPs; `explicit-prerequisite-hint` is labeled evidence, never a deterministic edge;

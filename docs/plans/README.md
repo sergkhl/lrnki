@@ -5,7 +5,6 @@ Stale planning docs should be removed.
 
 - [TODO](./TODO.md)
 - [BLOCKERS](./BLOCKERS.md)
-- [Concept-first implementation sequence](./concept-first-implementation.md)
 
 ## Progress report instructions
 
