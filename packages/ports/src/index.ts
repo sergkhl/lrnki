@@ -3,6 +3,7 @@ import type {
   AdmissionProposal,
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
+  BlockEvidence,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -54,6 +55,13 @@ export interface ConceptConditionedEvidenceProfileExtractionPort {
     subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
     admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
+    // The admission-verified definition-bearing passages for this subject (U2/KTD2).
+    // A HINT only: the extractor still emits its own definition passages and the
+    // application boundary still independently verbatim-verifies them. Carrying the
+    // already-proven definition forward keeps the extractor from losing it under
+    // fan-out, without bypassing the CEP port or relaxing the verbatim floor.
+    // Empty for optional subjects (admission gates this criterion on core only).
+    definitionBearingEvidence: BlockEvidence[];
   }): Promise<ExtractedEvidenceProfile>;
 }
 

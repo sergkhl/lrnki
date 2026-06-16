@@ -2,6 +2,7 @@ import type {
   AdmissionLabelJudgment,
   AdmissionProposal,
   AssertionEntailmentJudgment,
+  BlockEvidence,
   DiscoveredCandidate,
   ExtractedEvidenceProfile,
   ExtractedTypedAssertion,
@@ -274,6 +275,7 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
     subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
     admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
+    definitionBearingEvidence: BlockEvidence[];
   }): Promise<ExtractedEvidenceProfile> {
     const system = [
       "You build a Concept Evidence Profile for ONE subject concept from a curated source, for a learner-neutral concept graph.",
@@ -301,6 +303,18 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
       "Evidence blocks (quote verbatim from these):",
       renderBlocks(input.evidenceNeighborhood),
       "",
+      // KTD2 hint: admission already verified that the source establishes this
+      // concept's meaning in the passage(s) below. Surface it so the extractor does
+      // not lose the definition under fan-out. It is a HINT, not an injected passage:
+      // the model must still copy a verbatim definition passage from the evidence
+      // blocks above, and the application boundary independently re-verifies it.
+      ...(input.definitionBearingEvidence.length > 0
+        ? [
+            "Admission already found that this source establishes the subject concept's meaning here (use as a hint; you must still quote a verbatim definition passage from the evidence blocks above):",
+            ...input.definitionBearingEvidence.map((evidence) => `- "${evidence.evidenceQuote}"`),
+            ""
+          ]
+        : []),
       "Call submit_concept_evidence_profile with the subject concept's definition passages, salience-ordered mention passages, and any optional typed assertions."
     ].join("\n");
 
