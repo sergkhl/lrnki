@@ -17,6 +17,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type LearnerPathExplorerProps = Readonly<{ detail: LearnerPathDetail }>;
 
+// Per-step provenance badge (U5): distinguish an anchored asserted concept from a
+// rescued source-mention and a generated prerequisite, so a learner-path reader can
+// see which steps rest on the asserted core vs the derived layer.
+function originBadge(groundingOrigin: string): { label: string; variant: "default" | "secondary" | "outline" } {
+  if (groundingOrigin === "source_mentioned") return { label: "rescued", variant: "secondary" };
+  if (groundingOrigin === "llm_grounded") return { label: "generated", variant: "outline" };
+  return { label: "anchored", variant: "default" };
+}
+
 // Read-only Cytoscape rendering of a PERSISTED learner path highlighted over the
 // inferred prerequisite DAG of its enrichment (ADR-0011, ADR-0019, rule 12). All
 // ordering and inclusion were computed by the CLI; this view only renders.
@@ -205,6 +214,9 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
                     <span className="block truncate font-medium">{step.label}</span>
                     <span className="block text-xs text-muted-foreground">{step.includedReason}</span>
                   </span>
+                  <Badge variant={originBadge(step.groundingOrigin).variant} title={step.groundingOrigin}>
+                    {originBadge(step.groundingOrigin).label}
+                  </Badge>
                   <Badge variant="outline">difficulty {step.difficulty.toFixed(2)}</Badge>
                 </li>
               ))}

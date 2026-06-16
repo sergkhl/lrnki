@@ -38,7 +38,7 @@ export interface LearnerPathEdge {
 
 export interface LearnerPathDetail {
   summary: LearnerPathSummary;
-  steps: { position: number; conceptId: string; label: string; difficulty: number; includedReason: string }[];
+  steps: { position: number; conceptId: string; label: string; difficulty: number; includedReason: string; groundingOrigin: string }[];
   // The inferred prerequisite DAG of the path's enrichment, scoped to the target's
   // Declared Domain (prerequisites are always same-domain, ADR-0015).
   nodes: LearnerPathNode[];
@@ -97,8 +97,8 @@ export async function getLearnerPathDetail(learnerPathId: string): Promise<Learn
     if (headers.length === 0) return undefined;
     const header = headers[0];
 
-    const stepRows = await sql<{ position: number; concept_id: string; label: string; difficulty: number; included_reason: string }[]>`
-      SELECT s.position, s.derived_node_id AS concept_id, sn.canonical_label AS label, s.difficulty, s.included_reason
+    const stepRows = await sql<{ position: number; concept_id: string; label: string; difficulty: number; included_reason: string; grounding_origin: string }[]>`
+      SELECT s.position, s.derived_node_id AS concept_id, sn.canonical_label AS label, s.difficulty, s.included_reason, sn.grounding_origin
       FROM learner_path_steps s
       JOIN derived_graph_nodes sn ON sn.derived_node_id = s.derived_node_id
       WHERE s.learner_path_id = ${learnerPathId}
@@ -155,7 +155,8 @@ export async function getLearnerPathDetail(learnerPathId: string): Promise<Learn
         conceptId: row.concept_id,
         label: row.label,
         difficulty: Number(row.difficulty),
-        includedReason: row.included_reason
+        includedReason: row.included_reason,
+        groundingOrigin: row.grounding_origin
       })),
       nodes,
       edges
