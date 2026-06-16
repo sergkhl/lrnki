@@ -368,7 +368,28 @@ export type Concept = {
   aliases: string[];
   trustTier: TrustTier;
   homograph: boolean;
+  groundingOrigin: "document_anchored";
+  role: "anchor";
+  layer: "asserted";
 };
+
+// ---------------------------------------------------------------------------
+// Grounding model for the asserted core plus derived enrichment nodes.
+// `web_grounded` is intentionally reserved for a later retrieval-backed upgrade,
+// not admitted to this milestone's union.
+// ---------------------------------------------------------------------------
+
+export type GroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
+export type ConceptRole = "anchor" | "prerequisite";
+export type GraphLayer = "asserted" | "derived";
+
+export function layerOf(origin: GroundingOrigin): GraphLayer {
+  return origin === "document_anchored" ? "asserted" : "derived";
+}
+
+export function groundingForConcept(_concept: Concept): { groundingOrigin: "document_anchored"; role: "anchor"; layer: "asserted" } {
+  return { groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" };
+}
 
 // ---------------------------------------------------------------------------
 // Published Concept Evidence Profile (ADR-0007 reset, R1/R2/R5/R6). The CEP is
@@ -502,6 +523,84 @@ export type ArtifactEnvelope<TPayload = unknown> = {
 
 export type InferredRelationPredicate = "inferred-prerequisite-of";
 
+export type GroundingPassageVerbatimCheck =
+  | { disposition: "verified"; sourceResourceId: string; sourceBlockId: string }
+  | { disposition: "not_applicable_by_grounding"; rationale: string }
+  | { disposition: "failed"; sourceResourceId: string; sourceBlockId: string; rationale: string };
+
+export type GeneratedGroundingPassage = {
+  passageType: "definition" | "mention";
+  text: string;
+  groundingOrigin: "llm_grounded";
+  headingPath: string[];
+  locator: SourceLocator;
+  verbatimCheck: Extract<GroundingPassageVerbatimCheck, { disposition: "not_applicable_by_grounding" }>;
+};
+
+export type SourceMentionGroundingPassage = {
+  passageType: "mention";
+  text: string;
+  groundingOrigin: "source_mentioned";
+  sourceResourceId: string;
+  sourceBlockId: string;
+  evidenceQuote: string;
+  headingPath: string[];
+  locator: SourceLocator;
+  verbatimCheck: Extract<GroundingPassageVerbatimCheck, { disposition: "verified" | "failed" }>;
+};
+
+export type GeneratedGroundingBundle = {
+  derivedNodeId: string;
+  groundingOrigin: "llm_grounded";
+  definitions: GeneratedGroundingPassage[];
+  mentions: GeneratedGroundingPassage[];
+  scaffoldedAnchorConceptIds: string[];
+  generatingModel: string;
+  rationale: string;
+};
+
+export type AnchorProjectionNode = {
+  nodeKind: "anchor";
+  derivedNodeId: string;
+  conceptId: string;
+  groundingOrigin: "document_anchored";
+  role: "anchor";
+  layer: "asserted";
+  canonicalLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  aliases: string[];
+};
+
+export type SourceMentionedEnrichmentNode = {
+  nodeKind: "enrichment";
+  derivedNodeId: string;
+  groundingOrigin: "source_mentioned";
+  role: "prerequisite";
+  layer: "derived";
+  canonicalLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  aliases: string[];
+  groundingPassages: SourceMentionGroundingPassage[];
+};
+
+export type LlmGroundedEnrichmentNode = {
+  nodeKind: "enrichment";
+  derivedNodeId: string;
+  groundingOrigin: "llm_grounded";
+  role: "prerequisite";
+  layer: "derived";
+  canonicalLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  aliases: string[];
+  groundingBundle: GeneratedGroundingBundle;
+};
+
+export type EnrichmentNode = SourceMentionedEnrichmentNode | LlmGroundedEnrichmentNode;
+export type DerivedGraphNode = AnchorProjectionNode | EnrichmentNode;
+
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
 // meaning-bearing definition passages, bounded salience-ordered mention passages,
 // and LABELED optional typed assertions. An `explicit-prerequisite-hint` appears
@@ -581,6 +680,7 @@ export type DerivedGraphLayer = {
   // embedding model and candidate groups were removed with the embedding tier
   // (ADR-0019 reset): every same-domain CEP pair is judged exhaustively.
   judgeModel: string;
+  derivedNodes: DerivedGraphNode[];
   prerequisiteEdges: InferredPrerequisiteEdge[];
   difficulties: ConceptDifficulty[];
 };

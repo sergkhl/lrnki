@@ -134,6 +134,18 @@ export async function runGraphEnrichment(input: {
     graphVersionId: input.graphVersionId,
     enrichmentConfigHash: config.enrichmentConfigHash,
     judgeModel: input.prerequisiteJudge.model,
+    derivedNodes: concepts.map((concept) => ({
+      nodeKind: "anchor",
+      derivedNodeId: `${input.enrichmentId}:anchor:${concept.conceptId}`,
+      conceptId: concept.conceptId,
+      groundingOrigin: "document_anchored",
+      role: "anchor",
+      layer: "asserted",
+      canonicalLabel: concept.canonicalLabel,
+      normalizedLabel: concept.normalizedLabel,
+      declaredDomain: concept.declaredDomain,
+      aliases: concept.aliases
+    })),
     prerequisiteEdges,
     difficulties
   };
@@ -257,4 +269,3 @@ async function mapWithConcurrency<T, R>(
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
   return results;
 }
-

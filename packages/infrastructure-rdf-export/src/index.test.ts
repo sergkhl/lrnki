@@ -11,8 +11,8 @@ const snapshot: GraphSnapshot = {
   graphVersionId: "gv-1",
   baseGraphVersionId: null,
   concepts: [
-    { conceptId: "c1", iri: "https://lrnki.local/concept/derivative", canonicalLabel: "Derivative", normalizedLabel: "derivative", declaredDomain: "mathematics", aliases: ["differential coefficient"], trustTier: "curated_source_grounded", homograph: false },
-    { conceptId: "c2", iri: "https://lrnki.local/concept/limit", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false }
+    { conceptId: "c1", iri: "https://lrnki.local/concept/derivative", canonicalLabel: "Derivative", normalizedLabel: "derivative", declaredDomain: "mathematics", aliases: ["differential coefficient"], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" },
+    { conceptId: "c2", iri: "https://lrnki.local/concept/limit", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }
   ],
   evidenceProfiles: [
     { conceptId: "c1", definitions: [{ sourceResourceId: "s1", sourceBlockId: "b1", evidenceQuote: "A derivative measures change.", headingPath: [], locator: {} }], mentions: [], assertions: [{ type: "explicit-prerequisite-hint", objectConceptId: "c2", evidence: [{ sourceResourceId: "s1", sourceBlockId: "b2", evidenceQuote: "defined as a limit", headingPath: [], locator: {} }] }] },

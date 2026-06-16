@@ -27,7 +27,10 @@ function concept(id: string, label: string, domain: string, aliases: string[] = 
     declaredDomain: domain,
     aliases,
     trustTier: "curated_source_grounded" as const,
-    homograph: false
+    homograph: false,
+    groundingOrigin: "document_anchored" as const,
+    role: "anchor" as const,
+    layer: "asserted" as const
   };
 }
 

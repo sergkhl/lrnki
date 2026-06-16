@@ -85,6 +85,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       graphVersionId: row.graph_version_id,
       enrichmentConfigHash: row.enrichment_config_hash,
       judgeModel: row.judge_model,
+      derivedNodes: [],
       prerequisiteEdges,
       difficulties
     };

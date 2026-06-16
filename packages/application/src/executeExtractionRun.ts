@@ -94,9 +94,9 @@ export async function executeExtractionRun(input: {
     judge: input.admissionLabelJudge
   });
 
-  // CEPs are extracted for every admitted Concept — core AND optional (KTD): both
-  // carry source-grounded meaning into publication. Hint targets may reference any
-  // admitted Concept, so the admitted set spans both tiers.
+  // CEPs are extracted for every admitted core or optional proposal when possible.
+  // Only core proposals publish as asserted Concepts; optional incomplete profiles
+  // remain run-scoped evidence for later source-mentioned rescue.
   const admittedCandidates = candidates.filter(
     (candidate) => candidate.admission.tier === "core" || candidate.admission.tier === "optional"
   );
@@ -109,7 +109,7 @@ export async function executeExtractionRun(input: {
   const conceptsByKey = new Map<string, { canonicalLabel: string; aliases: string[] }>(
     admittedConcepts.map((concept) => [concept.candidateKey, { canonicalLabel: concept.canonicalLabel, aliases: concept.aliases }])
   );
-  const tierByKey = new Map(admittedCandidates.map((candidate) => [candidate.candidateKey, candidate.admission.tier] as const));
+  const coreKeys = new Set(candidates.filter((candidate) => candidate.admission.tier === "core").map((candidate) => candidate.candidateKey));
 
   // Stage 3 — concept-conditioned CEP extraction with deterministic verbatim
   // validation. One bounded call per admitted Concept; an extractor failure yields
@@ -147,9 +147,11 @@ export async function executeExtractionRun(input: {
     judge: input.assertionEntailmentJudge
   });
 
-  // The run is successful only when every admitted Concept has a complete CEP (R1).
+  // The run is successful only when every core Concept has a complete CEP (R1).
+  // Optional proposals may be source-mentioned supporting knowledge without a
+  // Definition Passage; they stay run-scoped and never publish asserted.
   const status: ExtractionRunResult["status"] =
-    admittedCandidates.length === tierByKey.size && evidenceProfiles.every((profile) => profile.complete)
+    [...coreKeys].every((key) => evidenceProfiles.some((profile) => profile.candidateKey === key && profile.complete))
       ? "succeeded"
       : "failed";
 

@@ -180,7 +180,10 @@ export async function buildGraphVersion(input: {
       aliases: [...cluster.aliases].filter((alias) => alias !== cluster.canonicalLabel),
       // Set provisionally; finalized after the CEP union reveals the true source span.
       trustTier: "curated_source_grounded",
-      homograph: isHomograph
+      homograph: isHomograph,
+      groundingOrigin: "document_anchored",
+      role: "anchor",
+      layer: "asserted"
     };
     conceptByIdentity.set(key, concept);
     concepts.push(concept);

@@ -184,7 +184,7 @@ maybe("publish writes a CEP snapshot with zero asserted edges and round-trips th
     const snapshot: GraphSnapshot = {
       graphVersionId,
       baseGraphVersionId: null,
-      concepts: [{ conceptId, iri: `https://lrnki.local/concept/ownership-${conceptId}`, canonicalLabel: "Ownership", normalizedLabel: "ownership", declaredDomain: "software engineering", aliases: ["ownership model"], trustTier: "curated_source_grounded", homograph: false }],
+      concepts: [{ conceptId, iri: `https://lrnki.local/concept/ownership-${conceptId}`, canonicalLabel: "Ownership", normalizedLabel: "ownership", declaredDomain: "software engineering", aliases: ["ownership model"], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
       evidenceProfiles: [{
         conceptId,
         definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }],
