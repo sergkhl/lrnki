@@ -31,6 +31,7 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
     pipelineConfigHash: "test-v1",
     maxMentionsPerConceptPerSource: 6,
     status: "succeeded",
+    qualityIssues: [],
     candidates: [
       candidate("ownership", "Ownership", "core"),
       candidate("borrowing", "Borrowing", "optional")
@@ -291,7 +292,8 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       enrichmentConfigHash: "test-enrichment",
       derivedNodes: layer.derivedNodes,
       judgments: [],
-      dispositions: []
+      dispositions: [],
+      groundingDispositions: []
     };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({
@@ -309,6 +311,126 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     assert.equal(hydrated.prerequisiteEdges[0].prerequisiteConceptId, borrowingId);
     assert.equal(hydrated.prerequisiteEdges[0].dependentConceptId, ownershipId);
     assert.equal(hydrated.difficulties.length, 2);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their grounding", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { sourceResourceId, sourceDocumentId } = await seedSource(sql);
+    const runId = randomUUID();
+    await new PostgresExtractionRunStore(sql).persist(runResult(sourceResourceId, sourceDocumentId, runId), artifactFor(runResult(sourceResourceId, sourceDocumentId, runId)));
+    const blocks = await sql<{ block_id: string; source_block_id: string }[]>`SELECT block_id, source_block_id FROM source_blocks WHERE source_document_id = ${sourceDocumentId}`;
+    const blk = (id: string) => blocks.find((row) => row.block_id === id)!.source_block_id;
+
+    const anchorId = randomUUID();
+    const graphVersionId = randomUUID();
+    const anchorLabel = `Ownership ${anchorId}`;
+    const snapshot: GraphSnapshot = {
+      graphVersionId,
+      baseGraphVersionId: null,
+      concepts: [{ conceptId: anchorId, iri: `https://lrnki.local/concept/ownership-${anchorId}`, canonicalLabel: anchorLabel, normalizedLabel: anchorLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
+      evidenceProfiles: [{ conceptId: anchorId, definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }], mentions: [], assertions: [] }]
+    };
+    await new PostgresGraphVersionStore(sql).publish({
+      snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+    });
+
+    const enrichmentId = randomUUID();
+    const mintedId = randomUUID();
+    const rescuedId = randomUUID();
+    const layer: DerivedGraphLayer = {
+      enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", judgeModel: "mock-judge",
+      derivedNodes: [
+        { nodeKind: "anchor", derivedNodeId: anchorId, conceptId: anchorId, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted", canonicalLabel: anchorLabel, normalizedLabel: anchorLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [] },
+        { nodeKind: "enrichment", derivedNodeId: mintedId, groundingOrigin: "llm_grounded", role: "prerequisite", layer: "derived", canonicalLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", aliases: [],
+          groundingBundle: { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", definitions: [{ passageType: "definition", text: "Stack allocation stores short-lived values.", groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }], mentions: [], scaffoldedAnchorConceptIds: [anchorId], generatingModel: "mock-gen", rationale: "scaffolds ownership" } },
+        { nodeKind: "enrichment", derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", role: "prerequisite", layer: "derived", canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", aliases: [],
+          groundingPassages: [{ passageType: "mention", text: "Borrowing lets you reference a value without taking ownership.", groundingOrigin: "source_mentioned", sourceResourceId, sourceBlockId: blk("b2"), evidenceQuote: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {}, verbatimCheck: { disposition: "verified", sourceResourceId, sourceBlockId: blk("b2") } }] }
+      ],
+      prerequisiteEdges: [
+        { prerequisiteConceptId: mintedId, dependentConceptId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.8, uncertain: false, provenance: { judgmentRationale: "minted scaffolds anchor" } },
+        { prerequisiteConceptId: rescuedId, dependentConceptId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.7, uncertain: false, provenance: { judgmentRationale: "rescued precedes anchor" } }
+      ],
+      difficulties: [
+        { conceptId: mintedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
+        { conceptId: rescuedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
+        { conceptId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
+      ]
+    };
+    const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes, judgments: [], dispositions: [], groundingDispositions: [
+      { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
+      { derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", outcome: "verified", rationale: "mention verified verbatim" }
+    ] };
+    const store = new PostgresEnrichmentRunStore(sql);
+    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
+
+    const hydrated = await store.getLayer(enrichmentId);
+    assert.ok(hydrated);
+    assert.equal(hydrated.derivedNodes.length, 3);
+    const minted = hydrated.derivedNodes.find((node) => node.derivedNodeId === mintedId);
+    assert.ok(minted && minted.nodeKind === "enrichment" && minted.groundingOrigin === "llm_grounded");
+    assert.equal(minted.groundingBundle.definitions[0].verbatimCheck.disposition, "not_applicable_by_grounding");
+    const rescued = hydrated.derivedNodes.find((node) => node.derivedNodeId === rescuedId);
+    assert.ok(rescued && rescued.nodeKind === "enrichment" && rescued.groundingOrigin === "source_mentioned");
+    assert.equal(rescued.groundingPassages[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
+    assert.equal(hydrated.prerequisiteEdges.length, 2);
+    assert.equal(hydrated.difficulties.length, 3);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("mentionedNonCoreCandidates returns member-run mentions with no definition, scoped by version", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { sourceResourceId, sourceDocumentId } = await seedSource(sql);
+    const runId = randomUUID();
+    // A run with a core anchor (Ownership, has a definition) and a non-core mention
+    // (Borrowing, optional, NO definition passage) — the rescue candidate.
+    const result: ExtractionRunResult = {
+      runId, sourceResourceId, sourceDocumentId, declaredDomain: "software engineering",
+      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", qualityIssues: [],
+      candidates: [
+        candidate("ownership", "Ownership", "core"),
+        candidate("borrowing", "Borrowing", "optional")
+      ],
+      evidenceProfiles: [
+        { candidateKey: "ownership", tier: "core", definitions: [{ blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." }], mentions: [], assertions: [], complete: true }
+        // No CEP for borrowing -> no definition passage -> eligible for rescue.
+      ],
+      latencyMs: 1
+    };
+    await new PostgresExtractionRunStore(sql).persist(result, artifactFor(result));
+    const blocks = await sql<{ block_id: string; source_block_id: string }[]>`SELECT block_id, source_block_id FROM source_blocks WHERE source_document_id = ${sourceDocumentId}`;
+    const blk = (id: string) => blocks.find((row) => row.block_id === id)!.source_block_id;
+
+    const anchorId = randomUUID();
+    const graphVersionId = randomUUID();
+    const anchorLabel = `Ownership ${anchorId}`;
+    const snapshot: GraphSnapshot = {
+      graphVersionId, baseGraphVersionId: null,
+      concepts: [{ conceptId: anchorId, iri: `https://lrnki.local/concept/ownership-${anchorId}`, canonicalLabel: anchorLabel, normalizedLabel: anchorLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
+      evidenceProfiles: [{ conceptId: anchorId, definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }], mentions: [], assertions: [] }]
+    };
+    await new PostgresGraphVersionStore(sql).publish({
+      snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+    });
+
+    const rescue = await new PostgresEnrichmentRunStore(sql).mentionedNonCoreCandidates(graphVersionId);
+    const borrowing = rescue.find((candidate) => candidate.candidateKey === "borrowing");
+    assert.ok(borrowing, "the non-core mentioned candidate is a rescue candidate");
+    assert.equal(borrowing.tier, "optional");
+    assert.equal(borrowing.declaredDomain, "software engineering");
+    assert.ok(borrowing.mentions.length >= 1);
+    assert.equal(borrowing.mentions[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
+    assert.ok(borrowing.mentions[0].blockText.includes("Borrowing lets you reference"), "carries the cited block text for the U6 floor");
+    // The core anchor (which HAS a definition) is never a rescue candidate.
+    assert.ok(!rescue.some((candidate) => candidate.candidateKey === "ownership"));
   } finally {
     await sql.end();
   }

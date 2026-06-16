@@ -14,6 +14,8 @@ export {
   prerequisiteJudgmentValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
+  missingPrerequisiteProposalSchema,
+  missingPrerequisiteProposalValidator,
   assertionEntailmentJudgmentSchema,
   assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
@@ -39,3 +41,7 @@ export {
   LiteLlmGroundingGenerationAdapter,
   GROUNDING_GENERATION_MODEL
 } from "./groundingGenerationAdapters";
+export {
+  LiteLlmMissingPrerequisiteProposalAdapter,
+  MISSING_PREREQUISITE_PROPOSAL_MODEL
+} from "./missingPrerequisiteProposalAdapters";

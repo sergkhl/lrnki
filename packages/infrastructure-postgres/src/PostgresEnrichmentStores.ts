@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   ArtifactEnvelope,
+  CandidateTier,
   ConceptDifficulty,
   DerivedGraphNode,
   DerivedGraphLayer,
@@ -9,6 +10,7 @@ import type {
   InferredPrerequisiteEdge,
   LearnerPath,
   LearnerPathStep,
+  MentionedNonCoreCandidate,
   SourceLocator,
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
@@ -94,6 +96,69 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
       await writeArtifactEnvelope(tx, artifact);
     });
+  }
+
+  // Rescue source for Graph Enrichment (KTD5, R7). The member Extraction Runs of
+  // `graphVersionId` reduced to their rejected/optional admission proposals that have
+  // a verbatim MENTION but no Definition Passage — concepts the source mentions but
+  // never defines. Each mention carries resolved provenance plus the cited block's
+  // text so the verbatim floor (U6) re-verifies at enrichment time. Never touches the
+  // asserted core; these become `source_mentioned`/`derived` nodes only.
+  async mentionedNonCoreCandidates(graphVersionId: string): Promise<MentionedNonCoreCandidate[]> {
+    const rows = await this.sql<{
+      run_id: string; declared_domain: string; candidate_key: string; canonical_label: string;
+      normalized_label: string; aliases: string[]; tier: string;
+      source_block_id: string; evidence_quote: string; block_text: string;
+      heading_path: string[]; locator: unknown; block_source_resource_id: string;
+    }[]>`
+      SELECT er.run_id, sr.declared_domain, cc.candidate_key, cc.canonical_label,
+             cc.normalized_label, cc.aliases, ad.tier,
+             sb.source_block_id, ccm.evidence_quote, sb.text AS block_text,
+             sb.heading_path, sb.locator, sd.source_resource_id AS block_source_resource_id
+      FROM graph_version_run_memberships gm
+      JOIN extraction_runs er ON er.run_id = gm.run_id
+      JOIN source_resources sr ON sr.source_resource_id = er.source_resource_id
+      JOIN concept_candidates cc ON cc.run_id = er.run_id
+      JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
+      JOIN concept_candidate_mentions ccm ON ccm.concept_candidate_id = cc.concept_candidate_id
+      JOIN source_blocks sb ON sb.source_block_id = ccm.source_block_id
+      JOIN source_documents sd ON sd.source_document_id = sb.source_document_id
+      WHERE gm.graph_version_id = ${graphVersionId}
+        AND ad.tier IN ('optional', 'reject')
+        AND NOT EXISTS (
+          SELECT 1 FROM run_concept_evidence_profiles p
+          JOIN run_evidence_passages rep ON rep.run_concept_evidence_profile_id = p.run_concept_evidence_profile_id
+          WHERE p.concept_candidate_id = cc.concept_candidate_id AND rep.kind = 'definition'
+        )
+      ORDER BY er.run_id, cc.candidate_key, sb.source_block_id`;
+
+    const byCandidate = new Map<string, MentionedNonCoreCandidate>();
+    for (const row of rows) {
+      const key = `${row.run_id}|${row.candidate_key}`;
+      let candidate = byCandidate.get(key);
+      if (!candidate) {
+        candidate = {
+          runId: row.run_id,
+          declaredDomain: row.declared_domain,
+          candidateKey: row.candidate_key,
+          canonicalLabel: row.canonical_label,
+          normalizedLabel: row.normalized_label,
+          aliases: row.aliases,
+          tier: row.tier as CandidateTier,
+          mentions: []
+        };
+        byCandidate.set(key, candidate);
+      }
+      candidate.mentions.push({
+        sourceResourceId: row.block_source_resource_id,
+        sourceBlockId: row.source_block_id,
+        evidenceQuote: row.evidence_quote,
+        blockText: row.block_text,
+        headingPath: row.heading_path,
+        locator: row.locator as SourceLocator
+      });
+    }
+    return [...byCandidate.values()];
   }
 
   async getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined> {

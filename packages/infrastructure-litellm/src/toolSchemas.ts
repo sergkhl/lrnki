@@ -384,6 +384,48 @@ export const generatedGroundingBundleValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Missing-prerequisite proposal: submit_missing_prerequisites ----------
+// The explicit, inspectable node-IDENTITY operation (R7, KTD6, handoff): for one
+// anchor, propose prerequisite concepts the source assumes but never teaches. The
+// model returns LABELS only — grounding is generated separately — so this stays a
+// bounded proposal, not free-form node construction. The application dedupes against
+// existing node labels and enforces the per-anchor / per-run caps.
+
+export const missingPrerequisiteProposalSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["proposals"],
+  properties: {
+    proposals: {
+      type: "array",
+      description:
+        "Prerequisite concepts a learner must understand BEFORE the anchor concept but that the source assumes rather than teaches. Domain-general established concepts only; omit anything the anchor's own evidence already explains. Return an empty array when nothing is assumed.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["proposedLabel", "rationale"],
+        properties: {
+          proposedLabel: {
+            type: "string",
+            description: "Precise, domain-qualified label for one assumed-prior concept. Not the anchor itself and not already listed among the existing node labels."
+          },
+          rationale: {
+            type: "string",
+            description: "One terse sentence: why a learner must understand this before the anchor."
+          }
+        }
+      }
+    }
+  }
+};
+
+export const missingPrerequisiteProposalValidator = z.object({
+  proposals: z.array(z.object({
+    proposedLabel: z.string().min(1),
+    rationale: z.string().min(1)
+  }).strict())
+}).strict();
+
 // --- Assertion entailment judgment: submit_assertion_entailment_judgment --
 // One bounded judgment over a single optional typed assertion (ADR-0007 reset).
 // For an explicit-prerequisite-hint the model decides whether the verbatim

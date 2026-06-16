@@ -612,6 +612,52 @@ export type LlmGroundedEnrichmentNode = {
 export type EnrichmentNode = SourceMentionedEnrichmentNode | LlmGroundedEnrichmentNode;
 export type DerivedGraphNode = AnchorProjectionNode | EnrichmentNode;
 
+// One explicit, inspectable proposal that a prerequisite concept the source
+// ASSUMES but never teaches should be minted as an `llm_grounded` node (R7, KTD6).
+// This is the node-identity decision the minting pass makes BEFORE any grounding is
+// generated: `GroundingGenerationPort` fills a chosen label, it never decides which
+// labels exist. Proposals are anchor-driven (each names the anchor it scaffolds) and
+// bounded; the application dedupes them against existing node labels within domain.
+export type MissingPrerequisiteProposal = {
+  proposedLabel: string;
+  rationale: string;
+};
+
+// A member Extraction Run's rejected/optional admission proposal that carries a
+// verbatim source MENTION but no Definition Passage (KTD5) — the fully-provenanced
+// source for a `source_mentioned` rescued node. `blockText` is carried so the
+// verbatim floor (U6) re-verifies each mention quote against its cited block at
+// enrichment time rather than trusting the extraction-time check.
+export type MentionedNonCoreCandidate = {
+  runId: string;
+  declaredDomain: string;
+  candidateKey: string;
+  canonicalLabel: string;
+  normalizedLabel: string;
+  aliases: string[];
+  tier: CandidateTier;
+  mentions: {
+    sourceResourceId: string;
+    sourceBlockId: string;
+    evidenceQuote: string;
+    blockText: string;
+    headingPath: string[];
+    locator: SourceLocator;
+  }[];
+};
+
+// A node-level record that the per-passage verbatim floor (U6, KTD4) ran on an
+// enrichment node and what it decided. `not_applicable_by_grounding` is the recorded
+// (never silent) exemption for `llm_grounded` generated passages; `verified`/`failed`
+// are the real hard-gate outcomes for `source_mentioned` rescue evidence. Kept on the
+// run trace so an operator can query why a generated node skipped the floor (R9, AE3).
+export type GroundingVerbatimDisposition = {
+  derivedNodeId: string;
+  groundingOrigin: "source_mentioned" | "llm_grounded";
+  outcome: "verified" | "failed" | "not_applicable_by_grounding";
+  rationale: string;
+};
+
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
 // meaning-bearing definition passages, bounded salience-ordered mention passages,
 // and LABELED optional typed assertions. An `explicit-prerequisite-hint` appears
@@ -671,6 +717,9 @@ export type EnrichmentRunTrace = {
   derivedNodes: DerivedGraphNode[];
   judgments: PrerequisiteJudgmentTrace[];
   dispositions: InferredEdgeDisposition[];
+  // Per-node verbatim-floor outcomes for enrichment nodes (R9, AE3). Recorded so the
+  // `not_applicable_by_grounding` exemption for generated passages is never silent.
+  groundingDispositions: GroundingVerbatimDisposition[];
 };
 
 // Baseline node difficulty. MVP `method` is "dag-depth-mock" (topological depth);
