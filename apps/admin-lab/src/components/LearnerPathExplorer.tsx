@@ -30,7 +30,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = 1;
     colorCanvas.height = 1;
-    const colorContext = colorCanvas.getContext("2d");
+    const colorContext = colorCanvas.getContext("2d", { willReadFrequently: true });
     const color = (name: string) => {
       const value = styles.getPropertyValue(name).trim();
       if (!colorContext) return value;
@@ -73,7 +73,6 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       },
       minZoom: 0.2,
       maxZoom: 3,
-      wheelSensitivity: 0.18,
       style: [
         {
           selector: "node",

@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { GraphSnapshot, PublishedEvidencePassage, PublishedTypedAssertion } from "@lrnki/domain-core";
-import { FocusIcon, NetworkIcon, SearchIcon } from "lucide-react";
+import { ArrowUpRightIcon, FocusIcon, NetworkIcon, SearchIcon } from "lucide-react";
 import {
   conceptLabel,
   filterConcepts,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/publishedView";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -117,12 +118,16 @@ export function GraphExplorer({ snapshot, live }: GraphExplorerProps) {
       <Card className="min-h-0 xl:max-h-[calc(100svh-7rem)]">
         <CardHeader className="border-b">
           <CardTitle>{snapshot.graphVersionId}</CardTitle>
-          <CardDescription>Published graph version · Concepts + evidence profiles, no asserted edges</CardDescription>
+          <CardDescription>Published graph version · Concepts + evidence profiles; inferred edges are derived separately</CardDescription>
           <CardAction className="flex flex-wrap items-center justify-end gap-2">
             <Badge variant={live ? "default" : "secondary"}>{live ? "Live graph" : "Demo fallback"}</Badge>
             <Badge variant="outline">{snapshot.concepts.length} concepts</Badge>
             <Badge variant="outline">{passageCount} passages</Badge>
             <Badge variant="outline">0 edges</Badge>
+            <Link className={buttonVariants({ variant: "outline", size: "sm" })} href="/admin/lab/enrichments">
+              <ArrowUpRightIcon data-icon="inline-start" />
+              Open derived graphs
+            </Link>
           </CardAction>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
