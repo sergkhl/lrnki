@@ -7,6 +7,8 @@ export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
+export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {

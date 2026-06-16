@@ -1,7 +1,10 @@
 import type {
-  Concept,
+  AnchorProjectionNode,
   DerivedGraphLayer,
+  DerivedGraphNode,
+  EnrichmentNode,
   EnrichmentRunTrace,
+  GroundingVerbatimDisposition,
   InferredPrerequisiteEdge,
   PrerequisiteConceptContext,
   PrerequisiteJudgment,
@@ -11,13 +14,18 @@ import type {
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
+  GroundingGenerationPort,
+  MissingPrerequisiteProposalPort,
   PrerequisiteJudgmentPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
+import { randomUUID } from "node:crypto";
+import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { cutWeakEdges, removeCycles, transitiveReduction } from "./prerequisiteDag";
+import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 
 const PRODUCER = "@lrnki/application";
-const PRODUCER_VERSION = "0.7.0";
+const PRODUCER_VERSION = "0.8.0";
 
 export type GraphEnrichmentConfig = {
   // Part of enrichment identity (ADR-0019): changing a knob re-derives the layer.
@@ -27,29 +35,36 @@ export type GraphEnrichmentConfig = {
   // Bounded concurrency for the per-pair judge calls (ADR-0019 reset). Results are
   // collected in deterministic pair order regardless of completion order.
   judgeConcurrency: number;
-  // Bound on mention passages passed per Concept into a pair judgment (R11). The
+  // Bound on mention passages passed per node into a pair judgment (R11). The
   // published CEP is already mention-bounded at extraction; this is a further
   // deterministic cap so a pair prompt cannot grow unbounded.
   maxMentionsPerConceptInPair: number;
+  // Bounds on the anchor-driven node-minting pass (KTD6, R7).
+  mintingBounds: EnrichmentMintingBounds;
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  enrichmentConfigHash: "cep-pair-enrichment-v1",
+  enrichmentConfigHash: "cep-node-enrichment-v1",
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
-  maxMentionsPerConceptInPair: 6
+  maxMentionsPerConceptInPair: 6,
+  mintingBounds: DEFAULT_MINTING_BOUNDS
 };
 
-// Graph Enrichment — the third operation (ADR-0019 reset). EVERY unordered
-// same-domain Concept pair is judged from both Concepts' published CEPs; there is
-// no embedding clustering or candidate-group gate. The LLM proposes (a bounded
-// judge rules on each pair); the symbolic helpers dispose (weak-edge cut -> cycle
-// removal -> transitive reduction); difficulty is mocked behind DifficultyPort.
-// Produces an immutable Derived Graph Layer; each append-only run has its own
-// enrichmentId and never touches the asserted core. Pair calls use bounded
-// concurrency, preserve deterministic pair/result order, and fail the run WITHOUT
-// persistence if any pair exhausts the forced-tool retry budget. Replayable from
-// (version + config + captured judgments).
+// Graph Enrichment — the third operation, generalized to NODE + EDGE derivation
+// (ADR-0019, U5). The asserted snapshot supplies anchors; enrichment additionally
+// RESCUES `source_mentioned` nodes from the member runs' non-core mentions and MINTS
+// `llm_grounded` nodes via an explicit anchor-driven proposal pass, so a sparse
+// source still yields a usable learner path. Every same-domain pair across anchors ∪
+// enrichment nodes is judged; any pair touching a GENERATED (`llm_grounded`) node is
+// routed to a CROSS-FAMILY judge (R13) so the DeepSeek self-loop cannot grade its own
+// minted output, while anchor/anchor and anchor/source_mentioned pairs stay on the
+// validated DeepSeek judge. The symbolic helpers dispose (weak-edge cut -> cycle
+// removal -> transitive reduction); difficulty is the dag-depth mock over ALL derived
+// nodes. The asserted core is never touched (R5): no enrichment node is ever
+// published. Node minting + rescue are OPT-IN — when the proposal/grounding ports are
+// omitted the run is anchor-only (the pre-node-minting behavior). Fails the run
+// WITHOUT persistence if any pair exhausts the forced-tool retry budget.
 export async function runGraphEnrichment(input: {
   enrichmentId: string;
   graphVersionId: string;
@@ -58,6 +73,12 @@ export async function runGraphEnrichment(input: {
   difficulty: DifficultyPort;
   enrichmentStore: EnrichmentRunStorePort;
   config?: GraphEnrichmentConfig;
+  // U5/U7 enrichment-node ports. Provide all three to enable rescue + mint + the
+  // cross-family generated-node judge; omit them for an anchor-only run.
+  missingPrerequisiteProposal?: MissingPrerequisiteProposalPort;
+  groundingGeneration?: GroundingGenerationPort;
+  generatedPrerequisiteJudge?: PrerequisiteJudgmentPort;
+  newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
@@ -65,43 +86,91 @@ export async function runGraphEnrichment(input: {
     throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
   }
   const concepts = snapshot.concepts;
-  const derivedNodes = concepts.map((concept) => ({
-    nodeKind: "anchor" as const,
+  const newNodeId = input.newNodeId ?? randomUUID;
+  const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
+  const labelByConcept = new Map(concepts.map((concept) => [concept.conceptId, concept.canonicalLabel] as const));
+
+  // Anchors: a per-run projection of the asserted snapshot (KTD2). Identity is the
+  // frozen conceptId; nothing here mutates the asserted layer (R5).
+  const anchorNodes: AnchorProjectionNode[] = concepts.map((concept) => ({
+    nodeKind: "anchor",
     derivedNodeId: concept.conceptId,
     conceptId: concept.conceptId,
-    groundingOrigin: "document_anchored" as const,
-    role: "anchor" as const,
-    layer: "asserted" as const,
+    groundingOrigin: "document_anchored",
+    role: "anchor",
+    layer: "asserted",
     canonicalLabel: concept.canonicalLabel,
     normalizedLabel: concept.normalizedLabel,
     declaredDomain: concept.declaredDomain,
     aliases: concept.aliases
   }));
-  const labelByConcept = new Map(concepts.map((concept) => [concept.conceptId, concept.canonicalLabel] as const));
-  const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
-  const contextOf = (concept: Concept): PrerequisiteConceptContext =>
-    buildContext(concept, profileByConcept.get(concept.conceptId), labelByConcept, config.maxMentionsPerConceptInPair);
 
-  // Step 1 — every unordered same-domain pair (ADR-0019 reset). The small core
-  // makes exhaustive judgment the simplest correct behavior; cross-domain pairs are
-  // never proposed (ADR-0015 Declared-Domain gate). Deterministic order for replay.
-  const pairs = sameDomainPairs(concepts);
+  // Step 0 — rescue + mint enrichment nodes (U5), then re-apply the verbatim floor
+  // per grounding origin (U6). Only runs when the enrichment-node ports are provided.
+  let enrichmentNodes: EnrichmentNode[] = [];
+  let groundingDispositions: GroundingVerbatimDisposition[] = [];
+  if (input.missingPrerequisiteProposal && input.groundingGeneration) {
+    const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
+    const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
+      conceptId: concept.conceptId,
+      canonicalLabel: concept.canonicalLabel,
+      normalizedLabel: concept.normalizedLabel,
+      declaredDomain: concept.declaredDomain,
+      definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
+    }));
+    const assembled = await assembleEnrichmentNodes({
+      anchors: mintingAnchors,
+      rescueCandidates,
+      proposalPort: input.missingPrerequisiteProposal,
+      groundingPort: input.groundingGeneration,
+      bounds: config.mintingBounds,
+      newNodeId
+    });
+    // The floor verifies source_mentioned passages verbatim against their cited block
+    // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
+    // does not verify is dropped before it can enter the derived layer.
+    const blockTextById = new Map<string, string>();
+    for (const candidate of rescueCandidates) {
+      for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
+    }
+    const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
+    enrichmentNodes = floored.nodes;
+    groundingDispositions = floored.dispositions;
+  }
 
-  // Step 2 — bounded LLM prerequisite judgment per pair (neural proposes). Each side
-  // carries its full CEP (definitions, bounded mentions, labeled typed assertions);
-  // an explicit-prerequisite-hint is labeled evidence the judge MAY weigh, never a
-  // deterministic edge (R11, KTD). A pair with no CEP evidence is impossible in a
-  // valid published snapshot and fails closed if an invalid snapshot is injected.
+  const allNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
+
+  // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
+  // their published CEP; enrichment nodes use their grounding (generated text for
+  // llm_grounded, verbatim mention quotes for source_mentioned). The bare label is
+  // never the evidence — an empty context is treated as insufficient upstream.
+  const pairingNodes = allNodes.map((node) => ({
+    derivedNodeId: node.derivedNodeId,
+    declaredDomain: node.declaredDomain,
+    groundingOrigin: node.groundingOrigin,
+    context: contextOf(node, profileByConcept, labelByConcept, config.maxMentionsPerConceptInPair)
+  }));
+  type PairingNode = (typeof pairingNodes)[number];
+
+  // Step 1 — every unordered same-domain pair over anchors ∪ enrichment nodes (R12).
+  // Cross-domain pairs are never proposed (ADR-0015 Declared-Domain gate). The
+  // asserted version stays anchors-only; this union is the DERIVED node space.
+  const pairs = sameDomainPairs(pairingNodes);
+
+  // Step 2 — bounded LLM prerequisite judgment per pair (neural proposes). A pair
+  // touching a GENERATED node routes cross-family (R13); anchor/anchor and
+  // anchor/source_mentioned stay on the validated DeepSeek judge (no regression).
+  const generatedJudge = input.generatedPrerequisiteJudge ?? input.prerequisiteJudge;
+  const isGenerated = (node: PairingNode) => node.groundingOrigin === "llm_grounded";
   type PairOutcome = { judgment?: PrerequisiteJudgment; trace?: PrerequisiteJudgmentTrace; insufficient?: EnrichmentRunTrace["dispositions"][number] };
   const outcomes = await mapWithConcurrency(pairs, config.judgeConcurrency, async ([a, b]): Promise<PairOutcome> => {
-    const contextA = contextOf(a);
-    const contextB = contextOf(b);
     const hasEvidence = (context: PrerequisiteConceptContext) => context.definitions.length > 0 || context.mentions.length > 0;
-    if (!hasEvidence(contextA) || !hasEvidence(contextB)) {
-      return { insufficient: { prerequisiteConceptId: a.conceptId, dependentConceptId: b.conceptId, disposition: "insufficient_evidence" } };
+    if (!hasEvidence(a.context) || !hasEvidence(b.context)) {
+      return { insufficient: { prerequisiteConceptId: a.derivedNodeId, dependentConceptId: b.derivedNodeId, disposition: "insufficient_evidence" } };
     }
-    const judgeInput = { declaredDomain: a.declaredDomain, a: contextA, b: contextB };
-    const judgment = await input.prerequisiteJudge.judge(judgeInput);
+    const judge = isGenerated(a) || isGenerated(b) ? generatedJudge : input.prerequisiteJudge;
+    const judgeInput = { declaredDomain: a.declaredDomain, a: a.context, b: b.context };
+    const judgment = await judge.judge(judgeInput);
     return { judgment, trace: { ...judgeInput, judgment } };
   });
 
@@ -138,15 +207,16 @@ export async function runGraphEnrichment(input: {
   const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(acyclicEdges);
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
-  // Step 5 — baseline difficulty over the reduced DAG (mock behind the port).
-  const difficulties = await input.difficulty.score({ concepts, prerequisiteEdges: reducedEdges });
+  // Step 5 — baseline difficulty over the reduced DAG (mock behind the port). Scores
+  // ALL derived node ids — anchors AND enrichment nodes (R12, handoff constraint).
+  const difficulties = await input.difficulty.score({ nodeIds: allNodes.map((node) => node.derivedNodeId), prerequisiteEdges: reducedEdges });
 
   const layer: DerivedGraphLayer = {
     enrichmentId: input.enrichmentId,
     graphVersionId: input.graphVersionId,
     enrichmentConfigHash: config.enrichmentConfigHash,
     judgeModel: input.prerequisiteJudge.model,
-    derivedNodes,
+    derivedNodes: allNodes,
     prerequisiteEdges,
     difficulties
   };
@@ -155,7 +225,7 @@ export async function runGraphEnrichment(input: {
     enrichmentId: input.enrichmentId,
     graphVersionId: input.graphVersionId,
     enrichmentConfigHash: config.enrichmentConfigHash,
-    derivedNodes,
+    derivedNodes: allNodes,
     judgments: judgmentTraces,
     dispositions: [
       ...insufficientEvidence,
@@ -164,7 +234,8 @@ export async function runGraphEnrichment(input: {
       ...cycleRemovedEdges.map((edge) => disposition(edge, "cycle_removed")),
       ...transitiveEdges.map((edge) => disposition(edge, "transitive_reduction")),
       ...reducedEdges.map((edge) => disposition(edge, "kept"))
-    ]
+    ],
+    groundingDispositions
   };
   await input.enrichmentStore.persist({
     layer,
@@ -196,21 +267,21 @@ function disposition(
 
 // --- Deterministic, model-free helpers -----------------------------------------
 
-// Every unordered same-domain pair (ADR-0019 reset). Concepts are grouped by
-// Declared Domain (ADR-0015) so a cross-domain pair is never proposed; both the
-// domain order and the within-domain member order are sorted by stable id so the
-// pair sequence — and therefore the persisted trace — is replay-deterministic. The
-// judge decides direction, so within-pair order is irrelevant.
-function sameDomainPairs(concepts: Concept[]): [Concept, Concept][] {
-  const byDomain = new Map<string, Concept[]>();
-  for (const concept of concepts) {
-    const existing = byDomain.get(concept.declaredDomain);
-    if (existing) existing.push(concept);
-    else byDomain.set(concept.declaredDomain, [concept]);
+// Every unordered same-domain pair over the derived node space (R12). Nodes are
+// grouped by Declared Domain (ADR-0015) so a cross-domain pair is never proposed;
+// both the domain order and the within-domain member order are sorted by stable
+// derived-node id so the pair sequence — and therefore the persisted trace — is
+// replay-deterministic. The judge decides direction, so within-pair order is moot.
+function sameDomainPairs<T extends { derivedNodeId: string; declaredDomain: string }>(nodes: T[]): [T, T][] {
+  const byDomain = new Map<string, T[]>();
+  for (const node of nodes) {
+    const existing = byDomain.get(node.declaredDomain);
+    if (existing) existing.push(node);
+    else byDomain.set(node.declaredDomain, [node]);
   }
-  const pairs: [Concept, Concept][] = [];
+  const pairs: [T, T][] = [];
   for (const [, members] of [...byDomain.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-    const sorted = [...members].sort((a, b) => a.conceptId.localeCompare(b.conceptId));
+    const sorted = [...members].sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
     for (let i = 0; i < sorted.length; i++) {
       for (let j = i + 1; j < sorted.length; j++) {
         pairs.push([sorted[i], sorted[j]]);
@@ -220,32 +291,50 @@ function sameDomainPairs(concepts: Concept[]): [Concept, Concept][] {
   return pairs;
 }
 
-// Reduce a Concept's published CEP to exactly what the prerequisite judge needs
-// (R11): verbatim definition + bounded mention quotes and LABELED typed
-// assertions. A `defines` assertion surfaces its literal; an
-// explicit-prerequisite-hint surfaces the canonical label of the Concept it points
-// at (falling back to the raw id if that Concept is somehow absent) so the judge
-// reads "needs <label>" rather than an opaque id. Mentions are capped a second
-// time here (the published CEP is already extraction-bounded) so a pair prompt
-// cannot grow unbounded. The bare label is never the evidence — an empty CEP
-// yields empty definitions/mentions and is treated as insufficient upstream.
-function buildContext(
-  concept: Concept,
-  profile: PublishedConceptEvidenceProfile | undefined,
+// Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor
+// uses its published CEP (verbatim definition + bounded mention quotes + LABELED typed
+// assertions, the hint resolved to a canonical label). A `source_mentioned` node has
+// no definition — only verbatim mention quotes. A `llm_grounded` node uses its
+// generated definition/mention text (exempt from the verbatim floor, U6). The bare
+// label is never the evidence — an empty context is treated as insufficient upstream.
+function contextOf(
+  node: DerivedGraphNode,
+  profileByConcept: Map<string, PublishedConceptEvidenceProfile>,
   labelByConcept: Map<string, string>,
   maxMentions: number
 ): PrerequisiteConceptContext {
+  if (node.nodeKind === "anchor") {
+    const profile = profileByConcept.get(node.conceptId);
+    return {
+      conceptId: node.derivedNodeId,
+      canonicalLabel: node.canonicalLabel,
+      aliases: node.aliases,
+      definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
+      mentions: (profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote),
+      assertions: (profile?.assertions ?? []).map((assertion) =>
+        assertion.type === "defines"
+          ? { type: assertion.type, detail: assertion.literalValue }
+          : { type: assertion.type, detail: labelByConcept.get(assertion.objectConceptId) ?? assertion.objectConceptId }
+      )
+    };
+  }
+  if (node.groundingOrigin === "source_mentioned") {
+    return {
+      conceptId: node.derivedNodeId,
+      canonicalLabel: node.canonicalLabel,
+      aliases: node.aliases,
+      definitions: [],
+      mentions: node.groundingPassages.slice(0, maxMentions).map((passage) => passage.evidenceQuote),
+      assertions: []
+    };
+  }
   return {
-    conceptId: concept.conceptId,
-    canonicalLabel: concept.canonicalLabel,
-    aliases: concept.aliases,
-    definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
-    mentions: (profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote),
-    assertions: (profile?.assertions ?? []).map((assertion) =>
-      assertion.type === "defines"
-        ? { type: assertion.type, detail: assertion.literalValue }
-        : { type: assertion.type, detail: labelByConcept.get(assertion.objectConceptId) ?? assertion.objectConceptId }
-    )
+    conceptId: node.derivedNodeId,
+    canonicalLabel: node.canonicalLabel,
+    aliases: node.aliases,
+    definitions: node.groundingBundle.definitions.map((passage) => passage.text),
+    mentions: node.groundingBundle.mentions.slice(0, maxMentions).map((passage) => passage.text),
+    assertions: []
   };
 }
 
