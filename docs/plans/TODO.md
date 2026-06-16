@@ -11,20 +11,25 @@ The 7-unit complexity reset and the derived-layer node-minting enrichment milest
 complete on `feat/derived-layer-prerequisite-enrichment`; durable architecture lives in the
 [ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md).
 
-1. **Tune minting/rescue precision against more fixtures (post-rule-14 follow-up).** The Rust rule-14 run
-   minted expert-plausible prerequisites but showed mild granularity redundancy (minted "Stack-allocated
+1. **Validate minting/rescue on a non-software fixture before tuning.** The Rust rule-14 run minted
+   expert-plausible prerequisites but showed mild granularity redundancy (minted "Stack-allocated
    data"/"Heap-allocated data" beside the anchor "The Stack and the Heap"; "Trait (Rust)" beside "Copy
-   trait") and rescued a heading-like concept ("Memory and Allocation").
-   - Inspect a non-software fixture (biology/economics) before tuning; do not overfit the proposal prompt
-     to Rust (AGENTS rule 17).
-   - Consider a generic rubric clause that suppresses sub-aspects of an existing anchor, measured against
-     an oracle, not a hardcoded denylist (AGENTS rule 16).
-2. **Tune the minting bounds beyond defaults (deferred in the plan).** The per-run cap (12) bound exactly
-   on the sparse Rust source; a richer source needs evidence-driven per-anchor/per-run caps.
-3. **DOCX/PPTX curated-source expansion** remains orthogonal and deferred.
-4. **Keep the standing deferred work deferred.** Difficulty stays the DAG-depth mock and learner state
+   trait") and rescued a heading-like concept ("Memory and Allocation"). The per-run mint cap (12) also
+   bound exactly on that sparse Rust source.
+   - Inspect a biology or economics fixture end-to-end before changing prompts, caps, or schemas.
+   - Decide from that run whether granularity redundancy and cap pressure are real cross-domain defects
+     or Rust-shaped noise.
+   - If a fix is needed, prefer a domain-neutral rubric or measured neural judge; do not add hardcoded
+     lexical denylist rules (AGENTS rules 16, 17).
+2. **Validate domain-neutral extraction quality outside Rust.** The latest Rust run kept baseline key
+   concepts but admitted extra operation/error concepts after fixture-specific calibration was removed.
+   - Inspect a non-software run before changing extraction prompts or adding repair workflow.
+   - Keep `ExtractionQualityIssue[]` as read-only run evidence unless a concrete repair or aggregation
+     workflow starts consuming it.
+3. **Keep the standing deferred work deferred.** Difficulty stays the DAG-depth mock and learner state
    stays the empty mock until measured need. The embedding canonicalization cascade and embedding blocking
-   tier stay removed unless a measured replacement beats exhaustive same-domain judgment.
+   tier stay removed unless a measured replacement beats exhaustive same-domain judgment. No DOCX/PPTX
+   expansion work is planned.
 
 ## COMPLETED
 
@@ -50,14 +55,6 @@ complete on `feat/derived-layer-prerequisite-enrichment`; durable architecture l
   artifacts. Admin Lab run detail now renders read-only quality issues from the artifact payload. Rule-14
   real-use check: Rust run `5889b488-5329-469f-892d-8bd071b16699` succeeded with the baseline key
   concepts preserved, but admitted extra operation/error concepts; see `tmp/dehack-prompt-quality-evaluation.md`.
-- **Derived-layer prerequisite enrichment paused after U4 (branch
-  `feat/derived-layer-prerequisite-enrichment`).** U1/U2 (`7849c31`): added the grounding-origin,
-  role, and layer model; projected asserted Concepts as `document_anchored` anchors; repaired Rust
-  admission/core-selection recall without relaxing the Definition-Passage floor. U3 (`387f7fe`):
-  rewrote the initial migration for `derived_graph_nodes`, `enrichment_grounding_bundles`, and
-  derived-node edge/difficulty endpoints; reset and reinitialized the local DB; live Postgres tests
-  passed. U4 (`52fc43e`): added `GroundingGenerationPort`, forced grounding-generation tool schema,
-  and LiteLLM adapter. U5-U9 are not complete.
 - **Reset milestone 4 — worker/Admin Lab/export reshape + docs (U6+U7, branch `refactor/cep-core-reset`).**
   U6: Run Inspector + run list now report CEP completeness and definition/mention/assertion counts (no
   claim/proposal reads); the published Graph Explorer is a zero-edge CEP evidence inspector with no graph
@@ -102,10 +99,10 @@ complete on `feat/derived-layer-prerequisite-enrichment`; durable architecture l
   presentation; reads select explicit version/run IDs; Enrichment Runs append-only with relational query
   surfaces + full JSONB traces; cross-domain homographs publish separately with an inspection flag.
 - **Gate 2 mixed-format ingestion (Docling) + retired oracle benchmark.** `DoclingStructuredDocumentParser`
-  (PDF/DOCX/PPTX) behind `StructuredDocumentParserPort`; shared `extractMarkdownBlocks`; PDF fixture
+  supports PDF/DOCX/PPTX behind `StructuredDocumentParserPort`; shared `extractMarkdownBlocks`; PDF fixture
   end-to-end with verbatim-verifiable evidence. The Gate 2 oracle benchmark (independence triangle +
   scoring-only label aligner) yielded the admission-precision diagnoses that drove U1, then was deleted with
-  the rest of the standing harness in U2 (ADR-0013/0022).
+  the rest of the standing harness in U2 (ADR-0013/0022). No additional DOCX/PPTX expansion work is planned.
 
 ## VALIDATION
 
