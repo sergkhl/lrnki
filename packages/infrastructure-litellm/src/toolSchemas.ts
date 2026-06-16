@@ -339,6 +339,51 @@ export const prerequisiteJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Generated grounding: submit_generated_grounding_bundle ---------------
+
+const generatedGroundingPassageSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text"],
+  properties: {
+    text: {
+      type: "string",
+      description: "Generated explanatory passage for the prerequisite concept. This is not a source quote."
+    }
+  }
+};
+
+export const generatedGroundingBundleSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["definitions", "mentions", "rationale"],
+  properties: {
+    definitions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 2,
+      description: "Generated meaning-bearing definition passages for the prerequisite concept.",
+      items: generatedGroundingPassageSchema
+    },
+    mentions: {
+      type: "array",
+      maxItems: 4,
+      description: "Generated mention-like passages that connect the prerequisite concept to the scaffolded anchors.",
+      items: generatedGroundingPassageSchema
+    },
+    rationale: {
+      type: "string",
+      description: "One terse sentence explaining why this prerequisite scaffolds the provided anchors."
+    }
+  }
+};
+
+export const generatedGroundingBundleValidator = z.object({
+  definitions: z.array(z.object({ text: z.string().min(1) }).strict()).min(1).max(2),
+  mentions: z.array(z.object({ text: z.string().min(1) }).strict()).max(4),
+  rationale: z.string().min(1)
+}).strict();
+
 // --- Assertion entailment judgment: submit_assertion_entailment_judgment --
 // One bounded judgment over a single optional typed assertion (ADR-0007 reset).
 // For an explicit-prerequisite-hint the model decides whether the verbatim
@@ -441,4 +486,3 @@ export const admissionLabelJudgmentValidator = z.object({
   groundingSpan: z.string(),
   rationale: z.string().min(1)
 }).strict();
-

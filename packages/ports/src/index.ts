@@ -10,6 +10,7 @@ import type {
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
   ExtractionRunResult,
+  GeneratedGroundingBundle,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
@@ -184,6 +185,16 @@ export interface PrerequisiteJudgmentPort {
     a: PrerequisiteConceptContext;
     b: PrerequisiteConceptContext;
   }): Promise<PrerequisiteJudgment>;
+}
+
+export interface GroundingGenerationPort {
+  readonly model: string;
+  generate(input: {
+    derivedNodeId: string;
+    declaredDomain: string;
+    nodeLabel: string;
+    scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
+  }): Promise<GeneratedGroundingBundle>;
 }
 
 // Baseline node difficulty (ADR-0019). MVP impl = deterministic DAG-depth mock

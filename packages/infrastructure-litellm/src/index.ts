@@ -12,6 +12,8 @@ export {
   conceptEvidenceProfileValidator,
   prerequisiteJudgmentSchema,
   prerequisiteJudgmentValidator,
+  generatedGroundingBundleSchema,
+  generatedGroundingBundleValidator,
   assertionEntailmentJudgmentSchema,
   assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
@@ -33,3 +35,7 @@ export {
   LiteLlmPrerequisiteJudgmentAdapter,
   PREREQUISITE_JUDGE_MODEL
 } from "./enrichmentAdapters";
+export {
+  LiteLlmGroundingGenerationAdapter,
+  GROUNDING_GENERATION_MODEL
+} from "./groundingGenerationAdapters";
