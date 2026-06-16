@@ -8,20 +8,64 @@ measurement became disposable scaffolding and is retired.
 ## TODO
 
 The 7-unit complexity reset is complete and merged to `main`; durable architecture lives in the
-[ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md). Only the work below remains.
+[ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md). Active work is now the paused
+derived-layer prerequisite enrichment plan:
+[`2026-06-16-001-feat-derived-layer-prerequisite-enrichment-plan.md`](./2026-06-16-001-feat-derived-layer-prerequisite-enrichment-plan.md).
 
-1. **DOCX and PPTX curated-source expansion.** The Docling adapter already supports both; register
-   curated DOCX/PPTX fixtures and run them end-to-end with verbatim-evidence verification.
-2. **Deferred measured deepening — keep mocked behind ports until measured need.** Difficulty stays the
-   DAG-depth mock (`DifficultyPort`); learner state stays the empty mock (`LearnerStatePort`). Do not
-   build Bradley-Terry, IRT/KT, anomaly detection, or synthetic priors before a measured need.
-3. **Hold the embedding cut.** Embedding canonicalization cascade and embedding blocking tier stay
-   removed; deterministic identity (ADR-0015) stays the sole merge authority. Any future cost-bound
-   pair-selection mechanism must be measured against exhaustive same-domain judgment before it may veto
-   pairs.
+1. **Restart U5 from a clean design for missing-prerequisite proposals.** Do not continue by fabricating
+   placeholder prerequisite labels locally and testing around that behavior. The `GroundingGenerationPort`
+   can generate a CEP-shaped bundle for a chosen label, but another explicit, inspectable operation must
+   justify which `llm_grounded` prerequisite nodes should exist.
+   - Decide whether this is a new LLM proposal port, a combined proposal+grounding port, or a bounded
+     extension of the existing grounding port.
+   - Keep the operation anchor-conditioned and capped per anchor/per run.
+   - Preserve the asserted graph invariant: enrichment nodes never publish as asserted `Concept`s.
+2. **Finish U5 source-mentioned rescue and union pair judging without collapsing node identity.**
+   - Add an extraction-run read model for member-run optional/rejected proposals with verbatim mentions
+     and no complete definition.
+   - Deduplicate rescued nodes by normalized label within declared domain.
+   - Judge pairs over anchors plus rescued/minted derived nodes, same-domain only.
+   - Keep prerequisite ordering only in `inferred-prerequisite-of` edges, never on node attributes.
+3. **Integrate the derived-node schema through downstream readers.** U3 rewrote the initial migration so
+   `inferred_prerequisite_edges` and `concept_difficulties` reference derived nodes, but Admin Lab and
+   learner-path loaders may still read the old concept endpoint columns.
+   - Update Admin Lab enrichment SQL/view models to read `derived_graph_nodes`.
+   - Update learner-path projection/persistence to use derived node IDs where appropriate.
+   - If difficulty scoring includes enrichment nodes, change `DifficultyPort` to accept derived node IDs
+     or derived node descriptors; do not fabricate asserted `Concept` records for generated nodes.
+4. **Complete U6-U8 only after U5 has a defensible proposal model.**
+   - Add per-grounding-origin verbatim-floor handling and explicit `not_applicable_by_grounding`
+     dispositions for generated passages.
+   - Add `kg-generated-prerequisite-judgment` and route generated-node pairs to the cross-family judge.
+   - Surface node kind, grounding origin, bundle, and recorded floor disposition in Admin Lab and learner
+     path inspection.
+5. **Run U9 real-use validation before calling the milestone complete.**
+   - Re-run the sparse Rust fixture after U5-U8 with real LLM calls.
+   - Inspect recovered anchors, rescued nodes, minted nodes, prerequisite DAG, and learner path usefulness.
+   - Record the result in `tmp/u9-derived-enrichment-quality-evaluation.md` and refresh ADRs/CONTEXT only
+     after the behavior is validated.
+6. **Keep the standing deferred work deferred.** DOCX/PPTX curated-source expansion remains orthogonal.
+   Difficulty stays the DAG-depth mock and learner state stays the empty mock until measured need. The
+   embedding canonicalization cascade and embedding blocking tier stay removed unless a measured
+   replacement beats exhaustive same-domain judgment.
 
 ## COMPLETED
 
+- **Domain-neutral extraction prompts + run-scoped quality issues (2026-06-16).** Removed fixture and
+  benchmark answer-key calibration from model-facing extraction prompts and forced-tool schema
+  descriptions, added AGENTS rule 17, bumped the extraction pipeline config hash to
+  `cep-domain-neutral-prompts-v34`, and added `ExtractionQualityIssue[]` to `extraction_run.v6`
+  artifacts. Admin Lab run detail now renders read-only quality issues from the artifact payload. Rule-14
+  real-use check: Rust run `5889b488-5329-469f-892d-8bd071b16699` succeeded with the baseline key
+  concepts preserved, but admitted extra operation/error concepts; see `tmp/dehack-prompt-quality-evaluation.md`.
+- **Derived-layer prerequisite enrichment paused after U4 (branch
+  `feat/derived-layer-prerequisite-enrichment`).** U1/U2 (`7849c31`): added the grounding-origin,
+  role, and layer model; projected asserted Concepts as `document_anchored` anchors; repaired Rust
+  admission/core-selection recall without relaxing the Definition-Passage floor. U3 (`387f7fe`):
+  rewrote the initial migration for `derived_graph_nodes`, `enrichment_grounding_bundles`, and
+  derived-node edge/difficulty endpoints; reset and reinitialized the local DB; live Postgres tests
+  passed. U4 (`52fc43e`): added `GroundingGenerationPort`, forced grounding-generation tool schema,
+  and LiteLLM adapter. U5-U9 are not complete.
 - **Reset milestone 4 — worker/Admin Lab/export reshape + docs (U6+U7, branch `refactor/cep-core-reset`).**
   U6: Run Inspector + run list now report CEP completeness and definition/mention/assertion counts (no
   claim/proposal reads); the published Graph Explorer is a zero-edge CEP evidence inspector with no graph
@@ -73,12 +117,22 @@ The 7-unit complexity reset is complete and merged to `main`; durable architectu
 
 ## VALIDATION
 
-Latest validation (2026-06-15) is **after the full U1–U7 reset** on branch `refactor/cep-core-reset`:
+Latest validation (2026-06-16) is after the domain-neutral prompt and quality-issue milestone:
 
-- **Static:** all workspace typechecks pass; tests green (application 67, infrastructure-litellm 13,
-  infrastructure-ingestion 9, admin-lab 9, infrastructure-rdf-export 2; live-PG integration tests no-op
-  without `DATABASE_URL`); ESLint clean; `next build` compiles all routes. Clear `apps/admin-lab/.next`
-  and run `next typegen` if stale typed-route errors appear.
-- **Real-use (rule-14):** U1–U6 each recorded a PASS over real model/DB runs (see COMPLETED and the
-  `tmp/u*-quality-evaluation.md` notes). The published Gate 1 graph identity is preserved (ADR-0015).
-- The reset is complete; re-validate only when the deferred mocks (difficulty, learner state) are replaced.
+- **Static/unit:** `pnpm --filter @lrnki/domain-core typecheck`,
+  `pnpm --filter @lrnki/infrastructure-litellm typecheck`, `pnpm --filter @lrnki/application typecheck`,
+  `pnpm --filter @lrnki/application test`, `pnpm --filter @lrnki/admin-lab typecheck`, and
+  `pnpm --filter @lrnki/kg-worker typecheck` passed.
+- **Manual prompt sweep:** the expanded fixture-term denylist over
+  `packages/infrastructure-litellm/src/extractionAdapters.ts` and
+  `packages/infrastructure-litellm/src/toolSchemas.ts` returned only the non-model-facing code comment
+  containing `dropped`.
+- **Real-use:** Rust fixture source `4c5dbe0b-9352-4f28-853b-6b7ffc972c37` was extracted with real LLM
+  calls as run `5889b488-5329-469f-892d-8bd071b16699`, `status=succeeded`, `32` candidates, `8` core,
+  `29` CEPs, `1` incomplete optional CEP, `32` definitions, `93` mentions, and `10` assertions. Core set:
+  `Copy trait`, `Double free error`, `Memory safety`, `Move`, `Ownership`, `Variable Scope`, `clone method`,
+  `drop function`. `qualityIssues`: standing `generic_domain_neutral_prompt` note plus
+  `possible_out_of_domain_illustration` for `Garbage collector (GC)`.
+- **Caveat:** the baseline key Rust concepts survived, but neutralization exposed redundant granularity
+  (`clone method`, `drop function`, and possibly error/safety concepts). Do not publish this run without
+  inspection; fix root causes generically rather than reintroducing fixture calibration.

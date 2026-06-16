@@ -37,7 +37,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "cep-reset-deepseek-v4-flash-no-thinking-atomic-admission-source-role-v33";
+const PIPELINE_CONFIG_HASH = "cep-domain-neutral-prompts-v34";
 
 import { existsSync } from "node:fs";
 

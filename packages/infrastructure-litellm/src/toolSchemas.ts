@@ -29,7 +29,7 @@ export const conceptDiscoverySchema: JsonSchema = {
         additionalProperties: false,
         required: ["candidateKey", "canonicalLabel", "mentions"],
         properties: {
-          candidateKey: { type: "string", description: "Short stable slug unique within this document, e.g. 'ownership'." },
+          candidateKey: { type: "string", description: "Short stable slug unique within this document, e.g. 'topic_x'." },
           canonicalLabel: { type: "string" },
           mentions: { type: "array", items: blockEvidenceSchema }
         }
@@ -115,7 +115,7 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             },
             atomicKey: {
               type: "string",
-              description: "Run-local key for this ATOMIC concept, unique across all decisions. Use the parentCandidateKey verbatim when the candidate names exactly one concept; append a distinct suffix per atom when splitting a conflated candidate (e.g. 'stack_heap__stack', 'stack_heap__heap')."
+              description: "Run-local key for this ATOMIC concept, unique across all decisions. Use the parentCandidateKey verbatim when the candidate names exactly one concept; append a distinct suffix per atom when splitting a conflated candidate (e.g. 'a_and_b__a', 'a_and_b__b')."
             },
             proposedCanonicalLabel: {
               type: "string",
@@ -125,7 +125,7 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             sourceRole: {
               type: "string",
               enum: ["declared_domain_concept", "out_of_domain_illustration"],
-              description: "'declared_domain_concept' when this is a genuine concept of the Declared Domain that the source teaches. 'out_of_domain_illustration' when it belongs to another domain and appears ONLY to illustrate this source (e.g. a generic sorting algorithm or SQL query inside an educational-technology paper); such material is rejected, never kept optional."
+              description: "'declared_domain_concept' when this is a genuine concept of the Declared Domain that the source teaches. 'out_of_domain_illustration' when it belongs to another domain and appears ONLY as example, sample, benchmark, or evaluation material for this source; such material is rejected, never kept optional."
             },
             standaloneLearningObjective: admissionCriterionSchema,
             establishedDomainMeaning: admissionCriterionSchema,
@@ -464,12 +464,12 @@ export const admissionLabelJudgmentSchema: JsonSchema = {
       type: "string",
       enum: ["concept", "proposition_or_claim"],
       description:
-        "'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as 'Operator Set as Bottleneck to Performance' or 'Division of Labour Limited by the Extent of the Market'. A long nominal label is still a concept."
+        "'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as '<Subject> as <Claimed Role>' or '<Subject> limited by <Constraint>'. A long nominal label is still a concept."
     },
     underlyingNounPhrase: {
       type: "string",
       description:
-        "When proposition_or_claim, the noun-phrase concept the label reduces to (e.g. 'Operator Set' for 'Operator Set as Bottleneck to Performance'), copied verbatim from the label/evidence. Empty string when labelKind is concept."
+        "When proposition_or_claim, the noun-phrase concept the label reduces to (for example '<Subject>' from '<Subject> as <Claimed Role>'), copied verbatim from the label/evidence. Empty string when labelKind is concept."
     },
     groundingSpan: {
       type: "string",

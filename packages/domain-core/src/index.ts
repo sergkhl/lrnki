@@ -252,6 +252,16 @@ export type RunEvidenceProfile = {
   complete: boolean;
 };
 
+export type ExtractionQualityIssue = {
+  stage: string;
+  candidateKey?: string;
+  conceptLabel?: string;
+  issueType: string;
+  severity: "info" | "warning";
+  evidenceQuotes: string[];
+  rationale: string;
+};
+
 // Concept-vs-proposition admission judgment (ADR-0005). One bounded LLM judgment
 // over a single admitted-`core` label, replacing the brittle deterministic
 // `looksLikePropositionLabel` lexical veto (AGENTS rule 16): "is this label a
@@ -348,6 +358,7 @@ export type ExtractionRunResult = {
   maxMentionsPerConceptPerSource: number;
   candidates: RunCandidate[];
   evidenceProfiles: RunEvidenceProfile[];
+  qualityIssues: ExtractionQualityIssue[];
   // A run is unsuccessful when any admitted (core|optional) Concept lacks a
   // complete CEP (R1). Publication refuses non-succeeded runs (ADR-0017).
   status: "succeeded" | "failed";

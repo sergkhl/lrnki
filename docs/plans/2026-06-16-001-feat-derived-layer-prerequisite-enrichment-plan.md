@@ -4,10 +4,51 @@ date: 2026-06-16
 type: feat
 depth: deep
 origin: docs/brainstorms/2026-06-16-derived-layer-prerequisite-enrichment-requirements.md
-status: ready
+status: paused-after-u4
 ---
 
 # feat: Derived-layer prerequisite enrichment — mint nodes, not just edges
+
+## Implementation Handoff — 2026-06-16
+
+Work is intentionally paused after U4. Do not continue U5-U7 by adding placeholder
+or fabricated prerequisite labels and then testing around that behavior. The next
+session should first tighten the enrichment-node proposal design so `llm_grounded`
+nodes are proposed by an explicit, inspectable operation rather than by local
+string construction.
+
+Completed commits on branch `feat/derived-layer-prerequisite-enrichment`:
+
+- `7849c31 feat(graph): add grounding model and repair admission recall` — U1 and U2.
+- `387f7fe feat(graph): persist derived graph nodes` — U3.
+- `52fc43e feat(graph): add grounding generation port` — U4.
+
+Current state:
+
+- The worktree was clean at handoff.
+- The local database was reset during U3 and reinitialized from the single
+  initial migration.
+- Registered fixture source IDs changed after the reset; the Rust fixture source
+  ID observed after reset was `4c5dbe0b-9352-4f28-853b-6b7ffc972c37`.
+- `runGraphEnrichment` still only projects asserted anchors into the derived node
+  space and still judges anchor-anchor pairs. U5-U7 are not implemented.
+
+Known continuation constraints:
+
+- Add a real proposal operation for missing prerequisites before minting
+  `llm_grounded` nodes. A `GroundingGenerationPort` generates grounding for a
+  chosen node label; it does not itself justify which node labels should exist.
+- Do not encode prerequisite-ness as a node attribute. Ordering remains only the
+  `inferred-prerequisite-of` edge.
+- Update downstream readers before claiming U3 is integrated end-to-end:
+  Admin Lab and learner-path SQL may still reference old concept endpoint
+  columns (`concept_id`, `prerequisite_concept_id`, `dependent_concept_id`)
+  while the migration now stores derived-node endpoints.
+- If `DifficultyPort` is extended to score enrichment nodes, change the port to
+  accept derived node IDs or derived node descriptors; do not fabricate asserted
+  `Concept` values for generated nodes.
+- U9 rule-14 validation has not been run for the node-minting milestone because
+  U5-U8 are not implemented.
 
 ## Summary
 

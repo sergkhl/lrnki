@@ -18,11 +18,12 @@ import { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 import { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
+import { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.5.0";
-const EXTRACTION_RUN_ARTIFACT_TYPE = "extraction_run.v5";
-const EXTRACTION_RUN_SCHEMA_VERSION = "5";
+const EXTRACTION_RUN_ARTIFACT_TYPE = "extraction_run.v6";
+const EXTRACTION_RUN_SCHEMA_VERSION = "6";
 
 // Default mention bound per Concept per source (R4, KTD). Overridable per run; part
 // of the pipeline configuration hash so a change is reflected in the artifact.
@@ -164,9 +165,11 @@ export async function executeExtractionRun(input: {
     maxMentionsPerConceptPerSource,
     candidates,
     evidenceProfiles,
+    qualityIssues: [],
     status,
     latencyMs: Date.now() - startedAt
   };
+  runResult.qualityIssues = detectExtractionQualityIssues(runResult);
 
   const artifact: ArtifactEnvelope<ExtractionRunResult> = {
     artifactId: `${input.runId}:run`,

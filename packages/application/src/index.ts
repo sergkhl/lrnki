@@ -1,6 +1,7 @@
 export { executeExtractionRun, DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE } from "./executeExtractionRun";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { applyAdmissionPolicy } from "./applyAdmissionPolicy";
+export { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
 export { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";

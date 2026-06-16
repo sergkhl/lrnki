@@ -63,7 +63,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
     );
   }
 
-  const { run, candidates, profiles } = inspection;
+  const { run, candidates, qualityIssues, profiles } = inspection;
   return (
     <AdminShell active="runs">
       <div className="flex flex-col gap-4">
@@ -91,6 +91,50 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Candidates</dt><dd>{run.candidateCount} total / {run.coreCount} core</dd></div>
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Evidence profiles</dt><dd>{run.completeProfileCount} complete / {run.profileCount} total · {run.definitionCount} def / {run.mentionCount} mention / {run.assertionCount} assert</dd></div>
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Quality issues</CardTitle>
+            <CardDescription>Run-scoped inspection notes from the extraction artifact.</CardDescription>
+            <CardAction><Badge variant="outline">{qualityIssues.length}</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
+            {qualityIssues.length > 0 ? (
+              <Table>
+                <TableHeader><TableRow><TableHead>Severity</TableHead><TableHead>Stage</TableHead><TableHead>Issue</TableHead><TableHead>Subject</TableHead><TableHead>Rationale</TableHead><TableHead>Evidence</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {qualityIssues.map((issue, index) => (
+                    <TableRow key={`${issue.issueType}-${issue.candidateKey ?? index}`}>
+                      <TableCell><Badge variant={issue.severity === "warning" ? "destructive" : "outline"}>{issue.severity}</Badge></TableCell>
+                      <TableCell className="font-mono text-xs">{issue.stage}</TableCell>
+                      <TableCell className="font-mono text-xs">{issue.issueType}</TableCell>
+                      <TableCell className="max-w-56 whitespace-normal">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-medium">{issue.conceptLabel ?? "Run"}</span>
+                          {issue.candidateKey ? <span className="font-mono text-xs text-muted-foreground">{issue.candidateKey}</span> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-96 whitespace-normal text-muted-foreground">{issue.rationale}</TableCell>
+                      <TableCell className="min-w-80 whitespace-normal">
+                        {issue.evidenceQuotes.length > 0 ? (
+                          <div className="flex flex-col gap-2">
+                            {issue.evidenceQuotes.map((quote, quoteIndex) => (
+                              <blockquote key={quoteIndex} className="border-l-2 pl-3 text-xs text-muted-foreground">&ldquo;{quote}&rdquo;</blockquote>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">None</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <span className="text-sm text-muted-foreground">No quality issues recorded for this run.</span>
+            )}
           </CardContent>
         </Card>
 
