@@ -19,7 +19,7 @@ import type {
   PrerequisiteJudgmentPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { cutWeakEdges, removeCycles, transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
@@ -94,7 +94,7 @@ export async function runGraphEnrichment(input: {
   // frozen conceptId; nothing here mutates the asserted layer (R5).
   const anchorNodes: AnchorProjectionNode[] = concepts.map((concept) => ({
     nodeKind: "anchor",
-    derivedNodeId: concept.conceptId,
+    derivedNodeId: deterministicUuid(input.enrichmentId, concept.conceptId),
     conceptId: concept.conceptId,
     groundingOrigin: "document_anchored",
     role: "anchor",
@@ -266,6 +266,13 @@ function disposition(
 }
 
 // --- Deterministic, model-free helpers -----------------------------------------
+
+function deterministicUuid(...parts: string[]): string {
+  const hash = createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 32).split("");
+  hash[12] = "4";
+  hash[16] = (8 + (Number.parseInt(hash[16], 16) % 4)).toString(16);
+  return `${hash.slice(0, 8).join("")}-${hash.slice(8, 12).join("")}-${hash.slice(12, 16).join("")}-${hash.slice(16, 20).join("")}-${hash.slice(20, 32).join("")}`;
+}
 
 // Every unordered same-domain pair over the derived node space (R12). Nodes are
 // grouped by Declared Domain (ADR-0015) so a cross-domain pair is never proposed;

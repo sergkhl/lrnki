@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type {
+  AnchorProjectionNode,
   DerivedGraphLayer,
   EnrichmentRunTrace,
   GraphSnapshot,
@@ -90,12 +91,13 @@ type JudgeFn = (input: { declaredDomain: string; a: PrerequisiteConceptContext; 
 // (cx2->cx1) to prove the judge — not the hint — decides direction; cx1/cx3 is a
 // plain directed edge; cx2/cx3 is uncertain; cy1/cy2 is none (dropped).
 const defaultJudge: JudgeFn = (input) => {
-  const ids = [input.a.conceptId, input.b.conceptId];
+  const labels = [input.a.canonicalLabel, input.b.canonicalLabel];
   const j = (p: string, d: string, outcome: PrerequisiteJudgment["outcome"], confidence: number): PrerequisiteJudgment =>
     ({ prerequisiteConceptId: p, dependentConceptId: d, outcome, confidence, rationale: "mock" });
-  if (ids.includes("cx1") && ids.includes("cx2")) return j("cx2", "cx1", "directed", 0.9);
-  if (ids.includes("cx1") && ids.includes("cx3")) return j("cx1", "cx3", "directed", 0.9);
-  if (ids.includes("cx2") && ids.includes("cx3")) return j("cx2", "cx3", "uncertain", 0.4);
+  const idByLabel = new Map([[input.a.canonicalLabel, input.a.conceptId], [input.b.canonicalLabel, input.b.conceptId]]);
+  if (labels.includes("X One") && labels.includes("X Two")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X One") ?? "", "directed", 0.9);
+  if (labels.includes("X One") && labels.includes("X Three")) return j(idByLabel.get("X One") ?? "", idByLabel.get("X Three") ?? "", "directed", 0.9);
+  if (labels.includes("X Two") && labels.includes("X Three")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X Three") ?? "", "uncertain", 0.4);
   return j(input.a.conceptId, input.b.conceptId, "none", 0.1);
 };
 
@@ -171,12 +173,12 @@ function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters
 // Scenario 1: exactly the same-domain pairs are judged; no cross-domain pair leaks.
 test("runGraphEnrichment judges every same-domain pair and never a cross-domain pair", async () => {
   const ports = buildPorts();
-  await run(ports);
+  const layer = await run(ports);
+  const domainByDerivedId = new Map(layer.derivedNodes.map((node) => [node.derivedNodeId, node.declaredDomain]));
 
   assert.equal(ports.judgedInputs.length, 4); // C(3,2)+C(2,2)
-  const domainOf: Record<string, string> = { cx1: "x", cx2: "x", cx3: "x", cy1: "y", cy2: "y" };
   for (const input of ports.judgedInputs) {
-    assert.equal(domainOf[input.a.conceptId], domainOf[input.b.conceptId], `cross-domain pair leaked: ${input.a.conceptId}/${input.b.conceptId}`);
+    assert.equal(domainByDerivedId.get(input.a.conceptId), domainByDerivedId.get(input.b.conceptId), `cross-domain pair leaked: ${input.a.conceptId}/${input.b.conceptId}`);
   }
 });
 
@@ -186,10 +188,10 @@ test("runGraphEnrichment passes both Concepts' CEPs to the judge with bounded me
   const ports = buildPorts();
   await run(ports);
 
-  const cx1cx2 = ports.judgedInputs.find((i) => [i.a.conceptId, i.b.conceptId].includes("cx1") && [i.a.conceptId, i.b.conceptId].includes("cx2"));
+  const cx1cx2 = ports.judgedInputs.find((i) => [i.a.canonicalLabel, i.b.canonicalLabel].includes("X One") && [i.a.canonicalLabel, i.b.canonicalLabel].includes("X Two"));
   assert.ok(cx1cx2, "expected the cx1/cx2 pair");
-  const cx1 = cx1cx2.a.conceptId === "cx1" ? cx1cx2.a : cx1cx2.b;
-  const cx2 = cx1cx2.a.conceptId === "cx2" ? cx1cx2.a : cx1cx2.b;
+  const cx1 = cx1cx2.a.canonicalLabel === "X One" ? cx1cx2.a : cx1cx2.b;
+  const cx2 = cx1cx2.a.canonicalLabel === "X Two" ? cx1cx2.a : cx1cx2.b;
 
   assert.deepEqual(cx1.definitions, ["X One is the definition of X One"]);
   assert.deepEqual(cx2.definitions, ["X Two is the definition of X Two"]);
@@ -219,7 +221,7 @@ test("runGraphEnrichment honors a non-default mention bound and preserves neural
     }
   });
 
-  const cx1 = ports.judgedInputs.flatMap((i) => [i.a, i.b]).find((c) => c.conceptId === "cx1");
+  const cx1 = ports.judgedInputs.flatMap((i) => [i.a, i.b]).find((c) => c.canonicalLabel === "X One");
   assert.ok(cx1);
   assert.deepEqual(cx1.mentions, ["mention one", "mention two"]);
 });
@@ -229,16 +231,25 @@ test("runGraphEnrichment honors a non-default mention bound and preserves neural
 test("runGraphEnrichment follows the judge over the hint, drops 'none', flags 'uncertain'", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
+  const idByConceptId = new Map(
+    layer.derivedNodes
+      .filter((node) => node.nodeKind === "anchor")
+      .map((node) => [node.conceptId, node.derivedNodeId] as const)
+  );
+  const cx1 = idByConceptId.get("cx1") ?? "";
+  const cx2 = idByConceptId.get("cx2") ?? "";
+  const cx3 = idByConceptId.get("cx3") ?? "";
+  const cy1 = idByConceptId.get("cy1") ?? "";
 
   // cx1 hinted cx1->cx2, but the judge returned cx2->cx1: the edge follows the judge.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === "cx2" && e.dependentConceptId === "cx1" && !e.uncertain));
-  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === "cx1" && e.dependentConceptId === "cx2"));
+  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx2 && e.dependentConceptId === cx1 && !e.uncertain));
+  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx1 && e.dependentConceptId === cx2));
   // plain directed edge survives.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === "cx1" && e.dependentConceptId === "cx3" && !e.uncertain));
+  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx1 && e.dependentConceptId === cx3 && !e.uncertain));
   // uncertain edge retained but flagged.
   assert.ok(layer.prerequisiteEdges.some((e) => e.uncertain));
   // 'none' (cy1/cy2) produced no edge.
-  assert.ok(!layer.prerequisiteEdges.some((e) => [e.prerequisiteConceptId, e.dependentConceptId].includes("cy1")));
+  assert.ok(!layer.prerequisiteEdges.some((e) => [e.prerequisiteConceptId, e.dependentConceptId].includes(cy1)));
 
   const dispositions = ports.getTrace()?.dispositions.map((d) => d.disposition) ?? [];
   assert.ok(dispositions.includes("uncertain"));
@@ -260,6 +271,19 @@ test("runGraphEnrichment persists a layer free of embedding and candidate-group 
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
   assert.equal(ports.getArtifactType(), "enrichment_run.v2");
   assert.equal(ports.getTrace()?.judgments.length, 4);
+});
+
+test("anchor derived node ids are per enrichment run, while concept ids stay stable", async () => {
+  const first = await run(buildPorts(), { enrichmentId: "11111111-1111-4111-8111-111111111111" });
+  const second = await run(buildPorts(), { enrichmentId: "22222222-2222-4222-8222-222222222222" });
+
+  const isCx1Anchor = (node: (typeof first.derivedNodes)[number]): node is AnchorProjectionNode =>
+    node.nodeKind === "anchor" && node.conceptId === "cx1";
+  const firstAnchor = first.derivedNodes.find(isCx1Anchor);
+  const secondAnchor = second.derivedNodes.find(isCx1Anchor);
+  if (!firstAnchor || !secondAnchor) assert.fail("expected cx1 anchor in both enrichments");
+  assert.equal(firstAnchor.conceptId, secondAnchor.conceptId);
+  assert.notEqual(firstAnchor.derivedNodeId, secondAnchor.derivedNodeId);
 });
 
 // Scenario 7: difficulty stays the dag-depth mock over the reduced DAG.
@@ -291,11 +315,13 @@ test("runGraphEnrichment fails closed on an evidence-free snapshot without judgi
 // keeps deterministic pair order regardless of completion order.
 test("runGraphEnrichment bounds concurrency and keeps deterministic pair order", async () => {
   const completionOrder: string[] = [];
+  let callIndex = 0;
   // Resolve later pairs first so completion order differs from input order.
   const judge: JudgeFn = async (input) => {
-    const key = `${input.a.conceptId}/${input.b.conceptId}`;
+    const key = `${input.a.canonicalLabel}/${input.b.canonicalLabel}`;
+    const index = callIndex++;
     // Make only the first sorted pair slow so later pairs complete before it.
-    const delay = key === "cx1/cx2" ? 30 : 1;
+    const delay = index === 0 ? 30 : 1;
     await new Promise((resolve) => setTimeout(resolve, delay));
     completionOrder.push(key);
     return { prerequisiteConceptId: input.a.conceptId, dependentConceptId: input.b.conceptId, outcome: "none", confidence: 0.1, rationale: "mock" };
@@ -313,15 +339,16 @@ test("runGraphEnrichment bounds concurrency and keeps deterministic pair order",
 
   assert.ok(ports.getMaxInFlight() <= 2, `concurrency exceeded: ${ports.getMaxInFlight()}`);
   // Trace order follows sorted pair order, not completion order.
-  const traceOrder = ports.getTrace()?.judgments.map((j) => `${j.a.conceptId}/${j.b.conceptId}`) ?? [];
-  assert.deepEqual(traceOrder, ["cx1/cx2", "cx1/cx3", "cx2/cx3", "cy1/cy2"]);
+  const traceOrder = ports.getTrace()?.judgments.map((j) => `${j.a.canonicalLabel}/${j.b.canonicalLabel}`) ?? [];
+  const dispatchOrder = ports.judgedInputs.map((j) => `${j.a.canonicalLabel}/${j.b.canonicalLabel}`);
+  assert.deepEqual(traceOrder, dispatchOrder);
   assert.notDeepEqual(completionOrder, traceOrder, "test setup should produce out-of-order completion");
 });
 
 // Scenario 8b: one exhausted pair (judge throws) fails the run before persistence.
 test("runGraphEnrichment fails the run without persisting when a pair exhausts its budget", async () => {
   const judge: JudgeFn = (input) => {
-    if (input.a.conceptId === "cx2" && input.b.conceptId === "cx3") {
+    if (input.a.canonicalLabel === "X Two" && input.b.canonicalLabel === "X Three") {
       throw new Error("forced-tool retry budget exhausted");
     }
     return { prerequisiteConceptId: input.a.conceptId, dependentConceptId: input.b.conceptId, outcome: "none", confidence: 0.1, rationale: "mock" };
