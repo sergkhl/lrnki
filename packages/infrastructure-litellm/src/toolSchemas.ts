@@ -55,7 +55,12 @@ const admissionCriterionSchema: JsonSchema = {
   properties: {
     passed: { type: "boolean" },
     rationale: { type: "string" },
-    evidence: { type: "array", maxItems: 2, items: blockEvidenceSchema }
+    // Soft tidiness bound, not a correctness gate. `strict` forced-tool mode does not
+    // enforce maxItems at generation time, so the boundary validator must TOLERATE a
+    // benign over-count (a model returning 3 quotes must not abort the whole run); the
+    // application only needs >=1 verified quote. Capped generously so a runaway array
+    // still fails closed (rule 6).
+    evidence: { type: "array", maxItems: 4, items: blockEvidenceSchema }
   }
 };
 
@@ -166,17 +171,17 @@ export const conceptAdmissionValidator = z.object({
     standaloneLearningObjective: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),
-      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(4)
     }).strict(),
     establishedDomainMeaning: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),
-      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(4)
     }).strict(),
     definitionBearingTreatment: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),
-      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(4)
     }).strict(),
     organizingPower: z.object({
       passed: z.boolean(),
