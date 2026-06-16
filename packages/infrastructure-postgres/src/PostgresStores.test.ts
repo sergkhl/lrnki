@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { ArtifactEnvelope, ExtractionRunResult, GraphSnapshot, StructuredDocument } from "@lrnki/domain-core";
+import type { ArtifactEnvelope, DerivedGraphLayer, EnrichmentRunTrace, ExtractionRunResult, GraphSnapshot, StructuredDocument } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
+import { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
 import { PostgresExtractionRunStore, PostgresGraphVersionStore, PostgresSourceRegistrationStore } from "./PostgresStores";
 
 // Integration tests against a live PostgreSQL with the single initial migration
@@ -181,10 +182,11 @@ maybe("publish writes a CEP snapshot with zero asserted edges and round-trips th
 
     const conceptId = randomUUID();
     const graphVersionId = randomUUID();
+    const ownershipLabel = `Ownership ${conceptId}`;
     const snapshot: GraphSnapshot = {
       graphVersionId,
       baseGraphVersionId: null,
-      concepts: [{ conceptId, iri: `https://lrnki.local/concept/ownership-${conceptId}`, canonicalLabel: "Ownership", normalizedLabel: "ownership", declaredDomain: "software engineering", aliases: ["ownership model"], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
+      concepts: [{ conceptId, iri: `https://lrnki.local/concept/ownership-${conceptId}`, canonicalLabel: ownershipLabel, normalizedLabel: ownershipLabel.toLowerCase(), declaredDomain: "software engineering", aliases: ["ownership model"], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
       evidenceProfiles: [{
         conceptId,
         definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }],
@@ -210,6 +212,103 @@ maybe("publish writes a CEP snapshot with zero asserted edges and round-trips th
     assert.ok(!("claims" in hydrated), "no asserted-edge collection in a published snapshot");
     const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM artifact_versions WHERE graph_version_id = ${graphVersionId}`;
     assert.equal(count, 1, "snapshot artifact written atomically with the publication");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("enrichment round-trips anchor projection nodes and derived-node edges", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { sourceResourceId, sourceDocumentId } = await seedSource(sql);
+    const runId = randomUUID();
+    await new PostgresExtractionRunStore(sql).persist(runResult(sourceResourceId, sourceDocumentId, runId), artifactFor(runResult(sourceResourceId, sourceDocumentId, runId)));
+    const blocks = await sql<{ block_id: string; source_block_id: string }[]>`SELECT block_id, source_block_id FROM source_blocks WHERE source_document_id = ${sourceDocumentId}`;
+    const blk = (id: string) => blocks.find((row) => row.block_id === id)!.source_block_id;
+
+    const ownershipId = randomUUID();
+    const borrowingId = randomUUID();
+    const graphVersionId = randomUUID();
+    const ownershipLabel = `Ownership ${ownershipId}`;
+    const borrowingLabel = `Borrowing ${borrowingId}`;
+    const snapshot: GraphSnapshot = {
+      graphVersionId,
+      baseGraphVersionId: null,
+      concepts: [
+        { conceptId: ownershipId, iri: `https://lrnki.local/concept/ownership-${ownershipId}`, canonicalLabel: ownershipLabel, normalizedLabel: ownershipLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" },
+        { conceptId: borrowingId, iri: `https://lrnki.local/concept/borrowing-${borrowingId}`, canonicalLabel: borrowingLabel, normalizedLabel: borrowingLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }
+      ],
+      evidenceProfiles: [
+        { conceptId: ownershipId, definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }], mentions: [], assertions: [] },
+        { conceptId: borrowingId, definitions: [{ sourceResourceId, sourceBlockId: blk("b2"), evidenceQuote: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {} }], mentions: [], assertions: [] }
+      ]
+    };
+    await new PostgresGraphVersionStore(sql).publish({
+      snapshot,
+      refinementConfigHash: "test",
+      runMemberships: [{ runId, sourceResourceId }],
+      refinementDecisions: [],
+      artifact: {
+        artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId,
+        producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot
+      }
+    });
+
+    const enrichmentId = randomUUID();
+    const layer: DerivedGraphLayer = {
+      enrichmentId,
+      graphVersionId,
+      enrichmentConfigHash: "test-enrichment",
+      judgeModel: "mock-judge",
+      derivedNodes: snapshot.concepts.map((concept) => ({
+        nodeKind: "anchor",
+        derivedNodeId: concept.conceptId,
+        conceptId: concept.conceptId,
+        groundingOrigin: "document_anchored",
+        role: "anchor",
+        layer: "asserted",
+        canonicalLabel: concept.canonicalLabel,
+        normalizedLabel: concept.normalizedLabel,
+        declaredDomain: concept.declaredDomain,
+        aliases: concept.aliases
+      })),
+      prerequisiteEdges: [{
+        prerequisiteConceptId: borrowingId,
+        dependentConceptId: ownershipId,
+        predicate: "inferred-prerequisite-of",
+        confidence: 0.9,
+        uncertain: false,
+        provenance: { judgmentRationale: "test" }
+      }],
+      difficulties: [
+        { conceptId: borrowingId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
+        { conceptId: ownershipId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
+      ]
+    };
+    const trace: EnrichmentRunTrace = {
+      enrichmentId,
+      graphVersionId,
+      enrichmentConfigHash: "test-enrichment",
+      derivedNodes: layer.derivedNodes,
+      judgments: [],
+      dispositions: []
+    };
+    const store = new PostgresEnrichmentRunStore(sql);
+    await store.persist({
+      layer,
+      artifact: {
+        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId,
+        producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace
+      }
+    });
+
+    const hydrated = await store.getLayer(enrichmentId);
+    assert.ok(hydrated);
+    assert.equal(hydrated.derivedNodes.length, 2);
+    assert.ok(hydrated.derivedNodes.every((node) => node.nodeKind === "anchor" && node.groundingOrigin === "document_anchored"));
+    assert.equal(hydrated.prerequisiteEdges[0].prerequisiteConceptId, borrowingId);
+    assert.equal(hydrated.prerequisiteEdges[0].dependentConceptId, ownershipId);
+    assert.equal(hydrated.difficulties.length, 2);
   } finally {
     await sql.end();
   }

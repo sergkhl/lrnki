@@ -657,6 +657,7 @@ export type EnrichmentRunTrace = {
   enrichmentId: string;
   graphVersionId: string;
   enrichmentConfigHash: string;
+  derivedNodes: DerivedGraphNode[];
   judgments: PrerequisiteJudgmentTrace[];
   dispositions: InferredEdgeDisposition[];
 };

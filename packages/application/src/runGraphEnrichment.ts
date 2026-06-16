@@ -65,6 +65,18 @@ export async function runGraphEnrichment(input: {
     throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
   }
   const concepts = snapshot.concepts;
+  const derivedNodes = concepts.map((concept) => ({
+    nodeKind: "anchor" as const,
+    derivedNodeId: concept.conceptId,
+    conceptId: concept.conceptId,
+    groundingOrigin: "document_anchored" as const,
+    role: "anchor" as const,
+    layer: "asserted" as const,
+    canonicalLabel: concept.canonicalLabel,
+    normalizedLabel: concept.normalizedLabel,
+    declaredDomain: concept.declaredDomain,
+    aliases: concept.aliases
+  }));
   const labelByConcept = new Map(concepts.map((concept) => [concept.conceptId, concept.canonicalLabel] as const));
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
   const contextOf = (concept: Concept): PrerequisiteConceptContext =>
@@ -134,18 +146,7 @@ export async function runGraphEnrichment(input: {
     graphVersionId: input.graphVersionId,
     enrichmentConfigHash: config.enrichmentConfigHash,
     judgeModel: input.prerequisiteJudge.model,
-    derivedNodes: concepts.map((concept) => ({
-      nodeKind: "anchor",
-      derivedNodeId: `${input.enrichmentId}:anchor:${concept.conceptId}`,
-      conceptId: concept.conceptId,
-      groundingOrigin: "document_anchored",
-      role: "anchor",
-      layer: "asserted",
-      canonicalLabel: concept.canonicalLabel,
-      normalizedLabel: concept.normalizedLabel,
-      declaredDomain: concept.declaredDomain,
-      aliases: concept.aliases
-    })),
+    derivedNodes,
     prerequisiteEdges,
     difficulties
   };
@@ -154,6 +155,7 @@ export async function runGraphEnrichment(input: {
     enrichmentId: input.enrichmentId,
     graphVersionId: input.graphVersionId,
     enrichmentConfigHash: config.enrichmentConfigHash,
+    derivedNodes,
     judgments: judgmentTraces,
     dispositions: [
       ...insufficientEvidence,

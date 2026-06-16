@@ -2,11 +2,15 @@ import { randomUUID } from "node:crypto";
 import type {
   ArtifactEnvelope,
   ConceptDifficulty,
+  DerivedGraphNode,
   DerivedGraphLayer,
   EnrichmentRunTrace,
+  GeneratedGroundingBundle,
   InferredPrerequisiteEdge,
   LearnerPath,
-  LearnerPathStep
+  LearnerPathStep,
+  SourceLocator,
+  SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
 import type { EnrichmentRunStorePort, LearnerPathStorePort } from "@lrnki/ports";
 import type { Sql } from "postgres";
@@ -28,15 +32,63 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
         INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method, completed_at)
         VALUES (${layer.enrichmentId}, ${layer.graphVersionId}, ${layer.enrichmentConfigHash}, 'succeeded', ${layer.judgeModel}, ${difficultyMethod}, now())`;
 
+      for (const node of layer.derivedNodes) {
+        await tx`
+          INSERT INTO derived_graph_nodes (
+            derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role,
+            canonical_label, normalized_label, declared_domain, aliases
+          )
+          VALUES (
+            ${node.derivedNodeId}, ${layer.enrichmentId}, ${node.nodeKind}, ${node.nodeKind === "anchor" ? node.conceptId : null},
+            ${node.groundingOrigin}, ${node.role}, ${node.canonicalLabel}, ${node.normalizedLabel},
+            ${node.declaredDomain}, ${tx.json(node.aliases)}
+          )`;
+
+        if (node.nodeKind === "enrichment" && node.groundingOrigin === "llm_grounded") {
+          await tx`
+            INSERT INTO enrichment_grounding_bundles (enrichment_grounding_bundle_id, derived_node_id, grounding_origin, generating_model, rationale, bundle)
+            VALUES (${randomUUID()}, ${node.derivedNodeId}, ${node.groundingOrigin}, ${node.groundingBundle.generatingModel}, ${node.groundingBundle.rationale}, ${tx.json(node.groundingBundle as Parameters<Sql["json"]>[0])})`;
+          const passages = [...node.groundingBundle.definitions, ...node.groundingBundle.mentions];
+          for (const [index, passage] of passages.entries()) {
+            await tx`
+              INSERT INTO enrichment_grounding_passages (
+                enrichment_grounding_passage_id, derived_node_id, passage_type, grounding_origin,
+                generated_text, heading_path, locator, verbatim_check, salience_rank
+              )
+              VALUES (
+                ${randomUUID()}, ${node.derivedNodeId}, ${passage.passageType}, ${passage.groundingOrigin},
+                ${passage.text}, ${tx.json(passage.headingPath)}, ${tx.json(passage.locator as Parameters<Sql["json"]>[0])},
+                ${tx.json(passage.verbatimCheck as Parameters<Sql["json"]>[0])}, ${index}
+              )`;
+          }
+        }
+
+        if (node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned") {
+          for (const [index, passage] of node.groundingPassages.entries()) {
+            await tx`
+              INSERT INTO enrichment_grounding_passages (
+                enrichment_grounding_passage_id, derived_node_id, passage_type, grounding_origin,
+                source_resource_id, source_block_id, evidence_quote, heading_path, locator, verbatim_check, salience_rank
+              )
+              VALUES (
+                ${randomUUID()}, ${node.derivedNodeId}, ${passage.passageType}, ${passage.groundingOrigin},
+                ${passage.sourceResourceId}, ${passage.sourceBlockId}, ${passage.evidenceQuote},
+                ${tx.json(passage.headingPath)}, ${tx.json(passage.locator as Parameters<Sql["json"]>[0])},
+                ${tx.json(passage.verbatimCheck as Parameters<Sql["json"]>[0])}, ${index}
+              )`;
+          }
+        }
+      }
+
       for (const edge of layer.prerequisiteEdges) {
         await tx`
-          INSERT INTO inferred_prerequisite_edges (inferred_prerequisite_edge_id, enrichment_id, predicate, prerequisite_concept_id, dependent_concept_id, confidence, uncertain, provenance)
+          INSERT INTO inferred_prerequisite_edges (inferred_prerequisite_edge_id, enrichment_id, predicate, prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain, provenance)
           VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteConceptId}, ${edge.dependentConceptId}, ${edge.confidence}, ${edge.uncertain}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
       }
 
       for (const difficulty of layer.difficulties) {
         await tx`
-          INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, concept_id, score, method, components)
+          INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, derived_node_id, score, method, components)
           VALUES (${randomUUID()}, ${layer.enrichmentId}, ${difficulty.conceptId}, ${difficulty.score}, ${difficulty.method}, ${tx.json(difficulty.components as Parameters<Sql["json"]>[0])})`;
       }
 
@@ -54,27 +106,117 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
   }
 
   private async hydrate(row: EnrichmentRow): Promise<DerivedGraphLayer> {
+    const nodeRows = await this.sql<{
+      derived_node_id: string; node_kind: string; concept_id: string | null; grounding_origin: string; role: string;
+      canonical_label: string; normalized_label: string; declared_domain: string; aliases: string[];
+    }[]>`
+      SELECT derived_node_id, node_kind, concept_id, grounding_origin, role,
+             canonical_label, normalized_label, declared_domain, aliases
+      FROM derived_graph_nodes
+      WHERE enrichment_id = ${row.enrichment_id}
+      ORDER BY declared_domain, canonical_label, derived_node_id`;
+
+    const nodeIds = nodeRows.map((node) => node.derived_node_id);
+    type BundleRow = { derived_node_id: string; bundle: unknown };
+    type GroundingPassageRow = {
+      derived_node_id: string; passage_type: string; grounding_origin: string;
+      source_resource_id: string | null; source_block_id: string | null; evidence_quote: string | null; generated_text: string | null;
+      heading_path: string[]; locator: unknown; verbatim_check: unknown; salience_rank: number;
+    };
+    const bundleRows: BundleRow[] = nodeIds.length
+      ? await this.sql<BundleRow[]>`
+          SELECT derived_node_id, bundle FROM enrichment_grounding_bundles
+          WHERE derived_node_id IN ${this.sql(nodeIds)}`
+      : [];
+    const bundleByNode = new Map(bundleRows.map((bundle) => [bundle.derived_node_id, bundle.bundle]));
+
+    const passageRows: GroundingPassageRow[] = nodeIds.length
+      ? await this.sql<GroundingPassageRow[]>`
+          SELECT derived_node_id, passage_type, grounding_origin, source_resource_id, source_block_id,
+                 evidence_quote, generated_text, heading_path, locator, verbatim_check, salience_rank
+          FROM enrichment_grounding_passages
+          WHERE derived_node_id IN ${this.sql(nodeIds)}
+          ORDER BY derived_node_id, salience_rank`
+      : [];
+    const passagesByNode = new Map<string, typeof passageRows>();
+    for (const passage of passageRows) {
+      passagesByNode.set(passage.derived_node_id, [...(passagesByNode.get(passage.derived_node_id) ?? []), passage]);
+    }
+
+    const derivedNodes: DerivedGraphNode[] = nodeRows.map((node) => {
+      if (node.node_kind === "anchor") {
+        return {
+          nodeKind: "anchor",
+          derivedNodeId: node.derived_node_id,
+          conceptId: node.concept_id ?? "",
+          groundingOrigin: "document_anchored",
+          role: "anchor",
+          layer: "asserted",
+          canonicalLabel: node.canonical_label,
+          normalizedLabel: node.normalized_label,
+          declaredDomain: node.declared_domain,
+          aliases: node.aliases
+        };
+      }
+      if (node.grounding_origin === "llm_grounded") {
+        return {
+          nodeKind: "enrichment",
+          derivedNodeId: node.derived_node_id,
+          groundingOrigin: "llm_grounded",
+          role: "prerequisite",
+          layer: "derived",
+          canonicalLabel: node.canonical_label,
+          normalizedLabel: node.normalized_label,
+          declaredDomain: node.declared_domain,
+          aliases: node.aliases,
+          groundingBundle: bundleByNode.get(node.derived_node_id) as GeneratedGroundingBundle
+        };
+      }
+      return {
+        nodeKind: "enrichment",
+        derivedNodeId: node.derived_node_id,
+        groundingOrigin: "source_mentioned",
+        role: "prerequisite",
+        layer: "derived",
+        canonicalLabel: node.canonical_label,
+        normalizedLabel: node.normalized_label,
+        declaredDomain: node.declared_domain,
+        aliases: node.aliases,
+        groundingPassages: (passagesByNode.get(node.derived_node_id) ?? []).map((passage) => ({
+          passageType: "mention",
+          text: passage.evidence_quote ?? "",
+          groundingOrigin: "source_mentioned",
+          sourceResourceId: passage.source_resource_id ?? "",
+          sourceBlockId: passage.source_block_id ?? "",
+          evidenceQuote: passage.evidence_quote ?? "",
+          headingPath: passage.heading_path,
+          locator: passage.locator as SourceLocator,
+          verbatimCheck: passage.verbatim_check as SourceMentionGroundingPassage["verbatimCheck"]
+        }))
+      };
+    });
+
     const edgeRows = await this.sql<{
-      predicate: string; prerequisite_concept_id: string; dependent_concept_id: string;
+      predicate: string; prerequisite_derived_node_id: string; dependent_derived_node_id: string;
       confidence: number; uncertain: boolean;
       provenance: InferredPrerequisiteEdge["provenance"];
     }[]>`
-      SELECT predicate, prerequisite_concept_id, dependent_concept_id, confidence, uncertain, provenance
+      SELECT predicate, prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain, provenance
       FROM inferred_prerequisite_edges WHERE enrichment_id = ${row.enrichment_id}
-      ORDER BY prerequisite_concept_id, dependent_concept_id`;
+      ORDER BY prerequisite_derived_node_id, dependent_derived_node_id`;
     const prerequisiteEdges: InferredPrerequisiteEdge[] = edgeRows.map((edge) => ({
-      prerequisiteConceptId: edge.prerequisite_concept_id,
-      dependentConceptId: edge.dependent_concept_id,
+      prerequisiteConceptId: edge.prerequisite_derived_node_id,
+      dependentConceptId: edge.dependent_derived_node_id,
       predicate: edge.predicate as InferredPrerequisiteEdge["predicate"],
       confidence: edge.confidence,
       uncertain: edge.uncertain,
       provenance: edge.provenance
     }));
 
-    const difficultyRows = await this.sql<{ concept_id: string; score: number; method: string; components: ConceptDifficulty["components"] }[]>`
-      SELECT concept_id, score, method, components FROM concept_difficulties WHERE enrichment_id = ${row.enrichment_id} ORDER BY concept_id`;
+    const difficultyRows = await this.sql<{ derived_node_id: string; score: number; method: string; components: ConceptDifficulty["components"] }[]>`
+      SELECT derived_node_id, score, method, components FROM concept_difficulties WHERE enrichment_id = ${row.enrichment_id} ORDER BY derived_node_id`;
     const difficulties: ConceptDifficulty[] = difficultyRows.map((difficulty) => ({
-      conceptId: difficulty.concept_id,
+      conceptId: difficulty.derived_node_id,
       score: difficulty.score,
       method: difficulty.method,
       components: difficulty.components
@@ -85,7 +227,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       graphVersionId: row.graph_version_id,
       enrichmentConfigHash: row.enrichment_config_hash,
       judgeModel: row.judge_model,
-      derivedNodes: [],
+      derivedNodes,
       prerequisiteEdges,
       difficulties
     };
