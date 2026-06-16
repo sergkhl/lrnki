@@ -2,28 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type {
   AdmissionProposal,
-  ClaimExtractionResult,
+  ArtifactEnvelope,
   DiscoveredCandidate,
-  ExtractedClaim,
+  ExtractedEvidenceProfile,
   ExtractionRunResult,
   StructuredDocument
 } from "@lrnki/domain-core";
 import type {
   AdmissionLabelJudgmentPort,
-  ArtifactRepositoryPort,
-  ClaimEntailmentJudgmentPort,
-  ConceptConditionedClaimExtractionPort,
+  AssertionEntailmentJudgmentPort,
+  ConceptConditionedEvidenceProfileExtractionPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
 
-// Default judge entails everything so these tests exercise the deterministic +
-// orchestration behavior; entailment downgrades are covered in
-// applyEntailmentJudge.test.ts.
-const entailEverything: ClaimEntailmentJudgmentPort = {
+// Default judge accepts every optional assertion so these tests exercise the
+// deterministic + orchestration behavior; rejection is covered in
+// applyAssertionEntailmentJudge.test.ts.
+const entailEverything: AssertionEntailmentJudgmentPort = {
   model: "test-judge",
-  judge: async () => ({ entailed: true, entailingSpan: "", rationale: "test" }),
-  judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+  judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" }),
+  judgePrerequisiteHint: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
 };
 
 // Default admission judge calls every label a concept, so candidates stay core and
@@ -64,9 +63,11 @@ function admission(candidate: DiscoveredCandidate): AdmissionProposal {
   const quote = candidate.candidateKey === "framework" ? frameworkQuote : signalQuote;
   const blockId = candidate.candidateKey === "framework" ? "block-1" : "block-2";
   return {
-    candidateKey: candidate.candidateKey,
+    atomicKey: candidate.candidateKey,
+    parentCandidateKey: candidate.candidateKey,
     proposedCanonicalLabel: candidate.canonicalLabel,
     tier: "core",
+    sourceRole: "declared_domain_concept",
     standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId, evidenceQuote: quote }] },
     establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId, evidenceQuote: quote }] },
     organizingPower: {
@@ -84,29 +85,31 @@ function admission(candidate: DiscoveredCandidate): AdmissionProposal {
   };
 }
 
-function usesClaim(): ExtractedClaim {
-  return {
-    subjectCandidateKey: "framework",
-    predicate: "uses",
-    object: { kind: "concept", candidateKey: "signals" },
-    evidenceLinkNature: "mechanism-employment",
-    evidenceDirection: "subject-uses-object",
-    evidence: [{ blockId: "block-1", evidenceQuote: frameworkQuote }],
-    confidence: 0.9
-  };
-}
+// A CEP extractor that gives every admitted subject a verbatim definition plus a
+// single verbatim mention drawn from its own block.
+const definitionFor: Record<string, ExtractedEvidenceProfile> = {
+  framework: {
+    definitions: [{ blockId: "block-1", evidenceQuote: frameworkQuote }],
+    mentions: [{ blockId: "block-1", evidenceQuote: "INSTRUCTKG works by leveraging temporal signals" }],
+    assertions: []
+  },
+  signals: {
+    definitions: [{ blockId: "block-2", evidenceQuote: signalQuote }],
+    mentions: [],
+    assertions: []
+  }
+};
 
 function harness(
-  extract: ConceptConditionedClaimExtractionPort["extract"],
-  selectedCandidates = candidates,
-  claimEntailmentJudge = entailEverything
+  extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
+  selectedCandidates = candidates
 ) {
   let persisted: ExtractionRunResult | undefined;
+  let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
   const store: ExtractionRunStorePort = {
-    persist: async (result) => { persisted = result; },
+    persist: async (result, artifact) => { persisted = result; persistedArtifact = artifact; },
     runsForBuildByIds: async () => []
   };
-  const artifacts: ArtifactRepositoryPort = { append: async () => {} };
   return {
     run: () => executeExtractionRun({
       runId: "run-1",
@@ -119,104 +122,164 @@ function harness(
       pipelineConfigHash: "test-v1",
       discovery: { discover: async () => selectedCandidates },
       admission: { admit: async () => selectedCandidates.map(admission) },
-      claimExtraction: { extract },
-      claimEntailmentJudge,
+      evidenceProfileExtraction: { extract },
+      assertionEntailmentJudge: entailEverything,
       admissionLabelJudge: everythingIsAConcept,
-      store,
-      artifacts
+      store
     }),
-    persisted: () => persisted
+    persisted: () => persisted,
+    artifact: () => persistedArtifact
   };
 }
 
-test("retries once with aliases and rejected feedback, preserving both attempts without conflict contamination", async () => {
-  const calls: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0][] = [];
-  const extract: ConceptConditionedClaimExtractionPort["extract"] = async (input) => {
-    calls.push(input);
-    if (input.subject.candidateKey === "signals") return { claims: [], proposals: [] };
-    if (!input.feedback) {
-      return {
-        claims: [
-          { ...usesClaim(), predicate: "part-of", evidenceLinkNature: "structural", evidenceDirection: "subject-is-part-of-object" },
-          usesClaim()
-        ],
-        proposals: []
-      };
+test("produces one complete CEP per admitted concept and marks the run succeeded", async () => {
+  const result = await harness(async (input) => definitionFor[input.subject.candidateKey]).run();
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.evidenceProfiles.length, 2);
+  const framework = result.evidenceProfiles.find((p) => p.candidateKey === "framework");
+  assert.equal(framework?.complete, true);
+  assert.equal(framework?.definitions.length, 1);
+  assert.equal(framework?.mentions.length, 1);
+  assert.equal(result.maxMentionsPerConceptPerSource, 6);
+});
+
+test("marks the run failed when an admitted concept has no verified definition passage", async () => {
+  const result = await harness(async (input) =>
+    input.subject.candidateKey === "signals"
+      ? { definitions: [], mentions: [], assertions: [] }
+      : definitionFor[input.subject.candidateKey]
+  ).run();
+  assert.equal(result.status, "failed");
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+});
+
+test("a non-verbatim definition quote is removed, leaving an incomplete profile and a failed run", async () => {
+  const result = await harness(async (input) =>
+    input.subject.candidateKey === "signals"
+      ? { definitions: [{ blockId: "block-2", evidenceQuote: "this text is not in the block" }], mentions: [], assertions: [] }
+      : definitionFor[input.subject.candidateKey]
+  ).run();
+  assert.equal(result.status, "failed");
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.definitions.length, 0);
+});
+
+test("an extractor failure yields an incomplete profile and a failed run, never throwing", async () => {
+  const result = await harness(async (input) => {
+    if (input.subject.candidateKey === "signals") throw new Error("model unavailable");
+    return definitionFor[input.subject.candidateKey];
+  }).run();
+  assert.equal(result.status, "failed");
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+});
+
+test("persists the run with its immutable extraction artifact in the same call", async () => {
+  const h = harness(async (input) => definitionFor[input.subject.candidateKey]);
+  const result = await h.run();
+  assert.equal(h.persisted()?.runId, "run-1");
+  const artifact = h.artifact();
+  assert.equal(artifact?.artifactType, "extraction_run.v5");
+  assert.equal(artifact?.runId, "run-1");
+  assert.equal(artifact?.payload, result);
+});
+
+// --- U1 regression: atomic admission splitting and fail-closed atom validation ---
+
+const splitDocument: StructuredDocument = {
+  sourceResourceId: "source-2",
+  parserName: "test",
+  parserVersion: "1",
+  parserConfigHash: "test",
+  blocks: [
+    {
+      blockId: "block-1",
+      blockType: "paragraph",
+      text: "The stack and the heap are two regions of memory. The stack stores values in order; the heap stores data of unknown size.",
+      headingPath: [],
+      locator: {}
     }
-    return { claims: [usesClaim()], proposals: [] };
-  };
+  ]
+};
 
-  const result = await harness(extract).run();
-  const frameworkClaims = result.claims.filter((claim) => claim.subjectCandidateKey === "framework");
-  assert.equal(frameworkClaims.length, 3);
-  assert.equal(frameworkClaims.filter((claim) => claim.extractionAttempt === 1).length, 2);
-  assert.equal(frameworkClaims.filter((claim) => claim.extractionAttempt === 1).every((claim) =>
-    claim.validationOutcome === "rejected" && claim.boundaryReasonCodes.includes("superseded_by_retry")
-  ), true);
-  const retryClaim = frameworkClaims.find((claim) => claim.extractionAttempt === 2);
-  assert.equal(retryClaim?.validationOutcome, "verified");
-  const firstFrameworkCall = calls.find((call) => call.subject.candidateKey === "framework" && !call.feedback);
-  assert.deepEqual(firstFrameworkCall?.subject.aliases, ["Instructor-Aligned Knowledge Graphs"]);
-  const retryCall = calls.find((call) => call.subject.candidateKey === "framework" && call.feedback);
-  assert.equal(retryCall?.feedback?.rejectedClaims.length, 2);
-  assert.equal(calls.filter((call) => call.subject.candidateKey === "framework").length, 2);
-});
+const conflatedCandidate: DiscoveredCandidate = {
+  candidateKey: "stack_heap",
+  canonicalLabel: "The stack and the heap",
+  mentions: [{ blockId: "block-1", evidenceQuote: "The stack and the heap are two regions of memory." }]
+};
 
-test("does not retry a subject after a verified first-attempt claim", async () => {
-  let calls = 0;
-  const { run } = harness(async (input): Promise<ClaimExtractionResult> => {
-    calls += 1;
-    return input.subject.candidateKey === "framework" ? { claims: [usesClaim()], proposals: [] } : { claims: [], proposals: [] };
-  });
-
-  const result = await run();
-  assert.equal(result.claims.find((claim) => claim.subjectCandidateKey === "framework")?.extractionAttempt, 1);
-  assert.equal(calls, 3, "framework runs once; the claimless signals subject runs twice");
-});
-
-test("retries when a structurally valid first-attempt claim fails semantic entailment", async () => {
-  const calls: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0][] = [];
-  const extract: ConceptConditionedClaimExtractionPort["extract"] = async (input) => {
-    calls.push(input);
-    if (input.subject.candidateKey === "signals") return { claims: [], proposals: [] };
-    return { claims: [usesClaim()], proposals: [] };
-  };
-  let frameworkJudgments = 0;
-  const judge: ClaimEntailmentJudgmentPort = {
-    model: "test-judge",
-    judge: async () => {
-      frameworkJudgments += 1;
-      return frameworkJudgments === 1
-        ? { entailed: false, entailingSpan: "", rationale: "first attempt unsupported" }
-        : { entailed: true, entailingSpan: "leveraging temporal signals", rationale: "retry supported" };
+function atom(atomicKey: string, label: string, defQuote: string, overrides: Partial<AdmissionProposal> = {}): AdmissionProposal {
+  return {
+    atomicKey,
+    parentCandidateKey: "stack_heap",
+    proposedCanonicalLabel: label,
+    tier: "core",
+    sourceRole: "declared_domain_concept",
+    standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
+    establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
+    organizingPower: {
+      passed: true,
+      rationale: "organizes",
+      aspects: [
+        { summary: "memory region", nature: "definition-or-property", evidence: { blockId: "block-1", evidenceQuote: "The stack and the heap are two regions of memory." } },
+        { summary: "storage behavior", nature: "mechanism", evidence: { blockId: "block-1", evidenceQuote: defQuote } }
+      ]
     },
-    judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+    coreSelected: true,
+    selectionReasonCode: "source_level_core",
+    reasonCodes: ["source_level_core"],
+    confidence: 0.9,
+    ...overrides
   };
+}
 
-  const result = await harness(extract, candidates, judge).run();
-  const frameworkClaims = result.claims.filter((claim) => claim.subjectCandidateKey === "framework");
-  assert.equal(calls.filter((call) => call.subject.candidateKey === "framework").length, 2);
-  const retryCall = calls.find((call) => call.subject.candidateKey === "framework" && call.feedback);
-  assert.deepEqual(retryCall?.feedback?.rejectedClaims[0]?.boundaryReasonCodes, ["evidence_does_not_entail_relation"]);
-  assert.equal(frameworkClaims.some((claim) =>
-    claim.extractionAttempt === 1 &&
-    claim.boundaryReasonCodes.includes("evidence_does_not_entail_relation") &&
-    claim.boundaryReasonCodes.includes("superseded_by_retry")
-  ), true);
-  assert.equal(frameworkClaims.some((claim) =>
-    claim.extractionAttempt === 2 && claim.validationOutcome === "verified"
-  ), true);
+function runSplit(admitProposals: AdmissionProposal[]): Promise<ExtractionRunResult> {
+  const store: ExtractionRunStorePort = { persist: async () => {}, runsForBuildByIds: async () => [] };
+  return executeExtractionRun({
+    runId: "run-split",
+    source: { sourceResourceId: "source-2", sourceDocumentId: "document-2", declaredDomain: "rust", document: splitDocument },
+    pipelineConfigHash: "test-v1",
+    discovery: { discover: async () => [conflatedCandidate] },
+    admission: { admit: async () => admitProposals },
+    evidenceProfileExtraction: {
+      extract: async () => ({ definitions: [{ blockId: "block-1", evidenceQuote: "two regions of memory" }], mentions: [], assertions: [] })
+    },
+    assertionEntailmentJudge: entailEverything,
+    admissionLabelJudge: everythingIsAConcept,
+    store
+  });
+}
+
+test("splits one conflated candidate into independently-tiered atomic concepts retaining the parent key", async () => {
+  const result = await runSplit([
+    atom("stack_heap__stack", "The stack", "The stack stores values in order"),
+    atom("stack_heap__heap", "The heap", "the heap stores data of unknown size", { coreSelected: false, selectionReasonCode: "supporting_mechanism", tier: "optional" })
+  ]);
+  const core = result.candidates.filter((c) => c.admission.tier === "core");
+  const optional = result.candidates.filter((c) => c.admission.tier === "optional");
+  assert.equal(core.length, 1);
+  assert.equal(core[0].candidateKey, "stack_heap__stack");
+  assert.equal(core[0].canonicalLabel, "The stack");
+  assert.equal(core[0].parentCandidateKey, "stack_heap");
+  assert.equal(optional[0].candidateKey, "stack_heap__heap");
+  assert.equal(optional[0].parentCandidateKey, "stack_heap");
+  // Both core and optional atoms receive a CEP.
+  assert.equal(result.evidenceProfiles.length, 2);
 });
 
-test("fails closed after exactly one retry when the model errors", async () => {
-  let calls = 0;
-  const { run, persisted } = harness(async () => {
-    calls += 1;
-    throw new Error("model unavailable");
-  }, [candidates[0]]);
+test("drops duplicate atomic keys fail-closed so neither publishes a core concept", async () => {
+  const result = await runSplit([
+    atom("dup", "The stack", "The stack stores values in order"),
+    atom("dup", "The heap", "the heap stores data of unknown size")
+  ]);
+  assert.equal(result.candidates.filter((c) => c.admission.tier === "core").length, 0);
+  assert.ok(result.candidates.every((c) => c.candidateKey !== "dup" || c.admission.tier === "reject"));
+});
 
-  const result = await run();
-  assert.equal(calls, 2);
-  assert.deepEqual(result.claims, []);
-  assert.equal(persisted()?.runId, "run-1");
+test("drops an atom whose parent candidate is unknown", async () => {
+  const orphan: AdmissionProposal = { ...atom("orphan", "The stack", "The stack stores values in order"), parentCandidateKey: "does-not-exist" };
+  const result = await runSplit([
+    atom("stack_heap__stack", "The stack", "The stack stores values in order"),
+    orphan
+  ]);
+  assert.equal(result.candidates.some((c) => c.candidateKey === "orphan"), false);
+  assert.equal(result.candidates.filter((c) => c.admission.tier === "core").length, 1);
 });

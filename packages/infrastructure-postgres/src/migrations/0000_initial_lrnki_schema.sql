@@ -36,27 +36,6 @@ CREATE TABLE source_blocks (
 );
 
 -- ---------------------------------------------------------------------------
--- Closed relation registry (ADR-0016) — models choose, humans extend
--- ---------------------------------------------------------------------------
-
-CREATE TABLE relation_definitions (
-  relation_definition_id uuid PRIMARY KEY,
-  iri text NOT NULL UNIQUE,
-  predicate text NOT NULL UNIQUE,
-  description text NOT NULL,
-  object_kind text NOT NULL CHECK (object_kind IN ('concept', 'literal')),
-  constraints jsonb NOT NULL
-);
-
-INSERT INTO relation_definitions (relation_definition_id, iri, predicate, description, object_kind, constraints) VALUES
-  (gen_random_uuid(), 'https://lrnki.local/relation/is-a', 'is-a', 'Subject concept is a kind of the object concept.', 'concept', '{}'::jsonb),
-  (gen_random_uuid(), 'https://lrnki.local/relation/part-of', 'part-of', 'Subject concept is a constituent part of the object concept.', 'concept', '{}'::jsonb),
-  (gen_random_uuid(), 'https://lrnki.local/relation/asserted-prerequisite-of', 'asserted-prerequisite-of', 'The source explicitly states the subject concept is a prerequisite of the object concept.', 'concept', '{}'::jsonb),
-  (gen_random_uuid(), 'https://lrnki.local/relation/contrasts-with', 'contrasts-with', 'Subject concept is explicitly contrasted with the object concept.', 'concept', '{}'::jsonb),
-  (gen_random_uuid(), 'https://lrnki.local/relation/uses', 'uses', 'Subject concept uses or depends on the object concept.', 'concept', '{}'::jsonb),
-  (gen_random_uuid(), 'https://lrnki.local/relation/defined-as', 'defined-as', 'Subject concept is defined as the literal value.', 'literal', '{}'::jsonb);
-
--- ---------------------------------------------------------------------------
 -- Extraction Runs — per-source, run-scoped, never publish (ADR-0017)
 -- ---------------------------------------------------------------------------
 
@@ -107,47 +86,58 @@ CREATE TABLE concept_admission_decisions (
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1)
 );
 
-CREATE TABLE run_claims (
-  run_claim_id uuid PRIMARY KEY,
+-- Run-scoped Concept Evidence Profiles (ADR-0007 reset) replace run claims. One
+-- per admitted atomic Concept; references the run-local candidate, never a
+-- published concept. `complete` requires a verified definition passage.
+CREATE TABLE run_concept_evidence_profiles (
+  run_concept_evidence_profile_id uuid PRIMARY KEY,
   run_id uuid NOT NULL REFERENCES extraction_runs(run_id),
-  subject_candidate_id uuid NOT NULL REFERENCES concept_candidates(concept_candidate_id),
-  predicate text NOT NULL REFERENCES relation_definitions(predicate),
-  object_kind text NOT NULL CHECK (object_kind IN ('concept', 'literal')),
-  object_candidate_id uuid REFERENCES concept_candidates(concept_candidate_id),
-  object_literal jsonb,
-  model_confidence real NOT NULL CHECK (model_confidence >= 0 AND model_confidence <= 1),
-  evidence_count integer NOT NULL,
-  validation_outcome text NOT NULL CHECK (validation_outcome IN ('verified', 'rejected')),
-  boundary_reason_codes jsonb NOT NULL,
-  extraction_attempt integer NOT NULL CHECK (extraction_attempt IN (1, 2)),
+  concept_candidate_id uuid NOT NULL REFERENCES concept_candidates(concept_candidate_id),
+  tier text NOT NULL CHECK (tier IN ('core', 'optional', 'reject', 'quarantine')),
+  complete boolean NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK ((object_kind = 'concept' AND object_candidate_id IS NOT NULL) OR (object_kind = 'literal' AND object_literal IS NOT NULL))
+  UNIQUE (run_id, concept_candidate_id)
 );
 
-CREATE TABLE run_claim_evidence (
-  run_claim_evidence_id uuid PRIMARY KEY,
-  run_claim_id uuid NOT NULL REFERENCES run_claims(run_claim_id),
+-- Definition and mention passages — verbatim source quotes. `kind` separates them;
+-- `salience_rank` preserves the neural order for mentions.
+CREATE TABLE run_evidence_passages (
+  run_evidence_passage_id uuid PRIMARY KEY,
+  run_concept_evidence_profile_id uuid NOT NULL REFERENCES run_concept_evidence_profiles(run_concept_evidence_profile_id),
+  kind text NOT NULL CHECK (kind IN ('definition', 'mention')),
+  source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
+  evidence_quote text NOT NULL,
+  salience_rank integer NOT NULL
+);
+
+-- Optional typed assertions — guarded evidence, never edges. `defines` carries a
+-- literal; `explicit-prerequisite-hint` references an admitted Concept candidate.
+CREATE TABLE run_optional_assertions (
+  run_optional_assertion_id uuid PRIMARY KEY,
+  run_concept_evidence_profile_id uuid NOT NULL REFERENCES run_concept_evidence_profiles(run_concept_evidence_profile_id),
+  assertion_type text NOT NULL CHECK (assertion_type IN ('defines', 'explicit-prerequisite-hint')),
+  literal_value text,
+  object_candidate_id uuid REFERENCES concept_candidates(concept_candidate_id),
+  CHECK ((assertion_type = 'defines' AND literal_value IS NOT NULL) OR (assertion_type = 'explicit-prerequisite-hint' AND object_candidate_id IS NOT NULL))
+);
+
+CREATE TABLE run_optional_assertion_evidence (
+  run_optional_assertion_evidence_id uuid PRIMARY KEY,
+  run_optional_assertion_id uuid NOT NULL REFERENCES run_optional_assertions(run_optional_assertion_id),
   source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
   evidence_quote text NOT NULL
-);
-
-CREATE TABLE missing_concept_proposals (
-  missing_concept_proposal_id uuid PRIMARY KEY,
-  run_id uuid NOT NULL REFERENCES extraction_runs(run_id),
-  proposed_label text NOT NULL,
-  rationale text NOT NULL,
-  source_block_id uuid REFERENCES source_blocks(source_block_id),
-  evidence_quote text,
-  extraction_attempt integer NOT NULL CHECK (extraction_attempt IN (1, 2)),
-  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------------------------
 -- Graph-Version Builds — deterministic, LLM-free, atomic (ADR-0010, ADR-0017)
 -- ---------------------------------------------------------------------------
 
+-- Each published version names the base version it extends (ADR-0007 reset R3);
+-- base_graph_version_id is NULL only for the initial build. CEP evidence is the
+-- UNION of the base version's evidence plus the newly selected runs.
 CREATE TABLE graph_versions (
   graph_version_id uuid PRIMARY KEY,
+  base_graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   status text NOT NULL CHECK (status IN ('building', 'published', 'failed')),
   refinement_config_hash text NOT NULL,
   published_at timestamptz
@@ -188,25 +178,51 @@ CREATE TABLE graph_version_run_memberships (
   UNIQUE (graph_version_id, run_id)
 );
 
-CREATE TABLE published_claims (
-  published_claim_id uuid PRIMARY KEY,
+-- Published Concept Evidence Profiles (ADR-0007 reset) replace published claims. A
+-- published snapshot carries one CEP per Concept and ZERO asserted edges (R5). CEP
+-- evidence is cumulative across versions: each build unions the base version's
+-- evidence with the newly selected runs and exact-deduplicates (R3, AE2).
+CREATE TABLE graph_version_concept_evidence_profiles (
+  graph_version_concept_evidence_profile_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
-  subject_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
-  predicate text NOT NULL REFERENCES relation_definitions(predicate),
-  object_kind text NOT NULL CHECK (object_kind IN ('concept', 'literal')),
-  object_concept_id uuid REFERENCES concepts(concept_id),
-  object_literal jsonb,
-  trust_tier text NOT NULL,
-  model_confidence real NOT NULL CHECK (model_confidence >= 0 AND model_confidence <= 1),
-  evidence_count integer NOT NULL,
-  contradiction_state text NOT NULL CHECK (contradiction_state IN ('none', 'possible', 'material'))
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  UNIQUE (graph_version_id, concept_id)
 );
 
-CREATE TABLE published_claim_evidence (
-  published_claim_evidence_id uuid PRIMARY KEY,
-  published_claim_id uuid NOT NULL REFERENCES published_claims(published_claim_id),
+-- Definition and mention passages — verbatim source quotes with full provenance
+-- (R2). `kind` separates them; `salience_rank` preserves the published order.
+CREATE TABLE graph_version_evidence_passages (
+  graph_version_evidence_passage_id uuid PRIMARY KEY,
+  graph_version_concept_evidence_profile_id uuid NOT NULL REFERENCES graph_version_concept_evidence_profiles(graph_version_concept_evidence_profile_id),
+  kind text NOT NULL CHECK (kind IN ('definition', 'mention')),
+  source_resource_id uuid NOT NULL REFERENCES source_resources(source_resource_id),
   source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
-  evidence_quote text NOT NULL
+  evidence_quote text NOT NULL,
+  heading_path jsonb NOT NULL,
+  locator jsonb NOT NULL,
+  salience_rank integer NOT NULL
+);
+
+-- Optional typed assertions — guarded evidence inside a CEP, never edges (R6).
+-- `defines` carries a literal; `explicit-prerequisite-hint` references a published
+-- Concept whose target was present in the same graph version.
+CREATE TABLE graph_version_optional_assertions (
+  graph_version_optional_assertion_id uuid PRIMARY KEY,
+  graph_version_concept_evidence_profile_id uuid NOT NULL REFERENCES graph_version_concept_evidence_profiles(graph_version_concept_evidence_profile_id),
+  assertion_type text NOT NULL CHECK (assertion_type IN ('defines', 'explicit-prerequisite-hint')),
+  literal_value text,
+  object_concept_id uuid REFERENCES concepts(concept_id),
+  CHECK ((assertion_type = 'defines' AND literal_value IS NOT NULL) OR (assertion_type = 'explicit-prerequisite-hint' AND object_concept_id IS NOT NULL))
+);
+
+CREATE TABLE graph_version_optional_assertion_evidence (
+  graph_version_optional_assertion_evidence_id uuid PRIMARY KEY,
+  graph_version_optional_assertion_id uuid NOT NULL REFERENCES graph_version_optional_assertions(graph_version_optional_assertion_id),
+  source_resource_id uuid NOT NULL REFERENCES source_resources(source_resource_id),
+  source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
+  evidence_quote text NOT NULL,
+  heading_path jsonb NOT NULL,
+  locator jsonb NOT NULL
 );
 
 CREATE TABLE refinement_decisions (
@@ -272,33 +288,86 @@ JSON_TABLE(
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type = 'extraction_run.v4';
+WHERE a.artifact_type = 'extraction_run.v5';
 
--- Flatten extraction-run artifact payloads: one row per extracted claim with
--- its validation outcome, for the Admin Lab Run Inspector.
-CREATE VIEW artifact_run_claims AS
-SELECT a.run_id, cl.subject_candidate_key, cl.predicate, cl.object_kind,
-       cl.object_candidate_key, cl.object_literal, cl.validation_outcome,
-       cl.evidence_count, cl.model_confidence, cl.boundary_reason_codes,
-       cl.extraction_attempt
+-- Flatten extraction-run artifact payloads: one row per Concept Evidence Profile
+-- with its definition/mention/assertion counts, for the Admin Lab Run Inspector.
+CREATE VIEW artifact_run_evidence_profiles AS
+SELECT a.run_id, p.candidate_key, p.tier, p.complete,
+       p.definition_count, p.mention_count, p.assertion_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
-  '$.claims[*]'
+  '$.evidenceProfiles[*]'
   COLUMNS (
-    subject_candidate_key text PATH '$.subjectCandidateKey',
-    predicate text PATH '$.predicate',
-    object_kind text PATH '$.object.kind',
-    object_candidate_key text PATH '$.object.candidateKey',
-    object_literal text PATH '$.object.value',
-    validation_outcome text PATH '$.validationOutcome',
-    evidence_count integer PATH '$.evidenceCount',
-    model_confidence numeric PATH '$.modelConfidence',
-    boundary_reason_codes jsonb FORMAT JSON PATH '$.boundaryReasonCodes',
-    extraction_attempt integer PATH '$.extractionAttempt'
+    candidate_key text PATH '$.candidateKey',
+    tier text PATH '$.tier',
+    complete boolean PATH '$.complete',
+    definition_count integer PATH '$.definitions.size()',
+    mention_count integer PATH '$.mentions.size()',
+    assertion_count integer PATH '$.assertions.size()'
   )
-) AS cl
-WHERE a.artifact_type = 'extraction_run.v4';
+) AS p
+WHERE a.artifact_type = 'extraction_run.v5';
+
+-- Flatten graph-snapshot artifact payloads: one row per published Concept with its
+-- identity and trust tier, for the Admin Lab published view (ADR-0007 reset).
+CREATE VIEW artifact_graph_concepts AS
+SELECT a.graph_version_id, c.concept_id, c.iri, c.canonical_label,
+       c.normalized_label, c.declared_domain, c.trust_tier, c.homograph
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.concepts[*]'
+  COLUMNS (
+    concept_id text PATH '$.conceptId',
+    iri text PATH '$.iri',
+    canonical_label text PATH '$.canonicalLabel',
+    normalized_label text PATH '$.normalizedLabel',
+    declared_domain text PATH '$.declaredDomain',
+    trust_tier text PATH '$.trustTier',
+    homograph boolean PATH '$.homograph'
+  )
+) AS c
+WHERE a.artifact_type = 'graph_snapshot.v2';
+
+-- Flatten graph-snapshot CEPs: one row per Concept Evidence Profile with its
+-- definition/mention/assertion counts and zero asserted edges (R5).
+CREATE VIEW artifact_graph_cep_profiles AS
+SELECT a.graph_version_id, p.concept_id,
+       p.definition_count, p.mention_count, p.assertion_count
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.evidenceProfiles[*]'
+  COLUMNS (
+    concept_id text PATH '$.conceptId',
+    definition_count integer PATH '$.definitions.size()',
+    mention_count integer PATH '$.mentions.size()',
+    assertion_count integer PATH '$.assertions.size()'
+  )
+) AS p
+WHERE a.artifact_type = 'graph_snapshot.v2';
+
+-- Flatten graph-snapshot typed assertions: one row per optional assertion inside a
+-- published CEP, for inspecting guarded `defines` / `explicit-prerequisite-hint`.
+CREATE VIEW artifact_graph_cep_assertions AS
+SELECT a.graph_version_id, t.concept_id, t.assertion_type,
+       t.literal_value, t.object_concept_id
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.evidenceProfiles[*]'
+  COLUMNS (
+    concept_id text PATH '$.conceptId',
+    NESTED PATH '$.assertions[*]' COLUMNS (
+      assertion_type text PATH '$.type',
+      literal_value text PATH '$.literalValue',
+      object_concept_id text PATH '$.objectConceptId'
+    )
+  )
+) AS t
+WHERE a.artifact_type = 'graph_snapshot.v2' AND t.assertion_type IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
@@ -312,19 +381,10 @@ CREATE TABLE graph_enrichments (
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_config_hash text NOT NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
-  embedding_model text NOT NULL,
   judge_model text NOT NULL,
   difficulty_method text NOT NULL,
   started_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz
-);
-
-CREATE TABLE enrichment_prerequisite_candidate_groups (
-  enrichment_prerequisite_candidate_group_id uuid PRIMARY KEY,
-  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
-  group_id text NOT NULL,
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
-  UNIQUE (enrichment_id, concept_id)
 );
 
 CREATE TABLE inferred_prerequisite_edges (
@@ -335,7 +395,6 @@ CREATE TABLE inferred_prerequisite_edges (
   dependent_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
-  candidate_group_id text,
   provenance jsonb NOT NULL,
   UNIQUE (enrichment_id, prerequisite_concept_id, dependent_concept_id),
   CHECK (prerequisite_concept_id <> dependent_concept_id)

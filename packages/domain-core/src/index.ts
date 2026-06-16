@@ -1,5 +1,4 @@
 export type CandidateTier = "core" | "optional" | "reject" | "quarantine";
-export type ClaimScope = "durable_domain_knowledge" | "scoped_empirical_result" | "reference_expansion" | "inferred_relationship";
 export type TrustTier = "curated_source_grounded" | "cross_source_synthesized" | "reference_expansion" | "inferred_relationship" | "model_proposed" | "quarantined";
 
 export type SourceLocator = {
@@ -66,7 +65,7 @@ export function normalizeConceptLabel(label: string): string {
 
 // Whether a label NAMES a concept or ASSERTS a proposition about one is a SEMANTIC
 // judgment, not a provable property, so it is decided by the measured neural
-// concept-vs-proposition admission judge (ADR-0021, `AdmissionLabelJudgment`),
+// concept-vs-proposition admission judge (ADR-0005, `AdmissionLabelJudgment`),
 // never a hardcoded lexical matcher (AGENTS rule 16). The earlier deterministic
 // `looksLikePropositionLabel` veto was removed: its closed copula/verb/participle
 // list both missed real propositions (no listed verb, e.g. "Operator Set as
@@ -107,11 +106,6 @@ export function evidenceQuoteMatches(blockText: string, evidenceQuote: string): 
   if (quote.length === 0) return false;
   return normalizeEvidenceText(blockText).includes(quote);
 }
-
-// Closed six-relation registry (ADR-0016). Models choose from this enum; only humans extend it.
-export type RelationPredicate = "is-a" | "part-of" | "asserted-prerequisite-of" | "contrasts-with" | "uses" | "defined-as";
-export const CONCEPT_RELATIONS: RelationPredicate[] = ["is-a", "part-of", "asserted-prerequisite-of", "contrasts-with", "uses"];
-export const LITERAL_RELATIONS: RelationPredicate[] = ["defined-as"];
 
 // ---------------------------------------------------------------------------
 // Run-scoped extraction artifacts (ADR-0017). These reference CANDIDATES by a
@@ -164,10 +158,27 @@ export type CoreSelectionReasonCode =
   | "failed_model_eligibility"
   | "missing_core_selection";
 
+// Source-role / Declared-Domain relevance (R12, ADR-0005). A SEMANTIC judgment
+// the admission prompt makes per atomic proposal, replacing the deterministic
+// illustrative-section regex (AGENTS rule 16). `out_of_domain_illustration`
+// material — an algorithm or SQL example used only to illustrate an
+// educational-technology source — must REJECT, never linger as `optional`; the
+// application boundary forces the effective tier to `reject` on that role so a
+// neural decision, not a lexical heading matcher, removes off-domain noise.
+export type AdmissionSourceRole = "declared_domain_concept" | "out_of_domain_illustration";
+
+// Atomic admission proposal (R13, ADR-0005). One discovered Candidate may be a
+// CONFLATED label ("The stack and the heap") that yields MULTIPLE atomic
+// proposals, each naming a single concept. `parentCandidateKey` is the discovered
+// Candidate this atom was split from (provenance); `atomicKey` is a run-local
+// stable key unique across all proposals. Core Set Selection operates over the
+// atomic proposals, not the discovered candidates.
 export type AdmissionProposal = {
-  candidateKey: string;
+  atomicKey: string;
+  parentCandidateKey: string;
   proposedCanonicalLabel: string;
   tier: CandidateTier;
+  sourceRole: AdmissionSourceRole;
   standaloneLearningObjective: AdmissionCriterionProposal;
   establishedDomainMeaning: AdmissionCriterionProposal;
   organizingPower: OrganizingPowerProposal;
@@ -177,79 +188,71 @@ export type AdmissionProposal = {
   confidence: number;
 };
 
-export type ExtractedClaimObject =
-  | { kind: "concept"; candidateKey: string }
-  | { kind: "literal"; value: string };
+// ---------------------------------------------------------------------------
+// Concept Evidence Profile (ADR-0007 reset). The CEP replaces asserted claims as
+// the published Concept context: per admitted atomic Concept, the curated source
+// teaches it through one or more meaning-bearing DEFINITION PASSAGES, a bounded
+// salience-ranked set of MENTION PASSAGES, and zero or more OPTIONAL TYPED
+// ASSERTIONS. Every element is verbatim-grounded against a cited block (R10); the
+// neural entailment judge guards ONLY the optional typed assertions. General
+// concept-to-concept relationships (taxonomy, structure, contrast, employment)
+// survive as untyped mention passages, never typed edges (R6/R7, AE1).
+// ---------------------------------------------------------------------------
 
-export type ClaimEvidenceLinkNature =
-  | "taxonomic"
-  | "structural"
-  | "mechanism-employment"
-  | "explicit-contrast"
-  | "explicit-prerequisite"
-  | "definitional"
-  | "causal-or-motivational";
+// The ONLY two guarded typed assertions (R6). `defines` carries a model-authored
+// literal definition (a faithful paraphrase, judged for entailment — no surface
+// matcher can verify a paraphrase, AGENTS rule 16). `explicit-prerequisite-hint`
+// names an admitted Concept the source explicitly flags as needed first. Both are
+// guarded EVIDENCE inside the CEP, never authoritative edges or numeric priors
+// (KTD): a hint is passed to enrichment with its type label but no boost or
+// direction override.
+export type OptionalAssertionType = "defines" | "explicit-prerequisite-hint";
 
-export type ClaimEvidenceDirection =
-  | "subject-is-kind-of-object"
-  | "subject-is-part-of-object"
-  | "object-is-part-of-subject"
-  | "subject-uses-object"
-  | "object-uses-subject"
-  | "subject-contrasts-with-object"
-  | "subject-prerequisite-of-object"
-  | "object-prerequisite-of-subject"
-  | "subject-defined-by-literal"
-  | "causal-or-motivational";
+// What the concept-conditioned extractor returns for one subject Concept, by
+// run-local key. Definition and mention passages are verbatim block quotes; the
+// mention order IS the neural salience order (most to least useful for enrichment)
+// — the application keeps the first configured number without re-ranking (R4).
+export type ExtractedTypedAssertion =
+  | { type: "defines"; literalValue: string; evidence: BlockEvidence[] }
+  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BlockEvidence[] };
 
-export type ExtractedClaim = {
-  subjectCandidateKey: string;
-  predicate: RelationPredicate;
-  object: ExtractedClaimObject;
-  evidenceLinkNature: ClaimEvidenceLinkNature;
-  evidenceDirection: ClaimEvidenceDirection;
-  evidence: BlockEvidence[];
-  confidence: number;
-  extractionAttempt?: number;
+export type ExtractedEvidenceProfile = {
+  definitions: BlockEvidence[];
+  mentions: BlockEvidence[];
+  assertions: ExtractedTypedAssertion[];
 };
 
-export type ClaimExtractionFeedback = {
-  rejectedClaims: {
-    predicate: RelationPredicate;
-    object: ExtractedClaimObject;
-    evidence: BlockEvidence[];
-    boundaryReasonCodes: string[];
-  }[];
-};
-
-export type MissingConceptProposal = {
-  proposedLabel: string;
-  rationale: string;
-  evidence?: BlockEvidence;
-  extractionAttempt: number;
-};
-
-export type ClaimExtractionResult = {
-  claims: ExtractedClaim[];
-  proposals: MissingConceptProposal[];
-};
-
-// Semantic claim-entailment judgment (ADR-0020). One bounded LLM judgment over a
-// single concept-to-concept claim whose evidence already verifies verbatim. It
-// replaces the brittle deterministic lexical-entailment veto (AGENTS rule 16):
-// real prose entails relations through pronouns, apposition, lists, and synonym
-// verbs that no hardcoded surface matcher can enumerate. The judge can ONLY
-// downgrade a deterministically-surviving claim — it never resurrects one that
-// failed the verbatim floor or a structural gate. `entailingSpan` must be a
-// substring of a provided (already-verbatim) quote; the application boundary
-// fails closed to `entailed: false` when it is not.
-export type ClaimEntailmentJudgment = {
+// One bounded LLM judgment over a single optional typed assertion whose evidence
+// already verifies verbatim (ADR-0007). Mirrors the retired claim-entailment
+// judge: it can ONLY reject an assertion; a rejected assertion's underlying
+// passage is preserved as an untyped mention. `entailingSpan` must be a substring
+// of a provided quote; the application boundary fails closed to `entailed: false`.
+export type AssertionEntailmentJudgment = {
   entailed: boolean;
   entailingSpan: string;
   rationale: string;
 };
 
-// Concept-vs-proposition admission judgment (ADR-0021). One bounded LLM judgment
+// The validated, run-scoped Concept Evidence Profile assembled at the application
+// boundary: definition + mention passages cleared the verbatim floor and were
+// deduplicated, mentions were bounded to maxMentionsPerConceptPerSource in neural
+// order, and each surviving typed assertion passed entailment. `complete` is true
+// only when at least one verified definition passage remains; an admitted Concept
+// with no complete CEP makes the Extraction Run unsuccessful (R1).
+export type RunTypedAssertion =
+  | { type: "defines"; literalValue: string; evidence: BlockEvidence[] }
+  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BlockEvidence[] };
+
+export type RunEvidenceProfile = {
+  candidateKey: string;
+  tier: CandidateTier;
+  definitions: BlockEvidence[];
+  mentions: BlockEvidence[];
+  assertions: RunTypedAssertion[];
+  complete: boolean;
+};
+
+// Concept-vs-proposition admission judgment (ADR-0005). One bounded LLM judgment
 // over a single admitted-`core` label, replacing the brittle deterministic
 // `looksLikePropositionLabel` lexical veto (AGENTS rule 16): "is this label a
 // proposition?" is a semantic judgment, not a provable property, so a hardcoded
@@ -288,7 +291,13 @@ export type ConceptCandidate = {
 export type ValidationOutcome = "verified" | "rejected";
 
 export type RunCandidate = {
+  // The atomic concept's run-local key (the unit of identity downstream). For an
+  // unsplit candidate this equals the discovered candidateKey; for a split one it
+  // is the atomic proposal's key.
   candidateKey: string;
+  // The discovered Candidate this atom was split from (provenance for R13). Equals
+  // candidateKey when admission did not split the candidate.
+  parentCandidateKey: string;
   discoveredLabel: string;
   canonicalLabel: string;
   normalizedLabel: string;
@@ -297,6 +306,7 @@ export type RunCandidate = {
   admission: {
     modelTier: CandidateTier;
     tier: CandidateTier;
+    sourceRole: AdmissionSourceRole;
     proposedCanonicalLabel: string;
     standaloneLearningObjective: {
       modelPassed: boolean;
@@ -327,27 +337,20 @@ export type RunCandidate = {
   };
 };
 
-export type RunClaim = {
-  subjectCandidateKey: string;
-  predicate: RelationPredicate;
-  object: ExtractedClaimObject;
-  evidence: BlockEvidence[];
-  modelConfidence: number;
-  evidenceCount: number;
-  validationOutcome: ValidationOutcome;
-  boundaryReasonCodes: string[];
-  extractionAttempt: number;
-};
-
 export type ExtractionRunResult = {
   runId: string;
   sourceResourceId: string;
   sourceDocumentId: string;
   declaredDomain: string;
   pipelineConfigHash: string;
+  // Configured bound on mention passages kept per Concept per source (R4); part of
+  // the pipeline configuration hash and recorded on the run for inspection.
+  maxMentionsPerConceptPerSource: number;
   candidates: RunCandidate[];
-  claims: RunClaim[];
-  proposals: MissingConceptProposal[];
+  evidenceProfiles: RunEvidenceProfile[];
+  // A run is unsuccessful when any admitted (core|optional) Concept lacks a
+  // complete CEP (R1). Publication refuses non-succeeded runs (ADR-0017).
+  status: "succeeded" | "failed";
   costUsd?: number;
   latencyMs?: number;
 };
@@ -367,26 +370,50 @@ export type Concept = {
   homograph: boolean;
 };
 
-export type PublishedClaimObject =
-  | { kind: "concept"; conceptId: string }
-  | { kind: "literal"; value: string };
+// ---------------------------------------------------------------------------
+// Published Concept Evidence Profile (ADR-0007 reset, R1/R2/R5/R6). The CEP is
+// the published Concept context: there is NO sibling asserted-edge collection, so
+// a published snapshot exposes zero asserted relations (R5, AE1/AE4). Each element
+// carries full provenance — source, block, verbatim quote, heading path, and
+// locator — so the Admin Lab and enrichment inspect a Concept's meaning without
+// reconstructing it from claims (R2). Evidence accumulates across graph versions:
+// publication UNIONS the base version's CEP with newly selected runs' evidence and
+// exact-deduplicates, so a later version never replaces previously published
+// evidence (R3, AE2).
+// ---------------------------------------------------------------------------
 
-export type PublishedClaim = {
-  claimId: string;
-  subjectConceptId: string;
-  predicate: RelationPredicate;
-  object: PublishedClaimObject;
-  evidence: EvidenceReference[];
-  trustTier: TrustTier;
-  modelConfidence: number;
-  evidenceCount: number;
-  contradictionState: "none" | "possible" | "material";
+export type PublishedEvidencePassage = {
+  sourceResourceId: string;
+  sourceBlockId: string;
+  evidenceQuote: string;
+  headingPath: string[];
+  locator: SourceLocator;
 };
 
+// The only two guarded typed assertions (R6). Both stay EVIDENCE inside the CEP,
+// never authoritative edges or numeric priors. `explicit-prerequisite-hint` names
+// the published Concept it points at; a hint whose target is not published in the
+// same graph version is omitted at build time (R9 publication discipline).
+export type PublishedTypedAssertion =
+  | { type: "defines"; literalValue: string; evidence: PublishedEvidencePassage[] }
+  | { type: "explicit-prerequisite-hint"; objectConceptId: string; evidence: PublishedEvidencePassage[] };
+
+export type PublishedConceptEvidenceProfile = {
+  conceptId: string;
+  definitions: PublishedEvidencePassage[];
+  mentions: PublishedEvidencePassage[];
+  assertions: PublishedTypedAssertion[];
+};
+
+// An immutable published graph version: stable Concepts plus one CEP each, and no
+// asserted edges (R5). `baseGraphVersionId` names the version this build extends
+// (`null` only for the initial build, KTD); the snapshot's evidence is the union
+// of that base plus the newly selected runs.
 export type GraphSnapshot = {
   graphVersionId: string;
+  baseGraphVersionId: string | null;
   concepts: Concept[];
-  claims: PublishedClaim[];
+  evidenceProfiles: PublishedConceptEvidenceProfile[];
 };
 
 // Read model the deterministic Graph-Version Build consumes (ADR-0017): the
@@ -399,13 +426,28 @@ export type BuildCandidate = {
   aliases: string[];
 };
 
-export type BuildClaim = {
-  subjectCandidateKey: string;
-  predicate: RelationPredicate;
-  object: ExtractedClaimObject;
-  evidence: EvidenceReference[];
-  modelConfidence: number;
-  evidenceCount: number;
+// Run-scoped CEP evidence reduced to the deterministic build read model (ADR-0017).
+// Passages carry full resolved provenance (the store maps run-local blockIds to
+// persisted source_block_id, heading path, and locator); typed assertions still
+// reference the OTHER admitted Concept by run-local candidateKey, which the build
+// resolves to a published Concept identity and omits when the target is absent.
+export type BuildEvidencePassage = {
+  sourceBlockId: string;
+  evidenceQuote: string;
+  headingPath: string[];
+  locator: SourceLocator;
+};
+
+export type BuildTypedAssertion =
+  | { type: "defines"; literalValue: string; evidence: BuildEvidencePassage[] }
+  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BuildEvidencePassage[] };
+
+export type BuildEvidenceProfile = {
+  candidateKey: string;
+  definitions: BuildEvidencePassage[];
+  mentions: BuildEvidencePassage[];
+  assertions: BuildTypedAssertion[];
+  complete: boolean;
 };
 
 export type RunForBuild = {
@@ -417,7 +459,9 @@ export type RunForBuild = {
   // (CONTEXT.md Graph-Version Build). Carried so the deterministic build can
   // fail closed and name the unresolved conflict rather than silently publish.
   quarantinedCandidates: { candidateKey: string; canonicalLabel: string }[];
-  verifiedClaims: BuildClaim[];
+  // One CEP per admitted core Concept in this run (ADR-0007 reset). Replaces the
+  // retired verifiedClaims: publication unions these by Concept identity.
+  evidenceProfiles: BuildEvidenceProfile[];
 };
 
 export type PublishedConceptIdentity = {
@@ -458,15 +502,22 @@ export type ArtifactEnvelope<TPayload = unknown> = {
 
 export type InferredRelationPredicate = "inferred-prerequisite-of";
 
-export type PrerequisiteCandidateGroup = {
-  groupId: string;
-  // Contextual-embedding group used only for Prerequisite Candidate Selection.
-  // It never decides Concept identity or creates an edge.
-  conceptIds: string[];
-  embeddingModel: string;
+// Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
+// meaning-bearing definition passages, bounded salience-ordered mention passages,
+// and LABELED optional typed assertions. An `explicit-prerequisite-hint` appears
+// here as labeled evidence the neural judge MAY weigh — never a deterministic edge,
+// numeric prior, or direction override (KTD). The exhaustive same-domain design
+// (ADR-0019 reset) removed contextual-embedding clustering and candidate groups.
+export type PrerequisiteConceptContext = {
+  conceptId: string;
+  canonicalLabel: string;
+  aliases: string[];
+  definitions: string[];
+  mentions: string[];
+  assertions: { type: OptionalAssertionType; detail: string }[];
 };
 
-// One bounded LLM prerequisite judgment over a gated, evidence-packed pair.
+// One bounded LLM prerequisite judgment over an evidence-packed same-domain pair.
 // "uncertain" is flagged for review and excluded from the path, never silently
 // promoted to an edge (concept-first method stack §4; goal 1.6/4).
 export type PrerequisiteJudgment = {
@@ -487,15 +538,13 @@ export type InferredPrerequisiteEdge = {
   predicate: InferredRelationPredicate;
   confidence: number;
   uncertain: boolean;
-  candidateGroupId?: string;
-  provenance: { judgmentRationale: string; evidencePacketRef?: string };
+  provenance: { judgmentRationale: string };
 };
 
 export type PrerequisiteJudgmentTrace = {
   declaredDomain: string;
-  a: { conceptId: string; canonicalLabel: string; definition?: string };
-  b: { conceptId: string; canonicalLabel: string; definition?: string };
-  evidencePacket: SourceBlock[];
+  a: PrerequisiteConceptContext;
+  b: PrerequisiteConceptContext;
   judgment: PrerequisiteJudgment;
 };
 
@@ -528,11 +577,10 @@ export type DerivedGraphLayer = {
   enrichmentId: string;
   graphVersionId: string;
   enrichmentConfigHash: string;
-  embeddingModel: string;
-  // The bounded prerequisite-judge model (provenance for the inferred DAG). Stored
-  // alongside embeddingModel so a layer fully records which models proposed it.
+  // The bounded prerequisite-judge model (provenance for the inferred DAG). The
+  // embedding model and candidate groups were removed with the embedding tier
+  // (ADR-0019 reset): every same-domain CEP pair is judged exhaustively.
   judgeModel: string;
-  prerequisiteCandidateGroups: PrerequisiteCandidateGroup[];
   prerequisiteEdges: InferredPrerequisiteEdge[];
   difficulties: ConceptDifficulty[];
 };

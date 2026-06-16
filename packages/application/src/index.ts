@@ -1,9 +1,9 @@
-export { executeExtractionRun } from "./executeExtractionRun";
+export { executeExtractionRun, DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE } from "./executeExtractionRun";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 export { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
-export { applyClaimPolicy } from "./applyClaimPolicy";
-export { applyEntailmentJudge } from "./applyEntailmentJudge";
+export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
+export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 export { computeLearnerPath } from "./computeLearnerPath";

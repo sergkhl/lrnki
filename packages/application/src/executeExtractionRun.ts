@@ -1,186 +1,157 @@
 import {
   extractableBlocks,
-  type ExtractedClaim,
+  type ArtifactEnvelope,
   type ExtractionRunResult,
   type RunCandidate,
+  type RunEvidenceProfile,
   type StructuredDocument
 } from "@lrnki/domain-core";
 import type {
   AdmissionLabelJudgmentPort,
-  ArtifactRepositoryPort,
-  ClaimEntailmentJudgmentPort,
+  AssertionEntailmentJudgmentPort,
   ConceptAdmissionPort,
-  ConceptConditionedClaimExtractionPort,
+  ConceptConditionedEvidenceProfileExtractionPort,
   ConceptDiscoveryPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
-import { applyClaimPolicy } from "./applyClaimPolicy";
-import { applyEntailmentJudge } from "./applyEntailmentJudge";
+import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
+import { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 
 const PRODUCER = "@lrnki/application";
-const PRODUCER_VERSION = "0.4.0";
+const PRODUCER_VERSION = "0.5.0";
+const EXTRACTION_RUN_ARTIFACT_TYPE = "extraction_run.v5";
+const EXTRACTION_RUN_SCHEMA_VERSION = "5";
 
-// One Extraction Run over one registered source (ADR-0017): discovery, admission,
-// concept-conditioned claim extraction, and deterministic evidence validation.
-// Assembles the run aggregate in memory and persists it once. Never publishes.
+// Default mention bound per Concept per source (R4, KTD). Overridable per run; part
+// of the pipeline configuration hash so a change is reflected in the artifact.
+export const DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE = 6;
+
+// One Extraction Run over one registered source (ADR-0017): discovery, atomic
+// admission, concept-conditioned Concept Evidence Profile extraction, deterministic
+// verbatim validation, and optional-assertion entailment. Assembles the run
+// aggregate in memory and persists it once with its immutable artifact. Never
+// publishes. Replaces the retired claim-extraction orchestration: no retries, no
+// recall feedback, no missing-concept proposals, no conflict pass (R7).
 export async function executeExtractionRun(input: {
   runId: string;
   source: { sourceResourceId: string; sourceDocumentId: string; declaredDomain: string; document: StructuredDocument };
   pipelineConfigHash: string;
+  maxMentionsPerConceptPerSource?: number;
   discovery: ConceptDiscoveryPort;
   admission: ConceptAdmissionPort;
-  claimExtraction: ConceptConditionedClaimExtractionPort;
-  claimEntailmentJudge: ClaimEntailmentJudgmentPort;
+  evidenceProfileExtraction: ConceptConditionedEvidenceProfileExtractionPort;
+  assertionEntailmentJudge: AssertionEntailmentJudgmentPort;
   admissionLabelJudge: AdmissionLabelJudgmentPort;
   store: ExtractionRunStorePort;
-  artifacts: ArtifactRepositoryPort;
 }): Promise<ExtractionRunResult> {
   const startedAt = Date.now();
   const { document, declaredDomain } = input.source;
+  const maxMentionsPerConceptPerSource = input.maxMentionsPerConceptPerSource ?? DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE;
   const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
-  const illustrativeBlockIds = new Set(
-    document.blocks
-      .filter((block) => isExplicitlyIllustrative(block.headingPath, block.text))
-      .map((block) => block.blockId)
-  );
 
   // Stage 1 — recall-oriented Candidate Discovery.
   const discovered = await input.discovery.discover({ document, declaredDomain });
 
   // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
+  // Admission may SPLIT one discovered Candidate into several atomic proposals
+  // (R13). Each proposal names its parent Candidate plus a run-local atomicKey.
+  // Fail closed: an atom whose parent is unknown, or whose atomicKey collides with
+  // another atom, is dropped before policy so it can never publish a core Concept.
   const admissionProposals = await input.admission.admit({ document, declaredDomain, candidates: discovered });
-  const proposalByKey = new Map<string, (typeof admissionProposals)[number]>();
-  const duplicateKeys = new Set<string>();
   const discoveredKeys = new Set(discovered.map((candidate) => candidate.candidateKey));
+  const atomicKeyCounts = new Map<string, number>();
   for (const proposal of admissionProposals) {
-    if (!discoveredKeys.has(proposal.candidateKey)) continue;
-    if (proposalByKey.has(proposal.candidateKey)) duplicateKeys.add(proposal.candidateKey);
-    else proposalByKey.set(proposal.candidateKey, proposal);
+    atomicKeyCounts.set(proposal.atomicKey, (atomicKeyCounts.get(proposal.atomicKey) ?? 0) + 1);
+  }
+  const proposalsByParent = new Map<string, typeof admissionProposals>();
+  for (const proposal of admissionProposals) {
+    if (!discoveredKeys.has(proposal.parentCandidateKey)) continue; // unknown parent: drop
+    if (atomicKeyCounts.get(proposal.atomicKey) !== 1) continue; // duplicate atomic key: drop
+    const group = proposalsByParent.get(proposal.parentCandidateKey) ?? [];
+    group.push(proposal);
+    proposalsByParent.set(proposal.parentCandidateKey, group);
   }
 
-  const policyCandidates: RunCandidate[] = discovered.map((candidate) => applyAdmissionPolicy({
-    candidate,
-    proposal: duplicateKeys.has(candidate.candidateKey) ? undefined : proposalByKey.get(candidate.candidateKey),
-    blockText,
-    illustrativeBlockIds,
-    initialBoundaryReasonCodes: duplicateKeys.has(candidate.candidateKey) ? ["duplicate_admission_decision"] : []
-  }));
+  const policyCandidates: RunCandidate[] = [];
+  for (const candidate of discovered) {
+    const group = proposalsByParent.get(candidate.candidateKey) ?? [];
+    if (group.length === 0) {
+      policyCandidates.push(applyAdmissionPolicy({ parentCandidate: candidate, blockText }));
+      continue;
+    }
+    for (const proposal of group) {
+      policyCandidates.push(applyAdmissionPolicy({ parentCandidate: candidate, proposal, blockText }));
+    }
+  }
 
-  // Concept-vs-proposition admission judge (ADR-0021). A downgrade-only neural
-  // stage after the deterministic boundary: it demotes a `core` candidate whose
-  // label asserts a proposition rather than naming a concept, replacing the
-  // removed `looksLikePropositionLabel` lexical veto (AGENTS rule 16). Fail-closed
-  // = preserve recall, so it never demotes on judge failure or an ungrounded
-  // verdict. Runs only on the handful of `core` candidates, so cost is bounded.
+  // Concept-vs-proposition admission judge (ADR-0005). Downgrade-only neural stage
+  // after the deterministic boundary; preserves recall on judge failure.
   const candidates = await applyAdmissionLabelJudge({
     candidates: policyCandidates,
     declaredDomain,
     judge: input.admissionLabelJudge
   });
 
-  const coreCandidates = candidates.filter((candidate) => candidate.admission.tier === "core");
-  const admittedConcepts = coreCandidates.map((candidate) => ({
+  // CEPs are extracted for every admitted Concept — core AND optional (KTD): both
+  // carry source-grounded meaning into publication. Hint targets may reference any
+  // admitted Concept, so the admitted set spans both tiers.
+  const admittedCandidates = candidates.filter(
+    (candidate) => candidate.admission.tier === "core" || candidate.admission.tier === "optional"
+  );
+  const admittedConcepts = admittedCandidates.map((candidate) => ({
     candidateKey: candidate.candidateKey,
     canonicalLabel: candidate.canonicalLabel,
     aliases: exactAliases(candidate)
   }));
-  const coreKeys = new Set(coreCandidates.map((candidate) => candidate.candidateKey));
-  // Canonical label + exact aliases per concept, for the semantic entailment judge.
+  const admittedKeys = new Set(admittedCandidates.map((candidate) => candidate.candidateKey));
   const conceptsByKey = new Map<string, { canonicalLabel: string; aliases: string[] }>(
     admittedConcepts.map((concept) => [concept.candidateKey, { canonicalLabel: concept.canonicalLabel, aliases: concept.aliases }])
   );
+  const tierByKey = new Map(admittedCandidates.map((candidate) => [candidate.candidateKey, candidate.admission.tier] as const));
 
-  // Stage 3 — concept-conditioned claim extraction with deterministic evidence
-  // validation and semantic entailment. Retry once only when a subject's first
-  // attempt has no fully verified claim. Superseded first-pass claims remain
-  // auditable, but are excluded from the final conflict pass.
-  const proposals: ExtractionRunResult["proposals"] = [];
-  const subjectAttempts = await mapWithConcurrency(coreCandidates, CLAIM_EXTRACTION_CONCURRENCY, async (subject) => {
-    const extract = async (feedback?: Parameters<ConceptConditionedClaimExtractionPort["extract"]>[0]["feedback"]) => {
-      try {
-        return await input.claimExtraction.extract({
-          document,
-          declaredDomain,
-          subject: {
-            candidateKey: subject.candidateKey,
-            canonicalLabel: subject.canonicalLabel,
-            aliases: exactAliases(subject)
-          },
-          admittedConcepts,
-          evidenceNeighborhood: evidenceNeighborhood(document, subject),
-          feedback
-        });
-      } catch {
-        return null;
-      }
-    };
-    const first = await extract();
-    const firstPolicyClaims = applyClaimPolicy({
-      claims: first?.claims ?? [],
-      extractionAttempt: 1,
-      coreCandidateKeys: coreKeys,
-      blockText
+  // Stage 3 — concept-conditioned CEP extraction with deterministic verbatim
+  // validation. One bounded call per admitted Concept; an extractor failure yields
+  // an empty (incomplete) profile so the run fails closed rather than publishing a
+  // Concept with no source-grounded meaning.
+  const rawProfiles = await mapWithConcurrency(admittedCandidates, CEP_EXTRACTION_CONCURRENCY, async (subject) => {
+    const extracted = await input.evidenceProfileExtraction
+      .extract({
+        document,
+        declaredDomain,
+        subject: {
+          candidateKey: subject.candidateKey,
+          canonicalLabel: subject.canonicalLabel,
+          aliases: exactAliases(subject)
+        },
+        admittedConcepts,
+        evidenceNeighborhood: evidenceNeighborhood(document, subject)
+      })
+      .catch(() => ({ definitions: [], mentions: [], assertions: [] }));
+    return applyEvidenceProfilePolicy({
+      candidateKey: subject.candidateKey,
+      tier: subject.admission.tier,
+      profile: extracted,
+      admittedKeys,
+      blockText,
+      maxMentionsPerConceptPerSource
     });
-    // Retry eligibility must use the complete claim verdict. Otherwise a claim
-    // that passes structural checks but fails semantic entailment suppresses the
-    // one precision-preserving retry.
-    const firstClaims = await applyEntailmentJudge({
-      claims: firstPolicyClaims,
-      declaredDomain,
-      conceptsByKey,
-      judge: input.claimEntailmentJudge
-    });
-    if (firstClaims.some((claim) => claim.validationOutcome === "verified")) {
-      return { first, firstClaims, retry: null };
-    }
-    const retry = await extract({
-      rejectedClaims: firstClaims.map((claim) => ({
-        predicate: claim.predicate,
-        object: claim.object,
-        evidence: claim.evidence,
-        boundaryReasonCodes: claim.boundaryReasonCodes
-      }))
-    });
-    return { first, firstClaims, retry };
   });
 
-  const effectiveExtractedClaims: ExtractedClaim[] = [];
-  const supersededClaims: ExtractionRunResult["claims"] = [];
-  for (const attempts of subjectAttempts) {
-    if (attempts.first) proposals.push(...attempts.first.proposals);
-    if (attempts.retry) {
-      proposals.push(...attempts.retry.proposals);
-      supersededClaims.push(...attempts.firstClaims.map((claim) => ({
-        ...claim,
-        validationOutcome: "rejected" as const,
-        boundaryReasonCodes: claim.boundaryReasonCodes.includes("superseded_by_retry")
-          ? claim.boundaryReasonCodes
-          : [...claim.boundaryReasonCodes, "superseded_by_retry"]
-      })));
-      effectiveExtractedClaims.push(...attempts.retry.claims.map((claim) => ({ ...claim, extractionAttempt: 2 })));
-    } else if (attempts.first) {
-      effectiveExtractedClaims.push(...attempts.first.claims.map((claim) => ({ ...claim, extractionAttempt: 1 })));
-    }
-  }
-
-  // Deterministic pass first (verbatim floor, nature/direction, aggregate
-  // structural gates), then the semantic entailment judge downgrades any
-  // surviving concept claim whose evidence does not actually assert the relation
-  // (ADR-0020). The judge only DOWNGRADES, so the deterministic guarantees hold.
-  const policyClaims = applyClaimPolicy({
-    claims: effectiveExtractedClaims,
-    coreCandidateKeys: coreKeys,
-    blockText
-  });
-  const judgedClaims = await applyEntailmentJudge({
-    claims: policyClaims,
+  // Stage 4 — neural acceptance of optional typed assertions only.
+  const evidenceProfiles: RunEvidenceProfile[] = await applyAssertionEntailmentJudge({
+    profiles: rawProfiles,
     declaredDomain,
     conceptsByKey,
-    judge: input.claimEntailmentJudge
+    judge: input.assertionEntailmentJudge
   });
-  const claims = [...supersededClaims, ...judgedClaims];
+
+  // The run is successful only when every admitted Concept has a complete CEP (R1).
+  const status: ExtractionRunResult["status"] =
+    admittedCandidates.length === tierByKey.size && evidenceProfiles.every((profile) => profile.complete)
+      ? "succeeded"
+      : "failed";
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,
@@ -188,24 +159,28 @@ export async function executeExtractionRun(input: {
     sourceDocumentId: input.source.sourceDocumentId,
     declaredDomain,
     pipelineConfigHash: input.pipelineConfigHash,
+    maxMentionsPerConceptPerSource,
     candidates,
-    claims,
-    proposals,
+    evidenceProfiles,
+    status,
     latencyMs: Date.now() - startedAt
   };
 
-  await input.store.persist(runResult);
-  await input.artifacts.append({
+  const artifact: ArtifactEnvelope<ExtractionRunResult> = {
     artifactId: `${input.runId}:run`,
-    artifactType: "extraction_run.v4",
-    schemaVersion: "4",
+    artifactType: EXTRACTION_RUN_ARTIFACT_TYPE,
+    schemaVersion: EXTRACTION_RUN_SCHEMA_VERSION,
     runId: input.runId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,
     configHash: input.pipelineConfigHash,
     createdAt: new Date().toISOString(),
     payload: runResult
-  });
+  };
+
+  // Persist the run, its normalized CEP evidence, and the immutable artifact in one
+  // transaction (R: no authoritative relational state without its artifact).
+  await input.store.persist(runResult, artifact);
   return runResult;
 }
 
@@ -214,7 +189,7 @@ function exactAliases(candidate: RunCandidate): string[] {
 }
 
 // Bounded so a large source cannot fan out unbounded parallel LLM calls through the proxy.
-const CLAIM_EXTRACTION_CONCURRENCY = 4;
+const CEP_EXTRACTION_CONCURRENCY = 4;
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results = new Array<R>(items.length);
@@ -230,17 +205,10 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
 }
 
 // Evidence neighborhood: the candidate's own mention blocks plus any block whose
-// text contains the concept label. Scoped to extractable body blocks so claims
-// can never cite references, appendices, captions, or table/figure placeholders.
+// text contains the concept label. Scoped to extractable body blocks so a CEP can
+// never cite references, appendices, captions, or table/figure placeholders.
 function evidenceNeighborhood(document: StructuredDocument, subject: RunCandidate) {
   const mentionBlockIds = new Set(subject.mentions.map((mention) => mention.blockId));
   const label = subject.canonicalLabel.toLowerCase();
   return extractableBlocks(document.blocks).filter((block) => mentionBlockIds.has(block.blockId) || block.text.toLowerCase().includes(label));
-}
-
-function isExplicitlyIllustrative(headingPath: string[], text: string): boolean {
-  const heading = headingPath.join(" ").toLowerCase();
-  const opening = text.slice(0, 240).toLowerCase();
-  return /\b(case study|worked example|illustrative example|demonstration|demo|downstream application)\b/.test(heading) ||
-    /\b(to illustrate|as an illustrative example|as a worked example|we demonstrate how|downstream application)\b/.test(opening);
 }

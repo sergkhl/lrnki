@@ -8,30 +8,28 @@ export {
   conceptAdmissionValidator,
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidator,
-  conceptClaimSchema,
-  conceptClaimValidator,
+  conceptEvidenceProfileSchema,
+  conceptEvidenceProfileValidator,
   prerequisiteJudgmentSchema,
   prerequisiteJudgmentValidator,
-  claimEntailmentJudgmentSchema,
-  claimEntailmentJudgmentValidator,
+  assertionEntailmentJudgmentSchema,
+  assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,
-  LiteLlmClaimExtractionAdapter,
-  LiteLlmClaimEntailmentJudgmentAdapter,
+  LiteLlmEvidenceProfileExtractionAdapter,
+  LiteLlmAssertionEntailmentJudgmentAdapter,
   LiteLlmAdmissionLabelJudgmentAdapter,
   DISCOVERY_MODEL,
   ADMISSION_MODEL,
-  CLAIM_MODEL,
-  CLAIM_ENTAILMENT_JUDGE_MODEL,
+  EVIDENCE_PROFILE_MODEL,
+  ASSERTION_ENTAILMENT_JUDGE_MODEL,
   ADMISSION_LABEL_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
-  LiteLlmEmbeddingAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
-  EMBEDDING_MODEL,
   PREREQUISITE_JUDGE_MODEL
 } from "./enrichmentAdapters";

@@ -2,19 +2,18 @@ import type {
   AdmissionLabelJudgment,
   AdmissionProposal,
   ArtifactEnvelope,
-  ClaimEntailmentJudgment,
-  ClaimExtractionFeedback,
-  ClaimExtractionResult,
+  AssertionEntailmentJudgment,
   Concept,
-  RelationPredicate,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
   EnrichmentRunTrace,
+  ExtractedEvidenceProfile,
   ExtractionRunResult,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
+  PrerequisiteConceptContext,
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
@@ -38,53 +37,53 @@ export interface ConceptAdmissionPort {
   admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionProposal[]>;
 }
 
-export interface ConceptConditionedClaimExtractionPort {
-  // Extract claims in the context of one admitted subject concept. Object concepts
-  // must be drawn from the admitted set; anything else becomes a missing-concept proposal.
+// Concept-conditioned Concept Evidence Profile extraction (ADR-0007 reset). For
+// ONE admitted subject Concept, return meaning-bearing definition passages, a
+// salience-ordered set of mention passages, and zero or more optional typed
+// assertions (`defines` literal, `explicit-prerequisite-hint` to an admitted
+// Concept). Replaces broad claim extraction: there is no retry, no recall
+// feedback, and no missing-concept escape hatch (R7). The application boundary
+// validates membership, verbatim grounding, deduplication, definition
+// completeness, and the configured mention bound.
+export interface ConceptConditionedEvidenceProfileExtractionPort {
   extract(input: {
     document: StructuredDocument;
     declaredDomain: string;
     subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
     admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
-    feedback?: ClaimExtractionFeedback;
-  }): Promise<ClaimExtractionResult>;
+  }): Promise<ExtractedEvidenceProfile>;
 }
 
-// Semantic claim-entailment judge (ADR-0020). A bounded, forced-tool LLM judgment
-// over ONE claim whose evidence already verifies verbatim. It answers the semantic
-// question the deterministic lexical gates got wrong: does the quoted evidence
-// actually assert this claim? Used only to DOWNGRADE a deterministically-surviving
-// claim; the verbatim floor and structural gates remain deterministic and
-// authoritative. Two claim shapes are judged by separate methods because their
-// questions differ: `judge` for a concept-to-concept typed relation in a direction,
-// `judgeDefinition` for a `defined-as` literal (the extractor PARAPHRASES the
-// definition, so no surface matcher can verify it — only entailment can).
-export interface ClaimEntailmentJudgmentPort {
+// Assertion-entailment judge (ADR-0007 reset). A bounded, forced-tool LLM judgment
+// over ONE optional typed assertion whose evidence already verifies verbatim, run
+// on an independent model family so the judge is not the extractor grading its own
+// homework. It guards ONLY the two optional typed assertions; definition and
+// mention passages face the deterministic verbatim floor alone. It can only
+// REJECT: a rejected assertion's underlying passage is preserved as an untyped
+// mention. `judgeDefinition` checks a `defines` literal (a model paraphrase no
+// surface matcher can verify); `judgePrerequisiteHint` checks whether the evidence
+// explicitly flags the subject as needed before the object Concept.
+export interface AssertionEntailmentJudgmentPort {
   readonly model: string;
-  judge(input: {
-    declaredDomain: string;
-    subject: { canonicalLabel: string; aliases: string[] };
-    predicate: RelationPredicate;
-    object: { canonicalLabel: string; aliases: string[] };
-    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
-  }): Promise<ClaimEntailmentJudgment>;
-  // Does the verbatim evidence support DEFINING the subject as this literal? The
-  // literal is model-authored prose, not a source substring; judge meaning, not
-  // wording. `entailingSpan` is the minimal source-grounded sub-quote that carries
-  // the definition.
   judgeDefinition(input: {
     declaredDomain: string;
     subject: { canonicalLabel: string; aliases: string[] };
     definition: string;
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
-  }): Promise<ClaimEntailmentJudgment>;
+  }): Promise<AssertionEntailmentJudgment>;
+  judgePrerequisiteHint(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    object: { canonicalLabel: string; aliases: string[] };
+    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
+  }): Promise<AssertionEntailmentJudgment>;
 }
 
-// Concept-vs-proposition admission judge (ADR-0021). A bounded, forced-tool LLM
+// Concept-vs-proposition admission judge (ADR-0005). A bounded, forced-tool LLM
 // judgment over ONE admitted-`core` label, run on an independent model family
-// (`kg-oracle-judge`) so the judge is not the admission extractor grading its own
-// homework. It answers the semantic question the deterministic lexical veto got
+// (`kg-independent-judge`) so the judge is not the admission extractor grading its
+// own homework. It answers the semantic question the deterministic lexical veto got
 // wrong: does this label NAME a concept, or ASSERT a claim about one? Used only
 // to DOWNGRADE a `core` candidate whose label is a proposition; it never promotes
 // or resurrects. The adapter grounds its verdict fail-closed (an ungrounded
@@ -126,9 +125,12 @@ export interface SourceRegistrationStorePort {
   listSources(): Promise<{ sourceResourceId: string; title: string; declaredDomain: string; contentType: string }[]>;
 }
 
-// Extraction Run persistence — run-scoped, never publishes (ADR-0017).
+// Extraction Run persistence — run-scoped, never publishes (ADR-0017). `persist`
+// accepts the immutable run artifact so PostgreSQL writes the run, its normalized
+// CEP evidence rows, and the artifact envelope in ONE transaction (R: no
+// authoritative relational state without its immutable artifact).
 export interface ExtractionRunStorePort {
-  persist(result: ExtractionRunResult): Promise<void>;
+  persist(result: ExtractionRunResult, artifact: ArtifactEnvelope<ExtractionRunResult>): Promise<void>;
   // Explicitly selected runs, reduced to the deterministic build read model.
   // Publication never auto-selects "latest succeeded": the operator names the
   // runs to publish, so a mechanically-valid but semantically-bad run cannot
@@ -137,7 +139,11 @@ export interface ExtractionRunStorePort {
   runsForBuildByIds(runIds: string[]): Promise<RunForBuild[]>;
 }
 
-// Atomic graph-version publication (ADR-0010). Refuses to mutate a published version.
+// Atomic graph-version publication (ADR-0010, ADR-0007 reset). Refuses to mutate a
+// published version. `publish` accepts the immutable graph-snapshot artifact so
+// PostgreSQL writes the graph-version rows, the unioned CEP evidence, and the
+// artifact envelope in ONE transaction — no authoritative relational state without
+// its immutable artifact (matches the extraction transaction in U3).
 export interface GraphVersionStorePort {
   existingConceptIdentities(): Promise<PublishedConceptIdentity[]>;
   publish(input: {
@@ -145,6 +151,7 @@ export interface GraphVersionStorePort {
     refinementConfigHash: string;
     runMemberships: { runId: string; sourceResourceId: string }[];
     refinementDecisions: RefinementDecisionRecord[];
+    artifact: ArtifactEnvelope<GraphSnapshot>;
   }): Promise<void>;
   getPublishedSnapshot(graphVersionId: string): Promise<GraphSnapshot | undefined>;
   getLatestPublishedSnapshot(): Promise<GraphSnapshot | undefined>;
@@ -161,26 +168,21 @@ export interface SourceObjectStoragePort {
 // REAL ports so Bradley-Terry / IRT-KT drop in later with no upstream change.
 // ---------------------------------------------------------------------------
 
-// Contextual embeddings as a propose-only blocking/clustering tier (ADR-0012).
-// Computed over a concept's definition + evidence text, NEVER its bare label, and
-// never an identity or merge authority — output only narrows candidate pairs and
-// forms clusters that gate which prerequisite pairs the LLM judges.
-export interface EmbeddingPort {
-  readonly model: string;
-  embed(input: { texts: string[] }): Promise<number[][]>;
-}
-
-// Bounded LLM prerequisite judgment over ONE gated, evidence-packed concept pair
-// (ADR-0019). Forced named tool schema; the application boundary validates the
-// arguments and maps "uncertain" to a flagged, path-excluded edge. The judge
-// proposes; deterministic cycle removal + transitive reduction dispose.
+// Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
+// reset). Every same-domain CEP pair is judged exhaustively — there is no
+// embedding clustering or candidate-group gate. Each side carries its published
+// CEP (definitions, bounded mentions, labeled typed assertions); an
+// explicit-prerequisite-hint is labeled evidence the judge MAY weigh, never a
+// deterministic edge or direction override (R11, KTD). Forced named tool schema;
+// the application validates arguments and maps "uncertain" to a flagged,
+// path-excluded edge. The judge proposes; cycle removal + transitive reduction
+// dispose.
 export interface PrerequisiteJudgmentPort {
   readonly model: string;
   judge(input: {
     declaredDomain: string;
-    a: { conceptId: string; canonicalLabel: string; definition?: string };
-    b: { conceptId: string; canonicalLabel: string; definition?: string };
-    evidencePacket: SourceBlock[];
+    a: PrerequisiteConceptContext;
+    b: PrerequisiteConceptContext;
   }): Promise<PrerequisiteJudgment>;
 }
 

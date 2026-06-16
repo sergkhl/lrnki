@@ -25,7 +25,13 @@ export class LiteLlmForcedToolClient {
         return await this.callOnce(input);
       } catch (error) {
         lastError = error;
-        if (attempt < maxRetries) await delay(500 * (attempt + 1));
+        if (attempt < maxRetries) {
+          // Rate limits (429) need a real cooldown window, not a 500ms blip —
+          // back off exponentially and longer than for ordinary deviations.
+          const status = error instanceof LiteLlmHttpError ? error.status : undefined;
+          const base = status === 429 ? 2000 : 500;
+          await delay(base * 2 ** attempt);
+        }
       }
     }
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
@@ -45,7 +51,7 @@ export class LiteLlmForcedToolClient {
         ...(this.options.seed !== undefined ? { seed: this.options.seed } : {})
       })
     });
-    if (!response.ok) throw new Error(`LiteLLM request failed with ${response.status}.`);
+    if (!response.ok) throw new LiteLlmHttpError(response.status);
     const payload = await response.json() as LiteLlmResponse;
     const calls = (payload.choices?.[0]?.message?.tool_calls ?? []).filter((call) => call?.function?.name === input.toolName);
     // Forced tool_choice should yield exactly one matching call; tolerate the model
@@ -54,6 +60,13 @@ export class LiteLlmForcedToolClient {
     const argumentsText = calls[0]?.function?.arguments;
     if (!argumentsText) throw new Error("Forced tool call did not include arguments.");
     return input.validator.parse(JSON.parse(argumentsText));
+  }
+}
+
+export class LiteLlmHttpError extends Error {
+  constructor(readonly status: number) {
+    super(`LiteLLM request failed with ${status}.`);
+    this.name = "LiteLlmHttpError";
   }
 }
 

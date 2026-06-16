@@ -6,7 +6,7 @@ A minimal scaffold for building a Learner-Neutral Core Concept Graph from curate
 
 - `apps/admin-lab`: minimal Next.js graph exploration lab
 - `apps/kg-worker`: graph-builder worker entrypoint scaffold
-- `packages/domain-core`: learner-neutral concepts, claims, evidence, and graph versions
+- `packages/domain-core`: learner-neutral Concepts, Concept Evidence Profiles, and graph versions
 - `packages/ports`: explicit application boundaries
 - `packages/application`: concept-first graph-build orchestration skeleton
 - `packages/infrastructure-ingestion`: structured text and HTML parser adapters
@@ -14,7 +14,6 @@ A minimal scaffold for building a Learner-Neutral Core Concept Graph from curate
 - `packages/infrastructure-postgres`: PostgreSQL schema and initial migration with JSONB artifacts and JSON_TABLE inspection view
 - `packages/infrastructure-storage-local`: local curated-source object store adapter
 - `packages/infrastructure-rdf-export`: JSON-LD export sidecar
-- `packages/quality-lab`: oracle-reference and fixture contracts
 
 ## Commands
 

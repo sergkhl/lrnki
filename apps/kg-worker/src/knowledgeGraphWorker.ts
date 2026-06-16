@@ -18,11 +18,10 @@ import {
 } from "@lrnki/infrastructure-ingestion";
 import {
   LiteLlmAdmissionLabelJudgmentAdapter,
-  LiteLlmClaimEntailmentJudgmentAdapter,
-  LiteLlmClaimExtractionAdapter,
+  LiteLlmAssertionEntailmentJudgmentAdapter,
+  LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmConceptDiscoveryAdapter,
-  LiteLlmEmbeddingAdapter,
   LiteLlmForcedToolClient,
   LiteLlmPrerequisiteJudgmentAdapter
 } from "@lrnki/infrastructure-litellm";
@@ -38,7 +37,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "gate1-deepseek-v4-flash-no-thinking-admission-label-judge-v29";
+const PIPELINE_CONFIG_HASH = "cep-reset-deepseek-v4-flash-no-thinking-atomic-admission-source-role-v31";
 
 import { existsSync } from "node:fs";
 
@@ -69,7 +68,7 @@ function buildContext() {
     new TextStructuredDocumentParser(),
     // Mixed-format ingestion (Gate 2, ADR-0013). The image tag is pinned in the
     // parser config hash so the layout contract is reproducible across the
-    // frozen oracle suite; bump DOCLING_IMAGE_TAG when docker/Dockerfile changes.
+    // curated source suite; bump DOCLING_IMAGE_TAG when docker/Dockerfile changes.
     new DoclingStructuredDocumentParser({
       baseUrl: process.env.DOCLING_BASE_URL ?? "http://localhost:5001",
       imageTag: process.env.DOCLING_IMAGE_TAG ?? "docling-serve-cpu-v1.23.0+docling-2.102.1"
@@ -102,19 +101,20 @@ function buildContext() {
     parsers,
     discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
     admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
-    claimExtraction: new LiteLlmClaimExtractionAdapter(deterministicClient),
-    // Semantic claim-entailment judge (ADR-0020). Independent model (Mistral
-    // Small via kg-oracle-judge) so the judge is not the extractor re-grading
-    // itself; deterministic decoding for stable re-derivation.
-    claimEntailmentJudge: new LiteLlmClaimEntailmentJudgmentAdapter(deterministicClient),
-    // Concept-vs-proposition admission judge (ADR-0021). Same independent family
-    // (kg-oracle-judge) and deterministic decoding; downgrade-only stage that
-    // replaces the removed looksLikePropositionLabel lexical veto.
+    evidenceProfileExtraction: new LiteLlmEvidenceProfileExtractionAdapter(deterministicClient),
+    // Assertion-entailment judge (ADR-0007 reset). Independent production judge
+    // (gpt-oss-120b via kg-independent-judge) so the judge is not the extractor
+    // re-grading itself; deterministic decoding for stable re-derivation. Guards
+    // only the optional typed assertions inside a Concept Evidence Profile.
+    assertionEntailmentJudge: new LiteLlmAssertionEntailmentJudgmentAdapter(deterministicClient),
+    // Concept-vs-proposition admission judge (ADR-0005). Same independent
+    // production judge (kg-independent-judge) and deterministic decoding;
+    // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
-    // Graph Enrichment ports (ADR-0019). Embedding clusters/gates pairs; the
-    // bounded judge proposes the inferred DAG (deterministic decoding for stable
-    // re-derivation); difficulty + learner state are mocks behind real ports.
-    embedding: new LiteLlmEmbeddingAdapter(baseClient),
+    // Graph Enrichment ports (ADR-0019 reset). Every same-domain CEP pair is judged
+    // exhaustively — no embedding clustering tier; the bounded judge proposes the
+    // inferred DAG (deterministic decoding for stable re-derivation); difficulty +
+    // learner state are mocks behind real ports.
     prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
     difficulty: dagDepthDifficultyPort,
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
@@ -167,34 +167,47 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
       pipelineConfigHash: PIPELINE_CONFIG_HASH,
       discovery: ctx.discovery,
       admission: ctx.admission,
-      claimExtraction: ctx.claimExtraction,
-      claimEntailmentJudge: ctx.claimEntailmentJudge,
+      evidenceProfileExtraction: ctx.evidenceProfileExtraction,
+      assertionEntailmentJudge: ctx.assertionEntailmentJudge,
       admissionLabelJudge: ctx.admissionLabelJudge,
-      store: ctx.runStore,
-      artifacts: ctx.artifacts
+      store: ctx.runStore
     });
     const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
-    const verified = result.claims.filter((claim) => claim.validationOutcome === "verified").length;
-    const rejected = result.claims.length - verified;
-    console.log(`   candidates=${result.candidates.length} core=${core} claims(verified/rejected)=${verified}/${rejected} proposals=${result.proposals.length} latency=${result.latencyMs}ms`);
+    const profiles = result.evidenceProfiles;
+    const incomplete = profiles.filter((profile) => !profile.complete).length;
+    const definitions = profiles.reduce((sum, profile) => sum + profile.definitions.length, 0);
+    const mentions = profiles.reduce((sum, profile) => sum + profile.mentions.length, 0);
+    const assertions = profiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
+    console.log(`   status=${result.status} candidates=${result.candidates.length} core=${core} CEPs=${profiles.length}(incomplete=${incomplete}) defs=${definitions} mentions=${mentions} assertions=${assertions} latency=${result.latencyMs}ms`);
   }
 }
 
-async function buildVersion(ctx: Context, runIds: string[]) {
+async function buildVersion(ctx: Context, args: string[]) {
   // Publication selects Extraction Runs explicitly by id. A run passing the
   // mechanical/evidence gates ('succeeded') is not automatically publishable —
   // the operator must name the runs they inspected and judged sound, so a
   // semantically-bad-but-valid run never silently mutates the graph (AGENTS
-  // rule 11; ADR-0017 builds are a pure function of the selected runs).
+  // rule 11; ADR-0017 builds are a pure function of the base version + runs).
+  // `--base <graphVersionId>` extends a published version, unioning its CEP
+  // evidence with the newly selected runs (ADR-0007 reset R3); omit it for the
+  // initial build.
+  let baseGraphVersionId: string | null = null;
+  const runIds: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--base") { baseGraphVersionId = args[++i] ?? null; continue; }
+    runIds.push(args[i]);
+  }
   if (runIds.length === 0) {
     console.error("! build-graph-version requires one or more explicit run IDs (no automatic 'latest succeeded' selection).");
-    console.error("  Inspect runs first, then: worker:kg build-graph-version <runId> [<runId> ...]");
+    console.error("  Inspect runs first, then: worker:kg build-graph-version [--base <graphVersionId>] <runId> [<runId> ...]");
     process.exitCode = 1;
     return;
   }
   const graphVersionId = randomUUID();
-  const snapshot = await buildGraphVersion({ graphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, artifacts: ctx.artifacts });
-  console.log(`\n>> published graph version ${graphVersionId} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} claims=${snapshot.claims.length}`);
+  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore });
+  const passages = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
+  const assertions = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
+  console.log(`\n>> published graph version ${graphVersionId}${baseGraphVersionId ? ` (base ${baseGraphVersionId})` : ""} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
 }
 
 async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
@@ -217,7 +230,6 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     enrichmentId,
     graphVersionId: targetVersionId,
     graphStore: ctx.graphStore,
-    embedding: ctx.embedding,
     prerequisiteJudge: ctx.prerequisiteJudge,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore
@@ -225,7 +237,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
   const certain = layer.prerequisiteEdges.filter((edge) => !edge.uncertain).length;
   const uncertain = layer.prerequisiteEdges.length - certain;
   console.log(
-    `   candidateGroups=${layer.prerequisiteCandidateGroups.length} edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} embedding=${layer.embeddingModel} judge=${layer.judgeModel}`
+    `   edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} judge=${layer.judgeModel}`
   );
   for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
     console.log(`   edge: ${edge.prerequisiteConceptId} -> ${edge.dependentConceptId} (conf=${edge.confidence.toFixed(2)})`);

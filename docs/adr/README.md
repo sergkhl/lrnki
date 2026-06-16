@@ -4,20 +4,19 @@
 - [0002-define-learner-neutral-core-concept-graph](./0002-define-learner-neutral-core-concept-graph.md)
 - [0003-use-postgres-json-table-artifact-store](./0003-use-postgres-json-table-artifact-store.md)
 - [0004-normalize-curated-sources](./0004-normalize-curated-sources.md)
-- [0005-admit-concepts-before-claims](./0005-admit-concepts-before-claims.md) — proposition-label demotion superseded by 0021
+- [0005-admit-atomic-concepts-before-evidence-profiles](./0005-admit-concepts-before-claims.md)
 - [0006-use-forced-named-tool-schemas](./0006-use-forced-named-tool-schemas.md)
-- [0007-extract-claims-in-concept-context](./0007-extract-claims-in-concept-context.md) — lexical-entailment validation superseded in part by 0020
+- [0007-extract-concept-evidence-profiles-in-concept-context](./0007-extract-claims-in-concept-context.md)
 - [0008-use-rdf-compatible-boundary](./0008-use-rdf-compatible-boundary.md)
 - [0009-apply-conservative-refinement](./0009-apply-conservative-refinement.md)
 - [0010-publish-static-graph-versions-atomically](./0010-publish-static-graph-versions-atomically.md)
 - [0011-retain-minimal-admin-lab](./0011-retain-minimal-admin-lab.md)
-- [0012-embeddings-as-cascading-blocking-tier](./0012-measure-embedding-sidecars.md)
-- [0013-use-mixed-format-oracle-suite](./0013-use-mixed-format-oracle-suite.md)
+- [0012-remove-embeddings-deterministic-identity-only](./0012-measure-embedding-sidecars.md)
+- [0013-verify-quality-by-real-source-inspection](./0013-use-mixed-format-oracle-suite.md)
 - [0014-defer-learner-modeling](./0014-defer-learner-modeling.md)
 - [0015-deterministic-cross-source-identity](./0015-deterministic-cross-source-identity.md)
-- [0016-closed-six-relation-registry](./0016-closed-six-relation-registry.md)
+- [0016-retire-relation-registry-keep-two-cep-assertions](./0016-closed-six-relation-registry.md)
 - [0017-split-extraction-runs-from-graph-version-builds](./0017-split-extraction-runs-from-graph-version-builds.md)
 - [0018-deterministic-extraction-sampling](./0018-deterministic-extraction-sampling.md)
 - [0019-graph-enrichment-derived-layer](./0019-graph-enrichment-derived-layer.md)
-- [0020-semantic-claim-entailment-judge](./0020-semantic-claim-entailment-judge.md) — supersedes the lexical-entailment portion of 0007
-- [0021-measured-concept-vs-proposition-admission-judge](./0021-measured-concept-vs-proposition-admission-judge.md) — supersedes the proposition-label portion of 0005
+- [0022-retire-measured-label-aligner](./0022-measured-label-aligner-for-oracle-scoring.md) — one-time Gate 2 scoring aid, retired with the oracle harness; never changed graph identity (0015)

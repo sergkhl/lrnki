@@ -4,7 +4,7 @@ Stable English-language sources for integration quality runs. Generated artifact
 
 ## Canonical fixture matrix
 
-Two gates (decided 2026-06-11): Gate 1 exercises the full pipeline through native parsers across three domains; Gate 2 adds Docling formats and freezes the ADR-0013 oracle suite.
+Two gates (decided 2026-06-11): Gate 1 exercises the full pipeline through native parsers across three domains; Gate 2 adds Docling mixed formats. Quality is judged by representative real-source inspection (rule-14), not a standing oracle benchmark — the off-core oracle triangle and label aligner were retired after the admission-precision fix (ADR-0013/0022).
 
 ### Gate 1 — first real-use quality run (native parsers)
 
@@ -20,7 +20,7 @@ Each fixture file is pure source content. Declared Domain (ADR-0015) and provena
 `fixtures/manifest.json`, which `worker:kg register-from-manifest` reads — never parsed from file
 content, so the content hash stays stable.
 
-### Gate 2 — frozen mixed-format oracle suite (adds Docling)
+### Gate 2 — mixed-format curated suite (adds Docling)
 
 | # | Source | Domain | Format | License | Status |
 |---|--------|--------|--------|---------|--------|

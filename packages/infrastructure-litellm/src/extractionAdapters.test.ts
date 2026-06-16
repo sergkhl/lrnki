@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmClaimEntailmentJudgmentAdapter } from "./extractionAdapters";
+import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmAssertionEntailmentJudgmentAdapter } from "./extractionAdapters";
 import { admissionLabelJudgmentValidator } from "./toolSchemas";
 
 function adapterReturning(result: {
@@ -17,7 +17,7 @@ function adapterReturning(result: {
       return result;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmClaimEntailmentJudgmentAdapter(client);
+  return new LiteLlmAssertionEntailmentJudgmentAdapter(client);
 }
 
 const generalizationInput = {
@@ -78,7 +78,7 @@ test("definition judge rejects a definition of a qualified variant", async () =>
   assert.equal(result.entailed, false);
 });
 
-// --- Concept-vs-proposition admission judge (ADR-0021) --------------------
+// --- Concept-vs-proposition admission judge (ADR-0005) --------------------
 
 function admissionAdapterReturning(result: {
   labelKind: "concept" | "proposition_or_claim";

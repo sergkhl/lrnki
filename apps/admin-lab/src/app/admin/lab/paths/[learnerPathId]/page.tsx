@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { LearnerPathExplorer } from "@/components/LearnerPathExplorer";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { getLearnerPathDetail } from "@/lib/learnerPaths";
 
 export const dynamic = "force-dynamic";
@@ -17,10 +17,10 @@ export default async function LearnerPathDetailPage({
   return (
     <AdminShell active="paths">
       <div className="mb-4">
-        <Button variant="ghost" size="sm" render={<Link href="/admin/lab/paths" />}>
+        <Link className={buttonVariants({ variant: "ghost", size: "sm" })} href="/admin/lab/paths">
           <ArrowLeftIcon data-icon="inline-start" />
           All learner paths
-        </Button>
+        </Link>
       </div>
       <LearnerPathExplorer detail={detail} />
     </AdminShell>

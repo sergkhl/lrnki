@@ -37,20 +37,6 @@ export const sourceBlocks = pgTable("source_blocks", {
 });
 
 // ---------------------------------------------------------------------------
-// Closed relation registry (ADR-0016) — models choose, humans extend.
-// ---------------------------------------------------------------------------
-
-export const relationDefinitions = pgTable("relation_definitions", {
-  relationDefinitionId: uuid("relation_definition_id").primaryKey(),
-  iri: text("iri").notNull().unique(),
-  predicate: text("predicate").notNull().unique(),
-  description: text("description").notNull(),
-  // "concept" => concept-to-concept; "literal" => concept-to-literal.
-  objectKind: text("object_kind").notNull(),
-  constraints: jsonb("constraints").notNull()
-});
-
-// ---------------------------------------------------------------------------
 // Extraction Runs — per-source, LLM-heavy, run-scoped, never publish (ADR-0017)
 // ---------------------------------------------------------------------------
 
@@ -101,50 +87,55 @@ export const conceptAdmissionDecisions = pgTable("concept_admission_decisions", 
   confidence: real("confidence").notNull()
 });
 
-// Run-scoped claims reference admitted CANDIDATES, not published concepts.
-export const runClaims = pgTable("run_claims", {
-  runClaimId: uuid("run_claim_id").primaryKey(),
+// Run-scoped Concept Evidence Profiles (ADR-0007 reset). One per admitted atomic
+// Concept; references the run-local CANDIDATE, never a published concept. Replaces
+// run_claims. `complete` is true only when a verified definition passage survives.
+export const runConceptEvidenceProfiles = pgTable("run_concept_evidence_profiles", {
+  runConceptEvidenceProfileId: uuid("run_concept_evidence_profile_id").primaryKey(),
   runId: uuid("run_id").notNull().references(() => extractionRuns.runId),
-  subjectCandidateId: uuid("subject_candidate_id").notNull().references(() => conceptCandidates.conceptCandidateId),
-  predicate: text("predicate").notNull().references(() => relationDefinitions.predicate),
-  // For concept-objects, objectCandidateId is set; for literal-objects, objectLiteral holds value/datatype.
-  objectKind: text("object_kind").notNull(),
-  objectCandidateId: uuid("object_candidate_id").references(() => conceptCandidates.conceptCandidateId),
-  objectLiteral: jsonb("object_literal"),
-  // Raw signals (no composite edge-confidence): model confidence, evidence count, validation outcome.
-  modelConfidence: real("model_confidence").notNull(),
-  evidenceCount: integer("evidence_count").notNull(),
-  validationOutcome: text("validation_outcome").notNull(),
-  boundaryReasonCodes: jsonb("boundary_reason_codes").notNull(),
-  extractionAttempt: integer("extraction_attempt").notNull(),
+  conceptCandidateId: uuid("concept_candidate_id").notNull().references(() => conceptCandidates.conceptCandidateId),
+  tier: text("tier").notNull(),
+  complete: boolean("complete").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+}, (table) => [unique().on(table.runId, table.conceptCandidateId)]);
+
+// Definition and mention passages — both are verbatim source quotes. `kind`
+// separates them; `salienceRank` preserves the neural order for mentions.
+export const runEvidencePassages = pgTable("run_evidence_passages", {
+  runEvidencePassageId: uuid("run_evidence_passage_id").primaryKey(),
+  runConceptEvidenceProfileId: uuid("run_concept_evidence_profile_id").notNull().references(() => runConceptEvidenceProfiles.runConceptEvidenceProfileId),
+  kind: text("kind").notNull(),
+  sourceBlockId: uuid("source_block_id").notNull().references(() => sourceBlocks.sourceBlockId),
+  evidenceQuote: text("evidence_quote").notNull(),
+  salienceRank: integer("salience_rank").notNull()
 });
 
-export const runClaimEvidence = pgTable("run_claim_evidence", {
-  runClaimEvidenceId: uuid("run_claim_evidence_id").primaryKey(),
-  runClaimId: uuid("run_claim_id").notNull().references(() => runClaims.runClaimId),
+// Optional typed assertions — guarded evidence, never edges. `defines` carries a
+// literal; `explicit-prerequisite-hint` references an admitted Concept candidate.
+export const runOptionalAssertions = pgTable("run_optional_assertions", {
+  runOptionalAssertionId: uuid("run_optional_assertion_id").primaryKey(),
+  runConceptEvidenceProfileId: uuid("run_concept_evidence_profile_id").notNull().references(() => runConceptEvidenceProfiles.runConceptEvidenceProfileId),
+  assertionType: text("assertion_type").notNull(),
+  literalValue: text("literal_value"),
+  objectCandidateId: uuid("object_candidate_id").references(() => conceptCandidates.conceptCandidateId)
+});
+
+export const runOptionalAssertionEvidence = pgTable("run_optional_assertion_evidence", {
+  runOptionalAssertionEvidenceId: uuid("run_optional_assertion_evidence_id").primaryKey(),
+  runOptionalAssertionId: uuid("run_optional_assertion_id").notNull().references(() => runOptionalAssertions.runOptionalAssertionId),
   sourceBlockId: uuid("source_block_id").notNull().references(() => sourceBlocks.sourceBlockId),
   evidenceQuote: text("evidence_quote").notNull()
-});
-
-// Missing-concept proposals: claim-extractor escape hatch, inspected in Admin Lab only.
-export const missingConceptProposals = pgTable("missing_concept_proposals", {
-  missingConceptProposalId: uuid("missing_concept_proposal_id").primaryKey(),
-  runId: uuid("run_id").notNull().references(() => extractionRuns.runId),
-  proposedLabel: text("proposed_label").notNull(),
-  rationale: text("rationale").notNull(),
-  sourceBlockId: uuid("source_block_id").references(() => sourceBlocks.sourceBlockId),
-  evidenceQuote: text("evidence_quote"),
-  extractionAttempt: integer("extraction_attempt").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
 });
 
 // ---------------------------------------------------------------------------
 // Graph-Version Builds — deterministic, LLM-free, atomic (ADR-0010, ADR-0017)
 // ---------------------------------------------------------------------------
 
+// Each published version names the base version it extends (ADR-0007 reset R3);
+// baseGraphVersionId is null only for the initial build.
 export const graphVersions = pgTable("graph_versions", {
   graphVersionId: uuid("graph_version_id").primaryKey(),
+  baseGraphVersionId: uuid("base_graph_version_id"),
   status: text("status").notNull(),
   refinementConfigHash: text("refinement_config_hash").notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true })
@@ -182,25 +173,47 @@ export const graphVersionRunMemberships = pgTable("graph_version_run_memberships
   sourceResourceId: uuid("source_resource_id").notNull().references(() => sourceResources.sourceResourceId)
 }, (table) => [unique().on(table.graphVersionId, table.runId)]);
 
-export const publishedClaims = pgTable("published_claims", {
-  publishedClaimId: uuid("published_claim_id").primaryKey(),
+// Published Concept Evidence Profiles (ADR-0007 reset) replace published claims.
+// One CEP per Concept per graph version; a published snapshot has ZERO asserted
+// edges (R5). Evidence is the cumulative union of the base version plus the newly
+// selected runs, exact-deduplicated (R3, AE2).
+export const graphVersionConceptEvidenceProfiles = pgTable("graph_version_concept_evidence_profiles", {
+  graphVersionConceptEvidenceProfileId: uuid("graph_version_concept_evidence_profile_id").primaryKey(),
   graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
-  subjectConceptId: uuid("subject_concept_id").notNull().references(() => concepts.conceptId),
-  predicate: text("predicate").notNull().references(() => relationDefinitions.predicate),
-  objectKind: text("object_kind").notNull(),
-  objectConceptId: uuid("object_concept_id").references(() => concepts.conceptId),
-  objectLiteral: jsonb("object_literal"),
-  trustTier: text("trust_tier").notNull(),
-  modelConfidence: real("model_confidence").notNull(),
-  evidenceCount: integer("evidence_count").notNull(),
-  contradictionState: text("contradiction_state").notNull()
+  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId)
+}, (table) => [unique().on(table.graphVersionId, table.conceptId)]);
+
+// Definition and mention passages — verbatim source quotes with full provenance
+// (R2). `kind` separates them; `salienceRank` preserves the published order.
+export const graphVersionEvidencePassages = pgTable("graph_version_evidence_passages", {
+  graphVersionEvidencePassageId: uuid("graph_version_evidence_passage_id").primaryKey(),
+  graphVersionConceptEvidenceProfileId: uuid("graph_version_concept_evidence_profile_id").notNull().references(() => graphVersionConceptEvidenceProfiles.graphVersionConceptEvidenceProfileId),
+  kind: text("kind").notNull(),
+  sourceResourceId: uuid("source_resource_id").notNull().references(() => sourceResources.sourceResourceId),
+  sourceBlockId: uuid("source_block_id").notNull().references(() => sourceBlocks.sourceBlockId),
+  evidenceQuote: text("evidence_quote").notNull(),
+  headingPath: jsonb("heading_path").notNull(),
+  locator: jsonb("locator").notNull(),
+  salienceRank: integer("salience_rank").notNull()
 });
 
-export const publishedClaimEvidence = pgTable("published_claim_evidence", {
-  publishedClaimEvidenceId: uuid("published_claim_evidence_id").primaryKey(),
-  publishedClaimId: uuid("published_claim_id").notNull().references(() => publishedClaims.publishedClaimId),
+// Optional typed assertions — guarded evidence inside a CEP, never edges (R6).
+export const graphVersionOptionalAssertions = pgTable("graph_version_optional_assertions", {
+  graphVersionOptionalAssertionId: uuid("graph_version_optional_assertion_id").primaryKey(),
+  graphVersionConceptEvidenceProfileId: uuid("graph_version_concept_evidence_profile_id").notNull().references(() => graphVersionConceptEvidenceProfiles.graphVersionConceptEvidenceProfileId),
+  assertionType: text("assertion_type").notNull(),
+  literalValue: text("literal_value"),
+  objectConceptId: uuid("object_concept_id").references(() => concepts.conceptId)
+});
+
+export const graphVersionOptionalAssertionEvidence = pgTable("graph_version_optional_assertion_evidence", {
+  graphVersionOptionalAssertionEvidenceId: uuid("graph_version_optional_assertion_evidence_id").primaryKey(),
+  graphVersionOptionalAssertionId: uuid("graph_version_optional_assertion_id").notNull().references(() => graphVersionOptionalAssertions.graphVersionOptionalAssertionId),
+  sourceResourceId: uuid("source_resource_id").notNull().references(() => sourceResources.sourceResourceId),
   sourceBlockId: uuid("source_block_id").notNull().references(() => sourceBlocks.sourceBlockId),
-  evidenceQuote: text("evidence_quote").notNull()
+  evidenceQuote: text("evidence_quote").notNull(),
+  headingPath: jsonb("heading_path").notNull(),
+  locator: jsonb("locator").notNull()
 });
 
 export const refinementDecisions = pgTable("refinement_decisions", {
@@ -235,9 +248,9 @@ export const artifactVersions = pgTable("artifact_versions", {
 // version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
 // asserted core. Normalized rows below are the query/traversal surface; the
 // immutable replay copy is an `artifact_versions` envelope (artifact_type
-// 'enrichment_run.v2', graph_version_id set). Inferred relations live in their
-// OWN namespace and intentionally do NOT reference relation_definitions, whose
-// closed asserted registry (ADR-0016) the published_claims FK enforces.
+// 'enrichment_run.v2', graph_version_id set). Inferred prerequisite edges are the
+// ONLY edges in the system: the published asserted layer carries Concepts plus CEPs
+// and no edges at all (ADR-0007 reset, R5).
 // ---------------------------------------------------------------------------
 
 export const graphEnrichments = pgTable("graph_enrichments", {
@@ -245,20 +258,11 @@ export const graphEnrichments = pgTable("graph_enrichments", {
   graphVersionId: uuid("graph_version_id").notNull().references(() => graphVersions.graphVersionId),
   enrichmentConfigHash: text("enrichment_config_hash").notNull(),
   status: text("status").notNull(),
-  embeddingModel: text("embedding_model").notNull(),
   judgeModel: text("judge_model").notNull(),
   difficultyMethod: text("difficulty_method").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true })
 });
-
-// Prerequisite Candidate Selection groups. These never decide Concept identity.
-export const enrichmentPrerequisiteCandidateGroups = pgTable("enrichment_prerequisite_candidate_groups", {
-  enrichmentPrerequisiteCandidateGroupId: uuid("enrichment_prerequisite_candidate_group_id").primaryKey(),
-  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
-  groupId: text("group_id").notNull(),
-  conceptId: uuid("concept_id").notNull().references(() => concepts.conceptId)
-}, (table) => [unique().on(table.enrichmentId, table.conceptId)]);
 
 // The inferred prerequisite DAG: prerequisite must precede dependent. Survives
 // only after deterministic cycle removal + transitive reduction + weak-edge cut.
@@ -274,7 +278,6 @@ export const inferredPrerequisiteEdges = pgTable("inferred_prerequisite_edges", 
   dependentConceptId: uuid("dependent_concept_id").notNull().references(() => concepts.conceptId),
   confidence: real("confidence").notNull(),
   uncertain: boolean("uncertain").notNull().default(false),
-  candidateGroupId: text("candidate_group_id"),
   provenance: jsonb("provenance").notNull()
 }, (table) => [unique().on(table.enrichmentId, table.prerequisiteConceptId, table.dependentConceptId)]);
 

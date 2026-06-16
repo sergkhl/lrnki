@@ -7,6 +7,7 @@ import { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 function candidate(tier: CandidateTier = "core", overrides: Partial<RunCandidate> = {}): RunCandidate {
   return {
     candidateKey: "operator-set",
+    parentCandidateKey: "operator-set",
     discoveredLabel: "Operator Set",
     canonicalLabel: "Operator Set as Bottleneck to Performance",
     normalizedLabel: "operator set as bottleneck to performance",
@@ -15,6 +16,7 @@ function candidate(tier: CandidateTier = "core", overrides: Partial<RunCandidate
     admission: {
       modelTier: "core",
       tier,
+      sourceRole: "declared_domain_concept",
       proposedCanonicalLabel: "Operator Set as Bottleneck to Performance",
       standaloneLearningObjective: { modelPassed: true, passed: true, rationale: "", submittedEvidence: [], evidence: [] },
       establishedDomainMeaning: { modelPassed: true, passed: true, rationale: "", submittedEvidence: [], evidence: [] },

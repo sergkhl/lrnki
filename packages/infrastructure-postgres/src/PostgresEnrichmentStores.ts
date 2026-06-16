@@ -6,8 +6,7 @@ import type {
   EnrichmentRunTrace,
   InferredPrerequisiteEdge,
   LearnerPath,
-  LearnerPathStep,
-  PrerequisiteCandidateGroup
+  LearnerPathStep
 } from "@lrnki/domain-core";
 import type { EnrichmentRunStorePort, LearnerPathStorePort } from "@lrnki/ports";
 import type { Sql } from "postgres";
@@ -26,21 +25,13 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
     const difficultyMethod = layer.difficulties[0]?.method ?? "dag-depth-mock";
     await this.sql.begin(async (tx) => {
       await tx`
-        INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, embedding_model, judge_model, difficulty_method, completed_at)
-        VALUES (${layer.enrichmentId}, ${layer.graphVersionId}, ${layer.enrichmentConfigHash}, 'succeeded', ${layer.embeddingModel}, ${layer.judgeModel}, ${difficultyMethod}, now())`;
-
-      for (const group of layer.prerequisiteCandidateGroups) {
-        for (const conceptId of group.conceptIds) {
-          await tx`
-            INSERT INTO enrichment_prerequisite_candidate_groups (enrichment_prerequisite_candidate_group_id, enrichment_id, group_id, concept_id)
-            VALUES (${randomUUID()}, ${layer.enrichmentId}, ${group.groupId}, ${conceptId})`;
-        }
-      }
+        INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method, completed_at)
+        VALUES (${layer.enrichmentId}, ${layer.graphVersionId}, ${layer.enrichmentConfigHash}, 'succeeded', ${layer.judgeModel}, ${difficultyMethod}, now())`;
 
       for (const edge of layer.prerequisiteEdges) {
         await tx`
-          INSERT INTO inferred_prerequisite_edges (inferred_prerequisite_edge_id, enrichment_id, predicate, prerequisite_concept_id, dependent_concept_id, confidence, uncertain, candidate_group_id, provenance)
-          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteConceptId}, ${edge.dependentConceptId}, ${edge.confidence}, ${edge.uncertain}, ${edge.candidateGroupId ?? null}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
+          INSERT INTO inferred_prerequisite_edges (inferred_prerequisite_edge_id, enrichment_id, predicate, prerequisite_concept_id, dependent_concept_id, confidence, uncertain, provenance)
+          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteConceptId}, ${edge.dependentConceptId}, ${edge.confidence}, ${edge.uncertain}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
       }
 
       for (const difficulty of layer.difficulties) {
@@ -55,7 +46,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
   async getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined> {
     const rows = await this.sql<EnrichmentRow[]>`
-      SELECT enrichment_id, graph_version_id, enrichment_config_hash, embedding_model, judge_model
+      SELECT enrichment_id, graph_version_id, enrichment_config_hash, judge_model
       FROM graph_enrichments
       WHERE enrichment_id = ${enrichmentId}
       LIMIT 1`;
@@ -63,26 +54,12 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
   }
 
   private async hydrate(row: EnrichmentRow): Promise<DerivedGraphLayer> {
-    const groupRows = await this.sql<{ group_id: string; concept_id: string }[]>`
-      SELECT group_id, concept_id FROM enrichment_prerequisite_candidate_groups WHERE enrichment_id = ${row.enrichment_id} ORDER BY group_id, concept_id`;
-    const conceptsByGroup = new Map<string, string[]>();
-    for (const group of groupRows) {
-      const existing = conceptsByGroup.get(group.group_id);
-      if (existing) existing.push(group.concept_id);
-      else conceptsByGroup.set(group.group_id, [group.concept_id]);
-    }
-    const prerequisiteCandidateGroups: PrerequisiteCandidateGroup[] = [...conceptsByGroup.entries()].map(([groupId, conceptIds]) => ({
-      groupId,
-      conceptIds,
-      embeddingModel: row.embedding_model
-    }));
-
     const edgeRows = await this.sql<{
       predicate: string; prerequisite_concept_id: string; dependent_concept_id: string;
-      confidence: number; uncertain: boolean; candidate_group_id: string | null;
+      confidence: number; uncertain: boolean;
       provenance: InferredPrerequisiteEdge["provenance"];
     }[]>`
-      SELECT predicate, prerequisite_concept_id, dependent_concept_id, confidence, uncertain, candidate_group_id, provenance
+      SELECT predicate, prerequisite_concept_id, dependent_concept_id, confidence, uncertain, provenance
       FROM inferred_prerequisite_edges WHERE enrichment_id = ${row.enrichment_id}
       ORDER BY prerequisite_concept_id, dependent_concept_id`;
     const prerequisiteEdges: InferredPrerequisiteEdge[] = edgeRows.map((edge) => ({
@@ -91,7 +68,6 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       predicate: edge.predicate as InferredPrerequisiteEdge["predicate"],
       confidence: edge.confidence,
       uncertain: edge.uncertain,
-      candidateGroupId: edge.candidate_group_id ?? undefined,
       provenance: edge.provenance
     }));
 
@@ -108,9 +84,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       enrichmentId: row.enrichment_id,
       graphVersionId: row.graph_version_id,
       enrichmentConfigHash: row.enrichment_config_hash,
-      embeddingModel: row.embedding_model,
       judgeModel: row.judge_model,
-      prerequisiteCandidateGroups,
       prerequisiteEdges,
       difficulties
     };
@@ -121,7 +95,6 @@ type EnrichmentRow = {
   enrichment_id: string;
   graph_version_id: string;
   enrichment_config_hash: string;
-  embedding_model: string;
   judge_model: string;
 };
 
