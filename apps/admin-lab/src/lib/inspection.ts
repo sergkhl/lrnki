@@ -66,6 +66,7 @@ export interface RunInspection {
     proposedCanonicalLabel: string;
     standaloneLearningObjective: RunCandidate["admission"]["standaloneLearningObjective"];
     establishedDomainMeaning: RunCandidate["admission"]["establishedDomainMeaning"];
+    definitionBearingTreatment: RunCandidate["admission"]["definitionBearingTreatment"];
     organizingPower: RunCandidate["admission"]["organizingPower"];
     coreSelected: boolean;
     selectionReasonCode: string;
@@ -161,6 +162,7 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
       proposed_canonical_label: string;
       standalone_learning_objective: RunCandidate["admission"]["standaloneLearningObjective"];
       established_domain_meaning: RunCandidate["admission"]["establishedDomainMeaning"];
+      definition_bearing_treatment: RunCandidate["admission"]["definitionBearingTreatment"];
       organizing_power: RunCandidate["admission"]["organizingPower"];
       core_selected: boolean;
       selection_reason_code: string;
@@ -170,7 +172,7 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
     }[]>`
       SELECT candidate_key, discovered_label, canonical_label, aliases, mention_count,
              model_tier, tier, proposed_canonical_label, standalone_learning_objective,
-             established_domain_meaning, organizing_power, core_selected,
+             established_domain_meaning, definition_bearing_treatment, organizing_power, core_selected,
              selection_reason_code, reason_codes,
              boundary_reason_codes, confidence
       FROM artifact_run_candidates WHERE run_id = ${runId}
@@ -225,6 +227,7 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
         proposedCanonicalLabel: row.proposed_canonical_label,
         standaloneLearningObjective: row.standalone_learning_objective,
         establishedDomainMeaning: row.established_domain_meaning,
+        definitionBearingTreatment: row.definition_bearing_treatment,
         organizingPower: row.organizing_power,
         coreSelected: row.core_selected,
         selectionReasonCode: row.selection_reason_code,

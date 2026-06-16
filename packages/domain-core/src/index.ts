@@ -181,6 +181,14 @@ export type AdmissionProposal = {
   sourceRole: AdmissionSourceRole;
   standaloneLearningObjective: AdmissionCriterionProposal;
   establishedDomainMeaning: AdmissionCriterionProposal;
+  // Fourth core-eligibility criterion (ADR-0005 refinement, KTD1): the source gives
+  // the atom DEFINITION-BEARING treatment — a passage that establishes the concept's
+  // meaning, distinct from a bare mention. The model judges this; the application
+  // boundary verifies the cited passage verbatim (like the other criteria) and gates
+  // `core` on it. NOT a lexical copula or "X is Y" matcher — a definition passage need
+  // not use a copula (AGENTS rule 16). The verified evidence is carried into CEP
+  // extraction (U2) so the admission-proven definition is not lost under fan-out.
+  definitionBearingTreatment: AdmissionCriterionProposal;
   organizingPower: OrganizingPowerProposal;
   coreSelected: boolean;
   selectionReasonCode: CoreSelectionReasonCode;
@@ -326,6 +334,15 @@ export type RunCandidate = {
       evidence: BlockEvidence[];
     };
     establishedDomainMeaning: {
+      modelPassed: boolean;
+      passed: boolean;
+      rationale: string;
+      submittedEvidence: BlockEvidence[];
+      evidence: BlockEvidence[];
+    };
+    // Validated definition-bearing-treatment criterion (KTD1). `evidence` holds the
+    // verbatim-verified definition passages; U2 carries them into CEP extraction.
+    definitionBearingTreatment: {
       modelPassed: boolean;
       passed: boolean;
       rationale: string;

@@ -20,6 +20,7 @@ function candidate(tier: CandidateTier = "core", overrides: Partial<RunCandidate
       proposedCanonicalLabel: "Operator Set as Bottleneck to Performance",
       standaloneLearningObjective: { modelPassed: true, passed: true, rationale: "", submittedEvidence: [], evidence: [] },
       establishedDomainMeaning: { modelPassed: true, passed: true, rationale: "", submittedEvidence: [], evidence: [] },
+      definitionBearingTreatment: { modelPassed: true, passed: true, rationale: "", submittedEvidence: [], evidence: [] },
       organizingPower: { modelPassed: true, passed: true, rationale: "", submittedAspects: [], aspects: [] },
       coreSelected: true,
       selectionReasonCode: "source_level_core",

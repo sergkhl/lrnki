@@ -74,6 +74,7 @@ function candidate(candidateKey: string, label: string, tier: "core" | "optional
       modelTier: tier, tier, sourceRole: "declared_domain_concept" as const, proposedCanonicalLabel: label,
       standaloneLearningObjective: { modelPassed: true, passed: true, rationale: "r", submittedEvidence: [], evidence: [] },
       establishedDomainMeaning: { modelPassed: true, passed: true, rationale: "r", submittedEvidence: [], evidence: [] },
+      definitionBearingTreatment: { modelPassed: true, passed: true, rationale: "r", submittedEvidence: [], evidence: [] },
       organizingPower: { modelPassed: true, passed: true, rationale: "r", submittedAspects: [], aspects: [] },
       coreSelected: tier === "core", selectionReasonCode: "source_level_core" as const, reasonCodes: [], boundaryReasonCodes: [], confidence: 0.9
     }

@@ -104,11 +104,12 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       "SOURCE ROLE — judge every concept against the DECLARED DOMAIN by its HOME FIELD, not by how often the source mentions it. Set sourceRole to 'declared_domain_concept' only when the concept genuinely belongs to the Declared Domain. Set it to 'out_of_domain_illustration' when the concept's home field is a DIFFERENT discipline and this source uses it only as example data, sample course content, a worked example, a benchmark task, or evaluation material — even if the source mentions it many times. Out-of-domain illustrative material is REJECTED, never kept optional.",
       "Source-role test: ask 'if I were building a concept graph FOR the Declared Domain, would a learner of THAT domain study this concept?' If the concept's home field is a different discipline and it appears only as sample content, a worked example, benchmark material, or evaluation material, it is out_of_domain_illustration. The declared-domain concepts are the source's own framework, signals, mechanisms, roles, methods, constraints, and evidence.",
       "Classify each atomic concept as 'core', 'optional', 'reject', or 'quarantine'. Be strict: in a typical source only a MINORITY of concepts are 'core'.",
-      "CORE CONCEPT ELIGIBILITY has three independent tests. A candidate is core only when ALL THREE pass with exact source evidence:",
+      "CORE CONCEPT ELIGIBILITY has four independent tests. A candidate is core only when ALL FOUR pass with exact source evidence:",
       "(1) standaloneLearningObjective: a learner could study and be assessed on this as its own objective. It is not reducible to a role, component, property, API name, operation name, or vocabulary item inside a broader concept.",
       "A candidate label must name a CONCEPT (a noun phrase), not assert a PROPOSITION. A label that states a full claim — for example a subject-relation-object title such as 'X is Y', 'X depends on Y', 'X is limited by Y', or 'X is determined by Y' — is a claim, not a concept; reject it and rely on the underlying noun phrase for X as the concept instead. Use reason code 'proposition_or_claim_label'.",
       "(2) establishedDomainMeaning: the source uses it as a coherent concept with an established meaning in the Declared Domain, not as narration, an improvised phrase, or a source-local composite.",
       "(3) organizingPower: the source demonstrates at least TWO DISTINCT substantive explanatory aspects or relationships organized by the concept. Return each aspect separately with its own verbatim evidence.",
+      "(4) definitionBearingTreatment: the source gives the concept DEFINITION-BEARING treatment — a passage that establishes what the concept MEANS (its defining properties, the criteria that distinguish it, or how it is constituted), distinct from a bare mention, an example, or a passing use. Cite that meaning-establishing passage verbatim. A core concept the source only names or uses but never explains is NOT core in this run, even if it is established in the wider domain. A definition need not use a copula or 'X is Y' phrasing; meaning can be established by description, mechanism, or contrast.",
       "Classify each organizing aspect's nature honestly. 'motivation-or-example' does not count toward organizing power and is discarded by the application boundary.",
       "Both organizing aspects must directly explain the candidate itself. A problem it motivates, a consequence it causes, or a teaser for later material is not a second aspect of the candidate.",
       "Each organizing aspect must cite a different evidence reference. Do not reuse the same blockId + evidenceQuote for two aspects; the application discards duplicate references and will fail the criterion closed.",
@@ -169,6 +170,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       decision.sourceRole === "declared_domain_concept" &&
       decision.standaloneLearningObjective.passed &&
       decision.establishedDomainMeaning.passed &&
+      decision.definitionBearingTreatment.passed &&
       decision.organizingPower.passed
     );
     if (individuallyEligible.length === 0) {

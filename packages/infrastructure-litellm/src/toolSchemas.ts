@@ -103,6 +103,7 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             "sourceRole",
             "standaloneLearningObjective",
             "establishedDomainMeaning",
+            "definitionBearingTreatment",
             "organizingPower",
             "reasonCodes",
             "confidence"
@@ -129,6 +130,11 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             },
             standaloneLearningObjective: admissionCriterionSchema,
             establishedDomainMeaning: admissionCriterionSchema,
+            definitionBearingTreatment: {
+              ...admissionCriterionSchema,
+              description:
+                "passed=true only when the source gives this concept DEFINITION-BEARING treatment: a passage that establishes what the concept means — its defining properties, the criteria that distinguish it, or how it is constituted — as opposed to a bare mention, an example, or a passing reference. The evidence MUST be the verbatim passage that establishes the meaning. A definition need not use a copula or an 'X is Y' phrasing; meaning can be established by description, mechanism, or contrast. If the source only names or uses the concept without establishing its meaning, set passed=false."
+            },
             organizingPower: {
               type: "object",
               additionalProperties: false,
@@ -163,6 +169,11 @@ export const conceptAdmissionValidator = z.object({
       evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
     }).strict(),
     establishedDomainMeaning: z.object({
+      passed: z.boolean(),
+      rationale: z.string().min(1),
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
+    }).strict(),
+    definitionBearingTreatment: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),
       evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)

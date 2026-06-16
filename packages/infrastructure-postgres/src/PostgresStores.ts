@@ -142,13 +142,13 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
           INSERT INTO concept_admission_decisions (
             concept_admission_decision_id, concept_candidate_id, model_tier, tier,
             proposed_canonical_label, standalone_learning_objective,
-            established_domain_meaning, organizing_power, core_selected,
+            established_domain_meaning, definition_bearing_treatment, organizing_power, core_selected,
             selection_reason_code, reason_codes, boundary_reason_codes, confidence
           )
           VALUES (
             ${randomUUID()}, ${candidateId}, ${admission.modelTier}, ${admission.tier},
             ${admission.proposedCanonicalLabel}, ${tx.json(admission.standaloneLearningObjective)},
-            ${tx.json(admission.establishedDomainMeaning)}, ${tx.json(admission.organizingPower)},
+            ${tx.json(admission.establishedDomainMeaning)}, ${tx.json(admission.definitionBearingTreatment)}, ${tx.json(admission.organizingPower)},
             ${admission.coreSelected}, ${admission.selectionReasonCode},
             ${tx.json(admission.reasonCodes)}, ${tx.json(admission.boundaryReasonCodes)},
             ${admission.confidence}

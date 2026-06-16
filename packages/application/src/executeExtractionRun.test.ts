@@ -70,6 +70,7 @@ function admission(candidate: DiscoveredCandidate, overrides: Partial<AdmissionP
     sourceRole: "declared_domain_concept",
     standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId, evidenceQuote: quote }] },
     establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId, evidenceQuote: quote }] },
+    definitionBearingTreatment: { passed: true, rationale: "definition-bearing", evidence: [{ blockId, evidenceQuote: quote }] },
     organizingPower: {
       passed: true,
       rationale: "organizes",
@@ -237,6 +238,7 @@ function atom(atomicKey: string, label: string, defQuote: string, overrides: Par
     sourceRole: "declared_domain_concept",
     standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
     establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
+    definitionBearingTreatment: { passed: true, rationale: "definition-bearing", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
     organizingPower: {
       passed: true,
       rationale: "organizes",

@@ -31,6 +31,11 @@ function eligibleProposal(overrides: Partial<AdmissionProposal> = {}): Admission
       rationale: "Move has a specific meaning in Rust ownership.",
       evidence: [{ blockId: "block-2", evidenceQuote: "After a move, the first variable is no longer valid." }]
     },
+    definitionBearingTreatment: {
+      passed: true,
+      rationale: "The source establishes the meaning of move.",
+      evidence: [{ blockId: "block-1", evidenceQuote: "Assigning a value to another variable moves it." }]
+    },
     organizingPower: {
       passed: true,
       rationale: "It explains transfer and invalidation.",
@@ -75,6 +80,72 @@ test("admits core only with all verified eligibility criteria", () => {
   assert.deepEqual(result.aliases, []);
   assert.ok(result.admission.boundaryReasonCodes.includes("proposed_canonical_label_not_source_grounded"));
   assert.equal(result.admission.organizingPower.aspects.length, 2);
+});
+
+test("corrects core to optional when the definition-bearing passage does not verify verbatim (Rust String type / Heap allocation failure mode)", () => {
+  // U1/R1: admission marked the criterion passed but its cited definition passage is
+  // not in any block, so the boundary fails it closed and core is unreachable.
+  const result = applyAdmissionPolicy({
+    parentCandidate: candidate,
+    proposal: eligibleProposal({
+      definitionBearingTreatment: {
+        passed: true,
+        rationale: "Claims a definition the source does not actually contain.",
+        evidence: [{ blockId: "block-1", evidenceQuote: "A String is a growable, heap-allocated UTF-8 buffer." }]
+      }
+    }),
+    blockText
+  });
+
+  assert.equal(result.admission.tier, "optional");
+  assert.equal(result.admission.definitionBearingTreatment.passed, false);
+  assert.ok(result.admission.boundaryReasonCodes.includes("definition_bearing_treatment_missing_verified_evidence"));
+  assert.ok(result.admission.boundaryReasonCodes.includes("effective_tier_corrected"));
+});
+
+test("does not admit core when the model omits definition-bearing treatment", () => {
+  const result = applyAdmissionPolicy({
+    parentCandidate: candidate,
+    proposal: eligibleProposal({
+      definitionBearingTreatment: { passed: false, rationale: "Source only mentions the concept.", evidence: [] }
+    }),
+    blockText
+  });
+
+  assert.equal(result.admission.tier, "optional");
+  assert.equal(result.admission.definitionBearingTreatment.passed, false);
+});
+
+test("definition-bearing treatment does not change an optional/reject/quarantine tier (gates core only)", () => {
+  const missingDefinition = { passed: false, rationale: "no definition", evidence: [] };
+  for (const tier of ["optional", "reject", "quarantine"] as const) {
+    const result = applyAdmissionPolicy({
+      parentCandidate: candidate,
+      proposal: eligibleProposal({ tier, coreSelected: false, definitionBearingTreatment: missingDefinition }),
+      blockText
+    });
+    assert.equal(result.admission.tier, tier);
+  }
+});
+
+test("a meaning-bearing definition passage with no copula still passes (no lexical whitelist)", () => {
+  // U1 domain-neutrality: meaning established by mechanism, not 'X is Y'. The model
+  // marks it passed and the quote verifies, so the criterion passes without any
+  // copula/keyword check (AGENTS rule 16).
+  const result = applyAdmissionPolicy({
+    parentCandidate: candidate,
+    proposal: eligibleProposal({
+      definitionBearingTreatment: {
+        passed: true,
+        rationale: "Meaning established by describing the mechanism, no copula.",
+        evidence: [{ blockId: "block-1", evidenceQuote: "Assigning a value to another variable moves it." }]
+      }
+    }),
+    blockText
+  });
+
+  assert.equal(result.admission.tier, "core");
+  assert.equal(result.admission.definitionBearingTreatment.passed, true);
 });
 
 test("accepts an admission canonical label that is explicitly source-grounded", () => {
@@ -183,6 +254,7 @@ test("carries atomic identity and parent provenance for a split atom", () => {
       proposedCanonicalLabel: "The heap",
       standaloneLearningObjective: { passed: true, rationale: "heap as its own objective", evidence: [{ blockId: "block-1", evidenceQuote: "The heap stores data of unknown size." }] },
       establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "block-1", evidenceQuote: "The heap stores data of unknown size." }] },
+      definitionBearingTreatment: { passed: true, rationale: "definition-bearing", evidence: [{ blockId: "block-1", evidenceQuote: "The heap stores data of unknown size." }] },
       organizingPower: {
         passed: true,
         rationale: "organizes",
