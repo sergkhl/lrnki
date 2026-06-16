@@ -3,7 +3,6 @@ import type {
   AdmissionProposal,
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
-  Concept,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,

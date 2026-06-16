@@ -7,49 +7,41 @@ measurement became disposable scaffolding and is retired.
 
 ## TODO
 
-The 7-unit complexity reset is complete and merged to `main`; durable architecture lives in the
-[ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md). Active work is now the paused
-derived-layer prerequisite enrichment plan:
-[`2026-06-16-001-feat-derived-layer-prerequisite-enrichment-plan.md`](./2026-06-16-001-feat-derived-layer-prerequisite-enrichment-plan.md).
+The 7-unit complexity reset and the derived-layer node-minting enrichment milestone (U1-U9) are both
+complete on `feat/derived-layer-prerequisite-enrichment`; durable architecture lives in the
+[ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md).
 
-1. **Restart U5 from a clean design for missing-prerequisite proposals.** Do not continue by fabricating
-   placeholder prerequisite labels locally and testing around that behavior. The `GroundingGenerationPort`
-   can generate a CEP-shaped bundle for a chosen label, but another explicit, inspectable operation must
-   justify which `llm_grounded` prerequisite nodes should exist.
-   - Decide whether this is a new LLM proposal port, a combined proposal+grounding port, or a bounded
-     extension of the existing grounding port.
-   - Keep the operation anchor-conditioned and capped per anchor/per run.
-   - Preserve the asserted graph invariant: enrichment nodes never publish as asserted `Concept`s.
-2. **Finish U5 source-mentioned rescue and union pair judging without collapsing node identity.**
-   - Add an extraction-run read model for member-run optional/rejected proposals with verbatim mentions
-     and no complete definition.
-   - Deduplicate rescued nodes by normalized label within declared domain.
-   - Judge pairs over anchors plus rescued/minted derived nodes, same-domain only.
-   - Keep prerequisite ordering only in `inferred-prerequisite-of` edges, never on node attributes.
-3. **Integrate the derived-node schema through downstream readers.** U3 rewrote the initial migration so
-   `inferred_prerequisite_edges` and `concept_difficulties` reference derived nodes, but Admin Lab and
-   learner-path loaders may still read the old concept endpoint columns.
-   - Update Admin Lab enrichment SQL/view models to read `derived_graph_nodes`.
-   - Update learner-path projection/persistence to use derived node IDs where appropriate.
-   - If difficulty scoring includes enrichment nodes, change `DifficultyPort` to accept derived node IDs
-     or derived node descriptors; do not fabricate asserted `Concept` records for generated nodes.
-4. **Complete U6-U8 only after U5 has a defensible proposal model.**
-   - Add per-grounding-origin verbatim-floor handling and explicit `not_applicable_by_grounding`
-     dispositions for generated passages.
-   - Add `kg-generated-prerequisite-judgment` and route generated-node pairs to the cross-family judge.
-   - Surface node kind, grounding origin, bundle, and recorded floor disposition in Admin Lab and learner
-     path inspection.
-5. **Run U9 real-use validation before calling the milestone complete.**
-   - Re-run the sparse Rust fixture after U5-U8 with real LLM calls.
-   - Inspect recovered anchors, rescued nodes, minted nodes, prerequisite DAG, and learner path usefulness.
-   - Record the result in `tmp/u9-derived-enrichment-quality-evaluation.md` and refresh ADRs/CONTEXT only
-     after the behavior is validated.
-6. **Keep the standing deferred work deferred.** DOCX/PPTX curated-source expansion remains orthogonal.
-   Difficulty stays the DAG-depth mock and learner state stays the empty mock until measured need. The
-   embedding canonicalization cascade and embedding blocking tier stay removed unless a measured
-   replacement beats exhaustive same-domain judgment.
+1. **Tune minting/rescue precision against more fixtures (post-rule-14 follow-up).** The Rust rule-14 run
+   minted expert-plausible prerequisites but showed mild granularity redundancy (minted "Stack-allocated
+   data"/"Heap-allocated data" beside the anchor "The Stack and the Heap"; "Trait (Rust)" beside "Copy
+   trait") and rescued a heading-like concept ("Memory and Allocation").
+   - Inspect a non-software fixture (biology/economics) before tuning; do not overfit the proposal prompt
+     to Rust (AGENTS rule 17).
+   - Consider a generic rubric clause that suppresses sub-aspects of an existing anchor, measured against
+     an oracle, not a hardcoded denylist (AGENTS rule 16).
+2. **Tune the minting bounds beyond defaults (deferred in the plan).** The per-run cap (12) bound exactly
+   on the sparse Rust source; a richer source needs evidence-driven per-anchor/per-run caps.
+3. **DOCX/PPTX curated-source expansion** remains orthogonal and deferred.
+4. **Keep the standing deferred work deferred.** Difficulty stays the DAG-depth mock and learner state
+   stays the empty mock until measured need. The embedding canonicalization cascade and embedding blocking
+   tier stay removed unless a measured replacement beats exhaustive same-domain judgment.
 
 ## COMPLETED
+
+- **Derived-layer prerequisite enrichment — node + edge derivation, U1-U9 (branch
+  `feat/derived-layer-prerequisite-enrichment`).** Graph Enrichment now mints `llm_grounded` prerequisite
+  nodes via an explicit anchor-driven proposal port (`MissingPrerequisiteProposalPort`, node identity is an
+  inspectable operation, never local string construction) and rescues `source_mentioned` nodes from member
+  runs' non-core mentions, judges the union of anchors + enrichment nodes same-domain, and routes any
+  generated-node pair to a cross-family judge (`kg-generated-prerequisite-judgment` → gpt-oss-120b, ADR-0023)
+  so the DeepSeek generator never grades its own output. The verbatim floor applies per passage by
+  provenance with a recorded `not_applicable_by_grounding` exemption for generated passages. `DifficultyPort`
+  scores derived node IDs; `inferred_prerequisite_edges`/`concept_difficulties`/learner-path endpoints all
+  reference `derived_graph_nodes`; Admin Lab + learner-path loaders read the derived node space and surface
+  grounding. ADR-0019 generalized, ADR-0023 added. rule-14 PASS on the sparse Rust fixture: 6 anchors → 19
+  derived nodes, expert-correct DAG, asserted layer untouched (6 concepts / 0 edges), densified 7-step
+  learner path to Ownership; see `tmp/u9-derived-enrichment-quality-evaluation.md`. Operational: LiteLLM
+  alias changes need a proxy reload (`docker restart lrnki-litellm`).
 
 - **Domain-neutral extraction prompts + run-scoped quality issues (2026-06-16).** Removed fixture and
   benchmark answer-key calibration from model-facing extraction prompts and forced-tool schema
@@ -117,22 +109,20 @@ derived-layer prerequisite enrichment plan:
 
 ## VALIDATION
 
-Latest validation (2026-06-16) is after the domain-neutral prompt and quality-issue milestone:
+Latest validation (2026-06-16) is after the derived-layer node-minting enrichment milestone (U1-U9):
 
-- **Static/unit:** `pnpm --filter @lrnki/domain-core typecheck`,
-  `pnpm --filter @lrnki/infrastructure-litellm typecheck`, `pnpm --filter @lrnki/application typecheck`,
-  `pnpm --filter @lrnki/application test`, `pnpm --filter @lrnki/admin-lab typecheck`, and
-  `pnpm --filter @lrnki/kg-worker typecheck` passed.
-- **Manual prompt sweep:** the expanded fixture-term denylist over
-  `packages/infrastructure-litellm/src/extractionAdapters.ts` and
-  `packages/infrastructure-litellm/src/toolSchemas.ts` returned only the non-model-facing code comment
-  containing `dropped`.
-- **Real-use:** Rust fixture source `4c5dbe0b-9352-4f28-853b-6b7ffc972c37` was extracted with real LLM
-  calls as run `5889b488-5329-469f-892d-8bd071b16699`, `status=succeeded`, `32` candidates, `8` core,
-  `29` CEPs, `1` incomplete optional CEP, `32` definitions, `93` mentions, and `10` assertions. Core set:
-  `Copy trait`, `Double free error`, `Memory safety`, `Move`, `Ownership`, `Variable Scope`, `clone method`,
-  `drop function`. `qualityIssues`: standing `generic_domain_neutral_prompt` note plus
-  `possible_out_of_domain_illustration` for `Garbage collector (GC)`.
-- **Caveat:** the baseline key Rust concepts survived, but neutralization exposed redundant granularity
-  (`clone method`, `drop function`, and possibly error/safety concepts). Do not publish this run without
-  inspection; fix root causes generically rather than reintroducing fixture calibration.
+- **Static/unit:** full-repo `pnpm -r typecheck` and `pnpm -r test` pass (135 tests; Postgres round-trip
+  tests run against the live DB with `DATABASE_URL` set, including the enrichment-node round-trip and the
+  member-run rescue read). `pnpm lint` clean.
+- **Real-use (rule-14 PASS):** sparse Rust fixture `b0682ea4-e359-4a41-b624-ad0e382a9185` end-to-end with
+  real LLM calls — extraction run `0911ecd0` (6 core anchors, 34 complete CEPs), published version
+  `bca9f521` (6 concepts / 0 asserted edges), enrichment run `6959c923` (6 anchors + 13 enrichment nodes;
+  12 minted `llm_grounded` + 1 rescued `source_mentioned`; per-run mint cap of 12 bound exactly), and
+  learner path `57ed5aea` to Ownership (7 steps: Function → Memory and Allocation → Pointer → Scope → The
+  Stack and the Heap → Runtime memory model → Ownership). Verbatim dispositions: 12
+  `not_applicable_by_grounding` + 1 `verified`. Asserted layer unchanged. See
+  `tmp/u9-derived-enrichment-quality-evaluation.md`.
+- **Caveats:** generated grounding is the load-bearing bet, validated by inspection not a standing metric;
+  single-fixture (Rust) validation; mild granularity redundancy in minted nodes flagged as a follow-up
+  tuning item (do not overfit the proposal prompt — AGENTS rule 17). LiteLLM alias changes need a proxy
+  reload (`docker restart lrnki-litellm`).

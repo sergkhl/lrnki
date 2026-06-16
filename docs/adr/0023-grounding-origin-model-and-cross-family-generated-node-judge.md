@@ -1,0 +1,15 @@
+# Grounding-origin model, recorded verbatim exemption, and a cross-family generated-node judge
+
+Status: Accepted (2026-06-16)
+
+## Decision
+
+Every node in the graph carries a `grounding_origin` ∈ {`document_anchored`, `source_mentioned`, `llm_grounded`} (with `web_grounded` reserved) and a `role` ∈ {`anchor`, `prerequisite`}. A node's `layer` is an **invariant** of its `grounding_origin`, never an independent field: `document_anchored` ⇒ `asserted`, everything else ⇒ `derived`. The pairing `llm_grounded + asserted` is made unrepresentable in the domain types, and a single `layerOf` function is the sole authority. Asserted Concepts are `document_anchored` anchors by construction; rescued and minted enrichment nodes are `source_mentioned` or `llm_grounded` and always `derived`. `role` is a minting reason, not an ordering — prerequisite ordering is only ever the `inferred-prerequisite-of` edge (ADR-0019).
+
+The deterministic verbatim evidence floor (AGENTS rule 16) is applied **per passage by provenance**. A passage that claims a source quote — anchor evidence or `source_mentioned` rescue evidence — must verify verbatim against its cited block or be rejected. A `llm_grounded` generated passage has no source quote, so it is **exempt** — but the exemption is recorded as an explicit `not_applicable_by_grounding` disposition on the node, never a silent skip. The floor therefore still hard-vetoes every passage that asserts a verifiable source claim; the non-verbatim trust contract for generated grounding is explicit and inspectable, not a relaxation of the floor.
+
+Any prerequisite pair touching a generated (`llm_grounded`, later `web_grounded`) node is ordered by a dedicated **cross-family** judge alias (`kg-generated-prerequisite-judgment` → gpt-oss-120b), distinct from the DeepSeek-family generator that minted the node and its grounding. Anchor-only and anchor/`source_mentioned` ordering stays on the validated DeepSeek judge (`kg-prerequisite-judgment`), so the existing anchor-only ordering is not re-validated. The judge reuses the existing direction-bias mitigations unchanged: it names the prerequisite by exact canonical label and may return `uncertain` (flagged and path-excluded).
+
+## Context
+
+Admission admits a Concept to the asserted core only with a verbatim Definition Passage, so a thin source yields few anchors and a sparse learner path. The derived layer must be able to introduce the missing nodes a learner needs, not only densify edges among existing anchors. Minting nodes raises two risks the decision contains: generated grounding must not masquerade as source-verbatim evidence (handled by the per-provenance floor with a recorded exemption), and a DeepSeek generator must not grade its own minted output (handled by the cross-family judge). Both keep generated structure non-authoritative and inspectable rather than trusted. The recall precondition — recovering anchors the source actually defines before enrichment fills the residual — keeps minting from papering over concepts admission should have kept.
