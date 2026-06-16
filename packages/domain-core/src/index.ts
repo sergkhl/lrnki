@@ -750,6 +750,9 @@ export type InferredPrerequisiteEdge = {
 
 export type PrerequisiteJudgmentTrace = {
   declaredDomain: string;
+  // Which judge model ordered this pair (U4): the cross-family generated-node alias
+  // for any pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
+  judgeModel: string;
   a: PrerequisiteConceptContext;
   b: PrerequisiteConceptContext;
   judgment: PrerequisiteJudgment;

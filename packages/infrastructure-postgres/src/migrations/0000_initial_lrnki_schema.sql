@@ -472,6 +472,9 @@ CREATE TABLE inferred_prerequisite_edges (
   dependent_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
+  -- Which judge model ordered this pair (U4): the cross-family generated-node alias
+  -- for any pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
+  judge_model text NOT NULL,
   provenance jsonb NOT NULL,
   UNIQUE (enrichment_id, prerequisite_derived_node_id, dependent_derived_node_id),
   CHECK (prerequisite_derived_node_id <> dependent_derived_node_id)
@@ -485,6 +488,23 @@ CREATE TABLE concept_difficulties (
   method text NOT NULL,
   components jsonb NOT NULL,
   UNIQUE (enrichment_id, derived_node_id)
+);
+
+-- Rescue durability dispositions (U4, ADR-0019 refinement). One row per AGGREGATED
+-- source_mentioned rescue candidate the durability judge ruled on (U3). A `dropped`
+-- candidate has no derived_graph_nodes row, so derived_node_id is correlation-only
+-- (no FK). The relational projection mirrors the immutable JSONB trace so Admin Lab
+-- reads dispositions without recompute (rules 11/12).
+CREATE TABLE rescue_dispositions (
+  rescue_disposition_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL,
+  canonical_label text NOT NULL,
+  normalized_label text NOT NULL,
+  declared_domain text NOT NULL,
+  disposition text NOT NULL CHECK (disposition IN ('accepted', 'dropped', 'kept_judge_unavailable')),
+  rationale text NOT NULL,
+  grounding_span text NOT NULL
 );
 
 -- ---------------------------------------------------------------------------

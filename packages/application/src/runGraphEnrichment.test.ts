@@ -271,6 +271,10 @@ test("runGraphEnrichment persists a layer free of embedding and candidate-group 
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
   assert.equal(ports.getArtifactType(), "enrichment_run.v2");
   assert.equal(ports.getTrace()?.judgments.length, 4);
+  // U4: each pair judgment records which judge model ordered it (anchor-only run -> all DeepSeek).
+  assert.ok(ports.getTrace()?.judgments.every((judgment) => judgment.judgeModel === "mock-judge"));
+  // U4: an anchor-only run (no enrichment-node ports) has no rescue dispositions.
+  assert.deepEqual(ports.getTrace()?.rescueDispositions, []);
 });
 
 test("anchor derived node ids are per enrichment run, while concept ids stay stable", async () => {

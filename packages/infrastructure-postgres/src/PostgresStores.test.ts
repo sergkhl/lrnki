@@ -363,10 +363,21 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         { conceptId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
       ]
     };
-    const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes, judgments: [], dispositions: [], groundingDispositions: [
+    // U4: per-pair judge model — the minted (llm_grounded) pair routes cross-family,
+    // the rescued (source_mentioned) pair stays on the DeepSeek alias.
+    const ctx = (id: string, label: string) => ({ conceptId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
+    const droppedId = randomUUID();
+    const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
+      judgments: [
+        { declaredDomain: "software engineering", judgeModel: "kg-generated-prerequisite-judgment", a: ctx(mintedId, "Stack allocation"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteConceptId: mintedId, dependentConceptId: anchorId, outcome: "directed", confidence: 0.8, rationale: "r" } },
+        { declaredDomain: "software engineering", judgeModel: "mock-judge", a: ctx(rescuedId, "Borrowing"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteConceptId: rescuedId, dependentConceptId: anchorId, outcome: "directed", confidence: 0.7, rationale: "r" } }
+      ], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
       { derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", outcome: "verified", rationale: "mention verified verbatim" }
-    ], rescueDispositions: [] };
+    ], rescueDispositions: [
+      { derivedNodeId: rescuedId, canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
+      { derivedNodeId: droppedId, canonicalLabel: "Table 3 Ablation", normalizedLabel: "table 3 ablation", declaredDomain: "software engineering", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
+    ] };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
 
@@ -381,6 +392,22 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     assert.equal(rescued.groundingPassages[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
     assert.equal(hydrated.prerequisiteEdges.length, 2);
     assert.equal(hydrated.difficulties.length, 3);
+
+    // U4: per-pair judge model persisted on the edges and matches the routing.
+    const edgeModels = await sql<{ prerequisite_derived_node_id: string; judge_model: string }[]>`
+      SELECT prerequisite_derived_node_id, judge_model FROM inferred_prerequisite_edges WHERE enrichment_id = ${enrichmentId}`;
+    assert.equal(edgeModels.find((e) => e.prerequisite_derived_node_id === mintedId)?.judge_model, "kg-generated-prerequisite-judgment");
+    assert.equal(edgeModels.find((e) => e.prerequisite_derived_node_id === rescuedId)?.judge_model, "mock-judge");
+
+    // U4: rescue dispositions persisted and read back, including the dropped candidate
+    // that has no derived_graph_nodes row.
+    const dispositions = await sql<{ derived_node_id: string; disposition: string; rationale: string }[]>`
+      SELECT derived_node_id, disposition, rationale FROM rescue_dispositions WHERE enrichment_id = ${enrichmentId} ORDER BY disposition`;
+    assert.equal(dispositions.length, 2);
+    assert.equal(dispositions.find((d) => d.derived_node_id === rescuedId)?.disposition, "accepted");
+    const dropped = dispositions.find((d) => d.derived_node_id === droppedId);
+    assert.equal(dropped?.disposition, "dropped");
+    assert.equal(dropped?.rationale, "incidental artifact");
   } finally {
     await sql.end();
   }

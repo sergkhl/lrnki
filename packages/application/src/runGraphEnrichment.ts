@@ -181,7 +181,9 @@ export async function runGraphEnrichment(input: {
     const judge = isGenerated(a) || isGenerated(b) ? generatedJudge : input.prerequisiteJudge;
     const judgeInput = { declaredDomain: a.declaredDomain, a: a.context, b: b.context };
     const judgment = await judge.judge(judgeInput);
-    return { judgment, trace: { ...judgeInput, judgment } };
+    // Record the judge model actually used for this pair (U4): cross-family for any
+    // pair touching a generated node, the validated DeepSeek judge otherwise.
+    return { judgment, trace: { ...judgeInput, judgeModel: judge.model, judgment } };
   });
 
   // Collect in deterministic pair order regardless of completion order.
