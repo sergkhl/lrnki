@@ -1,7 +1,17 @@
-import type { PrerequisiteConceptContext, PrerequisiteJudgment } from "@lrnki/domain-core";
-import type { PrerequisiteJudgmentPort } from "@lrnki/ports";
+import type { PrerequisiteConceptContext, PrerequisiteJudgment, RescueDurabilityJudgment } from "@lrnki/domain-core";
+import type { PrerequisiteJudgmentPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { prerequisiteJudgmentSchema, prerequisiteJudgmentValidator } from "./toolSchemas";
+import {
+  prerequisiteJudgmentSchema,
+  prerequisiteJudgmentValidator,
+  rescueDurabilityJudgmentSchema,
+  rescueDurabilityJudgmentValidator
+} from "./toolSchemas";
+
+// Cross-family rescue durability judge (U3, ADR-0019 refinement, KTD4). Reuses the
+// independent `kg-independent-judge` alias (gpt-oss-120b) so the DeepSeek generator
+// never grades rescue durability. Goes through LiteLLM, never a raw provider.
+export const RESCUE_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 
 // LiteLLM alias for the third operation (Graph Enrichment, ADR-0019 reset). Every
 // same-domain CEP pair is judged exhaustively — there is no embedding clustering
@@ -108,5 +118,63 @@ export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentP
       confidence: result.confidence,
       rationale: result.rationale
     };
+  }
+}
+
+// Bounded rescue-durability judge (U3). Forced named tool schema, deterministic
+// decoding; one judgment per aggregated `source_mentioned` rescue candidate against
+// the same-domain anchors it would scaffold. This adapter is a thin LLM caller: it
+// validates the tool arguments and returns the raw verdict + grounding span. The
+// fail-OPEN grounding decision (whether a `not_durable` veto is honored) lives in the
+// application stage `applyRescueDurabilityJudge`, which needs it to distinguish a
+// confident grounded drop from a kept-judge-unavailable case (KTD3).
+export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJudgmentPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = RESCUE_DURABILITY_JUDGE_MODEL) {
+    this.model = model;
+  }
+
+  async judge(input: {
+    declaredDomain: string;
+    candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
+    anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
+  }): Promise<RescueDurabilityJudgment> {
+    const system = [
+      "You judge whether a candidate concept is a DURABLE learning prerequisite or an incidental artifact, for a learner-neutral concept graph.",
+      "The candidate was MENTIONED in a source but never defined there. It would become a derived prerequisite node scaffolding the anchor concepts below — concepts the source teaches in full.",
+      "Decide: must a learner genuinely understand the candidate as its own unit of domain knowledge before the anchors, or is it an incidental artifact — a label tied to one specific method, system, experiment, dataset, ablation, or section; a pedagogical-role label; or a passing/source-local detail?",
+      "Judge from the candidate's MEANING and its relationship to the anchors, never from surface wordform or a fixed list of words.",
+      "Precision-first: this is a veto that removes nodes, so return 'not_durable' ONLY on a clear, evidenced judgment; when genuinely unsure, return 'durable' and let the node stand.",
+      "When 'not_durable', set groundingSpan to a minimal verbatim sub-quote copied exactly from one of the candidate's own mention quotes that shows it is incidental. When 'durable', return an empty groundingSpan."
+    ].join("\n");
+    const anchorLines = input.anchors.length
+      ? input.anchors.map((anchor, index) => {
+          const def = anchor.definitionQuotes[0] ? ` — "${anchor.definitionQuotes[0]}"` : "";
+          return `  [${index + 1}] "${anchor.canonicalLabel}"${def}`;
+        })
+      : ["  (no same-domain anchors)"];
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Candidate concept: "${input.candidate.canonicalLabel}"${input.candidate.aliases.length ? ` (aka ${input.candidate.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
+      "Candidate's verbatim mention quotes (the only text a 'not_durable' groundingSpan may be copied from):",
+      ...(input.candidate.mentionQuotes.length
+        ? input.candidate.mentionQuotes.map((quote, index) => `  [${index + 1}] "${quote}"`)
+        : ["  (none)"]),
+      "Same-domain anchor concepts this node would scaffold:",
+      ...anchorLines,
+      "",
+      "Call submit_rescue_durability_judgment: is this candidate a durable prerequisite, or an incidental artifact?"
+    ].join("\n");
+
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_rescue_durability_judgment",
+      toolDescription: "Submit whether the rescue candidate is a durable prerequisite or an incidental artifact.",
+      parameters: rescueDurabilityJudgmentSchema,
+      validator: rescueDurabilityJudgmentValidator
+    });
+
+    return { verdict: result.verdict, groundingSpan: result.groundingSpan, rationale: result.rationale };
   }
 }

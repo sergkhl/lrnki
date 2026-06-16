@@ -20,6 +20,7 @@ import type {
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
+  RescueDurabilityJudgment,
   RunForBuild,
   SourceBlock,
   StructuredDocument
@@ -107,6 +108,24 @@ export interface AdmissionLabelJudgmentPort {
     aliases: string[];
     evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
   }): Promise<AdmissionLabelJudgment>;
+}
+
+// Rescue durability judge (U3, ADR-0019 refinement). A bounded, forced-tool LLM
+// judgment over ONE aggregated `source_mentioned` rescue candidate, run on the
+// independent cross-family alias (`kg-independent-judge`) so the DeepSeek generator
+// never grades rescue durability. It answers: against the same-domain anchors this
+// node would scaffold, is the candidate a durable prerequisite or an incidental
+// artifact? Used only to DROP a non-durable rescue candidate; it never creates a
+// node. The application boundary grounds the veto fail-OPEN: a `not_durable` verdict
+// whose `groundingSpan` is not in the candidate's own mention evidence keeps the node
+// flagged rather than dropping it (KTD3, AGENTS rule 16).
+export interface RescueDurabilityJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
+    anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
+  }): Promise<RescueDurabilityJudgment>;
 }
 
 export interface ArtifactRepositoryPort {

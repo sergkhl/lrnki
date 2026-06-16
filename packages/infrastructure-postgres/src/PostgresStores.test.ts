@@ -294,7 +294,8 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       derivedNodes: layer.derivedNodes,
       judgments: [],
       dispositions: [],
-      groundingDispositions: []
+      groundingDispositions: [],
+      rescueDispositions: []
     };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({
@@ -365,7 +366,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes, judgments: [], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
       { derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", outcome: "verified", rationale: "mention verified verbatim" }
-    ] };
+    ], rescueDispositions: [] };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
 

@@ -2,10 +2,12 @@ import { normalizeConceptLabel } from "@lrnki/domain-core";
 import type {
   LlmGroundedEnrichmentNode,
   MentionedNonCoreCandidate,
+  RescueDisposition,
   SourceMentionedEnrichmentNode,
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
+import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
 
 // Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep densification
 // bounded so a thin source cannot explode into a runaway derived graph; both knobs
@@ -44,9 +46,19 @@ export async function assembleEnrichmentNodes(input: {
   rescueCandidates: MentionedNonCoreCandidate[];
   proposalPort: MissingPrerequisiteProposalPort;
   groundingPort: GroundingGenerationPort;
+  // Optional measured rescue durability judge (U3). When provided, each AGGREGATED
+  // rescued node is judged against its same-domain anchors before minting runs; a
+  // node judged non-durable (confident + grounded) is dropped with a recorded
+  // disposition. Omitted -> rescue is unjudged (prior behavior) and every aggregated
+  // node is accepted. Dropped labels stay "taken" so minting never resurrects them.
+  rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
   bounds?: EnrichmentMintingBounds;
   newNodeId: () => string;
-}): Promise<{ rescuedNodes: SourceMentionedEnrichmentNode[]; mintedNodes: LlmGroundedEnrichmentNode[] }> {
+}): Promise<{
+  rescuedNodes: SourceMentionedEnrichmentNode[];
+  mintedNodes: LlmGroundedEnrichmentNode[];
+  rescueDispositions: RescueDisposition[];
+}> {
   const bounds = input.bounds ?? DEFAULT_MINTING_BOUNDS;
 
   // A label is "taken" when an anchor, a rescued node, or an already-minted node in
@@ -85,7 +97,31 @@ export async function assembleEnrichmentNodes(input: {
       groundingPassages: rescuePassages(candidate)
     });
   }
-  const rescuedNodes = [...rescuedByKey.values()];
+  const aggregatedRescuedNodes = [...rescuedByKey.values()];
+
+  // --- Durability judging over AGGREGATED rescue nodes (U3) -----------------------
+  // The judge runs once per merged candidate (so it sees the node's full aggregated
+  // evidence) against the same-domain anchors it would scaffold. Drop-only and
+  // fail-open-with-flag. Dropped nodes leave the derived layer but their labels stay
+  // in `takenByDomain`, so the minting pass below cannot resurrect a dropped concept
+  // as an `llm_grounded` node. When no judge is provided, every node is accepted.
+  let rescuedNodes = aggregatedRescuedNodes;
+  let rescueDispositions: RescueDisposition[] = [];
+  if (input.rescueDurabilityJudge && aggregatedRescuedNodes.length > 0) {
+    const anchorsByDomain = new Map<string, { canonicalLabel: string; definitionQuotes: string[] }[]>();
+    for (const anchor of input.anchors) {
+      const existing = anchorsByDomain.get(anchor.declaredDomain) ?? [];
+      existing.push({ canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes });
+      anchorsByDomain.set(anchor.declaredDomain, existing);
+    }
+    const judged = await applyRescueDurabilityJudge({
+      rescuedNodes: aggregatedRescuedNodes,
+      anchorsByDomain,
+      judge: input.rescueDurabilityJudge
+    });
+    rescuedNodes = judged.keptNodes;
+    rescueDispositions = judged.dispositions;
+  }
 
   // --- Mint: anchor-driven bounded llm_grounded nodes ----------------------------
   const mintedNodes: LlmGroundedEnrichmentNode[] = [];
@@ -133,7 +169,7 @@ export async function assembleEnrichmentNodes(input: {
     }
   }
 
-  return { rescuedNodes, mintedNodes };
+  return { rescuedNodes, mintedNodes, rescueDispositions };
 }
 
 function rescuePassages(candidate: MentionedNonCoreCandidate): SourceMentionGroundingPassage[] {

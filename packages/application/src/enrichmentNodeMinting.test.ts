@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
+import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { assembleEnrichmentNodes, type MintingAnchor } from "./enrichmentNodeMinting";
 
 function anchor(id: string, label: string, domain = "software engineering"): MintingAnchor {
@@ -110,6 +110,102 @@ test("rescue dedupes a concept appearing in two member runs into one node", asyn
   });
   assert.equal(rescuedNodes.length, 1, "the duplicate concept collapses to a single node");
   assert.equal(rescuedNodes[0].groundingPassages.length, 2, "both runs' mentions are merged onto the node");
+});
+
+// Always-durable judge: an opt-in judge that accepts every rescue candidate.
+const acceptAllJudge: RescueDurabilityJudgmentPort = {
+  model: "kg-independent-judge",
+  judge: async () => ({ verdict: "durable", groundingSpan: "", rationale: "durable" })
+};
+
+test("the rescue durability judge drops a non-durable candidate before it becomes a node", async () => {
+  counter = 0;
+  const dropPointer: RescueDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async (input) =>
+      input.candidate.canonicalLabel === "Pointer"
+        ? { verdict: "not_durable", groundingSpan: "Pointer is mentioned.", rationale: "incidental mention" }
+        : { verdict: "durable", groundingSpan: "", rationale: "durable" }
+  };
+  const { rescuedNodes, rescueDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention("Pointer", "run-1"), mention("Lifetime", "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    rescueDurabilityJudge: dropPointer,
+    newNodeId
+  });
+  assert.deepEqual(rescuedNodes.map((n) => n.canonicalLabel), ["Lifetime"]);
+  assert.equal(rescueDispositions.length, 2);
+  assert.equal(rescueDispositions.find((d) => d.canonicalLabel === "Pointer")?.disposition, "dropped");
+  assert.equal(rescueDispositions.find((d) => d.canonicalLabel === "Lifetime")?.disposition, "accepted");
+});
+
+test("a dropped rescue label is not resurrected as a minted node", async () => {
+  counter = 0;
+  const dropPointer: RescueDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => ({ verdict: "not_durable", groundingSpan: "Pointer is mentioned.", rationale: "incidental" })
+  };
+  const { rescuedNodes, mintedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention("Pointer", "run-1")],
+    // The proposer tries to mint the very label the judge dropped.
+    proposalPort: proposer({ a: [{ proposedLabel: "Pointer", rationale: "r" }] }),
+    groundingPort: grounder,
+    rescueDurabilityJudge: dropPointer,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 0, "the dropped rescue node is gone");
+  assert.equal(mintedNodes.length, 0, "and its label stays taken, so minting cannot resurrect it");
+});
+
+test("the durability judge sees a concept's MERGED evidence (judged after dedupe)", async () => {
+  counter = 0;
+  let seenMentionCount = -1;
+  const recordingJudge: RescueDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async (input) => {
+      seenMentionCount = input.candidate.mentionQuotes.length;
+      return { verdict: "durable", groundingSpan: "", rationale: "durable" };
+    }
+  };
+  await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention("Pointer", "run-1"), mention("Pointer", "run-2")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    rescueDurabilityJudge: recordingJudge,
+    newNodeId
+  });
+  assert.equal(seenMentionCount, 2, "the judge saw both member runs' mentions on the merged node");
+});
+
+test("omitting the judge accepts every rescue candidate with no dispositions (opt-in)", async () => {
+  counter = 0;
+  const { rescuedNodes, rescueDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention("Pointer", "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1);
+  assert.deepEqual(rescueDispositions, []);
+});
+
+test("an accept-all judge records accepted dispositions and keeps every node", async () => {
+  counter = 0;
+  const { rescuedNodes, rescueDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention("Pointer", "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    rescueDurabilityJudge: acceptAllJudge,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1);
+  assert.equal(rescueDispositions[0].disposition, "accepted");
 });
 
 test("a proposal duplicating an anchor or rescued label is dropped", async () => {

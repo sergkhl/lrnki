@@ -675,6 +675,40 @@ export type GroundingVerbatimDisposition = {
   rationale: string;
 };
 
+// Rescue durability judgment (U3, KTD3/KTD4). One bounded LLM verdict over ONE
+// aggregated `source_mentioned` rescue candidate, judged against the same-domain
+// anchors it would scaffold: is it a DURABLE prerequisite a learner must grasp
+// before those anchors, or an incidental artifact (a method label, an ablation, a
+// pedagogical-role label, a source-local detail)? Mirrors AdmissionLabelJudgment:
+// the verdict is advisory and the application boundary grounds the veto fail-OPEN.
+// `groundingSpan` is the minimal verbatim sub-quote of the node's OWN mention
+// evidence that a `not_durable` verdict rests on; an ungrounded veto is not honored.
+export type RescueDurabilityVerdict = "durable" | "not_durable";
+
+export type RescueDurabilityJudgment = {
+  verdict: RescueDurabilityVerdict;
+  groundingSpan: string;
+  rationale: string;
+};
+
+// The recorded disposition of one aggregated rescue candidate after durability
+// judging (U3/R4). `accepted` — a derived `source_mentioned` node exists; `dropped`
+// — vetoed on a CONFIDENT, source-grounded `not_durable` verdict; `kept_judge_unavailable`
+// — transport failure, invalid tool args, or an ungrounded verdict, so the node is
+// KEPT and flagged (fail-open, never a silent veto, AGENTS rule 16). Persisted (U4)
+// so an operator can read why each rescued node survived or was dropped.
+export type RescueDispositionKind = "accepted" | "dropped" | "kept_judge_unavailable";
+
+export type RescueDisposition = {
+  derivedNodeId: string;
+  canonicalLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  disposition: RescueDispositionKind;
+  rationale: string;
+  groundingSpan: string;
+};
+
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
 // meaning-bearing definition passages, bounded salience-ordered mention passages,
 // and LABELED optional typed assertions. An `explicit-prerequisite-hint` appears
@@ -737,6 +771,11 @@ export type EnrichmentRunTrace = {
   // Per-node verbatim-floor outcomes for enrichment nodes (R9, AE3). Recorded so the
   // `not_applicable_by_grounding` exemption for generated passages is never silent.
   groundingDispositions: GroundingVerbatimDisposition[];
+  // Per-aggregated-rescue-candidate durability dispositions (U3/R4). Records which
+  // `source_mentioned` candidates the durability judge accepted, dropped, or kept on
+  // judge-unavailable, so an operator can audit why each rescued node is (or is not)
+  // in the derived layer. Persisted in U4.
+  rescueDispositions: RescueDisposition[];
 };
 
 // Baseline node difficulty. MVP `method` is "dag-depth-mock" (topological depth);
