@@ -6,34 +6,21 @@ pipeline output, not by deferred method-stack preference.
 
 ## TODO
 
-1. **Tighten core admission against definition-bearing source treatment.** Fresh Rust retries
-   `431c4015-56fa-4b2c-9464-9e906381f3a0` and `b2f4f4cb-792a-4b50-9f6d-c40f50032fa4` failed closed because
-   String type / Heap allocation were admitted as core while lacking a verified Definition Passage.
-   - Fix the generic admission/CEP contract so a core Concept is selected only when source treatment can support
-     the Definition-Passage floor.
-   - Preserve domain-neutral prompts and forced tool schemas; do not patch Rust-specific expected answers.
-   - Keep failed-run quality issues inspectable in Admin Lab while preventing repeated failed publication attempts.
-2. **Add a measured source-mentioned rescue admission step.** InstructKG run
-   `d9d68ae1-ae0c-46f0-a7eb-181ed4c653dc` produced useful core anchors but the enrichment run
-   `0f9c0118-5131-4abb-8b1f-5912e398c011` rescued 16 source-mentioned nodes, including method/evaluation
-   artifacts and pedagogical-role labels that polluted the path to Knowledge Gap Diagnosis.
-   - Judge whether a source-mentioned candidate is a durable prerequisite scaffold before it enters the Derived
-     Graph Layer.
-   - Prefer a neural, domain-neutral judgment or explicit inspection workflow; do not add hardcoded lexical deny
-     patterns for role labels, ablations, or course names.
-   - Keep rescued nodes derived and auditable; do not mutate asserted Concept identity.
-3. **Expose enrichment-node provenance pressure in Admin Lab.** The mixed batch showed useful biology/economics
-   paths and noisy InstructKG rescue in the same enrichment run.
-   - Surface per-domain counts of anchors, `source_mentioned`, and `llm_grounded` nodes on enrichment detail.
-   - Make paths visibly distinguish generated prerequisites from rescued source mentions.
-   - Keep UI loaders read-only; all graph state still comes from persisted JSONB/relational artifacts.
-4. **Re-run the native batch after the two quality fixes.** The next validation should reuse the manifest-backed
-   Rust, biology, economics, and InstructKG native fixtures.
-   - Require fresh successful extraction runs or explicitly record any failed retry as a blocker.
-   - Publish only selected successful runs with complete core CEPs.
-   - Inspect each source's anchors, CEPs, enrichment nodes, prerequisite DAG, and Learner Path before adding
-     downstream graph methods.
-5. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
+Roadmap items 1–4 below were implemented and validated by the 2026-06-16 evidence-backed re-run (see
+VALIDATION); they moved to COMPLETED. The next work is earned by that run's one recorded blocker.
+
+1. **Resolve InstructKG core CEP completeness for borderline meta-concepts.** Run
+   `7ed1dbc1-6112-48b0-a263-5432e297f1a2` failed closed on one core Concept, `pedagogical roles`: admission's
+   definition-bearing criterion passed correctly (block-40 verbatim-verifies and defines the four roles), but
+   the CEP verbatim floor could not lock a single verbatim definition passage for the *unified* meta-concept
+   whose meaning is distributed across per-role sentences (see `docs/plans/BLOCKERS.md`).
+   - Decide generically — a measured neural judgment, not a lexical rule — whether such a distributed-definition
+     concept should be admitted `optional` rather than `core`, or whether the CEP floor should accept a bounded
+     multi-passage definition for a compositionally-defined concept.
+   - Do NOT patch the prompt with InstructKG-specific text or relax the verbatim floor (rule 16/17).
+   - Once InstructKG publishes, inspect its rescue path directly (the durability judge currently generalizes on
+     Rust/biology/economics artifacts only, because InstructKG did not publish in the 2026-06-16 run).
+2. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
    empty mock until path quality makes calibration the limiting problem.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, or non-LLM
      prerequisite signals from method-stack preference.
@@ -42,6 +29,17 @@ pipeline output, not by deferred method-stack preference.
 
 ## COMPLETED
 
+- **Evidence-backed node treatment contract — admission + rescue (2026-06-16, U1–U6).** Gave each promotion
+  gate an evidence-backed treatment contract: (U1) a fourth core-admission criterion requires verbatim-validated
+  definition-bearing source treatment; (U2) that verified evidence is carried into CEP extraction as a hint
+  without bypassing the port or weakening the verbatim floor; (U3) a measured, cross-family, drop-only
+  rescue-durability judge (fail-open-with-flag) gates `source_mentioned` rescue before a derived node exists;
+  (U4) per-pair judge model and rescue dispositions are persisted relationally + in the JSONB trace; (U5) Admin
+  Lab exposes per-domain origin counts, dispositions, per-edge judge model, per-step origin badges, and marks
+  failed runs not publishable. Validated by the rule-14 native re-run (see VALIDATION): Rust/biology/economics
+  succeed with 0 incomplete core CEPs (the String Type / Heap allocation failure mode is gone); the rescue judge
+  drops incidental artifacts with grounded rationales while keeping transferable concepts. One blocker recorded
+  (InstructKG core completeness for a borderline meta-concept). Domain-neutral throughout (rules 16/17).
 - **Evaluation-first roadmap reset (2026-06-16).** Normalized fixture docs so Gate 1 names the manifest-backed
   native batch including the InstructKG Markdown fixture; ran real extraction/publication/enrichment/path
   generation over Rust, biology, economics, and InstructKG; recorded disposable inspection notes under
@@ -75,7 +73,31 @@ pipeline output, not by deferred method-stack preference.
 
 ## VALIDATION
 
-Latest validation (2026-06-16) is the evaluation-first native batch reset:
+Latest validation (2026-06-16) is the **evidence-backed node treatment** native re-run
+(`docs/plans/2026-06-16-002-feat-evidence-backed-node-treatment-plan.md`,
+`tmp/2026-06-16-evidence-backed-rerun/rule-14-evaluation.md`):
+
+- **Static/unit:** `pnpm typecheck` clean across all packages; application + litellm + admin-lab suites pass;
+  Postgres persistence round-trip (per-pair judge model + rescue dispositions) verified against a fresh PG18 DB.
+- **Real-use (rule-14 mixed native batch):** config `cep-definition-bearing-admission-v36` /
+  `cep-node-enrichment-rescue-judged-v2`. Extraction over the four native fixtures: Rust
+  `69a7de11-0fce-4293-b4dd-e50ba9169a1b`, biology `e7fa2640-775b-4242-a111-3f600d9baf4f`, economics
+  `8c9874d6-ee6e-4d16-84e8-b83612aafb47` all **succeeded with 0 incomplete core CEPs**; InstructKG
+  `7ed1dbc1-6112-48b0-a263-5432e297f1a2` **failed** on one borderline core meta-concept (`pedagogical roles`,
+  recorded in BLOCKERS). Published version `4cf872e0-872b-44e0-8bee-406f4733c1a4` (20 Concepts, 0 asserted
+  edges) from the three succeeded runs; enrichment `2842dae3-a2e8-4f17-b656-3d2f1f6d6a50`. Rescue durability
+  judge dropped 5/8 candidates with grounded rationales (experiment methods, illustrative example, section
+  heading, contrast-only mention) and kept transferable concepts (Deep copy, Shallow copy, RAII). Clean
+  expert-correct paths for Rust→Ownership (`1c9c016a`), economics→Division of Labour (`2f6ae016`), and
+  biology→DNA replication (`03a2de96`).
+- **Result:** the two FIX_FIRST defects from the prior batch are fixed — Rust core admission reliability
+  (String Type / Heap allocation now admit core with complete CEPs) and InstructKG-class rescue noise (dropped
+  with grounded dispositions, generalizing across domains). One blocker recorded (InstructKG core completeness).
+  Deferred method stack stays deferred (G3 held). A FIX_FIRST found mid-run — criterion-evidence over-count
+  aborting a run — was fixed generically (cap raised to 4). Disposable evidence under
+  `tmp/2026-06-16-evidence-backed-rerun/`.
+
+### Prior validation (2026-06-16, evaluation-first native batch reset):
 
 - **Static/unit:** `pnpm --filter @lrnki/infrastructure-ingestion test -- MarkdownStructuredDocumentParser.test.ts`
   passed; `pnpm --filter @lrnki/application exec tsx --test src/runGraphEnrichment.test.ts` passed after the
