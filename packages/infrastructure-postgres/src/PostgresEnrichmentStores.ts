@@ -317,35 +317,35 @@ export class PostgresLearnerPathStore implements LearnerPathStorePort {
     await this.sql.begin(async (tx) => {
       const prior = await tx<{ learner_path_id: string }[]>`
         SELECT learner_path_id FROM learner_paths
-        WHERE enrichment_id = ${path.enrichmentId} AND target_concept_id = ${path.targetConceptId} AND learner_state_ref = ${path.learnerStateRef}`;
+        WHERE enrichment_id = ${path.enrichmentId} AND target_derived_node_id = ${path.targetConceptId} AND learner_state_ref = ${path.learnerStateRef}`;
       for (const row of prior) {
         await tx`DELETE FROM learner_path_steps WHERE learner_path_id = ${row.learner_path_id}`;
         await tx`DELETE FROM learner_paths WHERE learner_path_id = ${row.learner_path_id}`;
       }
       await tx`
-        INSERT INTO learner_paths (learner_path_id, graph_version_id, enrichment_id, target_concept_id, learner_state_ref)
+        INSERT INTO learner_paths (learner_path_id, graph_version_id, enrichment_id, target_derived_node_id, learner_state_ref)
         VALUES (${path.learnerPathId}, ${path.graphVersionId}, ${path.enrichmentId}, ${path.targetConceptId}, ${path.learnerStateRef})`;
       for (const step of path.steps) {
         await tx`
-          INSERT INTO learner_path_steps (learner_path_step_id, learner_path_id, position, concept_id, difficulty, included_reason)
+          INSERT INTO learner_path_steps (learner_path_step_id, learner_path_id, position, derived_node_id, difficulty, included_reason)
           VALUES (${randomUUID()}, ${path.learnerPathId}, ${step.position}, ${step.conceptId}, ${step.difficulty}, ${step.includedReason})`;
       }
     });
   }
 
   async getPath(input: { enrichmentId: string; targetConceptId: string; learnerStateRef: string }): Promise<LearnerPath | undefined> {
-    const rows = await this.sql<{ learner_path_id: string; graph_version_id: string; enrichment_id: string; target_concept_id: string; learner_state_ref: string }[]>`
-      SELECT learner_path_id, graph_version_id, enrichment_id, target_concept_id, learner_state_ref
+    const rows = await this.sql<{ learner_path_id: string; graph_version_id: string; enrichment_id: string; target_derived_node_id: string; learner_state_ref: string }[]>`
+      SELECT learner_path_id, graph_version_id, enrichment_id, target_derived_node_id, learner_state_ref
       FROM learner_paths
-      WHERE enrichment_id = ${input.enrichmentId} AND target_concept_id = ${input.targetConceptId} AND learner_state_ref = ${input.learnerStateRef}
+      WHERE enrichment_id = ${input.enrichmentId} AND target_derived_node_id = ${input.targetConceptId} AND learner_state_ref = ${input.learnerStateRef}
       LIMIT 1`;
     if (rows.length === 0) return undefined;
     const row = rows[0];
-    const stepRows = await this.sql<{ position: number; concept_id: string; difficulty: number; included_reason: string }[]>`
-      SELECT position, concept_id, difficulty, included_reason FROM learner_path_steps WHERE learner_path_id = ${row.learner_path_id} ORDER BY position`;
+    const stepRows = await this.sql<{ position: number; derived_node_id: string; difficulty: number; included_reason: string }[]>`
+      SELECT position, derived_node_id, difficulty, included_reason FROM learner_path_steps WHERE learner_path_id = ${row.learner_path_id} ORDER BY position`;
     const steps: LearnerPathStep[] = stepRows.map((step) => ({
       position: step.position,
-      conceptId: step.concept_id,
+      conceptId: step.derived_node_id,
       difficulty: step.difficulty,
       includedReason: step.included_reason as LearnerPathStep["includedReason"]
     }));
@@ -353,7 +353,7 @@ export class PostgresLearnerPathStore implements LearnerPathStorePort {
       learnerPathId: row.learner_path_id,
       graphVersionId: row.graph_version_id,
       enrichmentId: row.enrichment_id,
-      targetConceptId: row.target_concept_id,
+      targetConceptId: row.target_derived_node_id,
       learnerStateRef: row.learner_state_ref,
       steps
     };

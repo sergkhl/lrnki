@@ -35,7 +35,8 @@ export {
 } from "./extractionAdapters";
 export {
   LiteLlmPrerequisiteJudgmentAdapter,
-  PREREQUISITE_JUDGE_MODEL
+  PREREQUISITE_JUDGE_MODEL,
+  GENERATED_PREREQUISITE_JUDGE_MODEL
 } from "./enrichmentAdapters";
 export {
   LiteLlmGroundingGenerationAdapter,

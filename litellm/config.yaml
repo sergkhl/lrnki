@@ -266,6 +266,11 @@ router_settings:
     # pair is judged exhaustively (no embedding clustering tier); the bounded judge
     # proposes the inferred DAG using the same no-thinking extractor.
     kg-prerequisite-judgment: deepseek/deepseek-v4-flash-no-thinking
+    # Cross-family generated-node ordering judge (ADR-0023, U7). Any prerequisite
+    # pair touching an `llm_grounded` minted node is ordered HERE, on gpt-oss-120b,
+    # so the DeepSeek generator never grades its own minted output (KTD7). Anchor-only
+    # ordering stays on kg-prerequisite-judgment -> DeepSeek (no re-validation).
+    kg-generated-prerequisite-judgment: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
     # cross-family independent of the DeepSeek extractor, supports forced

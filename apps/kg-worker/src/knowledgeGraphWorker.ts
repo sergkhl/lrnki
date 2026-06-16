@@ -23,7 +23,10 @@ import {
   LiteLlmConceptAdmissionAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
-  LiteLlmPrerequisiteJudgmentAdapter
+  LiteLlmGroundingGenerationAdapter,
+  LiteLlmMissingPrerequisiteProposalAdapter,
+  LiteLlmPrerequisiteJudgmentAdapter,
+  GENERATED_PREREQUISITE_JUDGE_MODEL
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -37,7 +40,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "cep-domain-neutral-prompts-v34";
+const PIPELINE_CONFIG_HASH = "cep-domain-neutral-prompts-v35";
 
 import { existsSync } from "node:fs";
 
@@ -116,6 +119,14 @@ function buildContext() {
     // inferred DAG (deterministic decoding for stable re-derivation); difficulty +
     // learner state are mocks behind real ports.
     prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
+    // Cross-family generated-node ordering judge (ADR-0023, U7): any pair touching an
+    // `llm_grounded` minted node routes here (gpt-oss-120b) so the DeepSeek generator
+    // never grades its own minted output; anchor-only ordering stays on DeepSeek.
+    generatedPrerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient, GENERATED_PREREQUISITE_JUDGE_MODEL),
+    // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
+    // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
+    missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
+    groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
     difficulty: dagDepthDifficultyPort,
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
@@ -231,9 +242,15 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     graphVersionId: targetVersionId,
     graphStore: ctx.graphStore,
     prerequisiteJudge: ctx.prerequisiteJudge,
+    generatedPrerequisiteJudge: ctx.generatedPrerequisiteJudge,
+    missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
+    groundingGeneration: ctx.groundingGeneration,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore
   });
+  const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
+  const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;
+  console.log(`   nodes(anchor/enrichment)=${anchorNodes}/${enrichmentNodeCount}`);
   const certain = layer.prerequisiteEdges.filter((edge) => !edge.uncertain).length;
   const uncertain = layer.prerequisiteEdges.length - certain;
   console.log(

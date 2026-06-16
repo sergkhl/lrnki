@@ -489,23 +489,27 @@ CREATE TABLE concept_difficulties (
 -- persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).
 -- ---------------------------------------------------------------------------
 
+-- The learner path spans the DERIVED node space (anchors ∪ enrichment nodes), so its
+-- target and step endpoints reference derived_graph_nodes, not the asserted concepts
+-- table (U7 FK repoint). A target may be an anchor or — once minting/rescue run — an
+-- enrichment node; the asserted layer is still never mutated (R5).
 CREATE TABLE learner_paths (
   learner_path_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
-  target_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  target_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   learner_state_ref text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (enrichment_id, target_concept_id, learner_state_ref)
+  UNIQUE (enrichment_id, target_derived_node_id, learner_state_ref)
 );
 
 CREATE TABLE learner_path_steps (
   learner_path_step_id uuid PRIMARY KEY,
   learner_path_id uuid NOT NULL REFERENCES learner_paths(learner_path_id),
   position integer NOT NULL,
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   difficulty real NOT NULL,
   included_reason text NOT NULL CHECK (included_reason IN ('prerequisite', 'target')),
   UNIQUE (learner_path_id, position),
-  UNIQUE (learner_path_id, concept_id)
+  UNIQUE (learner_path_id, derived_node_id)
 );
