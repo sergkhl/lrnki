@@ -369,6 +369,29 @@ JSON_TABLE(
 ) AS t
 WHERE a.artifact_type = 'graph_snapshot.v2' AND t.assertion_type IS NOT NULL;
 
+-- Flatten enrichment-run artifact payloads: one row per derived graph node with
+-- node kind, grounding origin, and role for Admin Lab inspection.
+CREATE VIEW artifact_derived_graph_nodes AS
+SELECT a.graph_version_id, a.payload->>'enrichmentId' AS enrichment_id,
+       n.derived_node_id, n.node_kind, n.concept_id, n.grounding_origin,
+       n.role, n.canonical_label, n.normalized_label, n.declared_domain
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.derivedNodes[*]'
+  COLUMNS (
+    derived_node_id text PATH '$.derivedNodeId',
+    node_kind text PATH '$.nodeKind',
+    concept_id text PATH '$.conceptId',
+    grounding_origin text PATH '$.groundingOrigin',
+    role text PATH '$.role',
+    canonical_label text PATH '$.canonicalLabel',
+    normalized_label text PATH '$.normalizedLabel',
+    declared_domain text PATH '$.declaredDomain'
+  )
+) AS n
+WHERE a.artifact_type = 'enrichment_run.v2';
+
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
 -- version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
@@ -387,27 +410,78 @@ CREATE TABLE graph_enrichments (
   completed_at timestamptz
 );
 
+CREATE TABLE derived_graph_nodes (
+  derived_node_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  node_kind text NOT NULL CHECK (node_kind IN ('anchor', 'enrichment')),
+  concept_id uuid REFERENCES concepts(concept_id),
+  grounding_origin text NOT NULL CHECK (grounding_origin IN ('document_anchored', 'source_mentioned', 'llm_grounded')),
+  role text NOT NULL CHECK (role IN ('anchor', 'prerequisite')),
+  canonical_label text NOT NULL,
+  normalized_label text NOT NULL,
+  declared_domain text NOT NULL,
+  aliases jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (enrichment_id, concept_id),
+  CHECK (
+    (node_kind = 'anchor' AND concept_id IS NOT NULL AND grounding_origin = 'document_anchored' AND role = 'anchor')
+    OR
+    (node_kind = 'enrichment' AND concept_id IS NULL AND grounding_origin IN ('source_mentioned', 'llm_grounded') AND role = 'prerequisite')
+  )
+);
+
+CREATE TABLE enrichment_grounding_bundles (
+  enrichment_grounding_bundle_id uuid PRIMARY KEY,
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  grounding_origin text NOT NULL CHECK (grounding_origin IN ('llm_grounded')),
+  generating_model text NOT NULL,
+  rationale text NOT NULL,
+  bundle jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (derived_node_id)
+);
+
+CREATE TABLE enrichment_grounding_passages (
+  enrichment_grounding_passage_id uuid PRIMARY KEY,
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  passage_type text NOT NULL CHECK (passage_type IN ('definition', 'mention')),
+  grounding_origin text NOT NULL CHECK (grounding_origin IN ('source_mentioned', 'llm_grounded')),
+  source_resource_id uuid REFERENCES source_resources(source_resource_id),
+  source_block_id uuid REFERENCES source_blocks(source_block_id),
+  evidence_quote text,
+  generated_text text,
+  heading_path jsonb NOT NULL,
+  locator jsonb NOT NULL,
+  verbatim_check jsonb NOT NULL,
+  salience_rank integer NOT NULL,
+  CHECK (
+    (grounding_origin = 'source_mentioned' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND generated_text IS NULL)
+    OR
+    (grounding_origin = 'llm_grounded' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND generated_text IS NOT NULL)
+  )
+);
+
 CREATE TABLE inferred_prerequisite_edges (
   inferred_prerequisite_edge_id uuid PRIMARY KEY,
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   predicate text NOT NULL DEFAULT 'inferred-prerequisite-of',
-  prerequisite_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
-  dependent_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  prerequisite_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  dependent_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
   provenance jsonb NOT NULL,
-  UNIQUE (enrichment_id, prerequisite_concept_id, dependent_concept_id),
-  CHECK (prerequisite_concept_id <> dependent_concept_id)
+  UNIQUE (enrichment_id, prerequisite_derived_node_id, dependent_derived_node_id),
+  CHECK (prerequisite_derived_node_id <> dependent_derived_node_id)
 );
 
 CREATE TABLE concept_difficulties (
   concept_difficulty_id uuid PRIMARY KEY,
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   score real NOT NULL,
   method text NOT NULL,
   components jsonb NOT NULL,
-  UNIQUE (enrichment_id, concept_id)
+  UNIQUE (enrichment_id, derived_node_id)
 );
 
 -- ---------------------------------------------------------------------------
@@ -415,23 +489,27 @@ CREATE TABLE concept_difficulties (
 -- persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).
 -- ---------------------------------------------------------------------------
 
+-- The learner path spans the DERIVED node space (anchors ∪ enrichment nodes), so its
+-- target and step endpoints reference derived_graph_nodes, not the asserted concepts
+-- table (U7 FK repoint). A target may be an anchor or — once minting/rescue run — an
+-- enrichment node; the asserted layer is still never mutated (R5).
 CREATE TABLE learner_paths (
   learner_path_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
-  target_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  target_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   learner_state_ref text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (enrichment_id, target_concept_id, learner_state_ref)
+  UNIQUE (enrichment_id, target_derived_node_id, learner_state_ref)
 );
 
 CREATE TABLE learner_path_steps (
   learner_path_step_id uuid PRIMARY KEY,
   learner_path_id uuid NOT NULL REFERENCES learner_paths(learner_path_id),
   position integer NOT NULL,
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   difficulty real NOT NULL,
   included_reason text NOT NULL CHECK (included_reason IN ('prerequisite', 'target')),
   UNIQUE (learner_path_id, position),
-  UNIQUE (learner_path_id, concept_id)
+  UNIQUE (learner_path_id, derived_node_id)
 );

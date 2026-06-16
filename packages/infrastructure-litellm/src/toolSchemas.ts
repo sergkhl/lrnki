@@ -29,7 +29,7 @@ export const conceptDiscoverySchema: JsonSchema = {
         additionalProperties: false,
         required: ["candidateKey", "canonicalLabel", "mentions"],
         properties: {
-          candidateKey: { type: "string", description: "Short stable slug unique within this document, e.g. 'ownership'." },
+          candidateKey: { type: "string", description: "Short stable slug unique within this document, e.g. 'topic_x'." },
           canonicalLabel: { type: "string" },
           mentions: { type: "array", items: blockEvidenceSchema }
         }
@@ -115,7 +115,7 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             },
             atomicKey: {
               type: "string",
-              description: "Run-local key for this ATOMIC concept, unique across all decisions. Use the parentCandidateKey verbatim when the candidate names exactly one concept; append a distinct suffix per atom when splitting a conflated candidate (e.g. 'stack_heap__stack', 'stack_heap__heap')."
+              description: "Run-local key for this ATOMIC concept, unique across all decisions. Use the parentCandidateKey verbatim when the candidate names exactly one concept; append a distinct suffix per atom when splitting a conflated candidate (e.g. 'a_and_b__a', 'a_and_b__b')."
             },
             proposedCanonicalLabel: {
               type: "string",
@@ -125,7 +125,7 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             sourceRole: {
               type: "string",
               enum: ["declared_domain_concept", "out_of_domain_illustration"],
-              description: "'declared_domain_concept' when this is a genuine concept of the Declared Domain that the source teaches. 'out_of_domain_illustration' when it belongs to another domain and appears ONLY to illustrate this source (e.g. a generic sorting algorithm or SQL query inside an educational-technology paper); such material is rejected, never kept optional."
+              description: "'declared_domain_concept' when this is a genuine concept of the Declared Domain that the source teaches. 'out_of_domain_illustration' when it belongs to another domain and appears ONLY as example, sample, benchmark, or evaluation material for this source; such material is rejected, never kept optional."
             },
             standaloneLearningObjective: admissionCriterionSchema,
             establishedDomainMeaning: admissionCriterionSchema,
@@ -339,6 +339,93 @@ export const prerequisiteJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Generated grounding: submit_generated_grounding_bundle ---------------
+
+const generatedGroundingPassageSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text"],
+  properties: {
+    text: {
+      type: "string",
+      description: "Generated explanatory passage for the prerequisite concept. This is not a source quote."
+    }
+  }
+};
+
+export const generatedGroundingBundleSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["definitions", "mentions", "rationale"],
+  properties: {
+    definitions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 2,
+      description: "Generated meaning-bearing definition passages for the prerequisite concept.",
+      items: generatedGroundingPassageSchema
+    },
+    mentions: {
+      type: "array",
+      maxItems: 4,
+      description: "Generated mention-like passages that connect the prerequisite concept to the scaffolded anchors.",
+      items: generatedGroundingPassageSchema
+    },
+    rationale: {
+      type: "string",
+      description: "One terse sentence explaining why this prerequisite scaffolds the provided anchors."
+    }
+  }
+};
+
+export const generatedGroundingBundleValidator = z.object({
+  definitions: z.array(z.object({ text: z.string().min(1) }).strict()).min(1).max(2),
+  mentions: z.array(z.object({ text: z.string().min(1) }).strict()).max(4),
+  rationale: z.string().min(1)
+}).strict();
+
+// --- Missing-prerequisite proposal: submit_missing_prerequisites ----------
+// The explicit, inspectable node-IDENTITY operation (R7, KTD6, handoff): for one
+// anchor, propose prerequisite concepts the source assumes but never teaches. The
+// model returns LABELS only — grounding is generated separately — so this stays a
+// bounded proposal, not free-form node construction. The application dedupes against
+// existing node labels and enforces the per-anchor / per-run caps.
+
+export const missingPrerequisiteProposalSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["proposals"],
+  properties: {
+    proposals: {
+      type: "array",
+      description:
+        "Prerequisite concepts a learner must understand BEFORE the anchor concept but that the source assumes rather than teaches. Domain-general established concepts only; omit anything the anchor's own evidence already explains. Return an empty array when nothing is assumed.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["proposedLabel", "rationale"],
+        properties: {
+          proposedLabel: {
+            type: "string",
+            description: "Precise, domain-qualified label for one assumed-prior concept. Not the anchor itself and not already listed among the existing node labels."
+          },
+          rationale: {
+            type: "string",
+            description: "One terse sentence: why a learner must understand this before the anchor."
+          }
+        }
+      }
+    }
+  }
+};
+
+export const missingPrerequisiteProposalValidator = z.object({
+  proposals: z.array(z.object({
+    proposedLabel: z.string().min(1),
+    rationale: z.string().min(1)
+  }).strict())
+}).strict();
+
 // --- Assertion entailment judgment: submit_assertion_entailment_judgment --
 // One bounded judgment over a single optional typed assertion (ADR-0007 reset).
 // For an explicit-prerequisite-hint the model decides whether the verbatim
@@ -419,12 +506,12 @@ export const admissionLabelJudgmentSchema: JsonSchema = {
       type: "string",
       enum: ["concept", "proposition_or_claim"],
       description:
-        "'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as 'Operator Set as Bottleneck to Performance' or 'Division of Labour Limited by the Extent of the Market'. A long nominal label is still a concept."
+        "'concept' when the label is a noun phrase naming a durable unit of domain knowledge (even a long multi-word one). 'proposition_or_claim' ONLY when the label asserts a full predication about a concept — a subject + relation + object statement such as '<Subject> as <Claimed Role>' or '<Subject> limited by <Constraint>'. A long nominal label is still a concept."
     },
     underlyingNounPhrase: {
       type: "string",
       description:
-        "When proposition_or_claim, the noun-phrase concept the label reduces to (e.g. 'Operator Set' for 'Operator Set as Bottleneck to Performance'), copied verbatim from the label/evidence. Empty string when labelKind is concept."
+        "When proposition_or_claim, the noun-phrase concept the label reduces to (for example '<Subject>' from '<Subject> as <Claimed Role>'), copied verbatim from the label/evidence. Empty string when labelKind is concept."
     },
     groundingSpan: {
       type: "string",
@@ -441,4 +528,3 @@ export const admissionLabelJudgmentValidator = z.object({
   groundingSpan: z.string(),
   rationale: z.string().min(1)
 }).strict();
-

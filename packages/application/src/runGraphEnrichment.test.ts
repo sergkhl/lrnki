@@ -27,7 +27,10 @@ function concept(id: string, label: string, domain: string, aliases: string[] = 
     declaredDomain: domain,
     aliases,
     trustTier: "curated_source_grounded" as const,
-    homograph: false
+    homograph: false,
+    groundingOrigin: "document_anchored" as const,
+    role: "anchor" as const,
+    layer: "asserted" as const
   };
 }
 
@@ -123,8 +126,8 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
   };
   const difficulty: DifficultyPort = {
     method: "dag-depth-mock",
-    async score({ concepts }) {
-      return concepts.map((c) => ({ conceptId: c.conceptId, score: 0, method: "dag-depth-mock", components: {} }));
+    async score({ nodeIds }) {
+      return nodeIds.map((id) => ({ conceptId: id, score: 0, method: "dag-depth-mock", components: {} }));
     }
   };
   let persisted: DerivedGraphLayer | undefined;
@@ -211,7 +214,8 @@ test("runGraphEnrichment honors a non-default mention bound and preserves neural
       enrichmentConfigHash: "cep-pair-enrichment-v1",
       minEdgeConfidence: 0.5,
       judgeConcurrency: 4,
-      maxMentionsPerConceptInPair: 2
+      maxMentionsPerConceptInPair: 2,
+      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
     }
   });
 
@@ -302,7 +306,8 @@ test("runGraphEnrichment bounds concurrency and keeps deterministic pair order",
       enrichmentConfigHash: "cep-pair-enrichment-v1",
       minEdgeConfidence: 0.5,
       judgeConcurrency: 2,
-      maxMentionsPerConceptInPair: 6
+      maxMentionsPerConceptInPair: 6,
+      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
     }
   });
 
@@ -324,4 +329,129 @@ test("runGraphEnrichment fails the run without persisting when a pair exhausts i
   const ports = buildPorts({ judge });
   await assert.rejects(() => run(ports), /retry budget exhausted/);
   assert.equal(ports.getPersistCalls(), 0, "no partial enrichment run may be persisted");
+});
+
+// --- U5/U7: node minting + rescue + cross-family routing -----------------------
+
+import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
+import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
+
+// A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
+// densify it with a rescued node and a minted node.
+const sparseSnapshot: GraphSnapshot = {
+  graphVersionId: "v1",
+  baseGraphVersionId: null,
+  concepts: [concept("a1", "Move Semantics", "x")],
+  evidenceProfiles: [{ conceptId: "a1", definitions: [passage("b1", "Move Semantics transfers ownership")], mentions: [], assertions: [] }]
+};
+
+function buildNodePorts(options: {
+  rescue?: MentionedNonCoreCandidate[];
+  proposals?: MissingPrerequisiteProposal[];
+}) {
+  const deepseekPairs: string[] = [];
+  const crossFamilyPairs: string[] = [];
+  const labelOf = (context: PrerequisiteConceptContext) => context.canonicalLabel;
+  const judgeRecording = (sink: string[]): PrerequisiteJudgmentPort => ({
+    model: sink === deepseekPairs ? "deepseek-judge" : "cross-family-judge",
+    async judge(input) {
+      sink.push([labelOf(input.a), labelOf(input.b)].sort().join("|"));
+      return { prerequisiteConceptId: input.a.conceptId, dependentConceptId: input.b.conceptId, outcome: "none", confidence: 0.1, rationale: "mock" };
+    }
+  });
+  const prerequisiteJudge = judgeRecording(deepseekPairs);
+  const generatedPrerequisiteJudge = judgeRecording(crossFamilyPairs);
+
+  let counter = 0;
+  const newNodeId = () => `dn-${++counter}`;
+  const proposalPort: MissingPrerequisiteProposalPort = {
+    model: "mock-proposer",
+    async propose(input) { return (options.proposals ?? []).slice(0, input.maxProposals); }
+  };
+  const groundingPort: GroundingGenerationPort = {
+    model: "mock-gen",
+    async generate(input): Promise<GeneratedGroundingBundle> {
+      return {
+        derivedNodeId: input.derivedNodeId, groundingOrigin: "llm_grounded",
+        definitions: [{ passageType: "definition", text: `${input.nodeLabel} explained.`, groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }],
+        mentions: [], scaffoldedAnchorConceptIds: input.scaffoldedAnchors.map((a) => a.conceptId), generatingModel: "mock-gen", rationale: "r"
+      };
+    }
+  };
+  let persisted: DerivedGraphLayer | undefined;
+  const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
+    async getPublishedSnapshot(id) { return id === sparseSnapshot.graphVersionId ? sparseSnapshot : undefined; }
+  };
+  const difficulty: DifficultyPort = { method: "dag-depth-mock", async score({ nodeIds }) { return nodeIds.map((id) => ({ conceptId: id, score: 0, method: "dag-depth-mock", components: {} })); } };
+  const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {
+    async persist(input) { persisted = input.layer; },
+    async mentionedNonCoreCandidates() { return options.rescue ?? []; }
+  };
+  return { deepseekPairs, crossFamilyPairs, newNodeId, proposalPort, groundingPort, prerequisiteJudge, generatedPrerequisiteJudge, graphStore, difficulty, enrichmentStore, getPersisted: () => persisted };
+}
+
+function rescueCandidate(label: string): MentionedNonCoreCandidate {
+  return {
+    runId: "run-1", declaredDomain: "x", candidateKey: label.toLowerCase(), canonicalLabel: label, normalizedLabel: label.toLowerCase(), aliases: [], tier: "reject",
+    mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: `${label} is mentioned`, blockText: `Here ${label} is mentioned in prose`, headingPath: [], locator: {} }]
+  };
+}
+
+function runNodes(ports: ReturnType<typeof buildNodePorts>) {
+  return runGraphEnrichment({
+    enrichmentId: "e1", graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteJudge: ports.prerequisiteJudge,
+    generatedPrerequisiteJudge: ports.generatedPrerequisiteJudge,
+    missingPrerequisiteProposal: ports.proposalPort,
+    groundingGeneration: ports.groundingPort,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId
+  });
+}
+
+test("rescues a source_mentioned node from a member-run mention and orders it as an edge", async () => {
+  const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")] });
+  const layer = await runNodes(ports);
+  const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
+  assert.ok(rescued, "a source_mentioned rescued node is present");
+  assert.equal(rescued.role, "prerequisite");
+  // Its relationship to the anchor is judged as an edge, never a node attribute.
+  assert.ok(!("prerequisiteOf" in rescued));
+});
+
+test("mints an llm_grounded node for an anchor and never publishes it asserted", async () => {
+  const ports = buildNodePorts({ proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
+  const layer = await runNodes(ports);
+  const minted = layer.derivedNodes.filter((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "llm_grounded");
+  assert.equal(minted.length, 1);
+  assert.equal(minted[0].layer, "derived");
+  // The single anchor stays the only asserted node; enrichment nodes are all derived.
+  const asserted = layer.derivedNodes.filter((node) => node.layer === "asserted");
+  assert.equal(asserted.length, 1);
+  assert.equal(asserted[0].nodeKind, "anchor");
+});
+
+test("routes generated-node pairs cross-family and anchor/source_mentioned pairs to deepseek", async () => {
+  const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
+  await runNodes(ports);
+  // Pairs: {Move Semantics, Pointer} -> deepseek; {Move Semantics, Stack allocation}
+  // and {Pointer, Stack allocation} both touch the generated node -> cross-family.
+  assert.ok(ports.deepseekPairs.includes("Move Semantics|Pointer"), `deepseek pairs: ${ports.deepseekPairs.join(", ")}`);
+  assert.ok(ports.crossFamilyPairs.includes("Move Semantics|Stack allocation"), `cross-family pairs: ${ports.crossFamilyPairs.join(", ")}`);
+  assert.ok(ports.crossFamilyPairs.includes("Pointer|Stack allocation"));
+  // No generated pair leaks onto deepseek.
+  assert.ok(!ports.deepseekPairs.some((pair) => pair.includes("Stack allocation")));
+});
+
+test("records the verbatim-floor grounding dispositions on the run", async () => {
+  const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
+  const layer = await runNodes(ports);
+  // The minted node is exempt-recorded; the rescued mention verifies against its block.
+  const minted = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "llm_grounded");
+  const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
+  assert.ok(minted && rescued, "both enrichment node kinds survive the floor");
+  // difficulty scores every derived node (anchor + enrichment).
+  assert.equal(layer.difficulties.length, layer.derivedNodes.length);
 });

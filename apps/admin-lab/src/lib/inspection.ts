@@ -1,5 +1,5 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import type { RunCandidate } from "@lrnki/domain-core";
+import type { ExtractionQualityIssue, RunCandidate } from "@lrnki/domain-core";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -73,6 +73,7 @@ export interface RunInspection {
     boundaryReasonCodes: string[];
     confidence: number;
   }[];
+  qualityIssues: ExtractionQualityIssue[];
   profiles: RunProfile[];
 }
 
@@ -175,6 +176,13 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
       FROM artifact_run_candidates WHERE run_id = ${runId}
       ORDER BY CASE tier WHEN 'core' THEN 0 WHEN 'quarantine' THEN 1 WHEN 'optional' THEN 2 ELSE 3 END, canonical_label`;
 
+    const artifactRows = await sql<{ quality_issues: ExtractionQualityIssue[] | null }[]>`
+      SELECT payload -> 'qualityIssues' AS quality_issues
+      FROM artifact_versions
+      WHERE run_id = ${runId} AND artifact_type LIKE 'extraction_run.%'
+      ORDER BY created_at DESC
+      LIMIT 1`;
+
     // Concept Evidence Profiles: one CEP per admitted Concept (ADR-0007 reset).
     const profileRows = await sql<{ profile_id: string; candidate_key: string; canonical_label: string; tier: string; complete: boolean }[]>`
       SELECT p.run_concept_evidence_profile_id AS profile_id, cc.candidate_key, cc.canonical_label, p.tier, p.complete
@@ -224,6 +232,7 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
         boundaryReasonCodes: row.boundary_reason_codes,
         confidence: Number(row.confidence)
       })),
+      qualityIssues: artifactRows[0]?.quality_issues ?? [],
       profiles: assembleProfiles(profileRows, passageRows, assertionRows, assertionEvidenceRows)
     };
   });

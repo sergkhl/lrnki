@@ -15,9 +15,9 @@ export const demoSnapshot: GraphSnapshot = {
   graphVersionId: "demo-core-graph-v1",
   baseGraphVersionId: null,
   concepts: [
-    { conceptId: "calculus", iri: "https://lrnki.local/concept/calculus", canonicalLabel: "Calculus", normalizedLabel: "calculus", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false },
-    { conceptId: "derivative", iri: "https://lrnki.local/concept/derivative", canonicalLabel: "Derivative", normalizedLabel: "derivative", declaredDomain: "mathematics", aliases: ["differential coefficient"], trustTier: "curated_source_grounded", homograph: false },
-    { conceptId: "limit", iri: "https://lrnki.local/concept/limit", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false }
+    { conceptId: "calculus", iri: "https://lrnki.local/concept/calculus", canonicalLabel: "Calculus", normalizedLabel: "calculus", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" },
+    { conceptId: "derivative", iri: "https://lrnki.local/concept/derivative", canonicalLabel: "Derivative", normalizedLabel: "derivative", declaredDomain: "mathematics", aliases: ["differential coefficient"], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" },
+    { conceptId: "limit", iri: "https://lrnki.local/concept/limit", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }
   ],
   evidenceProfiles: [
     { conceptId: "calculus", definitions: [passage("Calculus is the mathematical study of continuous change.")], mentions: [passage("Calculus builds on the notions of limit and derivative.")], assertions: [] },

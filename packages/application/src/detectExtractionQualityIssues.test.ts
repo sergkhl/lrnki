@@ -1,0 +1,111 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { ExtractionRunResult, RunCandidate } from "@lrnki/domain-core";
+import { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
+
+test("flags a core-poor run while retaining the standing neutral-prompt note", () => {
+  const issues = detectExtractionQualityIssues(run({ candidates: [candidate({ tier: "optional" })], evidenceProfiles: [] }));
+
+  assert.ok(issues.some((issue) => issue.issueType === "generic_domain_neutral_prompt" && issue.severity === "info"));
+  assert.ok(issues.some((issue) => issue.issueType === "possible_missing_core_concept" && issue.severity === "warning"));
+});
+
+test("flags failed runs where a core concept lacks a complete CEP", () => {
+  const issues = detectExtractionQualityIssues(run({
+    status: "failed",
+    candidates: [candidate({ candidateKey: "alpha", label: "Alpha" })],
+    evidenceProfiles: [{ candidateKey: "alpha", tier: "core", definitions: [], mentions: [], assertions: [], complete: false }]
+  }));
+
+  const issue = issues.find((item) => item.issueType === "insufficient_source_treatment");
+  assert.equal(issue?.candidateKey, "alpha");
+  assert.equal(issue?.conceptLabel, "Alpha");
+  assert.deepEqual(issue?.evidenceQuotes, ["Alpha is a taught concept.", "Alpha has a second aspect."]);
+});
+
+test("flags proposition-label demotions and out-of-domain illustration rejects", () => {
+  const issues = detectExtractionQualityIssues(run({
+    candidates: [
+      candidate({ candidateKey: "claim", label: "Alpha limited by Beta", tier: "optional", boundaryReasonCodes: ["proposition_label_judged"] }),
+      candidate({ candidateKey: "foreign", label: "Foreign Example", tier: "reject", sourceRole: "out_of_domain_illustration" })
+    ],
+    evidenceProfiles: []
+  }));
+
+  assert.ok(issues.some((issue) => issue.issueType === "possible_proposition_label" && issue.candidateKey === "claim"));
+  assert.ok(issues.some((issue) => issue.issueType === "possible_out_of_domain_illustration" && issue.candidateKey === "foreign" && issue.severity === "info"));
+});
+
+function run(overrides: Partial<ExtractionRunResult> = {}): ExtractionRunResult {
+  return {
+    runId: "run-1",
+    sourceResourceId: "source-1",
+    sourceDocumentId: "document-1",
+    declaredDomain: "test domain",
+    pipelineConfigHash: "test",
+    maxMentionsPerConceptPerSource: 6,
+    candidates: [],
+    evidenceProfiles: [],
+    qualityIssues: [],
+    status: "succeeded",
+    ...overrides
+  };
+}
+
+function candidate(input: {
+  candidateKey?: string;
+  label?: string;
+  tier?: RunCandidate["admission"]["tier"];
+  sourceRole?: RunCandidate["admission"]["sourceRole"];
+  boundaryReasonCodes?: string[];
+} = {}): RunCandidate {
+  const label = input.label ?? "Alpha";
+  const tier = input.tier ?? "core";
+  return {
+    candidateKey: input.candidateKey ?? "alpha",
+    parentCandidateKey: input.candidateKey ?? "alpha",
+    discoveredLabel: label,
+    canonicalLabel: label,
+    normalizedLabel: label.toLowerCase(),
+    aliases: [],
+    mentions: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }],
+    admission: {
+      modelTier: tier,
+      tier,
+      sourceRole: input.sourceRole ?? "declared_domain_concept",
+      proposedCanonicalLabel: label,
+      standaloneLearningObjective: {
+        modelPassed: true,
+        passed: true,
+        rationale: "standalone",
+        submittedEvidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }],
+        evidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }]
+      },
+      establishedDomainMeaning: {
+        modelPassed: true,
+        passed: true,
+        rationale: "meaning",
+        submittedEvidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }],
+        evidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }]
+      },
+      organizingPower: {
+        modelPassed: true,
+        passed: true,
+        rationale: "organizes",
+        submittedAspects: [],
+        aspects: [
+          {
+            summary: "second aspect",
+            nature: "mechanism",
+            evidence: { blockId: "block-1", evidenceQuote: `${label} has a second aspect.` }
+          }
+        ]
+      },
+      coreSelected: tier === "core",
+      selectionReasonCode: tier === "core" ? "source_level_core" : "supporting_mechanism",
+      reasonCodes: [],
+      boundaryReasonCodes: input.boundaryReasonCodes ?? [],
+      confidence: 0.9
+    }
+  };
+}

@@ -522,7 +522,10 @@ export class PostgresGraphVersionStore implements GraphVersionStorePort {
         declaredDomain: row.declared_domain,
         aliases: aliasesByConcept.get(row.concept_id) ?? [],
         trustTier: row.trust_tier as GraphSnapshot["concepts"][number]["trustTier"],
-        homograph: row.homograph
+        homograph: row.homograph,
+        groundingOrigin: "document_anchored",
+        role: "anchor",
+        layer: "asserted"
       })),
       evidenceProfiles: conceptRows.map((row) => profileFor(row.concept_id))
     };

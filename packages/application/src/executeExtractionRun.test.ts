@@ -59,7 +59,7 @@ const candidates: DiscoveredCandidate[] = [
   }
 ];
 
-function admission(candidate: DiscoveredCandidate): AdmissionProposal {
+function admission(candidate: DiscoveredCandidate, overrides: Partial<AdmissionProposal> = {}): AdmissionProposal {
   const quote = candidate.candidateKey === "framework" ? frameworkQuote : signalQuote;
   const blockId = candidate.candidateKey === "framework" ? "block-1" : "block-2";
   return {
@@ -81,7 +81,8 @@ function admission(candidate: DiscoveredCandidate): AdmissionProposal {
     coreSelected: true,
     selectionReasonCode: "source_level_core",
     reasonCodes: ["source_level_core"],
-    confidence: 0.9
+    confidence: 0.9,
+    ...overrides
   };
 }
 
@@ -102,7 +103,8 @@ const definitionFor: Record<string, ExtractedEvidenceProfile> = {
 
 function harness(
   extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
-  selectedCandidates = candidates
+  selectedCandidates = candidates,
+  admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission
 ) {
   let persisted: ExtractionRunResult | undefined;
   let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
@@ -121,7 +123,7 @@ function harness(
       },
       pipelineConfigHash: "test-v1",
       discovery: { discover: async () => selectedCandidates },
-      admission: { admit: async () => selectedCandidates.map(admission) },
+      admission: { admit: async () => selectedCandidates.map(admit) },
       evidenceProfileExtraction: { extract },
       assertionEntailmentJudge: entailEverything,
       admissionLabelJudge: everythingIsAConcept,
@@ -143,7 +145,7 @@ test("produces one complete CEP per admitted concept and marks the run succeeded
   assert.equal(result.maxMentionsPerConceptPerSource, 6);
 });
 
-test("marks the run failed when an admitted concept has no verified definition passage", async () => {
+test("marks the run failed when a core concept has no verified definition passage", async () => {
   const result = await harness(async (input) =>
     input.subject.candidateKey === "signals"
       ? { definitions: [], mentions: [], assertions: [] }
@@ -151,6 +153,24 @@ test("marks the run failed when an admitted concept has no verified definition p
   ).run();
   assert.equal(result.status, "failed");
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+});
+
+test("keeps an incomplete optional profile inspectable without failing the run", async () => {
+  const result = await harness(
+    async (input) =>
+      input.subject.candidateKey === "signals"
+        ? { definitions: [], mentions: [{ blockId: "block-2", evidenceQuote: "Temporal signals" }], assertions: [] }
+        : definitionFor[input.subject.candidateKey],
+    candidates,
+    (candidate) =>
+      candidate.candidateKey === "signals"
+        ? admission(candidate, { tier: "optional", coreSelected: false, selectionReasonCode: "supporting_mechanism" })
+        : admission(candidate)
+  ).run();
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "framework")?.complete, true);
 });
 
 test("a non-verbatim definition quote is removed, leaving an incomplete profile and a failed run", async () => {
@@ -177,9 +197,11 @@ test("persists the run with its immutable extraction artifact in the same call",
   const result = await h.run();
   assert.equal(h.persisted()?.runId, "run-1");
   const artifact = h.artifact();
-  assert.equal(artifact?.artifactType, "extraction_run.v5");
+  assert.equal(artifact?.artifactType, "extraction_run.v6");
+  assert.equal(artifact?.schemaVersion, "6");
   assert.equal(artifact?.runId, "run-1");
   assert.equal(artifact?.payload, result);
+  assert.ok(result.qualityIssues.some((issue) => issue.issueType === "generic_domain_neutral_prompt"));
 });
 
 // --- U1 regression: atomic admission splitting and fail-closed atom validation ---

@@ -49,7 +49,7 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
       container: containerRef.current,
       elements: [
         ...view.cytoscape.nodes.map((node) => ({
-          data: { id: node.id, label: node.label, domain: node.domain }
+          data: { id: node.id, label: node.label, domain: node.domain, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin }
         })),
         ...view.cytoscape.edges.map((edge) => ({
           data: { id: edge.id, source: edge.source, target: edge.target, uncertain: edge.uncertain }
@@ -81,6 +81,26 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
             "text-margin-y": 6,
             height: 26,
             width: 26
+          }
+        },
+        {
+          // Enrichment nodes (minted/rescued) are visually distinct from anchors
+          // (R15): a rounded rectangle in the secondary color so an operator never
+          // confuses a derived node with an asserted anchor.
+          selector: "node[nodeKind = 'enrichment']",
+          style: {
+            shape: "round-rectangle",
+            "background-color": color("--secondary"),
+            "border-color": color("--ring")
+          }
+        },
+        {
+          // Minted llm_grounded nodes carry a dashed border — their grounding is
+          // generated, not source-verbatim (the non-verbatim trust contract, R9).
+          selector: "node[groundingOrigin = 'llm_grounded']",
+          style: {
+            "border-style": "dashed",
+            "border-width": 2
           }
         },
         {
@@ -165,15 +185,38 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
           <ScrollArea className="h-full max-h-[30rem]">
             <div className="flex flex-col gap-4 pr-3">
               <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Concepts</h3>
+                <h3 className="text-sm font-medium">Nodes (anchors + enrichment)</h3>
                 <ul className="flex flex-col gap-1">
                   {view.textual.nodes.map((node) => (
-                    <li key={`${node.domain}-${node.label}`} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm">
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{node.label}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{node.domain}</span>
-                      </span>
-                      <Badge variant="outline">{node.difficulty === null ? "—" : `difficulty ${node.difficulty.toFixed(2)}`}</Badge>
+                    <li key={`${node.domain}-${node.label}`} className="flex flex-col gap-1.5 rounded-md border px-2 py-1.5 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{node.label}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{node.domain}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1">
+                          <Badge variant={node.nodeKind === "anchor" ? "default" : "secondary"}>{node.nodeKind === "anchor" ? "anchor" : "enrichment"}</Badge>
+                          <Badge variant="outline">{node.difficulty === null ? "—" : node.difficulty.toFixed(2)}</Badge>
+                        </span>
+                      </div>
+                      {node.grounding ? (
+                        <div className="flex flex-col gap-1 rounded-sm bg-muted/40 px-2 py-1.5 text-xs">
+                          <span className="flex flex-wrap items-center gap-1">
+                            <Badge variant="outline">{node.groundingOrigin}</Badge>
+                            <Badge variant={node.grounding.verbatimDisposition === "not_applicable_by_grounding" ? "secondary" : "outline"}>
+                              verbatim: {node.grounding.verbatimDisposition}
+                            </Badge>
+                            {node.grounding.generatingModel ? <span className="text-muted-foreground">via {node.grounding.generatingModel}</span> : null}
+                          </span>
+                          {node.grounding.rationale ? <span className="text-muted-foreground italic">{node.grounding.rationale}</span> : null}
+                          {node.grounding.passages.map((passage, index) => (
+                            <span key={index} className="block">
+                              <span className="text-muted-foreground">{passage.passageType}: </span>
+                              <span>{passage.text}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

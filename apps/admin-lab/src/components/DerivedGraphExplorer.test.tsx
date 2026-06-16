@@ -23,9 +23,9 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { conceptId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0 },
-    { conceptId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1 },
-    { conceptId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2 }
+    { conceptId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { conceptId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", grounding: null },
+    { conceptId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
     { prerequisiteConceptId: "scope", dependentConceptId: "ownership", confidence: 0.9, uncertain: false },
@@ -60,4 +60,28 @@ test("difficulty is carried into the textual node list", () => {
   const view = buildDerivedGraphView(detail);
   assert.deepEqual(view.textual.nodes.map((n) => n.difficulty), [0, 1, 2]);
   assert.deepEqual(view.textual.nodes.map((n) => n.label), ["Variable scope", "Ownership", "Move semantics"]);
+});
+
+// U8: the view model distinguishes anchors from enrichment nodes (R15) and surfaces
+// each enrichment node's grounding bundle + recorded verbatim disposition (R15, AE3).
+test("anchors and enrichment nodes are distinguished, with grounding exposed", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.deepEqual(view.cytoscape.nodes.map((n) => n.nodeKind), ["enrichment", "anchor", "enrichment"]);
+  assert.deepEqual(view.cytoscape.nodes.map((n) => n.groundingOrigin), ["source_mentioned", "document_anchored", "llm_grounded"]);
+  // The anchor carries no grounding bundle; both enrichment nodes do.
+  const anchor = view.textual.nodes.find((n) => n.nodeKind === "anchor");
+  assert.equal(anchor?.grounding, null);
+  const minted = view.textual.nodes.find((n) => n.groundingOrigin === "llm_grounded");
+  assert.equal(minted?.grounding?.verbatimDisposition, "not_applicable_by_grounding");
+  assert.equal(minted?.grounding?.passages[0].text, "Move semantics transfer ownership.");
+  const rescued = view.textual.nodes.find((n) => n.groundingOrigin === "source_mentioned");
+  assert.equal(rescued?.grounding?.verbatimDisposition, "verified");
+});
+
+// AE5: a rescued source_mentioned node relates to an anchor via a prerequisite EDGE,
+// never a node attribute.
+test("a rescued node's relationship to an anchor is an edge, not an attribute", () => {
+  const view = buildDerivedGraphView(detail);
+  const edge = view.textual.edges.find((e) => e.prerequisiteLabel === "Variable scope" && e.dependentLabel === "Ownership");
+  assert.ok(edge, "the rescued node precedes the anchor via an inferred edge");
 });

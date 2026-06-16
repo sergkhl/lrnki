@@ -19,8 +19,8 @@ const snapshot: GraphSnapshot = {
   graphVersionId: "gv-2",
   baseGraphVersionId: "gv-1",
   concepts: [
-    { conceptId: "c1", iri: "iri:1", canonicalLabel: "Derivative", normalizedLabel: "derivative", declaredDomain: "math", aliases: ["differential coefficient"], trustTier: "curated_source_grounded", homograph: false },
-    { conceptId: "c2", iri: "iri:2", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "math", aliases: [], trustTier: "curated_source_grounded", homograph: false }
+    { conceptId: "c1", iri: "iri:1", canonicalLabel: "Derivative", normalizedLabel: "derivative", declaredDomain: "math", aliases: ["differential coefficient"], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" },
+    { conceptId: "c2", iri: "iri:2", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "math", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }
   ],
   evidenceProfiles: [
     {

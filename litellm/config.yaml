@@ -181,6 +181,38 @@ model_list:
   #     model: "openrouter/mistralai/mistral-small-2603"
   #     api_key: os.environ/OPENROUTER_API_KEY
 
+  # Candidate prerequisite judge / independent eval model.
+  # Qwen3-235B-A22B-Instruct-2507 is a multilingual MoE model with 22B active
+  # parameters, 262K context, strong instruction following / logical reasoning /
+  # tool-use positioning, and no thinking-mode blocks. Consider as a non-OpenAI,
+  # non-DeepSeek primary judge candidate for kg-prerequisite-judgment.
+  # OpenRouter list price: $0.09 input / $0.10 output per 1M tokens.
+  - model_name: "openrouter/qwen/qwen3-235b-a22b-2507"
+    litellm_params:
+      model: "openrouter/qwen/qwen3-235b-a22b-2507"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000009
+      output_cost_per_token: 0.00000010
+    model_info:
+      mode: "chat"
+      max_input_tokens: 262144
+
+  # Candidate prerequisite judge / schema-reliability eval model.
+  # Llama 4 Scout is a Meta MoE model activating 17B parameters out of 109B,
+  # with native multimodal support and very large 10M context. Consider as a
+  # cheap cross-family judge candidate, especially for provider-pinned structured
+  # output experiments; validate forced tool_choice before using in production.
+  # OpenRouter list price: $0.10 input / $0.30 output per 1M tokens.
+  - model_name: "openrouter/meta-llama/llama-4-scout"
+    litellm_params:
+      model: "openrouter/meta-llama/llama-4-scout"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000010
+      output_cost_per_token: 0.00000030
+    model_info:
+      mode: "chat"
+      max_input_tokens: 10000000
+
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY # Required for API key management
   block_robots: true
@@ -234,6 +266,11 @@ router_settings:
     # pair is judged exhaustively (no embedding clustering tier); the bounded judge
     # proposes the inferred DAG using the same no-thinking extractor.
     kg-prerequisite-judgment: deepseek/deepseek-v4-flash-no-thinking
+    # Cross-family generated-node ordering judge (ADR-0023, U7). Any prerequisite
+    # pair touching an `llm_grounded` minted node is ordered HERE, on gpt-oss-120b,
+    # so the DeepSeek generator never grades its own minted output (KTD7). Anchor-only
+    # ordering stays on kg-prerequisite-judgment -> DeepSeek (no re-validation).
+    kg-generated-prerequisite-judgment: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
     # cross-family independent of the DeepSeek extractor, supports forced

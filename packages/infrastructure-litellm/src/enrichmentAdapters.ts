@@ -9,6 +9,13 @@ import { prerequisiteJudgmentSchema, prerequisiteJudgmentValidator } from "./too
 // a raw provider.
 export const PREREQUISITE_JUDGE_MODEL = "kg-prerequisite-judgment";
 
+// Cross-family generated-node ordering judge (ADR-0023, U7, KTD7). Reuses the same
+// LiteLlmPrerequisiteJudgmentAdapter (named-label + `uncertain` mitigations intact),
+// only the alias differs — any pair touching an `llm_grounded` node routes here so the
+// DeepSeek generator never grades its own minted output. Goes through LiteLLM, never a
+// raw provider.
+export const GENERATED_PREREQUISITE_JUDGE_MODEL = "kg-generated-prerequisite-judgment";
+
 // Render one Concept's published CEP for the judge: its label, aliases, verbatim
 // definition and mention quotes, and LABELED optional typed assertions. An
 // explicit-prerequisite-hint is presented as labeled evidence the judge MAY weigh

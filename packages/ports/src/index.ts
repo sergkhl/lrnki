@@ -3,16 +3,18 @@ import type {
   AdmissionProposal,
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
-  Concept,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
   ExtractionRunResult,
+  GeneratedGroundingBundle,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
+  MentionedNonCoreCandidate,
+  MissingPrerequisiteProposal,
   PrerequisiteConceptContext,
   PrerequisiteJudgment,
   PublishedConceptIdentity,
@@ -186,12 +188,46 @@ export interface PrerequisiteJudgmentPort {
   }): Promise<PrerequisiteJudgment>;
 }
 
+export interface GroundingGenerationPort {
+  readonly model: string;
+  generate(input: {
+    derivedNodeId: string;
+    declaredDomain: string;
+    nodeLabel: string;
+    scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
+  }): Promise<GeneratedGroundingBundle>;
+}
+
+// Missing-prerequisite proposal (R7, KTD6, handoff constraint). The explicit,
+// inspectable node-IDENTITY operation that must run BEFORE any grounding is minted:
+// for ONE anchor, propose up to `maxProposals` prerequisite concepts the source
+// assumes a learner already knows but never teaches. Bounded and anchor-driven (no
+// unbounded graph-wide gap-filling); the application dedupes proposals against the
+// labels already present in the run (anchors + rescued + already-minted) within the
+// Declared Domain. Forced named tool schema; arguments validated and failed closed.
+// The generator stays DeepSeek-family (AGENTS rule 5), which is exactly why the
+// generated-node ordering judge must be cross-family (KTD7).
+export interface MissingPrerequisiteProposalPort {
+  readonly model: string;
+  propose(input: {
+    declaredDomain: string;
+    anchor: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] };
+    existingNodeLabels: string[];
+    maxProposals: number;
+  }): Promise<MissingPrerequisiteProposal[]>;
+}
+
 // Baseline node difficulty (ADR-0019). MVP impl = deterministic DAG-depth mock
 // behind this port; Bradley-Terry pairwise calibration replaces the impl without
 // changing the port. Reads concepts + the inferred prereq DAG; one score each.
 export interface DifficultyPort {
   readonly method: string;
-  score(input: { concepts: Concept[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
+  // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
+  // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
+  // nodes are never fabricated into `Concept` values to satisfy the port (handoff
+  // constraint). `nodeIds` are `derived_node_id`s; the returned `conceptId` field
+  // carries the derived node id (the difficulty store keys on derived_node_id).
+  score(input: { nodeIds: string[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock
@@ -213,6 +249,13 @@ export interface EnrichmentRunStorePort {
     artifact: ArtifactEnvelope<EnrichmentRunTrace>;
   }): Promise<void>;
   getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined>;
+  // Rescue source for Graph Enrichment (KTD5, R7): the member Extraction Runs of
+  // `graphVersionId` (resolved via graph_version_run_memberships) reduced to their
+  // rejected/optional admission proposals that carry a verbatim MENTION but no
+  // Definition Passage. Each carries resolved mention provenance plus the cited
+  // block's text so the verbatim floor (U6) re-verifies at enrichment time. These
+  // become `source_mentioned`/`derived` nodes only and never touch the asserted core.
+  mentionedNonCoreCandidates(graphVersionId: string): Promise<MentionedNonCoreCandidate[]>;
 }
 
 // Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the

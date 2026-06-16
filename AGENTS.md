@@ -8,7 +8,7 @@
 
 4. Prioritize real curated source fixtures across mixed domains and formats.
 
-5. Route LLM calls through LiteLLM aliases. Concept discovery, concept admission, and concept-conditioned claim extraction must not bypass their ports. Production extraction uses DeepSeek V4 Flash with thinking explicitly disabled unless an experiment states otherwise.
+5. Route LLM calls through LiteLLM aliases. Concept discovery, concept admission, and concept-conditioned Concept Evidence Profile extraction must not bypass their ports. Production extraction uses DeepSeek V4 Flash with thinking explicitly disabled unless an experiment states otherwise.
 
 6. Structured LLM output must use forced named tool schemas. Do not depend on free-form JSON output. Validate all tool arguments in the application boundary and fail closed.
 
@@ -20,7 +20,7 @@
 
 10. Store stable curated sources under fixtures/. Store generated artifacts, reports, and scratch outputs under disposable gitignored tmp/.
 
-11. Model-authored benchmark labels are oracle references, not human gold. Freeze model, prompt, rubric, evidence, source hashes, and second-judge outcomes. Quarantine disagreements.
+11. Quality validation is real-source inspection (rule 14), the retained inline production judges, and deterministic verbatim-evidence verification. Model-authored measurement is disposable scaffolding, never human gold: build a benchmark or oracle only for a specific fix, keep it only while it earns its keep, and remove it once it has. No standing benchmark harness lives in the core (ADR-0013).
 
 12. Keep Admin Lab minimal and graph-focused. It may inspect and trigger explicit versioned operations. It must never silently mutate a published graph.
 
@@ -31,3 +31,5 @@
 15. When developing Web UI, use shadcn base-ui components, apply instructions from @.agents/skills/shadcn/SKILL.md. For graph visualization use cytoscape library.
 
 16. Symbolic gates over neural output must earn their veto. Keep the symbolic layer of the neuro-symbolic approach minimal and prefer neural judgment. A deterministic gate may hard-veto only to enforce a provable guarantee — for example, evidence quotes must match a cited source block verbatim. Heuristic symbolic gates — hardcoded lexical patterns, phrase whitelists, surface-order matchers, closed connective lists — must NOT silently veto otherwise-valid LLM output. Introduce such a gate only as an explicit measured module, and keep it only while an oracle shows it raises precision without discarding valid output. When a heuristic gate produces false negatives, replace it with a measured neural judge or remove it; never expand its hardcoded patterns to chase coverage. The "fail closed" in rule 6 governs schema and tool-argument validity, not semantic acceptance of well-formed output.
+
+17. Keep extraction domain-neutral; never overfit prompts to fixtures or benchmarks. Concept discovery, admission, Core Set Selection, CEP extraction, and all judge prompts — including forced-tool-schema `description` fields, which are model-facing — must express domain-neutral rubric language only. Do NOT inject fixture- or benchmark-specific calibration: named concepts from a known source, expected per-source outcomes, "this source should yield X" tuning, or exemplar lists drawn from a project fixture (e.g. Rust ownership terms, MLE-bench method names, a specific economics chapter title). Such hacks raise one benchmark's score while violating the learner-neutral, domain-general contract (rule 3) and hiding the real defect. When real-use output is wrong, do not patch the prompt with the fixture's answer: surface the defect, record it as a run-scoped quality issue, and fix the root cause — a generic rubric clause, a measured neural judge (rule 16), or an architectural change. Accepting temporary, explicitly-noted quality degradation while the root-cause fix is designed (rules 13–14) is preferred over a benchmark-fitting prompt. Generic illustrative phrasing and abstract placeholders that name no project fixture are allowed; fixture-derived exemplars are not.

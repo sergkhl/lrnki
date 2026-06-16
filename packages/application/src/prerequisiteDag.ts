@@ -1,4 +1,4 @@
-import type { Concept, ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-core";
+import type { ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-core";
 import type { DifficultyPort } from "@lrnki/ports";
 
 // ---------------------------------------------------------------------------
@@ -241,10 +241,7 @@ export function dagDepthDifficulty(conceptIds: string[], edges: Edge[]): Concept
 // changing the injected port, never the projection upstream (the seam discipline).
 export const dagDepthDifficultyPort: DifficultyPort = {
   method: "dag-depth-mock",
-  async score({ concepts, prerequisiteEdges }: { concepts: Concept[]; prerequisiteEdges: Edge[] }) {
-    return dagDepthDifficulty(
-      concepts.map((c) => c.conceptId),
-      prerequisiteEdges
-    );
+  async score({ nodeIds, prerequisiteEdges }: { nodeIds: string[]; prerequisiteEdges: Edge[] }) {
+    return dagDepthDifficulty(nodeIds, prerequisiteEdges);
   }
 };

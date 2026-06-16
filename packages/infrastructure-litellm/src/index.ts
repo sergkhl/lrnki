@@ -12,6 +12,10 @@ export {
   conceptEvidenceProfileValidator,
   prerequisiteJudgmentSchema,
   prerequisiteJudgmentValidator,
+  generatedGroundingBundleSchema,
+  generatedGroundingBundleValidator,
+  missingPrerequisiteProposalSchema,
+  missingPrerequisiteProposalValidator,
   assertionEntailmentJudgmentSchema,
   assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
@@ -31,5 +35,14 @@ export {
 } from "./extractionAdapters";
 export {
   LiteLlmPrerequisiteJudgmentAdapter,
-  PREREQUISITE_JUDGE_MODEL
+  PREREQUISITE_JUDGE_MODEL,
+  GENERATED_PREREQUISITE_JUDGE_MODEL
 } from "./enrichmentAdapters";
+export {
+  LiteLlmGroundingGenerationAdapter,
+  GROUNDING_GENERATION_MODEL
+} from "./groundingGenerationAdapters";
+export {
+  LiteLlmMissingPrerequisiteProposalAdapter,
+  MISSING_PREREQUISITE_PROPOSAL_MODEL
+} from "./missingPrerequisiteProposalAdapters";
