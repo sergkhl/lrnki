@@ -252,6 +252,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
           nodeKind: "enrichment",
           derivedNodeId: node.derived_node_id,
           groundingOrigin: "llm_grounded",
+          mintingReason: "assumed_prerequisite",
           role: "prerequisite",
           layer: "derived",
           canonicalLabel: node.canonical_label,

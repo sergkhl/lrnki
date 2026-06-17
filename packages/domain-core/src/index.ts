@@ -600,6 +600,8 @@ export type GeneratedGroundingBundle = {
   rationale: string;
 };
 
+export type MintingReason = "assumed_prerequisite" | "densification";
+
 export type AnchorProjectionNode = {
   nodeKind: "anchor";
   derivedNodeId: string;
@@ -630,6 +632,7 @@ export type LlmGroundedEnrichmentNode = {
   nodeKind: "enrichment";
   derivedNodeId: string;
   groundingOrigin: "llm_grounded";
+  mintingReason: MintingReason;
   role: "prerequisite";
   layer: "derived";
   canonicalLabel: string;
@@ -649,6 +652,11 @@ export type DerivedGraphNode = AnchorProjectionNode | EnrichmentNode;
 // labels exist. Proposals are anchor-driven (each names the anchor it scaffolds) and
 // bounded; the application dedupes them against existing node labels within domain.
 export type MissingPrerequisiteProposal = {
+  proposedLabel: string;
+  rationale: string;
+};
+
+export type BridgeConceptProposal = {
   proposedLabel: string;
   rationale: string;
 };

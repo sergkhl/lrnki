@@ -156,6 +156,7 @@ export async function assembleEnrichmentNodes(input: {
         nodeKind: "enrichment",
         derivedNodeId,
         groundingOrigin: "llm_grounded",
+        mintingReason: "assumed_prerequisite",
         role: "prerequisite",
         layer: "derived",
         canonicalLabel: proposal.proposedLabel,

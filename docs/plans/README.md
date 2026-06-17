@@ -14,6 +14,8 @@ These are not live work; their tasks are recorded in `TODO.md` COMPLETED.
 
 - [2026-06-16-001 Evaluation-first roadmap reset](./2026-06-16-001-feat-evaluation-first-roadmap-reset-plan.md)
 - [2026-06-16-002 Evidence-backed node treatment contract](./2026-06-16-002-feat-evidence-backed-node-treatment-plan.md)
+- [2026-06-17-001 Demote ungroundable core concepts](./2026-06-17-001-feat-demote-ungroundable-core-plan.md)
+- [2026-06-17-002 Enrichment-ordering eval gate + F3 v1 densification](./2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md)
 
 ## Progress report instructions
 

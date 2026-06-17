@@ -9,7 +9,27 @@ pipeline output, not by deferred method-stack preference.
 Roadmap items 1–4 below were implemented and validated by the 2026-06-16 evidence-backed re-run (see
 VALIDATION); they moved to COMPLETED. The next work is earned by that run's one recorded blocker.
 
-1. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
+1. **Densification F3 v2 — measured thin-connected-region trigger (`EXPERIMENT_ONLY`).** F3 v1 shipped but its
+   topology-primary trigger only fires on disconnected components and orphan nodes. The F1 baseline is already
+   same-domain-connected, so v1 found 0 candidate gaps and densification value is still **unmeasured** — this is a
+   trigger/target mismatch, not a verdict that bridging has no value. Improve the trigger to detect the
+   *thin-but-connected* sparsity F1 actually documented.
+   - Target the three concrete F1-documented thin regions as the evaluation set: the biology experimental-design
+     bridge (isotope labeling ↔ density-gradient ultracentrifugation), the economics market-distribution step
+     (specialization → opulence skipping `Market Exchange and Distribution`), and the InstructKG pedagogical-role
+     bridge (`Semantic Signals` ↔ `Pedagogical Roles`). See `tmp/2026-06-17-f1-enrichment-eval/rule-14-evaluation.md`.
+   - Reuse the existing harness unchanged: `runDensificationExperiment.ts`, `BridgeConceptProposalPort`, the
+     generated-grounding bundle, the cross-family generated-node judge, and the DAG disposal helpers. Only
+     `detectSparseRegions` (`packages/application/src/sparseRegionDetection.ts`) grows a thin-region path.
+   - The thin-region signal must be a **measured, domain-neutral module (AGENTS rule 16)**, not a hardcoded lexical
+     or surface heuristic that silently vetoes. Evaluate candidate signals (long same-domain shortest-path between
+     declined pairs inside one component; low-degree articulation concepts; source-implied-but-unconnected pairs)
+     by measurement against the F1 set before any bridge is proposed; keep the signal only while an oracle shows it
+     raises connectivity value without adding noise, then delete the oracle (rule 11).
+   - Stay `EXPERIMENT_ONLY` (rule 11, ADR-0019 / plan KTD4): append-only experiment artifact, asserted graph
+     byte-for-byte unchanged, no embeddings (ADR-0012 stands), prompts domain-neutral (rule 17).
+
+2. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
    empty mock until path quality makes calibration the limiting problem.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, or non-LLM
      prerequisite signals from method-stack preference.
@@ -18,6 +38,18 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
 
 ## COMPLETED
 
+- **Enrichment-ordering evaluation gate (F1) and v1 densification experiment (F3) (2026-06-17).** Ran a real
+  mixed-domain F1 evaluation of Graph Enrichment prerequisite ordering over biology, economics, and InstructKG:
+  all three Learner Paths judged `PASS` (no concept before a prerequisite it requires; every step traces to a CEP
+  passage or grounded derived node), and the thin/disconnected regions earning F3 were recorded. Added the
+  `mintingReason: "assumed_prerequisite" | "densification"` facet to `llm_grounded` nodes (ADR-0019 amended, not
+  superseded; ADR-0012/0016 untouched), pure sparse-region detection + connectivity metrics, the
+  `BridgeConceptProposalPort` + forced-tool LiteLLM adapter, `runDensificationExperiment`, and the
+  `densify-experiment` worker command. F3 v1 ran `EXPERIMENT_ONLY` and proposed **0 bridges**: its
+  topology-primary trigger only addresses disconnected/orphan gaps, and the baseline is already
+  same-domain-connected, so densification value remains unmeasured (next task #1). The experiment appended an
+  append-only artifact and left the asserted graph identity unchanged. Evidence under
+  `tmp/2026-06-17-f1-enrichment-eval/` and `tmp/2026-06-17-f3-densification-experiment/`.
 - **Ungroundable core demotion and InstructKG publishability (2026-06-17).** Changed extraction-run completeness
   policy so an incomplete core CEP demotes the candidate to `optional` with boundary reason
   `core_demoted_ungroundable` instead of failing the run; added run-level `degraded`, `critical` quality-issue
@@ -69,7 +101,25 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
 
 ## VALIDATION
 
-Latest validation (2026-06-17) is the **ungroundable core demotion** InstructKG re-run
+Latest validation (2026-06-17) is the **F1 enrichment-ordering gate + F3 v1 densification experiment**
+(`docs/plans/2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md`):
+
+- **Static/unit:** `pnpm run test`, `pnpm run typecheck`, and `pnpm run build` passed; `pnpm run lint` exited 0
+  (one pre-existing warning in `packages/domain-core/src/index.ts`); `git diff --check` clean.
+- **Real-use (rule-14 F1 gate):** real mixed-domain batch over graph version
+  `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b` / enrichment `30f05d4d-fab8-4409-a7a3-10f1be8bf091`. Biology
+  (`Meselson and Stahl experiments`), economics (`Universal Opulence from Division of Labour`), and InstructKG
+  (`Student Error Mapping`) Learner Paths were each judged **PASS** for prerequisite ordering with every step
+  traced to CEP evidence or a grounded derived node. Sparsity evidence recorded as the gate output for F3.
+- **Real-use (rule-14 F3 experiment):** `densify-experiment` over the F1 enrichment produced experiment
+  `3f90d1b3-1c5e-4782-99ef-83c8ad9caa33` with **0 bridges** (components 3→3, orphans 0→0, target ancestors
+  11→11); asserted snapshot hash `37dca346f1c312ce1610600b375749d5` unchanged, 0 authoritative derived rows.
+- **Result:** F1 **PASS**; F3 **EXPERIMENT_ONLY**, not promoted. The v1 topology-primary trigger found no
+  same-domain disconnected/orphan gaps on the connected baseline, so densification value is unmeasured. The
+  earned next task is a measured thin-connected-region trigger (TODO #1). Evidence under
+  `tmp/2026-06-17-f1-enrichment-eval/` and `tmp/2026-06-17-f3-densification-experiment/`.
+
+Prior validation (2026-06-17) is the **ungroundable core demotion** InstructKG re-run
 (`docs/plans/2026-06-17-001-feat-demote-ungroundable-core-plan.md`):
 
 - **Static/unit:** `pnpm --filter @lrnki/application test` passed (105 tests); `pnpm --filter

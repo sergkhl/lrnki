@@ -36,6 +36,7 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
     nodeKind: "enrichment",
     derivedNodeId: "dn1",
     groundingOrigin: "llm_grounded",
+    mintingReason: "assumed_prerequisite",
     role: "prerequisite",
     layer: "derived",
     canonicalLabel: "Stack allocation",
@@ -64,6 +65,36 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
 
   assert.equal(node.layer, "derived");
   assert.equal(node.role, "prerequisite");
+  assert.equal(node.mintingReason, "assumed_prerequisite");
   assert.equal("prerequisiteConceptId" in node, false);
   assert.equal("dependentConceptId" in node, false);
+});
+
+test("source-mentioned enrichment nodes do not carry a minting reason", () => {
+  const node: EnrichmentNode = {
+    nodeKind: "enrichment",
+    derivedNodeId: "dn2",
+    groundingOrigin: "source_mentioned",
+    role: "prerequisite",
+    layer: "derived",
+    canonicalLabel: "Borrowing",
+    normalizedLabel: "borrowing",
+    declaredDomain: "Rust",
+    aliases: [],
+    groundingPassages: [
+      {
+        passageType: "mention",
+        text: "Borrowing lets you reference a value without taking ownership.",
+        groundingOrigin: "source_mentioned",
+        sourceResourceId: "s1",
+        sourceBlockId: "b1",
+        evidenceQuote: "Borrowing lets you reference a value without taking ownership.",
+        headingPath: [],
+        locator: {},
+        verbatimCheck: { disposition: "verified", sourceResourceId: "s1", sourceBlockId: "b1" }
+      }
+    ]
+  };
+
+  assert.equal("mintingReason" in node, false);
 });
