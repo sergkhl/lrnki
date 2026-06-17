@@ -31,6 +31,7 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
     pipelineConfigHash: "test-v1",
     maxMentionsPerConceptPerSource: 6,
     status: "succeeded",
+    degraded: false,
     qualityIssues: [],
     candidates: [
       candidate("ownership", "Ownership", "core"),
@@ -84,8 +85,8 @@ function candidate(candidateKey: string, label: string, tier: "core" | "optional
 function artifactFor(result: ExtractionRunResult): ArtifactEnvelope<ExtractionRunResult> {
   return {
     artifactId: `${result.runId}:run`,
-    artifactType: "extraction_run.v5",
-    schemaVersion: "5",
+    artifactType: "extraction_run.v6",
+    schemaVersion: "6",
     runId: result.runId,
     producer: "test",
     producerVersion: "0",
@@ -126,6 +127,10 @@ maybe("persists a run with CEP passages, assertions, and its immutable artifact 
     assert.equal(assertionCount, 2);
     const [{ count: artifactCount }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM artifact_versions WHERE run_id = ${runId}`;
     assert.equal(artifactCount, 1);
+    const [{ degraded }] = await sql<{ degraded: boolean }[]>`SELECT degraded FROM extraction_runs WHERE run_id = ${runId}`;
+    assert.equal(degraded, false);
+    const [{ count: projectedCandidates }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM artifact_run_candidates WHERE run_id = ${runId}`;
+    assert.equal(projectedCandidates, 2);
   } finally {
     await sql.end();
   }
@@ -422,7 +427,7 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
     // (Borrowing, optional, NO definition passage) — the rescue candidate.
     const result: ExtractionRunResult = {
       runId, sourceResourceId, sourceDocumentId, declaredDomain: "software engineering",
-      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", qualityIssues: [],
+      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false, qualityIssues: [],
       candidates: [
         candidate("ownership", "Ownership", "core"),
         candidate("borrowing", "Borrowing", "optional")

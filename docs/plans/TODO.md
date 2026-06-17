@@ -9,18 +9,7 @@ pipeline output, not by deferred method-stack preference.
 Roadmap items 1–4 below were implemented and validated by the 2026-06-16 evidence-backed re-run (see
 VALIDATION); they moved to COMPLETED. The next work is earned by that run's one recorded blocker.
 
-1. **Resolve InstructKG core CEP completeness for borderline meta-concepts.** Run
-   `7ed1dbc1-6112-48b0-a263-5432e297f1a2` failed closed on one core Concept, `pedagogical roles`: admission's
-   definition-bearing criterion passed correctly (block-40 verbatim-verifies and defines the four roles), but
-   the CEP verbatim floor could not lock a single verbatim definition passage for the *unified* meta-concept
-   whose meaning is distributed across per-role sentences (see `docs/plans/BLOCKERS.md`).
-   - Decide generically — a measured neural judgment, not a lexical rule — whether such a distributed-definition
-     concept should be admitted `optional` rather than `core`, or whether the CEP floor should accept a bounded
-     multi-passage definition for a compositionally-defined concept.
-   - Do NOT patch the prompt with InstructKG-specific text or relax the verbatim floor (rule 16/17).
-   - Once InstructKG publishes, inspect its rescue path directly (the durability judge currently generalizes on
-     Rust/biology/economics artifacts only, because InstructKG did not publish in the 2026-06-16 run).
-2. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
+1. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
    empty mock until path quality makes calibration the limiting problem.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, or non-LLM
      prerequisite signals from method-stack preference.
@@ -29,6 +18,13 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
 
 ## COMPLETED
 
+- **Ungroundable core demotion and InstructKG publishability (2026-06-17).** Changed extraction-run completeness
+  policy so an incomplete core CEP demotes the candidate to `optional` with boundary reason
+  `core_demoted_ungroundable` instead of failing the run; added run-level `degraded`, `critical` quality-issue
+  severity, relational persistence, v6 artifact projection, and Admin Lab demotion/degraded surfaces. The real
+  InstructKG re-run published successfully; in that run `Pedagogical Roles` was already corrected to optional by
+  admission evidence validation, so the demotion path was verified by deterministic envelope tests rather than
+  by that live model sample.
 - **Evidence-backed node treatment contract — admission + rescue (2026-06-16, U1–U6).** Gave each promotion
   gate an evidence-backed treatment contract: (U1) a fourth core-admission criterion requires verbatim-validated
   definition-bearing source treatment; (U2) that verified evidence is carried into CEP extraction as a hint
@@ -73,7 +69,27 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
 
 ## VALIDATION
 
-Latest validation (2026-06-16) is the **evidence-backed node treatment** native re-run
+Latest validation (2026-06-17) is the **ungroundable core demotion** InstructKG re-run
+(`docs/plans/2026-06-17-001-feat-demote-ungroundable-core-plan.md`):
+
+- **Static/unit:** `pnpm --filter @lrnki/application test` passed (105 tests); `pnpm --filter
+  @lrnki/admin-lab test` passed (14 tests); `pnpm --filter @lrnki/infrastructure-postgres test` was invoked
+  without `DATABASE_URL` and skipped its 8 live-DB tests; `pnpm run typecheck` passed across the workspace.
+- **Real-use (rule-14 InstructKG):** reset the local PG18 database, registered the manifest fixtures, then ran
+  real extraction over InstructKG source `3ccd39d7-5caa-4326-82ab-6071ff784154`. Run
+  `9f0f959c-7455-4fe3-a0a6-b6193a3e750a` succeeded: 45 candidates, 6 remaining cores, 39 CEPs, 7 incomplete
+  optional profiles, `degraded=false`, v6 candidate/profile projections populated (`45`/`39`). Published graph
+  version `ffbeaafa-617e-4aed-a1fc-04c7b8723e44` from that run: 6 Concepts, 46 CEP passages, 5 optional
+  assertions, 0 asserted edges. Admin Lab run page rendered the v6 candidate table and `Pedagogical Roles`;
+  screenshot: `tmp/admin-lab-instructkg-run.png`.
+- **Result:** PASS for the user-facing outcome that the InstructKG source no longer fails publication because of
+  the borderline meta-concept. Caveat: this live sample did not exercise `core_demoted_ungroundable`; the
+  borderline concept was already model `core` / effective `optional` from admission evidence validation
+  (`standalone_learning_objective_missing_verified_evidence`,
+  `definition_bearing_treatment_missing_verified_evidence`, `effective_tier_corrected`). The demotion and
+  degraded machine-readable paths are covered by deterministic application tests, not by this N=1 live run.
+
+Prior validation (2026-06-16) is the **evidence-backed node treatment** native re-run
 (`docs/plans/2026-06-16-002-feat-evidence-backed-node-treatment-plan.md`,
 `tmp/2026-06-16-evidence-backed-rerun/rule-14-evaluation.md`):
 

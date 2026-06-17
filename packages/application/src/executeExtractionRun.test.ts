@@ -138,12 +138,14 @@ function harness(
 test("produces one complete CEP per admitted concept and marks the run succeeded", async () => {
   const result = await harness(async (input) => definitionFor[input.subject.candidateKey]).run();
   assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, false);
   assert.equal(result.evidenceProfiles.length, 2);
   const framework = result.evidenceProfiles.find((p) => p.candidateKey === "framework");
   assert.equal(framework?.complete, true);
   assert.equal(framework?.definitions.length, 1);
   assert.equal(framework?.mentions.length, 1);
   assert.equal(result.maxMentionsPerConceptPerSource, 6);
+  assert.ok(result.candidates.every((candidate) => !candidate.admission.boundaryReasonCodes.includes("core_demoted_ungroundable")));
 });
 
 test("carries each core subject's admission-verified definition-bearing evidence into extraction (optional carries none)", async () => {
@@ -179,27 +181,41 @@ test("an extractor that echoes the carried definition hint yields a complete cor
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "framework")?.complete, true);
 });
 
-test("a carried definition the extractor alters off-verbatim is still dropped by the boundary (no bypass)", async () => {
+test("a carried definition the extractor alters off-verbatim is still dropped and the ungroundable core is demoted", async () => {
   // U2: carrying evidence never weakens the verbatim floor. If the extractor returns
-  // an altered quote, the policy drops it and the run fails closed.
+  // an altered quote, the policy drops it and the incomplete core is demoted.
   const result = await harness(async (input) =>
     input.subject.candidateKey === "signals"
       ? { definitions: [{ blockId: "block-2", evidenceQuote: `${input.definitionBearingEvidence[0]?.evidenceQuote ?? ""} (added words not in the block)` }], mentions: [], assertions: [] }
       : definitionFor[input.subject.candidateKey]
   ).run();
 
-  assert.equal(result.status, "failed");
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, false);
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.definitions.length, 0);
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.tier, "optional");
+  const demoted = result.candidates.find((candidate) => candidate.candidateKey === "signals");
+  assert.equal(demoted?.admission.tier, "optional");
+  assert.equal(demoted?.admission.modelTier, "core");
+  assert.ok(demoted?.admission.boundaryReasonCodes.includes("core_demoted_ungroundable"));
 });
 
-test("marks the run failed when a core concept has no verified definition passage", async () => {
+test("demotes one ungroundable core while keeping grounded cores publishable", async () => {
   const result = await harness(async (input) =>
     input.subject.candidateKey === "signals"
       ? { definitions: [], mentions: [], assertions: [] }
       : definitionFor[input.subject.candidateKey]
   ).run();
-  assert.equal(result.status, "failed");
-  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, false);
+  assert.equal(result.candidates.find((c) => c.candidateKey === "framework")?.admission.tier, "core");
+  const demoted = result.candidates.find((c) => c.candidateKey === "signals");
+  assert.equal(demoted?.admission.tier, "optional");
+  assert.equal(demoted?.admission.modelTier, "core");
+  assert.ok(demoted?.admission.boundaryReasonCodes.includes("core_demoted_ungroundable"));
+  const profile = result.evidenceProfiles.find((p) => p.candidateKey === "signals");
+  assert.equal(profile?.complete, false);
+  assert.equal(profile?.tier, "optional");
 });
 
 test("keeps an incomplete optional profile inspectable without failing the run", async () => {
@@ -216,27 +232,49 @@ test("keeps an incomplete optional profile inspectable without failing the run",
   ).run();
 
   assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, false);
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+  assert.equal(result.candidates.find((c) => c.candidateKey === "signals")?.admission.tier, "optional");
+  assert.ok(!result.candidates.find((c) => c.candidateKey === "signals")?.admission.boundaryReasonCodes.includes("core_demoted_ungroundable"));
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "framework")?.complete, true);
 });
 
-test("a non-verbatim definition quote is removed, leaving an incomplete profile and a failed run", async () => {
+test("a non-verbatim definition quote is removed, leaving an incomplete demoted profile and a succeeded run", async () => {
   const result = await harness(async (input) =>
     input.subject.candidateKey === "signals"
       ? { definitions: [{ blockId: "block-2", evidenceQuote: "this text is not in the block" }], mentions: [], assertions: [] }
       : definitionFor[input.subject.candidateKey]
   ).run();
-  assert.equal(result.status, "failed");
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, false);
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.definitions.length, 0);
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.tier, "optional");
 });
 
-test("an extractor failure yields an incomplete profile and a failed run, never throwing", async () => {
+test("an extractor failure yields an incomplete demoted profile and a succeeded run, never throwing", async () => {
   const result = await harness(async (input) => {
     if (input.subject.candidateKey === "signals") throw new Error("model unavailable");
     return definitionFor[input.subject.candidateKey];
   }).run();
-  assert.equal(result.status, "failed");
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, false);
   assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.complete, false);
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.tier, "optional");
+});
+
+test("marks a run degraded when demotion removes the last published core", async () => {
+  const result = await harness(
+    async () => ({ definitions: [], mentions: [], assertions: [] }),
+    [candidates[0]]
+  ).run();
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.degraded, true);
+  assert.equal(result.candidates[0].admission.tier, "optional");
+  assert.equal(result.candidates[0].admission.modelTier, "core");
+  assert.ok(result.candidates[0].admission.boundaryReasonCodes.includes("core_demoted_ungroundable"));
+  assert.equal(result.evidenceProfiles[0].tier, "optional");
+  assert.equal(result.evidenceProfiles[0].complete, false);
 });
 
 test("persists the run with its immutable extraction artifact in the same call", async () => {

@@ -45,6 +45,7 @@ CREATE TABLE extraction_runs (
   source_document_id uuid NOT NULL REFERENCES source_documents(source_document_id),
   pipeline_config_hash text NOT NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
+  degraded boolean NOT NULL DEFAULT false,
   cost_usd real,
   latency_ms integer,
   started_at timestamptz NOT NULL DEFAULT now(),
@@ -291,7 +292,7 @@ JSON_TABLE(
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type = 'extraction_run.v5';
+WHERE a.artifact_type LIKE 'extraction_run.%';
 
 -- Flatten extraction-run artifact payloads: one row per Concept Evidence Profile
 -- with its definition/mention/assertion counts, for the Admin Lab Run Inspector.
@@ -311,7 +312,7 @@ JSON_TABLE(
     assertion_count integer PATH '$.assertions.size()'
   )
 ) AS p
-WHERE a.artifact_type = 'extraction_run.v5';
+WHERE a.artifact_type LIKE 'extraction_run.%';
 
 -- Flatten graph-snapshot artifact payloads: one row per published Concept with its
 -- identity and trust tier, for the Admin Lab published view (ADR-0007 reset).

@@ -245,8 +245,9 @@ export type AssertionEntailmentJudgment = {
 // boundary: definition + mention passages cleared the verbatim floor and were
 // deduplicated, mentions were bounded to maxMentionsPerConceptPerSource in neural
 // order, and each surviving typed assertion passed entailment. `complete` is true
-// only when at least one verified definition passage remains; an admitted Concept
-// with no complete CEP makes the Extraction Run unsuccessful (R1).
+// only when at least one verified definition passage remains; an incomplete core
+// Concept is demoted to optional before publication, while optional incomplete
+// profiles stay inspectable as run-scoped evidence.
 export type RunTypedAssertion =
   | { type: "defines"; literalValue: string; evidence: BlockEvidence[] }
   | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BlockEvidence[] };
@@ -265,7 +266,7 @@ export type ExtractionQualityIssue = {
   candidateKey?: string;
   conceptLabel?: string;
   issueType: string;
-  severity: "info" | "warning";
+  severity: "info" | "warning" | "critical";
   evidenceQuotes: string[];
   rationale: string;
 };
@@ -376,9 +377,13 @@ export type ExtractionRunResult = {
   candidates: RunCandidate[];
   evidenceProfiles: RunEvidenceProfile[];
   qualityIssues: ExtractionQualityIssue[];
-  // A run is unsuccessful when any admitted (core|optional) Concept lacks a
-  // complete CEP (R1). Publication refuses non-succeeded runs (ADR-0017).
+  // A run with an incomplete core Concept demotes that Concept to optional before
+  // publication. Genuine non-succeeded runs remain reserved for pipeline or
+  // persistence failures; publication refuses non-succeeded runs (ADR-0017).
   status: "succeeded" | "failed";
+  // True when the run succeeded but every model-selected core was demoted, leaving
+  // zero published cores.
+  degraded: boolean;
   costUsd?: number;
   latencyMs?: number;
 };

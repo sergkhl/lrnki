@@ -10,17 +10,35 @@ test("flags a core-poor run while retaining the standing neutral-prompt note", (
   assert.ok(issues.some((issue) => issue.issueType === "possible_missing_core_concept" && issue.severity === "warning"));
 });
 
-test("flags failed runs where a core concept lacks a complete CEP", () => {
+test("flags demoted ungroundable cores at warning severity", () => {
   const issues = detectExtractionQualityIssues(run({
-    status: "failed",
-    candidates: [candidate({ candidateKey: "alpha", label: "Alpha" })],
+    candidates: [candidate({ candidateKey: "alpha", label: "Alpha", tier: "optional", modelTier: "core", boundaryReasonCodes: ["core_demoted_ungroundable"] })],
     evidenceProfiles: [{ candidateKey: "alpha", tier: "core", definitions: [], mentions: [], assertions: [], complete: false }]
   }));
 
-  const issue = issues.find((item) => item.issueType === "insufficient_source_treatment");
+  const issue = issues.find((item) => item.issueType === "core_demoted_ungroundable");
   assert.equal(issue?.candidateKey, "alpha");
   assert.equal(issue?.conceptLabel, "Alpha");
+  assert.equal(issue?.severity, "warning");
   assert.deepEqual(issue?.evidenceQuotes, ["Alpha is a taught concept.", "Alpha has a second aspect."]);
+});
+
+test("flags degraded demotion as critical without also emitting missing-core", () => {
+  const issues = detectExtractionQualityIssues(run({
+    degraded: true,
+    candidates: [candidate({ candidateKey: "alpha", label: "Alpha", tier: "optional", modelTier: "core", boundaryReasonCodes: ["core_demoted_ungroundable"] })],
+    evidenceProfiles: [{ candidateKey: "alpha", tier: "optional", definitions: [], mentions: [], assertions: [], complete: false }]
+  }));
+
+  assert.ok(issues.some((issue) => issue.issueType === "core_demoted_ungroundable" && issue.severity === "critical"));
+  assert.ok(!issues.some((issue) => issue.issueType === "possible_missing_core_concept"));
+});
+
+test("distinguishes genuinely core-poor runs from demoted runs", () => {
+  const issues = detectExtractionQualityIssues(run({ candidates: [candidate({ tier: "optional" })], evidenceProfiles: [] }));
+
+  assert.ok(issues.some((issue) => issue.issueType === "possible_missing_core_concept"));
+  assert.ok(!issues.some((issue) => issue.issueType === "core_demoted_ungroundable"));
 });
 
 test("flags proposition-label demotions and out-of-domain illustration rejects", () => {
@@ -48,6 +66,7 @@ function run(overrides: Partial<ExtractionRunResult> = {}): ExtractionRunResult 
     evidenceProfiles: [],
     qualityIssues: [],
     status: "succeeded",
+    degraded: false,
     ...overrides
   };
 }
@@ -56,6 +75,7 @@ function candidate(input: {
   candidateKey?: string;
   label?: string;
   tier?: RunCandidate["admission"]["tier"];
+  modelTier?: RunCandidate["admission"]["modelTier"];
   sourceRole?: RunCandidate["admission"]["sourceRole"];
   boundaryReasonCodes?: string[];
 } = {}): RunCandidate {
@@ -70,7 +90,7 @@ function candidate(input: {
     aliases: [],
     mentions: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }],
     admission: {
-      modelTier: tier,
+      modelTier: input.modelTier ?? tier,
       tier,
       sourceRole: input.sourceRole ?? "declared_domain_concept",
       proposedCanonicalLabel: label,

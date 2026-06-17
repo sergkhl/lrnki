@@ -2,10 +2,12 @@ import type { ExtractionQualityIssue, ExtractionRunResult, RunCandidate } from "
 
 export function detectExtractionQualityIssues(run: ExtractionRunResult): ExtractionQualityIssue[] {
   const issues: ExtractionQualityIssue[] = [genericDomainNeutralPromptIssue()];
-  const profilesByCandidateKey = new Map(run.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
   const coreCandidates = run.candidates.filter((candidate) => candidate.admission.tier === "core");
+  const demotedUngroundableCandidates = run.candidates.filter((candidate) =>
+    candidate.admission.boundaryReasonCodes.includes("core_demoted_ungroundable")
+  );
 
-  if (coreCandidates.length === 0) {
+  if (coreCandidates.length === 0 && demotedUngroundableCandidates.length === 0) {
     issues.push({
       stage: "admission",
       issueType: "possible_missing_core_concept",
@@ -15,21 +17,16 @@ export function detectExtractionQualityIssues(run: ExtractionRunResult): Extract
     });
   }
 
-  if (run.status === "failed") {
-    for (const candidate of coreCandidates) {
-      const profile = profilesByCandidateKey.get(candidate.candidateKey);
-      if (!profile?.complete) {
-        issues.push({
-          stage: "evidence_profile",
-          candidateKey: candidate.candidateKey,
-          conceptLabel: candidate.canonicalLabel,
-          issueType: "insufficient_source_treatment",
-          severity: "warning",
-          evidenceQuotes: candidateEvidenceQuotes(candidate),
-          rationale: "A core Concept lacks a complete Concept Evidence Profile with a verified Definition Passage, so the run failed closed."
-        });
-      }
-    }
+  for (const candidate of demotedUngroundableCandidates) {
+    issues.push({
+      stage: "evidence_profile",
+      candidateKey: candidate.candidateKey,
+      conceptLabel: candidate.canonicalLabel,
+      issueType: "core_demoted_ungroundable",
+      severity: run.degraded ? "critical" : "warning",
+      evidenceQuotes: candidateEvidenceQuotes(candidate),
+      rationale: "A core Concept admitted with definition-bearing treatment could not be grounded with a verbatim Definition Passage, so it was demoted to optional and the run succeeded with the remaining cores."
+    });
   }
 
   for (const candidate of run.candidates) {
