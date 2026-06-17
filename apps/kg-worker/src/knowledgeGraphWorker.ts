@@ -26,6 +26,7 @@ import {
   LiteLlmGroundingGenerationAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmRescueDurabilityJudgmentAdapter,
   GENERATED_PREREQUISITE_JUDGE_MODEL
 } from "@lrnki/infrastructure-litellm";
 import {
@@ -40,7 +41,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "cep-domain-neutral-prompts-v35";
+const PIPELINE_CONFIG_HASH = "cep-definition-bearing-admission-v36";
 
 import { existsSync } from "node:fs";
 
@@ -127,6 +128,11 @@ function buildContext() {
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
     groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
+    // Measured rescue durability judge (U3): cross-family independent judge
+    // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
+    // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
+    // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
+    rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
     difficulty: dagDepthDifficultyPort,
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
@@ -245,6 +251,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     generatedPrerequisiteJudge: ctx.generatedPrerequisiteJudge,
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
+    rescueDurabilityJudge: ctx.rescueDurabilityJudge,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore
   });

@@ -1,5 +1,6 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView } from "./derivedGraph";
+import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView, RescueDispositionView } from "./derivedGraph";
+import { summarizeOriginCounts } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -63,11 +64,19 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
       WHERE n.enrichment_id = ${header.enrichment_id}
       ORDER BY n.declared_domain, n.node_kind, d.score NULLS LAST, n.canonical_label`;
-    const edgeRows = await sql<{ prerequisite_derived_node_id: string; dependent_derived_node_id: string; confidence: number; uncertain: boolean }[]>`
-      SELECT prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain
+    const edgeRows = await sql<{ prerequisite_derived_node_id: string; dependent_derived_node_id: string; confidence: number; uncertain: boolean; judge_model: string }[]>`
+      SELECT prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain, judge_model
       FROM inferred_prerequisite_edges
       WHERE enrichment_id = ${header.enrichment_id}
       ORDER BY prerequisite_derived_node_id, dependent_derived_node_id`;
+
+    // Rescue-durability dispositions (U5): the relational mirror of the trace's
+    // accept/drop/kept-judge-unavailable record. Read-only, no recompute (rule 12).
+    const rescueRows = await sql<{ derived_node_id: string; canonical_label: string; declared_domain: string; disposition: string; rationale: string; grounding_span: string }[]>`
+      SELECT derived_node_id, canonical_label, declared_domain, disposition, rationale, grounding_span
+      FROM rescue_dispositions
+      WHERE enrichment_id = ${header.enrichment_id}
+      ORDER BY declared_domain, disposition, canonical_label`;
 
     // Grounding bundles + passages for the enrichment nodes (R8, R15). The verbatim
     // disposition (R9, AE3) is read from the recorded run trace, falling back to the
@@ -130,10 +139,19 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       prerequisiteConceptId: row.prerequisite_derived_node_id,
       dependentConceptId: row.dependent_derived_node_id,
       confidence: Number(row.confidence),
-      uncertain: row.uncertain
+      uncertain: row.uncertain,
+      judgeModel: row.judge_model
+    }));
+    const rescueDispositions: RescueDispositionView[] = rescueRows.map((row) => ({
+      derivedNodeId: row.derived_node_id,
+      canonicalLabel: row.canonical_label,
+      declaredDomain: row.declared_domain,
+      disposition: row.disposition as RescueDispositionView["disposition"],
+      rationale: row.rationale,
+      groundingSpan: row.grounding_span
     }));
 
-    return { summary: toEnrichmentSummary(header), nodes, edges };
+    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions };
   });
 }
 

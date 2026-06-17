@@ -82,6 +82,9 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
             <CardAction className="flex flex-wrap gap-2">
               <Badge variant="outline">{run.declaredDomain}</Badge>
               <Badge variant={run.status === "failed" ? "destructive" : "default"}>{run.status}</Badge>
+              {/* A failed run lacks a complete CEP for an admitted Concept (R1); publication
+                  refuses non-succeeded runs (ADR-0017), so mark it explicitly not publishable. */}
+              {run.status !== "succeeded" ? <Badge variant="destructive">not publishable</Badge> : null}
             </CardAction>
           </CardHeader>
           <CardContent>
@@ -170,6 +173,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
                         <div className="flex flex-wrap gap-2">
                           <CriterionBadge label="Standalone" passed={candidate.standaloneLearningObjective.passed} />
                           <CriterionBadge label="Domain meaning" passed={candidate.establishedDomainMeaning.passed} />
+                          <CriterionBadge label="Definition-bearing" passed={candidate.definitionBearingTreatment.passed} />
                           <CriterionBadge label="Organizing power" passed={candidate.organizingPower.passed} />
                         </div>
                         <span className="text-muted-foreground">

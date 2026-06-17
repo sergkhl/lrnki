@@ -78,6 +78,7 @@ CREATE TABLE concept_admission_decisions (
   proposed_canonical_label text NOT NULL,
   standalone_learning_objective jsonb NOT NULL,
   established_domain_meaning jsonb NOT NULL,
+  definition_bearing_treatment jsonb NOT NULL,
   organizing_power jsonb NOT NULL,
   core_selected boolean NOT NULL,
   selection_reason_code text NOT NULL,
@@ -262,7 +263,8 @@ CREATE VIEW artifact_run_candidates AS
 SELECT a.run_id, c.candidate_key, c.discovered_label, c.canonical_label,
        c.aliases, c.mention_count, c.model_tier, c.tier,
        c.proposed_canonical_label, c.standalone_learning_objective,
-       c.established_domain_meaning, c.organizing_power, c.core_selected,
+       c.established_domain_meaning, c.definition_bearing_treatment,
+       c.organizing_power, c.core_selected,
        c.selection_reason_code,
        c.reason_codes, c.boundary_reason_codes, c.confidence
 FROM artifact_versions a,
@@ -280,6 +282,7 @@ JSON_TABLE(
     proposed_canonical_label text PATH '$.admission.proposedCanonicalLabel',
     standalone_learning_objective jsonb PATH '$.admission.standaloneLearningObjective',
     established_domain_meaning jsonb PATH '$.admission.establishedDomainMeaning',
+    definition_bearing_treatment jsonb PATH '$.admission.definitionBearingTreatment',
     organizing_power jsonb PATH '$.admission.organizingPower',
     core_selected boolean PATH '$.admission.coreSelected',
     selection_reason_code text PATH '$.admission.selectionReasonCode',
@@ -469,6 +472,9 @@ CREATE TABLE inferred_prerequisite_edges (
   dependent_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
+  -- Which judge model ordered this pair (U4): the cross-family generated-node alias
+  -- for any pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
+  judge_model text NOT NULL,
   provenance jsonb NOT NULL,
   UNIQUE (enrichment_id, prerequisite_derived_node_id, dependent_derived_node_id),
   CHECK (prerequisite_derived_node_id <> dependent_derived_node_id)
@@ -482,6 +488,23 @@ CREATE TABLE concept_difficulties (
   method text NOT NULL,
   components jsonb NOT NULL,
   UNIQUE (enrichment_id, derived_node_id)
+);
+
+-- Rescue durability dispositions (U4, ADR-0019 refinement). One row per AGGREGATED
+-- source_mentioned rescue candidate the durability judge ruled on (U3). A `dropped`
+-- candidate has no derived_graph_nodes row, so derived_node_id is correlation-only
+-- (no FK). The relational projection mirrors the immutable JSONB trace so Admin Lab
+-- reads dispositions without recompute (rules 11/12).
+CREATE TABLE rescue_dispositions (
+  rescue_disposition_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL,
+  canonical_label text NOT NULL,
+  normalized_label text NOT NULL,
+  declared_domain text NOT NULL,
+  disposition text NOT NULL CHECK (disposition IN ('accepted', 'dropped', 'kept_judge_unavailable')),
+  rationale text NOT NULL,
+  grounding_span text NOT NULL
 );
 
 -- ---------------------------------------------------------------------------

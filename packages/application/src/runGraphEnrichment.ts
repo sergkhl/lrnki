@@ -9,7 +9,8 @@ import type {
   PrerequisiteConceptContext,
   PrerequisiteJudgment,
   PrerequisiteJudgmentTrace,
-  PublishedConceptEvidenceProfile
+  PublishedConceptEvidenceProfile,
+  RescueDisposition
 } from "@lrnki/domain-core";
 import type {
   DifficultyPort,
@@ -17,9 +18,10 @@ import type {
   GroundingGenerationPort,
   MissingPrerequisiteProposalPort,
   PrerequisiteJudgmentPort,
+  RescueDurabilityJudgmentPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { cutWeakEdges, removeCycles, transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
@@ -44,7 +46,7 @@ export type GraphEnrichmentConfig = {
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  enrichmentConfigHash: "cep-node-enrichment-v1",
+  enrichmentConfigHash: "cep-node-enrichment-rescue-judged-v2",
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
   maxMentionsPerConceptInPair: 6,
@@ -78,6 +80,11 @@ export async function runGraphEnrichment(input: {
   missingPrerequisiteProposal?: MissingPrerequisiteProposalPort;
   groundingGeneration?: GroundingGenerationPort;
   generatedPrerequisiteJudge?: PrerequisiteJudgmentPort;
+  // Optional measured rescue durability judge (U3). When provided, aggregated
+  // `source_mentioned` rescue candidates are durability-judged against their
+  // same-domain anchors before becoming derived nodes; omit it to leave rescue
+  // unjudged (prior behavior).
+  rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
   newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
@@ -94,7 +101,7 @@ export async function runGraphEnrichment(input: {
   // frozen conceptId; nothing here mutates the asserted layer (R5).
   const anchorNodes: AnchorProjectionNode[] = concepts.map((concept) => ({
     nodeKind: "anchor",
-    derivedNodeId: concept.conceptId,
+    derivedNodeId: deterministicUuid(input.enrichmentId, concept.conceptId),
     conceptId: concept.conceptId,
     groundingOrigin: "document_anchored",
     role: "anchor",
@@ -109,6 +116,7 @@ export async function runGraphEnrichment(input: {
   // per grounding origin (U6). Only runs when the enrichment-node ports are provided.
   let enrichmentNodes: EnrichmentNode[] = [];
   let groundingDispositions: GroundingVerbatimDisposition[] = [];
+  let rescueDispositions: RescueDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
     const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
     const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
@@ -123,9 +131,11 @@ export async function runGraphEnrichment(input: {
       rescueCandidates,
       proposalPort: input.missingPrerequisiteProposal,
       groundingPort: input.groundingGeneration,
+      rescueDurabilityJudge: input.rescueDurabilityJudge,
       bounds: config.mintingBounds,
       newNodeId
     });
+    rescueDispositions = assembled.rescueDispositions;
     // The floor verifies source_mentioned passages verbatim against their cited block
     // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
     // does not verify is dropped before it can enter the derived layer.
@@ -171,7 +181,9 @@ export async function runGraphEnrichment(input: {
     const judge = isGenerated(a) || isGenerated(b) ? generatedJudge : input.prerequisiteJudge;
     const judgeInput = { declaredDomain: a.declaredDomain, a: a.context, b: b.context };
     const judgment = await judge.judge(judgeInput);
-    return { judgment, trace: { ...judgeInput, judgment } };
+    // Record the judge model actually used for this pair (U4): cross-family for any
+    // pair touching a generated node, the validated DeepSeek judge otherwise.
+    return { judgment, trace: { ...judgeInput, judgeModel: judge.model, judgment } };
   });
 
   // Collect in deterministic pair order regardless of completion order.
@@ -235,7 +247,8 @@ export async function runGraphEnrichment(input: {
       ...transitiveEdges.map((edge) => disposition(edge, "transitive_reduction")),
       ...reducedEdges.map((edge) => disposition(edge, "kept"))
     ],
-    groundingDispositions
+    groundingDispositions,
+    rescueDispositions
   };
   await input.enrichmentStore.persist({
     layer,
@@ -266,6 +279,13 @@ function disposition(
 }
 
 // --- Deterministic, model-free helpers -----------------------------------------
+
+function deterministicUuid(...parts: string[]): string {
+  const hash = createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 32).split("");
+  hash[12] = "4";
+  hash[16] = (8 + (Number.parseInt(hash[16], 16) % 4)).toString(16);
+  return `${hash.slice(0, 8).join("")}-${hash.slice(8, 12).join("")}-${hash.slice(12, 16).join("")}-${hash.slice(16, 20).join("")}-${hash.slice(20, 32).join("")}`;
+}
 
 // Every unordered same-domain pair over the derived node space (R12). Nodes are
 // grouped by Declared Domain (ADR-0015) so a cross-domain pair is never proposed;

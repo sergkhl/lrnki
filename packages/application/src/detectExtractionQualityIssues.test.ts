@@ -88,6 +88,13 @@ function candidate(input: {
         submittedEvidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }],
         evidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }]
       },
+      definitionBearingTreatment: {
+        modelPassed: true,
+        passed: true,
+        rationale: "definition-bearing",
+        submittedEvidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }],
+        evidence: [{ blockId: "block-1", evidenceQuote: `${label} is a taught concept.` }]
+      },
       organizingPower: {
         modelPassed: true,
         passed: true,

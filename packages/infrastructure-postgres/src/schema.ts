@@ -78,6 +78,7 @@ export const conceptAdmissionDecisions = pgTable("concept_admission_decisions", 
   proposedCanonicalLabel: text("proposed_canonical_label").notNull(),
   standaloneLearningObjective: jsonb("standalone_learning_objective").notNull(),
   establishedDomainMeaning: jsonb("established_domain_meaning").notNull(),
+  definitionBearingTreatment: jsonb("definition_bearing_treatment").notNull(),
   organizingPower: jsonb("organizing_power").notNull(),
   coreSelected: boolean("core_selected").notNull(),
   selectionReasonCode: text("selection_reason_code").notNull(),
@@ -278,6 +279,9 @@ export const inferredPrerequisiteEdges = pgTable("inferred_prerequisite_edges", 
   dependentConceptId: uuid("dependent_concept_id").notNull().references(() => concepts.conceptId),
   confidence: real("confidence").notNull(),
   uncertain: boolean("uncertain").notNull().default(false),
+  // Which judge model ordered this pair (U4): cross-family generated-node alias for a
+  // pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
+  judgeModel: text("judge_model").notNull(),
   provenance: jsonb("provenance").notNull()
 }, (table) => [unique().on(table.enrichmentId, table.prerequisiteConceptId, table.dependentConceptId)]);
 
@@ -292,6 +296,22 @@ export const conceptDifficulties = pgTable("concept_difficulties", {
   method: text("method").notNull(),
   components: jsonb("components").notNull()
 }, (table) => [unique().on(table.enrichmentId, table.conceptId)]);
+
+// Rescue durability dispositions (U4). One row per aggregated source_mentioned
+// rescue candidate the durability judge ruled on (U3). `dropped` candidates have no
+// derived_graph_nodes row, so derivedNodeId is correlation-only (no FK). Mirrors the
+// immutable JSONB trace so Admin Lab reads dispositions without recompute.
+export const rescueDispositions = pgTable("rescue_dispositions", {
+  rescueDispositionId: uuid("rescue_disposition_id").primaryKey(),
+  enrichmentId: uuid("enrichment_id").notNull().references(() => graphEnrichments.enrichmentId),
+  derivedNodeId: uuid("derived_node_id").notNull(),
+  canonicalLabel: text("canonical_label").notNull(),
+  normalizedLabel: text("normalized_label").notNull(),
+  declaredDomain: text("declared_domain").notNull(),
+  disposition: text("disposition").notNull(),
+  rationale: text("rationale").notNull(),
+  groundingSpan: text("grounding_span").notNull()
+});
 
 // ---------------------------------------------------------------------------
 // Learner Path — vertical-slice projection output (ADR-0019). CLI computes and

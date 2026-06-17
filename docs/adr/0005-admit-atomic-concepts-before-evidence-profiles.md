@@ -9,8 +9,16 @@ Use document-level discovery followed by a separate precision-first admission pr
 proposals, each with a stable run-local key, a shared parent-candidate key, and its own
 source-grounded label and positive-criterion evidence. The application boundary derives each
 proposal's effective tier fail-closed: `core` requires verified source evidence that the atom is a
-non-reducible standalone learning objective, has established meaning in its Declared Domain, and
-organizes at least two distinct substantive explanatory aspects or relationships. A compact
+non-reducible standalone learning objective, has established meaning in its Declared Domain,
+organizes at least two distinct substantive explanatory aspects or relationships, **and receives
+definition-bearing treatment** — a passage that establishes the concept's meaning, distinct from a
+bare mention (2026-06-16 refinement, KTD1). This fourth criterion is the model's judgment, validated
+only for verbatim grounding like the other three; it is **not** a lexical copula or "X is Y" matcher
+(rule 16), since meaning can be established by description, mechanism, or contrast. A `core` decision
+is unreachable without a verified definition-bearing passage, closing the gap where `core` was
+selected on mention-like evidence the CEP stage (ADR-0007) then could not turn into a verified
+Definition Passage; the verified evidence is carried forward into CEP extraction as conditioning
+context without bypassing the CEP port or its independent verbatim verification. A compact
 source-level Core Set Selection over the atomic proposals keeps a small, non-redundant set
 representing the source's principal durable learning structure. Admission may propose a more precise
 evidence-preserving canonical label, applied only when the label itself is source-grounded; it may not

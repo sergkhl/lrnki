@@ -127,7 +127,12 @@ export async function executeExtractionRun(input: {
           aliases: exactAliases(subject)
         },
         admittedConcepts,
-        evidenceNeighborhood: evidenceNeighborhood(document, subject)
+        evidenceNeighborhood: evidenceNeighborhood(document, subject),
+        // Carry admission's verified definition-bearing passages into extraction as a
+        // hint (U2/KTD2). Core only — optional subjects never gate on this criterion,
+        // so they carry no definition hint and behave exactly as before.
+        definitionBearingEvidence:
+          subject.admission.tier === "core" ? subject.admission.definitionBearingTreatment.evidence : []
       })
       .catch(() => ({ definitions: [], mentions: [], assertions: [] }));
     return applyEvidenceProfilePolicy({

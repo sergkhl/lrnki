@@ -1,128 +1,114 @@
 # TODO
 
-Roadmap reset 2026-06-15 (`docs/brainstorms/2026-06-15-kg-core-complexity-reset-requirements.md`):
-the product critical path is concept admission → enrichment prerequisite inference → learner path.
-Asserted claims moved off that path and are replaced by Concept Evidence Profiles; standing
-measurement became disposable scaffolding and is retired.
+Roadmap reset 2026-06-16 (`docs/brainstorms/2026-06-16-evaluation-first-roadmap-reset-requirements.md`,
+`tmp/evaluation-first-roadmap-reset/consolidated-findings.md`): the next work is earned by real mixed-domain
+pipeline output, not by deferred method-stack preference.
 
 ## TODO
 
-The 7-unit complexity reset and the derived-layer node-minting enrichment milestone (U1-U9) are both
-complete on `feat/derived-layer-prerequisite-enrichment`; durable architecture lives in the
-[ADRs](../adr/README.md) and [CONTEXT](../../CONTEXT.md).
+Roadmap items 1–4 below were implemented and validated by the 2026-06-16 evidence-backed re-run (see
+VALIDATION); they moved to COMPLETED. The next work is earned by that run's one recorded blocker.
 
-1. **Tune minting/rescue precision against more fixtures (post-rule-14 follow-up).** The Rust rule-14 run
-   minted expert-plausible prerequisites but showed mild granularity redundancy (minted "Stack-allocated
-   data"/"Heap-allocated data" beside the anchor "The Stack and the Heap"; "Trait (Rust)" beside "Copy
-   trait") and rescued a heading-like concept ("Memory and Allocation").
-   - Inspect a non-software fixture (biology/economics) before tuning; do not overfit the proposal prompt
-     to Rust (AGENTS rule 17).
-   - Consider a generic rubric clause that suppresses sub-aspects of an existing anchor, measured against
-     an oracle, not a hardcoded denylist (AGENTS rule 16).
-2. **Tune the minting bounds beyond defaults (deferred in the plan).** The per-run cap (12) bound exactly
-   on the sparse Rust source; a richer source needs evidence-driven per-anchor/per-run caps.
-3. **DOCX/PPTX curated-source expansion** remains orthogonal and deferred.
-4. **Keep the standing deferred work deferred.** Difficulty stays the DAG-depth mock and learner state
-   stays the empty mock until measured need. The embedding canonicalization cascade and embedding blocking
-   tier stay removed unless a measured replacement beats exhaustive same-domain judgment.
+1. **Resolve InstructKG core CEP completeness for borderline meta-concepts.** Run
+   `7ed1dbc1-6112-48b0-a263-5432e297f1a2` failed closed on one core Concept, `pedagogical roles`: admission's
+   definition-bearing criterion passed correctly (block-40 verbatim-verifies and defines the four roles), but
+   the CEP verbatim floor could not lock a single verbatim definition passage for the *unified* meta-concept
+   whose meaning is distributed across per-role sentences (see `docs/plans/BLOCKERS.md`).
+   - Decide generically — a measured neural judgment, not a lexical rule — whether such a distributed-definition
+     concept should be admitted `optional` rather than `core`, or whether the CEP floor should accept a bounded
+     multi-passage definition for a compositionally-defined concept.
+   - Do NOT patch the prompt with InstructKG-specific text or relax the verbatim floor (rule 16/17).
+   - Once InstructKG publishes, inspect its rescue path directly (the durability judge currently generalizes on
+     Rust/biology/economics artifacts only, because InstructKG did not publish in the 2026-06-16 run).
+2. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
+   empty mock until path quality makes calibration the limiting problem.
+   - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, or non-LLM
+     prerequisite signals from method-stack preference.
+   - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
+     behavior without hiding provenance or identity defects.
 
 ## COMPLETED
 
+- **Evidence-backed node treatment contract — admission + rescue (2026-06-16, U1–U6).** Gave each promotion
+  gate an evidence-backed treatment contract: (U1) a fourth core-admission criterion requires verbatim-validated
+  definition-bearing source treatment; (U2) that verified evidence is carried into CEP extraction as a hint
+  without bypassing the port or weakening the verbatim floor; (U3) a measured, cross-family, drop-only
+  rescue-durability judge (fail-open-with-flag) gates `source_mentioned` rescue before a derived node exists;
+  (U4) per-pair judge model and rescue dispositions are persisted relationally + in the JSONB trace; (U5) Admin
+  Lab exposes per-domain origin counts, dispositions, per-edge judge model, per-step origin badges, and marks
+  failed runs not publishable. Validated by the rule-14 native re-run (see VALIDATION): Rust/biology/economics
+  succeed with 0 incomplete core CEPs (the String Type / Heap allocation failure mode is gone); the rescue judge
+  drops incidental artifacts with grounded rationales while keeping transferable concepts. One blocker recorded
+  (InstructKG core completeness for a borderline meta-concept). Domain-neutral throughout (rules 16/17).
+- **Evaluation-first roadmap reset (2026-06-16).** Normalized fixture docs so Gate 1 names the manifest-backed
+  native batch including the InstructKG Markdown fixture; ran real extraction/publication/enrichment/path
+  generation over Rust, biology, economics, and InstructKG; recorded disposable inspection notes under
+  `tmp/evaluation-first-roadmap-reset/`; rewrote this roadmap from inspected output. Fixed a real persistence
+  defect discovered by the batch: anchor projection `derivedNodeId`s are now per-enrichment deterministic IDs,
+  while `conceptId` remains the asserted Concept pointer, so repeated enrichment over the same graph version no
+  longer collides on `derived_graph_nodes_pkey`.
 - **Derived-layer prerequisite enrichment — node + edge derivation, U1-U9 (branch
-  `feat/derived-layer-prerequisite-enrichment`).** Graph Enrichment now mints `llm_grounded` prerequisite
-  nodes via an explicit anchor-driven proposal port (`MissingPrerequisiteProposalPort`, node identity is an
-  inspectable operation, never local string construction) and rescues `source_mentioned` nodes from member
-  runs' non-core mentions, judges the union of anchors + enrichment nodes same-domain, and routes any
-  generated-node pair to a cross-family judge (`kg-generated-prerequisite-judgment` → gpt-oss-120b, ADR-0023)
-  so the DeepSeek generator never grades its own output. The verbatim floor applies per passage by
-  provenance with a recorded `not_applicable_by_grounding` exemption for generated passages. `DifficultyPort`
-  scores derived node IDs; `inferred_prerequisite_edges`/`concept_difficulties`/learner-path endpoints all
-  reference `derived_graph_nodes`; Admin Lab + learner-path loaders read the derived node space and surface
-  grounding. ADR-0019 generalized, ADR-0023 added. rule-14 PASS on the sparse Rust fixture: 6 anchors → 19
-  derived nodes, expert-correct DAG, asserted layer untouched (6 concepts / 0 edges), densified 7-step
-  learner path to Ownership; see `tmp/u9-derived-enrichment-quality-evaluation.md`. Operational: LiteLLM
-  alias changes need a proxy reload (`docker restart lrnki-litellm`).
-
-- **Domain-neutral extraction prompts + run-scoped quality issues (2026-06-16).** Removed fixture and
-  benchmark answer-key calibration from model-facing extraction prompts and forced-tool schema
-  descriptions, added AGENTS rule 17, bumped the extraction pipeline config hash to
-  `cep-domain-neutral-prompts-v34`, and added `ExtractionQualityIssue[]` to `extraction_run.v6`
-  artifacts. Admin Lab run detail now renders read-only quality issues from the artifact payload. Rule-14
-  real-use check: Rust run `5889b488-5329-469f-892d-8bd071b16699` succeeded with the baseline key
-  concepts preserved, but admitted extra operation/error concepts; see `tmp/dehack-prompt-quality-evaluation.md`.
-- **Derived-layer prerequisite enrichment paused after U4 (branch
-  `feat/derived-layer-prerequisite-enrichment`).** U1/U2 (`7849c31`): added the grounding-origin,
-  role, and layer model; projected asserted Concepts as `document_anchored` anchors; repaired Rust
-  admission/core-selection recall without relaxing the Definition-Passage floor. U3 (`387f7fe`):
-  rewrote the initial migration for `derived_graph_nodes`, `enrichment_grounding_bundles`, and
-  derived-node edge/difficulty endpoints; reset and reinitialized the local DB; live Postgres tests
-  passed. U4 (`52fc43e`): added `GroundingGenerationPort`, forced grounding-generation tool schema,
-  and LiteLLM adapter. U5-U9 are not complete.
-- **Reset milestone 4 — worker/Admin Lab/export reshape + docs (U6+U7, branch `refactor/cep-core-reset`).**
-  U6: Run Inspector + run list now report CEP completeness and definition/mention/assertion counts (no
-  claim/proposal reads); the published Graph Explorer is a zero-edge CEP evidence inspector with no graph
-  canvas; new read-only Enrichment Run list + detail render the Derived Graph Layer's prerequisite DAG in
-  Cytoscape with an equivalent textual view, independent of learner paths; RDF export emits only Concept
-  identity/labels/aliases; the orphan admission-variance probe is deleted. rule-14 PASS over the live Rust
-  DB rendered via `next start` (published view 0 edges/0 canvases, derived chain Variable scope → Ownership
-  → Move semantics → Copy trait); see `tmp/u6-admin-lab-quality-evaluation.md`. U7: rewrote
-  ADR-0002/0005/0007/0009/0012/0013/0016/0019/0022, the ADR README, CONTEXT.md vocabulary, README,
-  fixtures notes, and this roadmap to describe only the post-reset architecture. Operational invariants
-  from the reset: the LiteLLM judge alias is `kg-independent-judge` (gpt-oss-120b); bump the worker
-  pipeline config hash whenever admission/CEP/judge prompts or schemas change.
-- **Reset milestone 3 — exhaustive same-domain CEP-pair enrichment (U5, `a1e32b5`).** Removed the
-  embedding-clustering / candidate-group tier; every unordered same-domain Concept pair is judged from both
-  Concepts' published CEPs; `explicit-prerequisite-hint` is labeled evidence, never a deterministic edge;
-  bounded concurrency (default 4), deterministic order, atomic failure on retry exhaustion. The judge names
-  the prerequisite concept by verbatim label to kill a positional direction bias. rule-14 PASS: real Rust
-  DAG expert-correct.
-- **Reset milestone 2 — CEP extraction + publication (U3+U4).** U3 (`d612f16`): replaced claim extraction
-  with concept-conditioned CEP extraction (`applyEvidenceProfilePolicy` + `applyAssertionEntailmentJudge`),
-  retired the broad relation surface, claim-recall retries, conflict pass, and missing-concept escape
-  hatch; run-scoped CEP rows + immutable artifact in one transaction. U4 (`72ebde6`): publication unions CEP
-  evidence — `GraphSnapshot` carries Concepts + one CEP each and ZERO asserted edges; `buildGraphVersion`
-  takes `baseGraphVersionId` + selected runs, resolves identities (ADR-0015), unions and exact-deduplicates
-  cumulative source evidence (R3/AE2), remaps/omits `explicit-prerequisite-hint` targets; migration rewritten
-  and DB reset. rule-14 PASS; see `tmp/u4-cep-publication-quality-evaluation.md`.
-- **Reset milestone 1 — atomic admission precision + oracle teardown (U1+U2).** U1: admission emits
-  one-or-many ATOMIC proposals per discovered candidate; Core Set Selection runs over atoms; a neural
-  `sourceRole` (AGENTS rule 16) replaced the deterministic illustrative-section regex and closed the
-  InstructKG cross-domain CS/SQL leak. rule-14 PASS over Rust/InstructKG/MLE-bench. U2 (`85c083c`): deleted
-  the `quality-lab` package, LiteLLM oracle adapters, oracle/aligner types + ports + schemas, and frozen
-  artifacts; renamed retained inline judges to `kg-independent-judge`. Durable quality bar = rule-14 +
-  inline judges + verbatim-evidence floor.
-- **Gate 1 asserted-graph pipeline (historical).** Native ingestion → discovery → two-phase admission →
-  (pre-reset) claims → deterministic LLM-free `buildGraphVersion` with frozen IRIs, quality gates, atomic
-  publish, quarantine-blocks-publication; explicit run/version IDs (ADR-0017, 0010).
-- **Vertical slice: Graph Enrichment → Learner Path (ADR-0019).** Immutable Derived Graph Layer over a
-  published version with real LLM forced-tool prerequisite judgment; weak-edge cut / cycle removal /
-  transitive reduction; mock DAG-depth difficulty + mock empty learner state behind ports; persisted
-  difficulty-ordered Learner Path; Admin Lab read-only Cytoscape views.
-- **Canonical architecture consolidation.** Stable Concept identity separated from immutable graph-version
-  presentation; reads select explicit version/run IDs; Enrichment Runs append-only with relational query
-  surfaces + full JSONB traces; cross-domain homographs publish separately with an inspection flag.
-- **Gate 2 mixed-format ingestion (Docling) + retired oracle benchmark.** `DoclingStructuredDocumentParser`
-  (PDF/DOCX/PPTX) behind `StructuredDocumentParserPort`; shared `extractMarkdownBlocks`; PDF fixture
-  end-to-end with verbatim-verifiable evidence. The Gate 2 oracle benchmark (independence triangle +
-  scoring-only label aligner) yielded the admission-precision diagnoses that drove U1, then was deleted with
-  the rest of the standing harness in U2 (ADR-0013/0022).
+  `feat/derived-layer-prerequisite-enrichment`).** Graph Enrichment mints `llm_grounded` prerequisite nodes via
+  an explicit anchor-driven proposal port, rescues `source_mentioned` nodes from member runs' non-core mentions,
+  judges anchors + enrichment nodes same-domain, routes generated-node pairs to `kg-generated-prerequisite-judgment`,
+  and keeps the asserted layer untouched. Prior Rust rule-14 run `0911ecd0-11a1-4f6a-97a1-d4cc7f8cb272` produced
+  a useful path to Ownership; current mixed-batch validation is the newer evidence.
+- **Domain-neutral extraction prompts + run-scoped quality issues (2026-06-16).** Removed fixture and benchmark
+  answer-key calibration from model-facing extraction prompts and forced-tool schema descriptions, added AGENTS
+  rule 17, bumped the extraction pipeline config hash to `cep-domain-neutral-prompts-v35`, and added
+  `ExtractionQualityIssue[]` to extraction artifacts for Admin Lab inspection.
+- **Reset milestone 4 — worker/Admin Lab/export reshape + docs (branch `refactor/cep-core-reset`).** Run
+  Inspector reports CEP completeness and quality issues; published Graph Explorer is a zero-edge CEP evidence
+  inspector; Enrichment Run views render the Derived Graph Layer independently of learner paths; RDF export emits
+  Concept identity/labels/aliases only; ADRs, CONTEXT, README, fixtures notes, and roadmap were rewritten for the
+  post-reset architecture.
+- **Reset milestones 1-3 — admission precision, CEP extraction, publication, and exhaustive same-domain
+  enrichment.** Admission emits atomic proposals and uses neural source-role/domain relevance; standing oracle
+  machinery was deleted; CEP extraction replaced claims; Graph-Version Builds explicitly select runs and publish
+  Concepts + CEPs with zero asserted edges; Graph Enrichment judges every unordered same-domain CEP pair without
+  embeddings or candidate groups.
+- **Historical vertical slice and mixed-format ingestion.** Native ingestion, Graph-Version Build, Graph
+  Enrichment, Learner Path projection, Admin Lab read-only views, and Gate 2 Docling PDF ingestion exist as
+  historical capability. Additional DOCX/PPTX expansion is not active work.
 
 ## VALIDATION
 
-Latest validation (2026-06-16) is after the derived-layer node-minting enrichment milestone (U1-U9):
+Latest validation (2026-06-16) is the **evidence-backed node treatment** native re-run
+(`docs/plans/2026-06-16-002-feat-evidence-backed-node-treatment-plan.md`,
+`tmp/2026-06-16-evidence-backed-rerun/rule-14-evaluation.md`):
 
-- **Static/unit:** full-repo `pnpm -r typecheck` and `pnpm -r test` pass (135 tests; Postgres round-trip
-  tests run against the live DB with `DATABASE_URL` set, including the enrichment-node round-trip and the
-  member-run rescue read). `pnpm lint` clean.
-- **Real-use (rule-14 PASS):** sparse Rust fixture `b0682ea4-e359-4a41-b624-ad0e382a9185` end-to-end with
-  real LLM calls — extraction run `0911ecd0` (6 core anchors, 34 complete CEPs), published version
-  `bca9f521` (6 concepts / 0 asserted edges), enrichment run `6959c923` (6 anchors + 13 enrichment nodes;
-  12 minted `llm_grounded` + 1 rescued `source_mentioned`; per-run mint cap of 12 bound exactly), and
-  learner path `57ed5aea` to Ownership (7 steps: Function → Memory and Allocation → Pointer → Scope → The
-  Stack and the Heap → Runtime memory model → Ownership). Verbatim dispositions: 12
-  `not_applicable_by_grounding` + 1 `verified`. Asserted layer unchanged. See
-  `tmp/u9-derived-enrichment-quality-evaluation.md`.
-- **Caveats:** generated grounding is the load-bearing bet, validated by inspection not a standing metric;
-  single-fixture (Rust) validation; mild granularity redundancy in minted nodes flagged as a follow-up
-  tuning item (do not overfit the proposal prompt — AGENTS rule 17). LiteLLM alias changes need a proxy
-  reload (`docker restart lrnki-litellm`).
+- **Static/unit:** `pnpm typecheck` clean across all packages; application + litellm + admin-lab suites pass;
+  Postgres persistence round-trip (per-pair judge model + rescue dispositions) verified against a fresh PG18 DB.
+- **Real-use (rule-14 mixed native batch):** config `cep-definition-bearing-admission-v36` /
+  `cep-node-enrichment-rescue-judged-v2`. Extraction over the four native fixtures: Rust
+  `69a7de11-0fce-4293-b4dd-e50ba9169a1b`, biology `e7fa2640-775b-4242-a111-3f600d9baf4f`, economics
+  `8c9874d6-ee6e-4d16-84e8-b83612aafb47` all **succeeded with 0 incomplete core CEPs**; InstructKG
+  `7ed1dbc1-6112-48b0-a263-5432e297f1a2` **failed** on one borderline core meta-concept (`pedagogical roles`,
+  recorded in BLOCKERS). Published version `4cf872e0-872b-44e0-8bee-406f4733c1a4` (20 Concepts, 0 asserted
+  edges) from the three succeeded runs; enrichment `2842dae3-a2e8-4f17-b656-3d2f1f6d6a50`. Rescue durability
+  judge dropped 5/8 candidates with grounded rationales (experiment methods, illustrative example, section
+  heading, contrast-only mention) and kept transferable concepts (Deep copy, Shallow copy, RAII). Clean
+  expert-correct paths for Rust→Ownership (`1c9c016a`), economics→Division of Labour (`2f6ae016`), and
+  biology→DNA replication (`03a2de96`).
+- **Result:** the two FIX_FIRST defects from the prior batch are fixed — Rust core admission reliability
+  (String Type / Heap allocation now admit core with complete CEPs) and InstructKG-class rescue noise (dropped
+  with grounded dispositions, generalizing across domains). One blocker recorded (InstructKG core completeness).
+  Deferred method stack stays deferred (G3 held). A FIX_FIRST found mid-run — criterion-evidence over-count
+  aborting a run — was fixed generically (cap raised to 4). Disposable evidence under
+  `tmp/2026-06-16-evidence-backed-rerun/`.
+
+### Prior validation (2026-06-16, evaluation-first native batch reset):
+
+- **Static/unit:** `pnpm --filter @lrnki/infrastructure-ingestion test -- MarkdownStructuredDocumentParser.test.ts`
+  passed; `pnpm --filter @lrnki/application exec tsx --test src/runGraphEnrichment.test.ts` passed after the
+  per-enrichment anchor ID fix.
+- **Real-use (rule-14 mixed native batch):** registered manifest fixtures, selected successful runs
+  `0911ecd0-11a1-4f6a-97a1-d4cc7f8cb272`, `4857473d-858a-4439-905d-81a1d12354be`,
+  `d2b617fc-eaa8-4d84-a082-69ce99be4911`, and `d9d68ae1-ae0c-46f0-a7eb-181ed4c653dc`; published graph version
+  `53197c1e-e5cf-4e46-b374-2fc812196bea` (25 Concepts / 184 CEP passages / 14 optional assertions / 0 asserted
+  edges); enriched run `0f9c0118-5131-4abb-8b1f-5912e398c011` (59 derived nodes, 50 certain edges, 26 uncertain
+  edges); generated paths `a5639bc9-47aa-4761-8a8f-e75774791e2b`, `4dea6196-88c3-4470-8964-a0287003423a`,
+  `2ae7772b-bf22-4be1-9667-27a6f0084851`, and `c332d379-4b5e-426a-94ff-fd97e9a5ac62`.
+- **Result:** Biology and economics paths are useful enough to support roadmap decisions. Rust fresh retries show
+  extraction reliability defects. InstructKG shows source-mentioned rescue noise that must be fixed before adding
+  downstream methods. Evidence and caveats live under `tmp/evaluation-first-roadmap-reset/`.

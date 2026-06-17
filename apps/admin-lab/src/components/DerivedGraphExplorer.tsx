@@ -234,6 +234,7 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
                         </span>
                         <span className="flex shrink-0 items-center gap-1">
                           {edge.uncertain ? <Badge variant="secondary">uncertain</Badge> : null}
+                          <Badge variant="outline" title="judge model">{edge.judgeModel}</Badge>
                           <Badge variant="outline">{edge.confidence.toFixed(2)}</Badge>
                         </span>
                       </li>
@@ -241,6 +242,41 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground">No inferred prerequisite edges.</p>
+                )}
+              </section>
+              <section className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">Origin counts by domain</h3>
+                <ul className="flex flex-col gap-1">
+                  {detail.originCounts.map((counts) => (
+                    <li key={counts.domain} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm">
+                      <span className="min-w-0 truncate font-medium">{counts.domain}</span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <Badge variant="default" title="document_anchored">anchor {counts.anchor}</Badge>
+                        <Badge variant="secondary" title="source_mentioned">rescued {counts.sourceMentioned}</Badge>
+                        <Badge variant="outline" title="llm_grounded">generated {counts.llmGrounded}</Badge>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+              <section className="flex flex-col gap-2">
+                <h3 className="text-sm font-medium">Rescue durability dispositions</h3>
+                {detail.rescueDispositions.length > 0 ? (
+                  <ul className="flex flex-col gap-1">
+                    {detail.rescueDispositions.map((disposition) => (
+                      <li key={disposition.derivedNodeId} className="flex flex-col gap-1 rounded-md border px-2 py-1.5 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-medium">{disposition.canonicalLabel}</span>
+                          <Badge variant={disposition.disposition === "dropped" ? "destructive" : disposition.disposition === "accepted" ? "default" : "secondary"}>
+                            {disposition.disposition}
+                          </Badge>
+                        </div>
+                        {disposition.rationale ? <span className="text-xs text-muted-foreground italic">{disposition.rationale}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No rescue candidates were durability-judged in this run.</p>
                 )}
               </section>
             </div>

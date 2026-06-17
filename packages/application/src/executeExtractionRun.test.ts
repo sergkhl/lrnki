@@ -70,6 +70,7 @@ function admission(candidate: DiscoveredCandidate, overrides: Partial<AdmissionP
     sourceRole: "declared_domain_concept",
     standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId, evidenceQuote: quote }] },
     establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId, evidenceQuote: quote }] },
+    definitionBearingTreatment: { passed: true, rationale: "definition-bearing", evidence: [{ blockId, evidenceQuote: quote }] },
     organizingPower: {
       passed: true,
       rationale: "organizes",
@@ -143,6 +144,52 @@ test("produces one complete CEP per admitted concept and marks the run succeeded
   assert.equal(framework?.definitions.length, 1);
   assert.equal(framework?.mentions.length, 1);
   assert.equal(result.maxMentionsPerConceptPerSource, 6);
+});
+
+test("carries each core subject's admission-verified definition-bearing evidence into extraction (optional carries none)", async () => {
+  // U2/R2 wiring: the extract() subject receives the admission-verified
+  // definition-bearing passages for core subjects, and an empty hint for optional.
+  const carried = new Map<string, string[]>();
+  await harness(
+    async (input) => {
+      carried.set(input.subject.candidateKey, input.definitionBearingEvidence.map((e) => e.evidenceQuote));
+      return definitionFor[input.subject.candidateKey];
+    },
+    candidates,
+    (candidate) =>
+      candidate.candidateKey === "signals"
+        ? admission(candidate, { tier: "optional", coreSelected: false, selectionReasonCode: "supporting_mechanism" })
+        : admission(candidate)
+  ).run();
+
+  assert.deepEqual(carried.get("framework"), [frameworkQuote]);
+  assert.deepEqual(carried.get("signals"), []);
+});
+
+test("an extractor that echoes the carried definition hint yields a complete core CEP and a succeeded run", async () => {
+  // U2/R2: the hint is conditioning context; the extractor still emits its own
+  // verbatim definition passage and the boundary still verifies it.
+  const result = await harness(async (input) => ({
+    definitions: input.definitionBearingEvidence.map((e) => ({ blockId: e.blockId, evidenceQuote: e.evidenceQuote })),
+    mentions: [],
+    assertions: []
+  })).run();
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "framework")?.complete, true);
+});
+
+test("a carried definition the extractor alters off-verbatim is still dropped by the boundary (no bypass)", async () => {
+  // U2: carrying evidence never weakens the verbatim floor. If the extractor returns
+  // an altered quote, the policy drops it and the run fails closed.
+  const result = await harness(async (input) =>
+    input.subject.candidateKey === "signals"
+      ? { definitions: [{ blockId: "block-2", evidenceQuote: `${input.definitionBearingEvidence[0]?.evidenceQuote ?? ""} (added words not in the block)` }], mentions: [], assertions: [] }
+      : definitionFor[input.subject.candidateKey]
+  ).run();
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "signals")?.definitions.length, 0);
 });
 
 test("marks the run failed when a core concept has no verified definition passage", async () => {
@@ -237,6 +284,7 @@ function atom(atomicKey: string, label: string, defQuote: string, overrides: Par
     sourceRole: "declared_domain_concept",
     standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
     establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
+    definitionBearingTreatment: { passed: true, rationale: "definition-bearing", evidence: [{ blockId: "block-1", evidenceQuote: defQuote }] },
     organizingPower: {
       passed: true,
       rationale: "organizes",

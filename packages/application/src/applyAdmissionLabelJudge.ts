@@ -57,6 +57,7 @@ function candidateEvidenceQuotes(candidate: RunCandidate): string[] {
     ...candidate.mentions.map((mention) => mention.evidenceQuote),
     ...candidate.admission.standaloneLearningObjective.evidence.map((item) => item.evidenceQuote),
     ...candidate.admission.establishedDomainMeaning.evidence.map((item) => item.evidenceQuote),
+    ...candidate.admission.definitionBearingTreatment.evidence.map((item) => item.evidenceQuote),
     ...candidate.admission.organizingPower.aspects.map((aspect) => aspect.evidence.evidenceQuote)
   ];
   return [...new Set(quotes.filter((quote) => quote.trim().length > 0))];

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PrerequisiteConceptContext } from "@lrnki/domain-core";
-import { LiteLlmPrerequisiteJudgmentAdapter } from "./enrichmentAdapters";
+import { LiteLlmPrerequisiteJudgmentAdapter, LiteLlmRescueDurabilityJudgmentAdapter, RESCUE_DURABILITY_JUDGE_MODEL } from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
 function context(conceptId: string, canonicalLabel: string): PrerequisiteConceptContext {
@@ -48,4 +48,31 @@ test("'none' is mapped to none; 'uncertain' to uncertain", async () => {
   assert.equal(none.outcome, "none");
   const uncertain = await adapterReturning({ relation: "uncertain", prerequisiteLabel: "", confidence: 0.4, rationale: "r" }).judge({ declaredDomain: "x", a, b });
   assert.equal(uncertain.outcome, "uncertain");
+});
+
+// --- Rescue durability judge (U3) -----------------------------------------------
+
+function rescueAdapterReturning(canned: { verdict: string; groundingSpan: string; rationale: string }) {
+  const client = { async call() { return canned; } } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmRescueDurabilityJudgmentAdapter(client);
+}
+
+const rescueInput = {
+  declaredDomain: "educational technology",
+  candidate: { canonicalLabel: "Ablation Variant B", aliases: [], mentionQuotes: ["We ablate variant B in Table 3."] },
+  anchors: [{ canonicalLabel: "Knowledge Gap Diagnosis", definitionQuotes: ["A gap is the difference between mastery and target."] }]
+};
+
+test("rescue judge runs on the independent cross-family alias", () => {
+  assert.equal(RESCUE_DURABILITY_JUDGE_MODEL, "kg-independent-judge");
+  assert.equal(rescueAdapterReturning({ verdict: "durable", groundingSpan: "", rationale: "r" }).model, "kg-independent-judge");
+});
+
+test("rescue judge passes through the validated verdict and grounding span (application grounds the veto)", async () => {
+  const durable = await rescueAdapterReturning({ verdict: "durable", groundingSpan: "", rationale: "transferable" }).judge(rescueInput);
+  assert.deepEqual(durable, { verdict: "durable", groundingSpan: "", rationale: "transferable" });
+
+  const notDurable = await rescueAdapterReturning({ verdict: "not_durable", groundingSpan: "We ablate variant B in Table 3.", rationale: "ablation label" }).judge(rescueInput);
+  assert.equal(notDurable.verdict, "not_durable");
+  assert.equal(notDurable.groundingSpan, "We ablate variant B in Table 3.");
 });

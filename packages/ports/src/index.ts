@@ -3,6 +3,7 @@ import type {
   AdmissionProposal,
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
+  BlockEvidence,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -19,6 +20,7 @@ import type {
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
+  RescueDurabilityJudgment,
   RunForBuild,
   SourceBlock,
   StructuredDocument
@@ -54,6 +56,13 @@ export interface ConceptConditionedEvidenceProfileExtractionPort {
     subject: { candidateKey: string; canonicalLabel: string; aliases: string[] };
     admittedConcepts: { candidateKey: string; canonicalLabel: string; aliases: string[] }[];
     evidenceNeighborhood: SourceBlock[];
+    // The admission-verified definition-bearing passages for this subject (U2/KTD2).
+    // A HINT only: the extractor still emits its own definition passages and the
+    // application boundary still independently verbatim-verifies them. Carrying the
+    // already-proven definition forward keeps the extractor from losing it under
+    // fan-out, without bypassing the CEP port or relaxing the verbatim floor.
+    // Empty for optional subjects (admission gates this criterion on core only).
+    definitionBearingEvidence: BlockEvidence[];
   }): Promise<ExtractedEvidenceProfile>;
 }
 
@@ -99,6 +108,24 @@ export interface AdmissionLabelJudgmentPort {
     aliases: string[];
     evidenceQuotes: string[]; // already verbatim-verified candidate mention/eligibility evidence
   }): Promise<AdmissionLabelJudgment>;
+}
+
+// Rescue durability judge (U3, ADR-0019 refinement). A bounded, forced-tool LLM
+// judgment over ONE aggregated `source_mentioned` rescue candidate, run on the
+// independent cross-family alias (`kg-independent-judge`) so the DeepSeek generator
+// never grades rescue durability. It answers: against the same-domain anchors this
+// node would scaffold, is the candidate a durable prerequisite or an incidental
+// artifact? Used only to DROP a non-durable rescue candidate; it never creates a
+// node. The application boundary grounds the veto fail-OPEN: a `not_durable` verdict
+// whose `groundingSpan` is not in the candidate's own mention evidence keeps the node
+// flagged rather than dropping it (KTD3, AGENTS rule 16).
+export interface RescueDurabilityJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
+    anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
+  }): Promise<RescueDurabilityJudgment>;
 }
 
 export interface ArtifactRepositoryPort {

@@ -55,7 +55,12 @@ const admissionCriterionSchema: JsonSchema = {
   properties: {
     passed: { type: "boolean" },
     rationale: { type: "string" },
-    evidence: { type: "array", maxItems: 2, items: blockEvidenceSchema }
+    // Soft tidiness bound, not a correctness gate. `strict` forced-tool mode does not
+    // enforce maxItems at generation time, so the boundary validator must TOLERATE a
+    // benign over-count (a model returning 3 quotes must not abort the whole run); the
+    // application only needs >=1 verified quote. Capped generously so a runaway array
+    // still fails closed (rule 6).
+    evidence: { type: "array", maxItems: 4, items: blockEvidenceSchema }
   }
 };
 
@@ -103,6 +108,7 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             "sourceRole",
             "standaloneLearningObjective",
             "establishedDomainMeaning",
+            "definitionBearingTreatment",
             "organizingPower",
             "reasonCodes",
             "confidence"
@@ -129,6 +135,11 @@ export function conceptAdmissionSchemaForCandidateKeys(parentCandidateKeys?: str
             },
             standaloneLearningObjective: admissionCriterionSchema,
             establishedDomainMeaning: admissionCriterionSchema,
+            definitionBearingTreatment: {
+              ...admissionCriterionSchema,
+              description:
+                "passed=true only when the source gives this concept DEFINITION-BEARING treatment: a passage that establishes what the concept means — its defining properties, the criteria that distinguish it, or how it is constituted — as opposed to a bare mention, an example, or a passing reference. The evidence MUST be the verbatim passage that establishes the meaning. A definition need not use a copula or an 'X is Y' phrasing; meaning can be established by description, mechanism, or contrast. If the source only names or uses the concept without establishing its meaning, set passed=false."
+            },
             organizingPower: {
               type: "object",
               additionalProperties: false,
@@ -160,12 +171,17 @@ export const conceptAdmissionValidator = z.object({
     standaloneLearningObjective: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),
-      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(4)
     }).strict(),
     establishedDomainMeaning: z.object({
       passed: z.boolean(),
       rationale: z.string().min(1),
-      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(2)
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(4)
+    }).strict(),
+    definitionBearingTreatment: z.object({
+      passed: z.boolean(),
+      rationale: z.string().min(1),
+      evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()).max(4)
     }).strict(),
     organizingPower: z.object({
       passed: z.boolean(),
@@ -525,6 +541,41 @@ export const admissionLabelJudgmentSchema: JsonSchema = {
 export const admissionLabelJudgmentValidator = z.object({
   labelKind: z.enum(["concept", "proposition_or_claim"]),
   underlyingNounPhrase: z.string(),
+  groundingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
+// --- Rescue durability judgment: submit_rescue_durability_judgment ----------
+// One bounded judgment over a single aggregated `source_mentioned` rescue candidate
+// (U3). The model decides whether the candidate is a DURABLE prerequisite a learner
+// must grasp before the same-domain anchors it would scaffold, or an incidental
+// artifact. `groundingSpan` is the minimal verbatim sub-quote (from the candidate's
+// own mention evidence) a `not_durable` veto rests on; the application boundary keeps
+// the node fail-open when the span is not grounded, so the judge cannot drop on
+// absent text. Domain-neutral rubric — no fixture-specific labels (AGENTS rule 17).
+
+export const rescueDurabilityJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdict", "groundingSpan", "rationale"],
+  properties: {
+    verdict: {
+      type: "string",
+      enum: ["durable", "not_durable"],
+      description:
+        "'durable' when the candidate names a concept a learner would genuinely need to understand before the anchor concepts — a real, transferable unit of domain knowledge that scaffolds them. 'not_durable' when it is an incidental artifact rather than a durable prerequisite: a label specific to one method, system, experiment, dataset, or ablation; a pedagogical-role or section label; a passing or source-local detail that a learner does not need as a standalone prerequisite. Judge by the candidate's meaning and its relationship to the anchors, never by surface wordform. When genuinely unsure, prefer 'durable' (precision-first veto: only drop on a clear, evidenced non-durable judgment)."
+    },
+    groundingSpan: {
+      type: "string",
+      description:
+        "When verdict is 'not_durable', the minimal verbatim sub-quote — copied exactly from one of the candidate's own mention quotes — that shows it is an incidental artifact rather than a durable prerequisite. Empty string when verdict is 'durable'."
+    },
+    rationale: { type: "string", description: "One terse sentence." }
+  }
+};
+
+export const rescueDurabilityJudgmentValidator = z.object({
+  verdict: z.enum(["durable", "not_durable"]),
   groundingSpan: z.string(),
   rationale: z.string().min(1)
 }).strict();
