@@ -1,10 +1,19 @@
 # Plans
 
 ## Live plans
-Stale planning docs should be removed.
+Only `TODO.md` and `BLOCKERS.md` are live. Stale planning docs should be removed; completed
+implementation plans are moved to the archived list below rather than left as ambiguous live docs.
 
 - [TODO](./TODO.md)
 - [BLOCKERS](./BLOCKERS.md)
+
+## Archived (completed) plans
+
+Retained for implementation provenance only and cited by `TODO.md` VALIDATION evidence pointers.
+These are not live work; their tasks are recorded in `TODO.md` COMPLETED.
+
+- [2026-06-16-001 Evaluation-first roadmap reset](./2026-06-16-001-feat-evaluation-first-roadmap-reset-plan.md)
+- [2026-06-16-002 Evidence-backed node treatment contract](./2026-06-16-002-feat-evidence-backed-node-treatment-plan.md)
 
 ## Progress report instructions
 
