@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FileQuestionIcon } from "lucide-react";
+import { CORE_DEMOTED_UNGROUNDABLE_REASON } from "@lrnki/domain-core";
 import { AdminShell } from "@/components/AdminShell";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -72,7 +73,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
 
   const { run, candidates, qualityIssues, profiles } = inspection;
   const profilesByKey = new Map(profiles.map((profile) => [profile.candidateKey, profile] as const));
-  const demotedCandidates = candidates.filter((candidate) => candidate.boundaryReasonCodes.includes("core_demoted_ungroundable"));
+  const demotedCandidates = candidates.filter((candidate) => candidate.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON));
 
   return (
     <AdminShell active="runs">
@@ -93,8 +94,9 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
               <Badge variant="outline">{run.declaredDomain}</Badge>
               <Badge variant={run.status === "failed" ? "destructive" : "default"}>{run.status}</Badge>
               {run.degraded ? <Badge variant="destructive">degraded</Badge> : null}
-              {/* A failed run lacks a complete CEP for an admitted Concept (R1); publication
-                  refuses non-succeeded runs (ADR-0017), so mark it explicitly not publishable. */}
+              {/* An incomplete core is demoted to optional, not failed (see Demoted cores below);
+                  a non-succeeded run signals a pipeline or persistence failure (ADR-0017), and
+                  publication refuses it, so mark it explicitly not publishable. */}
               {run.status !== "succeeded" ? <Badge variant="destructive">not publishable</Badge> : null}
             </CardAction>
           </CardHeader>

@@ -365,6 +365,14 @@ export type RunCandidate = {
   };
 };
 
+// The boundary reason code stamped on a candidate whose admitted `core` tier was
+// demoted to `optional` because its CEP could not be grounded with a verbatim
+// Definition Passage (ADR-0007). One exported token shared by the demotion policy
+// that writes it onto `boundaryReasonCodes` and every consumer that reads it back
+// (the quality-issue detector, Admin Lab), so a rename can never silently desync a
+// `string[]` reason code into invisibility.
+export const CORE_DEMOTED_UNGROUNDABLE_REASON = "core_demoted_ungroundable";
+
 export type ExtractionRunResult = {
   runId: string;
   sourceResourceId: string;

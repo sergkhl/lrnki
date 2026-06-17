@@ -1,4 +1,5 @@
 import {
+  CORE_DEMOTED_UNGROUNDABLE_REASON,
   extractableBlocks,
   type ArtifactEnvelope,
   type ExtractionRunResult,
@@ -24,7 +25,6 @@ const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.5.0";
 const EXTRACTION_RUN_ARTIFACT_TYPE = "extraction_run.v6";
 const EXTRACTION_RUN_SCHEMA_VERSION = "6";
-const CORE_DEMOTED_UNGROUNDABLE_REASON = "core_demoted_ungroundable";
 
 // Default mention bound per Concept per source (R4, KTD). Overridable per run; part
 // of the pipeline configuration hash so a change is reflected in the artifact.

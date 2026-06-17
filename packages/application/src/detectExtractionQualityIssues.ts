@@ -1,10 +1,10 @@
-import type { ExtractionQualityIssue, ExtractionRunResult, RunCandidate } from "@lrnki/domain-core";
+import { CORE_DEMOTED_UNGROUNDABLE_REASON, type ExtractionQualityIssue, type ExtractionRunResult, type RunCandidate } from "@lrnki/domain-core";
 
 export function detectExtractionQualityIssues(run: ExtractionRunResult): ExtractionQualityIssue[] {
   const issues: ExtractionQualityIssue[] = [genericDomainNeutralPromptIssue()];
   const coreCandidates = run.candidates.filter((candidate) => candidate.admission.tier === "core");
   const demotedUngroundableCandidates = run.candidates.filter((candidate) =>
-    candidate.admission.boundaryReasonCodes.includes("core_demoted_ungroundable")
+    candidate.admission.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON)
   );
 
   if (coreCandidates.length === 0 && demotedUngroundableCandidates.length === 0) {
@@ -22,7 +22,7 @@ export function detectExtractionQualityIssues(run: ExtractionRunResult): Extract
       stage: "evidence_profile",
       candidateKey: candidate.candidateKey,
       conceptLabel: candidate.canonicalLabel,
-      issueType: "core_demoted_ungroundable",
+      issueType: CORE_DEMOTED_UNGROUNDABLE_REASON,
       severity: run.degraded ? "critical" : "warning",
       evidenceQuotes: candidateEvidenceQuotes(candidate),
       rationale: "A core Concept admitted with definition-bearing treatment could not be grounded with a verbatim Definition Passage, so it was demoted to optional and the run succeeded with the remaining cores."

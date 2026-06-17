@@ -86,7 +86,12 @@ export default async function RunListPage() {
                       </Link>
                     </TableCell>
                     <TableCell><Badge variant="outline">{run.declaredDomain}</Badge></TableCell>
-                    <TableCell><Badge variant={statusVariant(run.status)}>{run.status}</Badge></TableCell>
+                    <TableCell className="whitespace-normal">
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant={statusVariant(run.status)}>{run.status}</Badge>
+                        {run.degraded ? <Badge variant="destructive">degraded</Badge> : null}
+                      </div>
+                    </TableCell>
                     <TableCell>{run.candidateCount}</TableCell>
                     <TableCell>{run.coreCount}</TableCell>
                     <TableCell>{run.completeProfileCount} / {run.profileCount}</TableCell>
