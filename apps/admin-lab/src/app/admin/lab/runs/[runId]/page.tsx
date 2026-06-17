@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { FileQuestionIcon } from "lucide-react";
+import { CORE_DEMOTED_UNGROUNDABLE_REASON } from "@lrnki/domain-core";
 import { AdminShell } from "@/components/AdminShell";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,6 +41,12 @@ function tierVariant(tier: string): "default" | "secondary" | "destructive" | "o
   return "outline";
 }
 
+function severityVariant(severity: string): "destructive" | "secondary" | "outline" {
+  if (severity === "critical") return "destructive";
+  if (severity === "warning") return "secondary";
+  return "outline";
+}
+
 function CriterionBadge({ label, passed }: { label: string; passed: boolean }) {
   return <Badge variant={passed ? "default" : "outline"}>{label}: {passed ? "pass" : "fail"}</Badge>;
 }
@@ -64,6 +72,9 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
   }
 
   const { run, candidates, qualityIssues, profiles } = inspection;
+  const profilesByKey = new Map(profiles.map((profile) => [profile.candidateKey, profile] as const));
+  const demotedCandidates = candidates.filter((candidate) => candidate.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON));
+
   return (
     <AdminShell active="runs">
       <div className="flex flex-col gap-4">
@@ -82,8 +93,10 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
             <CardAction className="flex flex-wrap gap-2">
               <Badge variant="outline">{run.declaredDomain}</Badge>
               <Badge variant={run.status === "failed" ? "destructive" : "default"}>{run.status}</Badge>
-              {/* A failed run lacks a complete CEP for an admitted Concept (R1); publication
-                  refuses non-succeeded runs (ADR-0017), so mark it explicitly not publishable. */}
+              {run.degraded ? <Badge variant="destructive">degraded</Badge> : null}
+              {/* An incomplete core is demoted to optional, not failed (see Demoted cores below);
+                  a non-succeeded run signals a pipeline or persistence failure (ADR-0017), and
+                  publication refuses it, so mark it explicitly not publishable. */}
               {run.status !== "succeeded" ? <Badge variant="destructive">not publishable</Badge> : null}
             </CardAction>
           </CardHeader>
@@ -96,6 +109,80 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
             </dl>
           </CardContent>
         </Card>
+
+        {run.degraded ? (
+          <Alert variant="destructive">
+            <AlertTitle>Degraded run</AlertTitle>
+            <AlertDescription>
+              This run succeeded, but all model-selected cores were demoted because none could be grounded with a verbatim Definition Passage.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        {demotedCandidates.length > 0 ? (
+          <Card>
+            <CardHeader className="border-b">
+              <CardTitle>Demoted cores</CardTitle>
+              <CardDescription>
+                Core Concepts that could not be grounded with a verbatim Definition Passage were demoted to optional.
+              </CardDescription>
+              <CardAction><Badge variant={run.degraded ? "destructive" : "secondary"}>{demotedCandidates.length}</Badge></CardAction>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <Table>
+                <TableHeader><TableRow><TableHead>Concept</TableHead><TableHead>Admission definition evidence</TableHead><TableHead>CEP definition</TableHead><TableHead>Outcome</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {demotedCandidates.map((candidate) => {
+                    const profile = profilesByKey.get(candidate.candidateKey);
+                    return (
+                      <TableRow key={candidate.candidateKey}>
+                        <TableCell className="max-w-72 whitespace-normal">
+                          <div className="flex flex-col items-start gap-2">
+                            <span className="font-medium">{candidate.canonicalLabel}</span>
+                            <span className="font-mono text-xs text-muted-foreground">{candidate.candidateKey}</span>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="secondary">model: {candidate.modelTier}</Badge>
+                              <Badge variant="outline">now: {candidate.tier}</Badge>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="min-w-96 whitespace-normal">
+                          {candidate.definitionBearingTreatment.evidence.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                              {candidate.definitionBearingTreatment.evidence.map((evidence, index) => (
+                                <blockquote key={index} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                                  [{evidence.blockId}] &ldquo;{evidence.evidenceQuote}&rdquo;
+                                </blockquote>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">None</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="min-w-80 whitespace-normal">
+                          {profile?.definitions.length ? (
+                            <div className="flex flex-col gap-2">
+                              {profile.definitions.map((passage, index) => (
+                                <blockquote key={index} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                                  &ldquo;{passage.evidenceQuote}&rdquo;
+                                </blockquote>
+                              ))}
+                            </div>
+                          ) : (
+                            <Badge variant="destructive">no verbatim definition</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-96 whitespace-normal text-muted-foreground">
+                          The candidate remains inspectable as optional evidence; it will not publish as a core Concept.
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader className="border-b">
@@ -110,7 +197,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
                 <TableBody>
                   {qualityIssues.map((issue, index) => (
                     <TableRow key={`${issue.issueType}-${issue.candidateKey ?? index}`}>
-                      <TableCell><Badge variant={issue.severity === "warning" ? "destructive" : "outline"}>{issue.severity}</Badge></TableCell>
+                      <TableCell><Badge variant={severityVariant(issue.severity)}>{issue.severity}</Badge></TableCell>
                       <TableCell className="font-mono text-xs">{issue.stage}</TableCell>
                       <TableCell className="font-mono text-xs">{issue.issueType}</TableCell>
                       <TableCell className="max-w-56 whitespace-normal">
@@ -179,6 +266,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
                         <span className="text-muted-foreground">
                           Verified evidence: {candidate.standaloneLearningObjective.evidence.length}/{candidate.standaloneLearningObjective.submittedEvidence.length} standalone,{" "}
                           {candidate.establishedDomainMeaning.evidence.length}/{candidate.establishedDomainMeaning.submittedEvidence.length} domain meaning,{" "}
+                          {candidate.definitionBearingTreatment.evidence.length}/{candidate.definitionBearingTreatment.submittedEvidence.length} definition-bearing,{" "}
                           {candidate.organizingPower.aspects.length}/{candidate.organizingPower.submittedAspects.length} organizing aspects
                         </span>
                         <p className="text-muted-foreground">{candidate.standaloneLearningObjective.rationale || "No standalone-objective rationale."}</p>
@@ -196,6 +284,11 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
                         {candidate.establishedDomainMeaning.evidence.map((evidence, index) => (
                           <blockquote key={`meaning-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
                             Domain meaning [{evidence.blockId}]: &ldquo;{evidence.evidenceQuote}&rdquo;
+                          </blockquote>
+                        ))}
+                        {candidate.definitionBearingTreatment.evidence.map((evidence, index) => (
+                          <blockquote key={`definition-${index}`} className="border-l-2 pl-3 text-sm text-muted-foreground">
+                            Definition-bearing [{evidence.blockId}]: &ldquo;{evidence.evidenceQuote}&rdquo;
                           </blockquote>
                         ))}
                         {candidate.organizingPower.aspects.map((aspect, index) => (

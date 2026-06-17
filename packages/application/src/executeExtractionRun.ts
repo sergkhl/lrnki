@@ -1,4 +1,5 @@
 import {
+  CORE_DEMOTED_UNGROUNDABLE_REASON,
   extractableBlocks,
   type ArtifactEnvelope,
   type ExtractionRunResult,
@@ -153,13 +154,8 @@ export async function executeExtractionRun(input: {
     judge: input.assertionEntailmentJudge
   });
 
-  // The run is successful only when every core Concept has a complete CEP (R1).
-  // Optional proposals may be source-mentioned supporting knowledge without a
-  // Definition Passage; they stay run-scoped and never publish asserted.
-  const status: ExtractionRunResult["status"] =
-    [...coreKeys].every((key) => evidenceProfiles.some((profile) => profile.candidateKey === key && profile.complete))
-      ? "succeeded"
-      : "failed";
+  const demotedCoreCount = demoteUngroundableCores({ candidates, evidenceProfiles, coreKeys });
+  const remainingCoreCount = candidates.filter((candidate) => candidate.admission.tier === "core").length;
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,
@@ -171,7 +167,8 @@ export async function executeExtractionRun(input: {
     candidates,
     evidenceProfiles,
     qualityIssues: [],
-    status,
+    status: "succeeded",
+    degraded: demotedCoreCount > 0 && remainingCoreCount === 0,
     latencyMs: Date.now() - startedAt
   };
   runResult.qualityIssues = detectExtractionQualityIssues(runResult);
@@ -192,6 +189,34 @@ export async function executeExtractionRun(input: {
   // transaction (R: no authoritative relational state without its artifact).
   await input.store.persist(runResult, artifact);
   return runResult;
+}
+
+function demoteUngroundableCores(input: {
+  candidates: RunCandidate[];
+  evidenceProfiles: RunEvidenceProfile[];
+  coreKeys: Set<string>;
+}): number {
+  const profilesByKey = new Map(input.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
+  const candidatesByKey = new Map(input.candidates.map((candidate) => [candidate.candidateKey, candidate] as const));
+  let demotedCount = 0;
+
+  for (const key of input.coreKeys) {
+    const profile = profilesByKey.get(key);
+    if (profile?.complete) continue;
+
+    const candidate = candidatesByKey.get(key);
+    if (candidate) {
+      candidate.admission.tier = "optional";
+      if (!candidate.admission.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON)) {
+        candidate.admission.boundaryReasonCodes.push(CORE_DEMOTED_UNGROUNDABLE_REASON);
+      }
+    }
+    if (profile) {
+      profile.tier = "optional";
+    }
+    demotedCount += 1;
+  }
+  return demotedCount;
 }
 
 function exactAliases(candidate: RunCandidate): string[] {

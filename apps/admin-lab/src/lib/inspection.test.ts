@@ -6,11 +6,12 @@ import { assembleProfiles, toRunSummary } from "./inspection";
 // counts rather than verified/rejected claim counts. The summary mapper is pure.
 test("toRunSummary surfaces CEP completeness, not claim counts", () => {
   const summary = toRunSummary({
-    run_id: "r1", title: "Rust Book §4", declared_domain: "rust", status: "succeeded", latency_ms: 42000,
+    run_id: "r1", title: "Rust Book §4", declared_domain: "rust", status: "succeeded", degraded: true, latency_ms: 42000,
     started_at: "2026-06-15T10:00:00.000Z", candidate_count: 9, core_count: 4,
     profile_count: 4, complete_profile_count: 3, definition_count: 4, mention_count: 11, assertion_count: 2
   });
   assert.equal(summary.coreCount, 4);
+  assert.equal(summary.degraded, true);
   assert.equal(summary.profileCount, 4);
   assert.equal(summary.completeProfileCount, 3);
   assert.equal(summary.definitionCount, 4);

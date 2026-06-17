@@ -14,6 +14,7 @@ export interface RunSummary {
   sourceTitle: string;
   declaredDomain: string;
   status: string;
+  degraded: boolean;
   latencyMs: number | null;
   startedAt: string;
   candidateCount: number;
@@ -110,7 +111,7 @@ async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefine
 // Counts a run's CEPs into the summary surface. Subqueries keep the list query a
 // single round-trip; `definition`/`mention` are the only passage kinds (ADR-0007).
 const RUN_SUMMARY_COLUMNS = (sql: Sql) => sql`
-  er.run_id, sr.title, sr.declared_domain, er.status, er.latency_ms, er.started_at,
+  er.run_id, sr.title, sr.declared_domain, er.status, er.degraded, er.latency_ms, er.started_at,
   (SELECT count(*) FROM concept_candidates cc WHERE cc.run_id = er.run_id) AS candidate_count,
   (SELECT count(*) FROM concept_candidates cc JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
     WHERE cc.run_id = er.run_id AND ad.tier = 'core') AS core_count,
@@ -124,7 +125,7 @@ const RUN_SUMMARY_COLUMNS = (sql: Sql) => sql`
     WHERE p.run_id = er.run_id) AS assertion_count`;
 
 type RunSummaryRow = {
-  run_id: string; title: string; declared_domain: string; status: string; latency_ms: number | null; started_at: string;
+  run_id: string; title: string; declared_domain: string; status: string; degraded: boolean; latency_ms: number | null; started_at: string;
   candidate_count: number; core_count: number; profile_count: number; complete_profile_count: number;
   definition_count: number; mention_count: number; assertion_count: number;
 };
@@ -347,6 +348,7 @@ export function toRunSummary(row: RunSummaryRow): RunSummary {
     sourceTitle: row.title,
     declaredDomain: row.declared_domain,
     status: row.status,
+    degraded: row.degraded,
     latencyMs: row.latency_ms,
     startedAt: new Date(row.started_at).toISOString(),
     candidateCount: Number(row.candidate_count),

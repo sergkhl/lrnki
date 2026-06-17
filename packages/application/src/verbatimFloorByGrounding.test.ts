@@ -33,6 +33,7 @@ function llmGrounded(id: string): EnrichmentNode {
     nodeKind: "enrichment",
     derivedNodeId: id,
     groundingOrigin: "llm_grounded",
+    mintingReason: "assumed_prerequisite",
     role: "prerequisite",
     layer: "derived",
     canonicalLabel: id,

@@ -245,8 +245,9 @@ export type AssertionEntailmentJudgment = {
 // boundary: definition + mention passages cleared the verbatim floor and were
 // deduplicated, mentions were bounded to maxMentionsPerConceptPerSource in neural
 // order, and each surviving typed assertion passed entailment. `complete` is true
-// only when at least one verified definition passage remains; an admitted Concept
-// with no complete CEP makes the Extraction Run unsuccessful (R1).
+// only when at least one verified definition passage remains; an incomplete core
+// Concept is demoted to optional before publication, while optional incomplete
+// profiles stay inspectable as run-scoped evidence.
 export type RunTypedAssertion =
   | { type: "defines"; literalValue: string; evidence: BlockEvidence[] }
   | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BlockEvidence[] };
@@ -265,7 +266,7 @@ export type ExtractionQualityIssue = {
   candidateKey?: string;
   conceptLabel?: string;
   issueType: string;
-  severity: "info" | "warning";
+  severity: "info" | "warning" | "critical";
   evidenceQuotes: string[];
   rationale: string;
 };
@@ -364,6 +365,14 @@ export type RunCandidate = {
   };
 };
 
+// The boundary reason code stamped on a candidate whose admitted `core` tier was
+// demoted to `optional` because its CEP could not be grounded with a verbatim
+// Definition Passage (ADR-0007). One exported token shared by the demotion policy
+// that writes it onto `boundaryReasonCodes` and every consumer that reads it back
+// (the quality-issue detector, Admin Lab), so a rename can never silently desync a
+// `string[]` reason code into invisibility.
+export const CORE_DEMOTED_UNGROUNDABLE_REASON = "core_demoted_ungroundable";
+
 export type ExtractionRunResult = {
   runId: string;
   sourceResourceId: string;
@@ -376,9 +385,13 @@ export type ExtractionRunResult = {
   candidates: RunCandidate[];
   evidenceProfiles: RunEvidenceProfile[];
   qualityIssues: ExtractionQualityIssue[];
-  // A run is unsuccessful when any admitted (core|optional) Concept lacks a
-  // complete CEP (R1). Publication refuses non-succeeded runs (ADR-0017).
+  // A run with an incomplete core Concept demotes that Concept to optional before
+  // publication. Genuine non-succeeded runs remain reserved for pipeline or
+  // persistence failures; publication refuses non-succeeded runs (ADR-0017).
   status: "succeeded" | "failed";
+  // True when the run succeeded but every model-selected core was demoted, leaving
+  // zero published cores.
+  degraded: boolean;
   costUsd?: number;
   latencyMs?: number;
 };
@@ -587,6 +600,8 @@ export type GeneratedGroundingBundle = {
   rationale: string;
 };
 
+export type MintingReason = "assumed_prerequisite" | "densification";
+
 export type AnchorProjectionNode = {
   nodeKind: "anchor";
   derivedNodeId: string;
@@ -617,6 +632,7 @@ export type LlmGroundedEnrichmentNode = {
   nodeKind: "enrichment";
   derivedNodeId: string;
   groundingOrigin: "llm_grounded";
+  mintingReason: MintingReason;
   role: "prerequisite";
   layer: "derived";
   canonicalLabel: string;
@@ -636,6 +652,11 @@ export type DerivedGraphNode = AnchorProjectionNode | EnrichmentNode;
 // labels exist. Proposals are anchor-driven (each names the anchor it scaffolds) and
 // bounded; the application dedupes them against existing node labels within domain.
 export type MissingPrerequisiteProposal = {
+  proposedLabel: string;
+  rationale: string;
+};
+
+export type BridgeConceptProposal = {
   proposedLabel: string;
   rationale: string;
 };

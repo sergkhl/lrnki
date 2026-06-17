@@ -4,6 +4,7 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
+  BridgeConceptProposal,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -242,6 +243,20 @@ export interface MissingPrerequisiteProposalPort {
     existingNodeLabels: string[];
     maxProposals: number;
   }): Promise<MissingPrerequisiteProposal[]>;
+}
+
+export interface BridgeConceptProposalPort {
+  readonly model: string;
+  propose(input: {
+    declaredDomain: string;
+    gap: {
+      a: { conceptId: string; canonicalLabel: string; groundingTexts: string[] };
+      b: { conceptId: string; canonicalLabel: string; groundingTexts: string[] };
+      declinedRationale: string;
+    };
+    existingNodeLabels: string[];
+    maxProposals: number;
+  }): Promise<BridgeConceptProposal[]>;
 }
 
 // Baseline node difficulty (ADR-0019). MVP impl = deterministic DAG-depth mock

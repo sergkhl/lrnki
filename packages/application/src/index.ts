@@ -12,6 +12,23 @@ export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMinting
 export { computeLearnerPath } from "./computeLearnerPath";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
+  detectSparseRegions,
+  connectivityMetrics,
+  DEFAULT_SPARSE_REGION_BOUNDS,
+  type CandidateBridgeGap,
+  type ConnectivityMetrics,
+  type DeclinedPairDisposition,
+  type SparseRegionBounds,
+  type SparseRegionDetectionResult
+} from "./sparseRegionDetection";
+export {
+  runDensificationExperiment,
+  DEFAULT_DENSIFICATION_EXPERIMENT_CONFIG,
+  type DensificationBridgeRecord,
+  type DensificationExperimentConfig,
+  type DensificationExperimentResult
+} from "./runDensificationExperiment";
+export {
   cutWeakEdges,
   removeCycles,
   transitiveReduction,

@@ -194,6 +194,3 @@ flowchart TB
 - `docs/plans/TODO.md` - current live roadmap already flags non-Rust validation before prompt, cap, or
   schema tuning.
 - `fixtures/README.md` - canonical mixed-domain fixture matrix for real-use quality runs.
-- `docs/brainstorms/2026-06-15-kg-core-complexity-reset-requirements.md` - completed reset context.
-- `docs/brainstorms/2026-06-16-derived-layer-prerequisite-enrichment-requirements.md` - completed
-  derived-layer enrichment context.
