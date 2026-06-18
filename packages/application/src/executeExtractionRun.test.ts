@@ -105,7 +105,8 @@ const definitionFor: Record<string, ExtractedEvidenceProfile> = {
 function harness(
   extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
   selectedCandidates = candidates,
-  admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission
+  admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission,
+  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number } } = {}
 ) {
   let persisted: ExtractionRunResult | undefined;
   let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
@@ -120,9 +121,10 @@ function harness(
         sourceResourceId: "source-1",
         sourceDocumentId: "document-1",
         declaredDomain: "educational technology",
-        document
+        document: options.document ?? document
       },
       pipelineConfigHash: "test-v1",
+      evidenceNeighborhoodConfig: options.evidenceNeighborhoodConfig,
       discovery: { discover: async () => selectedCandidates },
       admission: { admit: async () => selectedCandidates.map(admit) },
       evidenceProfileExtraction: { extract },
@@ -132,6 +134,49 @@ function harness(
     }),
     persisted: () => persisted,
     artifact: () => persistedArtifact
+  };
+}
+
+const adjacentDefinitionQuote = "It widens the evidence neighborhood with adjacent teachable blocks.";
+const adjacentDocument: StructuredDocument = {
+  sourceResourceId: "source-adjacent",
+  parserName: "test",
+  parserVersion: "1",
+  parserConfigHash: "test",
+  blocks: [
+    { blockId: "alpha-mention", blockType: "paragraph", text: "Concept Alpha is named here.", headingPath: ["Method"], locator: {} },
+    { blockId: "alpha-definition", blockType: "paragraph", text: adjacentDefinitionQuote, headingPath: ["Method"], locator: {} },
+    { blockId: "alpha-sibling", blockType: "paragraph", text: "A later sibling explains why the context window is capped.", headingPath: ["Method"], locator: {} }
+  ]
+};
+const adjacentCandidate: DiscoveredCandidate = {
+  candidateKey: "alpha",
+  canonicalLabel: "Concept Alpha",
+  mentions: [{ blockId: "alpha-mention", evidenceQuote: "Concept Alpha" }]
+};
+
+function adjacentAdmission(): AdmissionProposal {
+  return {
+    atomicKey: "alpha",
+    parentCandidateKey: "alpha",
+    proposedCanonicalLabel: "Concept Alpha",
+    tier: "core",
+    sourceRole: "declared_domain_concept",
+    standaloneLearningObjective: { passed: true, rationale: "standalone", evidence: [{ blockId: "alpha-mention", evidenceQuote: "Concept Alpha" }] },
+    establishedDomainMeaning: { passed: true, rationale: "established", evidence: [{ blockId: "alpha-mention", evidenceQuote: "Concept Alpha" }] },
+    definitionBearingTreatment: { passed: true, rationale: "definition-bearing", evidence: [{ blockId: "alpha-mention", evidenceQuote: "Concept Alpha" }] },
+    organizingPower: {
+      passed: true,
+      rationale: "organizes",
+      aspects: [
+        { summary: "names the subject", nature: "definition-or-property", evidence: { blockId: "alpha-mention", evidenceQuote: "Concept Alpha" } },
+        { summary: "explains the window", nature: "mechanism", evidence: { blockId: "alpha-definition", evidenceQuote: adjacentDefinitionQuote } }
+      ]
+    },
+    coreSelected: true,
+    selectionReasonCode: "source_level_core",
+    reasonCodes: ["source_level_core"],
+    confidence: 0.9
   };
 }
 
@@ -146,6 +191,49 @@ test("produces one complete CEP per admitted concept and marks the run succeeded
   assert.equal(framework?.mentions.length, 1);
   assert.equal(result.maxMentionsPerConceptPerSource, 6);
   assert.ok(result.candidates.every((candidate) => !candidate.admission.boundaryReasonCodes.includes("core_demoted_ungroundable")));
+});
+
+test("passes adjacent definition blocks into the concept-conditioned extractor while preserving verbatim validation", async () => {
+  const receivedNeighborhood = new Map<string, string[]>();
+  const result = await harness(
+    async (input) => {
+      receivedNeighborhood.set(input.subject.candidateKey, input.evidenceNeighborhood.map((block) => block.blockId));
+      return {
+        definitions: [
+          { blockId: "alpha-definition", evidenceQuote: adjacentDefinitionQuote },
+          { blockId: "alpha-definition", evidenceQuote: "this quote is absent from every source block" }
+        ],
+        mentions: [],
+        assertions: []
+      };
+    },
+    [adjacentCandidate],
+    adjacentAdmission,
+    { document: adjacentDocument }
+  ).run();
+
+  assert.ok(receivedNeighborhood.get("alpha")?.includes("alpha-definition"));
+  const profile = result.evidenceProfiles.find((candidate) => candidate.candidateKey === "alpha");
+  assert.deepEqual(profile?.definitions.map((definition) => definition.evidenceQuote), [adjacentDefinitionQuote]);
+  assert.equal(profile?.complete, true);
+});
+
+test("passes evidence neighborhood config overrides into the selector", async () => {
+  const receivedNeighborhood = new Map<string, string[]>();
+  await harness(
+    async (input) => {
+      receivedNeighborhood.set(input.subject.candidateKey, input.evidenceNeighborhood.map((block) => block.blockId));
+      return { definitions: [{ blockId: "alpha-mention", evidenceQuote: "Concept Alpha" }], mentions: [], assertions: [] };
+    },
+    [adjacentCandidate],
+    adjacentAdmission,
+    {
+      document: adjacentDocument,
+      evidenceNeighborhoodConfig: { maxEvidenceBlocksPerConcept: 1, siblingCap: 4, adjacencyRadius: 1 }
+    }
+  ).run();
+
+  assert.deepEqual(receivedNeighborhood.get("alpha"), ["alpha-mention"]);
 });
 
 test("carries each core subject's admission-verified definition-bearing evidence into extraction (optional carries none)", async () => {

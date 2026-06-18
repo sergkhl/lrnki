@@ -1,13 +1,13 @@
 # TODO
 
-Roadmap reset 2026-06-16 (`docs/brainstorms/2026-06-16-evaluation-first-roadmap-reset-requirements.md`,
-`tmp/evaluation-first-roadmap-reset/consolidated-findings.md`): the next work is earned by real mixed-domain
-pipeline output, not by deferred method-stack preference.
+Roadmap reset 2026-06-16, updated by the 2026-06-18 structure-aware-neighborhood run: the next work is earned
+by real mixed-domain pipeline output, not by deferred method-stack preference.
 
 ## TODO
 
-Roadmap items 1–4 below were implemented and validated by the 2026-06-16 evidence-backed re-run (see
-VALIDATION); they moved to COMPLETED. The next work is earned by that run's one recorded blocker.
+Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
+outputs: the F1/F3 thin-connected-region trigger mismatch, and a CEP definition-quality caveat exposed by the
+2026-06-18 structure-aware-neighborhood run.
 
 1. **Densification F3 v2 — measured thin-connected-region trigger (`EXPERIMENT_ONLY`).** F3 v1 shipped but its
    topology-primary trigger only fires on disconnected components and orphan nodes. The F1 baseline is already
@@ -29,7 +29,18 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
    - Stay `EXPERIMENT_ONLY` (rule 11, ADR-0019 / plan KTD4): append-only experiment artifact, asserted graph
      byte-for-byte unchanged, no embeddings (ADR-0012 stands), prompts domain-neutral (rule 17).
 
-2. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
+2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+   neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
+   still found low-value accepted Definition Passages such as heading-only or citation-like snippets in the
+   AIRA-dojo Markdown run.
+   - Do **not** add a hardcoded symbolic section-role or lexical veto. Any fix must stay domain-neutral and comply
+     with AGENTS rules 16/17.
+   - Prefer improving the neural CEP extraction/judgment contract or adding a measured, disposable experiment that
+     proves a generic definition-quality guard raises precision without dropping valid adjacent definitions.
+   - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
+     and the inspected newly included adjacent blocks were genuine explaining passages.
+
+3. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
    empty mock until path quality makes calibration the limiting problem.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, or non-LLM
      prerequisite signals from method-stack preference.
@@ -38,6 +49,15 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
 
 ## COMPLETED
 
+- **Structure-aware evidence neighborhood for CEP extraction (2026-06-18).** Added a pure deterministic
+  `selectEvidenceNeighborhood` in `domain-core` that widens CEP input from mention/label blocks to a capped,
+  priority-ordered, extractable-only neighborhood: mention blocks, adjacent extractable body blocks, same
+  `headingPath` siblings, then label/alias blocks. Wired it through `executeExtractionRun` without changing the
+  port shape or the verbatim floor; added `prev`/`next` structural rendering with full-document adjacency for
+  filtered CEP neighborhoods; bumped the worker config hash to `structure-aware-neighborhood-v37`; and registered
+  the datalab Markdown 2507 fixture. Rule-14 mixed-domain re-run: InstructKG incomplete CEPs improved **9 → 3**,
+  economics stayed **1 → 1**, and AIRA-dojo Markdown exposed remaining CEP-quality caveats. Evidence under
+  `tmp/2026-06-18-structure-aware-neighborhood/`.
 - **Enrichment-ordering evaluation gate (F1) and v1 densification experiment (F3) (2026-06-17).** Ran a real
   mixed-domain F1 evaluation of Graph Enrichment prerequisite ordering over biology, economics, and InstructKG:
   all three Learner Paths judged `PASS` (no concept before a prerequisite it requires; every step traces to a CEP
@@ -101,7 +121,30 @@ VALIDATION); they moved to COMPLETED. The next work is earned by that run's one 
 
 ## VALIDATION
 
-Latest validation (2026-06-17) is the **F1 enrichment-ordering gate + F3 v1 densification experiment**
+Latest validation (2026-06-18) is the **structure-aware evidence-neighborhood gate**
+(`docs/plans/2026-06-18-001-feat-structure-aware-evidence-neighborhood-plan.md`):
+
+- **Static/unit:** `pnpm run test`, `pnpm run typecheck`, `pnpm --filter @lrnki/admin-lab build`, and
+  `git diff --check` passed. `pnpm run lint` exited 0 with one pre-existing warning in
+  `packages/domain-core/src/index.ts`.
+- **Simplify/review pass:** subagent simplify reviewers found and fixes were applied for unique sibling-cap
+  accounting, duplicate mention-index scans, duplicate alias computation, and misleading `prev`/`next` metadata
+  on filtered CEP neighborhoods. Focused domain-core, application, and litellm tests passed after those fixes.
+- **Real-use (rule-14 extraction rerun):** real mixed-domain extraction with config
+  `structure-aware-neighborhood-v37`. InstructKG run `1f827f1c-04ba-40aa-8c00-a4b255cdc742` succeeded with
+  `CEPs=49(incomplete=3)`, improving from the F1 baseline of 9 incomplete CEPs. Economics run
+  `cc1b754d-d656-4830-8e31-8e76c43221c9` succeeded with `CEPs=29(incomplete=1)`, unchanged from baseline.
+  AIRA-dojo Markdown run `0eddc4e1-c49e-4f5a-9abb-b2bb52c9cfc6` succeeded with
+  `CEPs=42(incomplete=10)`.
+- **Spot checks:** recovered definitions from newly surfaced adjacent/same-section blocks were source-faithful for
+  examples including InstructKG `Context Clustering`, `Role Classification`, `EDC`, and AIRA-dojo
+  `Generalization Gap`; cited passages verified verbatim and were genuine explaining passages.
+- **Result:** PASS with caveats. The retrieval-layer defect is materially improved, especially for InstructKG, and
+  the verbatim floor still holds. Remaining caveats are definition-quality precision issues, especially
+  heading-only or citation-like accepted definitions in AIRA-dojo; that earned TODO #2. Evidence under
+  `tmp/2026-06-18-structure-aware-neighborhood/`.
+
+Prior validation (2026-06-17) is the **F1 enrichment-ordering gate + F3 v1 densification experiment**
 (`docs/plans/2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md`):
 
 - **Static/unit:** `pnpm run test`, `pnpm run typecheck`, and `pnpm run build` passed; `pnpm run lint` exited 0

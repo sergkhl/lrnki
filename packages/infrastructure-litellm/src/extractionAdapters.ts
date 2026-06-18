@@ -54,11 +54,23 @@ export const ASSERTION_ENTAILMENT_JUDGE_MODEL = "kg-independent-judge";
 // its own label.
 export const ADMISSION_LABEL_JUDGE_MODEL = "kg-independent-judge";
 
-export function renderBlocks(blocks: SourceBlock[]): string {
+export function renderBlocks(blocks: SourceBlock[], options: { adjacencyBlocks?: SourceBlock[] } = {}): string {
+  const adjacency = new Map<string, { previous?: string; next?: string }>();
+  const adjacencyBlocks = options.adjacencyBlocks ?? blocks;
+  adjacencyBlocks.forEach((block, index) => {
+    adjacency.set(block.blockId, {
+      previous: adjacencyBlocks[index - 1]?.blockId,
+      next: adjacencyBlocks[index + 1]?.blockId
+    });
+  });
+
   return blocks
     .map((block) => {
       const path = block.headingPath.length ? ` heading="${block.headingPath.join(" › ")}"` : "";
-      return `[${block.blockId} type=${block.blockType}${path}] ${block.text}`;
+      const adjacent = adjacency.get(block.blockId);
+      const previous = adjacent?.previous ? ` prev=${adjacent.previous}` : "";
+      const next = adjacent?.next ? ` next=${adjacent.next}` : "";
+      return `[${block.blockId} type=${block.blockType}${path}${previous}${next}] ${block.text}`;
     })
     .join("\n");
 }
@@ -301,7 +313,7 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
       admitted || "(none)",
       "",
       "Evidence blocks (quote verbatim from these):",
-      renderBlocks(input.evidenceNeighborhood),
+      renderBlocks(input.evidenceNeighborhood, { adjacencyBlocks: extractableBlocks(input.document.blocks) }),
       "",
       // KTD2 hint: admission already verified that the source establishes this
       // concept's meaning in the passage(s) below. Surface it so the extractor does

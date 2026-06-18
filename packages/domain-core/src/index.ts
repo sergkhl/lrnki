@@ -43,6 +43,91 @@ export function extractableBlocks(blocks: SourceBlock[]): SourceBlock[] {
   return blocks.filter(isExtractableBlock);
 }
 
+export type EvidenceNeighborhoodConfig = {
+  maxEvidenceBlocksPerConcept: number;
+  siblingCap: number;
+  adjacencyRadius: number;
+};
+
+export const DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG: EvidenceNeighborhoodConfig = {
+  maxEvidenceBlocksPerConcept: 12,
+  siblingCap: 4,
+  adjacencyRadius: 1
+};
+
+export type EvidenceNeighborhoodSubject = {
+  mentionBlockIds: Set<string>;
+  labels: string[];
+};
+
+export function selectEvidenceNeighborhood(
+  blocks: SourceBlock[],
+  subject: EvidenceNeighborhoodSubject,
+  config: EvidenceNeighborhoodConfig = DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG
+): SourceBlock[] {
+  const bodyBlocks = extractableBlocks(blocks);
+  const bodyIds = new Set(bodyBlocks.map((block) => block.blockId));
+  const mentionIds = new Set([...subject.mentionBlockIds].filter((blockId) => bodyIds.has(blockId)));
+  const normalizedLabels = subject.labels.map((label) => label.trim().toLowerCase()).filter((label) => label.length > 0);
+  const candidates: SourceBlock[] = [];
+  const candidateIds = new Set<string>();
+  const addCandidate = (block: SourceBlock | undefined): boolean => {
+    if (!block || candidateIds.has(block.blockId)) return false;
+    candidateIds.add(block.blockId);
+    candidates.push(block);
+    return true;
+  };
+
+  const mentionBlocks: SourceBlock[] = [];
+  const mentionIndexes: number[] = [];
+  bodyBlocks.forEach((block, index) => {
+    if (!mentionIds.has(block.blockId)) return;
+    mentionBlocks.push(block);
+    mentionIndexes.push(index);
+    addCandidate(block);
+  });
+  for (const index of mentionIndexes) {
+    for (let radius = 1; radius <= config.adjacencyRadius; radius += 1) {
+      addCandidate(bodyBlocks[index - radius]);
+      addCandidate(bodyBlocks[index + radius]);
+    }
+  }
+
+  const mentionHeadingPaths = uniqueHeadingPaths(mentionBlocks.map((block) => block.headingPath));
+  let siblingCount = 0;
+  for (const block of bodyBlocks) {
+    if (siblingCount >= config.siblingCap) break;
+    if (candidateIds.has(block.blockId)) continue;
+    if (!mentionHeadingPaths.some((headingPath) => sameHeadingPath(headingPath, block.headingPath))) continue;
+    if (addCandidate(block)) siblingCount += 1;
+  }
+
+  for (const block of bodyBlocks) {
+    const text = block.text.toLowerCase();
+    if (normalizedLabels.some((label) => text.includes(label))) {
+      addCandidate(block);
+    }
+  }
+
+  return candidates.slice(0, config.maxEvidenceBlocksPerConcept);
+}
+
+function sameHeadingPath(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((part, index) => part === right[index]);
+}
+
+function uniqueHeadingPaths(paths: string[][]): string[][] {
+  const seen = new Set<string>();
+  const unique: string[][] = [];
+  for (const path of paths) {
+    const key = JSON.stringify(path);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(path);
+  }
+  return unique;
+}
+
 export type EvidenceReference = {
   sourceResourceId: string;
   sourceBlockId: string;

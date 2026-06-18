@@ -1,7 +1,9 @@
 import {
   CORE_DEMOTED_UNGROUNDABLE_REASON,
-  extractableBlocks,
+  DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG,
+  selectEvidenceNeighborhood,
   type ArtifactEnvelope,
+  type EvidenceNeighborhoodConfig,
   type ExtractionRunResult,
   type RunCandidate,
   type RunEvidenceProfile,
@@ -41,6 +43,7 @@ export async function executeExtractionRun(input: {
   source: { sourceResourceId: string; sourceDocumentId: string; declaredDomain: string; document: StructuredDocument };
   pipelineConfigHash: string;
   maxMentionsPerConceptPerSource?: number;
+  evidenceNeighborhoodConfig?: EvidenceNeighborhoodConfig;
   discovery: ConceptDiscoveryPort;
   admission: ConceptAdmissionPort;
   evidenceProfileExtraction: ConceptConditionedEvidenceProfileExtractionPort;
@@ -51,6 +54,7 @@ export async function executeExtractionRun(input: {
   const startedAt = Date.now();
   const { document, declaredDomain } = input.source;
   const maxMentionsPerConceptPerSource = input.maxMentionsPerConceptPerSource ?? DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE;
+  const evidenceNeighborhoodConfig = input.evidenceNeighborhoodConfig ?? DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG;
   const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
 
   // Stage 1 — recall-oriented Candidate Discovery.
@@ -118,6 +122,7 @@ export async function executeExtractionRun(input: {
   // an empty (incomplete) profile so the run fails closed rather than publishing a
   // Concept with no source-grounded meaning.
   const rawProfiles = await mapWithConcurrency(admittedCandidates, CEP_EXTRACTION_CONCURRENCY, async (subject) => {
+    const aliases = exactAliases(subject);
     const extracted = await input.evidenceProfileExtraction
       .extract({
         document,
@@ -125,10 +130,10 @@ export async function executeExtractionRun(input: {
         subject: {
           candidateKey: subject.candidateKey,
           canonicalLabel: subject.canonicalLabel,
-          aliases: exactAliases(subject)
+          aliases
         },
         admittedConcepts,
-        evidenceNeighborhood: evidenceNeighborhood(document, subject),
+        evidenceNeighborhood: evidenceNeighborhood(document, subject, aliases, evidenceNeighborhoodConfig),
         // Carry admission's verified definition-bearing passages into extraction as a
         // hint (U2/KTD2). Core only — optional subjects never gate on this criterion,
         // so they carry no definition hint and behave exactly as before.
@@ -223,6 +228,17 @@ function exactAliases(candidate: RunCandidate): string[] {
   return [...new Set([candidate.discoveredLabel, candidate.canonicalLabel, ...candidate.aliases])];
 }
 
+function evidenceNeighborhood(document: StructuredDocument, subject: RunCandidate, labels: string[], config: EvidenceNeighborhoodConfig) {
+  return selectEvidenceNeighborhood(
+    document.blocks,
+    {
+      mentionBlockIds: new Set(subject.mentions.map((mention) => mention.blockId)),
+      labels
+    },
+    config
+  );
+}
+
 // Bounded so a large source cannot fan out unbounded parallel LLM calls through the proxy.
 const CEP_EXTRACTION_CONCURRENCY = 4;
 
@@ -237,13 +253,4 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   });
   await Promise.all(workers);
   return results;
-}
-
-// Evidence neighborhood: the candidate's own mention blocks plus any block whose
-// text contains the concept label. Scoped to extractable body blocks so a CEP can
-// never cite references, appendices, captions, or table/figure placeholders.
-function evidenceNeighborhood(document: StructuredDocument, subject: RunCandidate) {
-  const mentionBlockIds = new Set(subject.mentions.map((mention) => mention.blockId));
-  const label = subject.canonicalLabel.toLowerCase();
-  return extractableBlocks(document.blocks).filter((block) => mentionBlockIds.has(block.blockId) || block.text.toLowerCase().includes(label));
 }
