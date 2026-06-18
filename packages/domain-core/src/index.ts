@@ -825,6 +825,20 @@ export type PrerequisiteConceptContext = {
   assertions: { type: OptionalAssertionType; detail: string }[];
 };
 
+// Per-derived-node evidence reduced for learner-neutral intrinsic difficulty.
+// Anchors carry CEP evidence; source-mentioned nodes carry rescued mention quotes;
+// llm_grounded nodes carry their generated grounding bundle text. This is not a
+// Concept projection and does not weaken the verbatim floor.
+export type DifficultyNodeContext = {
+  conceptId: string;
+  canonicalLabel: string;
+  aliases: string[];
+  declaredDomain: string;
+  groundingOrigin: GroundingOrigin;
+  definitions: string[];
+  mentions: string[];
+};
+
 // One bounded LLM prerequisite judgment over an evidence-packed same-domain pair.
 // "uncertain" is flagged for review and excluded from the path, never silently
 // promoted to an edge (concept-first method stack §4; goal 1.6/4).

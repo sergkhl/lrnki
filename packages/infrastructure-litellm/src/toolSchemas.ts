@@ -442,6 +442,36 @@ export const missingPrerequisiteProposalValidator = z.object({
   }).strict())
 }).strict();
 
+// --- Intrinsic difficulty judgment: submit_intrinsic_difficulty ----------
+// One bounded learner-neutral difficulty judgment over a derived node's evidence.
+// The score is later fused with deterministic graph/evidence components; this
+// schema captures only the neural subscore and a short rationale. The rubric text
+// stays domain-neutral and contains no fixture-derived exemplars (AGENTS rule 17).
+
+export const intrinsicDifficultySchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["neuralScore", "rationale"],
+  properties: {
+    neuralScore: {
+      type: "number",
+      minimum: 0,
+      maximum: 1,
+      description:
+        "Learner-neutral intrinsic difficulty in [0,1], based on abstraction level, technical density, implied background load, and how much the evidence requires integrating multiple ideas."
+    },
+    rationale: {
+      type: "string",
+      description: "One terse sentence explaining the generic difficulty factors that drove the score."
+    }
+  }
+};
+
+export const intrinsicDifficultyValidator = z.object({
+  neuralScore: z.number().min(0).max(1),
+  rationale: z.string().min(1)
+}).strict();
+
 // --- Assertion entailment judgment: submit_assertion_entailment_judgment --
 // One bounded judgment over a single optional typed assertion (ADR-0007 reset).
 // For an explicit-prerequisite-hint the model decides whether the verbatim

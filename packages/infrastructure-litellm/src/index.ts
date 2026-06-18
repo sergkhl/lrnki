@@ -16,6 +16,8 @@ export {
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalSchema,
   missingPrerequisiteProposalValidator,
+  intrinsicDifficultySchema,
+  intrinsicDifficultyValidator,
   assertionEntailmentJudgmentSchema,
   assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
@@ -50,3 +52,8 @@ export {
   LiteLlmMissingPrerequisiteProposalAdapter,
   MISSING_PREREQUISITE_PROPOSAL_MODEL
 } from "./missingPrerequisiteProposalAdapters";
+export {
+  LiteLlmIntrinsicDifficultyJudgmentAdapter,
+  INTRINSIC_DIFFICULTY_JUDGE_MODEL,
+  INTRINSIC_DIFFICULTY_SYSTEM_PROMPT
+} from "./intrinsicDifficultyAdapters";

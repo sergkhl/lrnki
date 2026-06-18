@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type {
   AnchorProjectionNode,
   DerivedGraphLayer,
+  DifficultyNodeContext,
   EnrichmentRunTrace,
   GraphSnapshot,
   PrerequisiteConceptContext,
@@ -14,7 +15,7 @@ import type {
   GraphVersionStorePort,
   PrerequisiteJudgmentPort
 } from "@lrnki/ports";
-import { runGraphEnrichment } from "./runGraphEnrichment";
+import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment } from "./runGraphEnrichment";
 
 // Two Declared Domains: "x" has 3 concepts, "y" has 2. Prerequisites are always
 // same-domain (ADR-0015), so the exhaustive judge (ADR-0019 reset) must see
@@ -127,9 +128,9 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
     }
   };
   const difficulty: DifficultyPort = {
-    method: "dag-depth-mock",
-    async score({ nodeIds }) {
-      return nodeIds.map((id) => ({ conceptId: id, score: 0, method: "dag-depth-mock", components: {} }));
+    method: "intrinsic-fused-v1",
+    async score({ nodes }) {
+      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0, method: "intrinsic-fused-v1", components: {} }));
     }
   };
   let persisted: DerivedGraphLayer | undefined;
@@ -290,12 +291,33 @@ test("anchor derived node ids are per enrichment run, while concept ids stay sta
   assert.notEqual(firstAnchor.derivedNodeId, secondAnchor.derivedNodeId);
 });
 
-// Scenario 7: difficulty stays the dag-depth mock over the reduced DAG.
-test("runGraphEnrichment scores difficulty with the dag-depth mock", async () => {
+// Scenario 7: difficulty receives per-node evidence contexts over all derived nodes.
+test("runGraphEnrichment scores intrinsic difficulty with per-node evidence contexts", async () => {
+  const scoredInputs: DifficultyNodeContext[][] = [];
   const ports = buildPorts();
+  ports.difficulty = {
+    method: "intrinsic-fused-v1",
+    async score({ nodes }) {
+      scoredInputs.push(nodes);
+      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 } }));
+    }
+  };
   const layer = await run(ports);
   assert.equal(layer.difficulties.length, 5);
-  assert.ok(layer.difficulties.every((d) => d.method === "dag-depth-mock"));
+  assert.ok(layer.difficulties.every((d) => d.method === "intrinsic-fused-v1"));
+  assert.equal(scoredInputs.length, 1);
+  assert.equal(scoredInputs[0].length, layer.derivedNodes.length);
+  const xOne = scoredInputs[0].find((node) => node.canonicalLabel === "X One");
+  assert.ok(xOne);
+  assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
+});
+
+test("runGraphEnrichment default config hash reflects intrinsic difficulty", async () => {
+  const ports = buildPorts();
+  const layer = await run(ports);
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "intrinsic-difficulty-v3");
+  assert.equal(layer.enrichmentConfigHash, "intrinsic-difficulty-v3");
+  assert.notEqual(layer.enrichmentConfigHash, "cep-node-enrichment-rescue-judged-v2");
 });
 
 // Scenario 3: a concept pair with no CEP evidence cannot reach the judge and fails
@@ -413,7 +435,12 @@ function buildNodePorts(options: {
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
     async getPublishedSnapshot(id) { return id === sparseSnapshot.graphVersionId ? sparseSnapshot : undefined; }
   };
-  const difficulty: DifficultyPort = { method: "dag-depth-mock", async score({ nodeIds }) { return nodeIds.map((id) => ({ conceptId: id, score: 0, method: "dag-depth-mock", components: {} })); } };
+  const difficulty: DifficultyPort = {
+    method: "intrinsic-fused-v1",
+    async score({ nodes }) {
+      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0, method: "intrinsic-fused-v1", components: {} }));
+    }
+  };
   const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {
     async persist(input) { persisted = input.layer; },
     async mentionedNonCoreCandidates() { return options.rescue ?? []; }

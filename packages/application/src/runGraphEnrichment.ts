@@ -2,6 +2,7 @@ import type {
   AnchorProjectionNode,
   DerivedGraphLayer,
   DerivedGraphNode,
+  DifficultyNodeContext,
   EnrichmentNode,
   EnrichmentRunTrace,
   GroundingVerbatimDisposition,
@@ -46,7 +47,7 @@ export type GraphEnrichmentConfig = {
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  enrichmentConfigHash: "cep-node-enrichment-rescue-judged-v2",
+  enrichmentConfigHash: "intrinsic-difficulty-v3",
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
   maxMentionsPerConceptInPair: 6,
@@ -62,8 +63,8 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
 // routed to a CROSS-FAMILY judge (R13) so the DeepSeek self-loop cannot grade its own
 // minted output, while anchor/anchor and anchor/source_mentioned pairs stay on the
 // validated DeepSeek judge. The symbolic helpers dispose (weak-edge cut -> cycle
-// removal -> transitive reduction); difficulty is the dag-depth mock over ALL derived
-// nodes. The asserted core is never touched (R5): no enrichment node is ever
+// removal -> transitive reduction); intrinsic difficulty scores ALL derived nodes
+// from the same evidence contexts. The asserted core is never touched (R5): no enrichment node is ever
 // published. Node minting + rescue are OPT-IN — when the proposal/grounding ports are
 // omitted the run is anchor-only (the pre-node-minting behavior). Fails the run
 // WITHOUT persistence if any pair exhausts the forced-tool retry budget.
@@ -160,6 +161,15 @@ export async function runGraphEnrichment(input: {
     groundingOrigin: node.groundingOrigin,
     context: contextOf(node, profileByConcept, labelByConcept, config.maxMentionsPerConceptInPair)
   }));
+  const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
+    conceptId: node.derivedNodeId,
+    canonicalLabel: node.context.canonicalLabel,
+    aliases: node.context.aliases,
+    declaredDomain: node.declaredDomain,
+    groundingOrigin: node.groundingOrigin,
+    definitions: node.context.definitions,
+    mentions: node.context.mentions
+  }));
   type PairingNode = (typeof pairingNodes)[number];
 
   // Step 1 — every unordered same-domain pair over anchors ∪ enrichment nodes (R12).
@@ -219,9 +229,9 @@ export async function runGraphEnrichment(input: {
   const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(acyclicEdges);
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
-  // Step 5 — baseline difficulty over the reduced DAG (mock behind the port). Scores
-  // ALL derived node ids — anchors AND enrichment nodes (R12, handoff constraint).
-  const difficulties = await input.difficulty.score({ nodeIds: allNodes.map((node) => node.derivedNodeId), prerequisiteEdges: reducedEdges });
+  // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
+  // — anchors AND enrichment nodes (R12, handoff constraint).
+  const difficulties = await input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges });
 
   const layer: DerivedGraphLayer = {
     enrichmentId: input.enrichmentId,

@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   buildGraphVersion,
   computeLearnerPath,
-  dagDepthDifficultyPort,
+  createIntrinsicDifficultyPort,
   emptyLearnerState,
   executeExtractionRun,
   runGraphEnrichment
@@ -24,6 +24,7 @@ import {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmGroundingGenerationAdapter,
+  LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
@@ -117,8 +118,9 @@ function buildContext() {
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
     // Graph Enrichment ports (ADR-0019 reset). Every same-domain CEP pair is judged
     // exhaustively — no embedding clustering tier; the bounded judge proposes the
-    // inferred DAG (deterministic decoding for stable re-derivation); difficulty +
-    // learner state are mocks behind real ports.
+    // inferred DAG (deterministic decoding for stable re-derivation). Difficulty is
+    // learner-neutral intrinsic: a cross-family neural subscore fused with
+    // deterministic graph/evidence components.
     prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
     // Cross-family generated-node ordering judge (ADR-0023, U7): any pair touching an
     // `llm_grounded` minted node routes here (gpt-oss-120b) so the DeepSeek generator
@@ -133,7 +135,7 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
-    difficulty: dagDepthDifficultyPort,
+    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
     pathStore: new PostgresLearnerPathStore(sql)

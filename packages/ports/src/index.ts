@@ -5,6 +5,7 @@ import type {
   AssertionEntailmentJudgment,
   BlockEvidence,
   ConceptDifficulty,
+  DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
   EnrichmentRunTrace,
@@ -193,8 +194,8 @@ export interface SourceObjectStoragePort {
 
 // ---------------------------------------------------------------------------
 // Graph Enrichment ports (ADR-0019). The third operation: LLM proposes, symbolic
-// machinery disposes, over one published graph version. Mocked stages sit behind
-// REAL ports so Bradley-Terry / IRT-KT drop in later with no upstream change.
+// machinery disposes, over one published graph version. Difficulty is now
+// learner-neutral intrinsic; learner-calibrated IRT/BT remains data-blocked.
 // ---------------------------------------------------------------------------
 
 // Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
@@ -244,6 +245,17 @@ export interface MissingPrerequisiteProposalPort {
   }): Promise<MissingPrerequisiteProposal[]>;
 }
 
+// Intrinsic difficulty judge (ADR-0024). A bounded, forced-tool neural judgment
+// over ONE derived node's evidence, run through an independent judge alias. It
+// estimates learner-neutral intrinsic difficulty from generic signals such as
+// abstraction level, technical density, and implied background load. The adapter
+// validates tool arguments fail-closed; fusion with graph structure happens in
+// the application layer.
+export interface IntrinsicDifficultyJudgmentPort {
+  readonly model: string;
+  judge(input: DifficultyNodeContext): Promise<{ neuralScore: number; rationale: string }>;
+}
+
 // Node difficulty (ADR-0019). The current production direction is
 // learner-neutral intrinsic difficulty: neural source-grounded judgment fused
 // with deterministic graph/evidence components. Learner-calibrated IRT/BT stays
@@ -254,9 +266,10 @@ export interface DifficultyPort {
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
   // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
   // nodes are never fabricated into `Concept` values to satisfy the port (handoff
-  // constraint). `nodeIds` are `derived_node_id`s; the returned `conceptId` field
-  // carries the derived node id (the difficulty store keys on derived_node_id).
-  score(input: { nodeIds: string[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
+  // constraint). `nodes[].conceptId` values are `derived_node_id`s; the returned
+  // `conceptId` field carries the derived node id (the difficulty store keys on
+  // derived_node_id).
+  score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock

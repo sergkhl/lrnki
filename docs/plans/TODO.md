@@ -6,24 +6,10 @@ by real mixed-domain pipeline output, not by deferred method-stack preference.
 ## TODO
 
 Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
-outputs: the difficulty seam is still a DAG-depth mock after F3 removal, and a CEP definition-quality caveat was
-exposed by the 2026-06-18 structure-aware-neighborhood run.
+outputs: intrinsic difficulty is implemented and inspected at `EXPERIMENT_ONLY` trust, and a CEP
+definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighborhood run.
 
-1. **Resume intrinsic difficulty from U4 in the current handoff plan.**
-   F3 densification has been removed through U3 of
-   `docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`: worker command/wiring, bridge
-   proposal adapter/schema/port/type, sparse-region detection, densification experiment runner, `shortestPathHops`,
-   and the `densification` minting reason are gone. The remaining implementation starts at U4.
-   - Add `DifficultyNodeContext` and `IntrinsicDifficultyJudgmentPort`; widen `DifficultyPort.score` to receive
-     per-node content.
-   - Add the LiteLLM forced-tool intrinsic-difficulty judge adapter with domain-neutral schema/prompt text and
-     fail-closed tool-argument validation.
-   - Add `createIntrinsicDifficultyPort`, fusing neural intrinsic score with deterministic structural components
-     (`dagDepthDifficulty`, transitive ancestors, fan-in, CEP evidence density).
-   - Wire intrinsic difficulty into `runGraphEnrichment` and the worker, bump the enrichment config hash, then run
-     rule-14 real-use plausibility inspection. Difficulty stays `EXPERIMENT_ONLY` trust until learner data exists.
-
-2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+1. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
    still found low-value accepted Definition Passages such as heading-only or citation-like snippets in the
    AIRA-dojo Markdown run.
@@ -34,7 +20,7 @@ exposed by the 2026-06-18 structure-aware-neighborhood run.
    - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
      and the inspected newly included adjacent blocks were genuine explaining passages.
 
-3. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
+2. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
      densification, or non-LLM prerequisite signals from method-stack preference.
    - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
@@ -42,12 +28,19 @@ exposed by the 2026-06-18 structure-aware-neighborhood run.
 
 ## COMPLETED
 
+- **Learner-neutral intrinsic difficulty implemented (2026-06-18, branch `feat/intrinsic-difficulty-remove-f3`).**
+  Replaced the `dag-depth-mock` port with `intrinsic-fused-v1`: `DifficultyPort.score` now receives per-node
+  evidence contexts, `LiteLlmIntrinsicDifficultyJudgmentAdapter` uses a forced named tool schema on
+  `kg-independent-judge`, and `createIntrinsicDifficultyPort` fuses the neural subscore with deterministic
+  topological depth, transitive ancestors, fan-in, and evidence-density components. The enrichment config hash is
+  now `intrinsic-difficulty-v3`; ADR-0024 records that learner-calibrated IRT/BT remains data-blocked. Rule-14
+  real-use inspection over enrichment `7ff10930-3236-4ea6-99f8-407e3a960d14` classified the signal
+  `EXPERIMENT_ONLY`: useful for plausible secondary ordering, not calibrated learner difficulty.
 - **F3 densification removed through U3 (2026-06-18, branch `feat/intrinsic-difficulty-remove-f3`).** Removed the
   failed graph-densification experiment from live code: deleted sparse-region detection, the densification
   experiment runner, the bridge-proposal port/type/schema/adapter/tests, the worker `densify-experiment` command,
   the `shortestPathHops` thin-connected helper, and the `densification` minting reason. ADR-0019 now records F3
-  as removed rather than dormant. Intrinsic difficulty remains the active follow-up starting at U4 of the handoff
-  plan.
+  as removed rather than dormant.
 - **Structure-aware evidence neighborhood for CEP extraction (2026-06-18).** Added a pure deterministic
   `selectEvidenceNeighborhood` in `domain-core` that widens CEP input from mention/label blocks to a capped,
   priority-ordered, extractable-only neighborhood: mention blocks, adjacent extractable body blocks, same
@@ -120,7 +113,26 @@ exposed by the 2026-06-18 structure-aware-neighborhood run.
 
 ## VALIDATION
 
-Latest validation (2026-06-18) is the **F3 removal through U3**
+Latest validation (2026-06-18) is the **intrinsic difficulty implementation and rule-14 inspection**
+(`docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`):
+
+- **Static/unit:** focused and package checks passed: `pnpm --filter @lrnki/infrastructure-litellm test`,
+  `pnpm --filter @lrnki/infrastructure-litellm typecheck`, `pnpm --filter @lrnki/ports typecheck`,
+  `pnpm --filter @lrnki/domain-core typecheck`, `pnpm --filter @lrnki/application test`,
+  `pnpm --filter @lrnki/application typecheck`, and `pnpm --filter @lrnki/kg-worker typecheck`.
+- **Real-use (rule-14 intrinsic difficulty):** fresh real enrichment
+  `7ff10930-3236-4ea6-99f8-407e3a960d14` over mixed-domain graph version
+  `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b` used real LiteLLM calls and produced
+  `enrichmentConfigHash=intrinsic-difficulty-v3`, `difficulty_method=intrinsic-fused-v1`,
+  `nodes(anchor/enrichment)=13/14`, `edges(certain/uncertain)=27/3`, and `difficulties=27`.
+- **Inspection result:** `EXPERIMENT_ONLY`, safe to continue only with difficulty kept as a secondary,
+  non-calibrated signal. Plausible examples: economics progresses from `Propensity to Truck, Barter, and Exchange`
+  0.238 to `Universal Opulence from Division of Labour` 0.519; biology replication-model anchors at equal
+  `topoDepth=2` are differentiated; generated passages remain `not_applicable_by_grounding` while
+  `source_mentioned` passages remain `verified`. Caveats: no learner-data oracle, untuned weights, and some broad
+  rescued nodes may be overestimated. Evidence under `tmp/2026-06-18-intrinsic-difficulty/`.
+
+Prior validation (2026-06-18) is the **F3 removal through U3**
 (`docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`):
 
 - **Static/unit:** focused removal checks passed: `pnpm --filter @lrnki/application test`,
@@ -130,8 +142,7 @@ Latest validation (2026-06-18) is the **F3 removal through U3**
 - **Removal check:** live code search under `apps/` and `packages/` has no `densif`, `BridgeConcept`,
   `bridgeConcept`, `sparseRegion`, or `shortestPathHops` references. The worker usage no longer exposes
   `densify-experiment`; the bridge proposal adapter/schema/port/type and F3 application modules are deleted.
-- **Resume point:** intrinsic difficulty is not implemented in this slice. The next session should resume at U4
-  of the handoff plan.
+- **Follow-up:** intrinsic difficulty was implemented and inspected in the later validation entry above.
 
 Prior validation (2026-06-18) is the **F3 v2 thin-connected-region measurement gate**
 (`docs/plans/2026-06-18-002-feat-densification-thin-region-trigger-plan.md`):

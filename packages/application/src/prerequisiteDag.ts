@@ -1,5 +1,4 @@
 import type { ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-core";
-import type { DifficultyPort } from "@lrnki/ports";
 
 // ---------------------------------------------------------------------------
 // Symbolic half of Graph Enrichment (ADR-0019). These helpers are PURE and
@@ -219,8 +218,8 @@ export function topologicalOrder(
 }
 
 // Deterministic DAG-depth difficulty component producer. The production difficulty
-// method is moving to neural intrinsic difficulty now; learner-calibrated IRT/BT
-// remains deferred until learner-response data exists.
+// method is neural intrinsic difficulty; learner-calibrated IRT/BT remains deferred
+// until learner-response data exists.
 export function dagDepthDifficulty(conceptIds: string[], edges: Edge[]): ConceptDifficulty[] {
   const depth = topologicalDepth(conceptIds, edges);
   const fanIn = new Map<string, number>();
@@ -236,13 +235,3 @@ export function dagDepthDifficulty(conceptIds: string[], edges: Edge[]): Concept
     };
   });
 }
-
-// Temporary DifficultyPort adapter retained until the intrinsic difficulty unit
-// replaces the injected implementation. Learner-calibrated IRT/BT remains
-// deferred until learner-response data exists.
-export const dagDepthDifficultyPort: DifficultyPort = {
-  method: "dag-depth-mock",
-  async score({ nodeIds, prerequisiteEdges }: { nodeIds: string[]; prerequisiteEdges: Edge[] }) {
-    return dagDepthDifficulty(nodeIds, prerequisiteEdges);
-  }
-};

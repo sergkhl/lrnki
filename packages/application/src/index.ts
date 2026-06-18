@@ -7,6 +7,7 @@ export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
@@ -18,6 +19,5 @@ export {
   topologicalDepth,
   topologicalOrder,
   prerequisiteAncestors,
-  dagDepthDifficulty,
-  dagDepthDifficultyPort
+  dagDepthDifficulty
 } from "./prerequisiteDag";
