@@ -47,7 +47,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "cep-definition-bearing-admission-v36";
+const PIPELINE_CONFIG_HASH = "structure-aware-neighborhood-v37";
 
 import { existsSync } from "node:fs";
 

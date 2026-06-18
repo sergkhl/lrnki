@@ -1,8 +1,56 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { SourceBlock } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmAssertionEntailmentJudgmentAdapter } from "./extractionAdapters";
+import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmAssertionEntailmentJudgmentAdapter, renderBlocks } from "./extractionAdapters";
 import { admissionLabelJudgmentValidator } from "./toolSchemas";
+
+function sourceBlock(blockId: string, text: string, headingPath: string[] = []): SourceBlock {
+  return {
+    blockId,
+    blockType: "paragraph",
+    text,
+    headingPath,
+    locator: {}
+  };
+}
+
+test("renderBlocks emits prev and next ids for middle blocks", () => {
+  const rendered = renderBlocks([
+    sourceBlock("b1", "First."),
+    sourceBlock("b2", "Second."),
+    sourceBlock("b3", "Third.")
+  ]);
+
+  assert.match(rendered, /^\[b1 type=paragraph next=b2\] First\./m);
+  assert.match(rendered, /^\[b2 type=paragraph prev=b1 next=b3\] Second\./m);
+  assert.match(rendered, /^\[b3 type=paragraph prev=b2\] Third\./m);
+});
+
+test("renderBlocks keeps heading output alongside adjacency", () => {
+  assert.equal(
+    renderBlocks([
+      sourceBlock("b1", "First.", ["Method", "Selector"]),
+      sourceBlock("b2", "Second.", ["Method", "Selector"])
+    ]),
+    '[b1 type=paragraph heading="Method › Selector" next=b2] First.\n[b2 type=paragraph heading="Method › Selector" prev=b1] Second.'
+  );
+});
+
+test("renderBlocks can use full-document adjacency for filtered neighborhoods", () => {
+  const b1 = sourceBlock("b1", "First.");
+  const b2 = sourceBlock("b2", "Hidden middle.");
+  const b3 = sourceBlock("b3", "Third.");
+
+  assert.equal(
+    renderBlocks([b1, b3], { adjacencyBlocks: [b1, b2, b3] }),
+    "[b1 type=paragraph next=b2] First.\n[b3 type=paragraph prev=b2] Third."
+  );
+});
+
+test("renderBlocks omits heading and adjacency for a single block when absent", () => {
+  assert.equal(renderBlocks([sourceBlock("b1", "Only.")]), "[b1 type=paragraph] Only.");
+});
 
 function adapterReturning(result: {
   subjectMatch: "exact_or_interchangeable" | "qualified_variant" | "different_or_absent";

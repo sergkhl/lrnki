@@ -49,6 +49,16 @@
       "source": "arXiv:2507.02554v2 (FAIR at Meta)",
       "license": "arXiv preprint (per-paper terms)",
       "curation": "Gate 2 mixed-format fixture (ADR-0013): the raw PDF is converted to Markdown by the version-pinned Docling adapter (docling-serve-cpu v1.23.0 + docling 2.102.1, OCR off, table_mode=accurate), then run through the same shared markdown structure pass as the native parsers. Caveat: an ML paper processed by an LLM extraction pipeline is a best-case bound, not a headline score. Domain kept distinct from 'educational technology' / 'software engineering' to avoid cross-source identity merges (ADR-0015)."
+    },
+    {
+      "fixtureId": "aira-dojo-2507-02554v1-md",
+      "path": "fixtures/markdown/datalab-output-2507.02554v2.pdf.md",
+      "contentType": "text/markdown",
+      "declaredDomain": "machine learning systems",
+      "title": "Toledo et al., AI Research Agents for Machine Learning: Search, Exploration, and Generalization in MLE-bench (arXiv 2507.02554v2)",
+      "source": "arXiv:2507.02554v2, datalab/marker PDF-to-Markdown conversion",
+      "license": "arXiv preprint (per-paper terms)",
+      "curation": "Full datalab/marker Markdown variant used for the structure-aware-neighborhood re-run. It skips Docling conversion so the inspection isolates evidence-neighborhood behavior from PDF-conversion variance. Domain matches the PDF fixture to preserve cross-source identity semantics (ADR-0015)."
     }
   ]
 }
