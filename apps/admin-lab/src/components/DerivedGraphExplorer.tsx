@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
+import { buildComponentAwareDagLayout } from "@/lib/cytoscapeDagLayout";
 import { buildDerivedGraphView, type DerivedGraphDetail } from "@/lib/derivedGraph";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +28,14 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
   const view = useMemo(() => buildDerivedGraphView(detail), [detail]);
+  const graphPositions = useMemo(
+    () =>
+      buildComponentAwareDagLayout(
+        view.cytoscape.nodes.map((node) => ({ id: node.id, label: node.label })),
+        view.cytoscape.edges.map((edge) => ({ source: edge.source, target: edge.target }))
+      ),
+    [view]
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -49,17 +58,17 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
       container: containerRef.current,
       elements: [
         ...view.cytoscape.nodes.map((node) => ({
-          data: { id: node.id, label: node.label, domain: node.domain, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin }
+          data: { id: node.id, label: node.label, domain: node.domain, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin },
+          position: graphPositions.get(node.id)
         })),
         ...view.cytoscape.edges.map((edge) => ({
           data: { id: edge.id, source: edge.source, target: edge.target, uncertain: edge.uncertain }
         }))
       ],
       layout: {
-        // Prerequisites above dependents — the natural reading of a prerequisite DAG.
-        name: "breadthfirst",
-        directed: true,
-        spacingFactor: 1.3,
+        // Positions are precomputed so disconnected DAG components keep an
+        // explicit gutter while each component still reads prerequisites first.
+        name: "preset",
         padding: 28,
         fit: true
       },
@@ -129,7 +138,7 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
       cy.destroy();
       cytoscapeRef.current = null;
     };
-  }, [view]);
+  }, [graphPositions, view]);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
+import { buildComponentAwareDagLayout } from "@/lib/cytoscapeDagLayout";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -32,6 +33,14 @@ function originBadge(groundingOrigin: string): { label: string; variant: "defaul
 export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
+  const graphPositions = useMemo(
+    () =>
+      buildComponentAwareDagLayout(
+        detail.nodes.map((node) => ({ id: node.conceptId, label: node.label })),
+        detail.edges.map((edge) => ({ source: edge.prerequisiteConceptId, target: edge.dependentConceptId }))
+      ),
+    [detail]
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -59,7 +68,8 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
             label: node.inPath ? `${node.position! + 1}. ${node.label}` : node.label,
             inPath: node.inPath ? "yes" : "no",
             target: node.isTarget ? "yes" : "no"
-          }
+          },
+          position: graphPositions.get(node.conceptId)
         })),
         ...detail.edges.map((edge, index) => ({
           data: {
@@ -72,11 +82,9 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
         }))
       ],
       layout: {
-        // Directed top-down layered layout reads the prerequisite DAG as a ladder
-        // (prerequisites above dependents) — the natural shape for a learning path.
-        name: "breadthfirst",
-        directed: true,
-        spacingFactor: 1.3,
+        // Positions are precomputed so disconnected DAG components keep an
+        // explicit gutter while path context still reads prerequisites first.
+        name: "preset",
         padding: 28,
         fit: true
       },
@@ -159,7 +167,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       cy.destroy();
       cytoscapeRef.current = null;
     };
-  }, [detail]);
+  }, [detail, graphPositions]);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
