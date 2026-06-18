@@ -442,46 +442,6 @@ export const missingPrerequisiteProposalValidator = z.object({
   }).strict())
 }).strict();
 
-// --- Densification bridge proposal: submit_bridge_concepts ----------------
-// Experiment-only node-identity operation: for one sparse-region gap, propose a
-// concept that can help a learner bridge the two endpoint concepts. It returns
-// labels only; grounding and edge direction are handled by separate ports/stages.
-
-export const bridgeConceptProposalSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["proposals"],
-  properties: {
-    proposals: {
-      type: "array",
-      description:
-        "Bridge concepts that may help a learner connect the two endpoint concepts in a sparse prerequisite graph. Return an empty array when no useful bridge is warranted.",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["proposedLabel", "rationale"],
-        properties: {
-          proposedLabel: {
-            type: "string",
-            description: "Precise, domain-qualified label for one bridge concept. Do not repeat either endpoint or an existing node label."
-          },
-          rationale: {
-            type: "string",
-            description: "One terse sentence explaining how the bridge concept connects the two endpoints for learning."
-          }
-        }
-      }
-    }
-  }
-};
-
-export const bridgeConceptProposalValidator = z.object({
-  proposals: z.array(z.object({
-    proposedLabel: z.string().min(1),
-    rationale: z.string().min(1)
-  }).strict())
-}).strict();
-
 // --- Assertion entailment judgment: submit_assertion_entailment_judgment --
 // One bounded judgment over a single optional typed assertion (ADR-0007 reset).
 // For an explicit-prerequisite-hint the model decides whether the verbatim

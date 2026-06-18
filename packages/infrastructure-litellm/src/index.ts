@@ -16,8 +16,6 @@ export {
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalSchema,
   missingPrerequisiteProposalValidator,
-  bridgeConceptProposalSchema,
-  bridgeConceptProposalValidator,
   assertionEntailmentJudgmentSchema,
   assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
@@ -52,7 +50,3 @@ export {
   LiteLlmMissingPrerequisiteProposalAdapter,
   MISSING_PREREQUISITE_PROPOSAL_MODEL
 } from "./missingPrerequisiteProposalAdapters";
-export {
-  LiteLlmBridgeConceptProposalAdapter,
-  BRIDGE_CONCEPT_PROPOSAL_MODEL
-} from "./densificationProposalAdapters";

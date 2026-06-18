@@ -6,28 +6,22 @@ by real mixed-domain pipeline output, not by deferred method-stack preference.
 ## TODO
 
 Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
-outputs: the F1/F3 thin-connected-region trigger mismatch, and a CEP definition-quality caveat exposed by the
-2026-06-18 structure-aware-neighborhood run.
+outputs: the difficulty seam is still a DAG-depth mock after F3 removal, and a CEP definition-quality caveat was
+exposed by the 2026-06-18 structure-aware-neighborhood run.
 
-1. **Densification F3 v2 — measured thin-connected-region trigger (`EXPERIMENT_ONLY`).** F3 v1 shipped but its
-   topology-primary trigger only fires on disconnected components and orphan nodes. The F1 baseline is already
-   same-domain-connected, so v1 found 0 candidate gaps and densification value is still **unmeasured** — this is a
-   trigger/target mismatch, not a verdict that bridging has no value. Improve the trigger to detect the
-   *thin-but-connected* sparsity F1 actually documented.
-   - Target the three concrete F1-documented thin regions as the evaluation set: the biology experimental-design
-     bridge (isotope labeling ↔ density-gradient ultracentrifugation), the economics market-distribution step
-     (specialization → opulence skipping `Market Exchange and Distribution`), and the InstructKG pedagogical-role
-     bridge (`Semantic Signals` ↔ `Pedagogical Roles`). See `tmp/2026-06-17-f1-enrichment-eval/rule-14-evaluation.md`.
-   - Reuse the existing harness unchanged: `runDensificationExperiment.ts`, `BridgeConceptProposalPort`, the
-     generated-grounding bundle, the cross-family generated-node judge, and the DAG disposal helpers. Only
-     `detectSparseRegions` (`packages/application/src/sparseRegionDetection.ts`) grows a thin-region path.
-   - The thin-region signal must be a **measured, domain-neutral module (AGENTS rule 16)**, not a hardcoded lexical
-     or surface heuristic that silently vetoes. Evaluate candidate signals (long same-domain shortest-path between
-     declined pairs inside one component; low-degree articulation concepts; source-implied-but-unconnected pairs)
-     by measurement against the F1 set before any bridge is proposed; keep the signal only while an oracle shows it
-     raises connectivity value without adding noise, then delete the oracle (rule 11).
-   - Stay `EXPERIMENT_ONLY` (rule 11, ADR-0019 / plan KTD4): append-only experiment artifact, asserted graph
-     byte-for-byte unchanged, no embeddings (ADR-0012 stands), prompts domain-neutral (rule 17).
+1. **Resume intrinsic difficulty from U4 in the current handoff plan.**
+   F3 densification has been removed through U3 of
+   `docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`: worker command/wiring, bridge
+   proposal adapter/schema/port/type, sparse-region detection, densification experiment runner, `shortestPathHops`,
+   and the `densification` minting reason are gone. The remaining implementation starts at U4.
+   - Add `DifficultyNodeContext` and `IntrinsicDifficultyJudgmentPort`; widen `DifficultyPort.score` to receive
+     per-node content.
+   - Add the LiteLLM forced-tool intrinsic-difficulty judge adapter with domain-neutral schema/prompt text and
+     fail-closed tool-argument validation.
+   - Add `createIntrinsicDifficultyPort`, fusing neural intrinsic score with deterministic structural components
+     (`dagDepthDifficulty`, transitive ancestors, fan-in, CEP evidence density).
+   - Wire intrinsic difficulty into `runGraphEnrichment` and the worker, bump the enrichment config hash, then run
+     rule-14 real-use plausibility inspection. Difficulty stays `EXPERIMENT_ONLY` trust until learner data exists.
 
 2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
@@ -40,15 +34,20 @@ outputs: the F1/F3 thin-connected-region trigger mismatch, and a CEP definition-
    - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
      and the inspected newly included adjacent blocks were genuine explaining passages.
 
-3. **Keep standing deferred methods deferred.** Difficulty stays the DAG-depth mock and learner state stays the
-   empty mock until path quality makes calibration the limiting problem.
-   - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, or non-LLM
-     prerequisite signals from method-stack preference.
+3. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
+   - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
+     densification, or non-LLM prerequisite signals from method-stack preference.
    - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
      behavior without hiding provenance or identity defects.
 
 ## COMPLETED
 
+- **F3 densification removed through U3 (2026-06-18, branch `feat/intrinsic-difficulty-remove-f3`).** Removed the
+  failed graph-densification experiment from live code: deleted sparse-region detection, the densification
+  experiment runner, the bridge-proposal port/type/schema/adapter/tests, the worker `densify-experiment` command,
+  the `shortestPathHops` thin-connected helper, and the `densification` minting reason. ADR-0019 now records F3
+  as removed rather than dormant. Intrinsic difficulty remains the active follow-up starting at U4 of the handoff
+  plan.
 - **Structure-aware evidence neighborhood for CEP extraction (2026-06-18).** Added a pure deterministic
   `selectEvidenceNeighborhood` in `domain-core` that widens CEP input from mention/label blocks to a capped,
   priority-ordered, extractable-only neighborhood: mention blocks, adjacent extractable body blocks, same
@@ -121,7 +120,34 @@ outputs: the F1/F3 thin-connected-region trigger mismatch, and a CEP definition-
 
 ## VALIDATION
 
-Latest validation (2026-06-18) is the **structure-aware evidence-neighborhood gate**
+Latest validation (2026-06-18) is the **F3 removal through U3**
+(`docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`):
+
+- **Static/unit:** focused removal checks passed: `pnpm --filter @lrnki/application test`,
+  `pnpm --filter @lrnki/application typecheck`, `pnpm --filter @lrnki/infrastructure-litellm test`,
+  `pnpm --filter @lrnki/infrastructure-litellm typecheck`, `pnpm --filter @lrnki/kg-worker typecheck`,
+  `pnpm --filter @lrnki/ports typecheck`, and `pnpm --filter @lrnki/domain-core typecheck`.
+- **Removal check:** live code search under `apps/` and `packages/` has no `densif`, `BridgeConcept`,
+  `bridgeConcept`, `sparseRegion`, or `shortestPathHops` references. The worker usage no longer exposes
+  `densify-experiment`; the bridge proposal adapter/schema/port/type and F3 application modules are deleted.
+- **Resume point:** intrinsic difficulty is not implemented in this slice. The next session should resume at U4
+  of the handoff plan.
+
+Prior validation (2026-06-18) is the **F3 v2 thin-connected-region measurement gate**
+(`docs/plans/2026-06-18-002-feat-densification-thin-region-trigger-plan.md`):
+
+- **Static/unit:** focused deterministic envelope tests passed:
+  `pnpm --filter @lrnki/application exec tsx --test src/prerequisiteDag.test.ts src/sparseRegionDetection.test.ts`.
+- **Measurement gate:** replayed frozen F1 dumps from `tmp/2026-06-17-f1-enrichment-eval/` through the
+  deterministic detector. The loader resolved 69 declined pairs by label with 0 unresolved rows and preserved
+  uncertain-edge handling. Hop-distance and low-degree endpoint sweeps surfaced the biology and InstructKG target
+  regions under broad thresholds, but no setting surfaced the economics market-distribution region because the
+  declined-pair dump contains no row involving the relevant economics labels.
+- **Result:** STOP before Phase B. No live `densify-experiment` was run, no bridge proposals were generated, and
+  no asserted or authoritative derived graph state was changed. Evidence under
+  `tmp/2026-06-18-f3v2-thin-region/measurement.md`.
+
+Prior validation (2026-06-18) is the **structure-aware evidence-neighborhood gate**
 (`docs/plans/2026-06-18-001-feat-structure-aware-evidence-neighborhood-plan.md`):
 
 - **Static/unit:** `pnpm run test`, `pnpm run typecheck`, `pnpm --filter @lrnki/admin-lab build`, and

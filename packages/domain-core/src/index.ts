@@ -685,7 +685,7 @@ export type GeneratedGroundingBundle = {
   rationale: string;
 };
 
-export type MintingReason = "assumed_prerequisite" | "densification";
+export type MintingReason = "assumed_prerequisite";
 
 export type AnchorProjectionNode = {
   nodeKind: "anchor";
@@ -737,11 +737,6 @@ export type DerivedGraphNode = AnchorProjectionNode | EnrichmentNode;
 // labels exist. Proposals are anchor-driven (each names the anchor it scaffolds) and
 // bounded; the application dedupes them against existing node labels within domain.
 export type MissingPrerequisiteProposal = {
-  proposedLabel: string;
-  rationale: string;
-};
-
-export type BridgeConceptProposal = {
   proposedLabel: string;
   rationale: string;
 };
@@ -887,8 +882,9 @@ export type EnrichmentRunTrace = {
   rescueDispositions: RescueDisposition[];
 };
 
-// Baseline node difficulty. MVP `method` is "dag-depth-mock" (topological depth);
-// Bradley-Terry calibration replaces the producer later behind the same shape.
+// Node difficulty keeps a stable output shape while the producer evolves. The
+// current direction is learner-neutral intrinsic difficulty; learner-calibrated
+// IRT/BT remains deferred until learner-response data exists.
 export type ConceptDifficulty = {
   conceptId: string;
   score: number;

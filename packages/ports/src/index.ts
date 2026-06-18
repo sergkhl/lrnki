@@ -4,7 +4,6 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
-  BridgeConceptProposal,
   ConceptDifficulty,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -245,23 +244,11 @@ export interface MissingPrerequisiteProposalPort {
   }): Promise<MissingPrerequisiteProposal[]>;
 }
 
-export interface BridgeConceptProposalPort {
-  readonly model: string;
-  propose(input: {
-    declaredDomain: string;
-    gap: {
-      a: { conceptId: string; canonicalLabel: string; groundingTexts: string[] };
-      b: { conceptId: string; canonicalLabel: string; groundingTexts: string[] };
-      declinedRationale: string;
-    };
-    existingNodeLabels: string[];
-    maxProposals: number;
-  }): Promise<BridgeConceptProposal[]>;
-}
-
-// Baseline node difficulty (ADR-0019). MVP impl = deterministic DAG-depth mock
-// behind this port; Bradley-Terry pairwise calibration replaces the impl without
-// changing the port. Reads concepts + the inferred prereq DAG; one score each.
+// Node difficulty (ADR-0019). The current production direction is
+// learner-neutral intrinsic difficulty: neural source-grounded judgment fused
+// with deterministic graph/evidence components. Learner-calibrated IRT/BT stays
+// deferred until learner-response data exists. Reads concepts + the inferred
+// prereq DAG; one score each.
 export interface DifficultyPort {
   readonly method: string;
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted

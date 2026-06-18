@@ -368,7 +368,7 @@ import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrereq
 import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
 
 // A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
-// densify it with a rescued node and a minted node.
+// expand it with a rescued node and a minted node.
 const sparseSnapshot: GraphSnapshot = {
   graphVersionId: "v1",
   baseGraphVersionId: null,

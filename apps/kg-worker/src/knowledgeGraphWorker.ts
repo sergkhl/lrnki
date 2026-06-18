@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import {
   buildGraphVersion,
@@ -7,13 +7,8 @@ import {
   dagDepthDifficultyPort,
   emptyLearnerState,
   executeExtractionRun,
-  runDensificationExperiment,
   runGraphEnrichment
 } from "@lrnki/application";
-import {
-  type DerivedGraphLayer,
-  type EnrichmentRunTrace
-} from "@lrnki/domain-core";
 import {
   DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
@@ -28,7 +23,6 @@ import {
   LiteLlmConceptAdmissionAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
-  LiteLlmBridgeConceptProposalAdapter,
   LiteLlmGroundingGenerationAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
@@ -133,7 +127,6 @@ function buildContext() {
     // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
-    bridgeConceptProposal: new LiteLlmBridgeConceptProposalAdapter(deterministicClient),
     groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
     // Measured rescue durability judge (U3): cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
@@ -298,127 +291,6 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   }
 }
 
-async function densifyExperimentCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string) {
-  if (!enrichmentId) {
-    console.error("! densify-experiment requires <enrichmentId> [targetDerivedNodeId].");
-    process.exitCode = 1;
-    return;
-  }
-  const baseline = await ctx.enrichmentStore.getLayer(enrichmentId);
-  if (!baseline) {
-    console.error(`! enrichment not found: ${enrichmentId}`);
-    process.exitCode = 1;
-    return;
-  }
-  const trace = await loadEnrichmentTrace(ctx, enrichmentId);
-  if (!trace) {
-    console.error(`! enrichment trace artifact not found for: ${enrichmentId}`);
-    process.exitCode = 1;
-    return;
-  }
-  const experimentId = randomUUID();
-  console.log(`\n>> densification experiment ${experimentId} over enrichment ${enrichmentId}`);
-  const result = await runDensificationExperiment({
-    experimentId,
-    baselineLayer: baseline,
-    declinedPairs: trace.judgments
-      .filter((judgment: EnrichmentRunTrace["judgments"][number]) => judgment.judgment.outcome === "none")
-      .map((judgment: EnrichmentRunTrace["judgments"][number]) => ({
-        aConceptId: judgment.a.conceptId,
-        bConceptId: judgment.b.conceptId,
-        declaredDomain: judgment.declaredDomain,
-        outcome: "none" as const,
-        rationale: judgment.judgment.rationale
-      })),
-    bridgeProposal: ctx.bridgeConceptProposal,
-    groundingGeneration: ctx.groundingGeneration,
-    generatedPrerequisiteJudge: ctx.generatedPrerequisiteJudge,
-    difficulty: ctx.difficulty,
-    groundingTextsByNodeId: await loadGroundingTexts(ctx, baseline),
-    targetConceptId
-  });
-
-  await ctx.artifacts.append({
-    artifactId: `${experimentId}:densification-experiment`,
-    artifactType: "densification_experiment.v1",
-    schemaVersion: "1",
-    graphVersionId: baseline.graphVersionId,
-    producer: "@lrnki/kg-worker",
-    producerVersion: "0.1.0",
-    configHash: result.densifiedLayer.enrichmentConfigHash,
-    createdAt: new Date().toISOString(),
-    payload: result
-  });
-
-  const outDir = path.join(REPO_ROOT, "tmp/2026-06-17-f3-densification-experiment");
-  await mkdir(outDir, { recursive: true });
-  const comparisonPath = path.join(outDir, "comparison.md");
-  await writeFile(comparisonPath, renderDensificationComparison(result, enrichmentId, experimentId), "utf8");
-  console.log(`   bridges=${result.bridges.length}`);
-  console.log(`   components ${result.before.componentCount} -> ${result.after.componentCount}; orphans ${result.before.orphanCount} -> ${result.after.orphanCount}`);
-  console.log(`   comparison=${path.relative(REPO_ROOT, comparisonPath)}`);
-}
-
-async function loadEnrichmentTrace(ctx: Context, enrichmentId: string): Promise<EnrichmentRunTrace | undefined> {
-  const rows = await ctx.sql<{ payload: EnrichmentRunTrace }[]>`
-    SELECT payload FROM artifact_versions
-    WHERE artifact_type = 'enrichment_run.v2'
-      AND artifact_id = ${`${enrichmentId}:enrichment-run`}
-    LIMIT 1`;
-  return rows[0]?.payload;
-}
-
-async function loadGroundingTexts(ctx: Context, layer: DerivedGraphLayer): Promise<Map<string, string[]>> {
-  const anchorIds = layer.derivedNodes
-    .filter((node): node is Extract<DerivedGraphLayer["derivedNodes"][number], { nodeKind: "anchor" }> => node.nodeKind === "anchor")
-    .map((node) => node.derivedNodeId);
-  const byNode = new Map<string, string[]>();
-  if (anchorIds.length === 0) return byNode;
-  const rows = await ctx.sql<{ derived_node_id: string; evidence_quote: string }[]>`
-    SELECT d.derived_node_id, p.evidence_quote
-    FROM derived_graph_nodes d
-    JOIN graph_version_concept_evidence_profiles cep
-      ON cep.graph_version_id = ${layer.graphVersionId}
-     AND cep.concept_id = d.concept_id
-    JOIN graph_version_evidence_passages p
-      ON p.graph_version_concept_evidence_profile_id = cep.graph_version_concept_evidence_profile_id
-    WHERE d.derived_node_id IN ${ctx.sql(anchorIds)}
-    ORDER BY d.derived_node_id, p.kind, p.salience_rank`;
-  for (const row of rows) byNode.set(row.derived_node_id, [...(byNode.get(row.derived_node_id) ?? []), row.evidence_quote]);
-  return byNode;
-}
-
-function renderDensificationComparison(
-  result: Awaited<ReturnType<typeof runDensificationExperiment>>,
-  baselineEnrichmentId: string,
-  experimentId: string
-): string {
-  const lines = [
-    "# F3 densification experiment comparison",
-    "",
-    `- Baseline enrichment: \`${baselineEnrichmentId}\``,
-    `- Experiment id: \`${experimentId}\``,
-    `- Graph version: \`${result.baselineLayer.graphVersionId}\``,
-    `- Components: ${result.before.componentCount} -> ${result.after.componentCount}`,
-    `- Orphans: ${result.before.orphanCount} -> ${result.after.orphanCount}`,
-    `- Reachable ancestors: ${result.before.reachableAncestorCount ?? "n/a"} -> ${result.after.reachableAncestorCount ?? "n/a"}`,
-    "",
-    "## Bridges",
-    "",
-    "| Bridge | Gap endpoint A | Gap endpoint B | Proposed edge count | Rationale |",
-    "| --- | --- | --- | ---: | --- |"
-  ];
-  const labelById = new Map(result.densifiedLayer.derivedNodes.map((node) => [node.derivedNodeId, node.canonicalLabel]));
-  for (const bridge of result.bridges) {
-    lines.push(
-      `| ${bridge.bridgeNode.canonicalLabel} | ${labelById.get(bridge.gap.aConceptId) ?? bridge.gap.aConceptId} | ${labelById.get(bridge.gap.bConceptId) ?? bridge.gap.bConceptId} | ${bridge.proposedEdges.length} | ${bridge.gap.rationale.replaceAll("|", "\\|")} |`
-    );
-  }
-  if (result.bridges.length === 0) lines.push("| _none_ | | | 0 | No bounded sparse-region bridge was proposed. |");
-  lines.push("", "## Asserted graph check", "", "This command appends only a `densification_experiment.v1` artifact and does not persist derived graph rows for the experiment.");
-  return `${lines.join("\n")}\n`;
-}
-
 async function listSources(ctx: Context) {
   for (const source of await ctx.registrationStore.listSources()) {
     console.log(`${source.sourceResourceId}  [${source.declaredDomain}]  ${source.title}`);
@@ -446,14 +318,11 @@ async function main() {
       case "compute-learner-path":
         await computeLearnerPathCommand(ctx, arg, rest[0]);
         break;
-      case "densify-experiment":
-        await densifyExperimentCommand(ctx, arg, rest[0]);
-        break;
       case "list-sources":
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | densify-experiment <enrichmentId> [targetDerivedNodeId] | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

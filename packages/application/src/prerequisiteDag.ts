@@ -218,9 +218,9 @@ export function topologicalOrder(
   return order;
 }
 
-// Mock baseline difficulty (ADR-0019): normalized topological depth + raw fan-in,
-// kept as interpretable `components` so the score is never an opaque number.
-// Bradley-Terry calibration replaces this behind the same shape later.
+// Deterministic DAG-depth difficulty component producer. The production difficulty
+// method is moving to neural intrinsic difficulty now; learner-calibrated IRT/BT
+// remains deferred until learner-response data exists.
 export function dagDepthDifficulty(conceptIds: string[], edges: Edge[]): ConceptDifficulty[] {
   const depth = topologicalDepth(conceptIds, edges);
   const fanIn = new Map<string, number>();
@@ -237,8 +237,9 @@ export function dagDepthDifficulty(conceptIds: string[], edges: Edge[]): Concept
   });
 }
 
-// The mock DifficultyPort: a thin wrapper so the slice swaps in Bradley-Terry by
-// changing the injected port, never the projection upstream (the seam discipline).
+// Temporary DifficultyPort adapter retained until the intrinsic difficulty unit
+// replaces the injected implementation. Learner-calibrated IRT/BT remains
+// deferred until learner-response data exists.
 export const dagDepthDifficultyPort: DifficultyPort = {
   method: "dag-depth-mock",
   async score({ nodeIds, prerequisiteEdges }: { nodeIds: string[]; prerequisiteEdges: Edge[] }) {
