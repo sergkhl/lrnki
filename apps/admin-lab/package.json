@@ -17,6 +17,8 @@
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "cytoscape": "catalog:",
+    "cytoscape-elk": "catalog:",
+    "elkjs": "catalog:",
     "lucide-react": "catalog:",
     "next": "catalog:",
     "react": "catalog:",

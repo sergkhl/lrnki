@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
-import { buildComponentAwareDagLayout } from "@/lib/cytoscapeDagLayout";
+import { elkLayeredLayout } from "@/lib/cytoscapeElkLayout";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,14 +33,6 @@ function originBadge(groundingOrigin: string): { label: string; variant: "defaul
 export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
-  const graphPositions = useMemo(
-    () =>
-      buildComponentAwareDagLayout(
-        detail.nodes.map((node) => ({ id: node.conceptId, label: node.label })),
-        detail.edges.map((edge) => ({ source: edge.prerequisiteConceptId, target: edge.dependentConceptId }))
-      ),
-    [detail]
-  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -68,8 +60,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
             label: node.inPath ? `${node.position! + 1}. ${node.label}` : node.label,
             inPath: node.inPath ? "yes" : "no",
             target: node.isTarget ? "yes" : "no"
-          },
-          position: graphPositions.get(node.conceptId)
+          }
         })),
         ...detail.edges.map((edge, index) => ({
           data: {
@@ -81,13 +72,9 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
           }
         }))
       ],
-      layout: {
-        // Positions are precomputed so disconnected DAG components keep an
-        // explicit gutter while path context still reads prerequisites first.
-        name: "preset",
-        padding: 28,
-        fit: true
-      },
+      // ELK `layered` owns node coordinates and component separation; path context
+      // still reads prerequisites first because edges flow top-down.
+      layout: elkLayeredLayout,
       minZoom: 0.2,
       maxZoom: 3,
       style: [
@@ -133,7 +120,12 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
         {
           selector: "edge",
           style: {
-            "curve-style": "bezier",
+            // Taxi (orthogonal) routing keeps prerequisite edges off the nodes in
+            // the top-down ELK layout; edges leave the bottom of a prerequisite and
+            // enter the top of its dependent.
+            "curve-style": "taxi",
+            "taxi-direction": "downward",
+            "taxi-turn": 18,
             "line-color": color("--border"),
             "target-arrow-color": color("--border"),
             "target-arrow-shape": "triangle",
@@ -167,7 +159,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       cy.destroy();
       cytoscapeRef.current = null;
     };
-  }, [detail, graphPositions]);
+  }, [detail]);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
