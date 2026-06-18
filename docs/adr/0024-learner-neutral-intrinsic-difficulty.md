@@ -22,4 +22,4 @@ Intrinsic difficulty is carried at `EXPERIMENT_ONLY` trust for ordering until re
 
 The previous `dag-depth-mock` difficulty producer was honest but too coarse: it could not distinguish concepts at the same topological depth. At the same time, jumping directly to learner-calibrated difficulty would invent precision unsupported by available data. A learner-neutral intrinsic judge fills the current gap while keeping the calibrated method explicitly data-blocked.
 
-F3 graph densification was removed at the same milestone. The enrichment layer already passed inspected prerequisite-ordering gates without densification, and the densification experiments did not earn their cost. Difficulty therefore improves the secondary ordering signal rather than adding another graph-growth pass.
+F3 graph densification was removed at the same milestone; that removal is owned by ADR-0019 (the enrichment layer already passed inspected prerequisite-ordering gates without it). Difficulty therefore improves the secondary ordering signal rather than adding another graph-growth pass.

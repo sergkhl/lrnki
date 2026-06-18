@@ -81,7 +81,7 @@ The deterministic, domain-scoped normalized-label process that decides whether C
 _Avoid_: embedding merge, identity clustering
 
 **Graph Enrichment**:
-The operation that derives learner-neutral graph facts not asserted by a source from one published graph version, by judging every same-domain Concept-Evidence-Profile pair exhaustively.
+The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and judges every same-domain pair exhaustively over anchors and those nodes to derive `inferred-prerequisite-of` edges. (Decision: ADR-0019.)
 _Avoid_: graph mutation, Static Graph Refinement, embedding blocking
 
 **Enrichment Run**:

@@ -1,4 +1,8 @@
 -- Single initial migration (AGENTS rule 8). Reset local state rather than adding migrations.
+-- This file is the SINGLE SOURCE OF TRUTH for the database schema (AGENTS rule 18):
+-- there is no Drizzle schema and no `drizzle-kit generate` path. Stores query raw SQL
+-- via `postgres`; `drizzle-kit migrate` only applies the files in this directory.
+-- Edit this DDL directly (including the JSON_TABLE views and CHECK constraints below).
 
 -- ---------------------------------------------------------------------------
 -- Curated source registration and normalization (ADR-0004, ADR-0015)
