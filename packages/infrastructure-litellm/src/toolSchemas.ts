@@ -642,3 +642,20 @@ export const answerGradingValidator = z.object({
   score: z.number().min(0).max(1),
   rationale: z.string().min(1)
 }).strict();
+
+// --- Learner answer simulation: submit_simulated_answer (U7, R14) ---------
+// Simulates a learner of a given competence answering a recall question, to seed the
+// Response Log for a rule-14 run. EXPERIMENT_ONLY scaffolding; never asserted in
+// tests (AGENTS rule 11). Domain-neutral (rule 17).
+export const learnerAnswerSimulationSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["answer"],
+  properties: {
+    answer: { type: "string", description: "The learner's free-form written answer to the question, written in the voice and competence of the given learner persona." }
+  }
+};
+
+export const learnerAnswerSimulationValidator = z.object({
+  answer: z.string().min(1)
+}).strict();

@@ -25,7 +25,9 @@ export {
   cardGenerationSchema,
   cardGenerationValidator,
   answerGradingSchema,
-  answerGradingValidator
+  answerGradingValidator,
+  learnerAnswerSimulationSchema,
+  learnerAnswerSimulationValidator
 } from "./toolSchemas";
 export {
   LiteLlmCardGenerationAdapter,
@@ -35,6 +37,10 @@ export {
   LiteLlmAnswerGradingJudgeAdapter,
   ANSWER_GRADING_JUDGE_MODEL
 } from "./answerGradingAdapters";
+export {
+  LiteLlmLearnerSimulatorAdapter,
+  LEARNER_SIMULATOR_MODEL
+} from "./learnerSimulatorAdapters";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,

@@ -334,6 +334,20 @@ export interface ResponseLogStorePort {
   nextAttemptSeq(learnerStateRef: string): Promise<number>;
 }
 
+// Learner answer simulator (R14, U7). Generates a learner's free-form written answer
+// for a card at a given competence, so synthetic prefill exercises the REAL grading
+// path (the answer is graded by AnswerGradingJudgePort, not stubbed). DeepSeek-family
+// generator; EXPERIMENT_ONLY scaffolding, never asserted in tests (AGENTS rule 11).
+export interface LearnerAnswerSimulatorPort {
+  readonly model: string;
+  simulateAnswer(input: {
+    declaredDomain: string;
+    question: string;
+    // "strong" → a competent answer; "weak" → a partial or struggling answer.
+    competence: "strong" | "weak";
+  }): Promise<{ answer: string }>;
+}
+
 // Answer grading judge (R9, U5). Grades a free-form written answer against a card's
 // answer-key, cross-family on `kg-independent-judge` so the DeepSeek card generator
 // never grades its own answer-key (KTD, ADR-0023). Forced named tool schema; the

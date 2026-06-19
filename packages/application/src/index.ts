@@ -35,6 +35,11 @@ export {
   projectAdaptivePath,
   ADAPTIVE_MASTERY_THRESHOLD
 } from "./adaptivePathProjection";
+export {
+  synthesizeResponses,
+  rateByDifficulty,
+  type SyntheticLearnerProfile
+} from "./syntheticResponses";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,
