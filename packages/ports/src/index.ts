@@ -7,6 +7,7 @@ import type {
   Card,
   CardDraft,
   ConceptDifficulty,
+  JudgedOutcome,
   NewResponseLogRow,
   ResponseLogRow,
   DifficultyNodeContext,
@@ -331,6 +332,20 @@ export interface ResponseLogStorePort {
   listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
   listForLearnerConcept(learnerStateRef: string, conceptId: string): Promise<ResponseLogRow[]>;
   nextAttemptSeq(learnerStateRef: string): Promise<number>;
+}
+
+// Answer grading judge (R9, U5). Grades a free-form written answer against a card's
+// answer-key, cross-family on `kg-independent-judge` so the DeepSeek card generator
+// never grades its own answer-key (KTD, ADR-0023). Forced named tool schema; the
+// adapter validates arguments fail-closed.
+export interface AnswerGradingJudgePort {
+  readonly model: string;
+  grade(input: {
+    declaredDomain: string;
+    question: string;
+    answerKey: string;
+    submittedAnswer: string;
+  }): Promise<{ outcome: JudgedOutcome; score: number; rationale: string }>;
 }
 
 export interface CardGenerationPort {

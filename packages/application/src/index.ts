@@ -23,6 +23,7 @@ export {
   type CalibrationItem,
   type SelfReportInput
 } from "./calibration";
+export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,

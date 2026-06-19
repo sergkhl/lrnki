@@ -22,6 +22,7 @@ import {
   LiteLlmAssertionEntailmentJudgmentAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
+  LiteLlmAnswerGradingJudgeAdapter,
   LiteLlmCardGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
@@ -37,6 +38,7 @@ import {
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
   PostgresCardBankStore,
+  PostgresResponseLogStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
@@ -146,7 +148,11 @@ function buildContext() {
     // a cross-family judge grades learner answers against the key (U5). Deterministic
     // decoding for stable re-derivation.
     cardGeneration: new LiteLlmCardGenerationAdapter(deterministicClient),
-    cardBankStore: new PostgresCardBankStore(sql)
+    cardBankStore: new PostgresCardBankStore(sql),
+    // Measurement grading judge (U5): cross-family (kg-independent-judge) so the
+    // DeepSeek card generator never grades its own answer-key (ADR-0023).
+    answerGradingJudge: new LiteLlmAnswerGradingJudgeAdapter(deterministicClient),
+    responseLogStore: new PostgresResponseLogStore(sql)
   };
 }
 

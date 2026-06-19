@@ -617,3 +617,28 @@ export const cardGenerationValidator = z.object({
   selfReportPrompt: z.string().min(1),
   citations: z.array(z.object({ sourceBlockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
 }).strict();
+
+// --- Answer grading: submit_answer_grade (U5, R9) -------------------------
+// Grades a learner's free-form written answer against a card's answer-key. Runs
+// cross-family (kg-independent-judge) so the DeepSeek card generator never grades
+// its own answer-key (ADR-0023). Domain-neutral rubric language only (rule 17).
+export const answerGradingSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["outcome", "score", "rationale"],
+  properties: {
+    outcome: {
+      type: "string",
+      enum: ["correct", "partial", "incorrect"],
+      description: "'correct' when the answer captures the answer-key's essential content; 'partial' when it is on-topic but incomplete or contains a notable error; 'incorrect' when it misses or contradicts the answer-key. Judge meaning, not wording."
+    },
+    score: { type: "number", description: "A [0,1] confidence-weighted correctness score consistent with the outcome (roughly 1.0 correct, ~0.5 partial, 0 incorrect)." },
+    rationale: { type: "string", description: "One terse sentence justifying the outcome against the answer-key." }
+  }
+};
+
+export const answerGradingValidator = z.object({
+  outcome: z.enum(["correct", "partial", "incorrect"]),
+  score: z.number().min(0).max(1),
+  rationale: z.string().min(1)
+}).strict();
