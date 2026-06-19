@@ -972,3 +972,41 @@ export type CardDraft = {
   selfReportPrompt: string;
   citations: { sourceBlockId: string; evidenceQuote: string }[];
 };
+
+// ---------------------------------------------------------------------------
+// Response Log — the durable, append-only commitment (R4–R6). Every recall attempt
+// is an immutable row. `self_report` rows carry an anki-style rating; `graded` rows
+// carry a judged outcome plus a [0,1] score (the partial/binary distinction the
+// estimator and a later IRT/BKT fit need, AE4). The skill is the asserted
+// `conceptId` (enrichment-independent); the item is `cardId` (per-item IRT key).
+// ---------------------------------------------------------------------------
+
+export type SignalType = "self_report" | "graded";
+export type SelfReportRating = "again" | "hard" | "good" | "easy";
+export type JudgedOutcome = "correct" | "partial" | "incorrect";
+export type ResponseSource = "synthetic" | "human";
+
+export type ResponseLogRow = {
+  responseId: string;
+  learnerStateRef: string;
+  cardId: string;
+  conceptId: string;
+  signalType: SignalType;
+  selfReportRating: SelfReportRating | null;
+  judgedOutcome: JudgedOutcome | null;
+  gradedScore: number | null;
+  evidenceWeight: number;
+  responseSource: ResponseSource;
+  graderIdentity: string | null;
+  // Groups one calibration sweep so re-calibration appends a distinct batch (R10).
+  batchId: string | null;
+  // Monotonic per learner_state_ref — the ordered sequence BKT/IRT consume (R6).
+  attemptSeq: number;
+  submittedAnswer: string | null;
+  // Set by the store (DB default) on append; populated on read.
+  createdAt?: string;
+};
+
+// Append shape: a row before the store stamps `createdAt`. There is deliberately no
+// update/delete shape — corrections APPEND (R5).
+export type NewResponseLogRow = Omit<ResponseLogRow, "createdAt">;

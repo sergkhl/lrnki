@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { Card, StructuredDocument } from "@lrnki/domain-core";
+import type { Card, NewResponseLogRow, StructuredDocument } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
-import { PostgresCardBankStore } from "./PostgresLearnerLoopStores";
+import { PostgresCardBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
 
 // Integration tests against a live PostgreSQL with the single initial migration
@@ -140,6 +140,145 @@ maybe("artifact_cards JSON_TABLE view returns one row per card", async () => {
     assert.equal(rows.length, 1);
     assert.equal(rows[0].concept_id, substrate.conceptId);
     assert.equal(Number(rows[0].citation_count), 2);
+  } finally {
+    await sql.end();
+  }
+});
+
+// --- Response Log (U3) -----------------------------------------------------
+
+// Persist a real card so response_log's card_id FK resolves, returning the ids the
+// log keys on.
+async function seedCard(sql: Sql): Promise<{ cardId: string; conceptId: string }> {
+  const substrate = await seedSubstrate(sql);
+  const card = cardFor(substrate);
+  await new PostgresCardBankStore(sql).persist([card]);
+  return { cardId: card.cardId, conceptId: substrate.conceptId };
+}
+
+function selfReportRow(input: { learnerStateRef: string; cardId: string; conceptId: string; rating: "again" | "hard" | "good" | "easy"; attemptSeq: number; batchId: string }): NewResponseLogRow {
+  return {
+    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, cardId: input.cardId, conceptId: input.conceptId,
+    signalType: "self_report", selfReportRating: input.rating, judgedOutcome: null, gradedScore: null,
+    evidenceWeight: 0.3, responseSource: "synthetic", graderIdentity: null, batchId: input.batchId,
+    attemptSeq: input.attemptSeq, submittedAnswer: null
+  };
+}
+
+function gradedRow(input: { learnerStateRef: string; cardId: string; conceptId: string; outcome: "correct" | "partial" | "incorrect"; score: number; attemptSeq: number }): NewResponseLogRow {
+  return {
+    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, cardId: input.cardId, conceptId: input.conceptId,
+    signalType: "graded", selfReportRating: null, judgedOutcome: input.outcome, gradedScore: input.score,
+    evidenceWeight: 1.0, responseSource: "synthetic", graderIdentity: "kg-independent-judge", batchId: null,
+    attemptSeq: input.attemptSeq, submittedAnswer: "a written answer"
+  };
+}
+
+maybe("appends a self_report and a graded row for the same learner+concept with distinct attempt_seq, nothing overwritten", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { cardId, conceptId } = await seedCard(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    await store.append([selfReportRow({ learnerStateRef: learner, cardId, conceptId, rating: "good", attemptSeq: 1, batchId: randomUUID() })]);
+    await store.append([gradedRow({ learnerStateRef: learner, cardId, conceptId, outcome: "incorrect", score: 0, attemptSeq: 2 })]);
+
+    const rows = await store.listForLearner(learner);
+    assert.equal(rows.length, 2);
+    assert.deepEqual(rows.map((r) => r.attemptSeq), [1, 2], "rows return in attempt_seq order");
+    assert.deepEqual(rows.map((r) => r.signalType), ["self_report", "graded"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a partial graded row round-trips distinct from correct and incorrect (Covers AE4)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { cardId, conceptId } = await seedCard(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    await store.append([
+      gradedRow({ learnerStateRef: learner, cardId, conceptId, outcome: "correct", score: 1, attemptSeq: 1 }),
+      gradedRow({ learnerStateRef: learner, cardId, conceptId, outcome: "partial", score: 0.5, attemptSeq: 2 }),
+      gradedRow({ learnerStateRef: learner, cardId, conceptId, outcome: "incorrect", score: 0, attemptSeq: 3 })
+    ]);
+    const rows = await store.listForLearnerConcept(learner, conceptId);
+    assert.deepEqual(rows.map((r) => r.judgedOutcome), ["correct", "partial", "incorrect"]);
+    assert.deepEqual(rows.map((r) => r.gradedScore), [1, 0.5, 0]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("CHECK rejects a self_report with null rating and a graded row with null outcome", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { cardId, conceptId } = await seedCard(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    const badSelfReport: NewResponseLogRow = { ...selfReportRow({ learnerStateRef: learner, cardId, conceptId, rating: "good", attemptSeq: 1, batchId: randomUUID() }), selfReportRating: null };
+    await assert.rejects(() => store.append([badSelfReport]), /violates check constraint|null/i);
+    const badGraded: NewResponseLogRow = { ...gradedRow({ learnerStateRef: learner, cardId, conceptId, outcome: "correct", score: 1, attemptSeq: 1 }), judgedOutcome: null };
+    await assert.rejects(() => store.append([badGraded]), /violates check constraint|null/i);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("two learners' rows never bleed across learner_state_ref", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { cardId, conceptId } = await seedCard(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learnerA = `learner-${randomUUID()}`;
+    const learnerB = `learner-${randomUUID()}`;
+    await store.append([selfReportRow({ learnerStateRef: learnerA, cardId, conceptId, rating: "good", attemptSeq: 1, batchId: randomUUID() })]);
+    await store.append([selfReportRow({ learnerStateRef: learnerB, cardId, conceptId, rating: "again", attemptSeq: 1, batchId: randomUUID() })]);
+    assert.equal((await store.listForLearner(learnerA)).length, 1);
+    assert.equal((await store.listForLearner(learnerB)).length, 1);
+    assert.equal((await store.listForLearner(learnerA))[0].selfReportRating, "good");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("re-calibration appends a new batch_id without deleting the prior batch (Covers R5, R10)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { cardId, conceptId } = await seedCard(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    const batch1 = randomUUID();
+    const batch2 = randomUUID();
+    let seq = await store.nextAttemptSeq(learner);
+    await store.append([selfReportRow({ learnerStateRef: learner, cardId, conceptId, rating: "again", attemptSeq: seq, batchId: batch1 })]);
+    seq = await store.nextAttemptSeq(learner);
+    await store.append([selfReportRow({ learnerStateRef: learner, cardId, conceptId, rating: "good", attemptSeq: seq, batchId: batch2 })]);
+
+    const rows = await store.listForLearner(learner);
+    assert.equal(rows.length, 2, "the first batch survives the second");
+    assert.deepEqual(new Set(rows.map((r) => r.batchId)), new Set([batch1, batch2]));
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("the returned row set carries every field an IRT and a BKT fit require (R6)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { cardId, conceptId } = await seedCard(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    await store.append([gradedRow({ learnerStateRef: learner, cardId, conceptId, outcome: "correct", score: 1, attemptSeq: 1 })]);
+    const [row] = await store.listForLearner(learner);
+    // IRT needs an item id + ordered outcome; BKT needs a skill id + ordered sequence.
+    assert.equal(typeof row.cardId, "string");      // per-item IRT key
+    assert.equal(typeof row.conceptId, "string");   // per-skill BKT key
+    assert.equal(typeof row.attemptSeq, "number");  // ordered sequence
+    assert.equal(typeof row.gradedScore, "number");
+    assert.equal(row.graderIdentity, "kg-independent-judge");
+    assert.ok(row.createdAt, "createdAt stamped by the store");
   } finally {
     await sql.end();
   }

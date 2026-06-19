@@ -7,6 +7,8 @@ import type {
   Card,
   CardDraft,
   ConceptDifficulty,
+  NewResponseLogRow,
+  ResponseLogRow,
   DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -320,6 +322,17 @@ export interface CardBankStorePort {
 // generator stays DeepSeek-family (AGENTS rule 5). Returns a pre-verification
 // CardDraft conditioned on ONE Concept's published CEP — the application boundary
 // verifies citations verbatim and resolves provenance before persisting (U2).
+// Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ
+// only — there is no update or delete — so the append-only guarantee (R5) is
+// structural, not a convention. `nextAttemptSeq` hands the caller the next monotonic
+// sequence for a learner so calibration/measurement stamp ordered rows.
+export interface ResponseLogStorePort {
+  append(rows: NewResponseLogRow[]): Promise<void>;
+  listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
+  listForLearnerConcept(learnerStateRef: string, conceptId: string): Promise<ResponseLogRow[]>;
+  nextAttemptSeq(learnerStateRef: string): Promise<number>;
+}
+
 export interface CardGenerationPort {
   readonly model: string;
   generate(input: {

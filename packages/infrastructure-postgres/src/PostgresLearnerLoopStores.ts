@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, Card } from "@lrnki/domain-core";
-import type { CardBankStorePort } from "@lrnki/ports";
+import type { ArtifactEnvelope, Card, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
+import type { CardBankStorePort, ResponseLogStorePort } from "@lrnki/ports";
 import type { Sql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
@@ -112,3 +112,91 @@ type CitationRow = {
   source_block_id: string;
   evidence_quote: string;
 };
+
+// Response Log persistence (R4–R6). APPEND + READ only — there is no update or delete
+// method, so the append-only guarantee is structural. The DB CHECK constraints keep
+// every row signal-coherent; this store never reshapes a row, it only inserts.
+export class PostgresResponseLogStore implements ResponseLogStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async append(rows: NewResponseLogRow[]): Promise<void> {
+    if (rows.length === 0) return;
+    await this.sql.begin(async (tx) => {
+      for (const row of rows) {
+        await tx`
+          INSERT INTO response_log (
+            response_id, learner_state_ref, card_id, concept_id, signal_type,
+            self_report_rating, judged_outcome, graded_score, evidence_weight,
+            response_source, grader_identity, batch_id, attempt_seq, submitted_answer
+          )
+          VALUES (
+            ${row.responseId}, ${row.learnerStateRef}, ${row.cardId}, ${row.conceptId}, ${row.signalType},
+            ${row.selfReportRating}, ${row.judgedOutcome}, ${row.gradedScore}, ${row.evidenceWeight},
+            ${row.responseSource}, ${row.graderIdentity}, ${row.batchId}, ${row.attemptSeq}, ${row.submittedAnswer}
+          )`;
+      }
+    });
+  }
+
+  async listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]> {
+    const rows = await this.sql<ResponseLogDbRow[]>`
+      SELECT response_id, learner_state_ref, card_id, concept_id, signal_type,
+             self_report_rating, judged_outcome, graded_score, evidence_weight,
+             response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
+      FROM response_log WHERE learner_state_ref = ${learnerStateRef} ORDER BY attempt_seq`;
+    return rows.map(hydrateResponseLogRow);
+  }
+
+  async listForLearnerConcept(learnerStateRef: string, conceptId: string): Promise<ResponseLogRow[]> {
+    const rows = await this.sql<ResponseLogDbRow[]>`
+      SELECT response_id, learner_state_ref, card_id, concept_id, signal_type,
+             self_report_rating, judged_outcome, graded_score, evidence_weight,
+             response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
+      FROM response_log WHERE learner_state_ref = ${learnerStateRef} AND concept_id = ${conceptId} ORDER BY attempt_seq`;
+    return rows.map(hydrateResponseLogRow);
+  }
+
+  async nextAttemptSeq(learnerStateRef: string): Promise<number> {
+    const [{ next }] = await this.sql<{ next: number }[]>`
+      SELECT COALESCE(MAX(attempt_seq), 0) + 1 AS next FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
+    return Number(next);
+  }
+}
+
+type ResponseLogDbRow = {
+  response_id: string;
+  learner_state_ref: string;
+  card_id: string;
+  concept_id: string;
+  signal_type: string;
+  self_report_rating: string | null;
+  judged_outcome: string | null;
+  graded_score: number | null;
+  evidence_weight: number;
+  response_source: string;
+  grader_identity: string | null;
+  batch_id: string | null;
+  attempt_seq: number;
+  submitted_answer: string | null;
+  created_at: string;
+};
+
+function hydrateResponseLogRow(row: ResponseLogDbRow): ResponseLogRow {
+  return {
+    responseId: row.response_id,
+    learnerStateRef: row.learner_state_ref,
+    cardId: row.card_id,
+    conceptId: row.concept_id,
+    signalType: row.signal_type as ResponseLogRow["signalType"],
+    selfReportRating: row.self_report_rating as ResponseLogRow["selfReportRating"],
+    judgedOutcome: row.judged_outcome as ResponseLogRow["judgedOutcome"],
+    gradedScore: row.graded_score === null ? null : Number(row.graded_score),
+    evidenceWeight: Number(row.evidence_weight),
+    responseSource: row.response_source as ResponseLogRow["responseSource"],
+    graderIdentity: row.grader_identity,
+    batchId: row.batch_id,
+    attemptSeq: Number(row.attempt_seq),
+    submittedAnswer: row.submitted_answer,
+    createdAt: new Date(row.created_at).toISOString()
+  };
+}
