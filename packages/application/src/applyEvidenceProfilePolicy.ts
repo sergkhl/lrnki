@@ -45,11 +45,6 @@ export function applyEvidenceProfilePolicy(input: {
     if (assertion.type === "defines") {
       if (assertion.literalValue.trim() === "") continue;
       assertions.push({ type: "defines", literalValue: assertion.literalValue, evidence });
-    } else {
-      // explicit-prerequisite-hint must target a DISTINCT admitted Concept.
-      if (assertion.objectCandidateKey === input.candidateKey) continue;
-      if (!input.admittedKeys.has(assertion.objectCandidateKey)) continue;
-      assertions.push({ type: "explicit-prerequisite-hint", objectCandidateKey: assertion.objectCandidateKey, evidence });
     }
   }
 

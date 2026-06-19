@@ -37,8 +37,7 @@ export interface ProfilePassage {
 
 export interface ProfileAssertion {
   assertionType: string;
-  // `defines` carries a literal; `explicit-prerequisite-hint` names another
-  // admitted Concept by its candidate label.
+  // `defines` carries a literal.
   target: string;
   evidenceQuotes: string[];
 }
@@ -200,12 +199,11 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
       JOIN source_blocks sb ON sb.source_block_id = ep.source_block_id
       WHERE p.run_id = ${runId}
       ORDER BY ep.kind, ep.salience_rank`;
-    const assertionRows = await sql<{ assertion_id: string; profile_id: string; assertion_type: string; literal_value: string | null; object_label: string | null }[]>`
+    const assertionRows = await sql<{ assertion_id: string; profile_id: string; assertion_type: string; literal_value: string | null }[]>`
       SELECT a.run_optional_assertion_id AS assertion_id, a.run_concept_evidence_profile_id AS profile_id,
-             a.assertion_type, a.literal_value, obj.canonical_label AS object_label
+             a.assertion_type, a.literal_value
       FROM run_optional_assertions a
       JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = a.run_concept_evidence_profile_id
-      LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = a.object_candidate_id
       WHERE p.run_id = ${runId}`;
     const assertionEvidenceRows = await sql<{ assertion_id: string; evidence_quote: string }[]>`
       SELECT ae.run_optional_assertion_id AS assertion_id, ae.evidence_quote
@@ -247,7 +245,7 @@ export async function getRunInspection(runId: string): Promise<RunInspection | u
 export function assembleProfiles(
   profileRows: { profile_id: string; candidate_key: string; canonical_label: string; tier: string; complete: boolean }[],
   passageRows: { profile_id: string; kind: string; source_block_id: string; heading_path: string[]; evidence_quote: string; salience_rank: number }[],
-  assertionRows: { assertion_id: string; profile_id: string; assertion_type: string; literal_value: string | null; object_label: string | null }[],
+  assertionRows: { assertion_id: string; profile_id: string; assertion_type: string; literal_value: string | null }[],
   assertionEvidenceRows: { assertion_id: string; evidence_quote: string }[]
 ): RunProfile[] {
   const quotesByAssertion = new Map<string, string[]>();
@@ -256,7 +254,7 @@ export function assembleProfiles(
   }
   const assertionsByProfile = new Map<string, ProfileAssertion[]>();
   for (const row of assertionRows) {
-    const target = row.assertion_type === "defines" ? row.literal_value ?? "" : row.object_label ?? "?";
+    const target = row.literal_value ?? "";
     assertionsByProfile.set(row.profile_id, [
       ...(assertionsByProfile.get(row.profile_id) ?? []),
       { assertionType: row.assertion_type, target, evidenceQuotes: quotesByAssertion.get(row.assertion_id) ?? [] }

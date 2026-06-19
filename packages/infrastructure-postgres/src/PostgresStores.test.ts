@@ -44,8 +44,7 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
         definitions: [{ blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." }],
         mentions: [{ blockId: "b2", evidenceQuote: "Borrowing lets you reference a value without taking ownership." }],
         assertions: [
-          { type: "defines", literalValue: "the rules governing memory", evidence: [{ blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." }] },
-          { type: "explicit-prerequisite-hint", objectCandidateKey: "borrowing", evidence: [{ blockId: "b2", evidenceQuote: "Borrowing lets you reference a value without taking ownership." }] }
+          { type: "defines", literalValue: "the rules governing memory", evidence: [{ blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." }] }
         ],
         complete: true
       },
@@ -124,7 +123,7 @@ maybe("persists a run with CEP passages, assertions, and its immutable artifact 
       SELECT count(*)::int AS count FROM run_optional_assertions a
       JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = a.run_concept_evidence_profile_id
       WHERE p.run_id = ${runId}`;
-    assert.equal(assertionCount, 2);
+    assert.equal(assertionCount, 1);
     const [{ count: artifactCount }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM artifact_versions WHERE run_id = ${runId}`;
     assert.equal(artifactCount, 1);
     const [{ degraded }] = await sql<{ degraded: boolean }[]>`SELECT degraded FROM extraction_runs WHERE run_id = ${runId}`;
@@ -170,8 +169,13 @@ maybe("runsForBuildByIds returns core CEP profiles with resolved heading paths a
     assert.equal(ownership.definitions.length, 1);
     assert.deepEqual(ownership.definitions[0].headingPath, ["Ownership"], "heading path resolved from source_blocks");
     assert.equal(ownership.mentions.length, 1);
-    const hint = ownership.assertions.find((assertion) => assertion.type === "explicit-prerequisite-hint");
-    assert.ok(hint && hint.type === "explicit-prerequisite-hint" && hint.objectCandidateKey === "borrowing", "hint keeps its run-local target key");
+    assert.deepEqual(ownership.assertions, [
+      {
+        type: "defines",
+        literalValue: "the rules governing memory",
+        evidence: [{ sourceBlockId: ownership.definitions[0].sourceBlockId, evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }]
+      }
+    ]);
     assert.ok(!runs[0].evidenceProfiles.some((profile) => profile.candidateKey === "borrowing"), "optional Concept CEP is not in the build read model");
   } finally {
     await sql.end();

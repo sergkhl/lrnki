@@ -76,27 +76,23 @@ test("removes ungrounded definition and mention passages and reports an incomple
   assert.equal(result.mentions.length, 1);
 });
 
-test("keeps a grounded defines literal and a hint to an admitted concept, dropping a hint to an unknown target", async () => {
+test("keeps a grounded defines literal", async () => {
   const result = applyEvidenceProfilePolicy({
     candidateKey: "ownership",
     tier: "core",
     profile: profile({
       definitions: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules" }],
       assertions: [
-        { type: "defines", literalValue: "the rules governing memory", evidence: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules" }] },
-        { type: "explicit-prerequisite-hint", objectCandidateKey: "borrowing", evidence: [{ blockId: "block-1", evidenceQuote: "Borrowing lets you reference a value" }] },
-        { type: "explicit-prerequisite-hint", objectCandidateKey: "not-admitted", evidence: [{ blockId: "block-1", evidenceQuote: "References point to data" }] },
-        { type: "explicit-prerequisite-hint", objectCandidateKey: "ownership", evidence: [{ blockId: "block-1", evidenceQuote: "References point to data" }] }
+        { type: "defines", literalValue: "the rules governing memory", evidence: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules" }] }
       ]
     }),
     admittedKeys: new Set(["ownership", "borrowing"]),
     blockText,
     maxMentionsPerConceptPerSource: 6
   });
-  // Pre-entailment: structurally valid + grounded assertions survive; self-target and unknown target dropped.
-  assert.equal(result.assertions.length, 2);
-  assert.equal(result.assertions.some((a) => a.type === "defines"), true);
-  assert.equal(result.assertions.some((a) => a.type === "explicit-prerequisite-hint" && a.objectCandidateKey === "borrowing"), true);
+  assert.deepEqual(result.assertions, [
+    { type: "defines", literalValue: "the rules governing memory", evidence: [{ blockId: "block-1", evidenceQuote: "Ownership is a set of rules" }] }
+  ]);
 });
 
 test("drops an ungrounded or empty assertion fail-closed", async () => {

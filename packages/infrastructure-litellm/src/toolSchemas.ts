@@ -257,23 +257,21 @@ export const conceptCoreSelectionValidator = z.object({
 
 // --- CEP Extraction: submit_concept_evidence_profile ----------------------
 // One Concept Evidence Profile for the subject Concept: meaning-bearing definition
-// passages, salience-ordered mention passages, and zero or more optional typed
-// assertions. Only `defines` (literal) and `explicit-prerequisite-hint` (admitted
-// Concept) are typed; every other relationship is an untyped mention passage.
+// passages, salience-ordered mention passages, and zero or more optional `defines`
+// assertions. Every concept-to-concept relationship is an untyped mention passage.
 
 const optionalTypedAssertionSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "objectKind", "objectCandidateKey", "literalValue", "evidence"],
+  required: ["type", "objectKind", "literalValue", "evidence"],
   properties: {
     type: {
       type: "string",
-      enum: ["defines", "explicit-prerequisite-hint"],
-      description: "'defines' = the evidence defines the subject (objectKind=literal, literalValue set). 'explicit-prerequisite-hint' = the evidence EXPLICITLY states the subject must be understood before another ADMITTED concept (objectKind=concept, objectCandidateKey set)."
+      enum: ["defines"],
+      description: "'defines' = the evidence defines the subject (objectKind=literal, literalValue set)."
     },
-    objectKind: { type: "string", enum: ["literal", "concept"] },
-    objectCandidateKey: { type: ["string", "null"], description: "For explicit-prerequisite-hint: the candidateKey of an ADMITTED concept the subject is needed before. Null for defines." },
-    literalValue: { type: ["string", "null"], description: "For defines: a faithful, concise definition grounded in the evidence quote. Null for explicit-prerequisite-hint." },
+    objectKind: { type: "string", enum: ["literal"] },
+    literalValue: { type: ["string", "null"], description: "A faithful, concise definition grounded in the evidence quote." },
     evidence: { type: "array", items: blockEvidenceSchema }
   }
 };
@@ -295,7 +293,7 @@ export const conceptEvidenceProfileSchema: JsonSchema = {
     },
     assertions: {
       type: "array",
-      description: "Optional typed assertions. Emit only when the evidence explicitly supports a definition literal or an explicit prerequisite hint to an admitted concept. Everything else belongs in mentions.",
+      description: "Optional `defines` assertions. Emit only when the evidence explicitly supports a definition literal. Everything else belongs in mentions.",
       items: optionalTypedAssertionSchema
     }
   }
@@ -305,9 +303,8 @@ export const conceptEvidenceProfileValidator = z.object({
   definitions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
   mentions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
   assertions: z.array(z.object({
-    type: z.enum(["defines", "explicit-prerequisite-hint"]),
-    objectKind: z.enum(["literal", "concept"]),
-    objectCandidateKey: z.string().nullable(),
+    type: z.enum(["defines"]),
+    objectKind: z.enum(["literal"]),
     literalValue: z.string().nullable(),
     evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
   }).strict())
@@ -469,39 +466,6 @@ export const intrinsicDifficultySchema: JsonSchema = {
 
 export const intrinsicDifficultyValidator = z.object({
   neuralScore: z.number().min(0).max(1),
-  rationale: z.string().min(1)
-}).strict();
-
-// --- Assertion entailment judgment: submit_assertion_entailment_judgment --
-// One bounded judgment over a single optional typed assertion (ADR-0007 reset).
-// For an explicit-prerequisite-hint the model decides whether the verbatim
-// evidence EXPLICITLY states the subject is needed before the object concept.
-// `entailingSpan` is the minimal sub-quote that carries the assertion; the
-// application boundary fails closed to entailed:false when it is not a substring
-// of any provided quote.
-
-export const assertionEntailmentJudgmentSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["entailed", "entailingSpan", "rationale"],
-  properties: {
-    entailed: {
-      type: "boolean",
-      description:
-        "True only if the quoted evidence actually asserts the stated assertion between the two named concepts. False for unrelated, wrongly-directed, or merely-co-mentioned pairs."
-    },
-    entailingSpan: {
-      type: "string",
-      description:
-        "The minimal verbatim sub-quote (copied exactly from one of the provided quotes) that carries the assertion. Empty string when entailed is false."
-    },
-    rationale: { type: "string", description: "One terse sentence grounded in the quoted evidence." }
-  }
-};
-
-export const assertionEntailmentJudgmentValidator = z.object({
-  entailed: z.boolean(),
-  entailingSpan: z.string(),
   rationale: z.string().min(1)
 }).strict();
 

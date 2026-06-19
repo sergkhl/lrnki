@@ -18,8 +18,6 @@ export {
   missingPrerequisiteProposalValidator,
   intrinsicDifficultySchema,
   intrinsicDifficultyValidator,
-  assertionEntailmentJudgmentSchema,
-  assertionEntailmentJudgmentValidator,
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
   rescueDurabilityJudgmentSchema,

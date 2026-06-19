@@ -11,13 +11,12 @@ passages** per source (default six, recorded in the extraction configuration has
 **typed assertions**. Every CEP element carries the curated source, source block, verbatim quote,
 heading path, and locator. There is no broad claim extraction, no relation-recall retry, no
 missing-concept proposal, and no claim conflict gate; a relationship the model wants to express that
-is not one of the two guarded assertion types survives only as an untyped mention passage.
+is not the guarded assertion type survives only as an untyped mention passage.
 
-The only two typed assertions are `defines` (object is a literal) and `explicit-prerequisite-hint`
-(object is another admitted Concept). Both remain **evidence inside the CEP** and never become
-authoritative graph edges or numeric priors (ADR-0016). Every passage and assertion quote must exist
-verbatim in its cited source block; an admitted Concept left without a verified definition passage
-makes the run unsuccessful.
+The only typed assertion is `defines` (object is a literal). It remains **evidence inside the CEP**
+and never becomes an authoritative graph edge or numeric prior (ADR-0016). Every passage and
+assertion quote must exist verbatim in its cited source block; an admitted Concept left without a
+verified definition passage makes the run unsuccessful.
 
 Optional-assertion entailment is decided by a bounded LLM **assertion-entailment judge** using a
 forced named tool schema and the independent `kg-independent-judge` model alias, run as a composed

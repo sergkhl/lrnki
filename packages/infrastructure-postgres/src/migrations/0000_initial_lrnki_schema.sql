@@ -117,14 +117,13 @@ CREATE TABLE run_evidence_passages (
 );
 
 -- Optional typed assertions — guarded evidence, never edges. `defines` carries a
--- literal; `explicit-prerequisite-hint` references an admitted Concept candidate.
+-- literal; concept-to-concept relationships remain mention passages.
 CREATE TABLE run_optional_assertions (
   run_optional_assertion_id uuid PRIMARY KEY,
   run_concept_evidence_profile_id uuid NOT NULL REFERENCES run_concept_evidence_profiles(run_concept_evidence_profile_id),
-  assertion_type text NOT NULL CHECK (assertion_type IN ('defines', 'explicit-prerequisite-hint')),
+  assertion_type text NOT NULL CHECK (assertion_type IN ('defines')),
   literal_value text,
-  object_candidate_id uuid REFERENCES concept_candidates(concept_candidate_id),
-  CHECK ((assertion_type = 'defines' AND literal_value IS NOT NULL) OR (assertion_type = 'explicit-prerequisite-hint' AND object_candidate_id IS NOT NULL))
+  CHECK (assertion_type = 'defines' AND literal_value IS NOT NULL)
 );
 
 CREATE TABLE run_optional_assertion_evidence (
@@ -210,15 +209,13 @@ CREATE TABLE graph_version_evidence_passages (
 );
 
 -- Optional typed assertions — guarded evidence inside a CEP, never edges (R6).
--- `defines` carries a literal; `explicit-prerequisite-hint` references a published
--- Concept whose target was present in the same graph version.
+-- `defines` carries a literal.
 CREATE TABLE graph_version_optional_assertions (
   graph_version_optional_assertion_id uuid PRIMARY KEY,
   graph_version_concept_evidence_profile_id uuid NOT NULL REFERENCES graph_version_concept_evidence_profiles(graph_version_concept_evidence_profile_id),
-  assertion_type text NOT NULL CHECK (assertion_type IN ('defines', 'explicit-prerequisite-hint')),
+  assertion_type text NOT NULL CHECK (assertion_type IN ('defines')),
   literal_value text,
-  object_concept_id uuid REFERENCES concepts(concept_id),
-  CHECK ((assertion_type = 'defines' AND literal_value IS NOT NULL) OR (assertion_type = 'explicit-prerequisite-hint' AND object_concept_id IS NOT NULL))
+  CHECK (assertion_type = 'defines' AND literal_value IS NOT NULL)
 );
 
 CREATE TABLE graph_version_optional_assertion_evidence (
@@ -357,11 +354,11 @@ JSON_TABLE(
 ) AS p
 WHERE a.artifact_type = 'graph_snapshot.v2';
 
--- Flatten graph-snapshot typed assertions: one row per optional assertion inside a
--- published CEP, for inspecting guarded `defines` / `explicit-prerequisite-hint`.
+-- Flatten graph-snapshot typed assertions: one row per optional `defines`
+-- assertion inside a published CEP.
 CREATE VIEW artifact_graph_cep_assertions AS
 SELECT a.graph_version_id, t.concept_id, t.assertion_type,
-       t.literal_value, t.object_concept_id
+       t.literal_value
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -370,8 +367,7 @@ JSON_TABLE(
     concept_id text PATH '$.conceptId',
     NESTED PATH '$.assertions[*]' COLUMNS (
       assertion_type text PATH '$.type',
-      literal_value text PATH '$.literalValue',
-      object_concept_id text PATH '$.objectConceptId'
+      literal_value text PATH '$.literalValue'
     )
   )
 ) AS t

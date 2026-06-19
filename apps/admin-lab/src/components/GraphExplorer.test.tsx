@@ -27,7 +27,7 @@ const snapshot: GraphSnapshot = {
       conceptId: "c1",
       definitions: [passage("sourceA", "A derivative measures change."), passage("sourceB", "Rate of change of a function.")],
       mentions: [passage("sourceA", "Derivatives appear in optimization.")],
-      assertions: [{ type: "explicit-prerequisite-hint", objectConceptId: "c2", evidence: [passage("sourceA", "defined via a limit")] }]
+      assertions: [{ type: "defines", literalValue: "rate of change of a function", evidence: [passage("sourceB", "Rate of change of a function.")] }]
     }
   ]
 };

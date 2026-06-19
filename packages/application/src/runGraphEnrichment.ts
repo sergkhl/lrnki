@@ -96,7 +96,6 @@ export async function runGraphEnrichment(input: {
   const concepts = snapshot.concepts;
   const newNodeId = input.newNodeId ?? randomUUID;
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
-  const labelByConcept = new Map(concepts.map((concept) => [concept.conceptId, concept.canonicalLabel] as const));
 
   // Anchors: a per-run projection of the asserted snapshot (KTD2). Identity is the
   // frozen conceptId; nothing here mutates the asserted layer (R5).
@@ -159,7 +158,7 @@ export async function runGraphEnrichment(input: {
     derivedNodeId: node.derivedNodeId,
     declaredDomain: node.declaredDomain,
     groundingOrigin: node.groundingOrigin,
-    context: contextOf(node, profileByConcept, labelByConcept, config.maxMentionsPerConceptInPair)
+    context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair)
   }));
   const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
     conceptId: node.derivedNodeId,
@@ -322,30 +321,26 @@ function sameDomainPairs<T extends { derivedNodeId: string; declaredDomain: stri
 }
 
 // Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor
-// uses its published CEP (verbatim definition + bounded mention quotes + LABELED typed
-// assertions, the hint resolved to a canonical label). A `source_mentioned` node has
+// uses its published CEP (verbatim definition + bounded mention quotes + LABELED
+// `defines` assertions). A `source_mentioned` node has
 // no definition — only verbatim mention quotes. A `llm_grounded` node uses its
 // generated definition/mention text (exempt from the verbatim floor, U6). The bare
 // label is never the evidence — an empty context is treated as insufficient upstream.
 function contextOf(
   node: DerivedGraphNode,
   profileByConcept: Map<string, PublishedConceptEvidenceProfile>,
-  labelByConcept: Map<string, string>,
   maxMentions: number
 ): PrerequisiteConceptContext {
   if (node.nodeKind === "anchor") {
     const profile = profileByConcept.get(node.conceptId);
+    const publishedAssertions = profile?.assertions ?? [];
     return {
       conceptId: node.derivedNodeId,
       canonicalLabel: node.canonicalLabel,
       aliases: node.aliases,
       definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
       mentions: (profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote),
-      assertions: (profile?.assertions ?? []).map((assertion) =>
-        assertion.type === "defines"
-          ? { type: assertion.type, detail: assertion.literalValue }
-          : { type: assertion.type, detail: labelByConcept.get(assertion.objectConceptId) ?? assertion.objectConceptId }
-      )
+      assertions: publishedAssertions.map((assertion) => ({ type: assertion.type, detail: assertion.literalValue }))
     };
   }
   if (node.groundingOrigin === "source_mentioned") {

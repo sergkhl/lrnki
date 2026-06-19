@@ -35,10 +35,9 @@ test("assembleProfiles splits definitions/mentions and resolves assertion target
       { profile_id: "p1", kind: "mention", source_block_id: "b3", heading_path: ["Ch. 4"], evidence_quote: "Owner goes out of scope.", salience_rank: 1 }
     ],
     [
-      { assertion_id: "a1", profile_id: "p1", assertion_type: "explicit-prerequisite-hint", literal_value: null, object_label: "Move semantics" },
-      { assertion_id: "a2", profile_id: "p1", assertion_type: "defines", literal_value: "a set of ownership rules", object_label: null }
+      { assertion_id: "a2", profile_id: "p1", assertion_type: "defines", literal_value: "a set of ownership rules" }
     ],
-    [{ assertion_id: "a1", evidence_quote: "ownership must be understood before moves" }]
+    [{ assertion_id: "a2", evidence_quote: "Ownership is a set of rules." }]
   );
 
   assert.equal(profiles.length, 2);
@@ -49,11 +48,9 @@ test("assembleProfiles splits definitions/mentions and resolves assertion target
   assert.equal(ownership.mentions.length, 2);
   assert.deepEqual(ownership.mentions.map((m) => m.salienceRank), [0, 1]);
 
-  const hint = ownership.assertions.find((a) => a.assertionType === "explicit-prerequisite-hint");
-  assert.equal(hint?.target, "Move semantics");
-  assert.deepEqual(hint?.evidenceQuotes, ["ownership must be understood before moves"]);
   const defines = ownership.assertions.find((a) => a.assertionType === "defines");
   assert.equal(defines?.target, "a set of ownership rules");
+  assert.deepEqual(defines?.evidenceQuotes, ["Ownership is a set of rules."]);
 
   // An admitted Concept left without a definition is surfaced as incomplete.
   assert.equal(profiles[1].complete, false);

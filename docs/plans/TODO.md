@@ -28,6 +28,12 @@ definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighbor
 
 ## COMPLETED
 
+- **Prerequisite hint assertion measured and removed (2026-06-19).** Added a disposable enrichment-context
+  probe, ran a real LiteLLM A/B over mixed-domain graph version `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b`, then
+  removed `explicit-prerequisite-hint` after the clean run showed an identical edge set: 13 certain edges with
+  hints fed vs. 13 certain edges with hints suppressed, no endpoint or uncertainty diff. `defines` is now the
+  sole Optional Typed Assertion; prerequisite prose remains ordinary CEP mention evidence consumed by exhaustive
+  Graph Enrichment. Evidence under `tmp/2026-06-18-prerequisite-hint-ab/`.
 - **Learner-neutral intrinsic difficulty implemented (2026-06-18, branch `feat/intrinsic-difficulty-remove-f3`).**
   Replaced the `dag-depth-mock` port with `intrinsic-fused-v1`: `DifficultyPort.score` now receives per-node
   evidence contexts, `LiteLlmIntrinsicDifficultyJudgmentAdapter` uses a forced named tool schema on
@@ -113,7 +119,20 @@ definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighbor
 
 ## VALIDATION
 
-Latest validation (2026-06-18) is the **intrinsic difficulty implementation and rule-14 inspection**
+Latest validation (2026-06-19) is the **prerequisite hint A/B removal gate**
+(`docs/plans/2026-06-18-004-refactor-prerequisite-hint-measure-remove-plan.md`):
+
+- **Static/unit:** focused `pnpm --filter @lrnki/application test -- runGraphEnrichment` passed after the
+  temporary probe was added and refined to suppress only prerequisite hints while preserving `defines`.
+- **Real-use (rule-14 prerequisite hint A/B):** real LiteLLM enrichment over mixed-domain graph version
+  `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b`, using a fixed in-memory enrichment id and serialized pair calls,
+  produced identical inferred edge sets with and without the labeled hint signal: 13 certain edges, 0 uncertain
+  edges, no endpoint diff.
+- **Inspection result:** `PASS`, safe to remove. The prerequisite hint label did not change the derived
+  prerequisite structure, so it was removed from extraction schema, policy, entailment, publication, enrichment
+  context, and docs. Evidence under `tmp/2026-06-18-prerequisite-hint-ab/`.
+
+Prior latest validation (2026-06-18) was the **intrinsic difficulty implementation and rule-14 inspection**
 (`docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`):
 
 - **Static/unit:** focused and package checks passed: `pnpm --filter @lrnki/infrastructure-litellm test`,
@@ -132,129 +151,12 @@ Latest validation (2026-06-18) is the **intrinsic difficulty implementation and 
   `source_mentioned` passages remain `verified`. Caveats: no learner-data oracle, untuned weights, and some broad
   rescued nodes may be overestimated. Evidence under `tmp/2026-06-18-intrinsic-difficulty/`.
 
-Prior validation (2026-06-18) is the **F3 removal through U3**
-(`docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`):
+### Prior validations (provenance in archived plans)
 
-- **Static/unit:** focused removal checks passed: `pnpm --filter @lrnki/application test`,
-  `pnpm --filter @lrnki/application typecheck`, `pnpm --filter @lrnki/infrastructure-litellm test`,
-  `pnpm --filter @lrnki/infrastructure-litellm typecheck`, `pnpm --filter @lrnki/kg-worker typecheck`,
-  `pnpm --filter @lrnki/ports typecheck`, and `pnpm --filter @lrnki/domain-core typecheck`.
-- **Removal check:** live code search under `apps/` and `packages/` has no `densif`, `BridgeConcept`,
-  `bridgeConcept`, `sparseRegion`, or `shortestPathHops` references. The worker usage no longer exposes
-  `densify-experiment`; the bridge proposal adapter/schema/port/type and F3 application modules are deleted.
-- **Follow-up:** intrinsic difficulty was implemented and inspected in the later validation entry above.
-
-Prior validation (2026-06-18) is the **F3 v2 thin-connected-region measurement gate**
-(`docs/plans/2026-06-18-002-feat-densification-thin-region-trigger-plan.md`):
-
-- **Static/unit:** focused deterministic envelope tests passed:
-  `pnpm --filter @lrnki/application exec tsx --test src/prerequisiteDag.test.ts src/sparseRegionDetection.test.ts`.
-- **Measurement gate:** replayed frozen F1 dumps from `tmp/2026-06-17-f1-enrichment-eval/` through the
-  deterministic detector. The loader resolved 69 declined pairs by label with 0 unresolved rows and preserved
-  uncertain-edge handling. Hop-distance and low-degree endpoint sweeps surfaced the biology and InstructKG target
-  regions under broad thresholds, but no setting surfaced the economics market-distribution region because the
-  declined-pair dump contains no row involving the relevant economics labels.
-- **Result:** STOP before Phase B. No live `densify-experiment` was run, no bridge proposals were generated, and
-  no asserted or authoritative derived graph state was changed. Evidence under
-  `tmp/2026-06-18-f3v2-thin-region/measurement.md`.
-
-Prior validation (2026-06-18) is the **structure-aware evidence-neighborhood gate**
-(`docs/plans/2026-06-18-001-feat-structure-aware-evidence-neighborhood-plan.md`):
-
-- **Static/unit:** `pnpm run test`, `pnpm run typecheck`, `pnpm --filter @lrnki/admin-lab build`, and
-  `git diff --check` passed. `pnpm run lint` exited 0 with one pre-existing warning in
-  `packages/domain-core/src/index.ts`.
-- **Simplify/review pass:** subagent simplify reviewers found and fixes were applied for unique sibling-cap
-  accounting, duplicate mention-index scans, duplicate alias computation, and misleading `prev`/`next` metadata
-  on filtered CEP neighborhoods. Focused domain-core, application, and litellm tests passed after those fixes.
-- **Real-use (rule-14 extraction rerun):** real mixed-domain extraction with config
-  `structure-aware-neighborhood-v37`. InstructKG run `1f827f1c-04ba-40aa-8c00-a4b255cdc742` succeeded with
-  `CEPs=49(incomplete=3)`, improving from the F1 baseline of 9 incomplete CEPs. Economics run
-  `cc1b754d-d656-4830-8e31-8e76c43221c9` succeeded with `CEPs=29(incomplete=1)`, unchanged from baseline.
-  AIRA-dojo Markdown run `0eddc4e1-c49e-4f5a-9abb-b2bb52c9cfc6` succeeded with
-  `CEPs=42(incomplete=10)`.
-- **Spot checks:** recovered definitions from newly surfaced adjacent/same-section blocks were source-faithful for
-  examples including InstructKG `Context Clustering`, `Role Classification`, `EDC`, and AIRA-dojo
-  `Generalization Gap`; cited passages verified verbatim and were genuine explaining passages.
-- **Result:** PASS with caveats. The retrieval-layer defect is materially improved, especially for InstructKG, and
-  the verbatim floor still holds. Remaining caveats are definition-quality precision issues, especially
-  heading-only or citation-like accepted definitions in AIRA-dojo; that earned TODO #2. Evidence under
-  `tmp/2026-06-18-structure-aware-neighborhood/`.
-
-Prior validation (2026-06-17) is the **F1 enrichment-ordering gate + F3 v1 densification experiment**
-(`docs/plans/2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md`):
-
-- **Static/unit:** `pnpm run test`, `pnpm run typecheck`, and `pnpm run build` passed; `pnpm run lint` exited 0
-  (one pre-existing warning in `packages/domain-core/src/index.ts`); `git diff --check` clean.
-- **Real-use (rule-14 F1 gate):** real mixed-domain batch over graph version
-  `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b` / enrichment `30f05d4d-fab8-4409-a7a3-10f1be8bf091`. Biology
-  (`Meselson and Stahl experiments`), economics (`Universal Opulence from Division of Labour`), and InstructKG
-  (`Student Error Mapping`) Learner Paths were each judged **PASS** for prerequisite ordering with every step
-  traced to CEP evidence or a grounded derived node. Sparsity evidence recorded as the gate output for F3.
-- **Real-use (rule-14 F3 experiment):** `densify-experiment` over the F1 enrichment produced experiment
-  `3f90d1b3-1c5e-4782-99ef-83c8ad9caa33` with **0 bridges** (components 3→3, orphans 0→0, target ancestors
-  11→11); asserted snapshot hash `37dca346f1c312ce1610600b375749d5` unchanged, 0 authoritative derived rows.
-- **Result:** F1 **PASS**; F3 **EXPERIMENT_ONLY**, not promoted. The v1 topology-primary trigger found no
-  same-domain disconnected/orphan gaps on the connected baseline, so densification value is unmeasured. The
-  earned next task is a measured thin-connected-region trigger (TODO #1). Evidence under
-  `tmp/2026-06-17-f1-enrichment-eval/` and `tmp/2026-06-17-f3-densification-experiment/`.
-
-Prior validation (2026-06-17) is the **ungroundable core demotion** InstructKG re-run
-(`docs/plans/2026-06-17-001-feat-demote-ungroundable-core-plan.md`):
-
-- **Static/unit:** `pnpm --filter @lrnki/application test` passed (105 tests); `pnpm --filter
-  @lrnki/admin-lab test` passed (14 tests); `pnpm --filter @lrnki/infrastructure-postgres test` was invoked
-  without `DATABASE_URL` and skipped its 8 live-DB tests; `pnpm run typecheck` passed across the workspace.
-- **Real-use (rule-14 InstructKG):** reset the local PG18 database, registered the manifest fixtures, then ran
-  real extraction over InstructKG source `3ccd39d7-5caa-4326-82ab-6071ff784154`. Run
-  `9f0f959c-7455-4fe3-a0a6-b6193a3e750a` succeeded: 45 candidates, 6 remaining cores, 39 CEPs, 7 incomplete
-  optional profiles, `degraded=false`, v6 candidate/profile projections populated (`45`/`39`). Published graph
-  version `ffbeaafa-617e-4aed-a1fc-04c7b8723e44` from that run: 6 Concepts, 46 CEP passages, 5 optional
-  assertions, 0 asserted edges. Admin Lab run page rendered the v6 candidate table and `Pedagogical Roles`;
-  screenshot: `tmp/admin-lab-instructkg-run.png`.
-- **Result:** PASS for the user-facing outcome that the InstructKG source no longer fails publication because of
-  the borderline meta-concept. Caveat: this live sample did not exercise `core_demoted_ungroundable`; the
-  borderline concept was already model `core` / effective `optional` from admission evidence validation
-  (`standalone_learning_objective_missing_verified_evidence`,
-  `definition_bearing_treatment_missing_verified_evidence`, `effective_tier_corrected`). The demotion and
-  degraded machine-readable paths are covered by deterministic application tests, not by this N=1 live run.
-
-Prior validation (2026-06-16) is the **evidence-backed node treatment** native re-run
-(`docs/plans/2026-06-16-002-feat-evidence-backed-node-treatment-plan.md`,
-`tmp/2026-06-16-evidence-backed-rerun/rule-14-evaluation.md`):
-
-- **Static/unit:** `pnpm typecheck` clean across all packages; application + litellm + admin-lab suites pass;
-  Postgres persistence round-trip (per-pair judge model + rescue dispositions) verified against a fresh PG18 DB.
-- **Real-use (rule-14 mixed native batch):** config `cep-definition-bearing-admission-v36` /
-  `cep-node-enrichment-rescue-judged-v2`. Extraction over the four native fixtures: Rust
-  `69a7de11-0fce-4293-b4dd-e50ba9169a1b`, biology `e7fa2640-775b-4242-a111-3f600d9baf4f`, economics
-  `8c9874d6-ee6e-4d16-84e8-b83612aafb47` all **succeeded with 0 incomplete core CEPs**; InstructKG
-  `7ed1dbc1-6112-48b0-a263-5432e297f1a2` **failed** on one borderline core meta-concept (`pedagogical roles`,
-  recorded in BLOCKERS). Published version `4cf872e0-872b-44e0-8bee-406f4733c1a4` (20 Concepts, 0 asserted
-  edges) from the three succeeded runs; enrichment `2842dae3-a2e8-4f17-b656-3d2f1f6d6a50`. Rescue durability
-  judge dropped 5/8 candidates with grounded rationales (experiment methods, illustrative example, section
-  heading, contrast-only mention) and kept transferable concepts (Deep copy, Shallow copy, RAII). Clean
-  expert-correct paths for Rust→Ownership (`1c9c016a`), economics→Division of Labour (`2f6ae016`), and
-  biology→DNA replication (`03a2de96`).
-- **Result:** the two FIX_FIRST defects from the prior batch are fixed — Rust core admission reliability
-  (String Type / Heap allocation now admit core with complete CEPs) and InstructKG-class rescue noise (dropped
-  with grounded dispositions, generalizing across domains). One blocker recorded (InstructKG core completeness).
-  Deferred method stack stays deferred (G3 held). A FIX_FIRST found mid-run — criterion-evidence over-count
-  aborting a run — was fixed generically (cap raised to 4). Disposable evidence under
-  `tmp/2026-06-16-evidence-backed-rerun/`.
-
-### Prior validation (2026-06-16, evaluation-first native batch reset):
-
-- **Static/unit:** `pnpm --filter @lrnki/infrastructure-ingestion test -- MarkdownStructuredDocumentParser.test.ts`
-  passed; `pnpm --filter @lrnki/application exec tsx --test src/runGraphEnrichment.test.ts` passed after the
-  per-enrichment anchor ID fix.
-- **Real-use (rule-14 mixed native batch):** registered manifest fixtures, selected successful runs
-  `0911ecd0-11a1-4f6a-97a1-d4cc7f8cb272`, `4857473d-858a-4439-905d-81a1d12354be`,
-  `d2b617fc-eaa8-4d84-a082-69ce99be4911`, and `d9d68ae1-ae0c-46f0-a7eb-181ed4c653dc`; published graph version
-  `53197c1e-e5cf-4e46-b374-2fc812196bea` (25 Concepts / 184 CEP passages / 14 optional assertions / 0 asserted
-  edges); enriched run `0f9c0118-5131-4abb-8b1f-5912e398c011` (59 derived nodes, 50 certain edges, 26 uncertain
-  edges); generated paths `a5639bc9-47aa-4761-8a8f-e75774791e2b`, `4dea6196-88c3-4470-8964-a0287003423a`,
-  `2ae7772b-bf22-4be1-9667-27a6f0084851`, and `c332d379-4b5e-426a-94ff-fd97e9a5ac62`.
-- **Result:** Biology and economics paths are useful enough to support roadmap decisions. Rust fresh retries show
-  extraction reliability defects. InstructKG shows source-mentioned rescue noise that must be fixed before adding
-  downstream methods. Evidence and caveats live under `tmp/evaluation-first-roadmap-reset/`.
+- 2026-06-18 F3 removal through U3 — `docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`
+- 2026-06-18 F3 v2 thin-connected-region gate — `docs/plans/2026-06-18-002-feat-densification-thin-region-trigger-plan.md`
+- 2026-06-18 structure-aware evidence-neighborhood — `docs/plans/2026-06-18-001-feat-structure-aware-evidence-neighborhood-plan.md`
+- 2026-06-17 F1 enrichment-ordering gate + F3 v1 — `docs/plans/2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md`
+- 2026-06-17 ungroundable-core demotion — `docs/plans/2026-06-17-001-feat-demote-ungroundable-core-plan.md`
+- 2026-06-16 evidence-backed node treatment — `docs/plans/2026-06-16-002-feat-evidence-backed-node-treatment-plan.md`
+- 2026-06-16 evaluation-first native batch reset — `docs/plans/2026-06-16-001-feat-evaluation-first-roadmap-reset-plan.md`

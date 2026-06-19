@@ -179,11 +179,9 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         }
         for (const assertion of profile.assertions) {
           const assertionId = randomUUID();
-          const objectCandidateId = assertion.type === "explicit-prerequisite-hint" ? candidateIdByKey.get(assertion.objectCandidateKey) ?? null : null;
-          if (assertion.type === "explicit-prerequisite-hint" && !objectCandidateId) continue;
           await tx`
-            INSERT INTO run_optional_assertions (run_optional_assertion_id, run_concept_evidence_profile_id, assertion_type, literal_value, object_candidate_id)
-            VALUES (${assertionId}, ${profileId}, ${assertion.type}, ${assertion.type === "defines" ? assertion.literalValue : null}, ${objectCandidateId})`;
+            INSERT INTO run_optional_assertions (run_optional_assertion_id, run_concept_evidence_profile_id, assertion_type, literal_value)
+            VALUES (${assertionId}, ${profileId}, ${assertion.type}, ${assertion.literalValue})`;
           for (const evidence of assertion.evidence) {
             await tx`
               INSERT INTO run_optional_assertion_evidence (run_optional_assertion_evidence_id, run_optional_assertion_id, source_block_id, evidence_quote)
@@ -236,9 +234,7 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         WHERE cc.run_id = ${run.run_id} AND ad.tier = 'quarantine'`;
 
       // CEPs of admitted-CORE Concepts are the publishable evidence. Optional
-      // Concepts are extracted for hint context but never published, so they are
-      // excluded here; a prerequisite-hint pointing at an optional Concept resolves
-      // to no published target and is omitted by the build (R9).
+      // Concepts are extracted for inspection but never published.
       const passageRows = await this.sql<{ candidate_key: string; tier: string; complete: boolean; kind: string; source_block_id: string; evidence_quote: string; heading_path: string[]; locator: unknown; salience_rank: number }[]>`
         SELECT cc.candidate_key, p.tier, p.complete, ep.kind, ep.source_block_id, ep.evidence_quote, sb.heading_path, sb.locator, ep.salience_rank
         FROM run_concept_evidence_profiles p
@@ -258,14 +254,13 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id AND ad.tier = 'core'
         WHERE p.run_id = ${run.run_id}`;
 
-      const assertionRows = await this.sql<{ candidate_key: string; assertion_type: string; literal_value: string | null; object_candidate_key: string | null; source_block_id: string | null; evidence_quote: string | null; heading_path: string[] | null; locator: unknown }[]>`
-        SELECT cc.candidate_key, oa.assertion_type, oa.literal_value, obj.candidate_key AS object_candidate_key,
+      const assertionRows = await this.sql<{ candidate_key: string; assertion_type: string; literal_value: string | null; source_block_id: string | null; evidence_quote: string | null; heading_path: string[] | null; locator: unknown }[]>`
+        SELECT cc.candidate_key, oa.assertion_type, oa.literal_value,
                oae.source_block_id, oae.evidence_quote, sb.heading_path, sb.locator
         FROM run_optional_assertions oa
         JOIN run_concept_evidence_profiles p ON p.run_concept_evidence_profile_id = oa.run_concept_evidence_profile_id
         JOIN concept_candidates cc ON cc.concept_candidate_id = p.concept_candidate_id
         JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id AND ad.tier = 'core'
-        LEFT JOIN concept_candidates obj ON obj.concept_candidate_id = oa.object_candidate_id
         LEFT JOIN run_optional_assertion_evidence oae ON oae.run_optional_assertion_id = oa.run_optional_assertion_id
         LEFT JOIN source_blocks sb ON sb.source_block_id = oae.source_block_id
         ORDER BY cc.candidate_key, oa.run_optional_assertion_id`;
@@ -290,7 +285,7 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
 function assembleBuildEvidenceProfiles(
   profileRows: { candidate_key: string; tier: string; complete: boolean }[],
   passageRows: { candidate_key: string; kind: string; source_block_id: string; evidence_quote: string; heading_path: string[]; locator: unknown; salience_rank: number }[],
-  assertionRows: { candidate_key: string; assertion_type: string; literal_value: string | null; object_candidate_key: string | null; source_block_id: string | null; evidence_quote: string | null; heading_path: string[] | null; locator: unknown }[]
+  assertionRows: { candidate_key: string; assertion_type: string; literal_value: string | null; source_block_id: string | null; evidence_quote: string | null; heading_path: string[] | null; locator: unknown }[]
 ): BuildEvidenceProfile[] {
   const byKey = new Map<string, BuildEvidenceProfile>();
   for (const row of profileRows) {
@@ -309,21 +304,15 @@ function assembleBuildEvidenceProfiles(
     else profile.mentions.push(passage(row));
   }
   // Assertion rows are joined to their evidence, so one assertion may span multiple
-  // rows; group consecutive rows of the same (candidate, type, target) into one.
+  // rows; group rows of the same (candidate, type, literal) into one.
   const assertionByKey = new Map<string, BuildTypedAssertion>();
   for (const row of assertionRows) {
     const profile = byKey.get(row.candidate_key);
     if (!profile) continue;
-    const target = row.assertion_type === "defines" ? row.literal_value ?? "" : row.object_candidate_key ?? "";
-    const groupKey = `${row.candidate_key}|${row.assertion_type}|${target}`;
+    const groupKey = `${row.candidate_key}|${row.assertion_type}|${row.literal_value ?? ""}`;
     let assertion = assertionByKey.get(groupKey);
     if (!assertion) {
-      if (row.assertion_type === "defines") {
-        assertion = { type: "defines", literalValue: row.literal_value ?? "", evidence: [] };
-      } else {
-        if (!row.object_candidate_key) continue; // hint target was an absent candidate
-        assertion = { type: "explicit-prerequisite-hint", objectCandidateKey: row.object_candidate_key, evidence: [] };
-      }
+      assertion = { type: "defines", literalValue: row.literal_value ?? "", evidence: [] };
       assertionByKey.set(groupKey, assertion);
       profile.assertions.push(assertion);
     }
@@ -396,8 +385,8 @@ export class PostgresGraphVersionStore implements GraphVersionStorePort {
         for (const assertion of profile.assertions) {
           const assertionId = randomUUID();
           await tx`
-            INSERT INTO graph_version_optional_assertions (graph_version_optional_assertion_id, graph_version_concept_evidence_profile_id, assertion_type, literal_value, object_concept_id)
-            VALUES (${assertionId}, ${profileId}, ${assertion.type}, ${assertion.type === "defines" ? assertion.literalValue : null}, ${assertion.type === "explicit-prerequisite-hint" ? assertion.objectConceptId : null})`;
+            INSERT INTO graph_version_optional_assertions (graph_version_optional_assertion_id, graph_version_concept_evidence_profile_id, assertion_type, literal_value)
+            VALUES (${assertionId}, ${profileId}, ${assertion.type}, ${assertion.literalValue})`;
           for (const evidence of assertion.evidence) {
             await tx`
               INSERT INTO graph_version_optional_assertion_evidence (graph_version_optional_assertion_evidence_id, graph_version_optional_assertion_id, source_resource_id, source_block_id, evidence_quote, heading_path, locator)
@@ -463,8 +452,8 @@ export class PostgresGraphVersionStore implements GraphVersionStorePort {
       JOIN graph_version_evidence_passages ep ON ep.graph_version_concept_evidence_profile_id = p.graph_version_concept_evidence_profile_id
       WHERE p.graph_version_id = ${graphVersionId}
       ORDER BY p.concept_id, ep.kind, ep.salience_rank`;
-    const assertionRows = await this.sql<{ graph_version_optional_assertion_id: string; concept_id: string; assertion_type: string; literal_value: string | null; object_concept_id: string | null }[]>`
-      SELECT oa.graph_version_optional_assertion_id, p.concept_id, oa.assertion_type, oa.literal_value, oa.object_concept_id
+    const assertionRows = await this.sql<{ graph_version_optional_assertion_id: string; concept_id: string; assertion_type: string; literal_value: string | null }[]>`
+      SELECT oa.graph_version_optional_assertion_id, p.concept_id, oa.assertion_type, oa.literal_value
       FROM graph_version_optional_assertions oa
       JOIN graph_version_concept_evidence_profiles p ON p.graph_version_concept_evidence_profile_id = oa.graph_version_concept_evidence_profile_id
       WHERE p.graph_version_id = ${graphVersionId}`;
@@ -505,9 +494,7 @@ export class PostgresGraphVersionStore implements GraphVersionStorePort {
     for (const row of assertionRows) {
       const profile = profileFor(row.concept_id);
       const evidence = evidenceByAssertion.get(row.graph_version_optional_assertion_id) ?? [];
-      const assertion: PublishedTypedAssertion = row.assertion_type === "defines"
-        ? { type: "defines", literalValue: row.literal_value ?? "", evidence }
-        : { type: "explicit-prerequisite-hint", objectConceptId: row.object_concept_id ?? "", evidence };
+      const assertion: PublishedTypedAssertion = { type: "defines", literalValue: row.literal_value ?? "", evidence };
       profile.assertions.push(assertion);
     }
 

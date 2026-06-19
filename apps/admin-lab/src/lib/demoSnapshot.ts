@@ -21,7 +21,7 @@ export const demoSnapshot: GraphSnapshot = {
   ],
   evidenceProfiles: [
     { conceptId: "calculus", definitions: [passage("Calculus is the mathematical study of continuous change.")], mentions: [passage("Calculus builds on the notions of limit and derivative.")], assertions: [] },
-    { conceptId: "derivative", definitions: [passage("The derivative measures the instantaneous rate of change of a function.")], mentions: [], assertions: [{ type: "explicit-prerequisite-hint", objectConceptId: "limit", evidence: [passage("The derivative is defined as a limit of difference quotients.")] }] },
+    { conceptId: "derivative", definitions: [passage("The derivative measures the instantaneous rate of change of a function.")], mentions: [passage("The derivative is defined as a limit of difference quotients.")], assertions: [] },
     { conceptId: "limit", definitions: [passage("A limit describes the value a function approaches as its input approaches some point.")], mentions: [], assertions: [] }
   ]
 };

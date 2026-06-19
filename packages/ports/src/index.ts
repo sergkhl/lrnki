@@ -44,9 +44,8 @@ export interface ConceptAdmissionPort {
 
 // Concept-conditioned Concept Evidence Profile extraction (ADR-0007 reset). For
 // ONE admitted subject Concept, return meaning-bearing definition passages, a
-// salience-ordered set of mention passages, and zero or more optional typed
-// assertions (`defines` literal, `explicit-prerequisite-hint` to an admitted
-// Concept). Replaces broad claim extraction: there is no retry, no recall
+// salience-ordered set of mention passages, and zero or more `defines` assertions.
+// Replaces broad claim extraction: there is no retry, no recall
 // feedback, and no missing-concept escape hatch (R7). The application boundary
 // validates membership, verbatim grounding, deduplication, definition
 // completeness, and the configured mention bound.
@@ -70,24 +69,17 @@ export interface ConceptConditionedEvidenceProfileExtractionPort {
 // Assertion-entailment judge (ADR-0007 reset). A bounded, forced-tool LLM judgment
 // over ONE optional typed assertion whose evidence already verifies verbatim, run
 // on an independent model family so the judge is not the extractor grading its own
-// homework. It guards ONLY the two optional typed assertions; definition and
-// mention passages face the deterministic verbatim floor alone. It can only
+// homework. It guards ONLY `defines` assertions; definition and mention passages
+// face the deterministic verbatim floor alone. It can only
 // REJECT: a rejected assertion's underlying passage is preserved as an untyped
 // mention. `judgeDefinition` checks a `defines` literal (a model paraphrase no
-// surface matcher can verify); `judgePrerequisiteHint` checks whether the evidence
-// explicitly flags the subject as needed before the object Concept.
+// surface matcher can verify).
 export interface AssertionEntailmentJudgmentPort {
   readonly model: string;
   judgeDefinition(input: {
     declaredDomain: string;
     subject: { canonicalLabel: string; aliases: string[] };
     definition: string;
-    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
-  }): Promise<AssertionEntailmentJudgment>;
-  judgePrerequisiteHint(input: {
-    declaredDomain: string;
-    subject: { canonicalLabel: string; aliases: string[] };
-    object: { canonicalLabel: string; aliases: string[] };
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
   }): Promise<AssertionEntailmentJudgment>;
 }
@@ -201,9 +193,7 @@ export interface SourceObjectStoragePort {
 // Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
 // reset). Every same-domain CEP pair is judged exhaustively — there is no
 // embedding clustering or candidate-group gate. Each side carries its published
-// CEP (definitions, bounded mentions, labeled typed assertions); an
-// explicit-prerequisite-hint is labeled evidence the judge MAY weigh, never a
-// deterministic edge or direction override (R11, KTD). Forced named tool schema;
+// CEP (definitions, bounded mentions, labeled `defines` assertions). Forced named tool schema;
 // the application validates arguments and maps "uncertain" to a flagged,
 // path-excluded edge. The judge proposes; cycle removal + transitive reduction
 // dispose.

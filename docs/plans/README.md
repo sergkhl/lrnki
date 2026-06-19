@@ -16,6 +16,7 @@ These are not live work; their tasks are recorded in `TODO.md` COMPLETED.
 - [2026-06-16-002 Evidence-backed node treatment contract](./2026-06-16-002-feat-evidence-backed-node-treatment-plan.md)
 - [2026-06-17-001 Demote ungroundable core concepts](./2026-06-17-001-feat-demote-ungroundable-core-plan.md)
 - [2026-06-17-002 Enrichment-ordering eval gate + F3 v1 densification](./2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md)
+- [2026-06-18-001 Structure-aware evidence neighborhood](./2026-06-18-001-feat-structure-aware-evidence-neighborhood-plan.md)
 - [2026-06-18-002 F3 v2 measured thin-connected-region trigger](./2026-06-18-002-feat-densification-thin-region-trigger-plan.md) — archived as a stopped experiment; F3 was removed by the 2026-06-18 intrinsic-difficulty handoff.
 - [2026-06-18-003 Remove F3 and build intrinsic difficulty](./2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md) — archived with intrinsic difficulty implemented; rule-14 evidence is recorded in `TODO.md` VALIDATION.
 

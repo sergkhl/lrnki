@@ -292,22 +292,17 @@ export type AdmissionProposal = {
 // survive as untyped mention passages, never typed edges (R6/R7, AE1).
 // ---------------------------------------------------------------------------
 
-// The ONLY two guarded typed assertions (R6). `defines` carries a model-authored
+// The sole guarded typed assertion (R6). `defines` carries a model-authored
 // literal definition (a faithful paraphrase, judged for entailment — no surface
-// matcher can verify a paraphrase, AGENTS rule 16). `explicit-prerequisite-hint`
-// names an admitted Concept the source explicitly flags as needed first. Both are
-// guarded EVIDENCE inside the CEP, never authoritative edges or numeric priors
-// (KTD): a hint is passed to enrichment with its type label but no boost or
-// direction override.
-export type OptionalAssertionType = "defines" | "explicit-prerequisite-hint";
+// matcher can verify a paraphrase, AGENTS rule 16). Other concept-to-concept
+// relationships survive as mentions and are interpreted by Graph Enrichment.
+export type OptionalAssertionType = "defines";
 
 // What the concept-conditioned extractor returns for one subject Concept, by
 // run-local key. Definition and mention passages are verbatim block quotes; the
 // mention order IS the neural salience order (most to least useful for enrichment)
 // — the application keeps the first configured number without re-ranking (R4).
-export type ExtractedTypedAssertion =
-  | { type: "defines"; literalValue: string; evidence: BlockEvidence[] }
-  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BlockEvidence[] };
+export type ExtractedTypedAssertion = { type: "defines"; literalValue: string; evidence: BlockEvidence[] };
 
 export type ExtractedEvidenceProfile = {
   definitions: BlockEvidence[];
@@ -333,9 +328,7 @@ export type AssertionEntailmentJudgment = {
 // only when at least one verified definition passage remains; an incomplete core
 // Concept is demoted to optional before publication, while optional incomplete
 // profiles stay inspectable as run-scoped evidence.
-export type RunTypedAssertion =
-  | { type: "defines"; literalValue: string; evidence: BlockEvidence[] }
-  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BlockEvidence[] };
+export type RunTypedAssertion = { type: "defines"; literalValue: string; evidence: BlockEvidence[] };
 
 export type RunEvidenceProfile = {
   candidateKey: string;
@@ -537,13 +530,9 @@ export type PublishedEvidencePassage = {
   locator: SourceLocator;
 };
 
-// The only two guarded typed assertions (R6). Both stay EVIDENCE inside the CEP,
-// never authoritative edges or numeric priors. `explicit-prerequisite-hint` names
-// the published Concept it points at; a hint whose target is not published in the
-// same graph version is omitted at build time (R9 publication discipline).
-export type PublishedTypedAssertion =
-  | { type: "defines"; literalValue: string; evidence: PublishedEvidencePassage[] }
-  | { type: "explicit-prerequisite-hint"; objectConceptId: string; evidence: PublishedEvidencePassage[] };
+// The single guarded typed assertion (R6). It stays EVIDENCE inside the CEP,
+// never an authoritative edge or numeric prior.
+export type PublishedTypedAssertion = { type: "defines"; literalValue: string; evidence: PublishedEvidencePassage[] };
 
 export type PublishedConceptEvidenceProfile = {
   conceptId: string;
@@ -575,9 +564,7 @@ export type BuildCandidate = {
 
 // Run-scoped CEP evidence reduced to the deterministic build read model (ADR-0017).
 // Passages carry full resolved provenance (the store maps run-local blockIds to
-// persisted source_block_id, heading path, and locator); typed assertions still
-// reference the OTHER admitted Concept by run-local candidateKey, which the build
-// resolves to a published Concept identity and omits when the target is absent.
+// persisted source_block_id, heading path, and locator).
 export type BuildEvidencePassage = {
   sourceBlockId: string;
   evidenceQuote: string;
@@ -585,9 +572,7 @@ export type BuildEvidencePassage = {
   locator: SourceLocator;
 };
 
-export type BuildTypedAssertion =
-  | { type: "defines"; literalValue: string; evidence: BuildEvidencePassage[] }
-  | { type: "explicit-prerequisite-hint"; objectCandidateKey: string; evidence: BuildEvidencePassage[] };
+export type BuildTypedAssertion = { type: "defines"; literalValue: string; evidence: BuildEvidencePassage[] };
 
 export type BuildEvidenceProfile = {
   candidateKey: string;
@@ -812,10 +797,8 @@ export type RescueDisposition = {
 
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
 // meaning-bearing definition passages, bounded salience-ordered mention passages,
-// and LABELED optional typed assertions. An `explicit-prerequisite-hint` appears
-// here as labeled evidence the neural judge MAY weigh — never a deterministic edge,
-// numeric prior, or direction override (KTD). The exhaustive same-domain design
-// (ADR-0019 reset) removed contextual-embedding clustering and candidate groups.
+// and LABELED `defines` assertions. The exhaustive same-domain design (ADR-0019
+// reset) removed contextual-embedding clustering and candidate groups.
 export type PrerequisiteConceptContext = {
   conceptId: string;
   canonicalLabel: string;
