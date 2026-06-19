@@ -14,6 +14,15 @@ export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
 export { generateCardBank, type CardBankGenerationResult, type RejectedCard } from "./generateCardBank";
+export {
+  buildCalibrationSet,
+  propagateSelfReport,
+  appendSelfReportBatch,
+  SELF_REPORT_EVIDENCE_WEIGHT,
+  PROPAGATED_SELF_REPORT_EVIDENCE_WEIGHT,
+  type CalibrationItem,
+  type SelfReportInput
+} from "./calibration";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,
