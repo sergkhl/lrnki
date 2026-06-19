@@ -257,23 +257,21 @@ export const conceptCoreSelectionValidator = z.object({
 
 // --- CEP Extraction: submit_concept_evidence_profile ----------------------
 // One Concept Evidence Profile for the subject Concept: meaning-bearing definition
-// passages, salience-ordered mention passages, and zero or more optional typed
-// assertions. Only `defines` (literal) and `explicit-prerequisite-hint` (admitted
-// Concept) are typed; every other relationship is an untyped mention passage.
+// passages, salience-ordered mention passages, and zero or more optional `defines`
+// assertions. Every concept-to-concept relationship is an untyped mention passage.
 
 const optionalTypedAssertionSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "objectKind", "objectCandidateKey", "literalValue", "evidence"],
+  required: ["type", "objectKind", "literalValue", "evidence"],
   properties: {
     type: {
       type: "string",
-      enum: ["defines", "explicit-prerequisite-hint"],
-      description: "'defines' = the evidence defines the subject (objectKind=literal, literalValue set). 'explicit-prerequisite-hint' = the evidence EXPLICITLY states the subject must be understood before another ADMITTED concept (objectKind=concept, objectCandidateKey set)."
+      enum: ["defines"],
+      description: "'defines' = the evidence defines the subject (objectKind=literal, literalValue set)."
     },
-    objectKind: { type: "string", enum: ["literal", "concept"] },
-    objectCandidateKey: { type: ["string", "null"], description: "For explicit-prerequisite-hint: the candidateKey of an ADMITTED concept the subject is needed before. Null for defines." },
-    literalValue: { type: ["string", "null"], description: "For defines: a faithful, concise definition grounded in the evidence quote. Null for explicit-prerequisite-hint." },
+    objectKind: { type: "string", enum: ["literal"] },
+    literalValue: { type: ["string", "null"], description: "A faithful, concise definition grounded in the evidence quote." },
     evidence: { type: "array", items: blockEvidenceSchema }
   }
 };
@@ -295,7 +293,7 @@ export const conceptEvidenceProfileSchema: JsonSchema = {
     },
     assertions: {
       type: "array",
-      description: "Optional typed assertions. Emit only when the evidence explicitly supports a definition literal or an explicit prerequisite hint to an admitted concept. Everything else belongs in mentions.",
+      description: "Optional `defines` assertions. Emit only when the evidence explicitly supports a definition literal. Everything else belongs in mentions.",
       items: optionalTypedAssertionSchema
     }
   }
@@ -305,9 +303,8 @@ export const conceptEvidenceProfileValidator = z.object({
   definitions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
   mentions: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()),
   assertions: z.array(z.object({
-    type: z.enum(["defines", "explicit-prerequisite-hint"]),
-    objectKind: z.enum(["literal", "concept"]),
-    objectCandidateKey: z.string().nullable(),
+    type: z.enum(["defines"]),
+    objectKind: z.enum(["literal"]),
     literalValue: z.string().nullable(),
     evidence: z.array(z.object({ blockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
   }).strict())
@@ -442,76 +439,33 @@ export const missingPrerequisiteProposalValidator = z.object({
   }).strict())
 }).strict();
 
-// --- Densification bridge proposal: submit_bridge_concepts ----------------
-// Experiment-only node-identity operation: for one sparse-region gap, propose a
-// concept that can help a learner bridge the two endpoint concepts. It returns
-// labels only; grounding and edge direction are handled by separate ports/stages.
+// --- Intrinsic difficulty judgment: submit_intrinsic_difficulty ----------
+// One bounded learner-neutral difficulty judgment over a derived node's evidence.
+// The score is later fused with deterministic graph/evidence components; this
+// schema captures only the neural subscore and a short rationale. The rubric text
+// stays domain-neutral and contains no fixture-derived exemplars (AGENTS rule 17).
 
-export const bridgeConceptProposalSchema: JsonSchema = {
+export const intrinsicDifficultySchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["proposals"],
+  required: ["neuralScore", "rationale"],
   properties: {
-    proposals: {
-      type: "array",
+    neuralScore: {
+      type: "number",
+      minimum: 0,
+      maximum: 1,
       description:
-        "Bridge concepts that may help a learner connect the two endpoint concepts in a sparse prerequisite graph. Return an empty array when no useful bridge is warranted.",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["proposedLabel", "rationale"],
-        properties: {
-          proposedLabel: {
-            type: "string",
-            description: "Precise, domain-qualified label for one bridge concept. Do not repeat either endpoint or an existing node label."
-          },
-          rationale: {
-            type: "string",
-            description: "One terse sentence explaining how the bridge concept connects the two endpoints for learning."
-          }
-        }
-      }
+        "Learner-neutral intrinsic difficulty in [0,1], based on abstraction level, technical density, implied background load, and how much the evidence requires integrating multiple ideas."
+    },
+    rationale: {
+      type: "string",
+      description: "One terse sentence explaining the generic difficulty factors that drove the score."
     }
   }
 };
 
-export const bridgeConceptProposalValidator = z.object({
-  proposals: z.array(z.object({
-    proposedLabel: z.string().min(1),
-    rationale: z.string().min(1)
-  }).strict())
-}).strict();
-
-// --- Assertion entailment judgment: submit_assertion_entailment_judgment --
-// One bounded judgment over a single optional typed assertion (ADR-0007 reset).
-// For an explicit-prerequisite-hint the model decides whether the verbatim
-// evidence EXPLICITLY states the subject is needed before the object concept.
-// `entailingSpan` is the minimal sub-quote that carries the assertion; the
-// application boundary fails closed to entailed:false when it is not a substring
-// of any provided quote.
-
-export const assertionEntailmentJudgmentSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["entailed", "entailingSpan", "rationale"],
-  properties: {
-    entailed: {
-      type: "boolean",
-      description:
-        "True only if the quoted evidence actually asserts the stated assertion between the two named concepts. False for unrelated, wrongly-directed, or merely-co-mentioned pairs."
-    },
-    entailingSpan: {
-      type: "string",
-      description:
-        "The minimal verbatim sub-quote (copied exactly from one of the provided quotes) that carries the assertion. Empty string when entailed is false."
-    },
-    rationale: { type: "string", description: "One terse sentence grounded in the quoted evidence." }
-  }
-};
-
-export const assertionEntailmentJudgmentValidator = z.object({
-  entailed: z.boolean(),
-  entailingSpan: z.string(),
+export const intrinsicDifficultyValidator = z.object({
+  neuralScore: z.number().min(0).max(1),
   rationale: z.string().min(1)
 }).strict();
 

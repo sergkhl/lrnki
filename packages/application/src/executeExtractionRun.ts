@@ -1,5 +1,4 @@
 import {
-  CORE_DEMOTED_UNGROUNDABLE_REASON,
   DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG,
   selectEvidenceNeighborhood,
   type ArtifactEnvelope,
@@ -17,11 +16,11 @@ import type {
   ConceptDiscoveryPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
-import { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
-import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
+import { admitSource } from "./admitSource";
 import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 import { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 import { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
+import { reconcileUngroundableCores } from "./reconcileUngroundableCores";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.5.0";
@@ -61,43 +60,17 @@ export async function executeExtractionRun(input: {
   const discovered = await input.discovery.discover({ document, declaredDomain });
 
   // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
-  // Admission may SPLIT one discovered Candidate into several atomic proposals
-  // (R13). Each proposal names its parent Candidate plus a run-local atomicKey.
-  // Fail closed: an atom whose parent is unknown, or whose atomicKey collides with
-  // another atom, is dropped before policy so it can never publish a core Concept.
+  // `admitSource` owns the whole-source admission decision: fail-closed cross-atom
+  // resolution (R13 split atoms), the deterministic per-atom boundary, and the neural
+  // concept-vs-proposition downgrade (ADR-0005). Tier reconciliation against CEP
+  // completeness runs AFTER extraction (`reconcileUngroundableCores`).
   const admissionProposals = await input.admission.admit({ document, declaredDomain, candidates: discovered });
-  const discoveredKeys = new Set(discovered.map((candidate) => candidate.candidateKey));
-  const atomicKeyCounts = new Map<string, number>();
-  for (const proposal of admissionProposals) {
-    atomicKeyCounts.set(proposal.atomicKey, (atomicKeyCounts.get(proposal.atomicKey) ?? 0) + 1);
-  }
-  const proposalsByParent = new Map<string, typeof admissionProposals>();
-  for (const proposal of admissionProposals) {
-    if (!discoveredKeys.has(proposal.parentCandidateKey)) continue; // unknown parent: drop
-    if (atomicKeyCounts.get(proposal.atomicKey) !== 1) continue; // duplicate atomic key: drop
-    const group = proposalsByParent.get(proposal.parentCandidateKey) ?? [];
-    group.push(proposal);
-    proposalsByParent.set(proposal.parentCandidateKey, group);
-  }
-
-  const policyCandidates: RunCandidate[] = [];
-  for (const candidate of discovered) {
-    const group = proposalsByParent.get(candidate.candidateKey) ?? [];
-    if (group.length === 0) {
-      policyCandidates.push(applyAdmissionPolicy({ parentCandidate: candidate, blockText }));
-      continue;
-    }
-    for (const proposal of group) {
-      policyCandidates.push(applyAdmissionPolicy({ parentCandidate: candidate, proposal, blockText }));
-    }
-  }
-
-  // Concept-vs-proposition admission judge (ADR-0005). Downgrade-only neural stage
-  // after the deterministic boundary; preserves recall on judge failure.
-  const candidates = await applyAdmissionLabelJudge({
-    candidates: policyCandidates,
+  const candidates = await admitSource({
+    discovered,
+    admissionProposals,
+    blockText,
     declaredDomain,
-    judge: input.admissionLabelJudge
+    labelJudge: input.admissionLabelJudge
   });
 
   // CEPs are extracted for every admitted core or optional proposal when possible.
@@ -159,8 +132,10 @@ export async function executeExtractionRun(input: {
     judge: input.assertionEntailmentJudge
   });
 
-  const demotedCoreCount = demoteUngroundableCores({ candidates, evidenceProfiles, coreKeys });
-  const remainingCoreCount = candidates.filter((candidate) => candidate.admission.tier === "core").length;
+  // Post-CEP tier reconciliation: a core whose CEP came back incomplete is demoted to
+  // optional. Pure/immutable, so `admission.tier` has a single writer in this phase.
+  const reconciled = reconcileUngroundableCores({ candidates, evidenceProfiles, coreKeys });
+  const remainingCoreCount = reconciled.candidates.filter((candidate) => candidate.admission.tier === "core").length;
 
   const runResult: ExtractionRunResult = {
     runId: input.runId,
@@ -169,11 +144,11 @@ export async function executeExtractionRun(input: {
     declaredDomain,
     pipelineConfigHash: input.pipelineConfigHash,
     maxMentionsPerConceptPerSource,
-    candidates,
-    evidenceProfiles,
+    candidates: reconciled.candidates,
+    evidenceProfiles: reconciled.evidenceProfiles,
     qualityIssues: [],
     status: "succeeded",
-    degraded: demotedCoreCount > 0 && remainingCoreCount === 0,
+    degraded: reconciled.demotedCoreCount > 0 && remainingCoreCount === 0,
     latencyMs: Date.now() - startedAt
   };
   runResult.qualityIssues = detectExtractionQualityIssues(runResult);
@@ -194,34 +169,6 @@ export async function executeExtractionRun(input: {
   // transaction (R: no authoritative relational state without its artifact).
   await input.store.persist(runResult, artifact);
   return runResult;
-}
-
-function demoteUngroundableCores(input: {
-  candidates: RunCandidate[];
-  evidenceProfiles: RunEvidenceProfile[];
-  coreKeys: Set<string>;
-}): number {
-  const profilesByKey = new Map(input.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
-  const candidatesByKey = new Map(input.candidates.map((candidate) => [candidate.candidateKey, candidate] as const));
-  let demotedCount = 0;
-
-  for (const key of input.coreKeys) {
-    const profile = profilesByKey.get(key);
-    if (profile?.complete) continue;
-
-    const candidate = candidatesByKey.get(key);
-    if (candidate) {
-      candidate.admission.tier = "optional";
-      if (!candidate.admission.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON)) {
-        candidate.admission.boundaryReasonCodes.push(CORE_DEMOTED_UNGROUNDABLE_REASON);
-      }
-    }
-    if (profile) {
-      profile.tier = "optional";
-    }
-    demotedCount += 1;
-  }
-  return demotedCount;
 }
 
 function exactAliases(candidate: RunCandidate): string[] {

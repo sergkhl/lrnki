@@ -13,7 +13,6 @@
   "dependencies": {
     "@lrnki/domain-core": "workspace:*",
     "@lrnki/ports": "workspace:*",
-    "drizzle-orm": "catalog:",
     "postgres": "catalog:"
   },
   "devDependencies": {

@@ -9,7 +9,7 @@ import type {
 import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
 
-// Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep densification
+// Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep minting
 // bounded so a thin source cannot explode into a runaway derived graph; both knobs
 // belong to the enrichment configuration so changing them re-derives the layer.
 export type EnrichmentMintingBounds = {

@@ -53,7 +53,7 @@ A verbatim source passage that substantively mentions a Concept, kept in neural 
 _Avoid_: claim, asserted relation
 
 **Optional Typed Assertion**:
-One of exactly two guarded CEP evidence types — `defines` (object is a literal) or `explicit-prerequisite-hint` (object is another admitted Concept). Both require verbatim evidence and assertion entailment, and both remain evidence inside a CEP, never an authoritative edge or a numeric prior.
+The single guarded CEP evidence type, `defines`, whose object is a literal definition. It requires verbatim evidence and assertion entailment, and remains evidence inside a CEP, never an authoritative edge or a numeric prior. The former prerequisite hint assertion was measured redundant against exhaustive enrichment and removed.
 _Avoid_: relation registry, asserted relation, edge
 
 **Declared Domain**:
@@ -81,7 +81,7 @@ The deterministic, domain-scoped normalized-label process that decides whether C
 _Avoid_: embedding merge, identity clustering
 
 **Graph Enrichment**:
-The operation that derives learner-neutral graph facts not asserted by a source from one published graph version, by judging every same-domain Concept-Evidence-Profile pair exhaustively.
+The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and judges every same-domain pair exhaustively over anchors and those nodes to derive `inferred-prerequisite-of` edges. (Decision: ADR-0019.)
 _Avoid_: graph mutation, Static Graph Refinement, embedding blocking
 
 **Enrichment Run**:
@@ -114,7 +114,7 @@ A learner-specific account of mastery consumed by projection and never stored in
 ## Flagged Ambiguities
 
 - "Refinement" is ambiguous. Use **Static Graph Refinement** for asserted graph assembly and CEP-evidence union, and **Graph Enrichment** for inferred prerequisite facts.
-- "Prerequisite" is ambiguous. An **Optional Typed Assertion** (`explicit-prerequisite-hint`) is CEP evidence inside the asserted layer; an `inferred-prerequisite-of` edge is a derived fact owned only by a Derived Graph Layer. The two names must never collide.
+- "Prerequisite" belongs to the Derived Graph Layer. An `inferred-prerequisite-of` edge is a derived fact owned only by Graph Enrichment; source prose that implies prerequisites remains CEP mention evidence.
 - "Quarantine" means an unresolved identity or meaning conflict that blocks publication. A cross-domain homograph is flagged, not quarantined.
 
 ## Example Dialogue

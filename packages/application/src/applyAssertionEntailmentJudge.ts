@@ -3,9 +3,9 @@ import type { AssertionEntailmentJudgmentPort } from "@lrnki/ports";
 
 // Composed semantic-entailment stage for optional typed assertions (ADR-0007
 // reset). Runs AFTER the deterministic `applyEvidenceProfilePolicy`. Each surviving
-// `defines` or `explicit-prerequisite-hint` assertion already cleared the verbatim
-// floor; here the independent judge re-checks, per assertion, whether the evidence
-// ACTUALLY states the definition / prerequisite hint. The judge can only REJECT:
+// `defines` assertion already cleared the verbatim floor; here the independent
+// judge re-checks, per assertion, whether the evidence ACTUALLY states the
+// definition. The judge can only REJECT:
 // a rejected assertion is dropped but its underlying verified passage is preserved
 // as an untyped mention (R: never lose grounded evidence). Definition and mention
 // passages are NOT judged — they face the deterministic floor alone. Fail closed:
@@ -55,21 +55,10 @@ async function judgeAssertion(
 ): Promise<boolean> {
   const evidenceQuotes = assertion.evidence.map((item) => item.evidenceQuote);
   try {
-    if (assertion.type === "defines") {
-      const judgment = await input.judge.judgeDefinition({
-        declaredDomain: input.declaredDomain,
-        subject,
-        definition: assertion.literalValue,
-        evidenceQuotes
-      });
-      return judgment.entailed;
-    }
-    const object = input.conceptsByKey.get(assertion.objectCandidateKey);
-    if (!object) return false; // unjudgeable endpoint: fail closed
-    const judgment = await input.judge.judgePrerequisiteHint({
+    const judgment = await input.judge.judgeDefinition({
       declaredDomain: input.declaredDomain,
       subject,
-      object,
+      definition: assertion.literalValue,
       evidenceQuotes
     });
     return judgment.entailed;

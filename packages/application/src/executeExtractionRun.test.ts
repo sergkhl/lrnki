@@ -21,8 +21,7 @@ import { executeExtractionRun } from "./executeExtractionRun";
 // applyAssertionEntailmentJudge.test.ts.
 const entailEverything: AssertionEntailmentJudgmentPort = {
   model: "test-judge",
-  judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" }),
-  judgePrerequisiteHint: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
+  judgeDefinition: async () => ({ entailed: true, entailingSpan: "", rationale: "test" })
 };
 
 // Default admission judge calls every label a concept, so candidates stay core and
@@ -457,25 +456,8 @@ test("splits one conflated candidate into independently-tiered atomic concepts r
   assert.equal(core[0].parentCandidateKey, "stack_heap");
   assert.equal(optional[0].candidateKey, "stack_heap__heap");
   assert.equal(optional[0].parentCandidateKey, "stack_heap");
-  // Both core and optional atoms receive a CEP.
+  // Both core and optional atoms receive a CEP — confirms the orchestrator wires
+  // admitSource through to CEP extraction. The fail-closed cross-atom invariants
+  // (duplicate atomic keys, unknown parent) are unit-tested in admitSource.test.ts.
   assert.equal(result.evidenceProfiles.length, 2);
-});
-
-test("drops duplicate atomic keys fail-closed so neither publishes a core concept", async () => {
-  const result = await runSplit([
-    atom("dup", "The stack", "The stack stores values in order"),
-    atom("dup", "The heap", "the heap stores data of unknown size")
-  ]);
-  assert.equal(result.candidates.filter((c) => c.admission.tier === "core").length, 0);
-  assert.ok(result.candidates.every((c) => c.candidateKey !== "dup" || c.admission.tier === "reject"));
-});
-
-test("drops an atom whose parent candidate is unknown", async () => {
-  const orphan: AdmissionProposal = { ...atom("orphan", "The stack", "The stack stores values in order"), parentCandidateKey: "does-not-exist" };
-  const result = await runSplit([
-    atom("stack_heap__stack", "The stack", "The stack stores values in order"),
-    orphan
-  ]);
-  assert.equal(result.candidates.some((c) => c.candidateKey === "orphan"), false);
-  assert.equal(result.candidates.filter((c) => c.admission.tier === "core").length, 1);
 });

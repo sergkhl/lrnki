@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import type { GraphSnapshot, PublishedEvidencePassage, PublishedTypedAssertion } from "@lrnki/domain-core";
 import { ArrowUpRightIcon, FocusIcon, NetworkIcon, SearchIcon } from "lucide-react";
 import {
-  conceptLabel,
   filterConcepts,
   groupPassagesBySource,
   profileFor,
@@ -70,7 +69,7 @@ function PassageList({ title, passages }: Readonly<{ title: string; passages: Pu
   );
 }
 
-function AssertionList({ snapshot, assertions }: Readonly<{ snapshot: GraphSnapshot; assertions: PublishedTypedAssertion[] }>) {
+function AssertionList({ assertions }: Readonly<{ assertions: PublishedTypedAssertion[] }>) {
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
@@ -86,7 +85,7 @@ function AssertionList({ snapshot, assertions }: Readonly<{ snapshot: GraphSnaps
               <p className="text-sm">
                 <Badge variant="outline">{assertion.type}</Badge>{" "}
                 <span className="font-medium">
-                  {assertion.type === "defines" ? assertion.literalValue : conceptLabel(snapshot, assertion.objectConceptId)}
+                  {assertion.literalValue}
                 </span>
               </p>
               {assertion.evidence.map((passage, evidenceIndex) => (
@@ -217,7 +216,7 @@ export function GraphExplorer({ snapshot, live }: GraphExplorerProps) {
                 <Separator />
                 <PassageList title="Definition passages" passages={selectedProfile.definitions} />
                 <PassageList title="Mention passages" passages={selectedProfile.mentions} />
-                <AssertionList snapshot={snapshot} assertions={selectedProfile.assertions} />
+                <AssertionList assertions={selectedProfile.assertions} />
               </div>
             </ScrollArea>
           ) : (

@@ -170,35 +170,6 @@ test("identical evidence from one source is deduplicated; distinct quotes are ke
   assert.equal(cep.mentions.length, 2, "distinct mentions retained");
 });
 
-test("a prerequisite-hint to a published Concept is kept; one to an absent target is omitted (U4.9 / AE1)", async () => {
-  const run = runForBuild({
-    coreCandidates: [
-      { candidateKey: "borrowing", canonicalLabel: "Borrowing", normalizedLabel: "borrowing", aliases: [] },
-      { candidateKey: "ownership", canonicalLabel: "Ownership", normalizedLabel: "ownership", aliases: [] }
-    ],
-    evidenceProfiles: [
-      profile("borrowing", {
-        assertions: [
-          // target is a published core Concept -> kept
-          { type: "explicit-prerequisite-hint", objectCandidateKey: "ownership", evidence: [{ sourceBlockId: "blk", evidenceQuote: "Understand ownership before borrowing.", headingPath: ["A"], locator: {} }] },
-          // target is not admitted/published -> omitted
-          { type: "explicit-prerequisite-hint", objectCandidateKey: "lifetimes", evidence: [{ sourceBlockId: "blk", evidenceQuote: "Lifetimes come later.", headingPath: ["A"], locator: {} }] }
-        ]
-      }),
-      profile("ownership")
-    ]
-  });
-  const { runStore, graphStore } = fakes([run]);
-
-  const snapshot = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore });
-  const ownershipId = snapshot.concepts.find((c) => c.normalizedLabel === "ownership")!.conceptId;
-  const borrowingCep = snapshot.evidenceProfiles.find((p) => p.conceptId === snapshot.concepts.find((c) => c.normalizedLabel === "borrowing")!.conceptId)!;
-  assert.equal(borrowingCep.assertions.length, 1, "only the published-target hint survives");
-  const hint = borrowingCep.assertions[0];
-  assert.equal(hint.type, "explicit-prerequisite-hint");
-  assert.equal(hint.type === "explicit-prerequisite-hint" ? hint.objectConceptId : "", ownershipId, "hint target remapped to published conceptId");
-});
-
 test("buildGraphVersion fails when the named base version is not published", async () => {
   const { runStore, graphStore } = fakes([runForBuild()]);
   await assert.rejects(

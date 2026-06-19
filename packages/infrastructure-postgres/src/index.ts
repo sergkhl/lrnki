@@ -1,4 +1,3 @@
-export * from "./schema";
 export { createDatabaseClient } from "./db";
 export {
   PostgresSourceRegistrationStore,

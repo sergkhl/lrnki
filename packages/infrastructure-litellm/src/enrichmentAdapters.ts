@@ -27,10 +27,7 @@ export const PREREQUISITE_JUDGE_MODEL = "kg-prerequisite-judgment";
 export const GENERATED_PREREQUISITE_JUDGE_MODEL = "kg-generated-prerequisite-judgment";
 
 // Render one Concept's published CEP for the judge: its label, aliases, verbatim
-// definition and mention quotes, and LABELED optional typed assertions. An
-// explicit-prerequisite-hint is presented as labeled evidence the judge MAY weigh
-// (R11, KTD) — never a directive — so it appears in the same evidence block as the
-// rest of the CEP rather than as a separate instruction.
+// definition and mention quotes, and LABELED `defines` assertions.
 function renderConcept(side: "A" | "B", context: PrerequisiteConceptContext): string {
   const lines = [
     `Concept ${side}: "${context.canonicalLabel}"${context.aliases.length ? ` (aka ${context.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
@@ -72,7 +69,6 @@ export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentP
       "You judge LEARNING PREREQUISITE order between two domain concepts for a learner-neutral concept graph.",
       "Concept X is a prerequisite of concept Y when a learner must understand X before they can understand Y.",
       "Decide from the concepts' meanings and the cited source evidence ONLY. Do not invent relations the evidence and meanings do not support.",
-      "An 'explicit-prerequisite-hint' is one piece of labeled evidence you MAY weigh; it is never decisive on its own and never overrides your own reading of the definitions and mentions.",
       "Be conservative and precision-first:",
       "- Return relation 'none' when neither concept must be understood before the other (they are siblings, alternatives, or merely related).",
       "- Return relation 'uncertain' when a prerequisite relation is plausible but the direction is not clearly established. 'uncertain' is flagged for human review and excluded from learner paths, so prefer it over guessing a direction.",

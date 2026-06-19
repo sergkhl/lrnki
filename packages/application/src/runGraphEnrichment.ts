@@ -2,6 +2,7 @@ import type {
   AnchorProjectionNode,
   DerivedGraphLayer,
   DerivedGraphNode,
+  DifficultyNodeContext,
   EnrichmentNode,
   EnrichmentRunTrace,
   GroundingVerbatimDisposition,
@@ -46,7 +47,7 @@ export type GraphEnrichmentConfig = {
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  enrichmentConfigHash: "cep-node-enrichment-rescue-judged-v2",
+  enrichmentConfigHash: "intrinsic-difficulty-v3",
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
   maxMentionsPerConceptInPair: 6,
@@ -62,8 +63,8 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
 // routed to a CROSS-FAMILY judge (R13) so the DeepSeek self-loop cannot grade its own
 // minted output, while anchor/anchor and anchor/source_mentioned pairs stay on the
 // validated DeepSeek judge. The symbolic helpers dispose (weak-edge cut -> cycle
-// removal -> transitive reduction); difficulty is the dag-depth mock over ALL derived
-// nodes. The asserted core is never touched (R5): no enrichment node is ever
+// removal -> transitive reduction); intrinsic difficulty scores ALL derived nodes
+// from the same evidence contexts. The asserted core is never touched (R5): no enrichment node is ever
 // published. Node minting + rescue are OPT-IN — when the proposal/grounding ports are
 // omitted the run is anchor-only (the pre-node-minting behavior). Fails the run
 // WITHOUT persistence if any pair exhausts the forced-tool retry budget.
@@ -95,7 +96,6 @@ export async function runGraphEnrichment(input: {
   const concepts = snapshot.concepts;
   const newNodeId = input.newNodeId ?? randomUUID;
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
-  const labelByConcept = new Map(concepts.map((concept) => [concept.conceptId, concept.canonicalLabel] as const));
 
   // Anchors: a per-run projection of the asserted snapshot (KTD2). Identity is the
   // frozen conceptId; nothing here mutates the asserted layer (R5).
@@ -158,7 +158,16 @@ export async function runGraphEnrichment(input: {
     derivedNodeId: node.derivedNodeId,
     declaredDomain: node.declaredDomain,
     groundingOrigin: node.groundingOrigin,
-    context: contextOf(node, profileByConcept, labelByConcept, config.maxMentionsPerConceptInPair)
+    context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair)
+  }));
+  const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
+    conceptId: node.derivedNodeId,
+    canonicalLabel: node.context.canonicalLabel,
+    aliases: node.context.aliases,
+    declaredDomain: node.declaredDomain,
+    groundingOrigin: node.groundingOrigin,
+    definitions: node.context.definitions,
+    mentions: node.context.mentions
   }));
   type PairingNode = (typeof pairingNodes)[number];
 
@@ -219,9 +228,9 @@ export async function runGraphEnrichment(input: {
   const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(acyclicEdges);
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
-  // Step 5 — baseline difficulty over the reduced DAG (mock behind the port). Scores
-  // ALL derived node ids — anchors AND enrichment nodes (R12, handoff constraint).
-  const difficulties = await input.difficulty.score({ nodeIds: allNodes.map((node) => node.derivedNodeId), prerequisiteEdges: reducedEdges });
+  // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
+  // — anchors AND enrichment nodes (R12, handoff constraint).
+  const difficulties = await input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges });
 
   const layer: DerivedGraphLayer = {
     enrichmentId: input.enrichmentId,
@@ -312,30 +321,26 @@ function sameDomainPairs<T extends { derivedNodeId: string; declaredDomain: stri
 }
 
 // Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor
-// uses its published CEP (verbatim definition + bounded mention quotes + LABELED typed
-// assertions, the hint resolved to a canonical label). A `source_mentioned` node has
+// uses its published CEP (verbatim definition + bounded mention quotes + LABELED
+// `defines` assertions). A `source_mentioned` node has
 // no definition — only verbatim mention quotes. A `llm_grounded` node uses its
 // generated definition/mention text (exempt from the verbatim floor, U6). The bare
 // label is never the evidence — an empty context is treated as insufficient upstream.
 function contextOf(
   node: DerivedGraphNode,
   profileByConcept: Map<string, PublishedConceptEvidenceProfile>,
-  labelByConcept: Map<string, string>,
   maxMentions: number
 ): PrerequisiteConceptContext {
   if (node.nodeKind === "anchor") {
     const profile = profileByConcept.get(node.conceptId);
+    const publishedAssertions = profile?.assertions ?? [];
     return {
       conceptId: node.derivedNodeId,
       canonicalLabel: node.canonicalLabel,
       aliases: node.aliases,
       definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
       mentions: (profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote),
-      assertions: (profile?.assertions ?? []).map((assertion) =>
-        assertion.type === "defines"
-          ? { type: assertion.type, detail: assertion.literalValue }
-          : { type: assertion.type, detail: labelByConcept.get(assertion.objectConceptId) ?? assertion.objectConceptId }
-      )
+      assertions: publishedAssertions.map((assertion) => ({ type: assertion.type, detail: assertion.literalValue }))
     };
   }
   if (node.groundingOrigin === "source_mentioned") {

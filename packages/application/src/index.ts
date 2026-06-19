@@ -1,5 +1,7 @@
 export { executeExtractionRun, DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE } from "./executeExtractionRun";
 export { buildGraphVersion } from "./buildGraphVersion";
+export { admitSource } from "./admitSource";
+export { reconcileUngroundableCores } from "./reconcileUngroundableCores";
 export { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 export { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
 export { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
@@ -7,27 +9,11 @@ export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
-export {
-  detectSparseRegions,
-  connectivityMetrics,
-  DEFAULT_SPARSE_REGION_BOUNDS,
-  type CandidateBridgeGap,
-  type ConnectivityMetrics,
-  type DeclinedPairDisposition,
-  type SparseRegionBounds,
-  type SparseRegionDetectionResult
-} from "./sparseRegionDetection";
-export {
-  runDensificationExperiment,
-  DEFAULT_DENSIFICATION_EXPERIMENT_CONFIG,
-  type DensificationBridgeRecord,
-  type DensificationExperimentConfig,
-  type DensificationExperimentResult
-} from "./runDensificationExperiment";
 export {
   cutWeakEdges,
   removeCycles,
@@ -35,6 +21,5 @@ export {
   topologicalDepth,
   topologicalOrder,
   prerequisiteAncestors,
-  dagDepthDifficulty,
-  dagDepthDifficultyPort
+  dagDepthDifficulty
 } from "./prerequisiteDag";

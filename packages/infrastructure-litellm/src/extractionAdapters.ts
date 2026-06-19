@@ -22,8 +22,6 @@ import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
-  assertionEntailmentJudgmentSchema,
-  assertionEntailmentJudgmentValidator,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidator,
   conceptCoreSelectionSchemaForCandidateKeys,
@@ -294,24 +292,15 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
       "A profile has three parts: definition passages, mention passages, and optional typed assertions. Every passage is a VERBATIM quote copied exactly from a cited block. No verbatim quote, no passage.",
       "DEFINITION PASSAGES: one or more verbatim passages that establish what the subject concept MEANS. A definition passage need NOT use a literal 'X is Y' form — apposition ('—a discrepancy known as the generalization gap'), a 'means'/'refers to'/'known as' construction, or any meaning-bearing sentence qualifies, as long as the passage conveys the concept's meaning. A bare repetition of the concept's own name, a section heading, or a title is NOT a definition passage — it conveys no meaning; quote the sentence that actually explains the concept instead. Include at least one; a concept the source never gives meaning to does not belong here.",
       "MENTION PASSAGES: verbatim passages where the source substantively teaches, applies, structures, contrasts, or constrains the concept — its taxonomy, parts, mechanisms it uses, what it is distinguished from, what it depends on. This is where ordinary concept-to-concept relationships live; they are NOT typed. ORDER the mentions from MOST to LEAST useful for understanding the concept and what must be learned before it. The application keeps the most salient few, so put the strongest passages first.",
-      "OPTIONAL TYPED ASSERTIONS — emit ONLY when the evidence explicitly supports one; otherwise leave assertions empty and keep the passage as a mention:",
+      "OPTIONAL TYPED ASSERTIONS — emit ONLY when the evidence explicitly supports the definition literal; otherwise leave assertions empty and keep the passage as a mention:",
       "- 'defines': set objectKind='literal' and literalValue to a faithful, concise definition GROUNDED IN the evidence quote (you may smooth wording, resolve apposition, or normalise order, but add no meaning the quote does not support). Attach the verbatim evidence.",
-      "- 'explicit-prerequisite-hint': set objectKind='concept' and objectCandidateKey to an ADMITTED concept that the source EXPLICITLY states must be understood before the subject. Mere topical ordering or co-mention is NOT a prerequisite hint. Attach the verbatim evidence naming both concepts.",
       "Do NOT invent assertion types. Taxonomy, part-of, uses, and contrast relationships are mention passages, not assertions.",
-      "Reference admitted concepts only by the candidateKeys listed. Never assert a prerequisite hint to a concept that is not admitted.",
       "Every definition, mention, and assertion evidence quote must be copied verbatim from a cited block."
     ].join("\n");
-    const admitted = input.admittedConcepts
-      .filter((concept) => concept.candidateKey !== input.subject.candidateKey)
-      .map((concept) => `- ${concept.candidateKey}: "${concept.canonicalLabel}" (exact aliases: ${renderAliases(concept.aliases)})`)
-      .join("\n");
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
       `Subject concept: ${input.subject.candidateKey} = "${input.subject.canonicalLabel}".`,
       `Subject exact aliases: ${renderAliases(input.subject.aliases)}.`,
-      "Other admitted concepts (valid targets for an explicit-prerequisite-hint):",
-      admitted || "(none)",
-      "",
       "Evidence blocks (quote verbatim from these):",
       renderBlocks(input.evidenceNeighborhood, { adjacencyBlocks: extractableBlocks(input.document.blocks) }),
       "",
@@ -339,17 +328,11 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
       validator: conceptEvidenceProfileValidator
     });
 
-    const admittedKeys = new Set(input.admittedConcepts.map((concept) => concept.candidateKey));
     const assertions: ExtractedTypedAssertion[] = [];
     for (const assertion of result.assertions) {
       if (assertion.type === "defines") {
         if (assertion.literalValue === null || assertion.literalValue.trim() === "") continue;
         assertions.push({ type: "defines", literalValue: assertion.literalValue, evidence: assertion.evidence });
-      } else {
-        // explicit-prerequisite-hint must target a distinct admitted concept.
-        if (!assertion.objectCandidateKey || assertion.objectCandidateKey === input.subject.candidateKey) continue;
-        if (!admittedKeys.has(assertion.objectCandidateKey)) continue;
-        assertions.push({ type: "explicit-prerequisite-hint", objectCandidateKey: assertion.objectCandidateKey, evidence: assertion.evidence });
       }
     }
 
@@ -362,9 +345,8 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
 }
 
 // Assertion-entailment judge (ADR-0007 reset). Mirrors the prerequisite-judgment
-// adapter: forced named tool, temp 0, one bounded judgment per OPTIONAL typed
-// assertion. It guards only the two assertion shapes — `judgePrerequisiteHint` for
-// an explicit-prerequisite-hint, `judgeDefinition` for a `defines` literal. Fail
+// adapter: forced named tool, temp 0, one bounded judgment per `defines`
+// assertion. Fail
 // closed: an ungrounded `entailingSpan` is treated as not-entailed so the judge
 // cannot "support" an assertion with text absent from the cited evidence. Grounding
 // uses the same formatting-noise normalization as the deterministic evidence floor.
@@ -372,44 +354,6 @@ export class LiteLlmAssertionEntailmentJudgmentAdapter implements AssertionEntai
   readonly model: string;
   constructor(private readonly client: LiteLlmForcedToolClient, model: string = ASSERTION_ENTAILMENT_JUDGE_MODEL) {
     this.model = model;
-  }
-
-  async judgePrerequisiteHint(input: {
-    declaredDomain: string;
-    subject: { canonicalLabel: string; aliases: string[] };
-    object: { canonicalLabel: string; aliases: string[] };
-    evidenceQuotes: string[];
-  }): Promise<AssertionEntailmentJudgment> {
-    const system = [
-      "You judge whether quoted source evidence EXPLICITLY states that one domain concept must be understood BEFORE another, for a learner-neutral concept graph.",
-      "The evidence quotes are already verified verbatim from the source. Judge ONLY what the quotes assert — do not use outside knowledge to fill gaps.",
-      "Real prose asserts prerequisites through pronouns, apposition, and synonym phrasing ('requires', 'builds on', 'before you can', 'depends on understanding'); do not require a fixed surface phrasing. Judge meaning, not wording.",
-      "Be precision-first. Return entailed=false when the quotes only co-mention the concepts, merely order topics, or state a non-prerequisite relation.",
-      "The hint has a fixed direction: the SUBJECT is the prerequisite of the OBJECT. A prerequisite stated in the REVERSE direction is NOT entailed.",
-      "When entailed=true, copy the minimal exact sub-quote that carries the prerequisite into entailingSpan; it must be a verbatim substring of one provided quote. When entailed=false, return an empty entailingSpan."
-    ].join("\n");
-    const user = [
-      `Declared domain: ${input.declaredDomain}.`,
-      `Subject (claimed prerequisite): "${input.subject.canonicalLabel}" (aliases: ${renderAliases(input.subject.aliases)}).`,
-      `Object (claimed dependent): "${input.object.canonicalLabel}" (aliases: ${renderAliases(input.object.aliases)}).`,
-      `Claimed hint: understanding ${input.subject.canonicalLabel} is needed before ${input.object.canonicalLabel}.`,
-      "",
-      "Verbatim evidence quotes:",
-      ...input.evidenceQuotes.map((quote, index) => `[${index + 1}] "${quote}"`),
-      "",
-      "Call submit_assertion_entailment_judgment: does the evidence explicitly state the subject is needed before the object?"
-    ].join("\n");
-
-    const result = await this.client.call({
-      model: this.model,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_assertion_entailment_judgment",
-      toolDescription: "Submit whether the verbatim evidence entails the explicit prerequisite hint in the claimed direction.",
-      parameters: assertionEntailmentJudgmentSchema,
-      validator: assertionEntailmentJudgmentValidator
-    });
-
-    return groundedJudgment(result, input.evidenceQuotes);
   }
 
   // Definition entailment for a `defines` literal. The literal is model-authored

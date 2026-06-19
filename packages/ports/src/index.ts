@@ -4,8 +4,8 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
-  BridgeConceptProposal,
   ConceptDifficulty,
+  DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
   EnrichmentRunTrace,
@@ -44,9 +44,8 @@ export interface ConceptAdmissionPort {
 
 // Concept-conditioned Concept Evidence Profile extraction (ADR-0007 reset). For
 // ONE admitted subject Concept, return meaning-bearing definition passages, a
-// salience-ordered set of mention passages, and zero or more optional typed
-// assertions (`defines` literal, `explicit-prerequisite-hint` to an admitted
-// Concept). Replaces broad claim extraction: there is no retry, no recall
+// salience-ordered set of mention passages, and zero or more `defines` assertions.
+// Replaces broad claim extraction: there is no retry, no recall
 // feedback, and no missing-concept escape hatch (R7). The application boundary
 // validates membership, verbatim grounding, deduplication, definition
 // completeness, and the configured mention bound.
@@ -70,24 +69,17 @@ export interface ConceptConditionedEvidenceProfileExtractionPort {
 // Assertion-entailment judge (ADR-0007 reset). A bounded, forced-tool LLM judgment
 // over ONE optional typed assertion whose evidence already verifies verbatim, run
 // on an independent model family so the judge is not the extractor grading its own
-// homework. It guards ONLY the two optional typed assertions; definition and
-// mention passages face the deterministic verbatim floor alone. It can only
+// homework. It guards ONLY `defines` assertions; definition and mention passages
+// face the deterministic verbatim floor alone. It can only
 // REJECT: a rejected assertion's underlying passage is preserved as an untyped
 // mention. `judgeDefinition` checks a `defines` literal (a model paraphrase no
-// surface matcher can verify); `judgePrerequisiteHint` checks whether the evidence
-// explicitly flags the subject as needed before the object Concept.
+// surface matcher can verify).
 export interface AssertionEntailmentJudgmentPort {
   readonly model: string;
   judgeDefinition(input: {
     declaredDomain: string;
     subject: { canonicalLabel: string; aliases: string[] };
     definition: string;
-    evidenceQuotes: string[]; // already verbatim-verified against cited blocks
-  }): Promise<AssertionEntailmentJudgment>;
-  judgePrerequisiteHint(input: {
-    declaredDomain: string;
-    subject: { canonicalLabel: string; aliases: string[] };
-    object: { canonicalLabel: string; aliases: string[] };
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
   }): Promise<AssertionEntailmentJudgment>;
 }
@@ -194,16 +186,14 @@ export interface SourceObjectStoragePort {
 
 // ---------------------------------------------------------------------------
 // Graph Enrichment ports (ADR-0019). The third operation: LLM proposes, symbolic
-// machinery disposes, over one published graph version. Mocked stages sit behind
-// REAL ports so Bradley-Terry / IRT-KT drop in later with no upstream change.
+// machinery disposes, over one published graph version. Difficulty is now
+// learner-neutral intrinsic; learner-calibrated IRT/BT remains data-blocked.
 // ---------------------------------------------------------------------------
 
 // Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
 // reset). Every same-domain CEP pair is judged exhaustively — there is no
 // embedding clustering or candidate-group gate. Each side carries its published
-// CEP (definitions, bounded mentions, labeled typed assertions); an
-// explicit-prerequisite-hint is labeled evidence the judge MAY weigh, never a
-// deterministic edge or direction override (R11, KTD). Forced named tool schema;
+// CEP (definitions, bounded mentions, labeled `defines` assertions). Forced named tool schema;
 // the application validates arguments and maps "uncertain" to a flagged,
 // path-excluded edge. The judge proposes; cycle removal + transitive reduction
 // dispose.
@@ -245,31 +235,31 @@ export interface MissingPrerequisiteProposalPort {
   }): Promise<MissingPrerequisiteProposal[]>;
 }
 
-export interface BridgeConceptProposalPort {
+// Intrinsic difficulty judge (ADR-0024). A bounded, forced-tool neural judgment
+// over ONE derived node's evidence, run through an independent judge alias. It
+// estimates learner-neutral intrinsic difficulty from generic signals such as
+// abstraction level, technical density, and implied background load. The adapter
+// validates tool arguments fail-closed; fusion with graph structure happens in
+// the application layer.
+export interface IntrinsicDifficultyJudgmentPort {
   readonly model: string;
-  propose(input: {
-    declaredDomain: string;
-    gap: {
-      a: { conceptId: string; canonicalLabel: string; groundingTexts: string[] };
-      b: { conceptId: string; canonicalLabel: string; groundingTexts: string[] };
-      declinedRationale: string;
-    };
-    existingNodeLabels: string[];
-    maxProposals: number;
-  }): Promise<BridgeConceptProposal[]>;
+  judge(input: DifficultyNodeContext): Promise<{ neuralScore: number; rationale: string }>;
 }
 
-// Baseline node difficulty (ADR-0019). MVP impl = deterministic DAG-depth mock
-// behind this port; Bradley-Terry pairwise calibration replaces the impl without
-// changing the port. Reads concepts + the inferred prereq DAG; one score each.
+// Node difficulty (ADR-0019). The current production direction is
+// learner-neutral intrinsic difficulty: neural source-grounded judgment fused
+// with deterministic graph/evidence components. Learner-calibrated IRT/BT stays
+// deferred until learner-response data exists. Reads concepts + the inferred
+// prereq DAG; one score each.
 export interface DifficultyPort {
   readonly method: string;
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
   // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
   // nodes are never fabricated into `Concept` values to satisfy the port (handoff
-  // constraint). `nodeIds` are `derived_node_id`s; the returned `conceptId` field
-  // carries the derived node id (the difficulty store keys on derived_node_id).
-  score(input: { nodeIds: string[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
+  // constraint). `nodes[].conceptId` values are `derived_node_id`s; the returned
+  // `conceptId` field carries the derived node id (the difficulty store keys on
+  // derived_node_id).
+  score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock

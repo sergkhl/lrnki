@@ -191,13 +191,11 @@ export async function buildGraphVersion(input: {
 
   // --- CEP evidence union (R3, AE2): base evidence + new runs, deduped ------
   // Accumulator per published Concept. Definition and mention passages are
-  // deduplicated by (source, block, quote); typed assertions are keyed by
-  // (type, target) and their evidence merged. A prerequisite hint whose target is
-  // not a published Concept in this version is omitted (R9, test U4.9).
+  // deduplicated by (source, block, quote); `defines` assertions are keyed by
+  // literal value and their evidence merged.
   type AssertionAcc = {
     type: PublishedTypedAssertion["type"];
     literalValue?: string;
-    objectConceptId?: string;
     evidence: Map<string, PublishedEvidencePassage>;
   };
   type ProfileAcc = {
@@ -232,10 +230,8 @@ export async function buildGraphVersion(input: {
     for (const definition of profile.definitions) addPassage(acc.definitions, acc.sources, definition);
     for (const mention of profile.mentions) addPassage(acc.mentions, acc.sources, mention);
     for (const assertion of profile.assertions) {
-      const assertionKey = assertion.type === "defines" ? `defines|${assertion.literalValue}` : `hint|${assertion.objectConceptId}`;
-      const existing = acc.assertions.get(assertionKey) ?? (assertion.type === "defines"
-        ? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() }
-        : { type: "explicit-prerequisite-hint" as const, objectConceptId: assertion.objectConceptId, evidence: new Map() });
+      const assertionKey = `defines|${assertion.literalValue}`;
+      const existing = acc.assertions.get(assertionKey) ?? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() };
       for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, passage);
       acc.assertions.set(assertionKey, existing);
     }
@@ -258,29 +254,10 @@ export async function buildGraphVersion(input: {
       for (const definition of profile.definitions) addPassage(acc.definitions, acc.sources, toPublishedPassage(run.sourceResourceId, definition));
       for (const mention of profile.mentions) addPassage(acc.mentions, acc.sources, toPublishedPassage(run.sourceResourceId, mention));
       for (const assertion of profile.assertions) {
-        if (assertion.type === "defines") {
-          const assertionKey = `defines|${assertion.literalValue}`;
-          const existing = acc.assertions.get(assertionKey) ?? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() };
-          for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, toPublishedPassage(run.sourceResourceId, passage));
-          acc.assertions.set(assertionKey, existing);
-        } else {
-          const targetIdentity = candidateIdentity.get(runCandidateKey(run.runId, assertion.objectCandidateKey));
-          const targetConcept = targetIdentity ? conceptByIdentity.get(targetIdentity) : undefined;
-          if (!targetConcept) {
-            refinementDecisions.push({
-              decisionType: "omitted_prerequisite_hint",
-              subject: { subjectConceptId: concept.conceptId, objectCandidateKey: assertion.objectCandidateKey },
-              outcome: "omitted",
-              rationale: "Prerequisite-hint target is not a published Concept in this graph version (R9).",
-              provenance: { runId: run.runId, candidateKey: profile.candidateKey }
-            });
-            continue;
-          }
-          const assertionKey = `hint|${targetConcept.conceptId}`;
-          const existing = acc.assertions.get(assertionKey) ?? { type: "explicit-prerequisite-hint" as const, objectConceptId: targetConcept.conceptId, evidence: new Map() };
-          for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, toPublishedPassage(run.sourceResourceId, passage));
-          acc.assertions.set(assertionKey, existing);
-        }
+        const assertionKey = `defines|${assertion.literalValue}`;
+        const existing = acc.assertions.get(assertionKey) ?? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() };
+        for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, toPublishedPassage(run.sourceResourceId, passage));
+        acc.assertions.set(assertionKey, existing);
       }
     }
   }
@@ -295,11 +272,11 @@ export async function buildGraphVersion(input: {
 
   const evidenceProfiles: PublishedConceptEvidenceProfile[] = concepts.map((concept) => {
     const acc = accByConcept.get(concept.conceptId);
-    const assertions: PublishedTypedAssertion[] = [...(acc?.assertions.values() ?? [])].map((assertion) =>
-      assertion.type === "defines"
-        ? { type: "defines", literalValue: assertion.literalValue!, evidence: [...assertion.evidence.values()] }
-        : { type: "explicit-prerequisite-hint", objectConceptId: assertion.objectConceptId!, evidence: [...assertion.evidence.values()] }
-    );
+    const assertions: PublishedTypedAssertion[] = [...(acc?.assertions.values() ?? [])].map((assertion) => ({
+      type: "defines",
+      literalValue: assertion.literalValue!,
+      evidence: [...assertion.evidence.values()]
+    }));
     return {
       conceptId: concept.conceptId,
       definitions: [...(acc?.definitions.values() ?? [])],

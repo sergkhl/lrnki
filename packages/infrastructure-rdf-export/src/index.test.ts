@@ -15,7 +15,7 @@ const snapshot: GraphSnapshot = {
     { conceptId: "c2", iri: "https://lrnki.local/concept/limit", canonicalLabel: "Limit", normalizedLabel: "limit", declaredDomain: "mathematics", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }
   ],
   evidenceProfiles: [
-    { conceptId: "c1", definitions: [{ sourceResourceId: "s1", sourceBlockId: "b1", evidenceQuote: "A derivative measures change.", headingPath: [], locator: {} }], mentions: [], assertions: [{ type: "explicit-prerequisite-hint", objectConceptId: "c2", evidence: [{ sourceResourceId: "s1", sourceBlockId: "b2", evidenceQuote: "defined as a limit", headingPath: [], locator: {} }] }] },
+    { conceptId: "c1", definitions: [{ sourceResourceId: "s1", sourceBlockId: "b1", evidenceQuote: "A derivative measures change.", headingPath: [], locator: {} }], mentions: [{ sourceResourceId: "s1", sourceBlockId: "b2", evidenceQuote: "defined as a limit", headingPath: [], locator: {} }], assertions: [] },
     { conceptId: "c2", definitions: [{ sourceResourceId: "s1", sourceBlockId: "b3", evidenceQuote: "A limit is a value approached.", headingPath: [], locator: {} }], mentions: [], assertions: [] }
   ]
 };

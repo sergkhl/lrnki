@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type {
   AnchorProjectionNode,
   DerivedGraphLayer,
+  DifficultyNodeContext,
   EnrichmentRunTrace,
   GraphSnapshot,
   PrerequisiteConceptContext,
@@ -14,7 +15,7 @@ import type {
   GraphVersionStorePort,
   PrerequisiteJudgmentPort
 } from "@lrnki/ports";
-import { runGraphEnrichment } from "./runGraphEnrichment";
+import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment } from "./runGraphEnrichment";
 
 // Two Declared Domains: "x" has 3 concepts, "y" has 2. Prerequisites are always
 // same-domain (ADR-0015), so the exhaustive judge (ADR-0019 reset) must see
@@ -39,8 +40,7 @@ function passage(blockId: string, quote: string) {
   return { sourceResourceId: "s1", sourceBlockId: blockId, evidenceQuote: quote, headingPath: ["X"], locator: {} };
 }
 
-// cx1 carries an explicit-prerequisite-hint at cx2 (labeled evidence the judge MAY
-// weigh, never a directive) and a multi-mention CEP so the bound is observable.
+// cx1 carries a `defines` assertion and a multi-mention CEP so the bound is observable.
 const snapshot: GraphSnapshot = {
   graphVersionId: "v1",
   baseGraphVersionId: null,
@@ -65,7 +65,6 @@ const snapshot: GraphSnapshot = {
         passage("b8", "mention seven")
       ],
       assertions: [
-        { type: "explicit-prerequisite-hint", objectConceptId: "cx2", evidence: [passage("b9", "understand X One before X Two")] },
         { type: "defines", literalValue: "the first X concept", evidence: [passage("b1", "X One is the definition of X One")] }
       ]
     },
@@ -87,9 +86,8 @@ const snapshot: GraphSnapshot = {
 
 type JudgeFn = (input: { declaredDomain: string; a: PrerequisiteConceptContext; b: PrerequisiteConceptContext }) => PrerequisiteJudgment | Promise<PrerequisiteJudgment>;
 
-// Default mock: directs the cx1/cx2 pair the OPPOSITE way the hint suggests
-// (cx2->cx1) to prove the judge — not the hint — decides direction; cx1/cx3 is a
-// plain directed edge; cx2/cx3 is uncertain; cy1/cy2 is none (dropped).
+// Default mock: directs cx2->cx1, cx1/cx3 is a plain directed edge, cx2/cx3 is
+// uncertain, and cy1/cy2 is none (dropped).
 const defaultJudge: JudgeFn = (input) => {
   const labels = [input.a.canonicalLabel, input.b.canonicalLabel];
   const j = (p: string, d: string, outcome: PrerequisiteJudgment["outcome"], confidence: number): PrerequisiteJudgment =>
@@ -127,9 +125,9 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
     }
   };
   const difficulty: DifficultyPort = {
-    method: "dag-depth-mock",
-    async score({ nodeIds }) {
-      return nodeIds.map((id) => ({ conceptId: id, score: 0, method: "dag-depth-mock", components: {} }));
+    method: "intrinsic-fused-v1",
+    async score({ nodes }) {
+      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0, method: "intrinsic-fused-v1", components: {} }));
     }
   };
   let persisted: DerivedGraphLayer | undefined;
@@ -198,11 +196,7 @@ test("runGraphEnrichment passes both Concepts' CEPs to the judge with bounded me
   // Default bound of six mentions is applied even though the CEP holds seven.
   assert.equal(cx1.mentions.length, 6);
   assert.deepEqual(cx1.mentions, ["mention one", "mention two", "mention three", "mention four", "mention five", "mention six"]);
-  // The explicit-prerequisite-hint is surfaced as labeled evidence with the TARGET
-  // concept resolved to its canonical label (not an opaque id), and `defines`
-  // surfaces its literal.
   assert.deepEqual(cx1.assertions, [
-    { type: "explicit-prerequisite-hint", detail: "X Two" },
     { type: "defines", detail: "the first X concept" }
   ]);
   assert.deepEqual(cx1.aliases, ["XOne"]);
@@ -226,9 +220,9 @@ test("runGraphEnrichment honors a non-default mention bound and preserves neural
   assert.deepEqual(cx1.mentions, ["mention one", "mention two"]);
 });
 
-// Scenario 4 + 5: the judge's verdict — not the hint — sets direction; 'none' is
-// dropped; 'uncertain' is retained flagged and path-excluded; directed survives.
-test("runGraphEnrichment follows the judge over the hint, drops 'none', flags 'uncertain'", async () => {
+// Scenario 4 + 5: the judge's verdict sets direction; 'none' is dropped;
+// 'uncertain' is retained flagged and path-excluded; directed survives.
+test("runGraphEnrichment follows the judge, drops 'none', flags 'uncertain'", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
   const idByConceptId = new Map(
@@ -241,7 +235,7 @@ test("runGraphEnrichment follows the judge over the hint, drops 'none', flags 'u
   const cx3 = idByConceptId.get("cx3") ?? "";
   const cy1 = idByConceptId.get("cy1") ?? "";
 
-  // cx1 hinted cx1->cx2, but the judge returned cx2->cx1: the edge follows the judge.
+  // The edge follows the judge.
   assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx2 && e.dependentConceptId === cx1 && !e.uncertain));
   assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx1 && e.dependentConceptId === cx2));
   // plain directed edge survives.
@@ -290,12 +284,33 @@ test("anchor derived node ids are per enrichment run, while concept ids stay sta
   assert.notEqual(firstAnchor.derivedNodeId, secondAnchor.derivedNodeId);
 });
 
-// Scenario 7: difficulty stays the dag-depth mock over the reduced DAG.
-test("runGraphEnrichment scores difficulty with the dag-depth mock", async () => {
+// Scenario 7: difficulty receives per-node evidence contexts over all derived nodes.
+test("runGraphEnrichment scores intrinsic difficulty with per-node evidence contexts", async () => {
+  const scoredInputs: DifficultyNodeContext[][] = [];
   const ports = buildPorts();
+  ports.difficulty = {
+    method: "intrinsic-fused-v1",
+    async score({ nodes }) {
+      scoredInputs.push(nodes);
+      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 } }));
+    }
+  };
   const layer = await run(ports);
   assert.equal(layer.difficulties.length, 5);
-  assert.ok(layer.difficulties.every((d) => d.method === "dag-depth-mock"));
+  assert.ok(layer.difficulties.every((d) => d.method === "intrinsic-fused-v1"));
+  assert.equal(scoredInputs.length, 1);
+  assert.equal(scoredInputs[0].length, layer.derivedNodes.length);
+  const xOne = scoredInputs[0].find((node) => node.canonicalLabel === "X One");
+  assert.ok(xOne);
+  assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
+});
+
+test("runGraphEnrichment default config hash reflects intrinsic difficulty", async () => {
+  const ports = buildPorts();
+  const layer = await run(ports);
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "intrinsic-difficulty-v3");
+  assert.equal(layer.enrichmentConfigHash, "intrinsic-difficulty-v3");
+  assert.notEqual(layer.enrichmentConfigHash, "cep-node-enrichment-rescue-judged-v2");
 });
 
 // Scenario 3: a concept pair with no CEP evidence cannot reach the judge and fails
@@ -368,7 +383,7 @@ import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrereq
 import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
 
 // A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
-// densify it with a rescued node and a minted node.
+// expand it with a rescued node and a minted node.
 const sparseSnapshot: GraphSnapshot = {
   graphVersionId: "v1",
   baseGraphVersionId: null,
@@ -413,7 +428,12 @@ function buildNodePorts(options: {
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
     async getPublishedSnapshot(id) { return id === sparseSnapshot.graphVersionId ? sparseSnapshot : undefined; }
   };
-  const difficulty: DifficultyPort = { method: "dag-depth-mock", async score({ nodeIds }) { return nodeIds.map((id) => ({ conceptId: id, score: 0, method: "dag-depth-mock", components: {} })); } };
+  const difficulty: DifficultyPort = {
+    method: "intrinsic-fused-v1",
+    async score({ nodes }) {
+      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0, method: "intrinsic-fused-v1", components: {} }));
+    }
+  };
   const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {
     async persist(input) { persisted = input.layer; },
     async mentionedNonCoreCandidates() { return options.rescue ?? []; }
