@@ -6,6 +6,7 @@ import type {
   LearnerStatePort
 } from "@lrnki/ports";
 import { projectLearnerPath } from "./learnerPathProjection";
+import { projectAdaptivePath } from "./adaptivePathProjection";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.5.0";
@@ -25,6 +26,10 @@ export async function computeLearnerPath(input: {
   pathStore: LearnerPathStorePort;
   artifacts: ArtifactRepositoryPort;
   masteryThreshold?: number;
+  // Adaptive frontier advancement (U6, R13): re-select the target as the hardest
+  // ready unmastered node before projecting. Default false keeps the mock path's
+  // behavior (project to the given target) byte-for-byte unchanged.
+  frontierAdvance?: boolean;
 }): Promise<LearnerPath> {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`computeLearnerPath: enrichment ${input.enrichmentId} not found.`);
@@ -32,21 +37,34 @@ export async function computeLearnerPath(input: {
     throw new Error(`computeLearnerPath: target ${input.targetConceptId} is not in enrichment ${input.enrichmentId}.`);
   }
 
-  const steps = projectLearnerPath({
-    targetConceptId: input.targetConceptId,
-    prerequisiteEdges: layer.prerequisiteEdges,
-    difficulties: layer.difficulties,
-    learnerState: input.learnerState,
-    masteryThreshold: input.masteryThreshold
-  });
+  // The frontier wrapper re-selects the target; the non-adaptive path projects to the
+  // given target. Either way the pure projection core is unchanged (R13).
+  const projected = input.frontierAdvance
+    ? projectAdaptivePath({
+        targetNodeId: input.targetConceptId,
+        prerequisiteEdges: layer.prerequisiteEdges,
+        difficulties: layer.difficulties,
+        learnerState: input.learnerState,
+        masteryThreshold: input.masteryThreshold
+      })
+    : {
+        targetNodeId: input.targetConceptId,
+        steps: projectLearnerPath({
+          targetConceptId: input.targetConceptId,
+          prerequisiteEdges: layer.prerequisiteEdges,
+          difficulties: layer.difficulties,
+          learnerState: input.learnerState,
+          masteryThreshold: input.masteryThreshold
+        })
+      };
 
   const path: LearnerPath = {
     learnerPathId: input.learnerPathId,
     graphVersionId: layer.graphVersionId,
     enrichmentId: layer.enrichmentId,
-    targetConceptId: input.targetConceptId,
+    targetConceptId: projected.targetNodeId,
     learnerStateRef: input.learnerState.learnerStateRef,
-    steps
+    steps: projected.steps
   };
 
   await input.pathStore.persist(path);

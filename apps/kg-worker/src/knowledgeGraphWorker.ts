@@ -8,6 +8,8 @@ import {
   emptyLearnerState,
   executeExtractionRun,
   generateCardBank,
+  loadResponseLogLearnerState,
+  ADAPTIVE_MASTERY_THRESHOLD,
   runGraphEnrichment
 } from "@lrnki/application";
 import {
@@ -310,6 +312,49 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   }
 }
 
+async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string, learnerStateRef?: string) {
+  if (!enrichmentId || !targetConceptId || !learnerStateRef) {
+    console.error("! compute-adaptive-path requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
+    process.exitCode = 1;
+    return;
+  }
+  // Build the log-backed LearnerStatePort (U6): resolve each anchor concept_id to its
+  // derived_node_id in THIS enrichment so the fold keys match the projection space.
+  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
+  if (!layer) {
+    console.error(`! enrichment ${enrichmentId} not found.`);
+    process.exitCode = 1;
+    return;
+  }
+  const nodeByConcept = new Map<string, string>();
+  for (const node of layer.derivedNodes) {
+    if (node.nodeKind === "anchor") nodeByConcept.set(node.conceptId, node.derivedNodeId);
+  }
+  const learnerState = await loadResponseLogLearnerState({
+    responseLog: ctx.responseLogStore,
+    learnerStateRef,
+    conceptToNodeResolver: (conceptId) => nodeByConcept.get(conceptId)
+  });
+
+  const learnerPathId = randomUUID();
+  console.log(`\n>> adaptive path ${learnerPathId} for goal ${targetConceptId} / learner ${learnerStateRef} (threshold=${ADAPTIVE_MASTERY_THRESHOLD})`);
+  const path = await computeLearnerPath({
+    learnerPathId,
+    enrichmentId,
+    targetConceptId,
+    enrichmentStore: ctx.enrichmentStore,
+    learnerState,
+    pathStore: ctx.pathStore,
+    artifacts: ctx.artifacts,
+    masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD,
+    frontierAdvance: true
+  });
+  console.log(`   advancedTarget=${path.targetConceptId} learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
+  for (const step of path.steps) {
+    console.log(`   #${step.position} [${step.includedReason}] ${step.conceptId} (difficulty=${step.difficulty.toFixed(2)})`);
+  }
+}
+
 async function generateCardsCommand(ctx: Context, graphVersionId?: string) {
   // Card Bank generation (U2): published version + its CEPs -> one learner-neutral
   // card per anchor Concept. Default to the latest published version when none named.
@@ -370,11 +415,14 @@ async function main() {
       case "generate-cards":
         await generateCardsCommand(ctx, arg);
         break;
+      case "compute-adaptive-path":
+        await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
+        break;
       case "list-sources":
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | generate-cards [<graphVersionId>] | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | generate-cards [<graphVersionId>] | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

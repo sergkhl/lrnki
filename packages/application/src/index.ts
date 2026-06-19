@@ -24,6 +24,17 @@ export {
   type SelfReportInput
 } from "./calibration";
 export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
+export {
+  loadResponseLogLearnerState,
+  foldConceptMastery,
+  ratingToMastery,
+  outcomeToMastery
+} from "./responseLogLearnerState";
+export {
+  selectFrontierTarget,
+  projectAdaptivePath,
+  ADAPTIVE_MASTERY_THRESHOLD
+} from "./adaptivePathProjection";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,
