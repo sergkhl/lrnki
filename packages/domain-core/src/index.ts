@@ -926,3 +926,37 @@ export type LearnerPath = {
   learnerStateRef: string;
   steps: LearnerPathStep[];
 };
+
+// ---------------------------------------------------------------------------
+// Learner Recall Loop — Card Bank (R1–R3). A learner-NEUTRAL derived asset: one
+// anki-style card per published anchor Concept, conditioned on that Concept's
+// published CEP and keyed to the graph version the CEP belongs to. Regenerable
+// without affecting learner state; never written into the asserted graph or the
+// Derived Graph Layer (CONTEXT.md "Learner State", AGENTS rule 3). The two recall
+// modes read ONE card: calibration uses `selfReportPrompt`, measurement grades a
+// written answer against `answerKey` (Key Technical Decisions: one item, two
+// signal types).
+// ---------------------------------------------------------------------------
+
+// A verbatim citation from the card's answer-key into a published CEP passage,
+// mirroring the published-CEP passage shape so it verifies against
+// graph_version_evidence_passages (R2). `evidenceQuote` is a verbatim substring of
+// the cited source block; the application boundary verifies this fail-closed before
+// a card persists (U2, AGENTS rule 6).
+export type CardAnswerKeyCitation = {
+  sourceResourceId: string;
+  sourceBlockId: string;
+  evidenceQuote: string;
+};
+
+export type Card = {
+  cardId: string;
+  graphVersionId: string;
+  conceptId: string;
+  question: string;
+  answerKey: string;
+  selfReportPrompt: string;
+  citations: CardAnswerKeyCitation[];
+  generatingModel: string;
+  configHash: string;
+};

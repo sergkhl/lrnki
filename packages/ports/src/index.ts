@@ -4,6 +4,7 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
+  Card,
   ConceptDifficulty,
   DifficultyNodeContext,
   DerivedGraphLayer,
@@ -295,4 +296,21 @@ export interface EnrichmentRunStorePort {
 export interface LearnerPathStorePort {
   persist(path: LearnerPath): Promise<void>;
   getPath(input: { enrichmentId: string; targetConceptId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
+}
+
+// ---------------------------------------------------------------------------
+// Learner Recall Loop ports (R1–R16). Learner-neutral Card Bank plus the durable
+// append-only Response Log. All learner structures are projection-only: nothing
+// here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
+// ---------------------------------------------------------------------------
+
+// Card Bank persistence (R3). `persist` writes a whole version's cards atomically
+// AND its immutable `card_bank` artifact in one transaction (no authoritative
+// relational state without its artifact, matching the enrichment/extraction
+// stores). Regeneration replaces a version's cards (delete-then-insert) rather than
+// silently duplicating against the `(graph_version_id, concept_id)` unique key.
+export interface CardBankStorePort {
+  persist(cards: Card[]): Promise<void>;
+  getCard(graphVersionId: string, conceptId: string): Promise<Card | undefined>;
+  listCardsForVersion(graphVersionId: string): Promise<Card[]>;
 }

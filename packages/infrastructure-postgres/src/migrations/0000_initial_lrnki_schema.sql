@@ -396,6 +396,27 @@ JSON_TABLE(
 ) AS n
 WHERE a.artifact_type = 'enrichment_run.v2';
 
+-- Flatten card-bank artifact payloads: one row per learner-neutral Card with its
+-- concept, question, self-report prompt, and answer-key citation count, for Admin
+-- Lab inspection (R3, R15). Reads the immutable `card_bank` artifact the Card Bank
+-- store writes beside its normalized rows.
+CREATE VIEW artifact_cards AS
+SELECT a.graph_version_id, c.card_id, c.concept_id, c.question,
+       c.self_report_prompt, c.citation_count
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.cards[*]'
+  COLUMNS (
+    card_id text PATH '$.cardId',
+    concept_id text PATH '$.conceptId',
+    question text PATH '$.question',
+    self_report_prompt text PATH '$.selfReportPrompt',
+    citation_count integer PATH '$.citations.size()'
+  )
+) AS c
+WHERE a.artifact_type = 'card_bank.v2';
+
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
 -- version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
@@ -536,4 +557,38 @@ CREATE TABLE learner_path_steps (
   included_reason text NOT NULL CHECK (included_reason IN ('prerequisite', 'target')),
   UNIQUE (learner_path_id, position),
   UNIQUE (learner_path_id, derived_node_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Learner Recall Loop — learner-neutral Card Bank keyed to a published version
+-- (R1–R3). One card per published anchor Concept, conditioned on that Concept's
+-- CEP. Cards key on `graph_version_id` because the CEP they cite is per published
+-- version; the estimator resolves the asserted concept_id to the active
+-- enrichment's derived_node_id at fold time (KTD). Regenerable; never mutates the
+-- asserted core or the Derived Graph Layer.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE cards (
+  card_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  question text NOT NULL,
+  answer_key text NOT NULL,
+  self_report_prompt text NOT NULL,
+  generating_model text NOT NULL,
+  config_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (graph_version_id, concept_id)
+);
+
+-- Answer-key citations mirror the published-CEP passage shape so each verifies
+-- against graph_version_evidence_passages (R2). The application boundary checks
+-- `evidence_quote` is a verbatim substring of the cited block before persisting
+-- (U2). Cascade so card regeneration (delete-then-insert) clears citations too.
+CREATE TABLE card_answer_key_citations (
+  card_answer_key_citation_id uuid PRIMARY KEY,
+  card_id uuid NOT NULL REFERENCES cards(card_id) ON DELETE CASCADE,
+  source_resource_id uuid NOT NULL REFERENCES source_resources(source_resource_id),
+  source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
+  evidence_quote text NOT NULL
 );
