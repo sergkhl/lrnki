@@ -300,12 +300,21 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
     process.exitCode = 1;
     return;
   }
+  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
+  if (!layer) {
+    console.error(`! enrichment ${enrichmentId} not found.`);
+    process.exitCode = 1;
+    return;
+  }
+  const resolvedTargetId =
+    layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetConceptId)?.derivedNodeId ??
+    targetConceptId;
   const learnerPathId = randomUUID();
   console.log(`\n>> learner path ${learnerPathId} for target ${targetConceptId} from enrichment ${enrichmentId}`);
   const path = await computeLearnerPath({
     learnerPathId,
     enrichmentId,
-    targetConceptId,
+    targetConceptId: resolvedTargetId,
     enrichmentStore: ctx.enrichmentStore,
     learnerState: ctx.learnerState,
     pathStore: ctx.pathStore,

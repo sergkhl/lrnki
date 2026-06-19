@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
+    "@lrnki/application": "workspace:*",
     "@lrnki/domain-core": "workspace:*",
+    "@lrnki/infrastructure-litellm": "workspace:*",
     "@lrnki/infrastructure-postgres": "workspace:*",
     "@lrnki/ports": "workspace:*",
     "class-variance-authority": "catalog:",

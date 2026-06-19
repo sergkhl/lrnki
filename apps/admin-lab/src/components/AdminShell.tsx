@@ -5,6 +5,7 @@ import {
   DatabaseIcon,
   EyeIcon,
   GitForkIcon,
+  GraduationCapIcon,
   NetworkIcon,
   RouteIcon,
   SearchCodeIcon
@@ -34,7 +35,8 @@ const VIEWS = [
   { key: "runs", label: "Run Inspector", href: "/admin/lab/runs", icon: SearchCodeIcon },
   { key: "sources", label: "Source Explorer", href: "/admin/lab/sources", icon: DatabaseIcon },
   { key: "enrichments", label: "Enrichment Runs", href: "/admin/lab/enrichments", icon: NetworkIcon },
-  { key: "paths", label: "Learner Paths", href: "/admin/lab/paths", icon: RouteIcon }
+  { key: "paths", label: "Learner Paths", href: "/admin/lab/paths", icon: RouteIcon },
+  { key: "learner-loop", label: "Learner Loop", href: "/admin/lab/learner-loop", icon: GraduationCapIcon }
 ] as const;
 
 export type AdminView = (typeof VIEWS)[number]["key"];

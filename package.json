@@ -17,7 +17,7 @@
     "typecheck": "pnpm -r --sort --if-present run typecheck",
     "check": "pnpm run tmp:clean && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
-    "db:migrate": "pnpm --filter @lrnki/infrastructure-postgres db:migrate",
+    "db:migrate": "scripts/migrate-db.sh",
     "worker:kg": "pnpm --filter @lrnki/kg-worker worker:kg"
   },
   "devDependencies": {

@@ -6,8 +6,8 @@ by real mixed-domain pipeline output, not by deferred method-stack preference.
 ## TODO
 
 Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
-outputs: intrinsic difficulty is implemented and inspected at `EXPERIMENT_ONLY` trust, and a CEP
-definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighborhood run.
+outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
+`EXPERIMENT_ONLY` trust, and prior CEP definition-quality caveats remain visible in the mixed-domain run.
 
 1. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
@@ -20,7 +20,28 @@ definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighbor
    - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
      and the inspected newly included adjacent blocks were genuine explaining passages.
 
-2. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
+2. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
+   malformed JSON forced-tool argument during AIRA-dojo Markdown concept admission; rerunning the single source
+   succeeded. Keep fail-closed semantics, but improve retry observability and capture malformed tool-call snippets
+   safely enough to diagnose provider/schema drift without logging secrets or full copyrighted source context.
+
+3. **Improve card-bank inspection around citation exactness.** Persisted cards passed the project verifier
+   (`evidenceQuoteMatches`) 87/87, but only 68/87 citations were byte-exact substrings of source blocks because the
+   verifier intentionally tolerates parser formatting noise (markdown emphasis, curly quotes, line wrapping, HTML
+   entities). Admin/inspection surfaces should label this distinction clearly so operators do not confuse normalized
+   verifier success with exact copied text.
+
+4. **Make enrichment-only frontier targets teachable.** Adaptive paths can correctly advance to enrichment-only
+   prerequisites once anchor prerequisites are mastered, but those nodes currently have no card-backed response item.
+   Add an explicit design for generated/source-mentioned prerequisite cards or a UI treatment that explains why the
+   next frontier node is not directly recall-tested yet.
+
+5. **Broaden learner-loop target coverage after fixing card gaps.** The educational-technology target produced only
+   one graded row and no self-report rows because the selected neighborhood had little card-backed anchor coverage
+   and the `Prerequisite Relationships` card was rejected. After card coverage for thin neighborhoods improves, rerun
+   the learner-loop evaluation with at least two targets per domain.
+
+6. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
      densification, or non-LLM prerequisite signals from method-stack preference.
    - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
@@ -28,6 +49,15 @@ definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighbor
 
 ## COMPLETED
 
+- **Learner recall/adaptive path all-manifest rule-14 evaluation (2026-06-19).** Reset the dev DB, registered all six
+  manifest sources as-is (including raw PDF via Docling), ran real LiteLLM extraction over every source, published
+  graph version `6b2b0204-295c-41de-8ff4-a052fd6f4cad`, enriched it as
+  `68ab5958-a004-4374-b2d0-4202188aff91`, generated 39 persisted cards with 1 rejected card, seeded five synthetic
+  learner states, and computed baseline/adaptive paths. Classification: `EXPERIMENT_ONLY` because synthetic learner
+  behavior and the mastery fold are not calibrated, but the response log and adaptive projection are inspectable.
+  Evidence under `tmp/2026-06-19-learner-loop-eval/`. During the run, removed the unnecessary Drizzle migration
+  runner in favor of direct `psql` application of the single SQL migration, and fixed `compute-learner-path` so the
+  advertised concept-id target resolves to the active enrichment anchor node.
 - **Prerequisite hint assertion measured and removed (2026-06-19).** Added a disposable enrichment-context
   probe, ran a real LiteLLM A/B over mixed-domain graph version `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b`, then
   removed `explicit-prerequisite-hint` after the clean run showed an identical edge set: 13 certain edges with
@@ -119,7 +149,21 @@ definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighbor
 
 ## VALIDATION
 
-Latest validation (2026-06-19) is the **prerequisite hint A/B removal gate**
+Latest validation (2026-06-19) is the **learner recall/adaptive path all-manifest rule-14 evaluation**
+(`tmp/2026-06-19-learner-loop-eval/rule-14-evaluation.md`):
+
+- **Static/unit:** direct DB reset/migration succeeded through `scripts/reset-db.sh` using `psql`; the
+  `compute-learner-path` CLI concept-id fix was smoke-tested with graph version
+  `6b2b0204-295c-41de-8ff4-a052fd6f4cad` and enrichment `68ab5958-a004-4374-b2d0-4202188aff91`.
+- **Real-use:** all six manifest fixtures were registered and extracted with real model calls after one transient
+  malformed JSON tool-call failure was rerun successfully. Graph publication produced 40 concepts; enrichment
+  produced 40 anchors, 16 enrichment nodes, 61 certain edges, and 14 uncertain edges. Card generation produced 39
+  persisted cards, one rejected card, and 87/87 citations passing the project verifier.
+- **Inspection result:** `EXPERIMENT_ONLY`. The loop is usable for inspectable prototype behavior: response rows are
+  append-only, preserve `card_id` and `concept_id`, include both self-report and graded synthetic signals, and
+  adaptive paths prune/advance differently from empty baselines. It is not calibrated learner modeling.
+
+Prior latest validation (2026-06-19) was the **prerequisite hint A/B removal gate**
 (`docs/plans/2026-06-18-004-refactor-prerequisite-hint-measure-remove-plan.md`):
 
 - **Static/unit:** focused `pnpm --filter @lrnki/application test -- runGraphEnrichment` passed after the
