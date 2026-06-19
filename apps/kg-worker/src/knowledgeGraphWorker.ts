@@ -7,6 +7,7 @@ import {
   createIntrinsicDifficultyPort,
   emptyLearnerState,
   executeExtractionRun,
+  generateCardBank,
   runGraphEnrichment
 } from "@lrnki/application";
 import {
@@ -21,6 +22,7 @@ import {
   LiteLlmAssertionEntailmentJudgmentAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
+  LiteLlmCardGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmGroundingGenerationAdapter,
@@ -34,6 +36,7 @@ import {
   PostgresArtifactRepository,
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
+  PostgresCardBankStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
@@ -138,9 +141,17 @@ function buildContext() {
     difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
-    pathStore: new PostgresLearnerPathStore(sql)
+    pathStore: new PostgresLearnerPathStore(sql),
+    // Learner Recall Loop (U2): card generation stays DeepSeek-family (AGENTS rule 5);
+    // a cross-family judge grades learner answers against the key (U5). Deterministic
+    // decoding for stable re-derivation.
+    cardGeneration: new LiteLlmCardGenerationAdapter(deterministicClient),
+    cardBankStore: new PostgresCardBankStore(sql)
   };
 }
+
+// Card Bank configuration identity — bump when the card prompt/schema/model changes.
+const CARD_BANK_CONFIG_HASH = "card-bank-v1";
 
 type Context = ReturnType<typeof buildContext>;
 type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
@@ -293,6 +304,36 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   }
 }
 
+async function generateCardsCommand(ctx: Context, graphVersionId?: string) {
+  // Card Bank generation (U2): published version + its CEPs -> one learner-neutral
+  // card per anchor Concept. Default to the latest published version when none named.
+  let targetVersionId = graphVersionId;
+  if (!targetVersionId) {
+    const snapshot = await ctx.graphStore.getLatestPublishedSnapshot();
+    if (!snapshot) {
+      console.error("! no published graph version to generate cards for.");
+      process.exitCode = 1;
+      return;
+    }
+    targetVersionId = snapshot.graphVersionId;
+  }
+  console.log(`\n>> generating Card Bank for graph version ${targetVersionId}`);
+  const result = await generateCardBank({
+    graphVersionId: targetVersionId,
+    configHash: CARD_BANK_CONFIG_HASH,
+    graphStore: ctx.graphStore,
+    cardGeneration: ctx.cardGeneration,
+    cardBankStore: ctx.cardBankStore
+  });
+  console.log(`   cards=${result.cards.length} rejected=${result.rejected.length} model=${ctx.cardGeneration.model}`);
+  for (const card of result.cards) {
+    console.log(`   card[${card.conceptId}] citations=${card.citations.length}\n     Q: ${card.question}\n     A: ${card.answerKey}`);
+  }
+  for (const rejected of result.rejected) {
+    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.conceptId}): ${rejected.reason}`);
+  }
+}
+
 async function listSources(ctx: Context) {
   for (const source of await ctx.registrationStore.listSources()) {
     console.log(`${source.sourceResourceId}  [${source.declaredDomain}]  ${source.title}`);
@@ -320,11 +361,14 @@ async function main() {
       case "compute-learner-path":
         await computeLearnerPathCommand(ctx, arg, rest[0]);
         break;
+      case "generate-cards":
+        await generateCardsCommand(ctx, arg);
+        break;
       case "list-sources":
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | generate-cards [<graphVersionId>] | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

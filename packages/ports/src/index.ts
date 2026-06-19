@@ -5,6 +5,7 @@ import type {
   AssertionEntailmentJudgment,
   BlockEvidence,
   Card,
+  CardDraft,
   ConceptDifficulty,
   DifficultyNodeContext,
   DerivedGraphLayer,
@@ -313,4 +314,21 @@ export interface CardBankStorePort {
   persist(cards: Card[]): Promise<void>;
   getCard(graphVersionId: string, conceptId: string): Promise<Card | undefined>;
   listCardsForVersion(graphVersionId: string): Promise<Card[]>;
+}
+
+// Card generation (R1, R2). Forced named tool schema routed through LiteLLM; the
+// generator stays DeepSeek-family (AGENTS rule 5). Returns a pre-verification
+// CardDraft conditioned on ONE Concept's published CEP — the application boundary
+// verifies citations verbatim and resolves provenance before persisting (U2).
+export interface CardGenerationPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    concept: { conceptId: string; canonicalLabel: string; aliases: string[] };
+    // Published CEP passages the card may cite, identified by sourceBlockId. The
+    // application resolves sourceResourceId from these after verbatim verification.
+    cepPassages: { sourceBlockId: string; kind: "definition" | "mention"; evidenceQuote: string }[];
+    // The single guarded `defines` literal, when the CEP carries one (HINT only).
+    definesLiteral: string | null;
+  }): Promise<CardDraft>;
 }

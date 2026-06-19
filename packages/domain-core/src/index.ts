@@ -960,3 +960,15 @@ export type Card = {
   generatingModel: string;
   configHash: string;
 };
+
+// The model's PRE-verification card output (U2). The model cites CEP passages by
+// `sourceBlockId` + a quote; the application boundary verifies each quote verbatim
+// against the published CEP and resolves the `sourceResourceId` before promoting a
+// draft to a persisted Card (AGENTS rule 6 fail-closed). A draft whose citations do
+// not all verify is rejected, never silently kept.
+export type CardDraft = {
+  question: string;
+  answerKey: string;
+  selfReportPrompt: string;
+  citations: { sourceBlockId: string; evidenceQuote: string }[];
+};

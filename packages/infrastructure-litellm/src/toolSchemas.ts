@@ -573,3 +573,47 @@ export const rescueDurabilityJudgmentValidator = z.object({
   groundingSpan: z.string(),
   rationale: z.string().min(1)
 }).strict();
+
+// --- Card generation: submit_recall_card (U2, R1/R2) ----------------------
+// One anki-style recall card per published Concept, conditioned on its CEP. The
+// answer-key cites CEP passages by blockId + a verbatim quote; the application
+// boundary verifies each quote against the published CEP and rejects fail-closed
+// (AGENTS rule 6). Domain-neutral rubric language only (AGENTS rule 17).
+export const cardGenerationSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["question", "answerKey", "selfReportPrompt", "citations"],
+  properties: {
+    question: {
+      type: "string",
+      description: "One self-contained recall question about the concept that a learner could answer from understanding it. Do not reference 'the passage' or 'the source'."
+    },
+    answerKey: {
+      type: "string",
+      description: "A concise correct answer a grader can check a learner's free-form response against. Grounded in the provided CEP passages; introduce no facts absent from them."
+    },
+    selfReportPrompt: {
+      type: "string",
+      description: "A short first-person confidence prompt for calibration, e.g. 'How confident are you that you can explain this concept and its role?'."
+    },
+    citations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["sourceBlockId", "evidenceQuote"],
+        properties: {
+          sourceBlockId: { type: "string", description: "Exact id of one provided CEP passage block the answer derives from." },
+          evidenceQuote: { type: "string", description: "Verbatim substring copied from that CEP passage supporting the answer-key." }
+        }
+      }
+    }
+  }
+};
+
+export const cardGenerationValidator = z.object({
+  question: z.string().min(1),
+  answerKey: z.string().min(1),
+  selfReportPrompt: z.string().min(1),
+  citations: z.array(z.object({ sourceBlockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
+}).strict();
