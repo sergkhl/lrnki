@@ -27,14 +27,14 @@ export function selectFrontierTarget(input: {
   const threshold = input.masteryThreshold ?? ADAPTIVE_MASTERY_THRESHOLD;
   const excludeUncertain = input.excludeUncertain ?? true;
   const edges = excludeUncertain ? input.prerequisiteEdges.filter((edge) => !edge.uncertain) : input.prerequisiteEdges;
-  const difficultyOf = new Map(input.difficulties.map((difficulty) => [difficulty.conceptId, difficulty.score] as const));
+  const difficultyOf = new Map(input.difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty.score] as const));
 
   const scope = prerequisiteAncestors(input.targetNodeId, edges);
   scope.add(input.targetNodeId);
 
   const directPrerequisitesOf = new Map<string, string[]>();
   for (const edge of edges) {
-    directPrerequisitesOf.set(edge.dependentConceptId, [...(directPrerequisitesOf.get(edge.dependentConceptId) ?? []), edge.prerequisiteConceptId]);
+    directPrerequisitesOf.set(edge.dependentDerivedNodeId, [...(directPrerequisitesOf.get(edge.dependentDerivedNodeId) ?? []), edge.prerequisiteDerivedNodeId]);
   }
 
   const isMastered = (nodeId: string): boolean => input.learnerState.mastery(nodeId) >= threshold;
@@ -62,7 +62,7 @@ export function projectAdaptivePath(input: {
   const masteryThreshold = input.masteryThreshold ?? ADAPTIVE_MASTERY_THRESHOLD;
   const frontierTarget = selectFrontierTarget({ ...input, masteryThreshold });
   const steps = projectLearnerPath({
-    targetConceptId: frontierTarget,
+    targetDerivedNodeId: frontierTarget,
     prerequisiteEdges: input.prerequisiteEdges,
     difficulties: input.difficulties,
     learnerState: input.learnerState,

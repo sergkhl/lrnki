@@ -91,12 +91,12 @@ type JudgeFn = (input: { declaredDomain: string; a: PrerequisiteConceptContext; 
 const defaultJudge: JudgeFn = (input) => {
   const labels = [input.a.canonicalLabel, input.b.canonicalLabel];
   const j = (p: string, d: string, outcome: PrerequisiteJudgment["outcome"], confidence: number): PrerequisiteJudgment =>
-    ({ prerequisiteConceptId: p, dependentConceptId: d, outcome, confidence, rationale: "mock" });
-  const idByLabel = new Map([[input.a.canonicalLabel, input.a.conceptId], [input.b.canonicalLabel, input.b.conceptId]]);
+    ({ prerequisiteDerivedNodeId: p, dependentDerivedNodeId: d, outcome, confidence, rationale: "mock" });
+  const idByLabel = new Map([[input.a.canonicalLabel, input.a.derivedNodeId], [input.b.canonicalLabel, input.b.derivedNodeId]]);
   if (labels.includes("X One") && labels.includes("X Two")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X One") ?? "", "directed", 0.9);
   if (labels.includes("X One") && labels.includes("X Three")) return j(idByLabel.get("X One") ?? "", idByLabel.get("X Three") ?? "", "directed", 0.9);
   if (labels.includes("X Two") && labels.includes("X Three")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X Three") ?? "", "uncertain", 0.4);
-  return j(input.a.conceptId, input.b.conceptId, "none", 0.1);
+  return j(input.a.derivedNodeId, input.b.derivedNodeId, "none", 0.1);
 };
 
 function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {}) {
@@ -127,7 +127,7 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
   const difficulty: DifficultyPort = {
     method: "intrinsic-fused-v1",
     async score({ nodes }) {
-      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0, method: "intrinsic-fused-v1", components: {} }));
+      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {} }));
     }
   };
   let persisted: DerivedGraphLayer | undefined;
@@ -176,7 +176,7 @@ test("runGraphEnrichment judges every same-domain pair and never a cross-domain 
 
   assert.equal(ports.judgedInputs.length, 4); // C(3,2)+C(2,2)
   for (const input of ports.judgedInputs) {
-    assert.equal(domainByDerivedId.get(input.a.conceptId), domainByDerivedId.get(input.b.conceptId), `cross-domain pair leaked: ${input.a.conceptId}/${input.b.conceptId}`);
+    assert.equal(domainByDerivedId.get(input.a.derivedNodeId), domainByDerivedId.get(input.b.derivedNodeId), `cross-domain pair leaked: ${input.a.derivedNodeId}/${input.b.derivedNodeId}`);
   }
 });
 
@@ -236,14 +236,14 @@ test("runGraphEnrichment follows the judge, drops 'none', flags 'uncertain'", as
   const cy1 = idByConceptId.get("cy1") ?? "";
 
   // The edge follows the judge.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx2 && e.dependentConceptId === cx1 && !e.uncertain));
-  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx1 && e.dependentConceptId === cx2));
+  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === cx2 && e.dependentDerivedNodeId === cx1 && !e.uncertain));
+  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === cx1 && e.dependentDerivedNodeId === cx2));
   // plain directed edge survives.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteConceptId === cx1 && e.dependentConceptId === cx3 && !e.uncertain));
+  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === cx1 && e.dependentDerivedNodeId === cx3 && !e.uncertain));
   // uncertain edge retained but flagged.
   assert.ok(layer.prerequisiteEdges.some((e) => e.uncertain));
   // 'none' (cy1/cy2) produced no edge.
-  assert.ok(!layer.prerequisiteEdges.some((e) => [e.prerequisiteConceptId, e.dependentConceptId].includes(cy1)));
+  assert.ok(!layer.prerequisiteEdges.some((e) => [e.prerequisiteDerivedNodeId, e.dependentDerivedNodeId].includes(cy1)));
 
   const dispositions = ports.getTrace()?.dispositions.map((d) => d.disposition) ?? [];
   assert.ok(dispositions.includes("uncertain"));
@@ -292,7 +292,7 @@ test("runGraphEnrichment scores intrinsic difficulty with per-node evidence cont
     method: "intrinsic-fused-v1",
     async score({ nodes }) {
       scoredInputs.push(nodes);
-      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 } }));
+      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 } }));
     }
   };
   const layer = await run(ports);
@@ -343,7 +343,7 @@ test("runGraphEnrichment bounds concurrency and keeps deterministic pair order",
     const delay = index === 0 ? 30 : 1;
     await new Promise((resolve) => setTimeout(resolve, delay));
     completionOrder.push(key);
-    return { prerequisiteConceptId: input.a.conceptId, dependentConceptId: input.b.conceptId, outcome: "none", confidence: 0.1, rationale: "mock" };
+    return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
   };
   const ports = buildPorts({ judge });
   await run(ports, {
@@ -370,7 +370,7 @@ test("runGraphEnrichment fails the run without persisting when a pair exhausts i
     if (input.a.canonicalLabel === "X Two" && input.b.canonicalLabel === "X Three") {
       throw new Error("forced-tool retry budget exhausted");
     }
-    return { prerequisiteConceptId: input.a.conceptId, dependentConceptId: input.b.conceptId, outcome: "none", confidence: 0.1, rationale: "mock" };
+    return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
   };
   const ports = buildPorts({ judge });
   await assert.rejects(() => run(ports), /retry budget exhausted/);
@@ -402,7 +402,7 @@ function buildNodePorts(options: {
     model: sink === deepseekPairs ? "deepseek-judge" : "cross-family-judge",
     async judge(input) {
       sink.push([labelOf(input.a), labelOf(input.b)].sort().join("|"));
-      return { prerequisiteConceptId: input.a.conceptId, dependentConceptId: input.b.conceptId, outcome: "none", confidence: 0.1, rationale: "mock" };
+      return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
     }
   });
   const prerequisiteJudge = judgeRecording(deepseekPairs);
@@ -431,7 +431,7 @@ function buildNodePorts(options: {
   const difficulty: DifficultyPort = {
     method: "intrinsic-fused-v1",
     async score({ nodes }) {
-      return nodes.map((node) => ({ conceptId: node.conceptId, score: 0, method: "intrinsic-fused-v1", components: {} }));
+      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {} }));
     }
   };
   const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {

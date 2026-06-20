@@ -9,7 +9,7 @@ test("passes the node and its grounding passages into the forced-tool prompt", a
   const client = {
     async call(input: { model: string; toolName: string; messages: { content: string }[] }) {
       calls.push(input);
-      return { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "rules that govern memory" }] };
+      return { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ passageId: "b1", evidenceQuote: "rules that govern memory" }] };
     }
   } as unknown as LiteLlmForcedToolClient;
   const adapter = new LiteLlmCardGenerationAdapter(client, "mock-card-gen");
@@ -22,7 +22,7 @@ test("passes the node and its grounding passages into the forced-tool prompt", a
     definesLiteral: "the rules governing memory"
   });
 
-  assert.equal(draft.citations[0].sourceBlockId, "b1");
+  assert.equal(draft.citations[0].passageId, "b1");
   assert.equal(calls[0].model, "mock-card-gen");
   assert.equal(calls[0].toolName, "submit_recall_card");
   assert.ok(calls[0].messages.some((m) => m.content.includes("Ownership")));

@@ -8,17 +8,17 @@ function anchor(id: string, conceptId: string) {
   return { nodeKind: "anchor" as const, derivedNodeId: id, conceptId, groundingOrigin: "document_anchored" as const, role: "anchor" as const, layer: "asserted" as const, canonicalLabel: id, normalizedLabel: id, declaredDomain: "software engineering", aliases: [] };
 }
 function edge(p: string, d: string) {
-  return { prerequisiteConceptId: p, dependentConceptId: d, predicate: "inferred-prerequisite-of" as const, confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } };
+  return { prerequisiteDerivedNodeId: p, dependentDerivedNodeId: d, predicate: "inferred-prerequisite-of" as const, confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } };
 }
 const layer: DerivedGraphLayer = {
   enrichmentId: "e", graphVersionId: "gv", enrichmentConfigHash: "c", judgeModel: "m",
   derivedNodes: [anchor("nA", "cA"), anchor("nB", "cB"), anchor("nC", "cC"), anchor("nD", "cD")],
   prerequisiteEdges: [edge("nA", "nB"), edge("nB", "nD"), edge("nC", "nD")],
   difficulties: [
-    { conceptId: "nA", score: 0.2, method: "m", components: {} },
-    { conceptId: "nB", score: 0.5, method: "m", components: {} },
-    { conceptId: "nC", score: 0.8, method: "m", components: {} },
-    { conceptId: "nD", score: 0.9, method: "m", components: {} }
+    { derivedNodeId: "nA", score: 0.2, method: "m", components: {} },
+    { derivedNodeId: "nB", score: 0.5, method: "m", components: {} },
+    { derivedNodeId: "nC", score: 0.8, method: "m", components: {} },
+    { derivedNodeId: "nD", score: 0.9, method: "m", components: {} }
   ]
 };
 function card(derivedNodeId: string): Card {

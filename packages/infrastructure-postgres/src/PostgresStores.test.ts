@@ -284,16 +284,16 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
         aliases: concept.aliases
       })),
       prerequisiteEdges: [{
-        prerequisiteConceptId: borrowingId,
-        dependentConceptId: ownershipId,
+        prerequisiteDerivedNodeId: borrowingId,
+        dependentDerivedNodeId: ownershipId,
         predicate: "inferred-prerequisite-of",
         confidence: 0.9,
         uncertain: false,
         provenance: { judgmentRationale: "test" }
       }],
       difficulties: [
-        { conceptId: borrowingId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
-        { conceptId: ownershipId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
+        { derivedNodeId: borrowingId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
+        { derivedNodeId: ownershipId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
       ]
     };
     const trace: EnrichmentRunTrace = {
@@ -319,8 +319,8 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     assert.ok(hydrated);
     assert.equal(hydrated.derivedNodes.length, 2);
     assert.ok(hydrated.derivedNodes.every((node) => node.nodeKind === "anchor" && node.groundingOrigin === "document_anchored"));
-    assert.equal(hydrated.prerequisiteEdges[0].prerequisiteConceptId, borrowingId);
-    assert.equal(hydrated.prerequisiteEdges[0].dependentConceptId, ownershipId);
+    assert.equal(hydrated.prerequisiteEdges[0].prerequisiteDerivedNodeId, borrowingId);
+    assert.equal(hydrated.prerequisiteEdges[0].dependentDerivedNodeId, ownershipId);
     assert.equal(hydrated.difficulties.length, 2);
   } finally {
     await sql.end();
@@ -363,23 +363,23 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
           groundingPassages: [{ passageType: "mention", text: "Borrowing lets you reference a value without taking ownership.", groundingOrigin: "source_mentioned", sourceResourceId, sourceBlockId: blk("b2"), evidenceQuote: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {}, verbatimCheck: { disposition: "verified", sourceResourceId, sourceBlockId: blk("b2") } }] }
       ],
       prerequisiteEdges: [
-        { prerequisiteConceptId: mintedId, dependentConceptId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.8, uncertain: false, provenance: { judgmentRationale: "minted scaffolds anchor" } },
-        { prerequisiteConceptId: rescuedId, dependentConceptId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.7, uncertain: false, provenance: { judgmentRationale: "rescued precedes anchor" } }
+        { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.8, uncertain: false, provenance: { judgmentRationale: "minted scaffolds anchor" } },
+        { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.7, uncertain: false, provenance: { judgmentRationale: "rescued precedes anchor" } }
       ],
       difficulties: [
-        { conceptId: mintedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
-        { conceptId: rescuedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
-        { conceptId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
+        { derivedNodeId: mintedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
+        { derivedNodeId: rescuedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
+        { derivedNodeId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
       ]
     };
     // U4: per-pair judge model — the minted (llm_grounded) pair routes cross-family,
     // the rescued (source_mentioned) pair stays on the DeepSeek alias.
-    const ctx = (id: string, label: string) => ({ conceptId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
+    const ctx = (id: string, label: string) => ({ derivedNodeId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
     const droppedId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
       judgments: [
-        { declaredDomain: "software engineering", judgeModel: "kg-generated-prerequisite-judgment", a: ctx(mintedId, "Stack allocation"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteConceptId: mintedId, dependentConceptId: anchorId, outcome: "directed", confidence: 0.8, rationale: "r" } },
-        { declaredDomain: "software engineering", judgeModel: "mock-judge", a: ctx(rescuedId, "Borrowing"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteConceptId: rescuedId, dependentConceptId: anchorId, outcome: "directed", confidence: 0.7, rationale: "r" } }
+        { declaredDomain: "software engineering", judgeModel: "kg-generated-prerequisite-judgment", a: ctx(mintedId, "Stack allocation"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.8, rationale: "r" } },
+        { declaredDomain: "software engineering", judgeModel: "mock-judge", a: ctx(rescuedId, "Borrowing"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.7, rationale: "r" } }
       ], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
       { derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", outcome: "verified", rationale: "mention verified verbatim" }

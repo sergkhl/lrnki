@@ -85,5 +85,5 @@ export async function synthesizeResponses(input: {
 }
 
 function difficultyOfNode(layer: DerivedGraphLayer, derivedNodeId: string): number {
-  return layer.difficulties.find((difficulty) => difficulty.conceptId === derivedNodeId)?.score ?? 1;
+  return layer.difficulties.find((difficulty) => difficulty.derivedNodeId === derivedNodeId)?.score ?? 1;
 }

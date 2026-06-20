@@ -105,8 +105,8 @@ The CEP-shaped, source-quoteless grounding a minting operation generates for one
 _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 
 **Learner Path**:
-A projection of one Derived Graph Layer for one target Concept and Learner State, ordered by prerequisite structure and difficulty.
-_Avoid_: course, personalized graph
+A projection of one Derived Graph Layer for one target derived node (`derived_node_id`, anchor or Enrichment Node) and Learner State, ordered by prerequisite structure and difficulty. The recall-loop subject identity is the derived node throughout, never an asserted `concept_id` (ADR-0025).
+_Avoid_: course, personalized graph, concept-keyed learner state
 
 **Learner State**:
 A learner-specific account of mastery consumed by projection and never stored in the learner-neutral graph.

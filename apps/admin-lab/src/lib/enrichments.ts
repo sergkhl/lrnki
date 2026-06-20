@@ -126,7 +126,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     };
 
     const nodes: DerivedGraphNode[] = nodeRows.map((row) => ({
-      conceptId: row.derived_node_id,
+      derivedNodeId: row.derived_node_id,
       label: row.label,
       declaredDomain: row.declared_domain,
       difficulty: row.score === null ? null : Number(row.score),
@@ -136,8 +136,8 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       grounding: groundingFor(row)
     }));
     const edges: DerivedGraphEdge[] = edgeRows.map((row) => ({
-      prerequisiteConceptId: row.prerequisite_derived_node_id,
-      dependentConceptId: row.dependent_derived_node_id,
+      prerequisiteDerivedNodeId: row.prerequisite_derived_node_id,
+      dependentDerivedNodeId: row.dependent_derived_node_id,
       confidence: Number(row.confidence),
       uncertain: row.uncertain,
       judgeModel: row.judge_model

@@ -7,15 +7,15 @@ import { emptyLearnerState, projectLearnerPath } from "./learnerPathProjection";
 
 // DAG: A -> B -> D, C -> D. Difficulty A<B<C<D.
 const edges: InferredPrerequisiteEdge[] = [
-  { prerequisiteConceptId: "nA", dependentConceptId: "nB", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } },
-  { prerequisiteConceptId: "nB", dependentConceptId: "nD", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } },
-  { prerequisiteConceptId: "nC", dependentConceptId: "nD", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }
+  { prerequisiteDerivedNodeId: "nA", dependentDerivedNodeId: "nB", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } },
+  { prerequisiteDerivedNodeId: "nB", dependentDerivedNodeId: "nD", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } },
+  { prerequisiteDerivedNodeId: "nC", dependentDerivedNodeId: "nD", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }
 ];
 const difficulties: ConceptDifficulty[] = [
-  { conceptId: "nA", score: 0.2, method: "m", components: {} },
-  { conceptId: "nB", score: 0.5, method: "m", components: {} },
-  { conceptId: "nC", score: 0.8, method: "m", components: {} },
-  { conceptId: "nD", score: 0.9, method: "m", components: {} }
+  { derivedNodeId: "nA", score: 0.2, method: "m", components: {} },
+  { derivedNodeId: "nB", score: 0.5, method: "m", components: {} },
+  { derivedNodeId: "nC", score: 0.8, method: "m", components: {} },
+  { derivedNodeId: "nD", score: 0.9, method: "m", components: {} }
 ];
 
 function learnerState(mastery: Record<string, number>): LearnerStatePort {
@@ -35,7 +35,7 @@ test("high self-report across the calibration set with no graded rows prunes the
   const state = learnerState({ nA: 0.7, nB: 0.7, nC: 0.7, nD: 0 });
   const { targetNodeId, steps } = projectAdaptivePath({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
   assert.equal(targetNodeId, "nD");
-  const ids = steps.map((s) => s.conceptId);
+  const ids = steps.map((s) => s.derivedNodeId);
   assert.deepEqual(ids, ["nD"], "mastered prerequisites are pruned; only the frontier remains");
 });
 
@@ -45,14 +45,14 @@ test("a concept at 0.7 is pruned; one at 0.5 (partial) is retained", () => {
   const state = learnerState({ nA: 0.7, nB: 0.5, nC: 0.8, nD: 0 });
   const { targetNodeId, steps } = projectAdaptivePath({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
   assert.equal(targetNodeId, "nB", "0.5 is below threshold so B stays a target");
-  assert.equal(steps.some((s) => s.conceptId === "nA"), false, "0.7 is at threshold so A is pruned");
+  assert.equal(steps.some((s) => s.derivedNodeId === "nA"), false, "0.7 is at threshold so A is pruned");
 });
 
 test("the adaptive path differs from the mock:empty path for the same target+enrichment", () => {
   const adaptive = projectAdaptivePath({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: learnerState({ nA: 0.7, nB: 0.7, nC: 0.7, nD: 0 }) });
-  const mock = projectLearnerPath({ targetConceptId: "nD", prerequisiteEdges: edges, difficulties, learnerState: emptyLearnerState });
+  const mock = projectLearnerPath({ targetDerivedNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: emptyLearnerState });
   assert.equal(mock.length, 4, "mock prunes nothing (knows nothing, threshold 1)");
-  assert.notDeepEqual(adaptive.steps.map((s) => s.conceptId), mock.map((s) => s.conceptId));
+  assert.notDeepEqual(adaptive.steps.map((s) => s.derivedNodeId), mock.map((s) => s.derivedNodeId));
 });
 
 test("when nothing in scope is both ready and unmastered, the frontier falls back to the goal target", () => {

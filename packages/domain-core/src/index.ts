@@ -800,7 +800,9 @@ export type RescueDisposition = {
 // and LABELED `defines` assertions. The exhaustive same-domain design (ADR-0019
 // reset) removed contextual-embedding clustering and candidate groups.
 export type PrerequisiteConceptContext = {
-  conceptId: string;
+  // The Derived Graph Layer node being judged (anchor projection OR enrichment node),
+  // never the asserted Concept id — enrichment nodes have no Concept identity.
+  derivedNodeId: string;
   canonicalLabel: string;
   aliases: string[];
   definitions: string[];
@@ -813,7 +815,7 @@ export type PrerequisiteConceptContext = {
 // llm_grounded nodes carry their generated grounding bundle text. This is not a
 // Concept projection and does not weaken the verbatim floor.
 export type DifficultyNodeContext = {
-  conceptId: string;
+  derivedNodeId: string;
   canonicalLabel: string;
   aliases: string[];
   declaredDomain: string;
@@ -826,8 +828,8 @@ export type DifficultyNodeContext = {
 // "uncertain" is flagged for review and excluded from the path, never silently
 // promoted to an edge (concept-first method stack §4; goal 1.6/4).
 export type PrerequisiteJudgment = {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   outcome: "directed" | "none" | "uncertain";
   confidence: number;
   rationale: string;
@@ -838,8 +840,8 @@ export type PrerequisiteJudgment = {
 // weak-edge cut (ADR-0019). `uncertain` edges are retained for inspection but
 // excluded from path traversal.
 export type InferredPrerequisiteEdge = {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   predicate: InferredRelationPredicate;
   confidence: number;
   uncertain: boolean;
@@ -857,8 +859,8 @@ export type PrerequisiteJudgmentTrace = {
 };
 
 export type InferredEdgeDisposition = {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   disposition: "insufficient_evidence" | "uncertain" | "weak_cut" | "cycle_removed" | "transitive_reduction" | "kept";
 };
 
@@ -881,9 +883,10 @@ export type EnrichmentRunTrace = {
 
 // Node difficulty keeps a stable output shape while the producer evolves. The
 // current direction is learner-neutral intrinsic difficulty; learner-calibrated
-// IRT/BT remains deferred until learner-response data exists.
+// IRT/BT remains deferred until learner-response data exists. Keyed to the Derived
+// Graph Layer node (anchors ∪ enrichment nodes), never the asserted Concept.
 export type ConceptDifficulty = {
-  conceptId: string;
+  derivedNodeId: string;
   score: number;
   method: string;
   components: Record<string, number>;
@@ -912,7 +915,7 @@ export type DerivedGraphLayer = {
 
 export type LearnerPathStep = {
   position: number;
-  conceptId: string;
+  derivedNodeId: string;
   difficulty: number;
   includedReason: "prerequisite" | "target";
 };
@@ -921,7 +924,7 @@ export type LearnerPath = {
   learnerPathId: string;
   graphVersionId: string;
   enrichmentId: string;
-  targetConceptId: string;
+  targetDerivedNodeId: string;
   // Identifies the learner state used; the mock is "mock:empty" (knows nothing).
   learnerStateRef: string;
   steps: LearnerPathStep[];
@@ -971,16 +974,18 @@ export type RejectedCard = {
   reason: string;
 };
 
-// The model's PRE-verification card output (U2). The model cites CEP passages by
-// `sourceBlockId` + a quote; the application boundary verifies each quote verbatim
-// against the published CEP and resolves the `sourceResourceId` before promoting a
-// draft to a persisted Card (AGENTS rule 6 fail-closed). A draft whose citations do
-// not all verify is rejected, never silently kept.
+// The model's PRE-verification card output (U2). The model cites grounding passages
+// by `passageId` + a quote; the application boundary verifies each quote verbatim
+// against the cited grounding passage before promoting a draft to a persisted Card
+// (AGENTS rule 6 fail-closed). `passageId` is a source block id for source-grounded
+// nodes but a synthetic generated-passage id for `llm_grounded` nodes, so the field
+// is NOT a source block id and must never be persisted as one. A draft whose citations
+// do not all verify is rejected, never silently kept.
 export type CardDraft = {
   question: string;
   answerKey: string;
   selfReportPrompt: string;
-  citations: { sourceBlockId: string; evidenceQuote: string }[];
+  citations: { passageId: string; evidenceQuote: string }[];
 };
 
 // ---------------------------------------------------------------------------

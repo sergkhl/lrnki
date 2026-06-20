@@ -36,7 +36,7 @@ type CardLike = Pick<Card, "derivedNodeId" | "cardId">;
 function nodeCardIndex(layer: DerivedGraphLayer, cards: CardLike[]) {
   const cardByNode = new Map(cards.map((card) => [card.derivedNodeId, card.cardId] as const));
   const nodeIds = new Set(layer.derivedNodes.map((node) => node.derivedNodeId));
-  const difficultyByNode = new Map(layer.difficulties.map((difficulty) => [difficulty.conceptId, difficulty.score] as const));
+  const difficultyByNode = new Map(layer.difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty.score] as const));
   return { cardByNode, nodeIds, difficultyByNode };
 }
 

@@ -70,7 +70,7 @@ export async function generateCardBank(input: {
     let unverifiable = false;
     for (const citation of draft.citations) {
       const match = grounding.passages.find(
-        (passage) => passage.passageId === citation.sourceBlockId && evidenceQuoteMatches(passage.text, citation.evidenceQuote)
+        (passage) => passage.passageId === citation.passageId && evidenceQuoteMatches(passage.text, citation.evidenceQuote)
       );
       if (!match) {
         unverifiable = true;

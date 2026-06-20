@@ -290,13 +290,13 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     `   edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} judge=${layer.judgeModel}`
   );
   for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
-    console.log(`   edge: ${edge.prerequisiteConceptId} -> ${edge.dependentConceptId} (conf=${edge.confidence.toFixed(2)})`);
+    console.log(`   edge: ${edge.prerequisiteDerivedNodeId} -> ${edge.dependentDerivedNodeId} (conf=${edge.confidence.toFixed(2)})`);
   }
 }
 
-async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string) {
-  if (!enrichmentId || !targetConceptId) {
-    console.error("! compute-learner-path requires <enrichmentId> <targetConceptId>.");
+async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetRef?: string) {
+  if (!enrichmentId || !targetRef) {
+    console.error("! compute-learner-path requires <enrichmentId> <target>.");
     process.exitCode = 1;
     return;
   }
@@ -306,15 +306,18 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
     process.exitCode = 1;
     return;
   }
+  // `target` is an operator-friendly reference: an anchor concept_id (resolved to its
+  // derived node) or a derived_node_id directly. The learner path subject identity is
+  // always the derived node (ADR-0025).
   const resolvedTargetId =
-    layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetConceptId)?.derivedNodeId ??
-    targetConceptId;
+    layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId ??
+    targetRef;
   const learnerPathId = randomUUID();
-  console.log(`\n>> learner path ${learnerPathId} for target ${targetConceptId} from enrichment ${enrichmentId}`);
+  console.log(`\n>> learner path ${learnerPathId} for target ${targetRef} from enrichment ${enrichmentId}`);
   const path = await computeLearnerPath({
     learnerPathId,
     enrichmentId,
-    targetConceptId: resolvedTargetId,
+    targetDerivedNodeId: resolvedTargetId,
     enrichmentStore: ctx.enrichmentStore,
     learnerState: ctx.learnerState,
     pathStore: ctx.pathStore,
@@ -322,7 +325,7 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   });
   console.log(`   learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
   for (const step of path.steps) {
-    console.log(`   #${step.position} [${step.includedReason}] ${step.conceptId} (difficulty=${step.difficulty.toFixed(2)})`);
+    console.log(`   #${step.position} [${step.includedReason}] ${step.derivedNodeId} (difficulty=${step.difficulty.toFixed(2)})`);
   }
 }
 
@@ -360,9 +363,9 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
   console.log(`   self_report=${result.selfReportCount} graded=${result.gradedCount} batch=${result.calibrationBatchId}`);
 }
 
-async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string, learnerStateRef?: string) {
-  if (!enrichmentId || !targetConceptId || !learnerStateRef) {
-    console.error("! compute-adaptive-path requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
+async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetRef?: string, learnerStateRef?: string) {
+  if (!enrichmentId || !targetRef || !learnerStateRef) {
+    console.error("! compute-adaptive-path requires <enrichmentId> <target> <learnerStateRef>.");
     process.exitCode = 1;
     return;
   }
@@ -372,11 +375,11 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
-  // The CLI target is an asserted concept_id; the projection works in derived-node
-  // space, so resolve it to the goal anchor node (KTD).
-  const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetConceptId)?.derivedNodeId;
+  // `target` is an anchor concept_id; the projection works in derived-node space, so
+  // resolve it to the goal anchor's derived node (KTD, ADR-0025).
+  const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId;
   if (!targetNodeId) {
-    console.error(`! target concept ${targetConceptId} is not an anchor in enrichment ${enrichmentId}.`);
+    console.error(`! target concept ${targetRef} is not an anchor in enrichment ${enrichmentId}.`);
     process.exitCode = 1;
     return;
   }
@@ -386,11 +389,11 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   });
 
   const learnerPathId = randomUUID();
-  console.log(`\n>> adaptive path ${learnerPathId} for goal ${targetConceptId} / learner ${learnerStateRef} (threshold=${ADAPTIVE_MASTERY_THRESHOLD})`);
+  console.log(`\n>> adaptive path ${learnerPathId} for goal ${targetRef} / learner ${learnerStateRef} (threshold=${ADAPTIVE_MASTERY_THRESHOLD})`);
   const path = await computeLearnerPath({
     learnerPathId,
     enrichmentId,
-    targetConceptId: targetNodeId,
+    targetDerivedNodeId: targetNodeId,
     enrichmentStore: ctx.enrichmentStore,
     learnerState,
     pathStore: ctx.pathStore,
@@ -398,9 +401,9 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
     masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD,
     frontierAdvance: true
   });
-  console.log(`   advancedTarget=${path.targetConceptId} learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
+  console.log(`   advancedTarget=${path.targetDerivedNodeId} learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
   for (const step of path.steps) {
-    console.log(`   #${step.position} [${step.includedReason}] ${step.conceptId} (difficulty=${step.difficulty.toFixed(2)})`);
+    console.log(`   #${step.position} [${step.includedReason}] ${step.derivedNodeId} (difficulty=${step.difficulty.toFixed(2)})`);
   }
 }
 
@@ -468,7 +471,7 @@ async function main() {
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | generate-cards <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetConceptId> <learnerStateRef> | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-cards <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

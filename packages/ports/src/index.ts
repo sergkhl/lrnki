@@ -262,19 +262,19 @@ export interface DifficultyPort {
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
   // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
   // nodes are never fabricated into `Concept` values to satisfy the port (handoff
-  // constraint). `nodes[].conceptId` values are `derived_node_id`s; the returned
-  // `conceptId` field carries the derived node id (the difficulty store keys on
-  // derived_node_id).
+  // constraint). Both the input contexts and the returned difficulties key on
+  // `derivedNodeId` (the difficulty store keys on derived_node_id).
   score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock
-// ("knows nothing"): mastery() === 0 for every concept. Real IRT/KT later
+// ("knows nothing"): mastery() === 0 for every derived node. Real IRT/KT later
 // implements the SAME port, so the projection upstream never changes. Pure/sync:
-// the projection is a deterministic CLI operation (ADR-0011).
+// the projection is a deterministic CLI operation (ADR-0011). Mastery is keyed to the
+// Derived Graph Layer node id (the learner-recall subject identity, ADR-0025).
 export interface LearnerStatePort {
   readonly learnerStateRef: string;
-  mastery(conceptId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
+  mastery(derivedNodeId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
 }
 
 // Graph Enrichment persistence (ADR-0019). Append-only; each run has its own
@@ -300,7 +300,7 @@ export interface EnrichmentRunStorePort {
 // Cytoscape view renders; the CLI computes and persists, the UI never computes.
 export interface LearnerPathStorePort {
   persist(path: LearnerPath): Promise<void>;
-  getPath(input: { enrichmentId: string; targetConceptId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
+  getPath(input: { enrichmentId: string; targetDerivedNodeId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
 }
 
 // ---------------------------------------------------------------------------

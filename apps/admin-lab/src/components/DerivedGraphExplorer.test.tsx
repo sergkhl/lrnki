@@ -23,13 +23,13 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { conceptId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
-    { conceptId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", grounding: null },
-    { conceptId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
+    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", grounding: null },
+    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
-    { prerequisiteConceptId: "scope", dependentConceptId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
-    { prerequisiteConceptId: "ownership", dependentConceptId: "move", confidence: 0.5, uncertain: true, judgeModel: "kg-generated-prerequisite-judgment" }
+    { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
+    { prerequisiteDerivedNodeId: "ownership", dependentDerivedNodeId: "move", confidence: 0.5, uncertain: true, judgeModel: "kg-generated-prerequisite-judgment" }
   ],
   originCounts: summarizeOriginCounts([
     { declaredDomain: "rust", groundingOrigin: "source_mentioned" },

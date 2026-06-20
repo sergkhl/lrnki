@@ -13,8 +13,8 @@ import {
 
 function edge(prereq: string, dependent: string, confidence = 0.9, uncertain = false): InferredPrerequisiteEdge {
   return {
-    prerequisiteConceptId: prereq,
-    dependentConceptId: dependent,
+    prerequisiteDerivedNodeId: prereq,
+    dependentDerivedNodeId: dependent,
     predicate: "inferred-prerequisite-of",
     confidence,
     uncertain,
@@ -26,8 +26,8 @@ test("removeCycles breaks a cycle by dropping its lowest-confidence edge", () =>
   // a -> b -> c -> a, with c -> a the weakest.
   const { edges, removed } = removeCycles([edge("a", "b", 0.9), edge("b", "c", 0.8), edge("c", "a", 0.7)]);
   assert.equal(removed.length, 1);
-  assert.equal(removed[0].prerequisiteConceptId, "c");
-  assert.equal(removed[0].dependentConceptId, "a");
+  assert.equal(removed[0].prerequisiteDerivedNodeId, "c");
+  assert.equal(removed[0].dependentDerivedNodeId, "a");
   assert.equal(edges.length, 2);
 });
 
@@ -41,8 +41,8 @@ test("removeCycles leaves an already-acyclic graph untouched", () => {
 test("removeCycles drops a self-loop", () => {
   const { edges, removed } = removeCycles([edge("a", "a"), edge("a", "b")]);
   assert.equal(removed.length, 1);
-  assert.equal(removed[0].prerequisiteConceptId, "a");
-  assert.equal(removed[0].dependentConceptId, "a");
+  assert.equal(removed[0].prerequisiteDerivedNodeId, "a");
+  assert.equal(removed[0].dependentDerivedNodeId, "a");
   assert.equal(edges.length, 1);
 });
 
@@ -50,10 +50,10 @@ test("transitiveReduction removes the redundant shortcut edge", () => {
   // a -> b -> c plus a -> c (redundant).
   const { edges, removed } = transitiveReduction([edge("a", "b"), edge("b", "c"), edge("a", "c")]);
   assert.equal(removed.length, 1);
-  assert.equal(removed[0].prerequisiteConceptId, "a");
-  assert.equal(removed[0].dependentConceptId, "c");
+  assert.equal(removed[0].prerequisiteDerivedNodeId, "a");
+  assert.equal(removed[0].dependentDerivedNodeId, "c");
   assert.deepEqual(
-    edges.map((e) => `${e.prerequisiteConceptId}->${e.dependentConceptId}`).sort(),
+    edges.map((e) => `${e.prerequisiteDerivedNodeId}->${e.dependentDerivedNodeId}`).sort(),
     ["a->b", "b->c"]
   );
 });
@@ -87,7 +87,7 @@ test("prerequisiteAncestors collects the transitive predecessors of a target", (
 
 test("dagDepthDifficulty normalizes depth and reports interpretable components", () => {
   const difficulties = dagDepthDifficulty(["a", "b", "c"], [edge("a", "b"), edge("b", "c")]);
-  const byId = new Map(difficulties.map((d) => [d.conceptId, d]));
+  const byId = new Map(difficulties.map((d) => [d.derivedNodeId, d]));
   assert.equal(byId.get("a")?.score, 0);
   assert.equal(byId.get("b")?.score, 0.5);
   assert.equal(byId.get("c")?.score, 1);
@@ -100,5 +100,5 @@ test("cutWeakEdges drops edges below the confidence floor", () => {
   const { kept, cut } = cutWeakEdges([edge("a", "b", 0.9), edge("b", "c", 0.3)], 0.5);
   assert.equal(kept.length, 1);
   assert.equal(cut.length, 1);
-  assert.equal(cut[0].dependentConceptId, "c");
+  assert.equal(cut[0].dependentDerivedNodeId, "c");
 });

@@ -309,7 +309,7 @@ export async function resubmitAndRecompute(deps: {
     await computeLearnerPath({
       learnerPathId: deps.newPathId(),
       enrichmentId: path.enrichmentId,
-      targetConceptId: path.targetDerivedNodeId,
+      targetDerivedNodeId: path.targetDerivedNodeId,
       enrichmentStore: deps.enrichmentStore,
       learnerState,
       pathStore: deps.pathStore,

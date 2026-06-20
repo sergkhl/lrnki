@@ -12,7 +12,7 @@ export const DEFAULT_MASTERY_THRESHOLD = 1;
 // first), and break ties by ascending difficulty so easier ready concepts come
 // first. No model, no store, no clock — the testable heart of the slice's endpoint.
 export function projectLearnerPath(input: {
-  targetConceptId: string;
+  targetDerivedNodeId: string;
   prerequisiteEdges: InferredPrerequisiteEdge[];
   difficulties: ConceptDifficulty[];
   learnerState: LearnerStatePort;
@@ -23,28 +23,28 @@ export function projectLearnerPath(input: {
   const threshold = input.masteryThreshold ?? DEFAULT_MASTERY_THRESHOLD;
   const excludeUncertain = input.excludeUncertain ?? true;
   const edges = excludeUncertain ? input.prerequisiteEdges.filter((e) => !e.uncertain) : input.prerequisiteEdges;
-  const difficultyOf = new Map(input.difficulties.map((d) => [d.conceptId, d.score] as const));
+  const difficultyOf = new Map(input.difficulties.map((d) => [d.derivedNodeId, d.score] as const));
 
   // 1. Scope = the target plus everything that must precede it.
-  const inScope = prerequisiteAncestors(input.targetConceptId, edges);
-  inScope.add(input.targetConceptId);
+  const inScope = prerequisiteAncestors(input.targetDerivedNodeId, edges);
+  inScope.add(input.targetDerivedNodeId);
 
   // 2. Prune mastered concepts — but the target is always included.
   const included = new Set(
-    [...inScope].filter((id) => id === input.targetConceptId || input.learnerState.mastery(id) < threshold)
+    [...inScope].filter((id) => id === input.targetDerivedNodeId || input.learnerState.mastery(id) < threshold)
   );
 
   // 3. Restrict edges to surviving nodes, then order them.
-  const scopedEdges = edges.filter((e) => included.has(e.prerequisiteConceptId) && included.has(e.dependentConceptId));
+  const scopedEdges = edges.filter((e) => included.has(e.prerequisiteDerivedNodeId) && included.has(e.dependentDerivedNodeId));
   const byDifficultyThenId = (a: string, b: string): number =>
     (difficultyOf.get(a) ?? 0) - (difficultyOf.get(b) ?? 0) || a.localeCompare(b);
   const order = topologicalOrder([...included], scopedEdges, byDifficultyThenId);
 
-  return order.map((conceptId, position) => ({
+  return order.map((derivedNodeId, position) => ({
     position,
-    conceptId,
-    difficulty: difficultyOf.get(conceptId) ?? 0,
-    includedReason: conceptId === input.targetConceptId ? "target" : "prerequisite"
+    derivedNodeId,
+    difficulty: difficultyOf.get(derivedNodeId) ?? 0,
+    includedReason: derivedNodeId === input.targetDerivedNodeId ? "target" : "prerequisite"
   }));
 }
 

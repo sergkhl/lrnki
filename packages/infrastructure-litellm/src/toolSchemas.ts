@@ -602,9 +602,9 @@ export const cardGenerationSchema: JsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["sourceBlockId", "evidenceQuote"],
+        required: ["passageId", "evidenceQuote"],
         properties: {
-          sourceBlockId: { type: "string", description: "Exact passageId of one provided grounding passage the answer derives from." },
+          passageId: { type: "string", description: "Exact passageId of one provided grounding passage the answer derives from." },
           evidenceQuote: { type: "string", description: "Substring copied from that grounding passage supporting the answer-key. For source-grounded passages, copy it verbatim." }
         }
       }
@@ -616,7 +616,7 @@ export const cardGenerationValidator = z.object({
   question: z.string().min(1),
   answerKey: z.string().min(1),
   selfReportPrompt: z.string().min(1),
-  citations: z.array(z.object({ sourceBlockId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
+  citations: z.array(z.object({ passageId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
 }).strict();
 
 // --- Answer grading: submit_answer_grade (U5, R9) -------------------------

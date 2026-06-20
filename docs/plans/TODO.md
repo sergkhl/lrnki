@@ -39,6 +39,20 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## COMPLETED
 
+- **Derived-node identity naming cleanup + ADR-0025 amendment (2026-06-20).** Renamed every
+  learner-loop / path / difficulty / derived-edge field that carried a `derived_node_id` under the
+  misleading name `conceptId` / `targetConceptId` / `prerequisite|dependentConceptId` to its
+  `derivedNodeId` form across domain-core, ports, application, litellm, Postgres stores, the worker
+  CLI, and Admin Lab; dropped the `derived_node_id AS concept_id` read-layer query aliases; and
+  renamed the card-draft citation key `sourceBlockId → passageId` (including the model-facing
+  forced-tool schema) because a generated card's grounding passage is not a source block. Legitimate
+  asserted `concept_id` fields (Concept, CEP, anchor projection, scaffolded anchors) were left intact.
+  Amended ADR-0025 with the two-identity model (`derived_node_id` = recall subject, `card_id` = item),
+  the append-only log, the one-outcome-per-node invariant (kept as atomic write + per-node unique key,
+  no new outcome table), and the deferred cross-enrichment learner identity. Pure identifier change:
+  the single DB migration was already on `derived_node_id`, so no schema change. Declined the review's
+  suggestions to add a `card_generation_outcomes` table and to remove the synthetic learner simulator
+  (already behind a port and already deferred per "keep deferred methods deferred").
 - **Learner recall loop and adaptive path (2026-06-19 to 2026-06-20).** Built the learner-neutral Card Bank,
   append-only Response Log, `EXPERIMENT_ONLY` mastery fold, synthetic learner seeding, Admin Lab inspection path,
   and adaptive projection. Extended cards and response rows to the full Derived Graph Layer so `source_mentioned`
@@ -88,7 +102,20 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## VALIDATION
 
-Latest validation (2026-06-20) is the **no-card frontier fallback persistence + live-trigger rule-14 evaluation**
+Latest change (2026-06-20) is the **derived-node identity naming cleanup** — a deterministic identifier
+refactor (no behavior change), so it is verified statically, not by a new rule-14 real-use run:
+
+- **Static/unit:** full workspace typecheck green (exit 0); unit suites green where DB-free — domain-core,
+  application 144/0, litellm, rdf-export, ingestion, admin-lab 19/0; eslint 0 errors (2 pre-existing
+  unrelated warnings). Postgres integration suite re-run against a live DB (2026-06-20): 19/19 pass, 0 fail,
+  0 skipped — covering both `PostgresLearnerLoopStores` (cards, append-only `response_log`, `rejected_cards`
+  replacement) and `PostgresStores` (transactional CEP run persistence, zero-edge snapshot, enrichment
+  round-trips). The identity rename was pure TS field changes over unchanged SQL columns, and the live
+  round-trip confirms the write and `JSON_TABLE` read paths still match the on-disk schema.
+- **Real-use:** unchanged. The loop's last real-use quality status remains the 2026-06-20 `PASS` /
+  `EXPERIMENT_ONLY` evaluation below; a rename does not alter model output.
+
+Prior real-use validation (2026-06-20) is the **no-card frontier fallback persistence + live-trigger rule-14 evaluation**
 (`tmp/2026-06-20-rejected-card-persistence/rule-14-evaluation.md`):
 
 - **Static/unit:** full workspace suite green — domain-core 16/0, ingestion 9/0, litellm 35/0, rdf-export 2/0,

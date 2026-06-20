@@ -22,7 +22,7 @@ function anchor(id: string, conceptId: string) {
   };
 }
 function edge(prerequisite: string, dependent: string) {
-  return { prerequisiteConceptId: prerequisite, dependentConceptId: dependent, predicate: "inferred-prerequisite-of" as const, confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "fixture" } };
+  return { prerequisiteDerivedNodeId: prerequisite, dependentDerivedNodeId: dependent, predicate: "inferred-prerequisite-of" as const, confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "fixture" } };
 }
 
 const layer: DerivedGraphLayer = {
@@ -39,11 +39,11 @@ const layer: DerivedGraphLayer = {
   ],
   prerequisiteEdges: [edge("nA", "nB"), edge("nB", "nD"), edge("nC", "nD"), edge("nE", "nD")],
   difficulties: [
-    { conceptId: "nA", score: 0.2, method: "m", components: {} },
-    { conceptId: "nB", score: 0.5, method: "m", components: {} },
-    { conceptId: "nC", score: 0.8, method: "m", components: {} },
-    { conceptId: "nD", score: 0.9, method: "m", components: {} },
-    { conceptId: "nE", score: 0.3, method: "m", components: {} }
+    { derivedNodeId: "nA", score: 0.2, method: "m", components: {} },
+    { derivedNodeId: "nB", score: 0.5, method: "m", components: {} },
+    { derivedNodeId: "nC", score: 0.8, method: "m", components: {} },
+    { derivedNodeId: "nD", score: 0.9, method: "m", components: {} },
+    { derivedNodeId: "nE", score: 0.3, method: "m", components: {} }
   ]
 };
 

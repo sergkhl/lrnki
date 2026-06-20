@@ -28,7 +28,7 @@ export interface NodeGroundingView {
 }
 
 export interface DerivedGraphNode {
-  conceptId: string;
+  derivedNodeId: string;
   label: string;
   declaredDomain: string;
   difficulty: number | null;
@@ -41,8 +41,8 @@ export interface DerivedGraphNode {
 }
 
 export interface DerivedGraphEdge {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   confidence: number;
   uncertain: boolean;
   // Which judge model ordered this pair (U5): the cross-family generated-node alias
@@ -126,15 +126,15 @@ export interface DerivedGraphView {
   };
 }
 
-export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, conceptId: string): string {
-  return detail.nodes.find((node) => node.conceptId === conceptId)?.label ?? conceptId;
+export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeId: string): string {
+  return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
 export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphView {
   return {
     cytoscape: {
       nodes: detail.nodes.map((node) => ({
-        id: node.conceptId,
+        id: node.derivedNodeId,
         label: node.label,
         domain: node.declaredDomain,
         difficulty: node.difficulty,
@@ -143,8 +143,8 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphV
       })),
       edges: detail.edges.map((edge, index) => ({
         id: `e${index}`,
-        source: edge.prerequisiteConceptId,
-        target: edge.dependentConceptId,
+        source: edge.prerequisiteDerivedNodeId,
+        target: edge.dependentDerivedNodeId,
         uncertain: edge.uncertain ? "yes" : "no",
         confidence: edge.confidence
       }))
@@ -152,8 +152,8 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphV
     textual: {
       nodes: detail.nodes.map((node) => ({ label: node.label, domain: node.declaredDomain, difficulty: node.difficulty, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin, grounding: node.grounding })),
       edges: detail.edges.map((edge) => ({
-        prerequisiteLabel: labelFor(detail, edge.prerequisiteConceptId),
-        dependentLabel: labelFor(detail, edge.dependentConceptId),
+        prerequisiteLabel: labelFor(detail, edge.prerequisiteDerivedNodeId),
+        dependentLabel: labelFor(detail, edge.dependentDerivedNodeId),
         confidence: edge.confidence,
         uncertain: edge.uncertain,
         judgeModel: edge.judgeModel

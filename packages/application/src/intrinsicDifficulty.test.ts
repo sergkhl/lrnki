@@ -6,7 +6,7 @@ import { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 
 function node(id: string, definitions: string[] = [`${id} definition`], mentions: string[] = []): DifficultyNodeContext {
   return {
-    conceptId: id,
+    derivedNodeId: id,
     canonicalLabel: id.toUpperCase(),
     aliases: [],
     declaredDomain: "test",
@@ -25,8 +25,8 @@ function llmGroundedNode(id: string): DifficultyNodeContext {
 
 function edge(prereq: string, dependent: string): InferredPrerequisiteEdge {
   return {
-    prerequisiteConceptId: prereq,
-    dependentConceptId: dependent,
+    prerequisiteDerivedNodeId: prereq,
+    dependentDerivedNodeId: dependent,
     predicate: "inferred-prerequisite-of",
     confidence: 0.9,
     uncertain: false,
@@ -38,7 +38,7 @@ function judge(scores: Record<string, number>): IntrinsicDifficultyJudgmentPort 
   return {
     model: "stub-judge",
     async judge(input) {
-      return { neuralScore: scores[input.conceptId] ?? 0, rationale: "stub" };
+      return { neuralScore: scores[input.derivedNodeId] ?? 0, rationale: "stub" };
     }
   };
 }
@@ -53,7 +53,7 @@ test("createIntrinsicDifficultyPort returns fused scores and interpretable compo
   assert.equal(port.method, "intrinsic-fused-v1");
   assert.equal(difficulties.length, 3);
   assert.ok(difficulties.every((difficulty) => difficulty.method === "intrinsic-fused-v1"));
-  const byId = new Map(difficulties.map((difficulty) => [difficulty.conceptId, difficulty] as const));
+  const byId = new Map(difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
   assert.equal(byId.get("a")?.components.neuralScore, 0.1);
   assert.equal(byId.get("b")?.components.topoDepth, 1);
   assert.equal(byId.get("c")?.components.transitiveAncestors, 2);
@@ -69,7 +69,7 @@ test("same-depth nodes are differentiated by the neural subscore", async () => {
     nodes: [node("root"), node("a"), node("b")],
     prerequisiteEdges: [edge("root", "a"), edge("root", "b")]
   });
-  const byId = new Map(difficulties.map((difficulty) => [difficulty.conceptId, difficulty] as const));
+  const byId = new Map(difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
 
   assert.equal(byId.get("a")?.components.topoDepth, byId.get("b")?.components.topoDepth);
   assert.ok((byId.get("b")?.score ?? 0) > (byId.get("a")?.score ?? 1));
@@ -81,7 +81,7 @@ test("structural components match hand-computed graph values", async () => {
     nodes: [node("a"), node("b"), node("c"), node("d", ["d def"], ["d mention 1", "d mention 2"])],
     prerequisiteEdges: [edge("a", "b"), edge("a", "c"), edge("b", "d"), edge("c", "d")]
   });
-  const d = difficulties.find((difficulty) => difficulty.conceptId === "d");
+  const d = difficulties.find((difficulty) => difficulty.derivedNodeId === "d");
   assert.ok(d);
   assert.equal(d.components.topoDepth, 2);
   assert.equal(d.components.transitiveAncestors, 3);

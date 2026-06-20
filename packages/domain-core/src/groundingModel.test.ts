@@ -66,8 +66,8 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
   assert.equal(node.layer, "derived");
   assert.equal(node.role, "prerequisite");
   assert.equal(node.mintingReason, "assumed_prerequisite");
-  assert.equal("prerequisiteConceptId" in node, false);
-  assert.equal("dependentConceptId" in node, false);
+  assert.equal("prerequisiteDerivedNodeId" in node, false);
+  assert.equal("dependentDerivedNodeId" in node, false);
 });
 
 test("source-mentioned enrichment nodes do not carry a minting reason", () => {

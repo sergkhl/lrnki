@@ -20,7 +20,7 @@ const PRODUCER_VERSION = "0.5.0";
 export async function computeLearnerPath(input: {
   learnerPathId: string;
   enrichmentId: string;
-  targetConceptId: string;
+  targetDerivedNodeId: string;
   enrichmentStore: EnrichmentRunStorePort;
   learnerState: LearnerStatePort;
   pathStore: LearnerPathStorePort;
@@ -33,24 +33,24 @@ export async function computeLearnerPath(input: {
 }): Promise<LearnerPath> {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`computeLearnerPath: enrichment ${input.enrichmentId} not found.`);
-  if (!layer.difficulties.some((difficulty) => difficulty.conceptId === input.targetConceptId)) {
-    throw new Error(`computeLearnerPath: target ${input.targetConceptId} is not in enrichment ${input.enrichmentId}.`);
+  if (!layer.difficulties.some((difficulty) => difficulty.derivedNodeId === input.targetDerivedNodeId)) {
+    throw new Error(`computeLearnerPath: target ${input.targetDerivedNodeId} is not in enrichment ${input.enrichmentId}.`);
   }
 
   // The frontier wrapper re-selects the target; the non-adaptive path projects to the
   // given target. Either way the pure projection core is unchanged (R13).
   const projected = input.frontierAdvance
     ? projectAdaptivePath({
-        targetNodeId: input.targetConceptId,
+        targetNodeId: input.targetDerivedNodeId,
         prerequisiteEdges: layer.prerequisiteEdges,
         difficulties: layer.difficulties,
         learnerState: input.learnerState,
         masteryThreshold: input.masteryThreshold
       })
     : {
-        targetNodeId: input.targetConceptId,
+        targetNodeId: input.targetDerivedNodeId,
         steps: projectLearnerPath({
-          targetConceptId: input.targetConceptId,
+          targetDerivedNodeId: input.targetDerivedNodeId,
           prerequisiteEdges: layer.prerequisiteEdges,
           difficulties: layer.difficulties,
           learnerState: input.learnerState,
@@ -62,7 +62,7 @@ export async function computeLearnerPath(input: {
     learnerPathId: input.learnerPathId,
     graphVersionId: layer.graphVersionId,
     enrichmentId: layer.enrichmentId,
-    targetConceptId: projected.targetNodeId,
+    targetDerivedNodeId: projected.targetNodeId,
     learnerStateRef: input.learnerState.learnerStateRef,
     steps: projected.steps
   };

@@ -53,8 +53,8 @@ const layer: DerivedGraphLayer = {
     { nodeKind: "anchor", derivedNodeId: "nA", conceptId: "cA", groundingOrigin: "document_anchored", role: "anchor", layer: "asserted", canonicalLabel: "A", normalizedLabel: "a", declaredDomain: "d", aliases: [] },
     { nodeKind: "anchor", derivedNodeId: "nB", conceptId: "cB", groundingOrigin: "document_anchored", role: "anchor", layer: "asserted", canonicalLabel: "B", normalizedLabel: "b", declaredDomain: "d", aliases: [] }
   ],
-  prerequisiteEdges: [{ prerequisiteConceptId: "nA", dependentConceptId: "nB", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }],
-  difficulties: [{ conceptId: "nA", score: 0.2, method: "m", components: {} }, { conceptId: "nB", score: 0.6, method: "m", components: {} }]
+  prerequisiteEdges: [{ prerequisiteDerivedNodeId: "nA", dependentDerivedNodeId: "nB", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }],
+  difficulties: [{ derivedNodeId: "nA", score: 0.2, method: "m", components: {} }, { derivedNodeId: "nB", score: 0.6, method: "m", components: {} }]
 };
 
 const enrichmentStore = { async getLayer() { return layer; } } as unknown as EnrichmentRunStorePort;
@@ -88,5 +88,5 @@ test("resubmit appends a new graded row, leaves the original synthetic row intac
   // the path was recomputed and persisted; the new graded correct on cA masters it,
   // so cA (0.7+) is pruned from the path to nB.
   assert.equal(persisted.length, 1);
-  assert.equal(persisted[0].steps.some((s) => s.conceptId === "nA"), false, "newly-mastered cA pruned");
+  assert.equal(persisted[0].steps.some((s) => s.derivedNodeId === "nA"), false, "newly-mastered cA pruned");
 });

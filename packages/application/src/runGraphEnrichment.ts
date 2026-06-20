@@ -161,7 +161,7 @@ export async function runGraphEnrichment(input: {
     context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair)
   }));
   const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
-    conceptId: node.derivedNodeId,
+    derivedNodeId: node.derivedNodeId,
     canonicalLabel: node.context.canonicalLabel,
     aliases: node.context.aliases,
     declaredDomain: node.declaredDomain,
@@ -185,7 +185,7 @@ export async function runGraphEnrichment(input: {
   const outcomes = await mapWithConcurrency(pairs, config.judgeConcurrency, async ([a, b]): Promise<PairOutcome> => {
     const hasEvidence = (context: PrerequisiteConceptContext) => context.definitions.length > 0 || context.mentions.length > 0;
     if (!hasEvidence(a.context) || !hasEvidence(b.context)) {
-      return { insufficient: { prerequisiteConceptId: a.derivedNodeId, dependentConceptId: b.derivedNodeId, disposition: "insufficient_evidence" } };
+      return { insufficient: { prerequisiteDerivedNodeId: a.derivedNodeId, dependentDerivedNodeId: b.derivedNodeId, disposition: "insufficient_evidence" } };
     }
     const judge = isGenerated(a) || isGenerated(b) ? generatedJudge : input.prerequisiteJudge;
     const judgeInput = { declaredDomain: a.declaredDomain, a: a.context, b: b.context };
@@ -210,8 +210,8 @@ export async function runGraphEnrichment(input: {
   const rawEdges: InferredPrerequisiteEdge[] = judgments
     .filter((judgment) => judgment.outcome !== "none")
     .map((judgment) => ({
-      prerequisiteConceptId: judgment.prerequisiteConceptId,
-      dependentConceptId: judgment.dependentConceptId,
+      prerequisiteDerivedNodeId: judgment.prerequisiteDerivedNodeId,
+      dependentDerivedNodeId: judgment.dependentDerivedNodeId,
       predicate: "inferred-prerequisite-of",
       confidence: judgment.confidence,
       uncertain: judgment.outcome === "uncertain",
@@ -281,8 +281,8 @@ function disposition(
   value: EnrichmentRunTrace["dispositions"][number]["disposition"]
 ): EnrichmentRunTrace["dispositions"][number] {
   return {
-    prerequisiteConceptId: edge.prerequisiteConceptId,
-    dependentConceptId: edge.dependentConceptId,
+    prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId,
+    dependentDerivedNodeId: edge.dependentDerivedNodeId,
     disposition: value
   };
 }
@@ -335,7 +335,7 @@ function contextOf(
     const profile = profileByConcept.get(node.conceptId);
     const publishedAssertions = profile?.assertions ?? [];
     return {
-      conceptId: node.derivedNodeId,
+      derivedNodeId: node.derivedNodeId,
       canonicalLabel: node.canonicalLabel,
       aliases: node.aliases,
       definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
@@ -345,7 +345,7 @@ function contextOf(
   }
   if (node.groundingOrigin === "source_mentioned") {
     return {
-      conceptId: node.derivedNodeId,
+      derivedNodeId: node.derivedNodeId,
       canonicalLabel: node.canonicalLabel,
       aliases: node.aliases,
       definitions: [],
@@ -354,7 +354,7 @@ function contextOf(
     };
   }
   return {
-    conceptId: node.derivedNodeId,
+    derivedNodeId: node.derivedNodeId,
     canonicalLabel: node.canonicalLabel,
     aliases: node.aliases,
     definitions: node.groundingBundle.definitions.map((passage) => passage.text),

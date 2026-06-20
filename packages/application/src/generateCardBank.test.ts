@@ -111,7 +111,7 @@ test("a card whose citation quote is a verbatim substring of the cited CEP passa
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      "node-c1": { question: "What governs memory?", answerKey: "A set of rules.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "rules that govern memory" }] }
+      "node-c1": { question: "What governs memory?", answerKey: "A set of rules.", selfReportPrompt: "Confident?", citations: [{ passageId: "b1", evidenceQuote: "rules that govern memory" }] }
     }),
     cardBankStore: store,
     newCardId: () => "card-1"
@@ -140,7 +140,7 @@ test("a card whose citation quote is not in any cited passage is rejected fail-c
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      "node-c1": { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "a fact never stated in the passage" }] }
+      "node-c1": { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ passageId: "b1", evidenceQuote: "a fact never stated in the passage" }] }
     }),
     cardBankStore: store,
     newCardId: () => "card-1"
@@ -167,7 +167,7 @@ test("an anchor with no definition passage still produces a card from a mention"
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      "node-c1": { question: "What is borrowing?", answerKey: "Referencing without taking ownership.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b2", evidenceQuote: "reference a value without taking ownership" }] }
+      "node-c1": { question: "What is borrowing?", answerKey: "Referencing without taking ownership.", selfReportPrompt: "Confident?", citations: [{ passageId: "b2", evidenceQuote: "reference a value without taking ownership" }] }
     }),
     cardBankStore: store,
     newCardId: () => "card-1"
@@ -259,8 +259,8 @@ test("source-mentioned and generated enrichment nodes verify against their own g
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      "source-node": { question: "What does scope control?", answerKey: "Where a binding can be used.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b-source", evidenceQuote: "where a binding can be used" }] },
-      "generated-node": { question: "What do move semantics transfer?", answerKey: "A resource between bindings.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "generated-node:definition:0", evidenceQuote: "transfer a resource from one binding to another" }] }
+      "source-node": { question: "What does scope control?", answerKey: "Where a binding can be used.", selfReportPrompt: "Confident?", citations: [{ passageId: "b-source", evidenceQuote: "where a binding can be used" }] },
+      "generated-node": { question: "What do move semantics transfer?", answerKey: "A resource between bindings.", selfReportPrompt: "Confident?", citations: [{ passageId: "generated-node:definition:0", evidenceQuote: "transfer a resource from one binding to another" }] }
     }),
     cardBankStore: store,
     newCardId: (() => {
