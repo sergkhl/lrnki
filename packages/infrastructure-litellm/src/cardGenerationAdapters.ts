@@ -18,29 +18,34 @@ export class LiteLlmCardGenerationAdapter implements CardGenerationPort {
 
   async generate(input: {
     declaredDomain: string;
-    concept: { conceptId: string; canonicalLabel: string; aliases: string[] };
-    cepPassages: { sourceBlockId: string; kind: "definition" | "mention"; evidenceQuote: string }[];
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: "source_cep" | "source_mentioned" | "generated";
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
     definesLiteral: string | null;
   }): Promise<CardDraft> {
     const system = [
-      "You write ONE anki-style recall card for a single concept, conditioned ONLY on the provided Concept Evidence Profile (CEP) passages.",
+      "You write ONE anki-style recall card for a single learning node, conditioned ONLY on the provided grounding passages.",
       "The card has a question, a concise answer-key a grader can check a free-form learner answer against, and a short first-person self-report confidence prompt.",
       "Ground the answer-key strictly in the provided passages: introduce no facts that are not supported by them.",
-      "Cite the passages your answer-key derives from by their exact blockId, quoting a verbatim substring of the passage text. Every citation quote MUST be copied exactly from a provided passage.",
+      "Cite the passages your answer-key derives from by their exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim. For generated grounding, quote only the generated grounding passage text.",
       "Stay within the Declared Domain. Write domain-neutral, learner-facing language; never reference 'the passage' or 'the source' in the question."
     ].join(" ");
-    const aliasText = input.concept.aliases.length ? ` (aliases: ${input.concept.aliases.join(", ")})` : "";
-    const passageText = input.cepPassages
-      .map((passage) => `- [${passage.sourceBlockId}] (${passage.kind}) "${passage.evidenceQuote}"`)
+    const aliasText = input.node.aliases.length ? ` (aliases: ${input.node.aliases.join(", ")})` : "";
+    const passageText = input.groundingPassages
+      .map((passage) => `- [${passage.passageId}] (${passage.kind}) "${passage.text}"`)
       .join("\n");
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
-      `Concept: "${input.concept.canonicalLabel}"${aliasText}.`,
+      `Learning node: "${input.node.canonicalLabel}"${aliasText}.`,
+      `Grounding provenance: ${input.groundingProvenance}.`,
       input.definesLiteral ? `Definition literal (hint): "${input.definesLiteral}".` : "",
-      "CEP passages (cite by blockId):",
+      "Grounding passages (cite by passageId):",
       passageText || "(none)",
       "",
-      "Call submit_recall_card with a question, answerKey, selfReportPrompt, and at least one citation quoting a provided passage verbatim."
+      "Call submit_recall_card with a question, answerKey, selfReportPrompt, and at least one citation quoting a provided passage."
     ].filter(Boolean).join("\n");
 
     return this.client.call({

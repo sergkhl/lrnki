@@ -17,14 +17,13 @@ export const SELF_REPORT_EVIDENCE_WEIGHT = 0.3;
 export const PROPAGATED_SELF_REPORT_EVIDENCE_WEIGHT = 0.15;
 
 export type CalibrationItem = {
-  conceptId: string;
-  cardId: string;
   derivedNodeId: string;
+  cardId: string;
   difficulty: number;
 };
 
 export type SelfReportInput = {
-  conceptId: string;
+  derivedNodeId: string;
   cardId: string;
   rating: SelfReportRating;
   // A row SEEDED by down-DAG propagation, not directly rated. Carried at a lower
@@ -32,46 +31,34 @@ export type SelfReportInput = {
   propagated?: boolean;
 };
 
-type CardLike = Pick<Card, "conceptId" | "cardId">;
+type CardLike = Pick<Card, "derivedNodeId" | "cardId">;
 
-// Resolve the anchor-node ⇄ concept bridge once. Only anchor nodes carry a
-// concept_id (and thus a card); enrichment prerequisite nodes are dropped here.
-function anchorBridges(layer: DerivedGraphLayer, cards: CardLike[]) {
-  const cardByConcept = new Map(cards.map((card) => [card.conceptId, card.cardId] as const));
-  const nodeByConcept = new Map<string, string>();
-  const conceptByNode = new Map<string, string>();
-  for (const node of layer.derivedNodes) {
-    if (node.nodeKind === "anchor") {
-      nodeByConcept.set(node.conceptId, node.derivedNodeId);
-      conceptByNode.set(node.derivedNodeId, node.conceptId);
-    }
-  }
+function nodeCardIndex(layer: DerivedGraphLayer, cards: CardLike[]) {
+  const cardByNode = new Map(cards.map((card) => [card.derivedNodeId, card.cardId] as const));
+  const nodeIds = new Set(layer.derivedNodes.map((node) => node.derivedNodeId));
   const difficultyByNode = new Map(layer.difficulties.map((difficulty) => [difficulty.conceptId, difficulty.score] as const));
-  return { cardByConcept, nodeByConcept, conceptByNode, difficultyByNode };
+  return { cardByNode, nodeIds, difficultyByNode };
 }
 
-// Calibration set = the target's prerequisite-ancestor ANCHOR concepts that have a
+// Calibration set = the target's prerequisite-ancestor derived nodes that have a
 // card (R7). Ordered hardest-first so a learner calibrates the most demanding
 // downstream prerequisites first (origin: Key Decisions). Pure.
 export function buildCalibrationSet(input: {
   layer: DerivedGraphLayer;
-  targetConceptId: string;
+  targetDerivedNodeId: string;
   cards: CardLike[];
 }): CalibrationItem[] {
-  const { cardByConcept, nodeByConcept, conceptByNode, difficultyByNode } = anchorBridges(input.layer, input.cards);
-  const targetNode = nodeByConcept.get(input.targetConceptId);
-  if (!targetNode) throw new Error(`buildCalibrationSet: target concept ${input.targetConceptId} is not an anchor in this enrichment.`);
+  const { cardByNode, nodeIds, difficultyByNode } = nodeCardIndex(input.layer, input.cards);
+  if (!nodeIds.has(input.targetDerivedNodeId)) throw new Error(`buildCalibrationSet: target node ${input.targetDerivedNodeId} is not in this enrichment.`);
 
-  const ancestorNodes = prerequisiteAncestors(targetNode, input.layer.prerequisiteEdges);
+  const ancestorNodes = prerequisiteAncestors(input.targetDerivedNodeId, input.layer.prerequisiteEdges);
   const items: CalibrationItem[] = [];
   for (const derivedNodeId of ancestorNodes) {
-    const conceptId = conceptByNode.get(derivedNodeId);
-    if (!conceptId) continue; // enrichment prerequisite node — no concept, no card
-    const cardId = cardByConcept.get(conceptId);
-    if (!cardId) continue; // anchor without a card (thin CEP) stays out of the sweep
-    items.push({ conceptId, cardId, derivedNodeId, difficulty: difficultyByNode.get(derivedNodeId) ?? 0 });
+    const cardId = cardByNode.get(derivedNodeId);
+    if (!cardId) continue; // a node without a verifiable card stays out of the sweep
+    items.push({ derivedNodeId, cardId, difficulty: difficultyByNode.get(derivedNodeId) ?? 0 });
   }
-  return items.sort((a, b) => b.difficulty - a.difficulty || a.conceptId.localeCompare(b.conceptId));
+  return items.sort((a, b) => b.difficulty - a.difficulty || a.derivedNodeId.localeCompare(b.derivedNodeId));
 }
 
 // Down-DAG propagation (R8). A "good"/"easy" rating on a concept seeds a weaker,
@@ -85,24 +72,21 @@ export function propagateSelfReport(input: {
   directRatings: SelfReportInput[];
   cards: CardLike[];
 }): SelfReportInput[] {
-  const { cardByConcept, nodeByConcept, conceptByNode } = anchorBridges(input.layer, input.cards);
-  const directlyRated = new Set(input.directRatings.map((rating) => rating.conceptId));
-  const seededByConcept = new Map<string, SelfReportInput>();
+  const { cardByNode } = nodeCardIndex(input.layer, input.cards);
+  const directlyRated = new Set(input.directRatings.map((rating) => rating.derivedNodeId));
+  const seededByNode = new Map<string, SelfReportInput>();
 
   for (const rated of input.directRatings) {
     if (rated.rating !== "good" && rated.rating !== "easy") continue; // only positive recall propagates
-    const node = nodeByConcept.get(rated.conceptId);
-    if (!node) continue;
-    for (const ancestorNode of prerequisiteAncestors(node, input.layer.prerequisiteEdges)) {
-      const conceptId = conceptByNode.get(ancestorNode);
-      if (!conceptId || directlyRated.has(conceptId) || seededByConcept.has(conceptId)) continue;
-      const cardId = cardByConcept.get(conceptId);
+    for (const ancestorNode of prerequisiteAncestors(rated.derivedNodeId, input.layer.prerequisiteEdges)) {
+      if (directlyRated.has(ancestorNode) || seededByNode.has(ancestorNode)) continue;
+      const cardId = cardByNode.get(ancestorNode);
       if (!cardId) continue;
       // Seed the same positive rating, flagged propagated (carried at lower weight).
-      seededByConcept.set(conceptId, { conceptId, cardId, rating: rated.rating, propagated: true });
+      seededByNode.set(ancestorNode, { derivedNodeId: ancestorNode, cardId, rating: rated.rating, propagated: true });
     }
   }
-  return [...seededByConcept.values()];
+  return [...seededByNode.values()];
 }
 
 // Append ONE calibration batch of self_report rows (R7, R10). Re-calibration calls
@@ -120,7 +104,7 @@ export async function appendSelfReportBatch(input: {
     responseId: randomUUID(),
     learnerStateRef: input.learnerStateRef,
     cardId: rating.cardId,
-    conceptId: rating.conceptId,
+    derivedNodeId: rating.derivedNodeId,
     signalType: "self_report",
     selfReportRating: rating.rating,
     judgedOutcome: null,

@@ -31,15 +31,13 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
    entities). Admin/inspection surfaces should label this distinction clearly so operators do not confuse normalized
    verifier success with exact copied text.
 
-4. **Make enrichment-only frontier targets teachable.** Adaptive paths can correctly advance to enrichment-only
-   prerequisites once anchor prerequisites are mastered, but those nodes currently have no card-backed response item.
-   Add an explicit design for generated/source-mentioned prerequisite cards or a UI treatment that explains why the
-   next frontier node is not directly recall-tested yet.
-
-5. **Broaden learner-loop target coverage after fixing card gaps.** The educational-technology target produced only
-   one graded row and no self-report rows because the selected neighborhood had little card-backed anchor coverage
-   and the `Prerequisite Relationships` card was rejected. After card coverage for thin neighborhoods improves, rerun
-   the learner-loop evaluation with at least two targets per domain.
+4. **Broaden learner-loop target coverage now that enrichment-node cards are verified.** With teachable
+   enrichment-node cards real-use verified (2026-06-20, see COMPLETED), rerun the learner-loop evaluation with at
+   least two targets per domain. The 2026-06-20 run only exercised one economics goal (Universal Opulence); confirm
+   `source_mentioned` and `llm_grounded` frontier teaching across biology, software-engineering, and ML targets too.
+   The no-card fallback ("not directly recall-tested yet") was not triggered by live data in the 2026-06-20 run
+   (0 rejected cards), so it remains covered only by the U4 deterministic tests — a target whose grounding yields
+   no verifiable card would exercise it for real.
 
 6. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
@@ -49,6 +47,18 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## COMPLETED
 
+- **Teachable enrichment-node cards rule-14 real-use evaluation (2026-06-20).** Reran the previously-`BLOCKED`
+  teachable-cards validation with the correct `.env` LiteLLM key (the prior block was purely
+  `LITELLM_API_KEY=sk-local`, the unprovisioned `.env.example` placeholder). Reset the DB, registered all six
+  manifest sources, ran real extraction (6/6 runs succeeded), published graph version
+  `4e6c56a6-2f55-437d-819e-a1591a5e3b42` and enriched it as `41b80e67-e1ec-4f8c-9cf0-432c78a8d45a` (32 anchors,
+  12 `llm_grounded`, 6 `source_mentioned`). Card generation produced 50/50 cards with 0 rejected
+  (32 `source_cep` / 12 `generated` / 6 `source_mentioned`); the provenance honesty guarantee held on real output
+  (0 generated citations carried source ids, 0 source citations missing ids). The loop appended response rows on
+  the minted enrichment-node cards (`Specialisation`, `Labour`) and the `derived_node_id`-keyed mastery fold pruned
+  an 8-step baseline path (including enrichment nodes) down to a 1-step adaptive path. Classification
+  `EXPERIMENT_ONLY` (uncalibrated learner model; generated cards are retrieval scaffolding). No `FIX_FIRST` defect.
+  Evidence under `tmp/2026-06-20-teachable-cards-rerun/`.
 - **Learner recall/adaptive path all-manifest rule-14 evaluation (2026-06-19).** Reset the dev DB, registered all six
   manifest sources as-is (including raw PDF via Docling), ran real LiteLLM extraction over every source, published
   graph version `6b2b0204-295c-41de-8ff4-a052fd6f4cad`, enriched it as
@@ -149,7 +159,34 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## VALIDATION
 
-Latest validation (2026-06-19) is the **learner recall/adaptive path all-manifest rule-14 evaluation**
+Latest validation (2026-06-20) is the **teachable enrichment-node cards rule-14 real-use rerun**
+(`tmp/2026-06-20-teachable-cards-rerun/rule-14-evaluation.md`), which UNBLOCKS the 2026-06-19 check below:
+
+- **Root cause of the prior block:** the shell exported `LITELLM_API_KEY=sk-local` (the `.env.example`
+  placeholder, not provisioned in the LiteLLM proxy). Sourcing the real `.env` key restores 200-OK model access;
+  no code defect was involved.
+- **Static/unit:** DB reset/migration via `psql` clean; application tests 144/0, Postgres integration 18/0,
+  Admin Lab typecheck clean.
+- **Real-use:** all six manifest sources extracted with real model calls (6/6 succeeded); graph version
+  `4e6c56a6-…` enriched as `41b80e67-…` with all three grounding origins; 50/50 nodes carded (0 rejected;
+  32 `source_cep` / 12 `generated` / 6 `source_mentioned`); generated-card provenance honesty schema-enforced on
+  real output; adaptive path pruned an 8-step baseline (incl. enrichment nodes) to 1 step using enrichment-node
+  response rows. Citation exactness 57/70 byte-exact, 13 verifier-normalized (known TODO #3).
+- **Inspection result:** `EXPERIMENT_ONLY`. The loop now teaches and prunes enrichment-only frontier nodes with
+  honest provenance; learner modelling stays uncalibrated. No `FIX_FIRST` defect.
+
+Prior validation (2026-06-19) was the **teachable enrichment-node cards implementation check**
+(`tmp/2026-06-19-teachable-enrichment-cards/rule-14-evaluation.md`):
+
+- **Static/unit:** workspace typecheck, workspace tests, Admin Lab build, lint, and live Postgres integration tests
+  passed after re-keying cards and response rows to `derived_node_id`; direct DB reset/migration succeeded through
+  `scripts/reset-db.sh`.
+- **Real-use:** blocked at the time. Local Postgres was available, but LiteLLM rejected the default worker token
+  `sk-local` (`token_not_found_in_db`), and no authenticated model key was exported. Superseded by the 2026-06-20
+  rerun above.
+- **Inspection result:** `BLOCKED` (now resolved).
+
+Prior latest validation (2026-06-19) is the **learner recall/adaptive path all-manifest rule-14 evaluation**
 (`tmp/2026-06-19-learner-loop-eval/rule-14-evaluation.md`):
 
 - **Static/unit:** direct DB reset/migration succeeded through `scripts/reset-db.sh` using `psql`; the

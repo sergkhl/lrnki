@@ -11,7 +11,7 @@ export const GRADED_EVIDENCE_WEIGHT = 1.0;
 
 export async function gradeAndAppend(input: {
   learnerStateRef: string;
-  card: { cardId: string; conceptId: string; question: string; answerKey: string };
+  card: { cardId: string; derivedNodeId: string; question: string; answerKey: string };
   declaredDomain: string;
   submittedAnswer: string;
   judge: AnswerGradingJudgePort;
@@ -30,7 +30,7 @@ export async function gradeAndAppend(input: {
     responseId: randomUUID(),
     learnerStateRef: input.learnerStateRef,
     cardId: input.card.cardId,
-    conceptId: input.card.conceptId,
+    derivedNodeId: input.card.derivedNodeId,
     signalType: "graded",
     selfReportRating: null,
     judgedOutcome: judgment.outcome,

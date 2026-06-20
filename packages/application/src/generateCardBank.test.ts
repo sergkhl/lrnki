@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Card, CardDraft, GraphSnapshot, PublishedEvidencePassage } from "@lrnki/domain-core";
-import type { CardBankStorePort, CardGenerationPort, GraphVersionStorePort } from "@lrnki/ports";
+import type { Card, CardDraft, DerivedGraphLayer, GraphSnapshot, PublishedEvidencePassage } from "@lrnki/domain-core";
+import type { CardBankStorePort, CardGenerationPort, EnrichmentRunStorePort, GraphVersionStorePort } from "@lrnki/ports";
 import { generateCardBank } from "./generateCardBank";
 
 function passage(sourceBlockId: string, evidenceQuote: string): PublishedEvidencePassage {
@@ -43,12 +43,46 @@ function graphStoreReturning(snapshot: GraphSnapshot): GraphVersionStorePort {
   } as unknown as GraphVersionStorePort;
 }
 
-function cardGenerationReturning(draftByConcept: Record<string, CardDraft>): CardGenerationPort {
+function layerWith(nodes: DerivedGraphLayer["derivedNodes"]): DerivedGraphLayer {
+  return {
+    enrichmentId: "enr-1",
+    graphVersionId: "gv-1",
+    enrichmentConfigHash: "cfg",
+    judgeModel: "mock",
+    derivedNodes: nodes,
+    prerequisiteEdges: [],
+    difficulties: []
+  };
+}
+
+function anchorNode(conceptId = "c1") {
+  return {
+    nodeKind: "anchor" as const,
+    derivedNodeId: `node-${conceptId}`,
+    conceptId,
+    groundingOrigin: "document_anchored" as const,
+    role: "anchor" as const,
+    layer: "asserted" as const,
+    canonicalLabel: "Ownership",
+    normalizedLabel: "ownership",
+    declaredDomain: "software engineering",
+    aliases: []
+  };
+}
+
+function enrichmentStoreReturning(layer: DerivedGraphLayer): EnrichmentRunStorePort {
+  return {
+    async persist() { /* unused */ },
+    async getLayer() { return layer; }
+  } as unknown as EnrichmentRunStorePort;
+}
+
+function cardGenerationReturning(draftByNode: Record<string, CardDraft>): CardGenerationPort {
   return {
     model: "mock-card-gen",
     async generate(input) {
-      const draft = draftByConcept[input.concept.conceptId];
-      if (!draft) throw new Error(`no canned draft for ${input.concept.conceptId}`);
+      const draft = draftByNode[input.node.derivedNodeId];
+      if (!draft) throw new Error(`no canned draft for ${input.node.derivedNodeId}`);
       return draft;
     }
   };
@@ -59,7 +93,7 @@ function capturingStore(): { store: CardBankStorePort; persisted: Card[] } {
   const store: CardBankStorePort = {
     async persist(cards) { persisted.push(...cards); },
     async getCard() { return undefined; },
-    async listCardsForVersion() { return persisted; }
+    async listCardsForEnrichment() { return persisted; }
   };
   return { store, persisted };
 }
@@ -68,13 +102,15 @@ test("a card whose citation quote is a verbatim substring of the cited CEP passa
   const snapshot = snapshotWith([
     { conceptId: "c1", label: "Ownership", definitions: [passage("b1", "Ownership is a set of rules that govern memory in Rust.")] }
   ]);
+  const layer = layerWith([anchorNode("c1")]);
   const { store, persisted } = capturingStore();
   const result = await generateCardBank({
-    graphVersionId: "gv-1",
+    enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      c1: { question: "What governs memory?", answerKey: "A set of rules.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "rules that govern memory" }] }
+      "node-c1": { question: "What governs memory?", answerKey: "A set of rules.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "rules that govern memory" }] }
     }),
     cardBankStore: store,
     newCardId: () => "card-1"
@@ -84,7 +120,10 @@ test("a card whose citation quote is a verbatim substring of the cited CEP passa
   assert.equal(result.rejected.length, 0);
   assert.equal(persisted.length, 1);
   assert.equal(persisted[0].citations.length, 1);
-  assert.equal(persisted[0].citations[0].sourceResourceId, "res-1", "sourceResourceId resolved from the published passage");
+  assert.equal(persisted[0].derivedNodeId, "node-c1");
+  assert.equal(persisted[0].groundingProvenance, "source_cep");
+  assert.equal(persisted[0].citations[0].provenance, "source");
+  assert.equal(persisted[0].citations[0].provenance === "source" ? persisted[0].citations[0].sourceResourceId : "", "res-1", "sourceResourceId resolved from the published passage");
   assert.equal(persisted[0].generatingModel, "mock-card-gen");
 });
 
@@ -92,13 +131,15 @@ test("a card whose citation quote is not in any cited passage is rejected fail-c
   const snapshot = snapshotWith([
     { conceptId: "c1", label: "Ownership", definitions: [passage("b1", "Ownership is a set of rules that govern memory.")] }
   ]);
+  const layer = layerWith([anchorNode("c1")]);
   const { store, persisted } = capturingStore();
   const result = await generateCardBank({
-    graphVersionId: "gv-1",
+    enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      c1: { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "a fact never stated in the passage" }] }
+      "node-c1": { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b1", evidenceQuote: "a fact never stated in the passage" }] }
     }),
     cardBankStore: store,
     newCardId: () => "card-1"
@@ -110,34 +151,38 @@ test("a card whose citation quote is not in any cited passage is rejected fail-c
   assert.equal(persisted.length, 0, "the rejected card is not persisted");
 });
 
-test("a Concept with no definition passage still produces a card from a mention", async () => {
+test("an anchor with no definition passage still produces a card from a mention", async () => {
   const snapshot = snapshotWith([
     { conceptId: "c1", label: "Borrowing", mentions: [passage("b2", "Borrowing lets you reference a value without taking ownership.")] }
   ]);
+  const layer = layerWith([anchorNode("c1")]);
   const { store, persisted } = capturingStore();
   const result = await generateCardBank({
-    graphVersionId: "gv-1",
+    enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: cardGenerationReturning({
-      c1: { question: "What is borrowing?", answerKey: "Referencing without taking ownership.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b2", evidenceQuote: "reference a value without taking ownership" }] }
+      "node-c1": { question: "What is borrowing?", answerKey: "Referencing without taking ownership.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b2", evidenceQuote: "reference a value without taking ownership" }] }
     }),
     cardBankStore: store,
     newCardId: () => "card-1"
   });
 
   assert.equal(result.cards.length, 1, "thin CEP (mentions only) still yields a card");
-  assert.equal(persisted[0].citations[0].sourceBlockId, "b2");
+  assert.equal(persisted[0].citations[0].provenance === "source" ? persisted[0].citations[0].sourceBlockId : "", "b2");
 });
 
-test("a Concept with no citable CEP passages is rejected without calling the generator", async () => {
+test("an anchor with no citable CEP passages is rejected without calling the generator", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Empty" }]);
+  const layer = layerWith([anchorNode("c1")]);
   const { store } = capturingStore();
   let generatorCalled = false;
   const result = await generateCardBank({
-    graphVersionId: "gv-1",
+    enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layer),
     cardGeneration: {
       model: "mock",
       async generate() { generatorCalled = true; throw new Error("should not be called"); }
@@ -147,4 +192,82 @@ test("a Concept with no citable CEP passages is rejected without calling the gen
   assert.equal(result.cards.length, 0);
   assert.equal(result.rejected.length, 1);
   assert.equal(generatorCalled, false);
+});
+
+test("source-mentioned and generated enrichment nodes verify against their own grounding provenance", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership" }]);
+  const layer = layerWith([
+    {
+      nodeKind: "enrichment",
+      derivedNodeId: "source-node",
+      groundingOrigin: "source_mentioned",
+      role: "prerequisite",
+      layer: "derived",
+      canonicalLabel: "Scope",
+      normalizedLabel: "scope",
+      declaredDomain: "software engineering",
+      aliases: [],
+      groundingPassages: [{
+        passageType: "mention",
+        text: "Scope controls where a binding can be used.",
+        groundingOrigin: "source_mentioned",
+        sourceResourceId: "res-1",
+        sourceBlockId: "b-source",
+        evidenceQuote: "Scope controls where a binding can be used.",
+        headingPath: [],
+        locator: {},
+        verbatimCheck: { disposition: "verified", sourceResourceId: "res-1", sourceBlockId: "b-source" }
+      }]
+    },
+    {
+      nodeKind: "enrichment",
+      derivedNodeId: "generated-node",
+      groundingOrigin: "llm_grounded",
+      mintingReason: "assumed_prerequisite",
+      role: "prerequisite",
+      layer: "derived",
+      canonicalLabel: "Move semantics",
+      normalizedLabel: "move semantics",
+      declaredDomain: "software engineering",
+      aliases: [],
+      groundingBundle: {
+        derivedNodeId: "generated-node",
+        groundingOrigin: "llm_grounded",
+        definitions: [{
+          passageType: "definition",
+          text: "Move semantics transfer a resource from one binding to another.",
+          groundingOrigin: "llm_grounded",
+          headingPath: [],
+          locator: {},
+          verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated grounding" }
+        }],
+        mentions: [],
+        scaffoldedAnchorConceptIds: ["c1"],
+        generatingModel: "mock",
+        rationale: "fixture"
+      }
+    }
+  ]);
+  const { store, persisted } = capturingStore();
+  const result = await generateCardBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layer),
+    cardGeneration: cardGenerationReturning({
+      "source-node": { question: "What does scope control?", answerKey: "Where a binding can be used.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "b-source", evidenceQuote: "where a binding can be used" }] },
+      "generated-node": { question: "What do move semantics transfer?", answerKey: "A resource between bindings.", selfReportPrompt: "Confident?", citations: [{ sourceBlockId: "generated-node:definition:0", evidenceQuote: "transfer a resource from one binding to another" }] }
+    }),
+    cardBankStore: store,
+    newCardId: (() => {
+      let i = 0;
+      return () => `card-${++i}`;
+    })()
+  });
+
+  assert.equal(result.cards.length, 2);
+  assert.equal(persisted.find((card) => card.derivedNodeId === "source-node")?.groundingProvenance, "source_mentioned");
+  const generated = persisted.find((card) => card.derivedNodeId === "generated-node");
+  assert.equal(generated?.groundingProvenance, "generated");
+  assert.equal(generated?.citations[0].provenance, "generated");
 });

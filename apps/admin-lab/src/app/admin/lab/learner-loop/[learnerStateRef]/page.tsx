@@ -13,7 +13,7 @@ export default async function LearnerLoopDetailPage({
 }: Readonly<{ params: Promise<{ learnerStateRef: string }> }>) {
   const { learnerStateRef } = await params;
   const detail = await getLearnerLoopDetail(decodeURIComponent(learnerStateRef));
-  if (!detail || detail.responses.length === 0) notFound();
+  if (!detail) notFound();
   return (
     <AdminShell active="learner-loop">
       <div className="mb-4">

@@ -27,7 +27,7 @@ export function rateByDifficulty(difficulty: number, cutoff: number): SelfReport
 export async function synthesizeResponses(input: {
   learnerStateRef: string;
   layer: DerivedGraphLayer;
-  targetConceptId: string;
+  targetDerivedNodeId: string;
   declaredDomain: string;
   cards: Card[];
   profile: SyntheticLearnerProfile;
@@ -35,13 +35,13 @@ export async function synthesizeResponses(input: {
   judge: AnswerGradingJudgePort;
   responseLog: ResponseLogStorePort;
 }): Promise<{ calibrationBatchId: string; selfReportCount: number; gradedCount: number }> {
-  const cardByConcept = new Map(input.cards.map((card) => [card.conceptId, card] as const));
-  const calibration = buildCalibrationSet({ layer: input.layer, targetConceptId: input.targetConceptId, cards: input.cards });
+  const cardByNode = new Map(input.cards.map((card) => [card.derivedNodeId, card] as const));
+  const calibration = buildCalibrationSet({ layer: input.layer, targetDerivedNodeId: input.targetDerivedNodeId, cards: input.cards });
 
   // 1. Calibration: deterministically rate every set item, then append ONE batch via
   //    U4's single append path (self-report rows tagged synthetic).
   const ratings: SelfReportInput[] = calibration.map((item) => ({
-    conceptId: item.conceptId,
+    derivedNodeId: item.derivedNodeId,
     cardId: item.cardId,
     rating: rateByDifficulty(item.difficulty, input.profile.difficultyCutoff)
   }));
@@ -56,22 +56,22 @@ export async function synthesizeResponses(input: {
   //    own card. Each answer is simulated then graded by the REAL judge through U5's
   //    gradeAndAppend — exercising the true measurement path, not a stub.
   const gradeOrder = [
-    ...(cardByConcept.has(input.targetConceptId) ? [{ conceptId: input.targetConceptId, difficulty: difficultyOfConcept(input.layer, input.targetConceptId) }] : []),
-    ...calibration.map((item) => ({ conceptId: item.conceptId, difficulty: item.difficulty }))
+    ...(cardByNode.has(input.targetDerivedNodeId) ? [{ derivedNodeId: input.targetDerivedNodeId, difficulty: difficultyOfNode(input.layer, input.targetDerivedNodeId) }] : []),
+    ...calibration.map((item) => ({ derivedNodeId: item.derivedNodeId, difficulty: item.difficulty }))
   ];
   const seen = new Set<string>();
   let gradedCount = 0;
   for (const candidate of gradeOrder) {
     if (gradedCount >= input.profile.gradedSampleSize) break;
-    if (seen.has(candidate.conceptId)) continue;
-    seen.add(candidate.conceptId);
-    const card = cardByConcept.get(candidate.conceptId);
+    if (seen.has(candidate.derivedNodeId)) continue;
+    seen.add(candidate.derivedNodeId);
+    const card = cardByNode.get(candidate.derivedNodeId);
     if (!card) continue;
     const competence: "strong" | "weak" = candidate.difficulty < input.profile.difficultyCutoff ? "strong" : "weak";
     const { answer } = await input.simulator.simulateAnswer({ declaredDomain: input.declaredDomain, question: card.question, competence });
     await gradeAndAppend({
       learnerStateRef: input.learnerStateRef,
-      card: { cardId: card.cardId, conceptId: card.conceptId, question: card.question, answerKey: card.answerKey },
+      card: { cardId: card.cardId, derivedNodeId: card.derivedNodeId, question: card.question, answerKey: card.answerKey },
       declaredDomain: input.declaredDomain,
       submittedAnswer: answer,
       judge: input.judge,
@@ -84,10 +84,6 @@ export async function synthesizeResponses(input: {
   return { calibrationBatchId: batchId, selfReportCount: ratings.length, gradedCount };
 }
 
-// The target anchor's difficulty is keyed by its derived_node_id; resolve via the
-// anchor bridge. Returns 1 (treated hardest) when not found so the target is graded.
-function difficultyOfConcept(layer: DerivedGraphLayer, conceptId: string): number {
-  const node = layer.derivedNodes.find((candidate) => candidate.nodeKind === "anchor" && candidate.conceptId === conceptId);
-  if (!node) return 1;
-  return layer.difficulties.find((difficulty) => difficulty.conceptId === node.derivedNodeId)?.score ?? 1;
+function difficultyOfNode(layer: DerivedGraphLayer, derivedNodeId: string): number {
+  return layer.difficulties.find((difficulty) => difficulty.conceptId === derivedNodeId)?.score ?? 1;
 }

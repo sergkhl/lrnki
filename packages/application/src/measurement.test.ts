@@ -11,7 +11,7 @@ function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogR
   const store: ResponseLogStorePort = {
     async append(appended) { rows.push(...appended); },
     async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref).map(hydrate); },
-    async listForLearnerConcept(ref, c) { return rows.filter((r) => r.learnerStateRef === ref && r.conceptId === c).map(hydrate); },
+    async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId).map(hydrate); },
     async nextAttemptSeq(ref) { return rows.filter((r) => r.learnerStateRef === ref).length + 1; }
   };
   return { store, rows };
@@ -21,7 +21,7 @@ function judgeReturning(canned: { outcome: JudgedOutcome; score: number; rationa
   return { model: "kg-independent-judge", async grade() { return canned; } };
 }
 
-const card = { cardId: "card-1", conceptId: "concept-1", question: "What is X?", answerKey: "X is a thing." };
+const card = { cardId: "card-1", derivedNodeId: "node-1", question: "What is X?", answerKey: "X is a thing." };
 
 test("a canned 'partial' verdict appends a graded row with the score and grader identity (Covers AE4, R4)", async () => {
   const log = fakeResponseLog();
@@ -55,7 +55,7 @@ test("canned 'correct' and 'incorrect' verdicts map to graded_score 1.0 and 0", 
 test("the graded row's evidence weight exceeds a self-report row's weight", async () => {
   assert.ok(GRADED_EVIDENCE_WEIGHT > SELF_REPORT_EVIDENCE_WEIGHT);
   const log = fakeResponseLog();
-  await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ conceptId: "concept-1", cardId: "card-1", rating: "good" }], responseSource: "human" });
+  await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "node-1", cardId: "card-1", rating: "good" }], responseSource: "human" });
   const { row } = await gradeAndAppend({
     learnerStateRef: "L1", card, declaredDomain: "d", submittedAnswer: "answer",
     judge: judgeReturning({ outcome: "correct", score: 1, rationale: "ok" }), responseLog: log.store, responseSource: "human"

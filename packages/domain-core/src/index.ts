@@ -929,30 +929,29 @@ export type LearnerPath = {
 
 // ---------------------------------------------------------------------------
 // Learner Recall Loop — Card Bank (R1–R3). A learner-NEUTRAL derived asset: one
-// anki-style card per published anchor Concept, conditioned on that Concept's
-// published CEP and keyed to the graph version the CEP belongs to. Regenerable
-// without affecting learner state; never written into the asserted graph or the
-// Derived Graph Layer (CONTEXT.md "Learner State", AGENTS rule 3). The two recall
-// modes read ONE card: calibration uses `selfReportPrompt`, measurement grades a
-// written answer against `answerKey` (Key Technical Decisions: one item, two
-// signal types).
+// anki-style card per Derived Graph Layer node, conditioned on that node's
+// grounding and keyed to the enrichment node identity. Regenerable without
+// affecting learner state; never written into the asserted graph or the Derived
+// Graph Layer (CONTEXT.md "Learner State", AGENTS rule 3). The two recall modes
+// read ONE card: calibration uses `selfReportPrompt`, measurement grades a written
+// answer against `answerKey` (Key Technical Decisions: one item, two signal types).
 // ---------------------------------------------------------------------------
 
-// A verbatim citation from the card's answer-key into a published CEP passage,
-// mirroring the published-CEP passage shape so it verifies against
-// graph_version_evidence_passages (R2). `evidenceQuote` is a verbatim substring of
-// the cited source block; the application boundary verifies this fail-closed before
-// a card persists (U2, AGENTS rule 6).
-export type CardAnswerKeyCitation = {
-  sourceResourceId: string;
-  sourceBlockId: string;
-  evidenceQuote: string;
-};
+export type CardGroundingProvenance = "source_cep" | "source_mentioned" | "generated";
+
+// Provenance-tagged citations keep generated grounding honest: source citations
+// must verify against source text, generated citations verify only against the
+// generated grounding bundle and never carry source ids.
+export type CardAnswerKeyCitation =
+  | { provenance: "source"; sourceResourceId: string; sourceBlockId: string; evidenceQuote: string }
+  | { provenance: "generated"; derivedNodeId: string; passageText: string };
 
 export type Card = {
   cardId: string;
   graphVersionId: string;
-  conceptId: string;
+  enrichmentId: string;
+  derivedNodeId: string;
+  groundingProvenance: CardGroundingProvenance;
   question: string;
   answerKey: string;
   selfReportPrompt: string;
@@ -977,8 +976,8 @@ export type CardDraft = {
 // Response Log — the durable, append-only commitment (R4–R6). Every recall attempt
 // is an immutable row. `self_report` rows carry an anki-style rating; `graded` rows
 // carry a judged outcome plus a [0,1] score (the partial/binary distinction the
-// estimator and a later IRT/BKT fit need, AE4). The skill is the asserted
-// `conceptId` (enrichment-independent); the item is `cardId` (per-item IRT key).
+// estimator and a later IRT/BKT fit need, AE4). The skill is the Derived Graph Layer
+// `derivedNodeId`; the item is `cardId` (per-item IRT key).
 // ---------------------------------------------------------------------------
 
 export type SignalType = "self_report" | "graded";
@@ -990,7 +989,7 @@ export type ResponseLogRow = {
   responseId: string;
   learnerStateRef: string;
   cardId: string;
-  conceptId: string;
+  derivedNodeId: string;
   signalType: SignalType;
   selfReportRating: SelfReportRating | null;
   judgedOutcome: JudgedOutcome | null;

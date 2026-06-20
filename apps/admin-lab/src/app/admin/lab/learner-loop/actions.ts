@@ -24,11 +24,11 @@ export async function resubmitEditedAnswer(formData: FormData): Promise<void> {
 
   const sql = createDatabaseClient();
   try {
-    // Re-derive the card and its concept from the DB — never trust a client-sent
-    // answer-key. declaredDomain comes from the published Concept.
-    const cardRows = await sql<{ concept_id: string; question: string; answer_key: string; declared_domain: string }[]>`
-      SELECT cd.concept_id, cd.question, cd.answer_key, c.declared_domain
-      FROM cards cd JOIN concepts c ON c.concept_id = cd.concept_id
+    // Re-derive the card and its node from the DB — never trust a client-sent
+    // answer-key. declaredDomain comes from the Derived Graph node.
+    const cardRows = await sql<{ derived_node_id: string; question: string; answer_key: string; declared_domain: string }[]>`
+      SELECT cd.derived_node_id, cd.question, cd.answer_key, n.declared_domain
+      FROM cards cd JOIN derived_graph_nodes n ON n.derived_node_id = cd.derived_node_id
       WHERE cd.card_id = ${cardId} LIMIT 1`;
     if (cardRows.length === 0) return;
     const card = cardRows[0];
@@ -46,7 +46,7 @@ export async function resubmitEditedAnswer(formData: FormData): Promise<void> {
 
     await resubmitAndRecompute({
       learnerStateRef,
-      card: { cardId, conceptId: card.concept_id, question: card.question, answerKey: card.answer_key },
+      card: { cardId, derivedNodeId: card.derived_node_id, question: card.question, answerKey: card.answer_key },
       declaredDomain: card.declared_domain,
       submittedAnswer: editedAnswer,
       paths: pathRows.map((row) => ({ enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id })),

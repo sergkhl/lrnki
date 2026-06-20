@@ -326,9 +326,9 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   }
 }
 
-async function synthesizeResponsesCommand(ctx: Context, graphVersionId?: string, enrichmentId?: string, targetConceptId?: string, learnerStateRef?: string) {
-  if (!graphVersionId || !enrichmentId || !targetConceptId || !learnerStateRef) {
-    console.error("! synthesize-responses requires <graphVersionId> <enrichmentId> <targetConceptId> <learnerStateRef>.");
+async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, targetDerivedNodeId?: string, learnerStateRef?: string) {
+  if (!enrichmentId || !targetDerivedNodeId || !learnerStateRef) {
+    console.error("! synthesize-responses requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
     process.exitCode = 1;
     return;
   }
@@ -338,18 +338,18 @@ async function synthesizeResponsesCommand(ctx: Context, graphVersionId?: string,
     process.exitCode = 1;
     return;
   }
-  const cards = await ctx.cardBankStore.listCardsForVersion(graphVersionId);
-  const targetNode = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetConceptId);
+  const cards = await ctx.cardBankStore.listCardsForEnrichment(enrichmentId);
+  const targetNode = layer.derivedNodes.find((node) => node.derivedNodeId === targetDerivedNodeId);
   if (!targetNode) {
-    console.error(`! target concept ${targetConceptId} is not an anchor in enrichment ${enrichmentId}.`);
+    console.error(`! target node ${targetDerivedNodeId} is not in enrichment ${enrichmentId}.`);
     process.exitCode = 1;
     return;
   }
-  console.log(`\n>> synthesizing responses for learner ${learnerStateRef} toward ${targetConceptId}`);
+  console.log(`\n>> synthesizing responses for learner ${learnerStateRef} toward ${targetDerivedNodeId}`);
   const result = await synthesizeResponses({
     learnerStateRef,
     layer,
-    targetConceptId,
+    targetDerivedNodeId,
     declaredDomain: targetNode.declaredDomain,
     cards,
     profile: { difficultyCutoff: 0.6, gradedSampleSize: 4 },
@@ -366,21 +366,15 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
-  // Build the log-backed LearnerStatePort (U6): resolve each anchor concept_id to its
-  // derived_node_id in THIS enrichment so the fold keys match the projection space.
   const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
   if (!layer) {
     console.error(`! enrichment ${enrichmentId} not found.`);
     process.exitCode = 1;
     return;
   }
-  const nodeByConcept = new Map<string, string>();
-  for (const node of layer.derivedNodes) {
-    if (node.nodeKind === "anchor") nodeByConcept.set(node.conceptId, node.derivedNodeId);
-  }
   // The CLI target is an asserted concept_id; the projection works in derived-node
   // space, so resolve it to the goal anchor node (KTD).
-  const targetNodeId = nodeByConcept.get(targetConceptId);
+  const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetConceptId)?.derivedNodeId;
   if (!targetNodeId) {
     console.error(`! target concept ${targetConceptId} is not an anchor in enrichment ${enrichmentId}.`);
     process.exitCode = 1;
@@ -388,8 +382,7 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
   const learnerState = await loadResponseLogLearnerState({
     responseLog: ctx.responseLogStore,
-    learnerStateRef,
-    conceptToNodeResolver: (conceptId) => nodeByConcept.get(conceptId)
+    learnerStateRef
   });
 
   const learnerPathId = randomUUID();
@@ -411,33 +404,27 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
 }
 
-async function generateCardsCommand(ctx: Context, graphVersionId?: string) {
-  // Card Bank generation (U2): published version + its CEPs -> one learner-neutral
-  // card per anchor Concept. Default to the latest published version when none named.
-  let targetVersionId = graphVersionId;
-  if (!targetVersionId) {
-    const snapshot = await ctx.graphStore.getLatestPublishedSnapshot();
-    if (!snapshot) {
-      console.error("! no published graph version to generate cards for.");
-      process.exitCode = 1;
-      return;
-    }
-    targetVersionId = snapshot.graphVersionId;
+async function generateCardsCommand(ctx: Context, enrichmentId?: string) {
+  if (!enrichmentId) {
+    console.error("! generate-cards requires <enrichmentId>.");
+    process.exitCode = 1;
+    return;
   }
-  console.log(`\n>> generating Card Bank for graph version ${targetVersionId}`);
+  console.log(`\n>> generating Card Bank for enrichment ${enrichmentId}`);
   const result = await generateCardBank({
-    graphVersionId: targetVersionId,
+    enrichmentId,
     configHash: CARD_BANK_CONFIG_HASH,
     graphStore: ctx.graphStore,
+    enrichmentStore: ctx.enrichmentStore,
     cardGeneration: ctx.cardGeneration,
     cardBankStore: ctx.cardBankStore
   });
   console.log(`   cards=${result.cards.length} rejected=${result.rejected.length} model=${ctx.cardGeneration.model}`);
   for (const card of result.cards) {
-    console.log(`   card[${card.conceptId}] citations=${card.citations.length}\n     Q: ${card.question}\n     A: ${card.answerKey}`);
+    console.log(`   card[${card.derivedNodeId}] provenance=${card.groundingProvenance} citations=${card.citations.length}\n     Q: ${card.question}\n     A: ${card.answerKey}`);
   }
   for (const rejected of result.rejected) {
-    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.conceptId}): ${rejected.reason}`);
+    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}): ${rejected.reason}`);
   }
 }
 
@@ -472,7 +459,7 @@ async function main() {
         await generateCardsCommand(ctx, arg);
         break;
       case "synthesize-responses":
-        await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1], rest[2]);
+        await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
         break;
       case "compute-adaptive-path":
         await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
@@ -481,7 +468,7 @@ async function main() {
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | generate-cards [<graphVersionId>] | synthesize-responses <graphVersionId> <enrichmentId> <targetConceptId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetConceptId> <learnerStateRef> | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | generate-cards <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetConceptId> <learnerStateRef> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

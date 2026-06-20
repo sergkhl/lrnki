@@ -308,15 +308,15 @@ export interface LearnerPathStorePort {
 // here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
 // ---------------------------------------------------------------------------
 
-// Card Bank persistence (R3). `persist` writes a whole version's cards atomically
+// Card Bank persistence (R3). `persist` writes a whole enrichment's cards atomically
 // AND its immutable `card_bank` artifact in one transaction (no authoritative
 // relational state without its artifact, matching the enrichment/extraction
-// stores). Regeneration replaces a version's cards (delete-then-insert) rather than
-// silently duplicating against the `(graph_version_id, concept_id)` unique key.
+// stores). Regeneration replaces an enrichment's cards (delete-then-insert) rather
+// than silently duplicating against the `derived_node_id` unique key.
 export interface CardBankStorePort {
   persist(cards: Card[]): Promise<void>;
-  getCard(graphVersionId: string, conceptId: string): Promise<Card | undefined>;
-  listCardsForVersion(graphVersionId: string): Promise<Card[]>;
+  getCard(derivedNodeId: string): Promise<Card | undefined>;
+  listCardsForEnrichment(enrichmentId: string): Promise<Card[]>;
 }
 
 // Card generation (R1, R2). Forced named tool schema routed through LiteLLM; the
@@ -330,7 +330,7 @@ export interface CardBankStorePort {
 export interface ResponseLogStorePort {
   append(rows: NewResponseLogRow[]): Promise<void>;
   listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
-  listForLearnerConcept(learnerStateRef: string, conceptId: string): Promise<ResponseLogRow[]>;
+  listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]>;
   nextAttemptSeq(learnerStateRef: string): Promise<number>;
 }
 
@@ -366,10 +366,15 @@ export interface CardGenerationPort {
   readonly model: string;
   generate(input: {
     declaredDomain: string;
-    concept: { conceptId: string; canonicalLabel: string; aliases: string[] };
-    // Published CEP passages the card may cite, identified by sourceBlockId. The
-    // application resolves sourceResourceId from these after verbatim verification.
-    cepPassages: { sourceBlockId: string; kind: "definition" | "mention"; evidenceQuote: string }[];
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: Card["groundingProvenance"];
+    // Grounding passages the card may cite. Source-grounded passages carry source ids
+    // and require verbatim quotes; generated passages carry generated text and no
+    // source ids.
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
     // The single guarded `defines` literal, when the CEP carries one (HINT only).
     definesLiteral: string | null;
   }): Promise<CardDraft>;

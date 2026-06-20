@@ -4,7 +4,7 @@ import { LiteLlmCardGenerationAdapter } from "./cardGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { cardGenerationValidator } from "./toolSchemas";
 
-test("passes the concept and its CEP passages into the forced-tool prompt", async () => {
+test("passes the node and its grounding passages into the forced-tool prompt", async () => {
   const calls: { model: string; toolName: string; messages: { content: string }[] }[] = [];
   const client = {
     async call(input: { model: string; toolName: string; messages: { content: string }[] }) {
@@ -16,8 +16,9 @@ test("passes the concept and its CEP passages into the forced-tool prompt", asyn
 
   const draft = await adapter.generate({
     declaredDomain: "software engineering",
-    concept: { conceptId: "c1", canonicalLabel: "Ownership", aliases: ["owner"] },
-    cepPassages: [{ sourceBlockId: "b1", kind: "definition", evidenceQuote: "Ownership is a set of rules that govern memory." }],
+    node: { derivedNodeId: "n1", canonicalLabel: "Ownership", aliases: ["owner"] },
+    groundingProvenance: "source_cep",
+    groundingPassages: [{ passageId: "b1", kind: "definition", text: "Ownership is a set of rules that govern memory.", sourceResourceId: "res-1", sourceBlockId: "b1" }],
     definesLiteral: "the rules governing memory"
   });
 

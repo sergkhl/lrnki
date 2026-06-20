@@ -3,8 +3,7 @@ import type { LearnerStatePort, ResponseLogStorePort } from "@lrnki/ports";
 
 // Mastery estimator (U6, R11/R12). Deliberately simple, carried at EXPERIMENT_ONLY
 // trust: no IRT/BKT/Bradley-Terry calibrated precision this milestone (R12). It folds
-// the append-only Response Log into a mastery score per asserted concept, then
-// resolves each concept to the active enrichment's derived node so the pure
+// the append-only Response Log into a mastery score per derived node so the pure
 // projection can read it unchanged. Real IRT/KT later implements the SAME
 // LearnerStatePort over the SAME log without re-collecting responses (R6).
 
@@ -27,7 +26,7 @@ export function outcomeToMastery(outcome: JudgedOutcome): number {
   }
 }
 
-// The fold for ONE concept's rows. Graded ALWAYS outranks self-report on conflict
+// The fold for ONE derived node's rows. Graded ALWAYS outranks self-report on conflict
 // (a graded row, even if older, beats a later self-report — AE1, R11); among graded
 // rows the latest wins. With only self-report rows, recency selects the active prior
 // (R11). Rows are assumed ordered by attempt_seq (the store returns them so).
@@ -46,25 +45,20 @@ export function foldConceptMastery(rows: ResponseLogRow[]): number {
 }
 
 // Build a synchronous LearnerStatePort from the log. Preloads all rows for the
-// learner, folds per concept, and resolves each concept_id to the active
-// enrichment's derived_node_id (the key the projection uses, KTD). A concept with no
-// anchor in the active enrichment is simply absent (defaults to 0 / unmastered).
+// learner and folds directly by derived_node_id (the key the projection uses, KTD).
 export async function loadResponseLogLearnerState(input: {
   responseLog: ResponseLogStorePort;
   learnerStateRef: string;
-  conceptToNodeResolver: (conceptId: string) => string | undefined;
 }): Promise<LearnerStatePort> {
   const rows = await input.responseLog.listForLearner(input.learnerStateRef);
-  const byConcept = new Map<string, ResponseLogRow[]>();
+  const byNode = new Map<string, ResponseLogRow[]>();
   for (const row of rows) {
-    byConcept.set(row.conceptId, [...(byConcept.get(row.conceptId) ?? []), row]);
+    byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
   }
 
   const masteryByNode = new Map<string, number>();
-  for (const [conceptId, conceptRows] of byConcept) {
-    const derivedNodeId = input.conceptToNodeResolver(conceptId);
-    if (!derivedNodeId) continue; // concept not anchored in this enrichment → unmastered
-    masteryByNode.set(derivedNodeId, foldConceptMastery(conceptRows));
+  for (const [derivedNodeId, nodeRows] of byNode) {
+    masteryByNode.set(derivedNodeId, foldConceptMastery(nodeRows));
   }
 
   return {

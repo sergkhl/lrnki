@@ -575,10 +575,11 @@ export const rescueDurabilityJudgmentValidator = z.object({
 }).strict();
 
 // --- Card generation: submit_recall_card (U2, R1/R2) ----------------------
-// One anki-style recall card per published Concept, conditioned on its CEP. The
-// answer-key cites CEP passages by blockId + a verbatim quote; the application
-// boundary verifies each quote against the published CEP and rejects fail-closed
-// (AGENTS rule 6). Domain-neutral rubric language only (AGENTS rule 17).
+// One anki-style recall card per derived learning node, conditioned on its grounding.
+// The answer-key cites provided grounding passages by passage id + quote; the
+// application boundary verifies each quote under that grounding's provenance
+// contract and rejects fail-closed (AGENTS rule 6). Domain-neutral rubric language
+// only (AGENTS rule 17).
 export const cardGenerationSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -586,11 +587,11 @@ export const cardGenerationSchema: JsonSchema = {
   properties: {
     question: {
       type: "string",
-      description: "One self-contained recall question about the concept that a learner could answer from understanding it. Do not reference 'the passage' or 'the source'."
+      description: "One self-contained recall question about the learning node that a learner could answer from understanding it. Do not reference 'the passage' or 'the source'."
     },
     answerKey: {
       type: "string",
-      description: "A concise correct answer a grader can check a learner's free-form response against. Grounded in the provided CEP passages; introduce no facts absent from them."
+      description: "A concise correct answer a grader can check a learner's free-form response against. Grounded in the provided grounding passages; introduce no facts absent from them."
     },
     selfReportPrompt: {
       type: "string",
@@ -603,8 +604,8 @@ export const cardGenerationSchema: JsonSchema = {
         additionalProperties: false,
         required: ["sourceBlockId", "evidenceQuote"],
         properties: {
-          sourceBlockId: { type: "string", description: "Exact id of one provided CEP passage block the answer derives from." },
-          evidenceQuote: { type: "string", description: "Verbatim substring copied from that CEP passage supporting the answer-key." }
+          sourceBlockId: { type: "string", description: "Exact passageId of one provided grounding passage the answer derives from." },
+          evidenceQuote: { type: "string", description: "Substring copied from that grounding passage supporting the answer-key. For source-grounded passages, copy it verbatim." }
         }
       }
     }

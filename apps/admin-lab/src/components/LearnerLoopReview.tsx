@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
 const CONFLICT_COPY: Record<ConceptConflict["kind"], string> = {
@@ -13,11 +14,17 @@ const CONFLICT_COPY: Record<ConceptConflict["kind"], string> = {
   claimed_unknown_but_passed: "Claimed unknown, graded correct"
 };
 
+const PROVENANCE_LABEL: Record<"source_cep" | "source_mentioned" | "generated", string> = {
+  source_cep: "CEP",
+  source_mentioned: "source-mention",
+  generated: "generated"
+};
+
 // Read + review surface for one learner's recall loop (U8). Conflicts are surfaced as
 // a deliberate calibration signal (R16); graded answers can be edited and resubmitted,
 // appending a new graded row and recomputing the path (learner state only, R15).
 export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDetail }>) {
-  const conflictByConcept = new Map(detail.conflicts.map((conflict) => [conflict.conceptId, conflict] as const));
+  const conflictByNode = new Map(detail.conflicts.map((conflict) => [conflict.derivedNodeId, conflict] as const));
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -36,8 +43,8 @@ export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDeta
               <AlertTitle>Calibration conflicts</AlertTitle>
               <AlertDescription>
                 {detail.conflicts.map((conflict) => (
-                  <span key={conflict.conceptId} className="block">
-                    {conflict.conceptId}: {CONFLICT_COPY[conflict.kind]} (self-report {conflict.activeSelfReport} vs graded {conflict.latestGraded})
+                  <span key={conflict.derivedNodeId} className="block">
+                    {conflict.derivedNodeId}: {CONFLICT_COPY[conflict.kind]} (self-report {conflict.activeSelfReport} vs graded {conflict.latestGraded})
                   </span>
                 ))}
               </AlertDescription>
@@ -46,13 +53,64 @@ export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDeta
         )}
       </Card>
 
+      {detail.coverage.map((path) => (
+        <Card key={`${path.enrichmentId}:${path.targetDerivedNodeId}`}>
+          <CardHeader className="border-b">
+            <CardTitle className="text-base">Path card coverage: {path.targetLabel}</CardTitle>
+            <CardDescription>
+              Every stored path step is shown with its recall-testability. Generated badges cite generated grounding, not source quotes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Step</TableHead>
+                  <TableHead>Node</TableHead>
+                  <TableHead>Grounding</TableHead>
+                  <TableHead>Card status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {path.steps.map((step) => (
+                  <TableRow key={`${path.enrichmentId}:${step.derivedNodeId}`}>
+                    <TableCell className="tabular-nums">{step.position + 1}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium">{step.label}</span>
+                        <span className="text-muted-foreground text-xs">{step.includedReason}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{step.groundingOrigin}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {step.card ? (
+                        <div className="flex flex-col gap-1">
+                          <Badge variant={step.card.provenance === "generated" ? "secondary" : "outline"}>
+                            {PROVENANCE_LABEL[step.card.provenance]}
+                          </Badge>
+                          <span className="text-muted-foreground text-xs">{step.card.question}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">{step.fallbackReason}</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ))}
+
       {detail.responses.map((response) => {
-        const conflict = conflictByConcept.get(response.conceptId);
+        const conflict = conflictByNode.get(response.derivedNodeId);
         return (
           <Card key={response.responseId}>
             <CardHeader className="border-b">
               <CardTitle className="flex items-center gap-2 text-base">
-                #{response.attemptSeq} {response.conceptLabel}
+                #{response.attemptSeq} {response.nodeLabel}
                 <Badge variant="outline">{response.signalType}</Badge>
                 <Badge variant="outline">{response.responseSource}</Badge>
                 {response.signalType === "self_report" && response.selfReportRating && (

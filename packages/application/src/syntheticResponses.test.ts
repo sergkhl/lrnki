@@ -21,10 +21,22 @@ const layer: DerivedGraphLayer = {
     { conceptId: "nD", score: 0.9, method: "m", components: {} }
   ]
 };
-function card(conceptId: string): Card {
-  return { cardId: `card-${conceptId}`, graphVersionId: "gv", conceptId, question: `Q ${conceptId}?`, answerKey: `A ${conceptId}`, selfReportPrompt: "Confident?", citations: [], generatingModel: "g", configHash: "c" };
+function card(derivedNodeId: string): Card {
+  return {
+    cardId: `card-${derivedNodeId}`,
+    graphVersionId: "gv",
+    enrichmentId: "e",
+    derivedNodeId,
+    groundingProvenance: "source_cep",
+    question: `Q ${derivedNodeId}?`,
+    answerKey: `A ${derivedNodeId}`,
+    selfReportPrompt: "Confident?",
+    citations: [],
+    generatingModel: "g",
+    configHash: "c"
+  };
 }
-const cards = ["cA", "cB", "cC", "cD"].map(card);
+const cards = ["nA", "nB", "nC", "nD"].map(card);
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
   const rows: NewResponseLogRow[] = [];
@@ -34,7 +46,7 @@ function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogR
     store: {
       async append(a) { rows.push(...a); },
       async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref).map(hydrate); },
-      async listForLearnerConcept(ref, c) { return rows.filter((r) => r.learnerStateRef === ref && r.conceptId === c).map(hydrate); },
+      async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId).map(hydrate); },
       async nextAttemptSeq(ref) { return rows.filter((r) => r.learnerStateRef === ref).length + 1; }
     }
   };
@@ -53,7 +65,7 @@ test("rateByDifficulty yields good/easy below the cutoff and hard/again at or ab
 test("synthesizeResponses writes one calibration batch and routes graded answers through the real judge", async () => {
   const log = fakeResponseLog();
   const result = await synthesizeResponses({
-    learnerStateRef: "L1", layer, targetConceptId: "cD", declaredDomain: "software engineering",
+    learnerStateRef: "L1", layer, targetDerivedNodeId: "nD", declaredDomain: "software engineering",
     cards, profile: { difficultyCutoff: 0.6, gradedSampleSize: 2 }, simulator, judge, responseLog: log.store
   });
 
@@ -75,7 +87,7 @@ test("synthesizeResponses writes one calibration batch and routes graded answers
 test("the generator does not write graded rows directly — they carry the judge's outcome via U5", async () => {
   const log = fakeResponseLog();
   await synthesizeResponses({
-    learnerStateRef: "L2", layer, targetConceptId: "cD", declaredDomain: "software engineering",
+    learnerStateRef: "L2", layer, targetDerivedNodeId: "nD", declaredDomain: "software engineering",
     cards, profile: { difficultyCutoff: 0.6, gradedSampleSize: 1 }, simulator, judge, responseLog: log.store
   });
   const graded = log.rows.filter((r) => r.signalType === "graded");

@@ -397,19 +397,21 @@ JSON_TABLE(
 WHERE a.artifact_type = 'enrichment_run.v2';
 
 -- Flatten card-bank artifact payloads: one row per learner-neutral Card with its
--- concept, question, self-report prompt, and answer-key citation count, for Admin
--- Lab inspection (R3, R15). Reads the immutable `card_bank` artifact the Card Bank
--- store writes beside its normalized rows.
+-- derived node, grounding provenance, question, self-report prompt, and answer-key
+-- citation count, for Admin Lab inspection (R3, R15). Reads the immutable
+-- `card_bank` artifact the Card Bank store writes beside its normalized rows.
 CREATE VIEW artifact_cards AS
-SELECT a.graph_version_id, c.card_id, c.concept_id, c.question,
-       c.self_report_prompt, c.citation_count
+SELECT a.graph_version_id, c.card_id, c.enrichment_id, c.derived_node_id,
+       c.grounding_provenance, c.question, c.self_report_prompt, c.citation_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
   '$.cards[*]'
   COLUMNS (
     card_id text PATH '$.cardId',
-    concept_id text PATH '$.conceptId',
+    enrichment_id text PATH '$.enrichmentId',
+    derived_node_id text PATH '$.derivedNodeId',
+    grounding_provenance text PATH '$.groundingProvenance',
     question text PATH '$.question',
     self_report_prompt text PATH '$.selfReportPrompt',
     citation_count integer PATH '$.citations.size()'
@@ -560,55 +562,63 @@ CREATE TABLE learner_path_steps (
 );
 
 -- ---------------------------------------------------------------------------
--- Learner Recall Loop — learner-neutral Card Bank keyed to a published version
--- (R1–R3). One card per published anchor Concept, conditioned on that Concept's
--- CEP. Cards key on `graph_version_id` because the CEP they cite is per published
--- version; the estimator resolves the asserted concept_id to the active
--- enrichment's derived_node_id at fold time (KTD). Regenerable; never mutates the
--- asserted core or the Derived Graph Layer.
+-- Learner Recall Loop — learner-neutral Card Bank keyed to the Derived Graph
+-- Layer (R1–R3). One card per derived node, conditioned on that node's grounding.
+-- Cards retain graph_version_id for publication scope and key their subject on
+-- derived_node_id so anchors and enrichment nodes share one identity space.
+-- Regenerable; never mutates the asserted core or the Derived Graph Layer.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE cards (
   card_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   question text NOT NULL,
   answer_key text NOT NULL,
   self_report_prompt text NOT NULL,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (graph_version_id, concept_id)
+  UNIQUE (derived_node_id)
 );
 
--- Answer-key citations mirror the published-CEP passage shape so each verifies
--- against graph_version_evidence_passages (R2). The application boundary checks
--- `evidence_quote` is a verbatim substring of the cited block before persisting
--- (U2). Cascade so card regeneration (delete-then-insert) clears citations too.
+-- Answer-key citations are provenance-tagged. Source citations mirror real source
+-- evidence and require source ids + a verbatim quote. Generated citations point at
+-- generated grounding text only and cannot smuggle nullable source ids through the
+-- schema. Cascade so card regeneration (delete-then-insert) clears citations too.
 CREATE TABLE card_answer_key_citations (
   card_answer_key_citation_id uuid PRIMARY KEY,
   card_id uuid NOT NULL REFERENCES cards(card_id) ON DELETE CASCADE,
-  source_resource_id uuid NOT NULL REFERENCES source_resources(source_resource_id),
-  source_block_id uuid NOT NULL REFERENCES source_blocks(source_block_id),
-  evidence_quote text NOT NULL
+  provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
+  source_resource_id uuid REFERENCES source_resources(source_resource_id),
+  source_block_id uuid REFERENCES source_blocks(source_block_id),
+  evidence_quote text,
+  derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  generated_passage_text text,
+  CHECK (
+    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
+    OR
+    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
+  )
 );
 
 -- ---------------------------------------------------------------------------
 -- Response Log — the ONE irreversible commitment (R4–R6). Append-only: every
 -- recall attempt is an immutable row. There is no UPDATE or DELETE path in the
 -- store port; re-calibration and Admin Lab resubmission APPEND new rows (R5, R10).
--- The log stores the durable asserted `concept_id` as the skill (enrichment-
--- independent, KTD); the estimator resolves it to the active enrichment's
--- derived_node_id at fold time. Field set is deliberately IRT- and BKT-sufficient:
--- `card_id` is the per-item IRT key, `concept_id` the per-skill BKT key, and
--- `attempt_seq` the monotonic-per-learner sequence both fits need (R6).
+-- The log stores the derived_node_id as the skill. Field set is deliberately IRT-
+-- and BKT-sufficient: `card_id` is the per-item IRT key, `derived_node_id` the
+-- per-skill BKT key, and `attempt_seq` the monotonic-per-learner sequence both
+-- fits need (R6).
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE response_log (
   response_id uuid PRIMARY KEY,
   learner_state_ref text NOT NULL,
   card_id uuid NOT NULL REFERENCES cards(card_id),
-  concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   signal_type text NOT NULL CHECK (signal_type IN ('self_report', 'graded')),
   self_report_rating text CHECK (self_report_rating IN ('again', 'hard', 'good', 'easy')),
   judged_outcome text CHECK (judged_outcome IN ('correct', 'partial', 'incorrect')),
@@ -635,7 +645,7 @@ CREATE TABLE response_log (
 -- projection — the log is normalized, not artifact-enveloped (it is learner state,
 -- not a published artifact).
 CREATE VIEW artifact_response_log AS
-SELECT response_id, learner_state_ref, card_id, concept_id, signal_type,
+SELECT response_id, learner_state_ref, card_id, derived_node_id, signal_type,
        self_report_rating, judged_outcome, graded_score, evidence_weight,
        response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
 FROM response_log;
