@@ -23,9 +23,9 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
-    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", grounding: null },
-    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
+    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasCard: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasCard: true, grounding: null },
+    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasCard: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
     { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
@@ -114,4 +114,58 @@ test("rescue dispositions distinguish accepted and dropped with rationale", () =
   const dropped = detail.rescueDispositions.find((d) => d.disposition === "dropped");
   assert.equal(dropped?.canonicalLabel, "Table 3 Ablation");
   assert.equal(dropped?.rationale, "incidental artifact");
+});
+
+// --- U3 adapted overlay view-model (R4/R5/R6/R7) ---------------------------
+
+const classification = {
+  stateByNode: { scope: "mastered", ownership: "frontier", move: "locked" } as const,
+  selectedFrontierTarget: "ownership"
+};
+
+test("neutral mode (no adapted arg) leaves every node unclassified and untargeted", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.deepEqual(view.cytoscape.nodes.map((n) => n.adaptedState), [null, null, null]);
+  assert.deepEqual(view.textual.nodes.map((n) => n.adaptedState), [null, null, null]);
+  assert.equal(view.cytoscape.nodes.every((n) => n.isFrontierTarget === false), true);
+  // Existing neutral assertions still hold (edges unchanged).
+  assert.deepEqual(view.cytoscape.edges.map((e) => [e.source, e.target]), [["scope", "ownership"], ["ownership", "move"]]);
+});
+
+test("adapted mode tags each node with its classification and marks the single frontier target", () => {
+  const view = buildDerivedGraphView(detail, classification);
+  const byId = new Map(view.cytoscape.nodes.map((n) => [n.id, n]));
+  assert.equal(byId.get("scope")?.adaptedState, "mastered");
+  assert.equal(byId.get("ownership")?.adaptedState, "frontier");
+  assert.equal(byId.get("move")?.adaptedState, "locked");
+  // Exactly one node is the frontier target, and it is the selected one.
+  const targets = view.cytoscape.nodes.filter((n) => n.isFrontierTarget).map((n) => n.id);
+  assert.deepEqual(targets, ["ownership"]);
+});
+
+test("a cardless node carries cardless:true in both cytoscape and textual representations (R6)", () => {
+  const view = buildDerivedGraphView(detail, classification);
+  assert.equal(view.cytoscape.nodes.find((n) => n.id === "move")?.cardless, true);
+  assert.equal(view.textual.nodes.find((n) => n.label === "Move semantics")?.cardless, true);
+  // Carded nodes are not flagged.
+  assert.equal(view.cytoscape.nodes.find((n) => n.id === "ownership")?.cardless, false);
+});
+
+test("difficulty is present on every node for size mapping; null difficulty is preserved, not coerced to 0", () => {
+  const withNull: DerivedGraphDetail = {
+    ...detail,
+    nodes: [{ ...detail.nodes[0], derivedNodeId: "nd", label: "No difficulty", difficulty: null, hasCard: true }]
+  };
+  const view = buildDerivedGraphView(withNull);
+  assert.equal(view.cytoscape.nodes[0].difficulty, null);
+  assert.equal(view.textual.nodes[0].difficulty, null);
+});
+
+// Covers R5: cytoscape and textual node sets stay equal in length and describe the same
+// nodes in adapted mode.
+test("cytoscape and textual node sets stay equal and describe the same nodes in adapted mode", () => {
+  const view = buildDerivedGraphView(detail, classification);
+  assert.equal(view.cytoscape.nodes.length, view.textual.nodes.length);
+  assert.deepEqual(view.cytoscape.nodes.map((n) => n.label), view.textual.nodes.map((n) => n.label));
+  assert.deepEqual(view.cytoscape.nodes.map((n) => n.adaptedState), view.textual.nodes.map((n) => n.adaptedState));
 });

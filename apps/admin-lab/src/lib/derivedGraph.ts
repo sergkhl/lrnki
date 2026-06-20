@@ -5,6 +5,8 @@
 // `tsx --test` and feed both the Cytoscape render and its required equivalent
 // textual node-and-edge representation (U6 test scenario 8).
 
+import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
+
 export type DerivedNodeKind = "anchor" | "enrichment";
 export type DerivedGroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
 
@@ -118,14 +120,25 @@ export function summarizeOriginCounts(nodes: Pick<DerivedGraphNode, "declaredDom
 
 // Cytoscape element model plus the equivalent textual representation. The textual
 // form resolves both endpoints to labels so a non-visual reader (or a test) can
-// inspect the same DAG the canvas draws.
+// inspect the same DAG the canvas draws. `adaptedState` is `null` in neutral mode
+// (no learner overlay); `cardless` is always carried so a no-card fact stays visible
+// in BOTH panels (R6). `isFrontierTarget` marks the single selected frontier node (R2).
+export interface DerivedGraphViewNode {
+  difficulty: number | null;
+  nodeKind: DerivedNodeKind;
+  groundingOrigin: DerivedGroundingOrigin;
+  cardless: boolean;
+  adaptedState: AdaptedNodeState | null;
+  isFrontierTarget: boolean;
+}
+
 export interface DerivedGraphView {
   cytoscape: {
-    nodes: { id: string; label: string; domain: string; difficulty: number | null; nodeKind: DerivedNodeKind; groundingOrigin: DerivedGroundingOrigin }[];
+    nodes: (DerivedGraphViewNode & { id: string; label: string; domain: string })[];
     edges: { id: string; source: string; target: string; uncertain: "yes" | "no"; confidence: number }[];
   };
   textual: {
-    nodes: { label: string; domain: string; difficulty: number | null; nodeKind: DerivedNodeKind; groundingOrigin: DerivedGroundingOrigin; grounding: NodeGroundingView | null }[];
+    nodes: (DerivedGraphViewNode & { label: string; domain: string; grounding: NodeGroundingView | null })[];
     edges: { prerequisiteLabel: string; dependentLabel: string; confidence: number; uncertain: boolean; judgeModel: string }[];
   };
 }
@@ -134,7 +147,17 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
-export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphView {
+// Build the view-model, optionally overlaying a learner classification (U3, KTD2). With
+// `adapted` absent the output is neutral — byte-equivalent to the enrichment-page render
+// today, every node `adaptedState: null` / `isFrontierTarget: false`. With `adapted`
+// present each node gains its mastered / frontier / locked state and the single frontier
+// target is marked. `cardless` is derived from `hasCard` in BOTH modes (R6).
+export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: AdaptedNodeClassification): DerivedGraphView {
+  const overlayFor = (derivedNodeId: string): Pick<DerivedGraphViewNode, "adaptedState" | "isFrontierTarget"> => ({
+    adaptedState: adapted ? adapted.stateByNode[derivedNodeId] ?? null : null,
+    isFrontierTarget: adapted ? adapted.selectedFrontierTarget === derivedNodeId : false
+  });
+
   return {
     cytoscape: {
       nodes: detail.nodes.map((node) => ({
@@ -143,7 +166,9 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphV
         domain: node.declaredDomain,
         difficulty: node.difficulty,
         nodeKind: node.nodeKind,
-        groundingOrigin: node.groundingOrigin
+        groundingOrigin: node.groundingOrigin,
+        cardless: !node.hasCard,
+        ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge, index) => ({
         id: `e${index}`,
@@ -154,7 +179,16 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail): DerivedGraphV
       }))
     },
     textual: {
-      nodes: detail.nodes.map((node) => ({ label: node.label, domain: node.declaredDomain, difficulty: node.difficulty, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin, grounding: node.grounding })),
+      nodes: detail.nodes.map((node) => ({
+        label: node.label,
+        domain: node.declaredDomain,
+        difficulty: node.difficulty,
+        nodeKind: node.nodeKind,
+        groundingOrigin: node.groundingOrigin,
+        grounding: node.grounding,
+        cardless: !node.hasCard,
+        ...overlayFor(node.derivedNodeId)
+      })),
       edges: detail.edges.map((edge) => ({
         prerequisiteLabel: labelFor(detail, edge.prerequisiteDerivedNodeId),
         dependentLabel: labelFor(detail, edge.dependentDerivedNodeId),
