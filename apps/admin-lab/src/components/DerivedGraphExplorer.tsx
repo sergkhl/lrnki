@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
+import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
 import { buildDerivedGraphView, type DerivedGraphDetail } from "@/lib/derivedGraph";
 import { Badge } from "@/components/ui/badge";
@@ -17,17 +18,47 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type DerivedGraphExplorerProps = Readonly<{ detail: DerivedGraphDetail }>;
+type DerivedGraphExplorerProps = Readonly<{ detail: DerivedGraphDetail; adapted?: AdaptedNodeClassification }>;
+
+// Difficulty maps to node diameter (R7/KTD3): a bounded range so an operator can spot
+// ordering defects at a glance. A null-difficulty node renders at the base size rather
+// than collapsing to the minimum, so "no score" reads differently from "easiest".
+const BASE_NODE_SIZE = 26;
+const MIN_NODE_SIZE = 18;
+const MAX_NODE_SIZE = 48;
+function nodeSize(difficulty: number | null): number {
+  if (difficulty === null) return BASE_NODE_SIZE;
+  const clamped = Math.max(0, Math.min(1, difficulty));
+  return MIN_NODE_SIZE + (MAX_NODE_SIZE - MIN_NODE_SIZE) * clamped;
+}
+
+// Adapted-overlay copy + textual badge variant for each learner state.
+const ADAPTED_STATE_COPY: Record<AdaptedNodeState, string> = {
+  mastered: "mastered",
+  frontier: "frontier",
+  locked: "locked"
+};
+const ADAPTED_STATE_BADGE: Record<AdaptedNodeState, "default" | "secondary" | "outline"> = {
+  mastered: "default",
+  frontier: "secondary",
+  locked: "outline"
+};
 
 // Read-only Cytoscape rendering of a PERSISTED Derived Graph Layer (ADR-0011,
 // ADR-0019, rule 12) — independent of any learner path. Cytoscape is reserved for
 // derived-graph visualization; the published asserted layer never gets a canvas
 // because it has zero edges (AE4). Every rendered graph carries an equivalent
 // textual node-and-edge representation for non-visual inspection (U6 scenario 8).
-export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
+//
+// With `adapted` present (U4), nodes recolor by learner state (mastered / frontier /
+// locked), the selected frontier target gets a stronger ring, and the header marks the
+// panel as learner-adapted. Without it the render is neutral — node-kind / grounding
+// coloring exactly as before, plus the difficulty-as-size encoding (R7) on both panels.
+export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
-  const view = useMemo(() => buildDerivedGraphView(detail), [detail]);
+  const isAdapted = adapted != null;
+  const view = useMemo(() => buildDerivedGraphView(detail, adapted), [detail, adapted]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -51,7 +82,17 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
       container: containerRef.current,
       elements: [
         ...view.cytoscape.nodes.map((node) => ({
-          data: { id: node.id, label: node.label, domain: node.domain, nodeKind: node.nodeKind, groundingOrigin: node.groundingOrigin }
+          data: {
+            id: node.id,
+            label: node.label,
+            domain: node.domain,
+            nodeKind: node.nodeKind,
+            groundingOrigin: node.groundingOrigin,
+            size: nodeSize(node.difficulty),
+            adaptedState: node.adaptedState ?? "none",
+            frontierTarget: node.isFrontierTarget ? "yes" : "no",
+            cardless: node.cardless ? "yes" : "no"
+          }
         })),
         ...view.cytoscape.edges.map((edge) => ({
           data: { id: edge.id, source: edge.source, target: edge.target, uncertain: edge.uncertain }
@@ -74,8 +115,8 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
             "text-wrap": "wrap",
             "text-valign": "bottom",
             "text-margin-y": 6,
-            height: 26,
-            width: 26
+            height: "data(size)",
+            width: "data(size)"
           }
         },
         {
@@ -92,11 +133,40 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
         {
           // Minted llm_grounded nodes carry a dashed border — their grounding is
           // generated, not source-verbatim (the non-verbatim trust contract, R9).
+          // Kept in adapted mode too: grounding still means what it means (R6).
           selector: "node[groundingOrigin = 'llm_grounded']",
           style: {
             "border-style": "dashed",
             "border-width": 2
           }
+        },
+        // --- Adapted overlay (U4, R2) ----------------------------------------
+        // These match only when a learner classification is present (otherwise every
+        // node carries adaptedState='none' and the neutral coloring above stands). They
+        // come AFTER node-kind/grounding so the learner state wins the fill, while shape
+        // and the dashed grounding border survive.
+        {
+          // Mastered — green (chart-1): the learner is at/above the ≈0.7 threshold.
+          selector: "node[adaptedState = 'mastered']",
+          style: { "background-color": color("--chart-1"), "border-color": color("--chart-1") }
+        },
+        {
+          // Frontier — amber (chart-4): unmastered but every direct prerequisite met.
+          selector: "node[adaptedState = 'frontier']",
+          style: { "background-color": color("--chart-4"), "border-color": color("--chart-4") }
+        },
+        {
+          // Locked — muted: a direct prerequisite is still unmastered.
+          selector: "node[adaptedState = 'locked']",
+          style: { "background-color": color("--muted"), "border-color": color("--border"), color: color("--muted-foreground") }
+        },
+        {
+          // The single selected frontier target — the hardest ready unmastered node the
+          // adaptive path is working toward. A stronger ring marks it apart from the
+          // other frontier nodes; border-style is left untouched so a generated
+          // frontier target keeps its dashed grounding cue.
+          selector: "node[frontierTarget = 'yes']",
+          style: { "border-color": color("--foreground"), "border-width": 4 }
         },
         {
           selector: "edge",
@@ -143,8 +213,12 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
           <CardTitle className="flex items-center gap-2">
             <GitForkIcon className="size-4" />
             Derived prerequisite DAG
+            {isAdapted ? <Badge variant="secondary">learner-adapted</Badge> : null}
           </CardTitle>
           <CardDescription>
+            {isAdapted
+              ? "Nodes recolored by learner state (mastered / frontier / locked); the frontier target is ringed. "
+              : null}
             Inferred prerequisite edges over published version{" "}
             <span className="font-mono text-xs">{detail.summary.graphVersionId}</span> · judge {detail.summary.judgeModel}
           </CardDescription>
@@ -159,6 +233,24 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
             Arrows point from prerequisite to dependent. Dashed = uncertain inferred edges (excluded
             from learner paths). Scroll to zoom, drag to pan.
           </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-2 rounded-full border" />
+              <span className="inline-block size-3 rounded-full border" />
+              node size ∝ intrinsic difficulty
+            </span>
+            {isAdapted ? (
+              <>
+                <LegendSwatch token="--chart-1" label="mastered" />
+                <LegendSwatch token="--chart-4" label="frontier" />
+                <LegendSwatch token="--muted" label="locked" />
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block size-3 rounded-full" style={{ border: "2px solid var(--foreground)" }} />
+                  frontier target
+                </span>
+              </>
+            ) : null}
+          </div>
           {view.cytoscape.nodes.length > 0 ? (
             <div
               ref={containerRef}
@@ -199,7 +291,12 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
                           <span className="block truncate font-medium">{node.label}</span>
                           <span className="block truncate text-xs text-muted-foreground">{node.domain}</span>
                         </span>
-                        <span className="flex shrink-0 items-center gap-1">
+                        <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                          {node.adaptedState ? (
+                            <Badge variant={ADAPTED_STATE_BADGE[node.adaptedState]}>{ADAPTED_STATE_COPY[node.adaptedState]}</Badge>
+                          ) : null}
+                          {node.isFrontierTarget ? <Badge variant="default">frontier target</Badge> : null}
+                          {node.cardless ? <Badge variant="outline" title="no recall card exists for this node">no card</Badge> : null}
                           <Badge variant={node.nodeKind === "anchor" ? "default" : "secondary"}>{node.nodeKind === "anchor" ? "anchor" : "enrichment"}</Badge>
                           <Badge variant="outline">{node.difficulty === null ? "—" : node.difficulty.toFixed(2)}</Badge>
                         </span>
@@ -289,5 +386,16 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// One learner-state legend entry: a filled swatch in the same theme token the canvas
+// uses for that state, so the legend can never drift from the rendered fill.
+function LegendSwatch({ token, label }: Readonly<{ token: string; label: string }>) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="inline-block size-3 rounded-full border" style={{ backgroundColor: `var(${token})` }} />
+      {label}
+    </span>
   );
 }
