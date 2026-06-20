@@ -231,6 +231,10 @@ export function dagDepthDifficulty(derivedNodeIds: string[], edges: Edge[]): Con
       derivedNodeId,
       score: topoDepth / maxDepth,
       method: "dag-depth-mock",
+      // Structural-only producer: no neural subscore is consulted, so the rationale is
+      // empty. Its output is read only for `components`/`score` inside intrinsic fusion
+      // and is never persisted as a ConceptDifficulty row.
+      neuralRationale: "",
       components: { topoDepth, fanIn: fanIn.get(derivedNodeId) ?? 0 }
     };
   });

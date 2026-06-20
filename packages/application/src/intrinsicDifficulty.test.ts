@@ -117,6 +117,28 @@ test("judge failures and out-of-range neural scores fail closed", async () => {
   );
 });
 
+test("the judge's rationale passes through to the ConceptDifficulty while the fused score is unchanged", async () => {
+  // A judge returning a per-node rationale alongside its numeric subscore. The port
+  // must carry the text through verbatim (R5) and must NOT let it perturb the score (R7).
+  // This asserts the deterministic transform of the model's output, not the model's
+  // judgment content (AGENTS rule 11).
+  const rationaleJudge: IntrinsicDifficultyJudgmentPort = {
+    model: "stub-judge",
+    async judge(input) {
+      return { neuralScore: 0.4, rationale: `${input.derivedNodeId} is moderately abstract` };
+    }
+  };
+  // Isolated single node: no edges, defs=1/mentions=0 → structuralScore = (0+0+0+1)/4 = 0.25.
+  const difficulties = await createIntrinsicDifficultyPort(rationaleJudge).score({ nodes: [node("a")], prerequisiteEdges: [] });
+  assert.equal(difficulties.length, 1);
+  assert.equal(difficulties[0].neuralRationale, "a is moderately abstract");
+  // Same fused formula as before the field was added: 0.55*neural + 0.45*structural
+  // (in-range, so the port's clamp is identity here).
+  assert.equal(difficulties[0].score, 0.55 * 0.4 + 0.45 * 0.25);
+  // The rationale lives beside, never inside, the strictly-numeric components (KTD3).
+  assert.equal(Object.values(difficulties[0].components).every((value) => typeof value === "number"), true);
+});
+
 test("llm_grounded node context is scored from generated grounding text", async () => {
   const seen: DifficultyNodeContext[] = [];
   const port = createIntrinsicDifficultyPort({

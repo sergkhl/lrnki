@@ -15,10 +15,10 @@ const layer: DerivedGraphLayer = {
   derivedNodes: [anchor("nA", "cA"), anchor("nB", "cB"), anchor("nC", "cC"), anchor("nD", "cD")],
   prerequisiteEdges: [edge("nA", "nB"), edge("nB", "nD"), edge("nC", "nD")],
   difficulties: [
-    { derivedNodeId: "nA", score: 0.2, method: "m", components: {} },
-    { derivedNodeId: "nB", score: 0.5, method: "m", components: {} },
-    { derivedNodeId: "nC", score: 0.8, method: "m", components: {} },
-    { derivedNodeId: "nD", score: 0.9, method: "m", components: {} }
+    { derivedNodeId: "nA", score: 0.2, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nB", score: 0.5, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nC", score: 0.8, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nD", score: 0.9, method: "m", components: {}, neuralRationale: "" }
   ]
 };
 function card(derivedNodeId: string): Card {

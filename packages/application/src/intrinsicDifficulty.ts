@@ -34,6 +34,10 @@ export function createIntrinsicDifficultyPort(judge: IntrinsicDifficultyJudgment
           derivedNodeId: node.derivedNodeId,
           score,
           method: METHOD,
+          // Carry the judge's free-text rationale through (R5). The fused score is
+          // unchanged — this is a pure passthrough of an already-validated field that
+          // the port previously dropped (R7; AGENTS rules 16/17).
+          neuralRationale: judgment.rationale,
           components: {
             neuralScore: judgment.neuralScore,
             topoDepth: terms.topoDepth,

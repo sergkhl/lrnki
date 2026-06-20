@@ -39,11 +39,11 @@ const layer: DerivedGraphLayer = {
   ],
   prerequisiteEdges: [edge("nA", "nB"), edge("nB", "nD"), edge("nC", "nD"), edge("nE", "nD")],
   difficulties: [
-    { derivedNodeId: "nA", score: 0.2, method: "m", components: {} },
-    { derivedNodeId: "nB", score: 0.5, method: "m", components: {} },
-    { derivedNodeId: "nC", score: 0.8, method: "m", components: {} },
-    { derivedNodeId: "nD", score: 0.9, method: "m", components: {} },
-    { derivedNodeId: "nE", score: 0.3, method: "m", components: {} }
+    { derivedNodeId: "nA", score: 0.2, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nB", score: 0.5, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nC", score: 0.8, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nD", score: 0.9, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "nE", score: 0.3, method: "m", components: {}, neuralRationale: "" }
   ]
 };
 

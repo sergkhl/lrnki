@@ -107,7 +107,7 @@ const layer: DerivedGraphLayer = {
     { nodeKind: "anchor", derivedNodeId: "nB", conceptId: "cB", groundingOrigin: "document_anchored", role: "anchor", layer: "asserted", canonicalLabel: "B", normalizedLabel: "b", declaredDomain: "d", aliases: [] }
   ],
   prerequisiteEdges: [{ prerequisiteDerivedNodeId: "nA", dependentDerivedNodeId: "nB", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }],
-  difficulties: [{ derivedNodeId: "nA", score: 0.2, method: "m", components: {} }, { derivedNodeId: "nB", score: 0.6, method: "m", components: {} }]
+  difficulties: [{ derivedNodeId: "nA", score: 0.2, method: "m", components: {}, neuralRationale: "" }, { derivedNodeId: "nB", score: 0.6, method: "m", components: {}, neuralRationale: "" }]
 };
 
 const enrichmentStore = { async getLayer() { return layer; } } as unknown as EnrichmentRunStorePort;

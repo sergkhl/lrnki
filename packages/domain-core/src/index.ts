@@ -890,6 +890,11 @@ export type ConceptDifficulty = {
   score: number;
   method: string;
   components: Record<string, number>;
+  // The neural judge's free-text justification for its difficulty subscore (ADR-0024).
+  // Kept beside the strictly-numeric `components` so an operator can read WHY a node
+  // scored as it did. Empty for deterministic structural-only producers that never
+  // consult the judge; the persisted production port always carries the judge's text.
+  neuralRationale: string;
 };
 
 // The immutable output of Graph Enrichment, keyed to (graphVersionId +

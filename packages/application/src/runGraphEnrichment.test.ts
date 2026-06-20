@@ -127,7 +127,7 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
   const difficulty: DifficultyPort = {
     method: "intrinsic-fused-v1",
     async score({ nodes }) {
-      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {} }));
+      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {}, neuralRationale: "" }));
     }
   };
   let persisted: DerivedGraphLayer | undefined;
@@ -292,7 +292,7 @@ test("runGraphEnrichment scores intrinsic difficulty with per-node evidence cont
     method: "intrinsic-fused-v1",
     async score({ nodes }) {
       scoredInputs.push(nodes);
-      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 } }));
+      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 }, neuralRationale: "" }));
     }
   };
   const layer = await run(ports);
@@ -431,7 +431,7 @@ function buildNodePorts(options: {
   const difficulty: DifficultyPort = {
     method: "intrinsic-fused-v1",
     async score({ nodes }) {
-      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {} }));
+      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {}, neuralRationale: "" }));
     }
   };
   const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {

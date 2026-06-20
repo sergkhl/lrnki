@@ -16,7 +16,7 @@ function edge(prereq: string, dependent: string, uncertain = false): InferredPre
 }
 
 function difficulty(derivedNodeId: string, score: number): ConceptDifficulty {
-  return { derivedNodeId, score, method: "dag-depth-mock", components: {} };
+  return { derivedNodeId, score, method: "dag-depth-mock", components: {}, neuralRationale: "" };
 }
 
 // a -> b -> target chain; difficulties ascend with depth.

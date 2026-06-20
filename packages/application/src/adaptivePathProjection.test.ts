@@ -12,10 +12,10 @@ const edges: InferredPrerequisiteEdge[] = [
   { prerequisiteDerivedNodeId: "nC", dependentDerivedNodeId: "nD", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }
 ];
 const difficulties: ConceptDifficulty[] = [
-  { derivedNodeId: "nA", score: 0.2, method: "m", components: {} },
-  { derivedNodeId: "nB", score: 0.5, method: "m", components: {} },
-  { derivedNodeId: "nC", score: 0.8, method: "m", components: {} },
-  { derivedNodeId: "nD", score: 0.9, method: "m", components: {} }
+  { derivedNodeId: "nA", score: 0.2, method: "m", components: {}, neuralRationale: "" },
+  { derivedNodeId: "nB", score: 0.5, method: "m", components: {}, neuralRationale: "" },
+  { derivedNodeId: "nC", score: 0.8, method: "m", components: {}, neuralRationale: "" },
+  { derivedNodeId: "nD", score: 0.9, method: "m", components: {}, neuralRationale: "" }
 ];
 
 function learnerState(mastery: Record<string, number>): LearnerStatePort {

@@ -114,8 +114,8 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
       for (const difficulty of layer.difficulties) {
         await tx`
-          INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, derived_node_id, score, method, components)
-          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${difficulty.derivedNodeId}, ${difficulty.score}, ${difficulty.method}, ${tx.json(difficulty.components as Parameters<Sql["json"]>[0])})`;
+          INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, derived_node_id, score, method, components, neural_rationale)
+          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${difficulty.derivedNodeId}, ${difficulty.score}, ${difficulty.method}, ${tx.json(difficulty.components as Parameters<Sql["json"]>[0])}, ${difficulty.neuralRationale})`;
       }
 
       await writeArtifactEnvelope(tx, artifact);
@@ -303,13 +303,14 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       provenance: edge.provenance
     }));
 
-    const difficultyRows = await this.sql<{ derived_node_id: string; score: number; method: string; components: ConceptDifficulty["components"] }[]>`
-      SELECT derived_node_id, score, method, components FROM concept_difficulties WHERE enrichment_id = ${row.enrichment_id} ORDER BY derived_node_id`;
+    const difficultyRows = await this.sql<{ derived_node_id: string; score: number; method: string; components: ConceptDifficulty["components"]; neural_rationale: string }[]>`
+      SELECT derived_node_id, score, method, components, neural_rationale FROM concept_difficulties WHERE enrichment_id = ${row.enrichment_id} ORDER BY derived_node_id`;
     const difficulties: ConceptDifficulty[] = difficultyRows.map((difficulty) => ({
       derivedNodeId: difficulty.derived_node_id,
       score: difficulty.score,
       method: difficulty.method,
-      components: difficulty.components
+      components: difficulty.components,
+      neuralRationale: difficulty.neural_rationale
     }));
 
     return {

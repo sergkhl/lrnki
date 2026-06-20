@@ -511,6 +511,11 @@ CREATE TABLE concept_difficulties (
   score real NOT NULL,
   method text NOT NULL,
   components jsonb NOT NULL,
+  -- The neural judge's free-text difficulty rationale (ADR-0024). Kept beside the
+  -- strictly-numeric `components` JSONB so an operator can read why a node scored as it
+  -- did. NOT NULL: the production judge's forced-tool schema always requires `rationale`,
+  -- so the port always supplies one (empty string for any structural-only producer).
+  neural_rationale text NOT NULL,
   UNIQUE (enrichment_id, derived_node_id)
 );
 

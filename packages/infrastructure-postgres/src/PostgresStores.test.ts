@@ -292,8 +292,8 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
         provenance: { judgmentRationale: "test" }
       }],
       difficulties: [
-        { derivedNodeId: borrowingId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
-        { derivedNodeId: ownershipId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
+        { derivedNodeId: borrowingId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 }, neuralRationale: "borrowing is a foundational mechanic" },
+        { derivedNodeId: ownershipId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 }, neuralRationale: "ownership composes several prior ideas" }
       ]
     };
     const trace: EnrichmentRunTrace = {
@@ -322,6 +322,10 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     assert.equal(hydrated.prerequisiteEdges[0].prerequisiteDerivedNodeId, borrowingId);
     assert.equal(hydrated.prerequisiteEdges[0].dependentDerivedNodeId, ownershipId);
     assert.equal(hydrated.difficulties.length, 2);
+    // U3: the neural rationale round-trips verbatim on every difficulty row (R5).
+    const rationaleByNode = new Map(hydrated.difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty.neuralRationale] as const));
+    assert.equal(rationaleByNode.get(borrowingId), "borrowing is a foundational mechanic");
+    assert.equal(rationaleByNode.get(ownershipId), "ownership composes several prior ideas");
   } finally {
     await sql.end();
   }
@@ -367,9 +371,9 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, predicate: "inferred-prerequisite-of", confidence: 0.7, uncertain: false, provenance: { judgmentRationale: "rescued precedes anchor" } }
       ],
       difficulties: [
-        { derivedNodeId: mintedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
-        { derivedNodeId: rescuedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 } },
-        { derivedNodeId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 } }
+        { derivedNodeId: mintedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 }, neuralRationale: "minted prerequisite, generated grounding" },
+        { derivedNodeId: rescuedId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 }, neuralRationale: "rescued source mention" },
+        { derivedNodeId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 }, neuralRationale: "anchor concept" }
       ]
     };
     // U4: per-pair judge model — the minted (llm_grounded) pair routes cross-family,
