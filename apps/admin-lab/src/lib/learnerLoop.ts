@@ -2,7 +2,10 @@ import {
   computeLearnerPath,
   loadResponseLogLearnerState,
   gradeAndAppend,
-  ADAPTIVE_MASTERY_THRESHOLD
+  classifyAdaptedNodes,
+  foldConceptMastery,
+  ADAPTIVE_MASTERY_THRESHOLD,
+  type AdaptedNodeClassification
 } from "@lrnki/application";
 import type { JudgedOutcome, ResponseLogRow, SelfReportRating } from "@lrnki/domain-core";
 import { createDatabaseClient, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
@@ -11,8 +14,11 @@ import type {
   ArtifactRepositoryPort,
   EnrichmentRunStorePort,
   LearnerPathStorePort,
+  LearnerStatePort,
   ResponseLogStorePort
 } from "@lrnki/ports";
+import { getEnrichmentDetail } from "./enrichments";
+import type { DerivedGraphDetail } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -111,7 +117,54 @@ export type LearnerLoopDetail = {
   // Existing paths for this learner, so a resubmit knows which path(s) to recompute.
   paths: { enrichmentId: string; targetDerivedNodeId: string; targetLabel: string }[];
   coverage: PathCardCoverage[];
+  // The learner's folded per-derived-node mastery (EXPERIMENT_ONLY trust) and a
+  // synthetic-vs-human response-source tally — both feed the adapted-graph overlay (R1, R3).
+  masteryByNode: Record<string, number>;
+  responseSourceSummary: ResponseSourceSummary;
 };
+
+// --- Pure overlay helpers (U2) ---------------------------------------------
+
+export type ResponseSourceSummary = { synthetic: number; human: number; total: number };
+
+// Tally a learner's rows by response source so the page can badge data origin, keeping
+// seeded synthetic rows distinguishable from real ones (R3). `total` includes any
+// source outside synthetic|human so the badge never silently under-counts.
+export function summarizeResponseSources(rows: { responseSource: string }[]): ResponseSourceSummary {
+  let synthetic = 0;
+  let human = 0;
+  for (const row of rows) {
+    if (row.responseSource === "synthetic") synthetic += 1;
+    else if (row.responseSource === "human") human += 1;
+  }
+  return { synthetic, human, total: rows.length };
+}
+
+// Fold a learner's rows to a per-derived-node mastery map, reusing `foldConceptMastery`
+// (graded outranks self-report; latest graded wins). Rows must be ordered by attempt_seq,
+// as the loader returns them — this does NOT re-query (KTD: fold what is already loaded).
+export function buildMasteryMap(rows: ResponseLogRow[]): Record<string, number> {
+  const byNode = new Map<string, ResponseLogRow[]>();
+  for (const row of rows) byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
+  const masteryByNode: Record<string, number> = {};
+  for (const [derivedNodeId, nodeRows] of byNode) masteryByNode[derivedNodeId] = foldConceptMastery(nodeRows);
+  return masteryByNode;
+}
+
+// Dedupe a learner's path scopes to distinct enrichments, keeping the first occurrence.
+// Callers pass paths latest-first (the loader returns them `created_at DESC`), so the kept
+// row is the most recent path per enrichment — resubmits append new path rows, and without
+// this the page would render duplicate panel-pairs for one enrichment (Risks).
+export function dedupeEnrichmentScopes<T extends { enrichmentId: string }>(paths: T[]): T[] {
+  const seen = new Set<string>();
+  const distinct: T[] = [];
+  for (const path of paths) {
+    if (seen.has(path.enrichmentId)) continue;
+    seen.add(path.enrichmentId);
+    distinct.push(path);
+  }
+  return distinct;
+}
 
 export type PathCardCoverage = {
   enrichmentId: string;
@@ -261,9 +314,65 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
       })),
       conflicts: detectConflicts(logRows),
       paths: pathRows.map((row) => ({ enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id, targetLabel: row.target_label })),
-      coverage: [...coverageByPath.values()]
+      coverage: [...coverageByPath.values()],
+      masteryByNode: buildMasteryMap(logRows),
+      responseSourceSummary: summarizeResponseSources(logRows)
     };
   });
+}
+
+// --- Adapted-graph overlay loader (U2, R1/R3/R12) --------------------------
+
+export type LearnerAdaptedGraph = {
+  enrichmentId: string;
+  targetDerivedNodeId: string;
+  targetLabel: string;
+  // The enrichment's Derived Graph Layer (read-only) and the learner's mastered /
+  // frontier / locked classification over it.
+  detail: DerivedGraphDetail;
+  classification: AdaptedNodeClassification;
+};
+
+export type LearnerAdaptedGraphs = {
+  learnerStateRef: string;
+  responseSourceSummary: ResponseSourceSummary;
+  graphs: LearnerAdaptedGraph[];
+};
+
+// One adapted-graph scope per DISTINCT enrichment in the learner's paths (KTD4/KTD5).
+// Read + projection only: it composes the read-only `getLearnerLoopDetail` and
+// `getEnrichmentDetail` with the pure `classifyAdaptedNodes`. No write port is imported,
+// so it structurally cannot mutate a published graph or the Derived Graph Layer (R12).
+export async function getLearnerAdaptedGraphs(learnerStateRef: string): Promise<LearnerAdaptedGraphs | undefined> {
+  const detail = await getLearnerLoopDetail(learnerStateRef);
+  if (!detail) return undefined;
+
+  // A synchronous LearnerStatePort over the already-folded mastery map (do not re-query).
+  const learnerState: LearnerStatePort = {
+    learnerStateRef,
+    mastery: (derivedNodeId: string) => detail.masteryByNode[derivedNodeId] ?? 0
+  };
+
+  const graphs: LearnerAdaptedGraph[] = [];
+  for (const scope of dedupeEnrichmentScopes(detail.paths)) {
+    const enrichmentDetail = await getEnrichmentDetail(scope.enrichmentId);
+    if (!enrichmentDetail) continue;
+    const classification = classifyAdaptedNodes({
+      nodeIds: enrichmentDetail.nodes.map((node) => node.derivedNodeId),
+      prerequisiteEdges: enrichmentDetail.edges,
+      difficulties: enrichmentDetail.nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: node.difficulty })),
+      learnerState,
+      masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
+    });
+    graphs.push({
+      enrichmentId: scope.enrichmentId,
+      targetDerivedNodeId: scope.targetDerivedNodeId,
+      targetLabel: scope.targetLabel,
+      detail: enrichmentDetail,
+      classification
+    });
+  }
+  return { learnerStateRef, responseSourceSummary: detail.responseSourceSummary, graphs };
 }
 
 // Generic fallback used ONLY when a step's node has neither a card nor a persisted

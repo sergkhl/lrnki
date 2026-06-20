@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DerivedGraphLayer, LearnerPath, NewResponseLogRow, ResponseLogRow, SelfReportRating, JudgedOutcome } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort, ArtifactRepositoryPort, EnrichmentRunStorePort, LearnerPathStorePort, ResponseLogStorePort } from "@lrnki/ports";
-import { detectConflicts, resubmitAndRecompute, summarizeLearnerStates } from "./learnerLoop";
+import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, resubmitAndRecompute, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoop";
 
 let seq = 0;
 function selfReport(derivedNodeId: string, rating: SelfReportRating): ResponseLogRow {
@@ -43,6 +43,47 @@ test("summarizeLearnerStates records each learner's newest response and sorts by
   assert.deepEqual(summaries.map((summary) => summary.learnerStateRef), ["L2", "L1"]);
   assert.equal(summaries.find((summary) => summary.learnerStateRef === "L1")?.latestResponseAt, "2026-06-18T12:30:00.000Z");
   assert.equal(summaries.find((summary) => summary.learnerStateRef === "L2")?.latestResponseAt, "2026-06-19T08:15:00.000Z");
+});
+
+// --- U2 pure overlay helpers (R1/R3) ---------------------------------------
+// The DB-bound getLearnerLoopDetail / getLearnerAdaptedGraphs are verified by real-use
+// inspection (live Postgres, established untested-loader pattern); only these extracted
+// pure helpers carry unit scenarios.
+
+test("dedupeEnrichmentScopes: two enrichments yield two entries; duplicates collapse keeping the first (latest-first input)", () => {
+  assert.deepEqual(
+    dedupeEnrichmentScopes([{ enrichmentId: "e1" }, { enrichmentId: "e2" }]).map((s) => s.enrichmentId),
+    ["e1", "e2"]
+  );
+  // Loader returns paths created_at DESC, so the first row for an enrichment is the latest.
+  const collapsed = dedupeEnrichmentScopes([
+    { enrichmentId: "e1", target: "latest" },
+    { enrichmentId: "e1", target: "older" }
+  ]);
+  assert.equal(collapsed.length, 1);
+  assert.equal(collapsed[0].target, "latest");
+});
+
+test("summarizeResponseSources: mixed, all-synthetic, and all-human tallies", () => {
+  assert.deepEqual(summarizeResponseSources([selfReport("nA", "good"), graded("nA", "incorrect", "human"), graded("nB", "correct", "synthetic")]), { synthetic: 2, human: 1, total: 3 });
+  assert.deepEqual(summarizeResponseSources([graded("nA", "correct", "synthetic"), graded("nB", "correct", "synthetic")]), { synthetic: 2, human: 0, total: 2 });
+  assert.deepEqual(summarizeResponseSources([graded("nA", "correct", "human")]), { synthetic: 0, human: 1, total: 1 });
+});
+
+test("buildMasteryMap: graded outranks self-report, latest graded wins, self-report recency selects the prior", () => {
+  // Build rows in attempt_seq order (the order the loader returns them).
+  const rows = [
+    graded("nA", "incorrect"),        // nA earlier graded incorrect (0)
+    selfReport("nA", "easy"),         // ...later self-report easy (1.0) must NOT override
+    graded("nB", "partial"),          // nB earlier graded partial
+    graded("nB", "correct"),          // ...latest graded correct (1.0) wins
+    selfReport("nC", "good")          // nC self-report only → 0.7
+  ];
+  const mastery = buildMasteryMap(rows);
+  assert.equal(mastery.nA, 0, "graded incorrect outranks the later self-report");
+  assert.equal(mastery.nB, 1, "latest graded correct wins");
+  assert.equal(mastery.nC, 0.7, "self-report recency selects the active prior");
+  assert.deepEqual(buildMasteryMap([]), {}, "empty rows fold to an empty map");
 });
 
 // --- resubmit + recompute (deterministic envelope, canned judge) -----------

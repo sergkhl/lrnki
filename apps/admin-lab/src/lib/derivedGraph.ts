@@ -36,6 +36,10 @@ export interface DerivedGraphNode {
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
   role: "anchor" | "prerequisite";
+  // Whether a recall card exists for this derived node (cards are UNIQUE per
+  // derived_node_id). An enrichment-level fact loaded once in `getEnrichmentDetail`, so
+  // a cardless node on a learner's path is rendered and flagged, never dropped (R6).
+  hasCard: boolean;
   // Present only for enrichment nodes; anchors carry their CEP in the published view.
   grounding: NodeGroundingView | null;
 }
