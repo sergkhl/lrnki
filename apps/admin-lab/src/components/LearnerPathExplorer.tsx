@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
-import { elkLayeredLayout } from "@/lib/cytoscapeElkLayout";
+import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,6 +36,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let stale = false;
     const styles = getComputedStyle(containerRef.current);
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = 1;
@@ -72,9 +73,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
           }
         }))
       ],
-      // ELK `layered` owns node coordinates and component separation; path context
-      // still reads prerequisites first because edges flow top-down.
-      layout: elkLayeredLayout,
+      layout: { name: "preset" },
       minZoom: 0.2,
       maxZoom: 3,
       style: [
@@ -155,7 +154,11 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       ]
     });
     cytoscapeRef.current = cy;
+    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
+      if (!stale) console.error("Failed to lay out learner path graph", error);
+    });
     return () => {
+      stale = true;
       cy.destroy();
       cytoscapeRef.current = null;
     };

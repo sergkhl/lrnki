@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
-import { elkLayeredLayout } from "@/lib/cytoscapeElkLayout";
+import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
 import { buildDerivedGraphView, type DerivedGraphDetail } from "@/lib/derivedGraph";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,6 +31,7 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let stale = false;
     const styles = getComputedStyle(containerRef.current);
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = 1;
@@ -56,9 +57,7 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
           data: { id: edge.id, source: edge.source, target: edge.target, uncertain: edge.uncertain }
         }))
       ],
-      // ELK `layered` owns node coordinates, crossing minimization, and component
-      // separation; it repositions and fits asynchronously when it returns.
-      layout: elkLayeredLayout,
+      layout: { name: "preset" },
       minZoom: 0.2,
       maxZoom: 3,
       style: [
@@ -127,7 +126,11 @@ export function DerivedGraphExplorer({ detail }: DerivedGraphExplorerProps) {
       ]
     });
     cytoscapeRef.current = cy;
+    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
+      if (!stale) console.error("Failed to lay out derived graph", error);
+    });
     return () => {
+      stale = true;
       cy.destroy();
       cytoscapeRef.current = null;
     };
