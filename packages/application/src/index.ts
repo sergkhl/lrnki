@@ -33,7 +33,11 @@ export {
 export {
   selectFrontierTarget,
   projectAdaptivePath,
-  ADAPTIVE_MASTERY_THRESHOLD
+  classifyAdaptedNodes,
+  ADAPTIVE_MASTERY_THRESHOLD,
+  type AdaptedNodeState,
+  type AdaptedNodeClassification,
+  type ReadinessEdge
 } from "./adaptivePathProjection";
 export {
   synthesizeResponses,
