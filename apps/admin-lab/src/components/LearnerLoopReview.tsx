@@ -1,6 +1,7 @@
 import { AlertTriangleIcon } from "lucide-react";
 import { resubmitEditedAnswer } from "@/app/admin/lab/learner-loop/actions";
 import type { ConceptConflict, LearnerLoopDetail } from "@/lib/learnerLoop";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -109,21 +110,25 @@ export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDeta
         return (
           <Card key={response.responseId}>
             <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2 text-base">
-                #{response.attemptSeq} {response.nodeLabel}
-                <Badge variant="outline">{response.signalType}</Badge>
-                <Badge variant="outline">{response.responseSource}</Badge>
-                {response.signalType === "self_report" && response.selfReportRating && (
-                  <Badge variant="secondary">{response.selfReportRating}</Badge>
-                )}
-                {response.signalType === "graded" && response.judgedOutcome && (
-                  <Badge variant={response.judgedOutcome === "incorrect" ? "destructive" : "secondary"}>
-                    {response.judgedOutcome}
-                    {response.gradedScore !== null ? ` (${response.gradedScore.toFixed(2)})` : ""}
-                  </Badge>
-                )}
-                {conflict && <Badge variant="destructive">conflict</Badge>}
-              </CardTitle>
+              <div className="flex flex-col gap-2">
+                <CardTitle className="text-base">{response.nodeLabel}</CardTitle>
+                <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+                  <Badge variant="outline">#{response.attemptSeq}</Badge>
+                  <Badge variant="outline">{response.signalType}</Badge>
+                  <Badge variant="outline">{response.responseSource}</Badge>
+                  <LocalDateTime iso={response.createdAt} />
+                  {response.signalType === "self_report" && response.selfReportRating && (
+                    <Badge variant="secondary">{response.selfReportRating}</Badge>
+                  )}
+                  {response.signalType === "graded" && response.judgedOutcome && (
+                    <Badge variant={response.judgedOutcome === "incorrect" ? "destructive" : "secondary"}>
+                      {response.judgedOutcome}
+                      {response.gradedScore !== null ? ` (${response.gradedScore.toFixed(2)})` : ""}
+                    </Badge>
+                  )}
+                  {conflict && <Badge variant="destructive">conflict</Badge>}
+                </div>
+              </div>
               <CardDescription>{response.question}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-4">

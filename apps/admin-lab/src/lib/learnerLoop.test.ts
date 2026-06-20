@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DerivedGraphLayer, LearnerPath, NewResponseLogRow, ResponseLogRow, SelfReportRating, JudgedOutcome } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort, ArtifactRepositoryPort, EnrichmentRunStorePort, LearnerPathStorePort, ResponseLogStorePort } from "@lrnki/ports";
-import { detectConflicts, resubmitAndRecompute } from "./learnerLoop";
+import { detectConflicts, resubmitAndRecompute, summarizeLearnerStates } from "./learnerLoop";
 
 let seq = 0;
 function selfReport(derivedNodeId: string, rating: SelfReportRating): ResponseLogRow {
@@ -31,6 +31,18 @@ test("detectConflicts flags the reverse: claimed unknown but graded correct", ()
 
 test("detectConflicts ignores nodes with only one signal type", () => {
   assert.equal(detectConflicts([selfReport("nA", "good"), graded("nB", "incorrect")]).length, 0);
+});
+
+test("summarizeLearnerStates records each learner's newest response and sorts by it", () => {
+  const older = { ...selfReport("nA", "good"), learnerStateRef: "L1", createdAt: "2026-06-15T10:00:00.000Z" };
+  const newestForL1 = { ...graded("nA", "incorrect"), learnerStateRef: "L1", createdAt: "2026-06-18T12:30:00.000Z" };
+  const newestOverall = { ...selfReport("nB", "again"), learnerStateRef: "L2", createdAt: "2026-06-19T08:15:00.000Z" };
+
+  const summaries = summarizeLearnerStates([older, newestForL1, newestOverall]);
+
+  assert.deepEqual(summaries.map((summary) => summary.learnerStateRef), ["L2", "L1"]);
+  assert.equal(summaries.find((summary) => summary.learnerStateRef === "L1")?.latestResponseAt, "2026-06-18T12:30:00.000Z");
+  assert.equal(summaries.find((summary) => summary.learnerStateRef === "L2")?.latestResponseAt, "2026-06-19T08:15:00.000Z");
 });
 
 // --- resubmit + recompute (deterministic envelope, canned judge) -----------

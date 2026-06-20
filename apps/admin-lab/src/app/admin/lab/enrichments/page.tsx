@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DatabaseZapIcon, GitForkIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,7 +86,9 @@ export default async function EnrichmentListPage() {
                     <TableCell>{enrichment.conceptCount}</TableCell>
                     <TableCell>{enrichment.certainEdgeCount} / {enrichment.uncertainEdgeCount}</TableCell>
                     <TableCell><Badge variant="secondary">{enrichment.judgeModel}</Badge></TableCell>
-                    <TableCell className="font-mono text-xs">{enrichment.startedAt.slice(0, 19).replace("T", " ")}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <LocalDateTime iso={enrichment.startedAt} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GraduationCapIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
@@ -44,6 +45,7 @@ export default async function LearnerLoopListPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Learner</TableHead>
+                  <TableHead>Last response</TableHead>
                   <TableHead className="text-right">Self-report</TableHead>
                   <TableHead className="text-right">Graded</TableHead>
                   <TableHead className="text-right">Conflicts</TableHead>
@@ -56,6 +58,9 @@ export default async function LearnerLoopListPage() {
                       <Link className="font-medium underline-offset-4 hover:underline" href={`/admin/lab/learner-loop/${encodeURIComponent(learner.learnerStateRef)}`}>
                         {learner.learnerStateRef}
                       </Link>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <LocalDateTime iso={learner.latestResponseAt} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{learner.selfReportCount}</TableCell>
                     <TableCell className="text-right tabular-nums">{learner.gradedCount}</TableCell>

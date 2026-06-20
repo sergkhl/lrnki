@@ -79,6 +79,7 @@ export function detectConflicts(rows: ResponseLogRow[]): ConceptConflict[] {
 
 export type LearnerStateSummary = {
   learnerStateRef: string;
+  latestResponseAt: string;
   responseCount: number;
   selfReportCount: number;
   gradedCount: number;
@@ -100,6 +101,7 @@ export type LearnerResponseView = {
   responseSource: string;
   graderIdentity: string | null;
   submittedAnswer: string | null;
+  createdAt: string;
 };
 
 export type LearnerLoopDetail = {
@@ -128,7 +130,9 @@ export type PathCardCoverageStep = {
   fallbackReason: string | null;
 };
 
-function rowToResponseLogRow(row: ResponseRow): ResponseLogRow {
+type TimestampedResponseLogRow = ResponseLogRow & { createdAt: string };
+
+function rowToResponseLogRow(row: ResponseRow): TimestampedResponseLogRow {
   return {
     responseId: row.response_id,
     learnerStateRef: row.learner_state_ref,
@@ -155,6 +159,22 @@ type ResponseRow = {
   attempt_seq: number; submitted_answer: string | null; created_at: string;
 };
 
+export function summarizeLearnerStates(rows: TimestampedResponseLogRow[]): LearnerStateSummary[] {
+  const byLearner = new Map<string, TimestampedResponseLogRow[]>();
+  for (const row of rows) byLearner.set(row.learnerStateRef, [...(byLearner.get(row.learnerStateRef) ?? []), row]);
+
+  return [...byLearner.entries()]
+    .map(([learnerStateRef, learnerRows]) => ({
+      learnerStateRef,
+      latestResponseAt: learnerRows.reduce((latest, row) => row.createdAt > latest ? row.createdAt : latest, learnerRows[0].createdAt),
+      responseCount: learnerRows.length,
+      selfReportCount: learnerRows.filter((r) => r.signalType === "self_report").length,
+      gradedCount: learnerRows.filter((r) => r.signalType === "graded").length,
+      conflictCount: detectConflicts(learnerRows).length
+    }))
+    .sort((a, b) => b.latestResponseAt.localeCompare(a.latestResponseAt) || a.learnerStateRef.localeCompare(b.learnerStateRef));
+}
+
 export async function listLearnerStates(): Promise<LearnerStateSummary[] | undefined> {
   return withClient(async (sql) => {
     const rows = await sql<ResponseRow[]>`
@@ -162,18 +182,7 @@ export async function listLearnerStates(): Promise<LearnerStateSummary[] | undef
              judged_outcome, graded_score, evidence_weight, response_source, grader_identity, batch_id,
              attempt_seq, submitted_answer, created_at
       FROM response_log ORDER BY learner_state_ref, attempt_seq`;
-    const byLearner = new Map<string, ResponseLogRow[]>();
-    for (const row of rows) {
-      const mapped = rowToResponseLogRow(row);
-      byLearner.set(mapped.learnerStateRef, [...(byLearner.get(mapped.learnerStateRef) ?? []), mapped]);
-    }
-    return [...byLearner.entries()].map(([learnerStateRef, learnerRows]) => ({
-      learnerStateRef,
-      responseCount: learnerRows.length,
-      selfReportCount: learnerRows.filter((r) => r.signalType === "self_report").length,
-      gradedCount: learnerRows.filter((r) => r.signalType === "graded").length,
-      conflictCount: detectConflicts(learnerRows).length
-    }));
+    return summarizeLearnerStates(rows.map(rowToResponseLogRow));
   });
 }
 
@@ -247,7 +256,8 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         gradedScore: row.graded_score === null ? null : Number(row.graded_score),
         responseSource: row.response_source,
         graderIdentity: row.grader_identity,
-        submittedAnswer: row.submitted_answer
+        submittedAnswer: row.submitted_answer,
+        createdAt: new Date(row.created_at).toISOString()
       })),
       conflicts: detectConflicts(logRows),
       paths: pathRows.map((row) => ({ enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id, targetLabel: row.target_label })),
