@@ -1,6 +1,7 @@
 import { AlertTriangleIcon } from "lucide-react";
 import { resubmitEditedAnswer } from "@/app/admin/lab/learner-loop/actions";
-import type { ConceptConflict, LearnerLoopDetail } from "@/lib/learnerLoop";
+import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
+import type { ConceptConflict, LearnerAdaptedGraphs, LearnerLoopDetail, ResponseSourceSummary } from "@/lib/learnerLoop";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +22,18 @@ const PROVENANCE_LABEL: Record<"source_cep" | "source_mentioned" | "generated", 
   generated: "generated"
 };
 
+function sourceBadgeCopy(summary: ResponseSourceSummary): string {
+  if (summary.total === 0) return "no responses";
+  if (summary.synthetic > 0 && summary.human === 0 && summary.synthetic === summary.total) return "synthetic learner data";
+  if (summary.human > 0 && summary.synthetic === 0 && summary.human === summary.total) return "human learner data";
+  if (summary.synthetic > 0 || summary.human > 0) return `${summary.synthetic} synthetic · ${summary.human} human`;
+  return `${summary.total} responses`;
+}
+
 // Read + review surface for one learner's recall loop (U8). Conflicts are surfaced as
 // a deliberate calibration signal (R16); graded answers can be edited and resubmitted,
 // appending a new graded row and recomputing the path (learner state only, R15).
-export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDetail }>) {
+export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: LearnerLoopDetail; adaptedGraphs: LearnerAdaptedGraphs }>) {
   const conflictByNode = new Map(detail.conflicts.map((conflict) => [conflict.derivedNodeId, conflict] as const));
   return (
     <div className="flex flex-col gap-4">
@@ -53,6 +62,55 @@ export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDeta
           </CardContent>
         )}
       </Card>
+
+      <section className="flex flex-col gap-4">
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Adapted graph view</CardTitle>
+            <CardDescription>
+              One neutral and learner-adapted graph pair per distinct enrichment in this learner&apos;s paths.
+            </CardDescription>
+            <div className="flex justify-end">
+              <Badge variant={adaptedGraphs.responseSourceSummary.synthetic > 0 ? "secondary" : "outline"}>
+                {sourceBadgeCopy(adaptedGraphs.responseSourceSummary)}
+              </Badge>
+            </div>
+          </CardHeader>
+        </Card>
+        {adaptedGraphs.graphs.length > 0 ? (
+          adaptedGraphs.graphs.map((graph) => (
+            <Card key={graph.enrichmentId}>
+              <CardHeader className="border-b">
+                <CardTitle className="text-base">Enrichment {graph.enrichmentId}</CardTitle>
+                <CardDescription>
+                  Target: {graph.targetLabel} · frontier target: {graph.classification.selectedFrontierTarget ?? "none"}
+                </CardDescription>
+                <div className="flex justify-end">
+                  <Badge variant="outline">{graph.detail.summary.conceptCount} concepts</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
+                  <div className="min-w-0">
+                    <DerivedGraphExplorer detail={graph.detail} />
+                  </div>
+                  <div className="min-w-0">
+                    <DerivedGraphExplorer detail={graph.detail} adapted={graph.classification} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Alert>
+            <AlertTriangleIcon />
+            <AlertTitle>No adapted graph scope</AlertTitle>
+            <AlertDescription>
+              This learner has no stored path enrichment to render. Responses, conflicts, and card coverage are still shown below.
+            </AlertDescription>
+          </Alert>
+        )}
+      </section>
 
       {detail.coverage.map((path) => (
         <Card key={`${path.enrichmentId}:${path.targetDerivedNodeId}`}>
