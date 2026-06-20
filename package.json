@@ -18,6 +18,7 @@
     "check": "pnpm run tmp:clean && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
     "db:migrate": "scripts/migrate-db.sh",
+    "seed:demo": "scripts/seed-demo.sh",
     "worker:kg": "pnpm --filter @lrnki/kg-worker worker:kg"
   },
   "devDependencies": {
