@@ -301,6 +301,12 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
                           <Badge variant="outline">{node.difficulty === null ? "—" : node.difficulty.toFixed(2)}</Badge>
                         </span>
                       </div>
+                      {node.difficultyRationale ? (
+                        <div className="rounded-sm bg-muted/40 px-2 py-1 text-xs">
+                          <span className="text-muted-foreground">difficulty rationale (generated): </span>
+                          <span className="text-muted-foreground italic">{node.difficultyRationale}</span>
+                        </div>
+                      ) : null}
                       {node.grounding ? (
                         <div className="flex flex-col gap-1 rounded-sm bg-muted/40 px-2 py-1.5 text-xs">
                           <span className="flex flex-wrap items-center gap-1">

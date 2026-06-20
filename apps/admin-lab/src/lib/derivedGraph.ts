@@ -34,6 +34,10 @@ export interface DerivedGraphNode {
   label: string;
   declaredDomain: string;
   difficulty: number | null;
+  // The difficulty judge's generated rationale for this node's score (R6). `null` when
+  // the node has no persisted difficulty row; empty string for a structural-only score.
+  // Always labeled as a generated rationale in the UI, never as a source quote.
+  difficultyRationale: string | null;
   // Anchor (a projection of an asserted Concept) vs enrichment (minted/rescued, R15).
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
@@ -125,6 +129,9 @@ export function summarizeOriginCounts(nodes: Pick<DerivedGraphNode, "declaredDom
 // in BOTH panels (R6). `isFrontierTarget` marks the single selected frontier node (R2).
 export interface DerivedGraphViewNode {
   difficulty: number | null;
+  // Carried alongside `difficulty` through both panels (R6); most useful beside the
+  // adapted size/color encoding. `null` is preserved (not coerced to "").
+  difficultyRationale: string | null;
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
   cardless: boolean;
@@ -165,6 +172,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         label: node.label,
         domain: node.declaredDomain,
         difficulty: node.difficulty,
+        difficultyRationale: node.difficultyRationale,
         nodeKind: node.nodeKind,
         groundingOrigin: node.groundingOrigin,
         cardless: !node.hasCard,
@@ -183,6 +191,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         label: node.label,
         domain: node.declaredDomain,
         difficulty: node.difficulty,
+        difficultyRationale: node.difficultyRationale,
         nodeKind: node.nodeKind,
         groundingOrigin: node.groundingOrigin,
         grounding: node.grounding,

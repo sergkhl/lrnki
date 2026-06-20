@@ -23,9 +23,9 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasCard: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
-    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasCard: true, grounding: null },
-    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasCard: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
+    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasCard: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasCard: true, grounding: null },
+    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasCard: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
     { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
@@ -69,6 +69,29 @@ test("difficulty is carried into the textual node list", () => {
   const view = buildDerivedGraphView(detail);
   assert.deepEqual(view.textual.nodes.map((n) => n.difficulty), [0, 1, 2]);
   assert.deepEqual(view.textual.nodes.map((n) => n.label), ["Variable scope", "Ownership", "Move semantics"]);
+});
+
+// U4/AE4: the generated difficulty rationale follows the same path as `difficulty`
+// through both the cytoscape and textual node shapes.
+test("the difficulty rationale is carried onto every node in both representations", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.deepEqual(view.textual.nodes.map((n) => n.difficultyRationale), [
+    "Foundational, concrete, low background load.",
+    "Abstract, composes several prior mechanics.",
+    "Builds directly on ownership transfer."
+  ]);
+  assert.deepEqual(view.cytoscape.nodes.map((n) => n.difficultyRationale), view.textual.nodes.map((n) => n.difficultyRationale));
+});
+
+// A node with no persisted difficulty row carries `null`, never coerced to "".
+test("a null difficulty rationale is preserved, not coerced to an empty string", () => {
+  const withNullRationale: DerivedGraphDetail = {
+    ...detail,
+    nodes: [{ ...detail.nodes[0], derivedNodeId: "nd", label: "No rationale", difficultyRationale: null }]
+  };
+  const view = buildDerivedGraphView(withNullRationale);
+  assert.equal(view.cytoscape.nodes[0].difficultyRationale, null);
+  assert.equal(view.textual.nodes[0].difficultyRationale, null);
 });
 
 // U8: the view model distinguishes anchors from enrichment nodes (R15) and surfaces

@@ -60,8 +60,8 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     // (R15). Difficulty and edges reference derived_node_id only (KTD2).
     // `cards` is UNIQUE per derived_node_id, so the LEFT JOIN keeps one row per node;
     // `has_card` flags whether the node is recall-testable (R6) for BOTH panels.
-    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; has_card: boolean }[]>`
-      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score,
+    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; neural_rationale: string | null; has_card: boolean }[]>`
+      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score, d.neural_rationale,
              (c.card_id IS NOT NULL) AS has_card
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
@@ -134,6 +134,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       label: row.label,
       declaredDomain: row.declared_domain,
       difficulty: row.score === null ? null : Number(row.score),
+      difficultyRationale: row.neural_rationale,
       nodeKind: row.node_kind as DerivedGraphNode["nodeKind"],
       groundingOrigin: row.grounding_origin as DerivedGraphNode["groundingOrigin"],
       role: row.role as DerivedGraphNode["role"],
