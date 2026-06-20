@@ -9,7 +9,24 @@ Most reset-roadmap items have moved to COMPLETED. The remaining active work is e
 outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
 `EXPERIMENT_ONLY` trust, and prior CEP definition-quality caveats remain visible in the mixed-domain run.
 
-1. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+1. **Adapted-graph comparison view + difficulty-ordering evaluation (in progress).** Make per-learner adaptation
+   legible in Admin Lab and read the intrinsic-difficulty ordering across the full manifest. Plan:
+   `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md`.
+   - **Landed (U1–U3, unit-green):** `classifyAdaptedNodes` (mastered/frontier/locked + selected frontier target)
+     sharing one readiness helper with `selectFrontierTarget` (AGENTS rule 18); the read-only
+     `getLearnerAdaptedGraphs` loader with folded `masteryByNode`, `responseSourceSummary`, distinct-enrichment
+     dedupe, and `hasCard`; and the optional `adapted` overlay (+ `cardless`) threaded through the pure
+     `buildDerivedGraphView`. Neutral render is unchanged.
+   - **Remaining (U4–U6):** U4 — teach `DerivedGraphExplorer` to color nodes by learner state, mark the frontier
+     target, size nodes by difficulty, and badge cardless nodes (+ legend), keeping the neutral path byte-identical.
+     U5 — render side-by-side neutral/adapted panel-pairs per distinct enrichment on the learner-loop page with a
+     synthetic/real source badge. U6 — rule-14 read of `intrinsic-fused-v1` ordering across all manifest domains
+     under `tmp/`, classifying whether the broad/evidence-thin over-scoring defect is systemic.
+   - This view is read + projection only (R12): no published-graph or Derived Graph Layer mutation, no new neural
+     surface. The U6 evaluation is analysis only (no scoring/fusion/rationale code change) and its conclusion is what
+     triggers the deferred difficulty-scoring fix; population calibration stays deferred (see task 5).
+
+2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
    still found low-value accepted Definition Passages such as heading-only or citation-like snippets in the
    AIRA-dojo Markdown run.
@@ -20,20 +37,21 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
    - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
      and the inspected newly included adjacent blocks were genuine explaining passages.
 
-2. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
+3. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
    malformed JSON forced-tool argument during AIRA-dojo Markdown concept admission; rerunning the single source
    succeeded. Keep fail-closed semantics, but improve retry observability and capture malformed tool-call snippets
    safely enough to diagnose provider/schema drift without logging secrets or full copyrighted source context.
 
-3. **Improve card-bank inspection around citation exactness.** Persisted cards passed the project verifier
+4. **Improve card-bank inspection around citation exactness.** Persisted cards passed the project verifier
    (`evidenceQuoteMatches`) 87/87, but only 68/87 citations were byte-exact substrings of source blocks because the
    verifier intentionally tolerates parser formatting noise (markdown emphasis, curly quotes, line wrapping, HTML
    entities). Admin/inspection surfaces should label this distinction clearly so operators do not confuse normalized
    verifier success with exact copied text.
 
-4. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
+5. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
-     densification, or non-LLM prerequisite signals from method-stack preference.
+     densification, or non-LLM prerequisite signals from method-stack preference. Population difficulty calibration
+     stays deferred until the study Game UI exists and per-learner calibration is stable (task 1 / ADR-0024).
    - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
      behavior without hiding provenance or identity defects.
 
@@ -102,7 +120,23 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## VALIDATION
 
-Latest change (2026-06-20) is the **derived-node identity naming cleanup** — a deterministic identifier
+Latest change (2026-06-20) is the **adapted-graph view, layers U1–U3** (TODO #1) — pure projection and
+view-model code, verified by unit tests only; real-use rule-14 inspection is **pending** the render and
+page-wiring units (U4–U5) and the difficulty evaluation (U6):
+
+- **Static/unit:** `packages/application` 158/0 (8 new `classifyAdaptedNodes` scenarios: AE1/AE2 classification,
+  threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with `selectFrontierTarget`, empty
+  frontier, mastered-over-ready precedence). `apps/admin-lab` 30/0 (3 new U2 pure-helper scenarios —
+  `dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`; 5 new U3 overlay view-model scenarios —
+  neutral unchanged, adapted tagging + single frontier mark, cardless in both representations, null-difficulty
+  preserved, R5 node-set equivalence). `tsc --noEmit` clean across admin-lab after adding the required `hasCard`
+  field. The DB-bound `getLearnerAdaptedGraphs` / `getLearnerLoopDetail` SQL paths follow the established
+  untested-loader pattern (live Postgres, real-use inspection in U5).
+- **Real-use:** NOT YET evaluated for this view — the overlay is not rendered until U4–U5, so no operator-visible
+  artifact exists to inspect. The loop's last real-use status remains the 2026-06-20 `PASS` / `EXPERIMENT_ONLY`
+  evaluation below; nothing in U1–U3 changes model output.
+
+Prior change (2026-06-20) is the **derived-node identity naming cleanup** — a deterministic identifier
 refactor (no behavior change), so it is verified statically, not by a new rule-14 real-use run:
 
 - **Static/unit:** full workspace typecheck green (exit 0); unit suites green where DB-free — domain-core,
