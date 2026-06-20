@@ -5,11 +5,12 @@ import {
   type CardAnswerKeyCitation,
   type DerivedGraphNode,
   type GraphSnapshot,
-  type PublishedConceptEvidenceProfile
+  type PublishedConceptEvidenceProfile,
+  type RejectedCard
 } from "@lrnki/domain-core";
 import type { CardBankStorePort, CardGenerationPort, EnrichmentRunStorePort, GraphVersionStorePort } from "@lrnki/ports";
 
-export type RejectedCard = { derivedNodeId: string; canonicalLabel: string; reason: string };
+export type { RejectedCard };
 
 export type CardBankGenerationResult = {
   graphVersionId: string;
@@ -101,7 +102,13 @@ export async function generateCardBank(input: {
     });
   }
 
-  await input.cardBankStore.persist(cards);
+  await input.cardBankStore.persist({
+    graphVersionId: layer.graphVersionId,
+    enrichmentId: layer.enrichmentId,
+    configHash: input.configHash,
+    cards,
+    rejected
+  });
   return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, cards, rejected };
 }
 

@@ -417,7 +417,7 @@ JSON_TABLE(
     citation_count integer PATH '$.citations.size()'
   )
 ) AS c
-WHERE a.artifact_type = 'card_bank.v2';
+WHERE a.artifact_type = 'card_bank.v3';
 
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
@@ -602,6 +602,21 @@ CREATE TABLE card_answer_key_citations (
     OR
     (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
   )
+);
+
+-- Derived nodes the card generator could NOT make recall-testable, recorded as a
+-- durable fact (not a transient log line). One of {card, rejection} exists per node;
+-- regeneration replaces an enrichment's rejections alongside its cards. The no-card
+-- frontier fallback reads `reason` instead of guessing from grounding origin.
+CREATE TABLE rejected_cards (
+  rejected_card_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  reason text NOT NULL,
+  config_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (derived_node_id)
 );
 
 -- ---------------------------------------------------------------------------

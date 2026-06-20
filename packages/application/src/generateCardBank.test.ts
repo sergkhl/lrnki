@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Card, CardDraft, DerivedGraphLayer, GraphSnapshot, PublishedEvidencePassage } from "@lrnki/domain-core";
+import type { Card, CardDraft, DerivedGraphLayer, GraphSnapshot, PublishedEvidencePassage, RejectedCard } from "@lrnki/domain-core";
 import type { CardBankStorePort, CardGenerationPort, EnrichmentRunStorePort, GraphVersionStorePort } from "@lrnki/ports";
 import { generateCardBank } from "./generateCardBank";
 
@@ -88,14 +88,15 @@ function cardGenerationReturning(draftByNode: Record<string, CardDraft>): CardGe
   };
 }
 
-function capturingStore(): { store: CardBankStorePort; persisted: Card[] } {
+function capturingStore(): { store: CardBankStorePort; persisted: Card[]; persistedRejected: RejectedCard[] } {
   const persisted: Card[] = [];
+  const persistedRejected: RejectedCard[] = [];
   const store: CardBankStorePort = {
-    async persist(cards) { persisted.push(...cards); },
+    async persist(input) { persisted.push(...input.cards); persistedRejected.push(...input.rejected); },
     async getCard() { return undefined; },
     async listCardsForEnrichment() { return persisted; }
   };
-  return { store, persisted };
+  return { store, persisted, persistedRejected };
 }
 
 test("a card whose citation quote is a verbatim substring of the cited CEP passage persists with citations intact", async () => {
@@ -127,12 +128,12 @@ test("a card whose citation quote is a verbatim substring of the cited CEP passa
   assert.equal(persisted[0].generatingModel, "mock-card-gen");
 });
 
-test("a card whose citation quote is not in any cited passage is rejected fail-closed and never persisted", async () => {
+test("a card whose citation quote is not in any cited passage is rejected fail-closed and recorded as a durable no-card fact", async () => {
   const snapshot = snapshotWith([
     { conceptId: "c1", label: "Ownership", definitions: [passage("b1", "Ownership is a set of rules that govern memory.")] }
   ]);
   const layer = layerWith([anchorNode("c1")]);
-  const { store, persisted } = capturingStore();
+  const { store, persisted, persistedRejected } = capturingStore();
   const result = await generateCardBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
@@ -148,7 +149,10 @@ test("a card whose citation quote is not in any cited passage is rejected fail-c
   assert.equal(result.cards.length, 0);
   assert.equal(result.rejected.length, 1);
   assert.match(result.rejected[0].reason, /unverifiable/);
-  assert.equal(persisted.length, 0, "the rejected card is not persisted");
+  assert.equal(persisted.length, 0, "no card is persisted for an unverifiable draft");
+  // The rejection is a durable fact (not just a return value): the store receives it
+  // so the no-card frontier fallback can surface the real reason instead of guessing.
+  assert.deepEqual(persistedRejected, [{ derivedNodeId: "node-c1", canonicalLabel: "Ownership", reason: result.rejected[0].reason }]);
 });
 
 test("an anchor with no definition passage still produces a card from a mention", async () => {

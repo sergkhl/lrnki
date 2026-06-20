@@ -14,7 +14,7 @@ Enrichment judges **every unordered same-domain pair exhaustively over the union
 
 Graph Enrichment also scores every derived node with learner-neutral intrinsic difficulty. The difficulty method, its fused components, and its `EXPERIMENT_ONLY` trust are owned by ADR-0024; here the only enrichment-scope commitments are that every derived node is scored and that prerequisite edges remain the primary learner-path constraint while difficulty is a secondary signal.
 
-Graph Enrichment never mutates the asserted graph and never reuses an asserted relation name; its only predicate is `inferred-prerequisite-of` (ADR-0016) — ordering is always an edge, never a node attribute. There is no densification/bridge-proposal pass: the removed F3 experiment and its run-by-run results are recorded in `docs/plans/TODO.md` and its archived plans, not here. Any future cost-bound pair-selection mechanism is separate follow-up work and must be measured against exhaustive judgment before it can veto pairs.
+Graph Enrichment never mutates the asserted graph and never reuses an asserted relation name; its only predicate is `inferred-prerequisite-of` (ADR-0016) — ordering is always an edge, never a node attribute. There is no densification/bridge-proposal pass: the removed F3 experiment is summarized as a completed outcome in `docs/plans/TODO.md`, not here. Any future cost-bound pair-selection mechanism is separate follow-up work and must be measured against exhaustive judgment before it can veto pairs.
 
 ## Context
 

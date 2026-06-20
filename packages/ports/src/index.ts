@@ -26,6 +26,7 @@ import type {
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
+  RejectedCard,
   RescueDurabilityJudgment,
   RunForBuild,
   SourceBlock,
@@ -308,13 +309,15 @@ export interface LearnerPathStorePort {
 // here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
 // ---------------------------------------------------------------------------
 
-// Card Bank persistence (R3). `persist` writes a whole enrichment's cards atomically
-// AND its immutable `card_bank` artifact in one transaction (no authoritative
-// relational state without its artifact, matching the enrichment/extraction
-// stores). Regeneration replaces an enrichment's cards (delete-then-insert) rather
-// than silently duplicating against the `derived_node_id` unique key.
+// Card Bank persistence (R3). `persist` writes a whole enrichment's cards AND its
+// rejected (no-card) nodes atomically, plus the immutable `card_bank` artifact, in
+// one transaction (no authoritative relational state without its artifact, matching
+// the enrichment/extraction stores). Regeneration replaces an enrichment's cards and
+// rejections (delete-then-insert) rather than silently duplicating against the
+// `derived_node_id` unique key. Rejected nodes are persisted so the no-card frontier
+// fallback reads the real rejection reason instead of guessing from grounding origin.
 export interface CardBankStorePort {
-  persist(cards: Card[]): Promise<void>;
+  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; cards: Card[]; rejected: RejectedCard[] }): Promise<void>;
   getCard(derivedNodeId: string): Promise<Card | undefined>;
   listCardsForEnrichment(enrichmentId: string): Promise<Card[]>;
 }

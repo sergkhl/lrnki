@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { Card, NewResponseLogRow, StructuredDocument } from "@lrnki/domain-core";
+import type { Card, NewResponseLogRow, RejectedCard, StructuredDocument } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
 import { PostgresCardBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
@@ -58,6 +58,13 @@ async function seedSubstrate(sql: Sql): Promise<{
   return { graphVersionId, enrichmentId, conceptId, derivedNodeId, sourceResourceId, blockIds: blocks.map((row) => row.source_block_id) };
 }
 
+// Persist whole-enrichment cards through the port's input shape. Derives the
+// enrichment context from the cards; pass `rejected` for no-card nodes.
+function persistBank(store: PostgresCardBankStore, cards: Card[], rejected: RejectedCard[] = []): Promise<void> {
+  const head = cards[0];
+  return store.persist({ graphVersionId: head.graphVersionId, enrichmentId: head.enrichmentId, configHash: head.configHash, cards, rejected });
+}
+
 function cardFor(input: { graphVersionId: string; enrichmentId: string; derivedNodeId: string; sourceResourceId: string; blockIds: string[] }): Card {
   return {
     cardId: randomUUID(),
@@ -83,7 +90,7 @@ maybe("persists a card with citations and reads it back intact via getCard", asy
     const substrate = await seedSubstrate(sql);
     const card = cardFor(substrate);
     const store = new PostgresCardBankStore(sql);
-    await store.persist([card]);
+    await persistBank(store, [card]);
 
     const loaded = await store.getCard(substrate.derivedNodeId);
     assert.ok(loaded, "card round-trips");
@@ -106,8 +113,8 @@ maybe("listCardsForEnrichment returns only the requested enrichment's cards", as
     const a = await seedSubstrate(sql);
     const b = await seedSubstrate(sql);
     const store = new PostgresCardBankStore(sql);
-    await store.persist([cardFor(a)]);
-    await store.persist([cardFor(b)]);
+    await persistBank(store, [cardFor(a)]);
+    await persistBank(store, [cardFor(b)]);
 
     const cardsA = await store.listCardsForEnrichment(a.enrichmentId);
     assert.equal(cardsA.length, 1);
@@ -123,9 +130,9 @@ maybe("regeneration replaces a version's cards instead of duplicating under the 
     const substrate = await seedSubstrate(sql);
     const store = new PostgresCardBankStore(sql);
     const first = cardFor(substrate);
-    await store.persist([first]);
+    await persistBank(store, [first]);
     const regenerated: Card = { ...cardFor(substrate), question: "Regenerated question?" };
-    await store.persist([regenerated]);
+    await persistBank(store, [regenerated]);
 
     const cards = await store.listCardsForEnrichment(substrate.enrichmentId);
     assert.equal(cards.length, 1, "delete-then-insert keeps exactly one card per derived node");
@@ -143,7 +150,7 @@ maybe("artifact_cards JSON_TABLE view returns one row per card", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const substrate = await seedSubstrate(sql);
-    await new PostgresCardBankStore(sql).persist([cardFor(substrate)]);
+    await persistBank(new PostgresCardBankStore(sql), [cardFor(substrate)]);
 
     const rows = await sql<{ card_id: string; derived_node_id: string; grounding_provenance: string; citation_count: number }[]>`
       SELECT card_id, derived_node_id, grounding_provenance, citation_count FROM artifact_cards WHERE enrichment_id = ${substrate.enrichmentId}`;
@@ -156,6 +163,46 @@ maybe("artifact_cards JSON_TABLE view returns one row per card", async () => {
   }
 });
 
+// Insert an extra derived node (with its own Concept) into an existing enrichment so
+// a single persist can carry one carded node and one rejected (no-card) node.
+async function addDerivedNode(sql: Sql, enrichmentId: string, label: string): Promise<string> {
+  const conceptId = randomUUID();
+  await sql`
+    INSERT INTO concepts (concept_id, iri, normalized_label, declared_domain)
+    VALUES (${conceptId}, ${`urn:lrnki:concept:${conceptId}`}, ${`${label.toLowerCase()}-${conceptId}`}, 'software engineering')`;
+  const derivedNodeId = randomUUID();
+  await sql`
+    INSERT INTO derived_graph_nodes (derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role, canonical_label, normalized_label, declared_domain, aliases)
+    VALUES (${derivedNodeId}, ${enrichmentId}, 'anchor', ${conceptId}, 'document_anchored', 'anchor', ${label}, ${`${label.toLowerCase()}-${conceptId}`}, 'software engineering', '[]'::jsonb)`;
+  return derivedNodeId;
+}
+
+maybe("persists rejected (no-card) nodes with their reason and replaces them on regeneration", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const substrate = await seedSubstrate(sql);
+    const rejectedNodeId = await addDerivedNode(sql, substrate.enrichmentId, "Ungroundable");
+    const store = new PostgresCardBankStore(sql);
+    await persistBank(store, [cardFor(substrate)], [
+      { derivedNodeId: rejectedNodeId, canonicalLabel: "Ungroundable", reason: "no usable grounding passages" }
+    ]);
+
+    const rows = await sql<{ derived_node_id: string; reason: string }[]>`
+      SELECT derived_node_id, reason FROM rejected_cards WHERE enrichment_id = ${substrate.enrichmentId}`;
+    assert.equal(rows.length, 1, "the no-card node is persisted as a durable fact");
+    assert.equal(rows[0].derived_node_id, rejectedNodeId);
+    assert.equal(rows[0].reason, "no usable grounding passages");
+
+    // Regeneration with no rejections clears the prior rejection (delete-then-insert).
+    await persistBank(store, [cardFor(substrate)], []);
+    const [{ count }] = await sql<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM rejected_cards WHERE enrichment_id = ${substrate.enrichmentId}`;
+    assert.equal(count, 0, "stale rejections are cleared on regeneration");
+  } finally {
+    await sql.end();
+  }
+});
+
 // --- Response Log (U3) -----------------------------------------------------
 
 // Persist a real card so response_log's card_id FK resolves, returning the ids the
@@ -163,7 +210,7 @@ maybe("artifact_cards JSON_TABLE view returns one row per card", async () => {
 async function seedCard(sql: Sql): Promise<{ cardId: string; derivedNodeId: string }> {
   const substrate = await seedSubstrate(sql);
   const card = cardFor(substrate);
-  await new PostgresCardBankStore(sql).persist([card]);
+  await persistBank(new PostgresCardBankStore(sql), [card]);
   return { cardId: card.cardId, derivedNodeId: substrate.derivedNodeId };
 }
 

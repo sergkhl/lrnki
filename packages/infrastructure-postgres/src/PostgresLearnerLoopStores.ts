@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, Card, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
+import type { ArtifactEnvelope, Card, NewResponseLogRow, RejectedCard, ResponseLogRow } from "@lrnki/domain-core";
 import type { CardBankStorePort, ResponseLogStorePort } from "@lrnki/ports";
 import type { Sql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
@@ -16,15 +16,20 @@ const CARD_BANK_PRODUCER_VERSION = "0.1.0";
 export class PostgresCardBankStore implements CardBankStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(cards: Card[]): Promise<void> {
-    if (cards.length === 0) return;
+  async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; cards: Card[]; rejected: RejectedCard[] }): Promise<void> {
+    const { graphVersionId, enrichmentId, configHash, cards, rejected } = input;
     // All cards in one persist belong to a single enrichment layer. Regeneration is
     // replay, not mutation: delete the enrichment's prior cards (citations cascade)
-    // then re-insert.
-    const graphVersionId = cards[0].graphVersionId;
-    const enrichmentId = cards[0].enrichmentId;
+    // and prior rejections, then re-insert both. Done even when 0 cards survive so an
+    // all-rejected regeneration still clears stale cards and records the rejections.
     await this.sql.begin(async (tx) => {
       await tx`DELETE FROM cards WHERE enrichment_id = ${enrichmentId}`;
+      await tx`DELETE FROM rejected_cards WHERE enrichment_id = ${enrichmentId}`;
+      for (const rejection of rejected) {
+        await tx`
+          INSERT INTO rejected_cards (rejected_card_id, graph_version_id, enrichment_id, derived_node_id, reason, config_hash)
+          VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${rejection.derivedNodeId}, ${rejection.reason}, ${configHash})`;
+      }
       for (const card of cards) {
         await tx`
           INSERT INTO cards (card_id, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
@@ -42,16 +47,16 @@ export class PostgresCardBankStore implements CardBankStorePort {
         }
       }
 
-      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; cards: Card[] }> = {
+      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; cards: Card[]; rejected: RejectedCard[] }> = {
         artifactId: randomUUID(),
-        artifactType: "card_bank.v2",
-        schemaVersion: "2",
+        artifactType: "card_bank.v3",
+        schemaVersion: "3",
         graphVersionId,
         producer: CARD_BANK_PRODUCER,
         producerVersion: CARD_BANK_PRODUCER_VERSION,
-        configHash: cards[0].configHash,
+        configHash,
         createdAt: new Date().toISOString(),
-        payload: { graphVersionId, enrichmentId, cards }
+        payload: { graphVersionId, enrichmentId, cards, rejected }
       };
       await writeArtifactEnvelope(tx, artifact);
     });

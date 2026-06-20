@@ -960,6 +960,17 @@ export type Card = {
   configHash: string;
 };
 
+// A derived node that produced NO recall-testable card, recorded as a durable fact
+// rather than a transient log line. The card generator is the sole authority for
+// recall-testability, so every node it cannot card is persisted here with the exact
+// reason (no grounding, unverifiable citation, generation failure). The no-card
+// frontier fallback reads this reason instead of guessing from grounding origin.
+export type RejectedCard = {
+  derivedNodeId: string;
+  canonicalLabel: string;
+  reason: string;
+};
+
 // The model's PRE-verification card output (U2). The model cites CEP passages by
 // `sourceBlockId` + a quote; the application boundary verifies each quote verbatim
 // against the published CEP and resolves the `sourceResourceId` before promoting a

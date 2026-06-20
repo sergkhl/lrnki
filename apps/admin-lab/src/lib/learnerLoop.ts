@@ -197,16 +197,17 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
       ORDER BY p.created_at DESC`;
     const coverageRows = await sql<{
       enrichment_id: string; target_derived_node_id: string; target_label: string; position: number; derived_node_id: string;
-      label: string; grounding_origin: string; included_reason: string; card_id: string | null; question: string | null; grounding_provenance: string | null;
+      label: string; grounding_origin: string; included_reason: string; card_id: string | null; question: string | null; grounding_provenance: string | null; rejection_reason: string | null;
     }[]>`
       SELECT p.enrichment_id, p.target_derived_node_id, tn.canonical_label AS target_label,
              s.position, s.derived_node_id, n.canonical_label AS label, n.grounding_origin,
-             s.included_reason, c.card_id, c.question, c.grounding_provenance
+             s.included_reason, c.card_id, c.question, c.grounding_provenance, rc.reason AS rejection_reason
       FROM learner_paths p
       JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
       JOIN learner_path_steps s ON s.learner_path_id = p.learner_path_id
       JOIN derived_graph_nodes n ON n.derived_node_id = s.derived_node_id
       LEFT JOIN cards c ON c.derived_node_id = s.derived_node_id
+      LEFT JOIN rejected_cards rc ON rc.derived_node_id = s.derived_node_id
       WHERE p.learner_state_ref = ${learnerStateRef}
       ORDER BY p.created_at DESC, s.position`;
     const coverageByPath = new Map<string, PathCardCoverage>();
@@ -226,7 +227,7 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         card: row.card_id && row.question && row.grounding_provenance
           ? { cardId: row.card_id, question: row.question, provenance: row.grounding_provenance as NonNullable<PathCardCoverageStep["card"]>["provenance"] }
           : null,
-        fallbackReason: row.card_id ? null : fallbackReasonFor(row.grounding_origin)
+        fallbackReason: row.card_id ? null : (row.rejection_reason ?? fallbackReasonFor(row.grounding_origin))
       });
     }
 
@@ -255,10 +256,13 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
   });
 }
 
+// Generic fallback used ONLY when a step's node has neither a card nor a persisted
+// rejection row (e.g. cards were never generated for the enrichment). When a real
+// rejection exists, the coverage view shows its persisted reason instead of this guess.
 function fallbackReasonFor(groundingOrigin: string): string {
-  if (groundingOrigin === "llm_grounded") return "Generated prerequisite, no verifiable card generated.";
-  if (groundingOrigin === "source_mentioned") return "Source-mentioned prerequisite, no verifiable card generated.";
-  return "Anchor node, no verifiable card generated.";
+  if (groundingOrigin === "llm_grounded") return "Generated prerequisite, not directly recall-tested yet.";
+  if (groundingOrigin === "source_mentioned") return "Source-mentioned prerequisite, not directly recall-tested yet.";
+  return "Anchor node, not directly recall-tested yet.";
 }
 
 // --- Resubmit + recompute (the first write) --------------------------------

@@ -34,3 +34,5 @@ The learner loop now has one subject identity: `derived_node_id`. The old concep
 Anchor `concept_id` remains recoverable by joining `derived_graph_nodes.concept_id` when later learner-modeling work needs stable asserted Concept identity.
 
 Card regeneration is scoped to one enrichment layer. Re-enrichment mints new enrichment-node identities, so response history for enrichment-only nodes remains enrichment-scoped until stable learner-facing node identity is designed.
+
+A derived node the generator cannot make recall-testable is recorded as a durable no-card fact carrying the rejection reason, persisted in the same transaction as that enrichment's cards. The frontier still advances by prerequisite structure and difficulty, but when it lands on a node with no card the projection surfaces the persisted reason ("not directly recall-tested yet") rather than presenting a card it does not have. A node is therefore in exactly one of {carded, recorded no-card} per enrichment.
