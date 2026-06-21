@@ -936,69 +936,128 @@ export type LearnerPath = {
 };
 
 // ---------------------------------------------------------------------------
-// Learner Recall Loop — Card Bank (R1–R3). A learner-NEUTRAL derived asset: one
-// anki-style card per Derived Graph Layer node, conditioned on that node's
-// grounding and keyed to the enrichment node identity. Regenerable without
-// affecting learner state; never written into the asserted graph or the Derived
-// Graph Layer (CONTEXT.md "Learner State", AGENTS rule 3). The two recall modes
-// read ONE card: calibration uses `selfReportPrompt`, measurement grades a written
-// answer against `answerKey` (Key Technical Decisions: one item, two signal types).
+// Learner Study Loop — Typed Study Item Bank (R7–R15, ADR-0026). A learner-NEUTRAL
+// derived asset: per Derived Graph Layer node, the bank holds whichever typed study
+// items the build could ground, conditioned on that node's grounding and keyed to the
+// enrichment node identity. Regenerable without affecting learner state; never written
+// into the asserted graph or the Derived Graph Layer (CONTEXT.md "Learner State",
+// AGENTS rule 3). The discriminant is `itemType`: `self_assessment` (calibration only)
+// and `option_select` (auto-graded studying) are concrete this round; the remaining
+// three are reserved in the discriminant with no payload built yet (R14). The
+// concept→type map is never stored — supported types are `SELECT DISTINCT item_type`
+// over persisted items (KTD2). ADR-0026 supersedes ADR-0025 for item identity.
 // ---------------------------------------------------------------------------
 
-export type CardGroundingProvenance = "source_cep" | "source_mentioned" | "generated";
+// Every item type the discriminant accommodates. The first two are implemented; the
+// last three are reserved so new mechanics slot in without a model reshape (R14).
+export type StudyItemType =
+  | "self_assessment"
+  | "option_select"
+  | "multi_option_select"
+  | "free_text"
+  | "mini_game";
+
+export type StudyItemGroundingProvenance = "source_cep" | "source_mentioned" | "generated";
 
 // Provenance-tagged citations keep generated grounding honest: source citations
 // must verify against source text, generated citations verify only against the
-// generated grounding bundle and never carry source ids.
-export type CardAnswerKeyCitation =
+// generated grounding bundle and never carry source ids. Shared by the self-assessment
+// answer key and the option-select correct answer.
+export type StudyItemCitation =
   | { provenance: "source"; sourceResourceId: string; sourceBlockId: string; evidenceQuote: string }
   | { provenance: "generated"; derivedNodeId: string; passageText: string };
 
-export type Card = {
-  cardId: string;
+// One option in an option-select item. Exactly one is `isCorrect` (the guard enforces
+// it, U2). The correct option is source-grounded and carries a verified `citation`;
+// distractors are `generated` and carry none (R10, ADR-0026 provenance).
+export type StudyItemOption = {
+  optionId: string;
+  text: string;
+  isCorrect: boolean;
+  provenance: "source" | "generated";
+  citation?: StudyItemCitation;
+};
+
+// Fields shared by every persisted study item, independent of `itemType`.
+type StudyItemBase = {
+  studyItemId: string;
   graphVersionId: string;
   enrichmentId: string;
   derivedNodeId: string;
-  groundingProvenance: CardGroundingProvenance;
-  question: string;
-  answerKey: string;
-  selfReportPrompt: string;
-  citations: CardAnswerKeyCitation[];
+  groundingProvenance: StudyItemGroundingProvenance;
   generatingModel: string;
   configHash: string;
 };
 
-// A derived node that produced NO recall-testable card, recorded as a durable fact
-// rather than a transient log line. The card generator is the sole authority for
-// recall-testability, so every node it cannot card is persisted here with the exact
-// reason (no grounding, unverifiable citation, generation failure). The no-card
-// frontier fallback reads this reason instead of guessing from grounding origin.
-export type RejectedCard = {
+// Self-assessment item — calibration only (R8). Keeps the prior recall-card payload:
+// a question, a grounded answer key, a self-report prompt, and verified citations.
+export type SelfAssessmentItem = StudyItemBase & {
+  itemType: "self_assessment";
+  question: string;
+  answerKey: string;
+  selfReportPrompt: string;
+  citations: StudyItemCitation[];
+};
+
+// Option-select item — auto-graded studying (R9). Four options, exactly one keyed
+// correct and source-grounded; the other three are sibling-conditioned distractors
+// labeled `generated`. A click writes a deterministic `graded(auto)` row, no judge.
+export type OptionSelectItem = StudyItemBase & {
+  itemType: "option_select";
+  question: string;
+  options: StudyItemOption[];
+};
+
+export type StudyItem = SelfAssessmentItem | OptionSelectItem;
+
+// A derived node that produced NO study item at all (no usable grounding), recorded as
+// a durable fact rather than a transient log line. A node that grounds a self-assessment
+// item but fails to yield an option-select item is NOT rejected — it simply lacks that
+// type and the frontier surfaces it as cardless-for-studying (R13). Only a node the build
+// could ground for nothing lands here, with the exact reason.
+export type RejectedStudyItem = {
   derivedNodeId: string;
   canonicalLabel: string;
   reason: string;
 };
 
-// The model's PRE-verification card output (U2). The model cites grounding passages
-// by `passageId` + a quote; the application boundary verifies each quote verbatim
-// against the cited grounding passage before promoting a draft to a persisted Card
-// (AGENTS rule 6 fail-closed). `passageId` is a source block id for source-grounded
-// nodes but a synthetic generated-passage id for `llm_grounded` nodes, so the field
-// is NOT a source block id and must never be persisted as one. A draft whose citations
-// do not all verify is rejected, never silently kept.
-export type CardDraft = {
+// Pre-verification drafts the generators return (U3). The model cites grounding passages
+// by `passageId` + a quote; the application boundary verifies each quote verbatim against
+// the cited grounding passage before promoting a draft to a persisted item (AGENTS rule 6
+// fail-closed). `passageId` is a source block id for source-grounded nodes but a synthetic
+// generated-passage id for `llm_grounded` nodes, so the field is NOT a source block id and
+// must never be persisted as one. A draft whose grounding does not verify is rejected.
+export type SelfAssessmentItemDraft = {
+  itemType: "self_assessment";
   question: string;
   answerKey: string;
   selfReportPrompt: string;
   citations: { passageId: string; evidenceQuote: string }[];
 };
 
+// One option in a pre-verification option-select draft. The correct option carries its
+// citation by `passageId` + quote (verified by the guard, U2); distractors carry none.
+export type StudyItemOptionDraft = {
+  text: string;
+  isCorrect: boolean;
+  provenance: "source" | "generated";
+  citation?: { passageId: string; evidenceQuote: string };
+};
+
+export type OptionSelectItemDraft = {
+  itemType: "option_select";
+  question: string;
+  options: StudyItemOptionDraft[];
+};
+
+export type StudyItemDraft = SelfAssessmentItemDraft | OptionSelectItemDraft;
+
 // ---------------------------------------------------------------------------
 // Response Log — the durable, append-only commitment (R4–R6). Every recall attempt
 // is an immutable row. `self_report` rows carry an anki-style rating; `graded` rows
 // carry a judged outcome plus a [0,1] score (the partial/binary distinction the
 // estimator and a later IRT/BKT fit need, AE4). The skill is the Derived Graph Layer
-// `derivedNodeId`; the item is `cardId` (per-item IRT key).
+// `derivedNodeId`; the item is `studyItemId` (per-item IRT key).
 // ---------------------------------------------------------------------------
 
 export type SignalType = "self_report" | "graded";
@@ -1009,7 +1068,7 @@ export type ResponseSource = "synthetic" | "human";
 export type ResponseLogRow = {
   responseId: string;
   learnerStateRef: string;
-  cardId: string;
+  studyItemId: string;
   derivedNodeId: string;
   signalType: SignalType;
   selfReportRating: SelfReportRating | null;

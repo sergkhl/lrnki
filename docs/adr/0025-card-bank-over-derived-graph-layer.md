@@ -3,7 +3,13 @@
 ## Status
 
 Accepted. Amended 2026-06-20 to sharpen the recall-loop identity model and record the
-derived-node naming decision (no decision reversed).
+derived-node naming decision (no decision reversed). **Superseded by
+[ADR-0026](./0026-typed-study-item-bank.md) for item identity (2026-06-21):** the single
+`Card` keyed by `card_id` became a typed `StudyItem` discriminated union keyed by
+`study_item_id`, and the `card_bank.v3` artifact became `study_item_bank.v4`. The
+derived-node **subject** identity (`derived_node_id`), the single-outcome-per-node
+invariant, the append-only Response Log, and the source/generated grounding-provenance
+contract recorded below are unchanged — read them as applying to typed study items.
 
 ## Context
 
