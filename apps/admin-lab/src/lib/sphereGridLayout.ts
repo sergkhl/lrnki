@@ -101,10 +101,6 @@ function certain(edge: SphereGridEdgeInput): boolean {
   return edge.uncertain === false || edge.uncertain === "no";
 }
 
-function isUncertain(edge: SphereGridEdgeInput): boolean {
-  return edge.uncertain === true || edge.uncertain === "yes";
-}
-
 // Deterministic placement order: difficulty asc, then label, then id — identical to
 // the prerequisite ordering the canvas uses everywhere, so the easiest/most-foundational
 // concept anchors each loop.
@@ -451,7 +447,3 @@ export function layoutSphereGrid(nodes: SphereGridNodeInput[], edges: SphereGrid
 
   return { positions, routes, regions, crossings, flaggedLoops };
 }
-
-// Convenience re-export so callers/tests can reason about a single edge's certainty the
-// same way placement does.
-export { certain as isCertainEdge, isUncertain as isUncertainEdge };
