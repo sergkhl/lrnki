@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { assessmentDisabled, calibrationRatingFor, nextStudyTarget } from "./studyView";
+import { assessmentDisabled, calibrationRatingFor, nextStudyTarget, shouldAcceptSheetOpenChange } from "./studyView";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -26,6 +26,18 @@ test("nextStudyTarget returns the freshly-advanced frontier target when present 
 
 test("nextStudyTarget returns null when the goal is reached (no frontier target)", () => {
   assert.equal(nextStudyTarget({ selectedFrontierTarget: null }), null);
+});
+
+test("sheet close is ignored while answer-triggered retargeting is guarded", () => {
+  assert.equal(shouldAcceptSheetOpenChange(false, true), false);
+});
+
+test("sheet close is accepted after answer-triggered retargeting guard clears", () => {
+  assert.equal(shouldAcceptSheetOpenChange(false, false), true);
+});
+
+test("sheet open is always accepted, including during answer-triggered retargeting", () => {
+  assert.equal(shouldAcceptSheetOpenChange(true, true), true);
 });
 
 // Covers R15: the transfer-ready modules import no Admin-Lab loader and no server action,

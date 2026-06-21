@@ -173,7 +173,7 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
 }
 
 // The neutral ↔ adapted display mode of the single pinned canvas (U2, KTD2). One
-// pre-computed ELK layout serves BOTH modes; switching mode restyles nodes only and
+// pre-computed layout serves BOTH modes; switching mode restyles nodes only and
 // never re-runs layout, so positions stay fixed for blink comparison (R11).
 export type DerivedGraphMode = "neutral" | "adapted";
 

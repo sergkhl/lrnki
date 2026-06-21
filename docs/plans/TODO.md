@@ -1,13 +1,14 @@
 # TODO
 
-Roadmap reset 2026-06-16, updated by the 2026-06-18 structure-aware-neighborhood run: the next work is earned
-by real mixed-domain pipeline output, not by deferred method-stack preference.
+Roadmap reset 2026-06-16, updated by the 2026-06-21 study-advance/spiral-layout rule-14 pass: the next work is earned
+by real mixed-domain pipeline output and inspected learner-loop behavior, not by deferred method-stack preference.
 
 ## TODO
 
 Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
 outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
-`EXPERIMENT_ONLY` trust, and prior CEP definition-quality caveats remain visible in the mixed-domain run.
+`EXPERIMENT_ONLY` trust, the study advance guard plus spiral graph layout passed rule-14 inspection, and prior CEP
+definition-quality caveats remain visible in the mixed-domain run.
 
 1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
    plausible ordering but confirmed a concentrated broad/evidence-thin distortion, especially relation-like or
@@ -58,6 +59,33 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## COMPLETED
 
+- **Study advance guard + prerequisite-order spiral graph layout (2026-06-21).** Replaced the
+  shared ELK layered placement with deterministic prerequisite-order spiral placement for Admin Lab
+  derived graph canvases, including the learner-path graph. Ordering uses certain prerequisite edges
+  only, keeps uncertain edges visible but placement-neutral, tie-breaks by difficulty/label/id, and
+  terminates deterministically on cycles. The study side sheet now ignores stale dismiss signals while
+  answer-triggered retargeting is guarded, clears selection only on accepted user dismissal or goal
+  completion, and keys recall cards by `cardId` so advanced cards start unrevealed. The earlier
+  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md` success is superseded: the observed
+  `Memory address` -> `Variable` sheet-dismiss regression invalidated its side-sheet continuity
+  evidence. Fresh rule-14 inspection over disposable learner `eval-spiral-advance` classified this
+  fix `PASS`: `Memory address` -> `Reveal answer` -> `Got it` advanced the still-open sheet to
+  `Variable`, the `Variable` card was unrevealed, and both derived-graph and learner-path Cytoscape
+  canvases rendered through the spiral helper. Caveat: the full 50-node mixed-domain spiral still has
+  dense edge crossings; this is deterministic prerequisite placement, not force-directed untangling.
+  Evidence: `tmp/2026-06-21-spiral-study-advance/rule-14-evaluation.md`.
+- **Study surface polish + calibration propagation trust fix (2026-06-21).** Completed
+  `docs/plans/2026-06-21-002-feat-study-surface-polish-plan.md` U1-U6. Admin Lab now uses
+  dedicated graph tokens and a single node-state fill source for legible locked/enrichment/frontier/mastered
+  states, clear button-vs-tag presentation on the study surface, frontier-neighborhood framing with
+  viewport-only recenter on advance, and uninterrupted post-answer retargeting of the open side sheet.
+  Calibration propagation now mirrors readiness trust by excluding uncertain edges while retaining cycle
+  termination. Its original rule-14 pass over the seeded Rust ownership `Move` path is now superseded by
+  the study advance guard evaluation above because the later observed sheet-dismiss regression invalidated
+  the recorded side-sheet continuity evidence. The retained non-retargeting evidence showed that a direct
+  uncertain-cycle propagation probe seeded only the trusted ancestor and did not credit the goal. Superseded
+  evidence:
+  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md`.
 - **Adapted-graph comparison view + full-manifest difficulty-ordering evaluation (2026-06-20).** Completed
   `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md` U1–U6. Admin Lab now renders one
   neutral/adapted `DerivedGraphExplorer` pair per distinct learner-path enrichment, badged by synthetic/human
@@ -130,15 +158,41 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## VALIDATION
 
-Latest change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
+Latest change (2026-06-21) is the **study advance guard + prerequisite-order spiral graph layout**:
 
-- **Static/unit:** `packages/application` 151/0 for the current suite, including `classifyAdaptedNodes` coverage
+- **Static/unit:** `pnpm --filter @lrnki/admin-lab test` passed 66/0, including sheet dismiss guard coverage,
+  spiral ordering coverage for certain-edge precedence, uncertain-edge exclusion, difficulty/label/id tie-breaks,
+  deterministic cycle termination, and shared derived-graph/learner-path helper inputs. `pnpm --filter
+  @lrnki/admin-lab typecheck` passed. `elkjs` and the local bundled type shim were removed from the Admin Lab
+  dependency surface.
+- **Real-use:** Playwright drove the live Admin Lab study route over enrichment
+  `56e55b9a-a62b-43b9-88de-8d5b381a2da8`, disposable learner `eval-spiral-advance`, target `Move`
+  (`1e1d9b1e-8288-4219-a9d1-f55d1d5b74c3`). The page opened with frontier `Memory address`; clicking the
+  Cytoscape frontier node opened the sheet, `Reveal answer` + `Got it` advanced the page and still-open sheet to
+  `Variable`, and the `Variable` card started unrevealed. The derived graph and learner-path canvases both rendered
+  through the spiral helper. Inspection result: `PASS`. Evidence:
+  `tmp/2026-06-21-spiral-study-advance/rule-14-evaluation.md`.
+
+Prior change (2026-06-21) is the **study surface polish + calibration propagation trust fix**:
+
+- **Static/unit:** `pnpm --filter @lrnki/application test` passed 160/0 for that suite, including the R6 regression
+  cases where positive self-report does not seed ancestors reachable only through uncertain edges and an uncertain-edge
+  cycle does not credit the goal. `pnpm --filter @lrnki/admin-lab test` passed 57/0 at that point, including
+  node-state token distinctness, frontier-neighborhood helper coverage, next-study-target helper coverage,
+  transfer-boundary guards, and study-session gating helpers.
+- **Real-use:** superseded for side-sheet continuity by the latest evaluation above. The retained calibration trust
+  evidence remains the direct uncertain-cycle propagation probe in
+  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md`.
+
+Prior change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
+
+- **Static/unit:** `packages/application` 151/0 for that suite, including `classifyAdaptedNodes` coverage
   for AE1/AE2 classification, threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with
   `selectFrontierTarget`, empty frontier, and mastered-over-ready precedence. `apps/admin-lab` 30/0, including U2
   pure-helper coverage (`dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`) and U3
   overlay view-model coverage (neutral unchanged, adapted tagging + single frontier mark, cardless in both
-  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck clean after U5
-  page wiring. Page composition remains un-unit-tested by local convention; U5 uses the DB-bound loader and was
+  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck was clean after
+  U5 page wiring. Page composition remained un-unit-tested by local convention; U5 used the DB-bound loader and was
   verified by the same real-use path as U6.
 - **Real-use:** full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` and enrichment
   `223cfb32-47a2-4488-a61a-561f6673f717` were produced with real LiteLLM calls. The run persisted 50/50

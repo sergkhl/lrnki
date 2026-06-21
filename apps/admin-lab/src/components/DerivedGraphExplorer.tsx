@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
-import { applyElkLayeredLayout, recenterOnFocus } from "@/lib/cytoscapeElkLayout";
+import { applySpiralLayout, recenterOnFocus } from "@/lib/cytoscapeSpiralLayout";
 import { buildDerivedGraphView, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ const ADAPTED_STATE_BADGE: Record<AdaptedNodeState, "default" | "secondary" | "o
 // textual node-and-edge representation for non-visual inspection (U6 scenario 8).
 //
 // With `adapted` present (U2), the panel shows an internal neutral ↔ adapted segmented
-// control over ONE pinned layout: ELK runs once over the neutral topology, and switching
+// control over ONE pinned layout: spiral placement runs once over the neutral topology, and switching
 // mode restyles nodes only (mastered / frontier / locked recolor, frontier target ringed)
 // via `cy.batch()` — never re-running layout, so positions stay fixed for blink
 // comparison (R11, KTD2). Without `adapted` there is no control and the render is neutral
@@ -81,11 +81,11 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
     [adapted?.selectedFrontierTarget, detail.edges]
   );
   // Read in the layout effect (keyed on topology only) without making it a dependency, so a
-  // frontier advance never re-runs ELK — it recenters via the viewport-only effect below.
+  // frontier advance never re-runs layout — it recenters via the viewport-only effect below.
   const focusRef = useRef(focusNodeIds);
   focusRef.current = focusNodeIds;
-  // Guards the recenter effect: the async ELK pass resolves after first paint, so until it
-  // does, initial framing is owned by the focus-fit at the end of the layout pass.
+  // Guards the recenter effect: initial framing is owned by the focus-fit at the end of the
+  // layout pass, and later frontier advances are viewport-only.
   const layoutReadyRef = useRef(false);
   const hasClassification = adapted != null;
   // The adapted view is the informative one, so default to it when a classification is
@@ -98,7 +98,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   const layoutView = useMemo(() => buildDerivedGraphView(detail), [detail]);
   const view = useMemo(() => buildDerivedGraphView(detail, isAdaptedMode ? adapted : undefined), [detail, adapted, isAdaptedMode]);
 
-  // Layout effect — runs ONCE per topology (KTD2). It builds the instance and runs ELK;
+  // Layout effect — runs ONCE per topology (KTD2). It builds the instance and runs spiral placement;
   // node positions become Cytoscape-owned state. Mode-dependent attrs start at the neutral
   // baseline and are set by the restyle effect below — never here, so a mode swap cannot
   // recreate the instance or re-fit the layout.
@@ -129,6 +129,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             id: node.id,
             label: node.label,
             domain: node.domain,
+            difficulty: node.difficulty,
             nodeKind: node.nodeKind,
             groundingOrigin: node.groundingOrigin,
             size: nodeSize(node.difficulty),
@@ -218,13 +219,8 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
         {
           selector: "edge",
           style: {
-            // Taxi (orthogonal) routing keeps edges off the nodes in the top-down
-            // ELK layout — straight bezier lines were cutting through depth-skipping
-            // chains. Edges leave the bottom of a prerequisite and enter the top of
-            // its dependent.
-            "curve-style": "taxi",
-            "taxi-direction": "downward",
-            "taxi-turn": 18,
+            "curve-style": "bezier",
+            "control-point-step-size": 32,
             "line-color": color("--muted-foreground"),
             "target-arrow-color": color("--muted-foreground"),
             "target-arrow-shape": "triangle",
@@ -245,14 +241,8 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
     cytoscapeRef.current = cy;
     // Node-tap → caller (U5). Reads the ref so the handler always calls the latest callback.
     cy.on("tap", "node", (event) => onNodeSelectRef.current?.(event.target.id()));
-    void applyElkLayeredLayout(cy, () => stale, focusRef.current)
-      .then(() => {
-        // Layout has positioned nodes and framed the initial focus; advances may now recenter.
-        if (!stale) layoutReadyRef.current = true;
-      })
-      .catch((error: unknown) => {
-        if (!stale) console.error("Failed to lay out derived graph", error);
-      });
+    applySpiralLayout(cy, () => stale, focusRef.current);
+    if (!stale) layoutReadyRef.current = true;
     return () => {
       stale = true;
       cy.destroy();
@@ -263,7 +253,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // Restyle effect — runs on every (mode, classification) change, AND once after the
   // layout effect (re)builds the instance. It is restyle-ONLY: it mutates each node's
   // `adaptedState` / `frontierTarget` data via `cy.batch()` and never calls
-  // `cy.layout().run()` or `cy.fit()`, so positions from the one-time ELK pass survive
+  // `cy.layout().run()` or `cy.fit()`, so positions from the one-time layout pass survive
   // the swap untouched (R11). This is the structural guard the side-by-side pair lacked.
   useEffect(() => {
     const cy = cytoscapeRef.current;
@@ -282,7 +272,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // Advance-recenter effect (KTD3) — keyed on the classification's frontier target, so it
   // fires on a FRONTIER ADVANCE, never on the neutral↔adapted mode toggle (which is local
   // `mode` state, absent from the deps). VIEWPORT-ONLY: it re-frames on the new working
-  // region via `recenterOnFocus` and never re-runs ELK, so pinned positions survive (R11).
+  // region via `recenterOnFocus` and never re-runs layout, so pinned positions survive (R11).
   // Skipped until the one-time layout pass has resolved — initial framing is the focus-fit
   // at the end of that pass, not this effect.
   useEffect(() => {

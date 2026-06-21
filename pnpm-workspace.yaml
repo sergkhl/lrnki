@@ -36,7 +36,6 @@ catalog:
   zod: 4.4.3
   cytoscape: 3.33.4
   '@types/cytoscape': 3.21.9
-  elkjs: 0.11.1
   playwright: ^1.60.0
 
 allowBuilds:

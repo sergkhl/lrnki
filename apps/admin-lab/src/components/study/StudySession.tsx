@@ -7,7 +7,7 @@ import { selfAssessCard, submitCalibration } from "@/app/admin/lab/study/actions
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
 import { CalibrationSweep, type CalibrationRating } from "@/components/study/CalibrationSweep";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
-import { nextStudyTarget } from "@/components/study/studyView";
+import { nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   // server re-fold delivered via revalidatePath), never on the synchronous pending-flag
   // flip against the stale prop. Refs because neither should trigger a re-render itself.
   const pendingAdvanceRef = useRef(false);
+  const autoAdvanceDismissGuardRef = useRef(false);
   const sessionAtAnswerRef = useRef(session);
 
   const goalReached = session.classification.selectedFrontierTarget === null;
@@ -41,6 +42,12 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     setSheetOpen(true);
   };
 
+  const onSheetOpenChange = (nextOpen: boolean) => {
+    if (!shouldAcceptSheetOpenChange(nextOpen, autoAdvanceDismissGuardRef.current)) return;
+    setSheetOpen(nextOpen);
+    if (!nextOpen) setSelectedNodeId(null);
+  };
+
   const onAssess = (outcome: SelfAssessmentOutcome) => {
     const content = selectedContent;
     if (!content || content.kind !== "frontier_card") return;
@@ -48,9 +55,16 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     // Keep the sheet open and arm the advance; the effect below retargets it once the
     // re-folded session prop arrives (R4). Do NOT close here — that was the drop-out (AE1).
     pendingAdvanceRef.current = true;
+    autoAdvanceDismissGuardRef.current = true;
     sessionAtAnswerRef.current = session;
     startTransition(async () => {
-      await selfAssessCard({ learnerStateRef: session.learnerStateRef, cardId, outcome });
+      try {
+        await selfAssessCard({ learnerStateRef: session.learnerStateRef, cardId, outcome });
+      } catch (error) {
+        pendingAdvanceRef.current = false;
+        autoAdvanceDismissGuardRef.current = false;
+        throw error;
+      }
     });
   };
 
@@ -63,11 +77,15 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     pendingAdvanceRef.current = false;
     const target = nextStudyTarget(session.classification);
     if (target === null) {
+      autoAdvanceDismissGuardRef.current = false;
       setSheetOpen(false);
       setSelectedNodeId(null);
     } else {
       setSelectedNodeId(target);
       setSheetOpen(true);
+      requestAnimationFrame(() => {
+        autoAdvanceDismissGuardRef.current = false;
+      });
     }
   }, [session]);
 
@@ -131,7 +149,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
 
       <StudySideSheet
         open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        onOpenChange={onSheetOpenChange}
         nodeLabel={selectedLabel}
         content={selectedContent}
         onAssess={onAssess}

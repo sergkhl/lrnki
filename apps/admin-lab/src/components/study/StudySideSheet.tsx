@@ -40,11 +40,11 @@ export function StudySideSheet({
         </SheetHeader>
 
         {content?.kind === "frontier_card" ? (
-          <RecallCard card={content.card} onAssess={onAssess} pending={pending} />
+          <RecallCard key={content.card.cardId} card={content.card} onAssess={onAssess} pending={pending} />
         ) : null}
 
         {content?.kind === "mastered_review" && content.card ? (
-          <RecallCard card={content.card} readOnly />
+          <RecallCard key={content.card.cardId} card={content.card} readOnly />
         ) : null}
 
         {content?.kind === "mastered_review" && !content.card ? (

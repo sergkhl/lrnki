@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
-import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
+import { applySpiralLayout } from "@/lib/cytoscapeSpiralLayout";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -59,6 +59,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
           data: {
             id: node.derivedNodeId,
             label: node.inPath ? `${node.position! + 1}. ${node.label}` : node.label,
+            difficulty: node.difficulty,
             inPath: node.inPath ? "yes" : "no",
             target: node.isTarget ? "yes" : "no"
           }
@@ -119,12 +120,8 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
         {
           selector: "edge",
           style: {
-            // Taxi (orthogonal) routing keeps prerequisite edges off the nodes in
-            // the top-down ELK layout; edges leave the bottom of a prerequisite and
-            // enter the top of its dependent.
-            "curve-style": "taxi",
-            "taxi-direction": "downward",
-            "taxi-turn": 18,
+            "curve-style": "bezier",
+            "control-point-step-size": 32,
             "line-color": color("--border"),
             "target-arrow-color": color("--border"),
             "target-arrow-shape": "triangle",
@@ -154,9 +151,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       ]
     });
     cytoscapeRef.current = cy;
-    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
-      if (!stale) console.error("Failed to lay out learner path graph", error);
-    });
+    applySpiralLayout(cy, () => stale);
     return () => {
       stale = true;
       cy.destroy();
