@@ -9,6 +9,7 @@ import {
   type SphereGridEdgeRoute,
   type SphereGridNodeInput
 } from "./sphereGridLayout";
+import { realShapeEdges, realShapeNodes } from "./sphereGridLayout.realShapeFixture";
 
 // Manhattan grid-adjacency check against the CELL spacing the module uses internally.
 const CELL = 130;
@@ -89,7 +90,7 @@ test("crossing counter sanity: a hand-built crossing returns > 0; coincident end
 
 // --- Single-loop embeddings ---------------------------------------------------------
 
-test("single chain: serpentine positions are grid-adjacent in topo order with zero crossings", () => {
+test("single chain: layered positions are a grid-adjacent vertical column in topo order, zero crossings", () => {
   const nodes = [node("a", "rust", 0), node("b", "rust", 1), node("c", "rust", 2), node("d", "rust", 3)];
   const edges: SphereGridEdgeInput[] = [
     { source: "a", target: "b", uncertain: false },
@@ -99,12 +100,14 @@ test("single chain: serpentine positions are grid-adjacent in topo order with ze
   const layout = layoutSphereGrid(nodes, edges);
   assert.equal(layout.crossings, 0);
   assert.deepEqual(layout.flaggedLoops, []);
+  // A chain has no branching, so the layered embedding is one column: each step is one row
+  // (CELL) below its prerequisite and grid-adjacent to it.
   assert.ok(gridAdjacent(positionOf(layout, "a"), positionOf(layout, "b")));
   assert.ok(gridAdjacent(positionOf(layout, "b"), positionOf(layout, "c")));
   assert.ok(gridAdjacent(positionOf(layout, "c"), positionOf(layout, "d")));
 });
 
-test("tree with branches: dependents occupy distinct adjacent cells, zero crossings", () => {
+test("tree with branches: dependents sit one row below the parent in distinct columns, zero crossings", () => {
   const nodes = [node("root", "rust", 0), node("c1", "rust", 1), node("c2", "rust", 1)];
   const edges: SphereGridEdgeInput[] = [
     { source: "root", target: "c1", uncertain: false },
@@ -113,14 +116,15 @@ test("tree with branches: dependents occupy distinct adjacent cells, zero crossi
   const layout = layoutSphereGrid(nodes, edges);
   assert.equal(layout.crossings, 0);
   assert.deepEqual(layout.flaggedLoops, []);
+  const root = positionOf(layout, "root");
   const c1 = positionOf(layout, "c1");
   const c2 = positionOf(layout, "c2");
-  // Distinct cells.
-  assert.ok(c1.x !== c2.x || c1.y !== c2.y);
-  // Each branch is grid-adjacent to some already-placed node (the snake keeps them close).
-  const root = positionOf(layout, "root");
-  assert.ok(gridAdjacent(root, c1));
-  assert.ok(gridAdjacent(c1, c2) || gridAdjacent(root, c2));
+  // Both branches are exactly one row below the parent (layered by prerequisite depth)...
+  assert.equal(c1.y, root.y + CELL);
+  assert.equal(c2.y, root.y + CELL);
+  // ...in distinct, grid-spaced columns.
+  assert.notEqual(c1.x, c2.x);
+  assert.equal(Math.abs(c1.x - c2.x), CELL);
 });
 
 test("reconvergent diamond: the non-tree edge is either routed crossing-free or the loop is flagged — never an unflagged crossing", () => {
@@ -194,6 +198,32 @@ test("multi-domain input: regions are disjoint, no route bridges two domains, to
   const domainOf = new Map(nodes.map((n) => [n.id, n.domain]));
   for (const route of layout.routes) {
     assert.equal(domainOf.get(route.source), domainOf.get(route.target));
+  }
+});
+
+// --- Real-shape invariant (U4, R1) --------------------------------------------------
+// The headline guarantee on production-shaped data: the real seeded mixed-domain
+// enrichment embeds with ZERO crossings and NO flagged loops. This is the regression
+// guard — it fails loudly if a future change reintroduces a crossing layout.
+
+test("real seeded mixed-domain enrichment embeds with zero crossings and no flagged loops (R1)", () => {
+  const layout = layoutSphereGrid(realShapeNodes, realShapeEdges);
+  assert.equal(layout.crossings, 0, "real-shape graph must embed crossing-free");
+  assert.deepEqual(layout.flaggedLoops, [], "no loop should be flagged non-embeddable on real data");
+  // Every node placed, no two concepts stacked on the same lattice cell.
+  assert.equal(layout.positions.length, realShapeNodes.length);
+  const cells = new Set(layout.positions.map((p) => `${p.x},${p.y}`));
+  assert.equal(cells.size, layout.positions.length, "no two nodes share a grid cell");
+  // One region per declared domain, all pairwise disjoint.
+  const domains = new Set(realShapeNodes.map((n) => n.domain));
+  assert.equal(layout.regions.length, domains.size);
+  for (let i = 0; i < layout.regions.length; i += 1) {
+    for (let j = i + 1; j < layout.regions.length; j += 1) {
+      const a = layout.regions[i];
+      const b = layout.regions[j];
+      const overlap = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+      assert.equal(overlap, false, `regions ${a.domain} and ${b.domain} must not overlap`);
+    }
   }
 });
 

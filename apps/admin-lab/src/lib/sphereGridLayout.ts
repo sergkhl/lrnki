@@ -9,10 +9,14 @@
 //     exist; grouping nodes into one "loop" per declared domain yields zero cross-loop
 //     crossings by construction. Each loop is packed into its own disjoint region box.
 //   - General HV-grid planarity is NP-complete, so we do NOT decide it. Per loop we
-//     embed a deterministic spanning tree as a boustrophedon (serpentine) snake on an
-//     integer grid — trees are always grid-embeddable — then add non-tree / uncertain
-//     edges back as straight routes. Those reconvergent edges are the only crossing
-//     risk; sparse near-trees have few.
+//     embed a deterministic spanning tree as a LAYERED integer-grid lattice (prerequisite
+//     depth → row, a tidy post-order sweep → column, each subtree in its own disjoint
+//     column band) — trees always have a crossing-free grid embedding — then add the
+//     non-tree / uncertain edges back as straight routes. Those reconvergent edges are
+//     the only crossing risk; sparse near-trees have few. (An earlier boustrophedon-snake
+//     placement tangled the denser real loops on straight reconvergent edges — economics
+//     and ML systems — where the layered embedding draws them crossing-free; see the U4
+//     rule-14 note. The FFX board reads as branching right-angle tracks either way.)
 //   - The straight center-to-center segment is the crossing MODEL, not the rendered
 //     geometry. Cytoscape renders orthogonal `taxi` tracks configured monotone within
 //     each edge's bounding box, so the right-angle rendering cannot add a crossing the
@@ -83,7 +87,7 @@ export interface SphereGridLayout {
 }
 
 // Grid lattice spacing (px). Cells are far larger than the largest node diameter
-// (~48px) so taxi tracks have gutter room and the serpentine reads as a board.
+// (~48px) so taxi tracks have gutter room and the layered board reads cleanly.
 const CELL = 130;
 // Padding between a loop's outermost node centers and its region box edge.
 const REGION_PAD = 90;
@@ -154,25 +158,77 @@ export function orderLoopNodes(nodes: SphereGridNodeInput[], edges: SphereGridEd
   return ordered;
 }
 
-// Boustrophedon (serpentine) cell index → grid column/row. Row 0 runs left→right, row 1
-// right→left, and so on, so consecutive ordered nodes are always grid-adjacent — the
-// FFX-sphere-grid meander, and the property the single-chain fixture asserts.
-function serpentineCell(index: number, width: number): { col: number; row: number } {
-  const row = Math.floor(index / width);
-  const offset = index % width;
-  const col = row % 2 === 0 ? offset : width - 1 - offset;
-  return { col, row };
-}
+// Embed a loop's spanning tree as a LAYERED grid lattice, local to the loop (origin 0,0):
+// prerequisite depth → row, a tidy post-order column sweep → column. Each subtree occupies
+// a disjoint column band, so every spanning-tree edge runs downward without crossing —
+// provably planar for the tree. A single chain becomes a vertical column; a branch fans
+// its children across adjacent columns one row below. Pure and deterministic.
+function layeredTreePositions(nodes: SphereGridNodeInput[], edges: SphereGridEdgeInput[]): Map<string, Point> {
+  const order = orderLoopNodes(nodes, edges);
+  const topoIndex = new Map(order.map((id, index) => [id, index]));
 
-// Place a loop's ordered nodes on a serpentine grid local to the loop (origin 0,0). The
-// grid width is ~sqrt(n) so a loop forms a compact board rather than one long strip.
-function serpentinePositions(orderedIds: string[]): Map<string, Point> {
-  const width = Math.max(1, Math.ceil(Math.sqrt(orderedIds.length)));
+  // Certain predecessors per node — uncertain edges never shape the spanning tree.
+  const preds = new Map<string, string[]>();
+  for (const node of nodes) preds.set(node.id, []);
+  for (const edge of edges) {
+    if (!certain(edge) || !topoIndex.has(edge.source) || !topoIndex.has(edge.target)) continue;
+    preds.get(edge.target)!.push(edge.source);
+  }
+
+  // Spanning-tree parent = the LATEST prerequisite in topo order (the closest upstream
+  // node, keeping the tree edge short and the choice deterministic). Roots have none.
+  const parent = new Map<string, string | null>();
+  for (const node of nodes) {
+    const sorted = preds.get(node.id)!.slice().sort((a, b) => topoIndex.get(a)! - topoIndex.get(b)!);
+    parent.set(node.id, sorted.length > 0 ? sorted[sorted.length - 1] : null);
+  }
+
+  const children = new Map<string, string[]>();
+  for (const node of nodes) children.set(node.id, []);
+  for (const node of nodes) {
+    const p = parent.get(node.id);
+    if (p) children.get(p)!.push(node.id);
+  }
+  for (const list of children.values()) list.sort((a, b) => topoIndex.get(a)! - topoIndex.get(b)!);
+
+  const depth = new Map<string, number>();
+  const depthOf = (id: string): number => {
+    const cached = depth.get(id);
+    if (cached !== undefined) return cached;
+    const p = parent.get(id);
+    const value = p ? depthOf(p) + 1 : 0;
+    depth.set(id, value);
+    return value;
+  };
+  for (const node of nodes) depthOf(node.id);
+
+  // Post-order column sweep: each leaf takes the next integer column; an internal node
+  // centers (rounded back to the lattice) over its children's span. Sequential leaf
+  // columns keep sibling subtrees in disjoint, non-overlapping column bands.
+  const column = new Map<string, number>();
+  let nextLeafColumn = 0;
+  const assignColumn = (id: string): void => {
+    const kids = children.get(id)!;
+    if (kids.length === 0) {
+      column.set(id, nextLeafColumn);
+      nextLeafColumn += 1;
+      return;
+    }
+    for (const kid of kids) assignColumn(kid);
+    const first = column.get(kids[0])!;
+    const last = column.get(kids[kids.length - 1])!;
+    column.set(id, Math.round((first + last) / 2));
+  };
+  const roots = nodes
+    .filter((node) => !parent.get(node.id))
+    .map((node) => node.id)
+    .sort((a, b) => topoIndex.get(a)! - topoIndex.get(b)!);
+  for (const root of roots) assignColumn(root);
+
   const positions = new Map<string, Point>();
-  orderedIds.forEach((id, index) => {
-    const { col, row } = serpentineCell(index, width);
-    positions.set(id, { x: col * CELL, y: row * CELL });
-  });
+  for (const node of nodes) {
+    positions.set(node.id, { x: column.get(node.id)! * CELL, y: depthOf(node.id)! * CELL });
+  }
   return positions;
 }
 
@@ -285,8 +341,7 @@ interface PlacedLoop {
 }
 
 function placeLoop(domain: string, nodes: SphereGridNodeInput[], edges: SphereGridEdgeInput[]): PlacedLoop {
-  const order = orderLoopNodes(nodes, edges);
-  const localPositions = serpentinePositions(order);
+  const localPositions = layeredTreePositions(nodes, edges);
   const routes = loopRoutes(localPositions, edges);
   const crossings = countEdgeCrossings(routes);
 
