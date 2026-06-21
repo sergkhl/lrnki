@@ -13,7 +13,7 @@ export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
-export { generateCardBank, type CardBankGenerationResult, type RejectedCard } from "./generateCardBank";
+export { generateStudyItemBank, type StudyItemBankGenerationResult, type RejectedStudyItem } from "./generateStudyItemBank";
 export {
   validateOptionSelectItem,
   type OptionSelectGrounding,

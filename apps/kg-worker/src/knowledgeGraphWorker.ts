@@ -7,7 +7,7 @@ import {
   createIntrinsicDifficultyPort,
   emptyLearnerState,
   executeExtractionRun,
-  generateCardBank,
+  generateStudyItemBank,
   loadResponseLogLearnerState,
   synthesizeResponses,
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -26,7 +26,7 @@ import {
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmAnswerGradingJudgeAdapter,
-  LiteLlmCardGenerationAdapter,
+  LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmGroundingGenerationAdapter,
@@ -41,7 +41,7 @@ import {
   PostgresArtifactRepository,
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
-  PostgresCardBankStore,
+  PostgresStudyItemBankStore,
   PostgresResponseLogStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
@@ -148,11 +148,11 @@ function buildContext() {
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
     pathStore: new PostgresLearnerPathStore(sql),
-    // Learner Recall Loop (U2): card generation stays DeepSeek-family (AGENTS rule 5);
-    // a cross-family judge grades learner answers against the key (U5). Deterministic
-    // decoding for stable re-derivation.
-    cardGeneration: new LiteLlmCardGenerationAdapter(deterministicClient),
-    cardBankStore: new PostgresCardBankStore(sql),
+    // Learner Study Loop (ADR-0026): study-item generation stays DeepSeek-family (AGENTS
+    // rule 5) for self-assessment AND option-select; a cross-family judge grades
+    // self-assessment answers. Deterministic decoding for stable re-derivation.
+    studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
+    studyItemBankStore: new PostgresStudyItemBankStore(sql),
     // Measurement grading judge (U5): cross-family (kg-independent-judge) so the
     // DeepSeek card generator never grades its own answer-key (ADR-0023).
     answerGradingJudge: new LiteLlmAnswerGradingJudgeAdapter(deterministicClient),
@@ -163,8 +163,8 @@ function buildContext() {
   };
 }
 
-// Card Bank configuration identity — bump when the card prompt/schema/model changes.
-const CARD_BANK_CONFIG_HASH = "card-bank-v1";
+// Study Item Bank configuration identity — bump when an item prompt/schema/model changes.
+const STUDY_ITEM_BANK_CONFIG_HASH = "study-item-bank-v1";
 
 type Context = ReturnType<typeof buildContext>;
 type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
@@ -341,7 +341,7 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
-  const cards = await ctx.cardBankStore.listCardsForEnrichment(enrichmentId);
+  const cards = await ctx.studyItemBankStore.listStudyItemsForEnrichment(enrichmentId);
   const targetNode = layer.derivedNodes.find((node) => node.derivedNodeId === targetDerivedNodeId);
   if (!targetNode) {
     console.error(`! target node ${targetDerivedNodeId} is not in enrichment ${enrichmentId}.`);
@@ -407,24 +407,30 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
 }
 
-async function generateCardsCommand(ctx: Context, enrichmentId?: string) {
+async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
   if (!enrichmentId) {
-    console.error("! generate-cards requires <enrichmentId>.");
+    console.error("! generate-study-items requires <enrichmentId>.");
     process.exitCode = 1;
     return;
   }
-  console.log(`\n>> generating Card Bank for enrichment ${enrichmentId}`);
-  const result = await generateCardBank({
+  console.log(`\n>> generating Study Item Bank for enrichment ${enrichmentId}`);
+  const result = await generateStudyItemBank({
     enrichmentId,
-    configHash: CARD_BANK_CONFIG_HASH,
+    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
-    cardGeneration: ctx.cardGeneration,
-    cardBankStore: ctx.cardBankStore
+    studyItemGeneration: ctx.studyItemGeneration,
+    studyItemBankStore: ctx.studyItemBankStore
   });
-  console.log(`   cards=${result.cards.length} rejected=${result.rejected.length} model=${ctx.cardGeneration.model}`);
-  for (const card of result.cards) {
-    console.log(`   card[${card.derivedNodeId}] provenance=${card.groundingProvenance} citations=${card.citations.length}\n     Q: ${card.question}\n     A: ${card.answerKey}`);
+  console.log(`   items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
+  for (const item of result.studyItems) {
+    if (item.itemType === "self_assessment") {
+      console.log(`   self_assessment[${item.derivedNodeId}] provenance=${item.groundingProvenance} citations=${item.citations.length}\n     Q: ${item.question}\n     A: ${item.answerKey}`);
+    } else {
+      const correct = item.options.find((option) => option.isCorrect);
+      const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
+      console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
+    }
   }
   for (const rejected of result.rejected) {
     console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}): ${rejected.reason}`);
@@ -458,8 +464,8 @@ async function main() {
       case "compute-learner-path":
         await computeLearnerPathCommand(ctx, arg, rest[0]);
         break;
-      case "generate-cards":
-        await generateCardsCommand(ctx, arg);
+      case "generate-study-items":
+        await generateStudyItemsCommand(ctx, arg);
         break;
       case "synthesize-responses":
         await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
@@ -471,7 +477,7 @@ async function main() {
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-cards <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });
