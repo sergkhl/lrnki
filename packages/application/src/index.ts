@@ -20,6 +20,7 @@ export {
   type OptionSelectGroundingPassage,
   type OptionSelectGuardResult
 } from "./optionSelectGuard";
+export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
 export {
   buildCalibrationSet,
   propagateSelfReport,

@@ -4,8 +4,11 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
-  Card,
-  CardDraft,
+  StudyItem,
+  SelfAssessmentItemDraft,
+  OptionSelectItemDraft,
+  StudyItemGroundingProvenance,
+  StudyItemType,
   ConceptDifficulty,
   JudgedOutcome,
   NewResponseLogRow,
@@ -26,7 +29,7 @@ import type {
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
-  RejectedCard,
+  RejectedStudyItem,
   RescueDurabilityJudgment,
   RunForBuild,
   SourceBlock,
@@ -304,28 +307,59 @@ export interface LearnerPathStorePort {
 }
 
 // ---------------------------------------------------------------------------
-// Learner Recall Loop ports (R1–R16). Learner-neutral Card Bank plus the durable
-// append-only Response Log. All learner structures are projection-only: nothing
-// here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
+// Learner Study Loop ports (R7–R16, ADR-0026). Learner-neutral typed Study Item Bank
+// plus the durable append-only Response Log. All learner structures are projection-only:
+// nothing here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
 // ---------------------------------------------------------------------------
 
-// Card Bank persistence (R3). `persist` writes a whole enrichment's cards AND its
-// rejected (no-card) nodes atomically, plus the immutable `card_bank` artifact, in
-// one transaction (no authoritative relational state without its artifact, matching
-// the enrichment/extraction stores). Regeneration replaces an enrichment's cards and
-// rejections (delete-then-insert) rather than silently duplicating against the
-// `derived_node_id` unique key. Rejected nodes are persisted so the no-card frontier
+// Study Item Bank persistence (R7, R12). `persist` writes a whole enrichment's typed
+// study items, their options + grounded-answer citations, AND its rejected (no-item)
+// nodes atomically, plus the immutable `study_item_bank` artifact, in one transaction
+// (no authoritative relational state without its artifact, matching the enrichment/
+// extraction stores). Regeneration replaces an enrichment's items and rejections
+// (delete-then-insert). `supportedItemTypes` is a `SELECT DISTINCT item_type` query —
+// the supported set is the literal byproduct of which typed items grounded, never a
+// stored map (KTD2, rule 18). Rejected nodes are persisted so the no-item frontier
 // fallback reads the real rejection reason instead of guessing from grounding origin.
-export interface CardBankStorePort {
-  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; cards: Card[]; rejected: RejectedCard[] }): Promise<void>;
-  getCard(derivedNodeId: string): Promise<Card | undefined>;
-  listCardsForEnrichment(enrichmentId: string): Promise<Card[]>;
+export interface StudyItemBankStorePort {
+  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
+  getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
+  listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]>;
+  supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
 }
 
-// Card generation (R1, R2). Forced named tool schema routed through LiteLLM; the
-// generator stays DeepSeek-family (AGENTS rule 5). Returns a pre-verification
-// CardDraft conditioned on ONE Concept's published CEP — the application boundary
-// verifies citations verbatim and resolves provenance before persisting (U2).
+// Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the
+// generator stays DeepSeek-family (AGENTS rule 5). `generate` returns a pre-verification
+// SelfAssessmentItemDraft; `generateOptionSelect` returns a pre-verification
+// OptionSelectItemDraft (a grounded correct answer + three sibling-conditioned
+// distractors). The application boundary verifies the grounded answer verbatim, then the
+// deterministic guard (U2) accepts or rejects — semantic acceptance is NOT done here.
+export interface StudyItemGenerationPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    definesLiteral: string | null;
+  }): Promise<SelfAssessmentItemDraft>;
+  generateOptionSelect(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    // Same-domain neighbor descriptors that flavor the distractors (prompt-context only;
+    // a sibling-poor node still generates, just with thinner flavor — KTD3).
+    siblings: { label: string; snippet: string }[];
+  }): Promise<OptionSelectItemDraft>;
+}
+
 // Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ
 // only — there is no update or delete — so the append-only guarantee (R5) is
 // structural, not a convention. `nextAttemptSeq` hands the caller the next monotonic
@@ -363,22 +397,4 @@ export interface AnswerGradingJudgePort {
     answerKey: string;
     submittedAnswer: string;
   }): Promise<{ outcome: JudgedOutcome; score: number; rationale: string }>;
-}
-
-export interface CardGenerationPort {
-  readonly model: string;
-  generate(input: {
-    declaredDomain: string;
-    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-    groundingProvenance: Card["groundingProvenance"];
-    // Grounding passages the card may cite. Source-grounded passages carry source ids
-    // and require verbatim quotes; generated passages carry generated text and no
-    // source ids.
-    groundingPassages: (
-      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
-      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
-    )[];
-    // The single guarded `defines` literal, when the CEP carries one (HINT only).
-    definesLiteral: string | null;
-  }): Promise<CardDraft>;
 }

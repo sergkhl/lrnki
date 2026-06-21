@@ -619,6 +619,60 @@ export const cardGenerationValidator = z.object({
   citations: z.array(z.object({ passageId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
 }).strict();
 
+// --- Option-select generation: submit_option_select_item (U3, R9/R10) -----
+// One four-option auto-graded item per node: a grounded correct answer (cited by
+// passage id + quote, verified verbatim by the application boundary) plus THREE
+// sibling-conditioned distractors that read like real domain answers but are wrong.
+// Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and
+// lists no exemplars. The deterministic guard (U2) enforces structure; this schema only
+// enforces SHAPE fail-closed (rule 6) — distractor quality is judged by the rule-14 pass.
+export const optionSelectSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["question", "correctAnswer", "distractors"],
+  properties: {
+    question: {
+      type: "string",
+      description: "One self-contained multiple-choice question about the learning node with a single correct answer. Do not reference 'the passage' or 'the source'."
+    },
+    correctAnswer: {
+      type: "object",
+      additionalProperties: false,
+      required: ["text", "citation"],
+      properties: {
+        text: { type: "string", description: "The single correct option, grounded strictly in the provided passages." },
+        citation: {
+          type: "object",
+          additionalProperties: false,
+          required: ["passageId", "evidenceQuote"],
+          properties: {
+            passageId: { type: "string", description: "Exact passageId of the provided grounding passage the correct answer derives from." },
+            evidenceQuote: { type: "string", description: "Substring copied from that grounding passage supporting the correct answer. For source-grounded passages, copy it verbatim." }
+          }
+        }
+      }
+    },
+    distractors: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: "string",
+        description: "A plausible but INCORRECT option in the same domain register as the provided neighbor concepts. It must be clearly wrong for this question, never a paraphrase of the correct answer."
+      }
+    }
+  }
+};
+
+export const optionSelectValidator = z.object({
+  question: z.string().min(1),
+  correctAnswer: z.object({
+    text: z.string().min(1),
+    citation: z.object({ passageId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()
+  }).strict(),
+  distractors: z.array(z.string().min(1)).length(3)
+}).strict();
+
 // --- Answer grading: submit_answer_grade (U5, R9) -------------------------
 // Grades a learner's free-form written answer against a card's answer-key. Runs
 // cross-family (kg-independent-judge) so the DeepSeek card generator never grades
