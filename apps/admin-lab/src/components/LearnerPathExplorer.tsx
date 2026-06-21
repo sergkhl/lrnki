@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
-import { applySpiralLayout } from "@/lib/cytoscapeSpiralLayout";
+import { applySphereGridLayout } from "@/lib/cytoscapeSphereGrid";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -118,10 +118,14 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
           }
         },
         {
+          // Right-angle FFX "track" edges (R3): Cytoscape-core taxi routing, midpoint turn,
+          // monotone within each edge's bounding box. Single-domain canvas → one region.
           selector: "edge",
           style: {
-            "curve-style": "bezier",
-            "control-point-step-size": 32,
+            "curve-style": "taxi",
+            "taxi-direction": "auto",
+            "taxi-turn": "50%",
+            "taxi-turn-min-distance": "5px",
             "line-color": color("--border"),
             "target-arrow-color": color("--border"),
             "target-arrow-shape": "triangle",
@@ -151,7 +155,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       ]
     });
     cytoscapeRef.current = cy;
-    applySpiralLayout(cy, () => stale);
+    applySphereGridLayout(cy, () => stale);
     return () => {
       stale = true;
       cy.destroy();

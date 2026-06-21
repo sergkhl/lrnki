@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
-import { applySpiralLayout, recenterOnFocus } from "@/lib/cytoscapeSpiralLayout";
+import { applySphereGridLayout, recenterOnFocus } from "@/lib/cytoscapeSphereGrid";
+import type { SphereGridFlaggedLoop } from "@/lib/sphereGridLayout";
 import { buildDerivedGraphView, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
@@ -92,6 +93,9 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // available; the enrichment page (no classification) is always neutral.
   const [mode, setMode] = useState<DerivedGraphMode>(hasClassification ? "adapted" : "neutral");
   const isAdaptedMode = hasClassification && mode === "adapted";
+  // Loops the sphere-grid geometry could not embed crossing-free (R10). Populated by the
+  // one-time layout pass and surfaced to the operator below — fail loud, never silent-cross.
+  const [flaggedLoops, setFlaggedLoops] = useState<SphereGridFlaggedLoop[]>([]);
 
   // Topology view drives the ONE-TIME layout (stable across mode swaps); the textual
   // view re-renders for the active mode so the non-visual listing matches the canvas (R14).
@@ -217,10 +221,16 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
           style: { "border-color": color("--foreground"), "border-width": 4 }
         },
         {
+          // Right-angle FFX "track" edges (R3): Cytoscape-core taxi routing, configured to
+          // turn at the segment midpoint and stay monotone within each edge's bounding box,
+          // so the orthogonal rendering cannot introduce a crossing the pure straight-segment
+          // model (sphereGridLayout) lacks.
           selector: "edge",
           style: {
-            "curve-style": "bezier",
-            "control-point-step-size": 32,
+            "curve-style": "taxi",
+            "taxi-direction": "auto",
+            "taxi-turn": "50%",
+            "taxi-turn-min-distance": "5px",
             "line-color": color("--muted-foreground"),
             "target-arrow-color": color("--muted-foreground"),
             "target-arrow-shape": "triangle",
@@ -241,8 +251,13 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
     cytoscapeRef.current = cy;
     // Node-tap → caller (U5). Reads the ref so the handler always calls the latest callback.
     cy.on("tap", "node", (event) => onNodeSelectRef.current?.(event.target.id()));
-    applySpiralLayout(cy, () => stale, focusRef.current);
-    if (!stale) layoutReadyRef.current = true;
+    const layout = applySphereGridLayout(cy, () => stale, focusRef.current);
+    if (!stale) {
+      layoutReadyRef.current = true;
+      // Surface any loop the geometry could not embed crossing-free (R10) — never render a
+      // crossing as if clean. Empty on the sparse near-trees this canvas draws today.
+      setFlaggedLoops(layout?.flaggedLoops ?? []);
+    }
     return () => {
       stale = true;
       cy.destroy();
@@ -356,6 +371,13 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
               </>
             ) : null}
           </div>
+          {flaggedLoops.length > 0 ? (
+            // R10: a loop whose reconvergent edges force a crossing is surfaced, not hidden.
+            <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {flaggedLoops.length === 1 ? "1 loop" : `${flaggedLoops.length} loops`} could not be drawn crossing-free:{" "}
+              {flaggedLoops.map((loop) => `${loop.domain} (${loop.crossings})`).join(", ")}. Edges in these regions may overlap.
+            </div>
+          ) : null}
           {view.cytoscape.nodes.length > 0 ? (
             <div
               ref={containerRef}
