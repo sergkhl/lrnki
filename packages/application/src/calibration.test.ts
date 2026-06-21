@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Card, DerivedGraphLayer, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
+import type { SelfAssessmentItem, DerivedGraphLayer, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
 import type { ResponseLogStorePort } from "@lrnki/ports";
 import {
   appendSelfReportBatch,
@@ -12,7 +12,7 @@ import {
 } from "./calibration";
 
 // Fixture DAG (derived-node space): A -> B -> D, C -> D, plus an enrichment-only
-// prerequisite node E -> D with a card. Ancestors of D = {A, B, C, E}; every carded
+// prerequisite node E -> D with a studyItem. Ancestors of D = {A, B, C, E}; every carded
 // derived node can be calibrated.
 function anchor(id: string, conceptId: string) {
   return {
@@ -50,10 +50,10 @@ const layer: DerivedGraphLayer = {
   ]
 };
 
-const cards: Pick<Card, "derivedNodeId" | "cardId">[] = [
-  { derivedNodeId: "nA", cardId: "cardA" }, { derivedNodeId: "nB", cardId: "cardB" },
-  { derivedNodeId: "nC", cardId: "cardC" }, { derivedNodeId: "nD", cardId: "cardD" },
-  { derivedNodeId: "nE", cardId: "cardE" }
+const studyItems: Pick<SelfAssessmentItem, "derivedNodeId" | "studyItemId">[] = [
+  { derivedNodeId: "nA", studyItemId: "cardA" }, { derivedNodeId: "nB", studyItemId: "cardB" },
+  { derivedNodeId: "nC", studyItemId: "cardC" }, { derivedNodeId: "nD", studyItemId: "cardD" },
+  { derivedNodeId: "nE", studyItemId: "cardE" }
 ];
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
@@ -69,14 +69,14 @@ function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogR
 }
 
 test("buildCalibrationSet returns exactly the target's prerequisite-ancestor carded nodes, hardest-first (Covers R7)", () => {
-  const set = buildCalibrationSet({ layer, targetDerivedNodeId: "nD", cards });
+  const set = buildCalibrationSet({ layer, targetDerivedNodeId: "nD", studyItems });
   assert.deepEqual(set.map((item) => item.derivedNodeId), ["nC", "nB", "nE", "nA"], "includes carded enrichment node nE; ordered by difficulty desc");
-  assert.deepEqual(set.map((item) => item.cardId), ["cardC", "cardB", "cardE", "cardA"]);
+  assert.deepEqual(set.map((item) => item.studyItemId), ["cardC", "cardB", "cardE", "cardA"]);
 });
 
 test("a 'good' rating on a downstream node propagates seeded rows onto its ancestors, which are not separately asked (Covers AE3, R8)", () => {
-  const directRatings: SelfReportInput[] = [{ derivedNodeId: "nB", cardId: "cardB", rating: "good" }];
-  const seeded = propagateSelfReport({ layer, directRatings, cards });
+  const directRatings: SelfReportInput[] = [{ derivedNodeId: "nB", studyItemId: "cardB", rating: "good" }];
+  const seeded = propagateSelfReport({ layer, directRatings, studyItems });
   assert.deepEqual(seeded.map((s) => s.derivedNodeId), ["nA"], "B's only ancestor A is seeded");
   assert.equal(seeded[0].propagated, true);
   assert.equal(directRatings.some((r) => r.derivedNodeId === "nA"), false, "A was not directly rated");
@@ -101,16 +101,16 @@ const layerWithUncertainAncestor: DerivedGraphLayer = {
   ],
   prerequisiteEdges: [...layer.prerequisiteEdges, uncertainEdge("nU", "nB")]
 };
-const cardsWithU: Pick<Card, "derivedNodeId" | "cardId">[] = [...cards, { derivedNodeId: "nU", cardId: "cardU" }];
+const cardsWithU: Pick<SelfAssessmentItem, "derivedNodeId" | "studyItemId">[] = [...studyItems, { derivedNodeId: "nU", studyItemId: "cardU" }];
 
 test("a 'good' rating does not seed an ancestor reachable only through an uncertain edge (Covers R6)", () => {
-  const seeded = propagateSelfReport({ layer: layerWithUncertainAncestor, directRatings: [{ derivedNodeId: "nB", cardId: "cardB", rating: "good" }], cards: cardsWithU });
+  const seeded = propagateSelfReport({ layer: layerWithUncertainAncestor, directRatings: [{ derivedNodeId: "nB", studyItemId: "cardB", rating: "good" }], studyItems: cardsWithU });
   assert.deepEqual(seeded.map((s) => s.derivedNodeId), ["nA"], "only the certain-edge ancestor nA is seeded; the uncertain-edge ancestor nU is excluded");
 });
 
 test("a 'good' rating still seeds ancestors reachable through certain edges (regression)", () => {
   // nD's certain ancestors are nA, nB, nC, nE (nU is not an ancestor of nD).
-  const seeded = propagateSelfReport({ layer: layerWithUncertainAncestor, directRatings: [{ derivedNodeId: "nD", cardId: "cardD", rating: "good" }], cards: cardsWithU });
+  const seeded = propagateSelfReport({ layer: layerWithUncertainAncestor, directRatings: [{ derivedNodeId: "nD", studyItemId: "cardD", rating: "good" }], studyItems: cardsWithU });
   assert.deepEqual([...seeded.map((s) => s.derivedNodeId)].sort(), ["nA", "nB", "nC", "nE"], "all certain-edge ancestors of nD are still seeded");
 });
 
@@ -135,22 +135,22 @@ const cyclicLayer: DerivedGraphLayer = {
     { derivedNodeId: "goal", score: 0.9, method: "m", components: {}, neuralRationale: "" }
   ]
 };
-const cyclicCards: Pick<Card, "derivedNodeId" | "cardId">[] = [
-  { derivedNodeId: "own", cardId: "cOwn" }, { derivedNodeId: "var", cardId: "cVar" },
-  { derivedNodeId: "ptr", cardId: "cPtr" }, { derivedNodeId: "stk", cardId: "cStk" }, { derivedNodeId: "goal", cardId: "cGoal" }
+const cyclicCards: Pick<SelfAssessmentItem, "derivedNodeId" | "studyItemId">[] = [
+  { derivedNodeId: "own", studyItemId: "cOwn" }, { derivedNodeId: "var", studyItemId: "cVar" },
+  { derivedNodeId: "ptr", studyItemId: "cPtr" }, { derivedNodeId: "stk", studyItemId: "cStk" }, { derivedNodeId: "goal", studyItemId: "cGoal" }
 ];
 
 test("on an uncertain-edge cycle, calibrating one node seeds only certain-edge ancestors and never credits the goal (Covers AE2)", () => {
   // Rate `ptr`. Its only CERTAIN ancestor is `var`. Every other node (own, stk, goal) is
   // reachable only through uncertain edges, so none may be seeded — and the traversal must
   // terminate despite the cycle.
-  const seeded = propagateSelfReport({ layer: cyclicLayer, directRatings: [{ derivedNodeId: "ptr", cardId: "cPtr", rating: "good" }], cards: cyclicCards });
+  const seeded = propagateSelfReport({ layer: cyclicLayer, directRatings: [{ derivedNodeId: "ptr", studyItemId: "cPtr", rating: "good" }], studyItems: cyclicCards });
   assert.deepEqual(seeded.map((s) => s.derivedNodeId), ["var"], "only the certain-edge ancestor var is seeded");
   assert.equal(seeded.some((s) => s.derivedNodeId === "goal"), false, "the goal is not auto-credited through uncertain edges");
 });
 
 test("an 'again' rating does not propagate mastery downward", () => {
-  const seeded = propagateSelfReport({ layer, directRatings: [{ derivedNodeId: "nB", cardId: "cardB", rating: "again" }], cards });
+  const seeded = propagateSelfReport({ layer, directRatings: [{ derivedNodeId: "nB", studyItemId: "cardB", rating: "again" }], studyItems });
   assert.equal(seeded.length, 0);
 });
 
@@ -158,8 +158,8 @@ test("propagated rows carry the lower evidence weight, distinguishing seeded fro
   const { rows } = fakeResponseLog();
   const log = fakeResponseLog();
   const ratings: SelfReportInput[] = [
-    { derivedNodeId: "nB", cardId: "cardB", rating: "good" },
-    { derivedNodeId: "nA", cardId: "cardA", rating: "good", propagated: true }
+    { derivedNodeId: "nB", studyItemId: "cardB", rating: "good" },
+    { derivedNodeId: "nA", studyItemId: "cardA", rating: "good", propagated: true }
   ];
   await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings, responseSource: "synthetic" });
   const byNode = new Map(log.rows.map((r) => [r.derivedNodeId, r] as const));
@@ -170,8 +170,8 @@ test("propagated rows carry the lower evidence weight, distinguishing seeded fro
 
 test("a second calibration batch appends with a new batch_id, leaving the first intact (Covers R10)", async () => {
   const log = fakeResponseLog();
-  const first = await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "nB", cardId: "cardB", rating: "again" }], responseSource: "human" });
-  const second = await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "nB", cardId: "cardB", rating: "good" }], responseSource: "human" });
+  const first = await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "nB", studyItemId: "cardB", rating: "again" }], responseSource: "human" });
+  const second = await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "nB", studyItemId: "cardB", rating: "good" }], responseSource: "human" });
 
   assert.notEqual(first.batchId, second.batchId);
   assert.equal(log.rows.length, 2, "the first batch survives the second");

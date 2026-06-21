@@ -21,12 +21,12 @@ function judgeReturning(canned: { outcome: JudgedOutcome; score: number; rationa
   return { model: "kg-independent-judge", async grade() { return canned; } };
 }
 
-const card = { cardId: "card-1", derivedNodeId: "node-1", question: "What is X?", answerKey: "X is a thing." };
+const studyItem = { studyItemId: "studyItem-1", derivedNodeId: "node-1", question: "What is X?", answerKey: "X is a thing." };
 
 test("a canned 'partial' verdict appends a graded row with the score and grader identity (Covers AE4, R4)", async () => {
   const log = fakeResponseLog();
   const { row } = await gradeAndAppend({
-    learnerStateRef: "L1", card, declaredDomain: "software engineering", submittedAnswer: "X is sort of a thing",
+    learnerStateRef: "L1", studyItem, declaredDomain: "software engineering", submittedAnswer: "X is sort of a thing",
     judge: judgeReturning({ outcome: "partial", score: 0.5, rationale: "incomplete" }), responseLog: log.store, responseSource: "synthetic"
   });
   assert.equal(row.signalType, "graded");
@@ -40,11 +40,11 @@ test("a canned 'partial' verdict appends a graded row with the score and grader 
 test("canned 'correct' and 'incorrect' verdicts map to graded_score 1.0 and 0", async () => {
   const log = fakeResponseLog();
   const correct = await gradeAndAppend({
-    learnerStateRef: "L1", card, declaredDomain: "d", submittedAnswer: "X is a thing",
+    learnerStateRef: "L1", studyItem, declaredDomain: "d", submittedAnswer: "X is a thing",
     judge: judgeReturning({ outcome: "correct", score: 1.0, rationale: "ok" }), responseLog: log.store, responseSource: "human"
   });
   const incorrect = await gradeAndAppend({
-    learnerStateRef: "L1", card, declaredDomain: "d", submittedAnswer: "no idea",
+    learnerStateRef: "L1", studyItem, declaredDomain: "d", submittedAnswer: "no idea",
     judge: judgeReturning({ outcome: "incorrect", score: 0, rationale: "wrong" }), responseLog: log.store, responseSource: "human"
   });
   assert.equal(correct.row.gradedScore, 1.0);
@@ -55,9 +55,9 @@ test("canned 'correct' and 'incorrect' verdicts map to graded_score 1.0 and 0", 
 test("the graded row's evidence weight exceeds a self-report row's weight", async () => {
   assert.ok(GRADED_EVIDENCE_WEIGHT > SELF_REPORT_EVIDENCE_WEIGHT);
   const log = fakeResponseLog();
-  await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "node-1", cardId: "card-1", rating: "good" }], responseSource: "human" });
+  await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "node-1", studyItemId: "studyItem-1", rating: "good" }], responseSource: "human" });
   const { row } = await gradeAndAppend({
-    learnerStateRef: "L1", card, declaredDomain: "d", submittedAnswer: "answer",
+    learnerStateRef: "L1", studyItem, declaredDomain: "d", submittedAnswer: "answer",
     judge: judgeReturning({ outcome: "correct", score: 1, rationale: "ok" }), responseLog: log.store, responseSource: "human"
   });
   const selfReport = log.rows.find((r) => r.signalType === "self_report")!;
@@ -68,7 +68,7 @@ test("a judge transport/validation failure propagates and appends nothing (fail-
   const log = fakeResponseLog();
   const failingJudge: AnswerGradingJudgePort = { model: "kg-independent-judge", async grade() { throw new Error("invalid tool arguments"); } };
   await assert.rejects(() => gradeAndAppend({
-    learnerStateRef: "L1", card, declaredDomain: "d", submittedAnswer: "answer",
+    learnerStateRef: "L1", studyItem, declaredDomain: "d", submittedAnswer: "answer",
     judge: failingJudge, responseLog: log.store, responseSource: "synthetic"
   }), /invalid tool arguments/);
   assert.equal(log.rows.length, 0, "no row appended when grading fails");

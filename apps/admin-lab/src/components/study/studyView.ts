@@ -1,4 +1,4 @@
-import type { CardGroundingProvenance, SelfReportRating } from "@lrnki/domain-core";
+import type { SelfReportRating, StudyItemGroundingProvenance } from "@lrnki/domain-core";
 
 // Pure presentation contract for the transfer-ready study modules (U4, R15). These
 // types and helpers carry NO Admin-Lab coupling — they import only `@lrnki/domain-core`
@@ -7,20 +7,33 @@ import type { CardGroundingProvenance, SelfReportRating } from "@lrnki/domain-co
 // folder and writes its own loader against the SAME contract.
 
 export type StudyCardView = {
-  cardId: string;
+  studyItemId: string;
   derivedNodeId: string;
   question: string;
   answerKey: string;
   selfReportPrompt: string;
-  groundingProvenance: CardGroundingProvenance;
+  groundingProvenance: StudyItemGroundingProvenance;
 };
 
-// Side-sheet content gated by the node's learner state (R9). A frontier node opens its
-// recall card; a frontier node with no card is flagged, never dropped (R13); a locked node
-// names its unmet direct prerequisites and shows NO card; a mastered node opens its card as
-// a read-only review.
+export type StudyOptionSelectView = {
+  studyItemId: string;
+  derivedNodeId: string;
+  question: string;
+  groundingProvenance: StudyItemGroundingProvenance;
+  options: {
+    optionId: string;
+    text: string;
+    isCorrect: boolean;
+    provenance: "source" | "generated";
+  }[];
+};
+
+// Side-sheet content gated by the node's learner state. A frontier node opens its
+// option-select item; a frontier node without one is flagged, never dropped; a locked node
+// names its unmet direct prerequisites; a mastered node opens its self-assessment item as
+// a read-only review when one exists.
 export type SheetContent =
-  | { kind: "frontier_card"; card: StudyCardView }
+  | { kind: "option_select"; item: StudyOptionSelectView }
   | { kind: "cardless" }
   | { kind: "locked"; unmetPrerequisiteLabels: string[] }
   | { kind: "mastered_review"; card: StudyCardView | null };
@@ -34,12 +47,6 @@ export type CalibrationChoice = "know_it" | "not_sure";
 // emitted ratings into self-report rows.
 export function calibrationRatingFor(choice: CalibrationChoice): SelfReportRating {
   return choice === "know_it" ? "good" : "hard";
-}
-
-// The recall-card assess controls ("Got it" / "Missed it") are disabled until the learner
-// reveals the answer, so a self-assessment always follows an actual recall attempt (R6).
-export function assessmentDisabled(revealed: boolean): boolean {
-  return !revealed;
 }
 
 // Radix/Base sheet primitives can emit `open=false` while focus/animation state is

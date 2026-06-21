@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { Card, DerivedGraphLayer, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
+import type { SelfAssessmentItem, DerivedGraphLayer, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort, LearnerAnswerSimulatorPort, ResponseLogStorePort } from "@lrnki/ports";
 import { rateByDifficulty, synthesizeResponses } from "./syntheticResponses";
 
@@ -21,9 +21,10 @@ const layer: DerivedGraphLayer = {
     { derivedNodeId: "nD", score: 0.9, method: "m", components: {}, neuralRationale: "" }
   ]
 };
-function card(derivedNodeId: string): Card {
+function studyItem(derivedNodeId: string): SelfAssessmentItem {
   return {
-    cardId: `card-${derivedNodeId}`,
+    itemType: "self_assessment",
+    studyItemId: `studyItem-${derivedNodeId}`,
     graphVersionId: "gv",
     enrichmentId: "e",
     derivedNodeId,
@@ -36,7 +37,7 @@ function card(derivedNodeId: string): Card {
     configHash: "c"
   };
 }
-const cards = ["nA", "nB", "nC", "nD"].map(card);
+const studyItems = ["nA", "nB", "nC", "nD"].map(studyItem);
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
   const rows: NewResponseLogRow[] = [];
@@ -66,10 +67,10 @@ test("synthesizeResponses writes one calibration batch and routes graded answers
   const log = fakeResponseLog();
   const result = await synthesizeResponses({
     learnerStateRef: "L1", layer, targetDerivedNodeId: "nD", declaredDomain: "software engineering",
-    cards, profile: { difficultyCutoff: 0.6, gradedSampleSize: 2 }, simulator, judge, responseLog: log.store
+    studyItems, profile: { difficultyCutoff: 0.6, gradedSampleSize: 2 }, simulator, judge, responseLog: log.store
   });
 
-  // Calibration: ancestors of D with cards = {cC, cB, cA} → 3 self_report rows in ONE batch.
+  // Calibration: ancestors of D with studyItems = {cC, cB, cA} → 3 self_report rows in ONE batch.
   assert.equal(result.selfReportCount, 3);
   const selfReports = log.rows.filter((r) => r.signalType === "self_report");
   assert.equal(selfReports.length, 3);
@@ -88,7 +89,7 @@ test("the generator does not write graded rows directly — they carry the judge
   const log = fakeResponseLog();
   await synthesizeResponses({
     learnerStateRef: "L2", layer, targetDerivedNodeId: "nD", declaredDomain: "software engineering",
-    cards, profile: { difficultyCutoff: 0.6, gradedSampleSize: 1 }, simulator, judge, responseLog: log.store
+    studyItems, profile: { difficultyCutoff: 0.6, gradedSampleSize: 1 }, simulator, judge, responseLog: log.store
   });
   const graded = log.rows.filter((r) => r.signalType === "graded");
   assert.equal(graded.length, 1);

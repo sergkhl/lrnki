@@ -401,7 +401,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                             <Badge variant={ADAPTED_STATE_BADGE[node.adaptedState]}>{ADAPTED_STATE_COPY[node.adaptedState]}</Badge>
                           ) : null}
                           {node.isFrontierTarget ? <Badge variant="default">frontier target</Badge> : null}
-                          {node.cardless ? <Badge variant="outline" title="no recall card exists for this node">no card</Badge> : null}
+                          {node.cardless ? <Badge variant="outline" title="no study item exists for this node">no item</Badge> : null}
                           <Badge variant={node.nodeKind === "anchor" ? "default" : "secondary"}>{node.nodeKind === "anchor" ? "anchor" : "enrichment"}</Badge>
                           <Badge variant="outline">{node.difficulty === null ? "—" : node.difficulty.toFixed(2)}</Badge>
                         </span>

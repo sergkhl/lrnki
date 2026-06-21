@@ -9,18 +9,18 @@ import {
 } from "@lrnki/application";
 import type { InferredPrerequisiteEdge } from "@lrnki/domain-core";
 import type { LearnerStatePort } from "@lrnki/ports";
-import { createDatabaseClient, PostgresCardBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
+import { createDatabaseClient, PostgresStudyItemBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
 import { getEnrichmentDetail } from "./enrichments";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoop";
 import { labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
 // The transfer-ready study modules own the presentation contract (R15); the loader
 // produces data matching it (AGENTS rule 18 — one definition).
-import type { SheetContent, StudyCardView } from "@/components/study/studyView";
+import type { SheetContent, StudyCardView, StudyOptionSelectView } from "@/components/study/studyView";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
 // Server-only loader + pure gating helpers for the learner Study surface (U3, KTD3). It
-// composes the read-only enrichment/card/response-log loaders with the pure mastery fold
+// composes the read-only enrichment/study-item/response-log loaders with the pure mastery fold
 // and `classifyAdaptedNodes` — no graph or Derived Graph Layer write port is imported, so
 // it structurally cannot mutate a published graph (R16). A study session re-folds mastery
 // live from the append-only log and re-classifies on every response; nothing about the
@@ -53,19 +53,21 @@ export function unmetPrerequisites(nodeId: string, edges: ReadinessEdge[], class
 export function sheetContentFor(input: {
   derivedNodeId: string;
   classification: AdaptedNodeClassification;
-  cardsByNode: Map<string, StudyCardView>;
+  optionItemsByNode: Map<string, StudyOptionSelectView>;
+  selfAssessmentItemsByNode: Map<string, StudyCardView>;
   edges: ReadinessEdge[];
   labelByNode: Map<string, string>;
 }): SheetContent {
   const state = input.classification.stateByNode[input.derivedNodeId] ?? "locked";
-  const card = input.cardsByNode.get(input.derivedNodeId) ?? null;
+  const optionItem = input.optionItemsByNode.get(input.derivedNodeId) ?? null;
+  const selfAssessmentItem = input.selfAssessmentItemsByNode.get(input.derivedNodeId) ?? null;
   if (state === "locked") {
     const unmet = unmetPrerequisites(input.derivedNodeId, input.edges, input.classification);
     return { kind: "locked", unmetPrerequisiteLabels: unmet.map((id) => input.labelByNode.get(id) ?? id) };
   }
-  if (state === "mastered") return { kind: "mastered_review", card };
+  if (state === "mastered") return { kind: "mastered_review", card: selfAssessmentItem };
   // frontier
-  return card ? { kind: "frontier_card", card } : { kind: "cardless" };
+  return optionItem ? { kind: "option_select", item: optionItem } : { kind: "cardless" };
 }
 
 // The node within the goal's ancestor cone (∪ the goal itself) the learner advances to
@@ -101,11 +103,12 @@ export type StudySession = {
   // so the adapted-graph ring marks the node the learner advances to next toward Z.
   classification: AdaptedNodeClassification;
   responseSourceSummary: ResponseSourceSummary;
-  // Hardest-first calibration sweep over the goal's prerequisite-ancestor cards (R2).
+  // Hardest-first calibration sweep over the goal's prerequisite-ancestor self-assessment items.
   calibrationItems: (CalibrationItem & { label: string; question: string })[];
-  // Per-node gated side-sheet payloads (R9) and the card lookup the modules render from.
+  // Per-node gated side-sheet payloads (R9) and the item lookups the modules render from.
   sheetByNode: Record<string, SheetContent>;
-  cardsByNode: Record<string, StudyCardView>;
+  selfAssessmentItemsByNode: Record<string, StudyCardView>;
+  optionItemsByNode: Record<string, StudyOptionSelectView>;
 };
 
 export async function getStudySession(
@@ -119,21 +122,38 @@ export async function getStudySession(
 
   const loaded = await withClient(async (sql) => {
     const layer = await new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId);
-    const cards = await new PostgresCardBankStore(sql).listCardsForEnrichment(enrichmentId);
+    const studyItems = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId);
     const rows = await new PostgresResponseLogStore(sql).listForLearner(learnerStateRef);
-    return { layer, cards, rows };
+    return { layer, studyItems, rows };
   });
   if (!loaded || !loaded.layer) return undefined;
 
-  const cardViews: StudyCardView[] = loaded.cards.map((card) => ({
-    cardId: card.cardId,
-    derivedNodeId: card.derivedNodeId,
-    question: card.question,
-    answerKey: card.answerKey,
-    selfReportPrompt: card.selfReportPrompt,
-    groundingProvenance: card.groundingProvenance
-  }));
-  const cardsByNode = new Map(cardViews.map((card) => [card.derivedNodeId, card] as const));
+  const selfAssessmentViews: StudyCardView[] = loaded.studyItems
+    .filter((item) => item.itemType === "self_assessment")
+    .map((item) => ({
+      studyItemId: item.studyItemId,
+      derivedNodeId: item.derivedNodeId,
+      question: item.question,
+      answerKey: item.answerKey,
+      selfReportPrompt: item.selfReportPrompt,
+      groundingProvenance: item.groundingProvenance
+    }));
+  const optionViews: StudyOptionSelectView[] = loaded.studyItems
+    .filter((item) => item.itemType === "option_select")
+    .map((item) => ({
+      studyItemId: item.studyItemId,
+      derivedNodeId: item.derivedNodeId,
+      question: item.question,
+      groundingProvenance: item.groundingProvenance,
+      options: [...item.options].sort((a, b) => a.optionId.localeCompare(b.optionId)).map((option) => ({
+        optionId: option.optionId,
+        text: option.text,
+        isCorrect: option.isCorrect,
+        provenance: option.provenance
+      }))
+    }));
+  const selfAssessmentItemsByNode = new Map(selfAssessmentViews.map((item) => [item.derivedNodeId, item] as const));
+  const optionItemsByNode = new Map(optionViews.map((item) => [item.derivedNodeId, item] as const));
 
   const masteryByNode = buildMasteryMap(loaded.rows);
   const learnerState: LearnerStatePort = {
@@ -163,7 +183,8 @@ export async function getStudySession(
     sheetByNode[node.derivedNodeId] = sheetContentFor({
       derivedNodeId: node.derivedNodeId,
       classification,
-      cardsByNode,
+      optionItemsByNode,
+      selfAssessmentItemsByNode,
       edges: detail.edges,
       labelByNode
     });
@@ -172,11 +193,11 @@ export async function getStudySession(
   const calibrationItems = buildCalibrationSet({
     layer: loaded.layer,
     targetDerivedNodeId,
-    cards: cardViews.map((card) => ({ derivedNodeId: card.derivedNodeId, cardId: card.cardId }))
+    studyItems: selfAssessmentViews.map((item) => ({ derivedNodeId: item.derivedNodeId, studyItemId: item.studyItemId }))
   }).map((item) => ({
     ...item,
     label: labelByNode.get(item.derivedNodeId) ?? item.derivedNodeId,
-    question: cardsByNode.get(item.derivedNodeId)?.question ?? ""
+    question: selfAssessmentItemsByNode.get(item.derivedNodeId)?.question ?? ""
   }));
 
   return {
@@ -188,6 +209,7 @@ export async function getStudySession(
     responseSourceSummary: summarizeResponseSources(loaded.rows),
     calibrationItems,
     sheetByNode,
-    cardsByNode: Object.fromEntries(cardsByNode)
+    selfAssessmentItemsByNode: Object.fromEntries(selfAssessmentItemsByNode),
+    optionItemsByNode: Object.fromEntries(optionItemsByNode)
   };
 }

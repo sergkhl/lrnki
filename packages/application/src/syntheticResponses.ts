@@ -1,4 +1,4 @@
-import type { Card, DerivedGraphLayer, SelfReportRating } from "@lrnki/domain-core";
+import type { SelfAssessmentItem, DerivedGraphLayer, SelfReportRating } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort, LearnerAnswerSimulatorPort, ResponseLogStorePort } from "@lrnki/ports";
 import { appendSelfReportBatch, buildCalibrationSet, type SelfReportInput } from "./calibration";
 import { gradeAndAppend } from "./measurement";
@@ -12,7 +12,7 @@ import { gradeAndAppend } from "./measurement";
 export type SyntheticLearnerProfile = {
   // A learner who masters concepts below `difficultyCutoff` and struggles at/above it.
   difficultyCutoff: number;
-  // How many cards to actually answer-and-grade (bounds LLM calls). Hardest-first.
+  // How many studyItems to actually answer-and-grade (bounds LLM calls). Hardest-first.
   gradedSampleSize: number;
 };
 
@@ -29,20 +29,20 @@ export async function synthesizeResponses(input: {
   layer: DerivedGraphLayer;
   targetDerivedNodeId: string;
   declaredDomain: string;
-  cards: Card[];
+  studyItems: SelfAssessmentItem[];
   profile: SyntheticLearnerProfile;
   simulator: LearnerAnswerSimulatorPort;
   judge: AnswerGradingJudgePort;
   responseLog: ResponseLogStorePort;
 }): Promise<{ calibrationBatchId: string; selfReportCount: number; gradedCount: number }> {
-  const cardByNode = new Map(input.cards.map((card) => [card.derivedNodeId, card] as const));
-  const calibration = buildCalibrationSet({ layer: input.layer, targetDerivedNodeId: input.targetDerivedNodeId, cards: input.cards });
+  const studyItemByNode = new Map(input.studyItems.map((studyItem) => [studyItem.derivedNodeId, studyItem] as const));
+  const calibration = buildCalibrationSet({ layer: input.layer, targetDerivedNodeId: input.targetDerivedNodeId, studyItems: input.studyItems });
 
   // 1. Calibration: deterministically rate every set item, then append ONE batch via
   //    U4's single append path (self-report rows tagged synthetic).
   const ratings: SelfReportInput[] = calibration.map((item) => ({
     derivedNodeId: item.derivedNodeId,
-    cardId: item.cardId,
+    studyItemId: item.studyItemId,
     rating: rateByDifficulty(item.difficulty, input.profile.difficultyCutoff)
   }));
   const { batchId } = await appendSelfReportBatch({
@@ -53,10 +53,10 @@ export async function synthesizeResponses(input: {
   });
 
   // 2. Measurement: answer-and-grade a hardest-first sample, including the target's
-  //    own card. Each answer is simulated then graded by the REAL judge through U5's
+  //    own studyItem. Each answer is simulated then graded by the REAL judge through U5's
   //    gradeAndAppend — exercising the true measurement path, not a stub.
   const gradeOrder = [
-    ...(cardByNode.has(input.targetDerivedNodeId) ? [{ derivedNodeId: input.targetDerivedNodeId, difficulty: difficultyOfNode(input.layer, input.targetDerivedNodeId) }] : []),
+    ...(studyItemByNode.has(input.targetDerivedNodeId) ? [{ derivedNodeId: input.targetDerivedNodeId, difficulty: difficultyOfNode(input.layer, input.targetDerivedNodeId) }] : []),
     ...calibration.map((item) => ({ derivedNodeId: item.derivedNodeId, difficulty: item.difficulty }))
   ];
   const seen = new Set<string>();
@@ -65,13 +65,13 @@ export async function synthesizeResponses(input: {
     if (gradedCount >= input.profile.gradedSampleSize) break;
     if (seen.has(candidate.derivedNodeId)) continue;
     seen.add(candidate.derivedNodeId);
-    const card = cardByNode.get(candidate.derivedNodeId);
-    if (!card) continue;
+    const studyItem = studyItemByNode.get(candidate.derivedNodeId);
+    if (!studyItem) continue;
     const competence: "strong" | "weak" = candidate.difficulty < input.profile.difficultyCutoff ? "strong" : "weak";
-    const { answer } = await input.simulator.simulateAnswer({ declaredDomain: input.declaredDomain, question: card.question, competence });
+    const { answer } = await input.simulator.simulateAnswer({ declaredDomain: input.declaredDomain, question: studyItem.question, competence });
     await gradeAndAppend({
       learnerStateRef: input.learnerStateRef,
-      card: { cardId: card.cardId, derivedNodeId: card.derivedNodeId, question: card.question, answerKey: card.answerKey },
+      studyItem: { studyItemId: studyItem.studyItemId, derivedNodeId: studyItem.derivedNodeId, question: studyItem.question, answerKey: studyItem.answerKey },
       declaredDomain: input.declaredDomain,
       submittedAnswer: answer,
       judge: input.judge,

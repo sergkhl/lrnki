@@ -23,9 +23,9 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasCard: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
-    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasCard: true, grounding: null },
-    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasCard: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
+    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasStudyItem: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasStudyItem: true, grounding: null },
+    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasStudyItem: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
     { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
@@ -166,18 +166,18 @@ test("adapted mode tags each node with its classification and marks the single f
   assert.deepEqual(targets, ["ownership"]);
 });
 
-test("a cardless node carries cardless:true in both cytoscape and textual representations (R6)", () => {
+test("a itemless node carries cardless:true in both cytoscape and textual representations (R6)", () => {
   const view = buildDerivedGraphView(detail, classification);
   assert.equal(view.cytoscape.nodes.find((n) => n.id === "move")?.cardless, true);
   assert.equal(view.textual.nodes.find((n) => n.label === "Move semantics")?.cardless, true);
-  // Carded nodes are not flagged.
+  // Itemed nodes are not flagged.
   assert.equal(view.cytoscape.nodes.find((n) => n.id === "ownership")?.cardless, false);
 });
 
 test("difficulty is present on every node for size mapping; null difficulty is preserved, not coerced to 0", () => {
   const withNull: DerivedGraphDetail = {
     ...detail,
-    nodes: [{ ...detail.nodes[0], derivedNodeId: "nd", label: "No difficulty", difficulty: null, hasCard: true }]
+    nodes: [{ ...detail.nodes[0], derivedNodeId: "nd", label: "No difficulty", difficulty: null, hasStudyItem: true }]
   };
   const view = buildDerivedGraphView(withNull);
   assert.equal(view.cytoscape.nodes[0].difficulty, null);
@@ -220,7 +220,7 @@ test("a node absent from the classification gets 'none' rather than throwing", (
 
 // Covers R11/R13 regression guard: neutral-mode view-model is byte-equivalent to the
 // pre-reshape enrichment render (no classification overlay), so the enrichment page is
-// unaffected by the reshape. A cardless node stays flagged in this neutral view (R13).
+// unaffected by the reshape. A itemless node stays flagged in this neutral view (R13).
 test("neutral-mode view-model equals the no-classification render (enrichment-page regression guard)", () => {
   assert.deepEqual(buildDerivedGraphView(detail, undefined), buildDerivedGraphView(detail));
   assert.equal(buildDerivedGraphView(detail).cytoscape.nodes.find((n) => n.id === "move")?.cardless, true);

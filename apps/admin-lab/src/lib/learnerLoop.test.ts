@@ -6,10 +6,10 @@ import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, resubmitAndRe
 
 let seq = 0;
 function selfReport(derivedNodeId: string, rating: SelfReportRating): ResponseLogRow {
-  return { responseId: `r${++seq}`, learnerStateRef: "L1", cardId: `card-${derivedNodeId}`, derivedNodeId, signalType: "self_report", selfReportRating: rating, judgedOutcome: null, gradedScore: null, evidenceWeight: 0.3, responseSource: "synthetic", graderIdentity: null, batchId: "b", attemptSeq: seq, submittedAnswer: null, createdAt: new Date().toISOString() };
+  return { responseId: `r${++seq}`, learnerStateRef: "L1", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "self_report", selfReportRating: rating, judgedOutcome: null, gradedScore: null, evidenceWeight: 0.3, responseSource: "synthetic", graderIdentity: null, batchId: "b", attemptSeq: seq, submittedAnswer: null, createdAt: new Date().toISOString() };
 }
 function graded(derivedNodeId: string, outcome: JudgedOutcome, source: "synthetic" | "human" = "synthetic"): ResponseLogRow {
-  return { responseId: `r${++seq}`, learnerStateRef: "L1", cardId: `card-${derivedNodeId}`, derivedNodeId, signalType: "graded", selfReportRating: null, judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, evidenceWeight: 1, responseSource: source, graderIdentity: "kg-independent-judge", attemptSeq: seq, batchId: null, submittedAnswer: "answer", createdAt: new Date().toISOString() };
+  return { responseId: `r${++seq}`, learnerStateRef: "L1", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", selfReportRating: null, judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, evidenceWeight: 1, responseSource: source, graderIdentity: "kg-independent-judge", attemptSeq: seq, batchId: null, submittedAnswer: "answer", createdAt: new Date().toISOString() };
 }
 
 test("detectConflicts flags a node claimed known but graded incorrect (Covers R16)", () => {
@@ -122,7 +122,7 @@ test("resubmit appends a new graded row, leaves the original synthetic row intac
 
   const result = await resubmitAndRecompute({
     learnerStateRef: "L1",
-    card: { cardId: "card-nA", derivedNodeId: "nA", question: "Q?", answerKey: "A" },
+    studyItem: { studyItemId: "studyItem-nA", derivedNodeId: "nA", question: "Q?", answerKey: "A" },
     declaredDomain: "d",
     submittedAnswer: "an improved answer",
     paths: [{ enrichmentId: "e1", targetDerivedNodeId: "nB" }],

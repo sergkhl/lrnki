@@ -341,7 +341,8 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
-  const cards = await ctx.studyItemBankStore.listStudyItemsForEnrichment(enrichmentId);
+  const studyItems = (await ctx.studyItemBankStore.listStudyItemsForEnrichment(enrichmentId))
+    .filter((item) => item.itemType === "self_assessment");
   const targetNode = layer.derivedNodes.find((node) => node.derivedNodeId === targetDerivedNodeId);
   if (!targetNode) {
     console.error(`! target node ${targetDerivedNodeId} is not in enrichment ${enrichmentId}.`);
@@ -354,7 +355,7 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     layer,
     targetDerivedNodeId,
     declaredDomain: targetNode.declaredDomain,
-    cards,
+    studyItems,
     profile: { difficultyCutoff: 0.6, gradedSampleSize: 4 },
     simulator: ctx.learnerSimulator,
     judge: ctx.answerGradingJudge,

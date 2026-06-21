@@ -1,15 +1,15 @@
 "use client";
 
 import { LockIcon } from "lucide-react";
-import type { SelfAssessmentOutcome } from "@lrnki/application";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { OptionSelectCard } from "@/components/study/OptionSelectCard";
 import { RecallCard } from "@/components/study/RecallCard";
 import type { SheetContent as SheetContentPayload } from "@/components/study/studyView";
 
 // Transfer-ready, state-gated study side sheet (U4, R9/R13/R15). It keeps the graph visible
 // (a right-side sheet) and renders content gated by the clicked node's learner state: a
-// frontier node opens its recall card; a cardless frontier node is flagged, never dropped
+// frontier node opens its study item; a cardless frontier node is flagged, never dropped
 // (R13); a locked node names its unmet prerequisites with NO card; a mastered node opens a
 // read-only review. All data and the `onAssess` callback are injected props — no loader or
 // server action is imported (R15).
@@ -18,14 +18,14 @@ export function StudySideSheet({
   onOpenChange,
   nodeLabel,
   content,
-  onAssess,
+  onSelect,
   pending = false
 }: Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   nodeLabel: string | null;
   content: SheetContentPayload | null;
-  onAssess: (outcome: SelfAssessmentOutcome) => void;
+  onSelect: (optionId: string) => void;
   pending?: boolean;
 }>) {
   return (
@@ -39,21 +39,21 @@ export function StudySideSheet({
           <SheetDescription>{content ? descriptionFor(content) : null}</SheetDescription>
         </SheetHeader>
 
-        {content?.kind === "frontier_card" ? (
-          <RecallCard key={content.card.cardId} card={content.card} onAssess={onAssess} pending={pending} />
+        {content?.kind === "option_select" ? (
+          <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={onSelect} pending={pending} />
         ) : null}
 
         {content?.kind === "mastered_review" && content.card ? (
-          <RecallCard key={content.card.cardId} card={content.card} readOnly />
+          <RecallCard key={content.card.studyItemId} card={content.card} />
         ) : null}
 
         {content?.kind === "mastered_review" && !content.card ? (
-          <p className="text-sm text-muted-foreground">Mastered — no recall card exists for this node.</p>
+          <p className="text-sm text-muted-foreground">Mastered — no study item exists for this node.</p>
         ) : null}
 
         {content?.kind === "cardless" ? (
           <div className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
-            No recall card exists for this node, so it can&apos;t be self-assessed. It stays on the graph, flagged — never dropped.
+            No option-select study item exists for this node. Self-assessment is calibration-only, so this frontier is flagged for studying and kept visible.
           </div>
         ) : null}
 
@@ -80,7 +80,7 @@ export function StudySideSheet({
 
 function StateBadge({ content }: Readonly<{ content: SheetContentPayload }>) {
   switch (content.kind) {
-    case "frontier_card":
+    case "option_select":
     case "cardless":
       return <Badge variant="secondary">frontier</Badge>;
     case "mastered_review":
@@ -92,10 +92,10 @@ function StateBadge({ content }: Readonly<{ content: SheetContentPayload }>) {
 
 function descriptionFor(content: SheetContentPayload): string {
   switch (content.kind) {
-    case "frontier_card":
-      return "Ready to study — reveal the answer, then self-assess your recall.";
+    case "option_select":
+      return "Ready to study — choose one option.";
     case "cardless":
-      return "On the frontier, but not recall-testable.";
+      return "On the frontier, but no auto-graded study item exists.";
     case "mastered_review":
       return "Already mastered — review only.";
     case "locked":

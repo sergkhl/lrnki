@@ -18,20 +18,20 @@ import { resubmitAndRecompute } from "@/lib/learnerLoop";
 // cannot touch a published graph or the Derived Graph Layer (AGENTS rule 12).
 export async function resubmitEditedAnswer(formData: FormData): Promise<void> {
   const learnerStateRef = String(formData.get("learnerStateRef") ?? "");
-  const cardId = String(formData.get("cardId") ?? "");
+  const studyItemId = String(formData.get("studyItemId") ?? "");
   const editedAnswer = String(formData.get("editedAnswer") ?? "").trim();
-  if (!learnerStateRef || !cardId || !editedAnswer) return;
+  if (!learnerStateRef || !studyItemId || !editedAnswer) return;
 
   const sql = createDatabaseClient();
   try {
-    // Re-derive the card and its node from the DB — never trust a client-sent
+    // Re-derive the studyItem and its node from the DB — never trust a client-sent
     // answer-key. declaredDomain comes from the Derived Graph node.
-    const cardRows = await sql<{ derived_node_id: string; question: string; answer_key: string; declared_domain: string }[]>`
+    const studyItemRows = await sql<{ derived_node_id: string; question: string; answer_key: string; declared_domain: string }[]>`
       SELECT cd.derived_node_id, cd.question, cd.answer_key, n.declared_domain
-      FROM cards cd JOIN derived_graph_nodes n ON n.derived_node_id = cd.derived_node_id
-      WHERE cd.card_id = ${cardId} LIMIT 1`;
-    if (cardRows.length === 0) return;
-    const card = cardRows[0];
+      FROM study_items cd JOIN derived_graph_nodes n ON n.derived_node_id = cd.derived_node_id
+      WHERE cd.study_item_id = ${studyItemId} AND cd.item_type = 'self_assessment' LIMIT 1`;
+    if (studyItemRows.length === 0) return;
+    const studyItem = studyItemRows[0];
 
     const pathRows = await sql<{ enrichment_id: string; target_derived_node_id: string }[]>`
       SELECT enrichment_id, target_derived_node_id FROM learner_paths WHERE learner_state_ref = ${learnerStateRef}`;
@@ -46,8 +46,8 @@ export async function resubmitEditedAnswer(formData: FormData): Promise<void> {
 
     await resubmitAndRecompute({
       learnerStateRef,
-      card: { cardId, derivedNodeId: card.derived_node_id, question: card.question, answerKey: card.answer_key },
-      declaredDomain: card.declared_domain,
+      studyItem: { studyItemId, derivedNodeId: studyItem.derived_node_id, question: studyItem.question, answerKey: studyItem.answer_key },
+      declaredDomain: studyItem.declared_domain,
       submittedAnswer: editedAnswer,
       paths: pathRows.map((row) => ({ enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id })),
       judge: new LiteLlmAnswerGradingJudgeAdapter(client),

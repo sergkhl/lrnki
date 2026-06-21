@@ -9,12 +9,12 @@ import { calibrationRatingFor, type CalibrationChoice } from "@/components/study
 
 export type CalibrationSweepItem = {
   derivedNodeId: string;
-  cardId: string;
+  studyItemId: string;
   label: string;
   question: string;
 };
 
-export type CalibrationRating = { derivedNodeId: string; cardId: string; rating: SelfReportRating };
+export type CalibrationRating = { derivedNodeId: string; studyItemId: string; rating: SelfReportRating };
 
 // Transfer-ready calibration sweep (U4, R2/R15). Renders the goal's prerequisite-ancestor
 // cards in the order received — the loader sorts them hardest-first (buildCalibrationSet) —
@@ -35,7 +35,7 @@ export function CalibrationSweep({
   const submit = () => {
     const ratings: CalibrationRating[] = items
       .filter((item) => choiceByNode[item.derivedNodeId])
-      .map((item) => ({ derivedNodeId: item.derivedNodeId, cardId: item.cardId, rating: calibrationRatingFor(choiceByNode[item.derivedNodeId]) }));
+      .map((item) => ({ derivedNodeId: item.derivedNodeId, studyItemId: item.studyItemId, rating: calibrationRatingFor(choiceByNode[item.derivedNodeId]) }));
     if (ratings.length > 0) onSubmit(ratings);
   };
 
@@ -50,7 +50,7 @@ export function CalibrationSweep({
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pt-4">
         {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">This goal has no prerequisite cards to calibrate — study it directly.</p>
+          <p className="text-sm text-muted-foreground">This goal has no prerequisite self-assessment items to calibrate — study it directly.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {items.map((item) => {

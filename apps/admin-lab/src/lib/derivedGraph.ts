@@ -42,10 +42,9 @@ export interface DerivedGraphNode {
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
   role: "anchor" | "prerequisite";
-  // Whether a recall card exists for this derived node (cards are UNIQUE per
-  // derived_node_id). An enrichment-level fact loaded once in `getEnrichmentDetail`, so
-  // a cardless node on a learner's path is rendered and flagged, never dropped (R6).
-  hasCard: boolean;
+  // Whether any study item exists for this derived node. An enrichment-level fact loaded
+  // once in `getEnrichmentDetail`, so an itemless node is rendered and flagged.
+  hasStudyItem: boolean;
   // Present only for enrichment nodes; anchors carry their CEP in the published view.
   grounding: NodeGroundingView | null;
 }
@@ -198,7 +197,7 @@ export function nodeRenderAttrs(mode: DerivedGraphMode, classification: AdaptedN
 // `adapted` absent the output is neutral — byte-equivalent to the enrichment-page render
 // today, every node `adaptedState: null` / `isFrontierTarget: false`. With `adapted`
 // present each node gains its mastered / frontier / locked state and the single frontier
-// target is marked. `cardless` is derived from `hasCard` in BOTH modes (R6).
+// target is marked. `cardless` is derived from `hasStudyItem` in BOTH modes (R6).
 export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: AdaptedNodeClassification): DerivedGraphView {
   const overlayFor = (derivedNodeId: string): Pick<DerivedGraphViewNode, "adaptedState" | "isFrontierTarget"> => ({
     adaptedState: adapted ? adapted.stateByNode[derivedNodeId] ?? null : null,
@@ -215,7 +214,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         difficultyRationale: node.difficultyRationale,
         nodeKind: node.nodeKind,
         groundingOrigin: node.groundingOrigin,
-        cardless: !node.hasCard,
+        cardless: !node.hasStudyItem,
         ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge, index) => ({
@@ -235,7 +234,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         nodeKind: node.nodeKind,
         groundingOrigin: node.groundingOrigin,
         grounding: node.grounding,
-        cardless: !node.hasCard,
+        cardless: !node.hasStudyItem,
         ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge) => ({

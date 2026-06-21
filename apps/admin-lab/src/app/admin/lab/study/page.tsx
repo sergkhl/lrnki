@@ -47,7 +47,7 @@ export default async function StudyStartPage({
                 <EmptyHeader>
                   <EmptyMedia variant="icon"><GitForkIcon /></EmptyMedia>
                   <EmptyTitle>No enrichments</EmptyTitle>
-                  <EmptyDescription>Run the enrichment pipeline (and seed cards) first, then refresh.</EmptyDescription>
+                  <EmptyDescription>Run the enrichment pipeline (and seed study items) first, then refresh.</EmptyDescription>
                 </EmptyHeader>
               </Empty>
             ) : (
@@ -92,7 +92,7 @@ export default async function StudyStartPage({
                       </span>
                       <span className="flex shrink-0 items-center gap-1">
                         <Badge variant={node.nodeKind === "anchor" ? "default" : "secondary"}>{node.nodeKind}</Badge>
-                        {node.hasCard ? null : <Badge variant="outline">no card</Badge>}
+                        {node.hasStudyItem ? null : <Badge variant="outline">no item</Badge>}
                       </span>
                     </Link>
                   </li>

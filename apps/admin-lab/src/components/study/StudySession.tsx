@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { GraduationCapIcon, SlidersHorizontalIcon, TrophyIcon } from "lucide-react";
-import type { SelfAssessmentOutcome } from "@lrnki/application";
-import { selfAssessCard, submitCalibration } from "@/app/admin/lab/study/actions";
+import { submitOptionSelect, submitCalibration } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
 import { CalibrationSweep, type CalibrationRating } from "@/components/study/CalibrationSweep";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
@@ -48,10 +47,10 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     if (!nextOpen) setSelectedNodeId(null);
   };
 
-  const onAssess = (outcome: SelfAssessmentOutcome) => {
+  const onSelect = (optionId: string) => {
     const content = selectedContent;
-    if (!content || content.kind !== "frontier_card") return;
-    const cardId = content.card.cardId;
+    if (!content || content.kind !== "option_select") return;
+    const studyItemId = content.item.studyItemId;
     // Keep the sheet open and arm the advance; the effect below retargets it once the
     // re-folded session prop arrives (R4). Do NOT close here — that was the drop-out (AE1).
     pendingAdvanceRef.current = true;
@@ -59,7 +58,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     sessionAtAnswerRef.current = session;
     startTransition(async () => {
       try {
-        await selfAssessCard({ learnerStateRef: session.learnerStateRef, cardId, outcome });
+        await submitOptionSelect({ learnerStateRef: session.learnerStateRef, studyItemId, chosenOptionId: optionId });
       } catch (error) {
         pendingAdvanceRef.current = false;
         autoAdvanceDismissGuardRef.current = false;
@@ -152,7 +151,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         onOpenChange={onSheetOpenChange}
         nodeLabel={selectedLabel}
         content={selectedContent}
-        onAssess={onAssess}
+        onSelect={onSelect}
         pending={pending}
       />
     </div>

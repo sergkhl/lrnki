@@ -58,14 +58,13 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
 
     // The DERIVED node space: anchor projections + enrichment (minted/rescued) nodes
     // (R15). Difficulty and edges reference derived_node_id only (KTD2).
-    // `cards` is UNIQUE per derived_node_id, so the LEFT JOIN keeps one row per node;
-    // `has_card` flags whether the node is recall-testable (R6) for BOTH panels.
-    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; neural_rationale: string | null; has_card: boolean }[]>`
+    // `study_items` can hold multiple types per derived_node_id, so the EXISTS check keeps
+    // one row per node while flagging whether any study item exists for graph inspection.
+    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; neural_rationale: string | null; has_study_item: boolean }[]>`
       SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score, d.neural_rationale,
-             (c.card_id IS NOT NULL) AS has_card
+             EXISTS (SELECT 1 FROM study_items si WHERE si.derived_node_id = n.derived_node_id) AS has_study_item
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
-      LEFT JOIN cards c ON c.derived_node_id = n.derived_node_id
       WHERE n.enrichment_id = ${header.enrichment_id}
       ORDER BY n.declared_domain, n.node_kind, d.score NULLS LAST, n.canonical_label`;
     const edgeRows = await sql<{ prerequisite_derived_node_id: string; dependent_derived_node_id: string; confidence: number; uncertain: boolean; judge_model: string }[]>`
@@ -138,7 +137,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       nodeKind: row.node_kind as DerivedGraphNode["nodeKind"],
       groundingOrigin: row.grounding_origin as DerivedGraphNode["groundingOrigin"],
       role: row.role as DerivedGraphNode["role"],
-      hasCard: row.has_card,
+      hasStudyItem: row.has_study_item,
       grounding: groundingFor(row)
     }));
     const edges: DerivedGraphEdge[] = edgeRows.map((row) => ({
