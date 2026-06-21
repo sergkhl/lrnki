@@ -19,7 +19,14 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type DerivedGraphExplorerProps = Readonly<{ detail: DerivedGraphDetail; adapted?: AdaptedNodeClassification }>;
+type DerivedGraphExplorerProps = Readonly<{
+  detail: DerivedGraphDetail;
+  adapted?: AdaptedNodeClassification;
+  // Optional node-tap handler for the Study surface (U5). When present, tapping a node
+  // reports its derivedNodeId so the caller can open the state-gated side sheet. Absent on
+  // the neutral enrichment page, so that render keeps its read-only behavior unchanged.
+  onNodeSelect?: (derivedNodeId: string) => void;
+}>;
 
 // Difficulty maps to node diameter (R7/KTD3): a bounded range so an operator can spot
 // ordering defects at a glance. A null-difficulty node renders at the base size rather
@@ -58,9 +65,13 @@ const ADAPTED_STATE_BADGE: Record<AdaptedNodeState, "default" | "secondary" | "o
 // comparison (R11, KTD2). Without `adapted` there is no control and the render is neutral
 // — node-kind / grounding coloring exactly as before, plus the difficulty-as-size
 // encoding (R7). The textual node/edge panel re-renders for the active mode (R14).
-export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerProps) {
+export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedGraphExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
+  // Held in a ref so the tap handler is bound ONCE in the layout effect (keyed on topology)
+  // without re-running layout when the callback identity changes each render.
+  const onNodeSelectRef = useRef(onNodeSelect);
+  onNodeSelectRef.current = onNodeSelect;
   const hasClassification = adapted != null;
   // The adapted view is the informative one, so default to it when a classification is
   // available; the enrichment page (no classification) is always neutral.
@@ -213,6 +224,8 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
       ]
     });
     cytoscapeRef.current = cy;
+    // Node-tap → caller (U5). Reads the ref so the handler always calls the latest callback.
+    cy.on("tap", "node", (event) => onNodeSelectRef.current?.(event.target.id()));
     void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
       if (!stale) console.error("Failed to lay out derived graph", error);
     });
