@@ -15,6 +15,12 @@ export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMinting
 export { computeLearnerPath } from "./computeLearnerPath";
 export { generateCardBank, type CardBankGenerationResult, type RejectedCard } from "./generateCardBank";
 export {
+  validateOptionSelectItem,
+  type OptionSelectGrounding,
+  type OptionSelectGroundingPassage,
+  type OptionSelectGuardResult
+} from "./optionSelectGuard";
+export {
   buildCalibrationSet,
   propagateSelfReport,
   appendSelfReportBatch,
