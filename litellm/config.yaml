@@ -77,6 +77,7 @@ model_list:
       # max_tokens: 8192
 
 
+  # DeepSeek platform models (out of credits)
   - model_name: "deepseek/deepseek-v4-pro"
     litellm_params:
       model: deepseek/deepseek-v4-pro
@@ -154,12 +155,20 @@ model_list:
       input_cost_per_token: 0.0000003
       output_cost_per_token: 0.0000012
 
-  # NOTE: tencent/hy3-preview advertises tool_choice but its backend only accepts
-  # tool_choice="auto" (not forced/named) — unusable for forced tools (rule 6).
-  - model_name: "openrouter/tencent/hy3-preview"
+  # NOTE: openrouter flash
+  # turning off thinking does no work via extra body
+  - model_name: "openrouter/deepseek/deepseek-v4-flash-no-thinking"
     litellm_params:
-      model: "openrouter/tencent/hy3-preview"
+      model: "openrouter/deepseek/deepseek-v4-flash"
       api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000009
+      output_cost_per_token: 0.00000018
+      extra_body:
+        thinking:
+          type: "disabled"
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
 
   # Independent production judge (kg-independent-judge, ADR-0007/0005). gpt-oss-120b
   # is cross-family independent of the DeepSeek extractor, forced tool_choice works,
@@ -258,14 +267,14 @@ router_settings:
   #   temperature: 0.5
 
   model_group_alias:
-    default-model: deepseek/deepseek-v4-flash-no-thinking
-    kg-concept-discovery: deepseek/deepseek-v4-flash-no-thinking
-    kg-concept-admission: deepseek/deepseek-v4-flash-no-thinking
-    kg-claim-extraction: deepseek/deepseek-v4-flash-no-thinking
+    default-model: openrouter/deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-discovery: openrouter/deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-admission: openrouter/deepseek/deepseek-v4-flash-no-thinking
+    kg-claim-extraction: openrouter/deepseek/deepseek-v4-flash-no-thinking
     # Graph Enrichment, third operation (ADR-0019 reset): every same-domain CEP
     # pair is judged exhaustively (no embedding clustering tier); the bounded judge
     # proposes the inferred DAG using the same no-thinking extractor.
-    kg-prerequisite-judgment: deepseek/deepseek-v4-flash-no-thinking
+    kg-prerequisite-judgment: openrouter/deepseek/deepseek-v4-flash-no-thinking
     # Cross-family generated-node ordering judge (ADR-0023, U7). Any prerequisite
     # pair touching an `llm_grounded` minted node is ordered HERE, on gpt-oss-120b,
     # so the DeepSeek generator never grades its own minted output (KTD7). Anchor-only

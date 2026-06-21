@@ -9,22 +9,17 @@ Most reset-roadmap items have moved to COMPLETED. The remaining active work is e
 outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
 `EXPERIMENT_ONLY` trust, and prior CEP definition-quality caveats remain visible in the mixed-domain run.
 
-1. **Adapted-graph comparison view + difficulty-ordering evaluation (in progress).** Make per-learner adaptation
-   legible in Admin Lab and read the intrinsic-difficulty ordering across the full manifest. Plan:
-   `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md`.
-   - **Landed (U1–U3, unit-green):** `classifyAdaptedNodes` (mastered/frontier/locked + selected frontier target)
-     sharing one readiness helper with `selectFrontierTarget` (AGENTS rule 18); the read-only
-     `getLearnerAdaptedGraphs` loader with folded `masteryByNode`, `responseSourceSummary`, distinct-enrichment
-     dedupe, and `hasCard`; and the optional `adapted` overlay (+ `cardless`) threaded through the pure
-     `buildDerivedGraphView`. Neutral render is unchanged.
-   - **Remaining (U4–U6):** U4 — teach `DerivedGraphExplorer` to color nodes by learner state, mark the frontier
-     target, size nodes by difficulty, and badge cardless nodes (+ legend), keeping the neutral path byte-identical.
-     U5 — render side-by-side neutral/adapted panel-pairs per distinct enrichment on the learner-loop page with a
-     synthetic/real source badge. U6 — rule-14 read of `intrinsic-fused-v1` ordering across all manifest domains
-     under `tmp/`, classifying whether the broad/evidence-thin over-scoring defect is systemic.
-   - This view is read + projection only (R12): no published-graph or Derived Graph Layer mutation, no new neural
-     surface. The U6 evaluation is analysis only (no scoring/fusion/rationale code change) and its conclusion is what
-     triggers the deferred difficulty-scoring fix; population calibration stays deferred (see task 5).
+1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
+   plausible ordering but confirmed a concentrated broad/evidence-thin distortion, especially relation-like or
+   framework-level labels with sparse evidence. Evidence:
+   `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`.
+   - Do **not** patch prompts with fixture-specific expected answers or named concepts. Any fix must remain
+     domain-neutral and comply with AGENTS rules 16/17.
+   - Prefer persisting difficulty rationales and/or a measured neural judge that can explicitly assess whether a
+     broad, evidence-thin node should be down-weighted. Keep any oracle/benchmark disposable unless it continues to
+     earn its keep.
+   - Population calibration remains deferred until real learner-response data exists; this follow-up is about
+     operator-facing intrinsic ordering, not IRT/KT/Bradley-Terry.
 
 2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
@@ -57,6 +52,15 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## COMPLETED
 
+- **Adapted-graph comparison view + full-manifest difficulty-ordering evaluation (2026-06-20).** Completed
+  `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md` U1–U6. Admin Lab now renders one
+  neutral/adapted `DerivedGraphExplorer` pair per distinct learner-path enrichment, badged by synthetic/human
+  response source; the adapted panel colors mastered/frontier/locked nodes, rings the selected frontier target,
+  scales nodes by intrinsic difficulty, and flags cardless nodes while leaving the neutral enrichment view intact.
+  The rule-14 evaluation published/enriched full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` /
+  `223cfb32-47a2-4488-a61a-561f6673f717` with real LiteLLM calls and classified `intrinsic-fused-v1` as
+  `EXPERIMENT_ONLY`, useful for operator inspection but not calibrated learner difficulty. Evidence:
+  `tmp/2026-06-20-intrinsic-difficulty-full-manifest/`.
 - **Derived-node identity naming cleanup + ADR-0025 amendment (2026-06-20).** Renamed every
   learner-loop / path / difficulty / derived-edge field that carried a `derived_node_id` under the
   misleading name `conceptId` / `targetConceptId` / `prerequisite|dependentConceptId` to its
@@ -120,21 +124,22 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## VALIDATION
 
-Latest change (2026-06-20) is the **adapted-graph view, layers U1–U3** (TODO #1) — pure projection and
-view-model code, verified by unit tests only; real-use rule-14 inspection is **pending** the render and
-page-wiring units (U4–U5) and the difficulty evaluation (U6):
+Latest change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
 
-- **Static/unit:** `packages/application` 158/0 (8 new `classifyAdaptedNodes` scenarios: AE1/AE2 classification,
-  threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with `selectFrontierTarget`, empty
-  frontier, mastered-over-ready precedence). `apps/admin-lab` 30/0 (3 new U2 pure-helper scenarios —
-  `dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`; 5 new U3 overlay view-model scenarios —
-  neutral unchanged, adapted tagging + single frontier mark, cardless in both representations, null-difficulty
-  preserved, R5 node-set equivalence). `tsc --noEmit` clean across admin-lab after adding the required `hasCard`
-  field. The DB-bound `getLearnerAdaptedGraphs` / `getLearnerLoopDetail` SQL paths follow the established
-  untested-loader pattern (live Postgres, real-use inspection in U5).
-- **Real-use:** NOT YET evaluated for this view — the overlay is not rendered until U4–U5, so no operator-visible
-  artifact exists to inspect. The loop's last real-use status remains the 2026-06-20 `PASS` / `EXPERIMENT_ONLY`
-  evaluation below; nothing in U1–U3 changes model output.
+- **Static/unit:** `packages/application` 151/0 for the current suite, including `classifyAdaptedNodes` coverage
+  for AE1/AE2 classification, threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with
+  `selectFrontierTarget`, empty frontier, and mastered-over-ready precedence. `apps/admin-lab` 30/0, including U2
+  pure-helper coverage (`dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`) and U3
+  overlay view-model coverage (neutral unchanged, adapted tagging + single frontier mark, cardless in both
+  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck clean after U5
+  page wiring. Page composition remains un-unit-tested by local convention; U5 uses the DB-bound loader and was
+  verified by the same real-use path as U6.
+- **Real-use:** full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` and enrichment
+  `223cfb32-47a2-4488-a61a-561f6673f717` were produced with real LiteLLM calls. The run persisted 50/50
+  `intrinsic-fused-v1` difficulties across all five manifest domains. Inspection result:
+  `EXPERIMENT_ONLY` for intrinsic ordering — broadly plausible chains in every domain, but concentrated broad/thin
+  distortions remain and learner-calibrated difficulty is still data-blocked. Evidence:
+  `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`.
 
 Prior change (2026-06-20) is the **derived-node identity naming cleanup** — a deterministic identifier
 refactor (no behavior change), so it is verified statically, not by a new rule-14 real-use run:
