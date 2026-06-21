@@ -7,12 +7,15 @@ import {
   type CalibrationItem,
   type ReadinessEdge
 } from "@lrnki/application";
-import type { CardGroundingProvenance, InferredPrerequisiteEdge } from "@lrnki/domain-core";
+import type { InferredPrerequisiteEdge } from "@lrnki/domain-core";
 import type { LearnerStatePort } from "@lrnki/ports";
 import { createDatabaseClient, PostgresCardBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
 import { getEnrichmentDetail } from "./enrichments";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoop";
 import { labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
+// The transfer-ready study modules own the presentation contract (R15); the loader
+// produces data matching it (AGENTS rule 18 — one definition).
+import type { SheetContent, StudyCardView } from "@/components/study/studyView";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -35,26 +38,7 @@ async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefine
   }
 }
 
-// --- Pure presentation types + gating helpers (R9, R13) --------------------
-
-export type StudyCardView = {
-  cardId: string;
-  derivedNodeId: string;
-  question: string;
-  answerKey: string;
-  selfReportPrompt: string;
-  groundingProvenance: CardGroundingProvenance;
-};
-
-// Side-sheet content gated by the node's learner state (R9). A frontier node opens its
-// recall card; a frontier node with no card is flagged, never dropped (R13); a locked node
-// names its unmet direct prerequisites and shows NO card; a mastered node opens its card as
-// a read-only review.
-export type SheetContent =
-  | { kind: "frontier_card"; card: StudyCardView }
-  | { kind: "cardless" }
-  | { kind: "locked"; unmetPrerequisiteLabels: string[] }
-  | { kind: "mastered_review"; card: StudyCardView | null };
+// --- Pure gating helpers (R9, R13) -----------------------------------------
 
 // Direct prerequisites of a node that are not yet mastered — what keeps a locked node
 // locked (R9). Mirrors `classifyAdaptedNodes` readiness: uncertain edges are excluded, so

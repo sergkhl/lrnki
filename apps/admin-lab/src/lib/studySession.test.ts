@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AdaptedNodeClassification } from "@lrnki/application";
-import { sheetContentFor, unmetPrerequisites, selectScopedFrontier, type StudyCardView } from "./studySession";
+import { sheetContentFor, unmetPrerequisites, selectScopedFrontier } from "./studySession";
+import type { StudyCardView } from "@/components/study/studyView";
 import type { DerivedGraphEdge } from "./derivedGraph";
 
 // DAG: scope -> ownership -> move, plus a second prerequisite borrow -> move (uncertain).
