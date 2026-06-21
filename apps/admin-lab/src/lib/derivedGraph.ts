@@ -171,6 +171,14 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
+// The distinct declared domains present on the canvas, sorted deterministically. Each
+// becomes one FFX learning-loop region — a Cytoscape compound parent node wrapping that
+// domain's concepts (U3, R2). A single-domain graph yields exactly one region. Pure so
+// the grouping is unit-testable independently of Cytoscape.
+export function distinctDomains(nodes: ReadonlyArray<{ domain: string }>): string[] {
+  return [...new Set(nodes.map((node) => node.domain))].sort((a, b) => a.localeCompare(b));
+}
+
 // The neutral ↔ adapted display mode of the single pinned canvas (U2, KTD2). One
 // pre-computed layout serves BOTH modes; switching mode restyles nodes only and
 // never re-runs layout, so positions stay fixed for blink comparison (R11).

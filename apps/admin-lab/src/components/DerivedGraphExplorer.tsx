@@ -6,7 +6,7 @@ import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applySphereGridLayout, recenterOnFocus } from "@/lib/cytoscapeSphereGrid";
 import type { SphereGridFlaggedLoop } from "@/lib/sphereGridLayout";
-import { buildDerivedGraphView, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
+import { buildDerivedGraphView, distinctDomains, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,11 +128,20 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
     const cy = cytoscape({
       container: containerRef.current,
       elements: [
+        // One compound parent per declared domain = one FFX learning-loop region (R2). The
+        // box + domain label come from Cytoscape core and auto-bound the packed children;
+        // styled by the `node:parent` selector, excluded from every concept-node selector.
+        ...distinctDomains(layoutView.cytoscape.nodes).map((domain) => ({
+          data: { id: `region:${domain}`, label: domain, regionKind: "loop" }
+        })),
         ...layoutView.cytoscape.nodes.map((node) => ({
           data: {
             id: node.id,
             label: node.label,
             domain: node.domain,
+            // Membership in the domain's region parent. Same-domain edges only, so no edge
+            // ever crosses a region boundary.
+            parent: `region:${node.domain}`,
             difficulty: node.difficulty,
             nodeKind: node.nodeKind,
             groundingOrigin: node.groundingOrigin,
@@ -152,7 +161,31 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
       maxZoom: 3,
       style: [
         {
-          selector: "node",
+          // Region parents (R2): one bordered, labeled box per domain/learning loop. A
+          // subtle dashed border + faint fill reads as an FFX cluster without competing with
+          // the concept nodes; `node:parent` matches ONLY compound parents, never concepts.
+          selector: "node:parent",
+          style: {
+            label: "data(label)",
+            shape: "round-rectangle",
+            "background-color": color("--muted"),
+            "background-opacity": 0.2,
+            "border-color": color("--border"),
+            "border-width": 1.5,
+            "border-style": "dashed",
+            padding: "26px",
+            "text-valign": "top",
+            "text-halign": "center",
+            "text-margin-y": -4,
+            "font-size": 12,
+            "font-weight": 600,
+            color: color("--muted-foreground")
+          }
+        },
+        {
+          // Concept nodes only (`:childless`) — a region parent must never pick up the
+          // concept fill, the difficulty-driven `data(size)`, or the leaf label position.
+          selector: "node:childless",
           style: {
             "background-color": color("--primary"),
             "border-color": color("--border"),
@@ -249,8 +282,9 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
       ]
     });
     cytoscapeRef.current = cy;
-    // Node-tap → caller (U5). Reads the ref so the handler always calls the latest callback.
-    cy.on("tap", "node", (event) => onNodeSelectRef.current?.(event.target.id()));
+    // Node-tap → caller (U5). Scoped to `:childless` so tapping a region parent never
+    // reports a non-concept id. Reads the ref so the handler always calls the latest callback.
+    cy.on("tap", "node:childless", (event) => onNodeSelectRef.current?.(event.target.id()));
     const layout = applySphereGridLayout(cy, () => stale, focusRef.current);
     if (!stale) {
       layoutReadyRef.current = true;
@@ -350,10 +384,15 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
           <p className="text-xs text-muted-foreground">
-            Arrows point from prerequisite to dependent. Dashed = uncertain inferred edges (excluded
-            from learner paths). Scroll to zoom, drag to pan.
+            Right-angle tracks point from prerequisite to dependent; each dashed-bordered region is
+            one domain (a learning loop), and no edge crosses between regions. Dashed edges = uncertain
+            inferred edges (excluded from learner paths). Scroll to zoom, drag to pan.
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-3 rounded-[3px] border border-dashed" />
+              domain / learning loop
+            </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-full border" />
               <span className="inline-block size-3 rounded-full border" />

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDerivedGraphView, nodeRenderAttrs, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
+import { buildDerivedGraphView, distinctDomains, nodeRenderAttrs, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
 
 // The DerivedGraphExplorer renders a Derived Graph Layer (ADR-0019) independently
 // of learner paths (U6 scenario 5) and must carry an equivalent textual
@@ -137,6 +137,18 @@ test("rescue dispositions distinguish accepted and dropped with rationale", () =
   const dropped = detail.rescueDispositions.find((d) => d.disposition === "dropped");
   assert.equal(dropped?.canonicalLabel, "Table 3 Ablation");
   assert.equal(dropped?.rationale, "incidental artifact");
+});
+
+// --- Region grouping (U3, R2): each declared domain → one compound-parent region ---
+
+test("distinctDomains groups nodes into one sorted region per declared domain", () => {
+  const nodes = [{ domain: "rust" }, { domain: "biology" }, { domain: "rust" }, { domain: "economics" }];
+  assert.deepEqual(distinctDomains(nodes), ["biology", "economics", "rust"]);
+});
+
+test("a single-domain graph yields exactly one region", () => {
+  const view = buildDerivedGraphView(detail); // detail is all-rust
+  assert.deepEqual(distinctDomains(view.cytoscape.nodes), ["rust"]);
 });
 
 // --- U3 adapted overlay view-model (R4/R5/R6/R7) ---------------------------
