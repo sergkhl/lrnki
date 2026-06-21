@@ -1,5 +1,79 @@
 # TODO
 
+## ⏳ IN PROGRESS — Typed Study Item model (Plan 2), U6–U8 remaining (2026-06-21)
+
+Plan: `docs/plans/2026-06-21-002-feat-typed-study-item-model-plan.md`. Branch:
+`feat/learner-calibrated-study-loop` (continuing here per user choice; Plan 1's surface work is underneath).
+**U1–U5 are shipped and committed (each unit's own tests green); U6, U7, U8 remain.**
+
+| Unit | State |
+|---|---|
+| U1 typed domain model + ADR-0026 | ✅ committed |
+| U2 deterministic option-select guard (11 tests) | ✅ committed |
+| U3 generation port/adapter + sibling selector (13 tests) | ✅ committed |
+| U4 Postgres reshape — migration + store (9 live-DB tests) | ✅ committed |
+| U5 build fan-out + worker `generate-study-items` (6 tests) | ✅ committed |
+| **U6 auto-graded write + delete self-assessed path** | ⬜ TODO |
+| **U7 typed study UI** | ⬜ TODO |
+| **U8 rule-14 real-use evaluation** (blocked on U6+U7) | ⬜ TODO |
+
+**Mid-rename compile state (expected):** this is a rule-18 full `Card → StudyItem` rename, so the repo does
+NOT fully typecheck yet — that is the work U6+U7 finish. Green now: `domain-core`, `ports`,
+`infrastructure-litellm`, `infrastructure-postgres`. Still broken until U6/U7: `application`
+(`calibration.ts`, `syntheticResponses.ts`, `measurement.ts`, `selfAssessment.ts` still use `cardId`/old
+`Card`), `kg-worker` (the `synthesize-responses` path passes `StudyItem[]` into `synthesizeResponses` —
+reconciled by U6's `syntheticResponses` reshape), and `admin-lab` (study UI + SQL loaders). **Before
+declaring done:** `pnpm -r typecheck && pnpm -r test` must be green (export `DATABASE_URL` from `.env` first).
+
+### U6 — auto-graded option-select write + delete self-assessed study path
+- NEW `packages/application/src/optionSelectOutcome.ts` — `appendOptionSelectOutcome(...)`: `chosen===correct`
+  → `graded(correct,1.0)` else `graded(incorrect,0)`, `graderIdentity:"auto"`, `evidenceWeight:
+  GRADED_EVIDENCE_WEIGHT`, `selfReportRating:null`, `submittedAnswer:null`, `attemptSeq` from `nextAttemptSeq`.
+  Mirror deleted `appendSelfAssessedGrade` (`selfAssessment.ts:28-55`) minus the self-grader identity.
+- NEW `optionSelectOutcome.test.ts` — plan §U6 scenarios (correct→1/auto; wrong→0/auto; fold via
+  `foldConceptMastery`; monotonic `attemptSeq`; `responseSource` passthrough; R15 no graph/enrichment write
+  import; deletion guard — `appendSelfAssessedGrade`/`SELF_GRADER_IDENTITY` no longer exported).
+- DELETE `packages/application/src/selfAssessment.ts` + `selfAssessment.test.ts` (rule 18); drop their exports
+  from `application/src/index.ts`.
+- Rename `cardId`→`studyItemId` in `calibration.ts`, `syntheticResponses.ts`, `measurement.ts` (+ tests) and
+  `responseLogLearnerState.test.ts`. Reshape `synthesizeResponses` to consume `SelfAssessmentItem`/`StudyItem`
+  keyed on `studyItemId` (this also unbreaks the worker `synthesize-responses` path).
+- `apps/admin-lab/src/app/admin/lab/study/actions.ts` — `selfAssessCard`→`submitOptionSelect` (re-derive the
+  keyed-correct option SERVER-side by `studyItemId` from the DB; never trust the client); `submitCalibration`
+  reads `self_assessment` items via `listStudyItemsForEnrichment`. Calibration's `self_report` path is UNTOUCHED.
+
+### U7 — typed study UI (admin-lab)
+- NEW `components/study/OptionSelectCard.tsx` (4 options, click → `onSelect(optionId)`, keyed feedback, disable
+  while `pending`).
+- `studyView.ts`(+`.test.ts`): `SheetContent` → frontier `option_select | cardless`; drop
+  `frontier_card`/`assessmentDisabled`/`SelfAssessmentOutcome`; add `StudyOptionSelectView`; keep
+  `mastered_review`. Keep the prop-only, no-loader/no-action contract (R15).
+- `StudySideSheet.tsx` (render option_select; cardless-for-studying flag when no option_select item — even if a
+  self_assessment item exists, calibration-only now), `RecallCard.tsx` (read-only or delete; remove Got it/Missed
+  it controls, R8), `StudySession.tsx` (`onAssess`→`onSelect` calling `submitOptionSelect`),
+  `lib/studySession.ts`(+`.test.ts`) typed loader, `study/page.tsx` follow-through.
+- ALSO (not in the plan's U7 file list but these query the renamed tables and break the app at runtime — fix in
+  U7): `lib/enrichments.ts` (`JOIN cards`→`study_items`), `lib/derivedGraph.ts`, `lib/learnerLoop.ts`(+`.test.ts`)
+  (`cards`/`card_id`/`rejected_cards` → `study_items`/`study_item_id`/`rejected_study_items`),
+  `app/admin/lab/learner-loop/actions.ts`, `components/LearnerLoopReview.tsx`, `components/study/CalibrationSweep.tsx`.
+
+### U8 — rule-14 real-use evaluation (gate before downstream)
+- The DB schema was already dropped+recreated with the reshaped migration (rule 9), so **prior seed data is
+  gone** — re-seed via `scripts/seed-demo.sh` (real LiteLLM), then `pnpm worker:kg generate-study-items
+  <enrichmentId>` on the Rust ownership enrichment.
+- Inspect per plan §U8 (distractor plausibility + honest labeling AE4/R15; guard rejections are real not
+  over-veto; fan-out correctness; self-assessment-only → cardless-for-studying AE5/R13; click correct → one
+  `graded(auto)` row + mastered + frontier reselect, no got-it/missed-it AE1; click wrong → incorrect).
+- Write `tmp/2026-06-21-typed-study-items/rule-14-evaluation.md`; classify PASS/FIX_FIRST/EXPERIMENT_ONLY/BLOCKED.
+  No test asserts model output quality (rule 11).
+
+### Env notes
+- `DATABASE_URL` in `.env`: `postgresql://lrnki:lrnki@localhost:5432/lrnki` (reachable; reshaped migration applied).
+- Fast single-file test: `npx tsx --test <file>`. Postgres integration tests need
+  `export $(grep -E '^DATABASE_URL=' .env | xargs)` first (else they skip silently).
+
+---
+
 Roadmap reset 2026-06-16, updated by the 2026-06-21 study-advance/spiral-layout rule-14 pass: the next work is earned
 by real mixed-domain pipeline output and inspected learner-loop behavior, not by deferred method-stack preference.
 
