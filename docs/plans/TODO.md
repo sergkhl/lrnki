@@ -44,11 +44,17 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
    verifier success with exact copied text.
 
 5. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
-   - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
-     densification, or non-LLM prerequisite signals from method-stack preference. Population difficulty calibration
-     stays deferred until the study Game UI exists and per-learner calibration is stable (task 1 / ADR-0024).
-   - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
-     behavior without hiding provenance or identity defects.
+   - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a difficulty or
+     learner model on synthetic or self-assessed responses stay deferred until the study Game UI exists and per-learner
+     calibration is stable (task 1 / ADR-0024). Do not reintroduce embeddings, clustering, or non-LLM prerequisite
+     signals from method-stack preference.
+   - **Graph-growth guard (narrowed).** Do not reintroduce F3-style densification: no ungrounded bridge-node/bridge-edge
+     pass, no embedding/clustering gate, and no method-stack-driven graph growth. Performance-driven graph growth may be
+     reconsidered only as a measured, run-scoped experiment. Learner responses may propose candidate missing
+     prerequisites or candidate edge audits, but they must not directly mutate the asserted graph or silently modify an
+     existing Derived Graph Layer. Any accepted mechanism must be versioned, provenance-visible, validated against
+     held-out learner data or inspected real-use runs, and compared against the current ADR-0019 exhaustive same-domain
+     judgment baseline.
 
 ## COMPLETED
 
