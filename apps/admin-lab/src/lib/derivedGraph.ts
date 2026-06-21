@@ -154,6 +154,28 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
+// The neutral ↔ adapted display mode of the single pinned canvas (U2, KTD2). One
+// pre-computed ELK layout serves BOTH modes; switching mode restyles nodes only and
+// never re-runs layout, so positions stay fixed for blink comparison (R11).
+export type DerivedGraphMode = "neutral" | "adapted";
+
+// The Cytoscape node `data` attributes that change between modes — and ONLY these.
+// Everything else (id, label, size, nodeKind, grounding, cardless) is mode-invariant and
+// owned by the one-time layout pass. The restyle effect feeds each node these two attrs
+// via `cy.batch()` on a mode/classification change; the style selectors keyed on
+// `adaptedState` / `frontierTarget` then recolor in place. "none"/"no" is the neutral
+// baseline (matching the absent-classification render), so neutral mode is byte-identical
+// to the enrichment-page view regardless of whether a classification is available.
+export type NodeRenderAttrs = { adaptedState: AdaptedNodeState | "none"; frontierTarget: "yes" | "no" };
+
+export function nodeRenderAttrs(mode: DerivedGraphMode, classification: AdaptedNodeClassification | undefined, derivedNodeId: string): NodeRenderAttrs {
+  if (mode === "neutral" || !classification) return { adaptedState: "none", frontierTarget: "no" };
+  return {
+    adaptedState: classification.stateByNode[derivedNodeId] ?? "none",
+    frontierTarget: classification.selectedFrontierTarget === derivedNodeId ? "yes" : "no"
+  };
+}
+
 // Build the view-model, optionally overlaying a learner classification (U3, KTD2). With
 // `adapted` absent the output is neutral — byte-equivalent to the enrichment-page render
 // today, every node `adaptedState: null` / `isFrontierTarget: false`. With `adapted`

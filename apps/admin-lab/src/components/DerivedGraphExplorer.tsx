@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
-import { buildDerivedGraphView, type DerivedGraphDetail } from "@/lib/derivedGraph";
+import { buildDerivedGraphView, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -50,16 +51,31 @@ const ADAPTED_STATE_BADGE: Record<AdaptedNodeState, "default" | "secondary" | "o
 // because it has zero edges (AE4). Every rendered graph carries an equivalent
 // textual node-and-edge representation for non-visual inspection (U6 scenario 8).
 //
-// With `adapted` present (U4), nodes recolor by learner state (mastered / frontier /
-// locked), the selected frontier target gets a stronger ring, and the header marks the
-// panel as learner-adapted. Without it the render is neutral — node-kind / grounding
-// coloring exactly as before, plus the difficulty-as-size encoding (R7) on both panels.
+// With `adapted` present (U2), the panel shows an internal neutral ↔ adapted segmented
+// control over ONE pinned layout: ELK runs once over the neutral topology, and switching
+// mode restyles nodes only (mastered / frontier / locked recolor, frontier target ringed)
+// via `cy.batch()` — never re-running layout, so positions stay fixed for blink
+// comparison (R11, KTD2). Without `adapted` there is no control and the render is neutral
+// — node-kind / grounding coloring exactly as before, plus the difficulty-as-size
+// encoding (R7). The textual node/edge panel re-renders for the active mode (R14).
 export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
-  const isAdapted = adapted != null;
-  const view = useMemo(() => buildDerivedGraphView(detail, adapted), [detail, adapted]);
+  const hasClassification = adapted != null;
+  // The adapted view is the informative one, so default to it when a classification is
+  // available; the enrichment page (no classification) is always neutral.
+  const [mode, setMode] = useState<DerivedGraphMode>(hasClassification ? "adapted" : "neutral");
+  const isAdaptedMode = hasClassification && mode === "adapted";
 
+  // Topology view drives the ONE-TIME layout (stable across mode swaps); the textual
+  // view re-renders for the active mode so the non-visual listing matches the canvas (R14).
+  const layoutView = useMemo(() => buildDerivedGraphView(detail), [detail]);
+  const view = useMemo(() => buildDerivedGraphView(detail, isAdaptedMode ? adapted : undefined), [detail, adapted, isAdaptedMode]);
+
+  // Layout effect — runs ONCE per topology (KTD2). It builds the instance and runs ELK;
+  // node positions become Cytoscape-owned state. Mode-dependent attrs start at the neutral
+  // baseline and are set by the restyle effect below — never here, so a mode swap cannot
+  // recreate the instance or re-fit the layout.
   useEffect(() => {
     if (!containerRef.current) return;
     let stale = false;
@@ -81,7 +97,7 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
     const cy = cytoscape({
       container: containerRef.current,
       elements: [
-        ...view.cytoscape.nodes.map((node) => ({
+        ...layoutView.cytoscape.nodes.map((node) => ({
           data: {
             id: node.id,
             label: node.label,
@@ -89,12 +105,13 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
             nodeKind: node.nodeKind,
             groundingOrigin: node.groundingOrigin,
             size: nodeSize(node.difficulty),
-            adaptedState: node.adaptedState ?? "none",
-            frontierTarget: node.isFrontierTarget ? "yes" : "no",
+            // Neutral baseline; the restyle effect overrides these on the active mode.
+            adaptedState: "none",
+            frontierTarget: "no",
             cardless: node.cardless ? "yes" : "no"
           }
         })),
-        ...view.cytoscape.edges.map((edge) => ({
+        ...layoutView.cytoscape.edges.map((edge) => ({
           data: { id: edge.id, source: edge.source, target: edge.target, uncertain: edge.uncertain }
         }))
       ],
@@ -204,7 +221,26 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
       cy.destroy();
       cytoscapeRef.current = null;
     };
-  }, [view]);
+  }, [layoutView]);
+
+  // Restyle effect — runs on every (mode, classification) change, AND once after the
+  // layout effect (re)builds the instance. It is restyle-ONLY: it mutates each node's
+  // `adaptedState` / `frontierTarget` data via `cy.batch()` and never calls
+  // `cy.layout().run()` or `cy.fit()`, so positions from the one-time ELK pass survive
+  // the swap untouched (R11). This is the structural guard the side-by-side pair lacked.
+  useEffect(() => {
+    const cy = cytoscapeRef.current;
+    if (!cy || cy.destroyed()) return;
+    cy.batch(() => {
+      for (const node of layoutView.cytoscape.nodes) {
+        const element = cy.getElementById(node.id);
+        if (element.empty()) continue;
+        const attrs = nodeRenderAttrs(mode, adapted, node.id);
+        element.data("adaptedState", attrs.adaptedState);
+        element.data("frontierTarget", attrs.frontierTarget);
+      }
+    });
+  }, [layoutView, mode, adapted]);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
@@ -213,16 +249,43 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
           <CardTitle className="flex items-center gap-2">
             <GitForkIcon className="size-4" />
             Derived prerequisite DAG
-            {isAdapted ? <Badge variant="secondary">learner-adapted</Badge> : null}
+            {isAdaptedMode ? <Badge variant="secondary">learner-adapted</Badge> : null}
           </CardTitle>
           <CardDescription>
-            {isAdapted
+            {isAdaptedMode
               ? "Nodes recolored by learner state (mastered / frontier / locked); the frontier target is ringed. "
               : null}
             Inferred prerequisite edges over published version{" "}
             <span className="font-mono text-xs">{detail.summary.graphVersionId}</span> · judge {detail.summary.judgeModel}
           </CardDescription>
           <CardAction className="flex flex-wrap items-center justify-end gap-2">
+            {hasClassification ? (
+              // Segmented control over the ONE pinned layout (R10): switching mode
+              // restyles nodes only — positions never move (R11). Rendered only when a
+              // learner classification is present; the neutral enrichment page has none.
+              <div role="group" aria-label="Graph view mode" className="flex items-center rounded-md border p-0.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mode === "neutral" ? "secondary" : "ghost"}
+                  aria-pressed={mode === "neutral"}
+                  className="h-7 px-2.5"
+                  onClick={() => setMode("neutral")}
+                >
+                  Neutral
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mode === "adapted" ? "secondary" : "ghost"}
+                  aria-pressed={mode === "adapted"}
+                  className="h-7 px-2.5"
+                  onClick={() => setMode("adapted")}
+                >
+                  Adapted
+                </Button>
+              </div>
+            ) : null}
             <Badge variant="outline">{detail.summary.conceptCount} concepts</Badge>
             <Badge variant="default">{detail.summary.certainEdgeCount} edges</Badge>
             <Badge variant="secondary">{detail.summary.uncertainEdgeCount} uncertain</Badge>
@@ -239,7 +302,7 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
               <span className="inline-block size-3 rounded-full border" />
               node size ∝ intrinsic difficulty
             </span>
-            {isAdapted ? (
+            {isAdaptedMode ? (
               <>
                 <LegendSwatch token="--chart-1" label="mastered" />
                 <LegendSwatch token="--chart-4" label="frontier" />

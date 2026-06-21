@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDerivedGraphView, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
+import { buildDerivedGraphView, nodeRenderAttrs, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
 
 // The DerivedGraphExplorer renders a Derived Graph Layer (ADR-0019) independently
 // of learner paths (U6 scenario 5) and must carry an equivalent textual
@@ -191,4 +191,37 @@ test("cytoscape and textual node sets stay equal and describe the same nodes in 
   assert.equal(view.cytoscape.nodes.length, view.textual.nodes.length);
   assert.deepEqual(view.cytoscape.nodes.map((n) => n.label), view.textual.nodes.map((n) => n.label));
   assert.deepEqual(view.cytoscape.nodes.map((n) => n.adaptedState), view.textual.nodes.map((n) => n.adaptedState));
+});
+
+// --- U2 single-canvas restyle attrs (R10/R11/R13) --------------------------
+// `nodeRenderAttrs` is the pure source of the two mode-dependent Cytoscape `data`
+// attributes the restyle effect writes. The one-time layout owns positions; these
+// attrs are the ONLY thing a mode swap changes, so the helper fully captures the swap.
+
+test("neutral mode yields the baseline 'none'/'no' for every node, ignoring any classification", () => {
+  for (const id of ["scope", "ownership", "move", "absent"]) {
+    assert.deepEqual(nodeRenderAttrs("neutral", classification, id), { adaptedState: "none", frontierTarget: "no" });
+  }
+});
+
+test("adapted mode yields each node's mastered/frontier/locked state and marks only the frontier target", () => {
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "scope"), { adaptedState: "mastered", frontierTarget: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "ownership"), { adaptedState: "frontier", frontierTarget: "yes" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "move"), { adaptedState: "locked", frontierTarget: "no" });
+});
+
+test("adapted mode with no classification falls back to the neutral baseline", () => {
+  assert.deepEqual(nodeRenderAttrs("adapted", undefined, "scope"), { adaptedState: "none", frontierTarget: "no" });
+});
+
+test("a node absent from the classification gets 'none' rather than throwing", () => {
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "absent"), { adaptedState: "none", frontierTarget: "no" });
+});
+
+// Covers R11/R13 regression guard: neutral-mode view-model is byte-equivalent to the
+// pre-reshape enrichment render (no classification overlay), so the enrichment page is
+// unaffected by the reshape. A cardless node stays flagged in this neutral view (R13).
+test("neutral-mode view-model equals the no-classification render (enrichment-page regression guard)", () => {
+  assert.deepEqual(buildDerivedGraphView(detail, undefined), buildDerivedGraphView(detail));
+  assert.equal(buildDerivedGraphView(detail).cytoscape.nodes.find((n) => n.id === "move")?.cardless, true);
 });

@@ -68,7 +68,8 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
           <CardHeader className="border-b">
             <CardTitle>Adapted graph view</CardTitle>
             <CardDescription>
-              One neutral and learner-adapted graph pair per distinct enrichment in this learner&apos;s paths.
+              One pinned graph per distinct enrichment in this learner&apos;s paths — toggle neutral ↔ adapted in place
+              (positions stay fixed for blink comparison).
             </CardDescription>
             <div className="flex justify-end">
               <Badge variant={adaptedGraphs.responseSourceSummary.synthetic > 0 ? "secondary" : "outline"}>
@@ -90,13 +91,8 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
-                  <div className="min-w-0">
-                    <DerivedGraphExplorer detail={graph.detail} />
-                  </div>
-                  <div className="min-w-0">
-                    <DerivedGraphExplorer detail={graph.detail} adapted={graph.classification} />
-                  </div>
+                <div className="min-w-0">
+                  <DerivedGraphExplorer detail={graph.detail} adapted={graph.classification} />
                 </div>
               </CardContent>
             </Card>
