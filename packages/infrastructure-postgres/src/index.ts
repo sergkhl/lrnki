@@ -9,4 +9,4 @@ export {
   PostgresEnrichmentRunStore,
   PostgresLearnerPathStore
 } from "./PostgresEnrichmentStores";
-export { PostgresCardBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
+export { PostgresStudyItemBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";

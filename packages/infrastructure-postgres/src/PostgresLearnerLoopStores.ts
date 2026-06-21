@@ -1,134 +1,187 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, Card, NewResponseLogRow, RejectedCard, ResponseLogRow } from "@lrnki/domain-core";
-import type { CardBankStorePort, ResponseLogStorePort } from "@lrnki/ports";
-import type { Sql } from "postgres";
+import type { ArtifactEnvelope, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
+import type { ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
-const CARD_BANK_PRODUCER = "@lrnki/infrastructure-postgres";
-const CARD_BANK_PRODUCER_VERSION = "0.1.0";
+const STUDY_ITEM_BANK_PRODUCER = "@lrnki/infrastructure-postgres";
+const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.1.0";
 
-// Card Bank persistence (R3). Normalized `cards` + `card_answer_key_citations` are
-// the query surface; the immutable `card_bank` artifact is the inspection trace the
-// `artifact_cards` JSON_TABLE view flattens. `persist` writes both in ONE
-// transaction so there is never authoritative relational state without its artifact
-// (mirrors PostgresEnrichmentRunStore). Cards are a learner-NEUTRAL derived asset:
-// regeneration replaces an enrichment's cards rather than mutating learner state.
-export class PostgresCardBankStore implements CardBankStorePort {
+// Study Item Bank persistence (R7, R12, ADR-0026). Normalized `study_items` +
+// `study_item_options` + `study_item_citations` are the query surface; the immutable
+// `study_item_bank` artifact is the inspection trace the `artifact_study_items`
+// JSON_TABLE view flattens. `persist` writes them all in ONE transaction so there is
+// never authoritative relational state without its artifact (mirrors
+// PostgresEnrichmentRunStore). Items are a learner-NEUTRAL derived asset: regeneration
+// replaces an enrichment's items rather than mutating learner state. `supportedItemTypes`
+// is a SELECT DISTINCT query — the supported set is the byproduct of which items grounded,
+// never a stored map (KTD2, rule 18).
+export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; cards: Card[]; rejected: RejectedCard[] }): Promise<void> {
-    const { graphVersionId, enrichmentId, configHash, cards, rejected } = input;
-    // All cards in one persist belong to a single enrichment layer. Regeneration is
-    // replay, not mutation: delete the enrichment's prior cards (citations cascade)
-    // and prior rejections, then re-insert both. Done even when 0 cards survive so an
-    // all-rejected regeneration still clears stale cards and records the rejections.
+  async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
+    const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
+    // All items in one persist belong to a single enrichment layer. Regeneration is
+    // replay, not mutation: delete the enrichment's prior items (options + citations
+    // cascade) and prior rejections, then re-insert. Done even when 0 items survive so an
+    // all-rejected regeneration still clears stale items and records the rejections.
     await this.sql.begin(async (tx) => {
-      await tx`DELETE FROM cards WHERE enrichment_id = ${enrichmentId}`;
-      await tx`DELETE FROM rejected_cards WHERE enrichment_id = ${enrichmentId}`;
+      await tx`DELETE FROM study_items WHERE enrichment_id = ${enrichmentId}`;
+      await tx`DELETE FROM rejected_study_items WHERE enrichment_id = ${enrichmentId}`;
       for (const rejection of rejected) {
         await tx`
-          INSERT INTO rejected_cards (rejected_card_id, graph_version_id, enrichment_id, derived_node_id, reason, config_hash)
+          INSERT INTO rejected_study_items (rejected_study_item_id, graph_version_id, enrichment_id, derived_node_id, reason, config_hash)
           VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${rejection.derivedNodeId}, ${rejection.reason}, ${configHash})`;
       }
-      for (const card of cards) {
+      for (const item of studyItems) {
+        const answerKey = item.itemType === "self_assessment" ? item.answerKey : null;
+        const selfReportPrompt = item.itemType === "self_assessment" ? item.selfReportPrompt : null;
         await tx`
-          INSERT INTO cards (card_id, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
-          VALUES (${card.cardId}, ${card.graphVersionId}, ${card.enrichmentId}, ${card.derivedNodeId}, ${card.groundingProvenance}, ${card.question}, ${card.answerKey}, ${card.selfReportPrompt}, ${card.generatingModel}, ${card.configHash})`;
-        for (const citation of card.citations) {
-          if (citation.provenance === "source") {
+          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
+          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${answerKey}, ${selfReportPrompt}, ${item.generatingModel}, ${item.configHash})`;
+
+        if (item.itemType === "self_assessment") {
+          for (const citation of item.citations) await this.insertCitation(tx, item.studyItemId, citation);
+        } else {
+          // Sequential await keeps the option/citation inserts ordered within the tx.
+          for (const [ordinal, option] of item.options.entries()) {
             await tx`
-              INSERT INTO card_answer_key_citations (card_answer_key_citation_id, card_id, provenance, source_resource_id, source_block_id, evidence_quote)
-              VALUES (${randomUUID()}, ${card.cardId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote})`;
-          } else {
-            await tx`
-              INSERT INTO card_answer_key_citations (card_answer_key_citation_id, card_id, provenance, derived_node_id, generated_passage_text)
-              VALUES (${randomUUID()}, ${card.cardId}, 'generated', ${citation.derivedNodeId}, ${citation.passageText})`;
+              INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
+              VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
+            if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
           }
         }
       }
 
-      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; cards: Card[]; rejected: RejectedCard[] }> = {
+      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }> = {
         artifactId: randomUUID(),
-        artifactType: "card_bank.v3",
-        schemaVersion: "3",
+        artifactType: "study_item_bank.v4",
+        schemaVersion: "4",
         graphVersionId,
-        producer: CARD_BANK_PRODUCER,
-        producerVersion: CARD_BANK_PRODUCER_VERSION,
+        producer: STUDY_ITEM_BANK_PRODUCER,
+        producerVersion: STUDY_ITEM_BANK_PRODUCER_VERSION,
         configHash,
         createdAt: new Date().toISOString(),
-        payload: { graphVersionId, enrichmentId, cards, rejected }
+        payload: { graphVersionId, enrichmentId, studyItems, rejected }
       };
       await writeArtifactEnvelope(tx, artifact);
     });
   }
 
-  async getCard(derivedNodeId: string): Promise<Card | undefined> {
-    const rows = await this.sql<CardRow[]>`
-      SELECT card_id, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
-      FROM cards WHERE derived_node_id = ${derivedNodeId} LIMIT 1`;
-    if (rows.length === 0) return undefined;
-    const [card] = await this.hydrate(rows);
-    return card;
+  private async insertCitation(tx: Sql | TransactionSql, studyItemId: string, citation: StudyItemCitation): Promise<void> {
+    if (citation.provenance === "source") {
+      await tx`
+        INSERT INTO study_item_citations (study_item_citation_id, study_item_id, provenance, source_resource_id, source_block_id, evidence_quote)
+        VALUES (${randomUUID()}, ${studyItemId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote})`;
+    } else {
+      await tx`
+        INSERT INTO study_item_citations (study_item_citation_id, study_item_id, provenance, derived_node_id, generated_passage_text)
+        VALUES (${randomUUID()}, ${studyItemId}, 'generated', ${citation.derivedNodeId}, ${citation.passageText})`;
+    }
   }
 
-  async listCardsForEnrichment(enrichmentId: string): Promise<Card[]> {
-    const rows = await this.sql<CardRow[]>`
-      SELECT card_id, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
-      FROM cards WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id`;
+  async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
+    const rows = await this.sql<StudyItemRow[]>`
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
+      FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} LIMIT 1`;
+    if (rows.length === 0) return undefined;
+    const [item] = await this.hydrate(rows);
+    return item;
+  }
+
+  async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
+    const rows = await this.sql<StudyItemRow[]>`
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
+      FROM study_items WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
 
-  private async hydrate(rows: CardRow[]): Promise<Card[]> {
+  async supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]> {
+    const rows = await this.sql<{ item_type: string }[]>`
+      SELECT DISTINCT item_type FROM study_items WHERE derived_node_id = ${derivedNodeId} ORDER BY item_type`;
+    return rows.map((row) => row.item_type as StudyItemType);
+  }
+
+  private async hydrate(rows: StudyItemRow[]): Promise<StudyItem[]> {
     if (rows.length === 0) return [];
-    const cardIds = rows.map((row) => row.card_id);
+    const ids = rows.map((row) => row.study_item_id);
     const citationRows = await this.sql<CitationRow[]>`
-      SELECT card_id, provenance, source_resource_id, source_block_id, evidence_quote, derived_node_id, generated_passage_text
-      FROM card_answer_key_citations WHERE card_id IN ${this.sql(cardIds)}
-      ORDER BY card_id, card_answer_key_citation_id`;
-    const citationsByCard = new Map<string, CitationRow[]>();
+      SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, derived_node_id, generated_passage_text
+      FROM study_item_citations WHERE study_item_id IN ${this.sql(ids)}
+      ORDER BY study_item_id, study_item_citation_id`;
+    const optionRows = await this.sql<OptionRow[]>`
+      SELECT option_id, study_item_id, ordinal, option_text, is_correct, provenance
+      FROM study_item_options WHERE study_item_id IN ${this.sql(ids)}
+      ORDER BY study_item_id, ordinal`;
+
+    const citationsByItem = new Map<string, CitationRow[]>();
     for (const citation of citationRows) {
-      citationsByCard.set(citation.card_id, [...(citationsByCard.get(citation.card_id) ?? []), citation]);
+      citationsByItem.set(citation.study_item_id, [...(citationsByItem.get(citation.study_item_id) ?? []), citation]);
     }
-    return rows.map((row) => ({
-      cardId: row.card_id,
-      graphVersionId: row.graph_version_id,
-      enrichmentId: row.enrichment_id,
-      derivedNodeId: row.derived_node_id,
-      groundingProvenance: row.grounding_provenance as Card["groundingProvenance"],
-      question: row.question,
-      answerKey: row.answer_key,
-      selfReportPrompt: row.self_report_prompt,
-      generatingModel: row.generating_model,
-      configHash: row.config_hash,
-      citations: (citationsByCard.get(row.card_id) ?? []).map((citation) => citation.provenance === "source" ? {
-        provenance: "source",
-        sourceResourceId: citation.source_resource_id!,
-        sourceBlockId: citation.source_block_id!,
-        evidenceQuote: citation.evidence_quote!
-      } : {
-        provenance: "generated",
-        derivedNodeId: citation.derived_node_id!,
-        passageText: citation.generated_passage_text!
-      })
-    }));
+    const optionsByItem = new Map<string, OptionRow[]>();
+    for (const option of optionRows) {
+      optionsByItem.set(option.study_item_id, [...(optionsByItem.get(option.study_item_id) ?? []), option]);
+    }
+
+    return rows.map((row) => {
+      const base = {
+        studyItemId: row.study_item_id,
+        graphVersionId: row.graph_version_id,
+        enrichmentId: row.enrichment_id,
+        derivedNodeId: row.derived_node_id,
+        groundingProvenance: row.grounding_provenance as StudyItem["groundingProvenance"],
+        generatingModel: row.generating_model,
+        configHash: row.config_hash,
+        question: row.question
+      };
+      const citations = (citationsByItem.get(row.study_item_id) ?? []).map(toCitation);
+      if (row.item_type === "self_assessment") {
+        return { ...base, itemType: "self_assessment", answerKey: row.answer_key!, selfReportPrompt: row.self_report_prompt!, citations };
+      }
+      const citation = citations[0];
+      const options: StudyItemOption[] = (optionsByItem.get(row.study_item_id) ?? []).map((option) => ({
+        optionId: option.option_id,
+        text: option.option_text,
+        isCorrect: option.is_correct,
+        provenance: option.provenance,
+        ...(option.is_correct && citation ? { citation } : {})
+      }));
+      return { ...base, itemType: "option_select", options };
+    });
   }
 }
 
-type CardRow = {
-  card_id: string;
+function toCitation(row: CitationRow): StudyItemCitation {
+  return row.provenance === "source"
+    ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote! }
+    : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
+}
+
+type StudyItemRow = {
+  study_item_id: string;
+  item_type: "self_assessment" | "option_select";
   graph_version_id: string;
   enrichment_id: string;
   derived_node_id: string;
   grounding_provenance: string;
   question: string;
-  answer_key: string;
-  self_report_prompt: string;
+  answer_key: string | null;
+  self_report_prompt: string | null;
   generating_model: string;
   config_hash: string;
 };
 
+type OptionRow = {
+  option_id: string;
+  study_item_id: string;
+  ordinal: number;
+  option_text: string;
+  is_correct: boolean;
+  provenance: "source" | "generated";
+};
+
 type CitationRow = {
-  card_id: string;
+  study_item_id: string;
   provenance: "source" | "generated";
   source_resource_id: string | null;
   source_block_id: string | null;
@@ -149,12 +202,12 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
       for (const row of rows) {
         await tx`
           INSERT INTO response_log (
-            response_id, learner_state_ref, card_id, derived_node_id, signal_type,
+            response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
             self_report_rating, judged_outcome, graded_score, evidence_weight,
             response_source, grader_identity, batch_id, attempt_seq, submitted_answer
           )
           VALUES (
-            ${row.responseId}, ${row.learnerStateRef}, ${row.cardId}, ${row.derivedNodeId}, ${row.signalType},
+            ${row.responseId}, ${row.learnerStateRef}, ${row.studyItemId}, ${row.derivedNodeId}, ${row.signalType},
             ${row.selfReportRating}, ${row.judgedOutcome}, ${row.gradedScore}, ${row.evidenceWeight},
             ${row.responseSource}, ${row.graderIdentity}, ${row.batchId}, ${row.attemptSeq}, ${row.submittedAnswer}
           )`;
@@ -164,7 +217,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
 
   async listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]> {
     const rows = await this.sql<ResponseLogDbRow[]>`
-      SELECT response_id, learner_state_ref, card_id, derived_node_id, signal_type,
+      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
              self_report_rating, judged_outcome, graded_score, evidence_weight,
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} ORDER BY attempt_seq`;
@@ -173,7 +226,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
 
   async listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]> {
     const rows = await this.sql<ResponseLogDbRow[]>`
-      SELECT response_id, learner_state_ref, card_id, derived_node_id, signal_type,
+      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
              self_report_rating, judged_outcome, graded_score, evidence_weight,
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} AND derived_node_id = ${derivedNodeId} ORDER BY attempt_seq`;
@@ -190,7 +243,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
 type ResponseLogDbRow = {
   response_id: string;
   learner_state_ref: string;
-  card_id: string;
+  study_item_id: string;
   derived_node_id: string;
   signal_type: string;
   self_report_rating: string | null;
@@ -209,7 +262,7 @@ function hydrateResponseLogRow(row: ResponseLogDbRow): ResponseLogRow {
   return {
     responseId: row.response_id,
     learnerStateRef: row.learner_state_ref,
-    cardId: row.card_id,
+    studyItemId: row.study_item_id,
     derivedNodeId: row.derived_node_id,
     signalType: row.signal_type as ResponseLogRow["signalType"],
     selfReportRating: row.self_report_rating as ResponseLogRow["selfReportRating"],

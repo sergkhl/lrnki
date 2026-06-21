@@ -396,28 +396,31 @@ JSON_TABLE(
 ) AS n
 WHERE a.artifact_type = 'enrichment_run.v2';
 
--- Flatten card-bank artifact payloads: one row per learner-neutral Card with its
--- derived node, grounding provenance, question, self-report prompt, and answer-key
--- citation count, for Admin Lab inspection (R3, R15). Reads the immutable
--- `card_bank` artifact the Card Bank store writes beside its normalized rows.
-CREATE VIEW artifact_cards AS
-SELECT a.graph_version_id, c.card_id, c.enrichment_id, c.derived_node_id,
-       c.grounding_provenance, c.question, c.self_report_prompt, c.citation_count
+-- Flatten study-item-bank artifact payloads: one row per typed Study Item with its
+-- item type, derived node, grounding provenance, question, self-report prompt (null for
+-- option_select), and a citation/option count, for Admin Lab inspection (R7, R15). Reads
+-- the immutable `study_item_bank` artifact the Study Item Bank store writes beside its
+-- normalized rows.
+CREATE VIEW artifact_study_items AS
+SELECT a.graph_version_id, si.study_item_id, si.item_type, si.enrichment_id, si.derived_node_id,
+       si.grounding_provenance, si.question, si.self_report_prompt, si.citation_count, si.option_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
-  '$.cards[*]'
+  '$.studyItems[*]'
   COLUMNS (
-    card_id text PATH '$.cardId',
+    study_item_id text PATH '$.studyItemId',
+    item_type text PATH '$.itemType',
     enrichment_id text PATH '$.enrichmentId',
     derived_node_id text PATH '$.derivedNodeId',
     grounding_provenance text PATH '$.groundingProvenance',
     question text PATH '$.question',
     self_report_prompt text PATH '$.selfReportPrompt',
-    citation_count integer PATH '$.citations.size()'
+    citation_count integer PATH '$.citations.size()',
+    option_count integer PATH '$.options.size()'
   )
-) AS c
-WHERE a.artifact_type = 'card_bank.v3';
+) AS si
+WHERE a.artifact_type = 'study_item_bank.v4';
 
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
@@ -567,35 +570,61 @@ CREATE TABLE learner_path_steps (
 );
 
 -- ---------------------------------------------------------------------------
--- Learner Recall Loop — learner-neutral Card Bank keyed to the Derived Graph
--- Layer (R1–R3). One card per derived node, conditioned on that node's grounding.
--- Cards retain graph_version_id for publication scope and key their subject on
+-- Learner Study Loop — learner-neutral typed Study Item Bank keyed to the Derived
+-- Graph Layer (R7, R12, ADR-0026). At most one item PER TYPE per derived node
+-- (UNIQUE (derived_node_id, item_type)), conditioned on that node's grounding. Items
+-- retain graph_version_id for publication scope and key their subject on
 -- derived_node_id so anchors and enrichment nodes share one identity space.
 -- Regenerable; never mutates the asserted core or the Derived Graph Layer.
 -- ---------------------------------------------------------------------------
 
-CREATE TABLE cards (
-  card_id uuid PRIMARY KEY,
+CREATE TABLE study_items (
+  study_item_id uuid PRIMARY KEY,
+  item_type text NOT NULL CHECK (item_type IN ('self_assessment', 'option_select')),
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   question text NOT NULL,
-  answer_key text NOT NULL,
-  self_report_prompt text NOT NULL,
+  answer_key text,
+  self_report_prompt text,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (derived_node_id)
+  -- Type coherence: a self_assessment item carries an answer_key + self_report_prompt
+  -- (calibration reads them); an option_select item carries NEITHER — its content lives
+  -- in study_item_options. Fail closed at the DB so no incoherent typed row can enter.
+  CHECK (
+    (item_type = 'self_assessment' AND answer_key IS NOT NULL AND self_report_prompt IS NOT NULL)
+    OR
+    (item_type = 'option_select' AND answer_key IS NULL AND self_report_prompt IS NULL)
+  ),
+  UNIQUE (derived_node_id, item_type)
 );
 
--- Answer-key citations are provenance-tagged. Source citations mirror real source
--- evidence and require source ids + a verbatim quote. Generated citations point at
--- generated grounding text only and cannot smuggle nullable source ids through the
--- schema. Cascade so card regeneration (delete-then-insert) clears citations too.
-CREATE TABLE card_answer_key_citations (
-  card_answer_key_citation_id uuid PRIMARY KEY,
-  card_id uuid NOT NULL REFERENCES cards(card_id) ON DELETE CASCADE,
+-- Options for option_select items (R9). Exactly one is_correct per item, enforced by the
+-- deterministic guard at build time (U2). `ordinal` preserves a stable render order.
+-- The correct option's grounding lives in study_item_citations; distractors are
+-- generated and carry none. Cascade so item regeneration (delete-then-insert) clears
+-- options too.
+CREATE TABLE study_item_options (
+  option_id uuid PRIMARY KEY,
+  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
+  ordinal integer NOT NULL,
+  option_text text NOT NULL,
+  is_correct boolean NOT NULL,
+  provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
+  UNIQUE (study_item_id, ordinal)
+);
+
+-- Grounded-answer citations are provenance-tagged. They back the self_assessment answer
+-- key and the option_select correct answer alike, keyed by study_item_id. Source
+-- citations mirror real source evidence and require source ids + a verbatim quote.
+-- Generated citations point at generated grounding text only and cannot smuggle nullable
+-- source ids through the schema. Cascade so item regeneration clears citations too.
+CREATE TABLE study_item_citations (
+  study_item_citation_id uuid PRIMARY KEY,
+  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
   provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
   source_resource_id uuid REFERENCES source_resources(source_resource_id),
   source_block_id uuid REFERENCES source_blocks(source_block_id),
@@ -609,12 +638,14 @@ CREATE TABLE card_answer_key_citations (
   )
 );
 
--- Derived nodes the card generator could NOT make recall-testable, recorded as a
--- durable fact (not a transient log line). One of {card, rejection} exists per node;
--- regeneration replaces an enrichment's rejections alongside its cards. The no-card
--- frontier fallback reads `reason` instead of guessing from grounding origin.
-CREATE TABLE rejected_cards (
-  rejected_card_id uuid PRIMARY KEY,
+-- Derived nodes that yielded NO study item at all (no usable grounding), recorded as a
+-- durable fact (not a transient log line). A node that grounds a self_assessment item but
+-- fails to yield an option_select item is NOT here — it simply lacks that type and the
+-- frontier surfaces it as cardless-for-studying (R13). Regeneration replaces an
+-- enrichment's rejections alongside its items. The no-item frontier fallback reads
+-- `reason` instead of guessing from grounding origin.
+CREATE TABLE rejected_study_items (
+  rejected_study_item_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
@@ -629,7 +660,7 @@ CREATE TABLE rejected_cards (
 -- recall attempt is an immutable row. There is no UPDATE or DELETE path in the
 -- store port; re-calibration and Admin Lab resubmission APPEND new rows (R5, R10).
 -- The log stores the derived_node_id as the skill. Field set is deliberately IRT-
--- and BKT-sufficient: `card_id` is the per-item IRT key, `derived_node_id` the
+-- and BKT-sufficient: `study_item_id` is the per-item IRT key, `derived_node_id` the
 -- per-skill BKT key, and `attempt_seq` the monotonic-per-learner sequence both
 -- fits need (R6).
 -- ---------------------------------------------------------------------------
@@ -637,7 +668,7 @@ CREATE TABLE rejected_cards (
 CREATE TABLE response_log (
   response_id uuid PRIMARY KEY,
   learner_state_ref text NOT NULL,
-  card_id uuid NOT NULL REFERENCES cards(card_id),
+  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   signal_type text NOT NULL CHECK (signal_type IN ('self_report', 'graded')),
   self_report_rating text CHECK (self_report_rating IN ('again', 'hard', 'good', 'easy')),
@@ -665,7 +696,7 @@ CREATE TABLE response_log (
 -- projection — the log is normalized, not artifact-enveloped (it is learner state,
 -- not a published artifact).
 CREATE VIEW artifact_response_log AS
-SELECT response_id, learner_state_ref, card_id, derived_node_id, signal_type,
+SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
        self_report_rating, judged_outcome, graded_score, evidence_weight,
        response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
 FROM response_log;
