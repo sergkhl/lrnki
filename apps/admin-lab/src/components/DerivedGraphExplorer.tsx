@@ -6,6 +6,7 @@ import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
 import { buildDerivedGraphView, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
+import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -149,12 +150,13 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
         },
         {
           // Enrichment nodes (minted/rescued) are visually distinct from anchors
-          // (R15): a rounded rectangle in the secondary color so an operator never
-          // confuses a derived node with an asserted anchor.
+          // (R15): a rounded rectangle in the dedicated graph-enrichment fill (KTD1) so an
+          // operator never confuses a derived node with an asserted anchor — and so it
+          // reads on the near-white canvas instead of vanishing into it.
           selector: "node[nodeKind = 'enrichment']",
           style: {
             shape: "round-rectangle",
-            "background-color": color("--secondary"),
+            "background-color": color(graphNodeFillToken("enrichment")),
             "border-color": color("--ring")
           }
         },
@@ -176,17 +178,19 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
         {
           // Mastered — green (chart-1): the learner is at/above the ≈0.7 threshold.
           selector: "node[adaptedState = 'mastered']",
-          style: { "background-color": color("--chart-1"), "border-color": color("--chart-1") }
+          style: { "background-color": color(graphNodeFillToken("mastered")), "border-color": color(graphNodeFillToken("mastered")) }
         },
         {
           // Frontier — amber (chart-4): unmastered but every direct prerequisite met.
           selector: "node[adaptedState = 'frontier']",
-          style: { "background-color": color("--chart-4"), "border-color": color("--chart-4") }
+          style: { "background-color": color(graphNodeFillToken("frontier")), "border-color": color(graphNodeFillToken("frontier")) }
         },
         {
-          // Locked — muted: a direct prerequisite is still unmastered.
+          // Locked — dedicated cool gray (KTD1): a direct prerequisite is still unmastered.
+          // Reads as "inactive" yet stays visible on the canvas, unlike the old --muted fill
+          // that collided with both the background and the enrichment fill.
           selector: "node[adaptedState = 'locked']",
-          style: { "background-color": color("--muted"), "border-color": color("--border"), color: color("--muted-foreground") }
+          style: { "background-color": color(graphNodeFillToken("locked")), "border-color": color("--border"), color: color("--muted-foreground") }
         },
         {
           // The single selected frontier target — the hardest ready unmastered node the
@@ -317,9 +321,9 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             </span>
             {isAdaptedMode ? (
               <>
-                <LegendSwatch token="--chart-1" label="mastered" />
-                <LegendSwatch token="--chart-4" label="frontier" />
-                <LegendSwatch token="--muted" label="locked" />
+                <LegendSwatch token={graphNodeFillToken("mastered")} label="mastered" />
+                <LegendSwatch token={graphNodeFillToken("frontier")} label="frontier" />
+                <LegendSwatch token={graphNodeFillToken("locked")} label="locked" />
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block size-3 rounded-full" style={{ border: "2px solid var(--foreground)" }} />
                   frontier target

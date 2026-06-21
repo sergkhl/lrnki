@@ -72,6 +72,13 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.65 0.12 94);
   --chart-5: oklch(0.58 0.12 35);
+  /* Derived-graph node-state fills (KTD1). Dedicated tokens — NOT the shared
+     --secondary / --muted chrome — so the graph reads on the near-white --background
+     without rippling into every badge and button. `--graph-locked` is a cool low-chroma
+     gray that reads "inactive"; `--graph-enrichment` is a soft indigo distinct from it
+     and from the mastered green (--chart-1) / frontier amber (--chart-4). */
+  --graph-locked: oklch(0.78 0.012 250);
+  --graph-enrichment: oklch(0.86 0.062 264);
   --sidebar: oklch(0.97 0 0);
   --sidebar-foreground: oklch(0.205 0 0);
   --sidebar-primary: oklch(0.205 0 0);
