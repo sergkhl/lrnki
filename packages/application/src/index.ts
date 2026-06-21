@@ -25,6 +25,11 @@ export {
 } from "./calibration";
 export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
 export {
+  appendSelfAssessedGrade,
+  SELF_GRADER_IDENTITY,
+  type SelfAssessmentOutcome
+} from "./selfAssessment";
+export {
   loadResponseLogLearnerState,
   foldConceptMastery,
   ratingToMastery,
