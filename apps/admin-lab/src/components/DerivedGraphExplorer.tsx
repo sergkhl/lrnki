@@ -313,11 +313,11 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
               // Segmented control over the ONE pinned layout (R10): switching mode
               // restyles nodes only — positions never move (R11). Rendered only when a
               // learner classification is present; the neutral enrichment page has none.
-              <div role="group" aria-label="Graph view mode" className="flex items-center rounded-md border p-0.5">
+              <div role="group" aria-label="Graph view mode" className="flex items-center gap-1">
                 <Button
                   type="button"
                   size="sm"
-                  variant={mode === "neutral" ? "secondary" : "ghost"}
+                  variant={mode === "neutral" ? "default" : "outline"}
                   aria-pressed={mode === "neutral"}
                   className="h-7 px-2.5"
                   onClick={() => setMode("neutral")}
@@ -327,7 +327,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                 <Button
                   type="button"
                   size="sm"
-                  variant={mode === "adapted" ? "secondary" : "ghost"}
+                  variant={mode === "adapted" ? "default" : "outline"}
                   aria-pressed={mode === "adapted"}
                   className="h-7 px-2.5"
                   onClick={() => setMode("adapted")}
@@ -336,9 +336,11 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                 </Button>
               </div>
             ) : null}
+            {/* Non-interactive metadata: bordered/light tag pills (KTD5). Kept off the solid
+                `default` register so nothing inert mimics the solid active segmented button. */}
             <Badge variant="outline">{detail.summary.conceptCount} concepts</Badge>
-            <Badge variant="default">{detail.summary.certainEdgeCount} edges</Badge>
-            <Badge variant="secondary">{detail.summary.uncertainEdgeCount} uncertain</Badge>
+            <Badge variant="secondary">{detail.summary.certainEdgeCount} edges</Badge>
+            <Badge variant="outline">{detail.summary.uncertainEdgeCount} uncertain</Badge>
           </CardAction>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
