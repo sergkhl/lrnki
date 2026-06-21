@@ -24,6 +24,9 @@ function anchor(id: string, conceptId: string) {
 function edge(prerequisite: string, dependent: string) {
   return { prerequisiteDerivedNodeId: prerequisite, dependentDerivedNodeId: dependent, predicate: "inferred-prerequisite-of" as const, confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "fixture" } };
 }
+function uncertainEdge(prerequisite: string, dependent: string) {
+  return { ...edge(prerequisite, dependent), uncertain: true };
+}
 
 const layer: DerivedGraphLayer = {
   enrichmentId: "enr-1",
@@ -77,6 +80,73 @@ test("a 'good' rating on a downstream node propagates seeded rows onto its ances
   assert.deepEqual(seeded.map((s) => s.derivedNodeId), ["nA"], "B's only ancestor A is seeded");
   assert.equal(seeded[0].propagated, true);
   assert.equal(directRatings.some((r) => r.derivedNodeId === "nA"), false, "A was not directly rated");
+});
+
+// --- U5: propagation honors the router's trust model (R6, AE2) --------------
+// `propagateSelfReport` must walk only the edges the router trusts (certain edges),
+// mirroring `buildReadiness`'s `!edge.uncertain` filter. Otherwise an "I know it"
+// credits mastery across edges readiness itself distrusts (the recorded over-seeding
+// defect). These fixtures add uncertain edges to the trusted DAG above.
+
+// Ancestor `nU` is reachable from `nB` ONLY through an uncertain edge; `nA` through a
+// certain one. The shared `layer` already has the certain `nA -> nB`.
+const layerWithUncertainAncestor: DerivedGraphLayer = {
+  ...layer,
+  derivedNodes: [
+    ...layer.derivedNodes,
+    {
+      nodeKind: "enrichment", derivedNodeId: "nU", groundingOrigin: "source_mentioned", role: "prerequisite",
+      layer: "derived", canonicalLabel: "U", normalizedLabel: "u", declaredDomain: "software engineering", aliases: [], groundingPassages: []
+    }
+  ],
+  prerequisiteEdges: [...layer.prerequisiteEdges, uncertainEdge("nU", "nB")]
+};
+const cardsWithU: Pick<Card, "derivedNodeId" | "cardId">[] = [...cards, { derivedNodeId: "nU", cardId: "cardU" }];
+
+test("a 'good' rating does not seed an ancestor reachable only through an uncertain edge (Covers R6)", () => {
+  const seeded = propagateSelfReport({ layer: layerWithUncertainAncestor, directRatings: [{ derivedNodeId: "nB", cardId: "cardB", rating: "good" }], cards: cardsWithU });
+  assert.deepEqual(seeded.map((s) => s.derivedNodeId), ["nA"], "only the certain-edge ancestor nA is seeded; the uncertain-edge ancestor nU is excluded");
+});
+
+test("a 'good' rating still seeds ancestors reachable through certain edges (regression)", () => {
+  // nD's certain ancestors are nA, nB, nC, nE (nU is not an ancestor of nD).
+  const seeded = propagateSelfReport({ layer: layerWithUncertainAncestor, directRatings: [{ derivedNodeId: "nD", cardId: "cardD", rating: "good" }], cards: cardsWithU });
+  assert.deepEqual([...seeded.map((s) => s.derivedNodeId)].sort(), ["nA", "nB", "nC", "nE"], "all certain-edge ancestors of nD are still seeded");
+});
+
+// AE2: the recorded SE cycle shape — an uncertain-edge cycle through the goal. Calibrating
+// one node must seed only certain-edge ancestors, terminate, and never credit the goal
+// through uncertain edges.
+const cyclicLayer: DerivedGraphLayer = {
+  ...layer,
+  derivedNodes: [anchor("own", "cOwn"), anchor("var", "cVar"), anchor("ptr", "cPtr"), anchor("stk", "cStk"), anchor("goal", "cGoal")],
+  // Certain: var -> ptr (ptr's only trusted ancestor is var). Uncertain cycle:
+  // own ->(u) var ->(u) ptr ->(u) stk ->(u) own, plus uncertain goal credit own ->(u) goal.
+  prerequisiteEdges: [
+    edge("var", "ptr"),
+    uncertainEdge("own", "var"), uncertainEdge("ptr", "stk"), uncertainEdge("stk", "own"),
+    uncertainEdge("own", "goal")
+  ],
+  difficulties: [
+    { derivedNodeId: "own", score: 0.5, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "var", score: 0.2, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "ptr", score: 0.4, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "stk", score: 0.3, method: "m", components: {}, neuralRationale: "" },
+    { derivedNodeId: "goal", score: 0.9, method: "m", components: {}, neuralRationale: "" }
+  ]
+};
+const cyclicCards: Pick<Card, "derivedNodeId" | "cardId">[] = [
+  { derivedNodeId: "own", cardId: "cOwn" }, { derivedNodeId: "var", cardId: "cVar" },
+  { derivedNodeId: "ptr", cardId: "cPtr" }, { derivedNodeId: "stk", cardId: "cStk" }, { derivedNodeId: "goal", cardId: "cGoal" }
+];
+
+test("on an uncertain-edge cycle, calibrating one node seeds only certain-edge ancestors and never credits the goal (Covers AE2)", () => {
+  // Rate `ptr`. Its only CERTAIN ancestor is `var`. Every other node (own, stk, goal) is
+  // reachable only through uncertain edges, so none may be seeded — and the traversal must
+  // terminate despite the cycle.
+  const seeded = propagateSelfReport({ layer: cyclicLayer, directRatings: [{ derivedNodeId: "ptr", cardId: "cPtr", rating: "good" }], cards: cyclicCards });
+  assert.deepEqual(seeded.map((s) => s.derivedNodeId), ["var"], "only the certain-edge ancestor var is seeded");
+  assert.equal(seeded.some((s) => s.derivedNodeId === "goal"), false, "the goal is not auto-credited through uncertain edges");
 });
 
 test("an 'again' rating does not propagate mastery downward", () => {

@@ -76,9 +76,16 @@ export function propagateSelfReport(input: {
   const directlyRated = new Set(input.directRatings.map((rating) => rating.derivedNodeId));
   const seededByNode = new Map<string, SelfReportInput>();
 
+  // Propagate only along edges the router TRUSTS (R6): mirror `buildReadiness`'s
+  // `!edge.uncertain` filter so "I know it" seeds exactly the prerequisites readiness
+  // itself credits. Walking all edges would over-seed a whole connected component through
+  // distrusted edges — and through uncertain-edge cycles credit the goal (the recorded
+  // defect). `prerequisiteAncestors`' seen-set still terminates on any residual cycle.
+  const certainEdges = input.layer.prerequisiteEdges.filter((edge) => !edge.uncertain);
+
   for (const rated of input.directRatings) {
     if (rated.rating !== "good" && rated.rating !== "easy") continue; // only positive recall propagates
-    for (const ancestorNode of prerequisiteAncestors(rated.derivedNodeId, input.layer.prerequisiteEdges)) {
+    for (const ancestorNode of prerequisiteAncestors(rated.derivedNodeId, certainEdges)) {
       if (directlyRated.has(ancestorNode) || seededByNode.has(ancestorNode)) continue;
       const cardId = cardByNode.get(ancestorNode);
       if (!cardId) continue;
