@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DatabaseZapIcon, RouteIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -57,7 +58,7 @@ export default async function LearnerPathListPage() {
                 <EmptyTitle>No learner paths</EmptyTitle>
                 <EmptyDescription>
                   Run <code className="font-mono">worker:kg enrich-graph-version</code> then{" "}
-                  <code className="font-mono">worker:kg compute-learner-path &lt;enrichmentId&gt; &lt;targetConceptId&gt;</code>.
+                  <code className="font-mono">worker:kg compute-learner-path &lt;enrichmentId&gt; &lt;target&gt;</code>.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -83,7 +84,9 @@ export default async function LearnerPathListPage() {
                     <TableCell><Badge variant="outline">{path.declaredDomain}</Badge></TableCell>
                     <TableCell>{path.stepCount}</TableCell>
                     <TableCell><Badge variant="secondary">{path.learnerStateRef}</Badge></TableCell>
-                    <TableCell className="font-mono text-xs">{path.createdAt.slice(0, 19).replace("T", " ")}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <LocalDateTime iso={path.createdAt} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

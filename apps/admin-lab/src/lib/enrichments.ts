@@ -58,10 +58,14 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
 
     // The DERIVED node space: anchor projections + enrichment (minted/rescued) nodes
     // (R15). Difficulty and edges reference derived_node_id only (KTD2).
-    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null }[]>`
-      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score
+    // `cards` is UNIQUE per derived_node_id, so the LEFT JOIN keeps one row per node;
+    // `has_card` flags whether the node is recall-testable (R6) for BOTH panels.
+    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; neural_rationale: string | null; has_card: boolean }[]>`
+      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score, d.neural_rationale,
+             (c.card_id IS NOT NULL) AS has_card
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
+      LEFT JOIN cards c ON c.derived_node_id = n.derived_node_id
       WHERE n.enrichment_id = ${header.enrichment_id}
       ORDER BY n.declared_domain, n.node_kind, d.score NULLS LAST, n.canonical_label`;
     const edgeRows = await sql<{ prerequisite_derived_node_id: string; dependent_derived_node_id: string; confidence: number; uncertain: boolean; judge_model: string }[]>`
@@ -126,18 +130,20 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     };
 
     const nodes: DerivedGraphNode[] = nodeRows.map((row) => ({
-      conceptId: row.derived_node_id,
+      derivedNodeId: row.derived_node_id,
       label: row.label,
       declaredDomain: row.declared_domain,
       difficulty: row.score === null ? null : Number(row.score),
+      difficultyRationale: row.neural_rationale,
       nodeKind: row.node_kind as DerivedGraphNode["nodeKind"],
       groundingOrigin: row.grounding_origin as DerivedGraphNode["groundingOrigin"],
       role: row.role as DerivedGraphNode["role"],
+      hasCard: row.has_card,
       grounding: groundingFor(row)
     }));
     const edges: DerivedGraphEdge[] = edgeRows.map((row) => ({
-      prerequisiteConceptId: row.prerequisite_derived_node_id,
-      dependentConceptId: row.dependent_derived_node_id,
+      prerequisiteDerivedNodeId: row.prerequisite_derived_node_id,
+      dependentDerivedNodeId: row.dependent_derived_node_id,
       confidence: Number(row.confidence),
       uncertain: row.uncertain,
       judgeModel: row.judge_model

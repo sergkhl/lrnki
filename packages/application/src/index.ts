@@ -13,6 +13,37 @@ export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
+export { generateCardBank, type CardBankGenerationResult, type RejectedCard } from "./generateCardBank";
+export {
+  buildCalibrationSet,
+  propagateSelfReport,
+  appendSelfReportBatch,
+  SELF_REPORT_EVIDENCE_WEIGHT,
+  PROPAGATED_SELF_REPORT_EVIDENCE_WEIGHT,
+  type CalibrationItem,
+  type SelfReportInput
+} from "./calibration";
+export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
+export {
+  loadResponseLogLearnerState,
+  foldConceptMastery,
+  ratingToMastery,
+  outcomeToMastery
+} from "./responseLogLearnerState";
+export {
+  selectFrontierTarget,
+  projectAdaptivePath,
+  classifyAdaptedNodes,
+  ADAPTIVE_MASTERY_THRESHOLD,
+  type AdaptedNodeState,
+  type AdaptedNodeClassification,
+  type ReadinessEdge
+} from "./adaptivePathProjection";
+export {
+  synthesizeResponses,
+  rateByDifficulty,
+  type SyntheticLearnerProfile
+} from "./syntheticResponses";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,

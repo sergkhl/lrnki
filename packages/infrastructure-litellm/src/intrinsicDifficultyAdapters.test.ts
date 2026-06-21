@@ -10,7 +10,7 @@ import {
 import { intrinsicDifficultySchema, intrinsicDifficultyValidator } from "./toolSchemas";
 
 const context: DifficultyNodeContext = {
-  conceptId: "dn-1",
+  derivedNodeId: "dn-1",
   canonicalLabel: "Example Concept",
   aliases: ["Example Alias"],
   declaredDomain: "example domain",

@@ -26,14 +26,18 @@ export function createIntrinsicDifficultyPort(judge: IntrinsicDifficultyJudgment
       for (const node of input.nodes) {
         const judgment = await judge.judge(node);
         if (!Number.isFinite(judgment.neuralScore) || judgment.neuralScore < 0 || judgment.neuralScore > 1) {
-          throw new Error(`Intrinsic difficulty judge returned out-of-range score for ${node.conceptId}.`);
+          throw new Error(`Intrinsic difficulty judge returned out-of-range score for ${node.derivedNodeId}.`);
         }
-        const terms = termsByNode.get(node.conceptId) ?? zeroTerms();
+        const terms = termsByNode.get(node.derivedNodeId) ?? zeroTerms();
         const score = clamp01(0.55 * judgment.neuralScore + 0.45 * terms.structuralScore);
         difficulties.push({
-          conceptId: node.conceptId,
+          derivedNodeId: node.derivedNodeId,
           score,
           method: METHOD,
+          // Carry the judge's free-text rationale through (R5). The fused score is
+          // unchanged — this is a pure passthrough of an already-validated field that
+          // the port previously dropped (R7; AGENTS rules 16/17).
+          neuralRationale: judgment.rationale,
           components: {
             neuralScore: judgment.neuralScore,
             topoDepth: terms.topoDepth,
@@ -55,28 +59,28 @@ export function createIntrinsicDifficultyPort(judge: IntrinsicDifficultyJudgment
 }
 
 function structuralTerms(nodes: DifficultyNodeContext[], edges: InferredPrerequisiteEdge[]): Map<string, StructuralTerms> {
-  const nodeIds = nodes.map((node) => node.conceptId);
-  const dagById = new Map(dagDepthDifficulty(nodeIds, edges).map((difficulty) => [difficulty.conceptId, difficulty] as const));
+  const nodeIds = nodes.map((node) => node.derivedNodeId);
+  const dagById = new Map(dagDepthDifficulty(nodeIds, edges).map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
   const ancestorCounts = new Map(nodeIds.map((id) => [id, prerequisiteAncestors(id, edges).size] as const));
-  const evidenceCounts = new Map(nodes.map((node) => [node.conceptId, node.definitions.length + node.mentions.length] as const));
+  const evidenceCounts = new Map(nodes.map((node) => [node.derivedNodeId, node.definitions.length + node.mentions.length] as const));
   const maxTopoDepth = Math.max(1, ...[...dagById.values()].map((difficulty) => difficulty.components.topoDepth ?? 0));
   const maxAncestors = Math.max(1, ...ancestorCounts.values());
   const maxFanIn = Math.max(1, ...[...dagById.values()].map((difficulty) => difficulty.components.fanIn ?? 0));
   const maxEvidenceDensity = Math.max(1, ...evidenceCounts.values());
   const terms = new Map<string, StructuralTerms>();
   for (const node of nodes) {
-    const dag = dagById.get(node.conceptId);
+    const dag = dagById.get(node.derivedNodeId);
     const topoDepth = dag?.components.topoDepth ?? 0;
     const fanIn = dag?.components.fanIn ?? 0;
-    const transitiveAncestors = ancestorCounts.get(node.conceptId) ?? 0;
-    const evidenceDensity = evidenceCounts.get(node.conceptId) ?? 0;
+    const transitiveAncestors = ancestorCounts.get(node.derivedNodeId) ?? 0;
+    const evidenceDensity = evidenceCounts.get(node.derivedNodeId) ?? 0;
     const normalizedTopoDepth = topoDepth / maxTopoDepth;
     const normalizedTransitiveAncestors = transitiveAncestors / maxAncestors;
     const normalizedFanIn = fanIn / maxFanIn;
     const normalizedEvidenceDensity = evidenceDensity / maxEvidenceDensity;
     const dagDepthScore = dag?.score ?? 0;
     const structuralScore = clamp01((normalizedTopoDepth + normalizedTransitiveAncestors + normalizedFanIn + normalizedEvidenceDensity) / 4);
-    terms.set(node.conceptId, {
+    terms.set(node.derivedNodeId, {
       topoDepth,
       normalizedTopoDepth,
       transitiveAncestors,

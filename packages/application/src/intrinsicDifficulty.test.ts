@@ -6,7 +6,7 @@ import { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 
 function node(id: string, definitions: string[] = [`${id} definition`], mentions: string[] = []): DifficultyNodeContext {
   return {
-    conceptId: id,
+    derivedNodeId: id,
     canonicalLabel: id.toUpperCase(),
     aliases: [],
     declaredDomain: "test",
@@ -25,8 +25,8 @@ function llmGroundedNode(id: string): DifficultyNodeContext {
 
 function edge(prereq: string, dependent: string): InferredPrerequisiteEdge {
   return {
-    prerequisiteConceptId: prereq,
-    dependentConceptId: dependent,
+    prerequisiteDerivedNodeId: prereq,
+    dependentDerivedNodeId: dependent,
     predicate: "inferred-prerequisite-of",
     confidence: 0.9,
     uncertain: false,
@@ -38,7 +38,7 @@ function judge(scores: Record<string, number>): IntrinsicDifficultyJudgmentPort 
   return {
     model: "stub-judge",
     async judge(input) {
-      return { neuralScore: scores[input.conceptId] ?? 0, rationale: "stub" };
+      return { neuralScore: scores[input.derivedNodeId] ?? 0, rationale: "stub" };
     }
   };
 }
@@ -53,7 +53,7 @@ test("createIntrinsicDifficultyPort returns fused scores and interpretable compo
   assert.equal(port.method, "intrinsic-fused-v1");
   assert.equal(difficulties.length, 3);
   assert.ok(difficulties.every((difficulty) => difficulty.method === "intrinsic-fused-v1"));
-  const byId = new Map(difficulties.map((difficulty) => [difficulty.conceptId, difficulty] as const));
+  const byId = new Map(difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
   assert.equal(byId.get("a")?.components.neuralScore, 0.1);
   assert.equal(byId.get("b")?.components.topoDepth, 1);
   assert.equal(byId.get("c")?.components.transitiveAncestors, 2);
@@ -69,7 +69,7 @@ test("same-depth nodes are differentiated by the neural subscore", async () => {
     nodes: [node("root"), node("a"), node("b")],
     prerequisiteEdges: [edge("root", "a"), edge("root", "b")]
   });
-  const byId = new Map(difficulties.map((difficulty) => [difficulty.conceptId, difficulty] as const));
+  const byId = new Map(difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
 
   assert.equal(byId.get("a")?.components.topoDepth, byId.get("b")?.components.topoDepth);
   assert.ok((byId.get("b")?.score ?? 0) > (byId.get("a")?.score ?? 1));
@@ -81,7 +81,7 @@ test("structural components match hand-computed graph values", async () => {
     nodes: [node("a"), node("b"), node("c"), node("d", ["d def"], ["d mention 1", "d mention 2"])],
     prerequisiteEdges: [edge("a", "b"), edge("a", "c"), edge("b", "d"), edge("c", "d")]
   });
-  const d = difficulties.find((difficulty) => difficulty.conceptId === "d");
+  const d = difficulties.find((difficulty) => difficulty.derivedNodeId === "d");
   assert.ok(d);
   assert.equal(d.components.topoDepth, 2);
   assert.equal(d.components.transitiveAncestors, 3);
@@ -115,6 +115,28 @@ test("judge failures and out-of-range neural scores fail closed", async () => {
     () => createIntrinsicDifficultyPort(judge({ a: 1.1 })).score({ nodes: [node("a")], prerequisiteEdges: [] }),
     /out-of-range/
   );
+});
+
+test("the judge's rationale passes through to the ConceptDifficulty while the fused score is unchanged", async () => {
+  // A judge returning a per-node rationale alongside its numeric subscore. The port
+  // must carry the text through verbatim (R5) and must NOT let it perturb the score (R7).
+  // This asserts the deterministic transform of the model's output, not the model's
+  // judgment content (AGENTS rule 11).
+  const rationaleJudge: IntrinsicDifficultyJudgmentPort = {
+    model: "stub-judge",
+    async judge(input) {
+      return { neuralScore: 0.4, rationale: `${input.derivedNodeId} is moderately abstract` };
+    }
+  };
+  // Isolated single node: no edges, defs=1/mentions=0 → structuralScore = (0+0+0+1)/4 = 0.25.
+  const difficulties = await createIntrinsicDifficultyPort(rationaleJudge).score({ nodes: [node("a")], prerequisiteEdges: [] });
+  assert.equal(difficulties.length, 1);
+  assert.equal(difficulties[0].neuralRationale, "a is moderately abstract");
+  // Same fused formula as before the field was added: 0.55*neural + 0.45*structural
+  // (in-range, so the port's clamp is identity here).
+  assert.equal(difficulties[0].score, 0.55 * 0.4 + 0.45 * 0.25);
+  // The rationale lives beside, never inside, the strictly-numeric components (KTD3).
+  assert.equal(Object.values(difficulties[0].components).every((value) => typeof value === "number"), true);
 });
 
 test("llm_grounded node context is scored from generated grounding text", async () => {

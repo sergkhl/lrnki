@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
-import { elkLayeredLayout } from "@/lib/cytoscapeElkLayout";
+import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,6 +36,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let stale = false;
     const styles = getComputedStyle(containerRef.current);
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = 1;
@@ -56,7 +57,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       elements: [
         ...detail.nodes.map((node) => ({
           data: {
-            id: node.conceptId,
+            id: node.derivedNodeId,
             label: node.inPath ? `${node.position! + 1}. ${node.label}` : node.label,
             inPath: node.inPath ? "yes" : "no",
             target: node.isTarget ? "yes" : "no"
@@ -65,16 +66,14 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
         ...detail.edges.map((edge, index) => ({
           data: {
             id: `e${index}`,
-            source: edge.prerequisiteConceptId,
-            target: edge.dependentConceptId,
+            source: edge.prerequisiteDerivedNodeId,
+            target: edge.dependentDerivedNodeId,
             uncertain: edge.uncertain ? "yes" : "no",
             inPath: edge.inPath ? "yes" : "no"
           }
         }))
       ],
-      // ELK `layered` owns node coordinates and component separation; path context
-      // still reads prerequisites first because edges flow top-down.
-      layout: elkLayeredLayout,
+      layout: { name: "preset" },
       minZoom: 0.2,
       maxZoom: 3,
       style: [
@@ -155,7 +154,11 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       ]
     });
     cytoscapeRef.current = cy;
+    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
+      if (!stale) console.error("Failed to lay out learner path graph", error);
+    });
     return () => {
+      stale = true;
       cy.destroy();
       cytoscapeRef.current = null;
     };
@@ -204,7 +207,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
             <ol className="flex flex-col gap-2 pr-3">
               {detail.steps.map((step) => (
                 <li
-                  key={step.conceptId}
+                  key={step.derivedNodeId}
                   className={`flex items-center gap-3 rounded-lg border p-3 ${step.includedReason === "target" ? "border-destructive/50 bg-destructive/5" : ""}`}
                 >
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">

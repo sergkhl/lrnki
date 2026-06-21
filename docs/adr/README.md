@@ -22,5 +22,6 @@
 - [0022-retire-measured-label-aligner](./0022-measured-label-aligner-for-oracle-scoring.md) — one-time Gate 2 scoring aid, retired with the oracle harness; never changed graph identity (0015)
 - [0023-grounding-origin-model-and-cross-family-generated-node-judge](./0023-grounding-origin-model-and-cross-family-generated-node-judge.md) — grounding_origin/role/layer invariant, per-provenance verbatim floor with recorded exemption, cross-family generated-node judge
 - [0024-learner-neutral-intrinsic-difficulty](./0024-learner-neutral-intrinsic-difficulty.md) — intrinsic difficulty now; learner-calibrated difficulty remains data-blocked
+- [0025-card-bank-over-derived-graph-layer](./0025-card-bank-over-derived-graph-layer.md) — Card Bank and Response Log keyed to derived nodes, with source/generated grounding provenance
 
 > Numbers 0020–0021 were never issued: the 2026-06-15 complexity reset folded those decisions into in-place rewrites of existing ADRs (0002/0005/0007/0009/0012/0013/0016/0019/0022) rather than new records.

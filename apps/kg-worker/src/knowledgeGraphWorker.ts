@@ -7,6 +7,10 @@ import {
   createIntrinsicDifficultyPort,
   emptyLearnerState,
   executeExtractionRun,
+  generateCardBank,
+  loadResponseLogLearnerState,
+  synthesizeResponses,
+  ADAPTIVE_MASTERY_THRESHOLD,
   runGraphEnrichment
 } from "@lrnki/application";
 import {
@@ -21,10 +25,13 @@ import {
   LiteLlmAssertionEntailmentJudgmentAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
+  LiteLlmAnswerGradingJudgeAdapter,
+  LiteLlmCardGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmGroundingGenerationAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
+  LiteLlmLearnerSimulatorAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
@@ -34,6 +41,8 @@ import {
   PostgresArtifactRepository,
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
+  PostgresCardBankStore,
+  PostgresResponseLogStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
@@ -138,9 +147,24 @@ function buildContext() {
     difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
-    pathStore: new PostgresLearnerPathStore(sql)
+    pathStore: new PostgresLearnerPathStore(sql),
+    // Learner Recall Loop (U2): card generation stays DeepSeek-family (AGENTS rule 5);
+    // a cross-family judge grades learner answers against the key (U5). Deterministic
+    // decoding for stable re-derivation.
+    cardGeneration: new LiteLlmCardGenerationAdapter(deterministicClient),
+    cardBankStore: new PostgresCardBankStore(sql),
+    // Measurement grading judge (U5): cross-family (kg-independent-judge) so the
+    // DeepSeek card generator never grades its own answer-key (ADR-0023).
+    answerGradingJudge: new LiteLlmAnswerGradingJudgeAdapter(deterministicClient),
+    responseLogStore: new PostgresResponseLogStore(sql),
+    // Synthetic learner simulator (U7): DeepSeek-family generator whose answers the
+    // cross-family judge grades — EXPERIMENT_ONLY scaffolding for the rule-14 run.
+    learnerSimulator: new LiteLlmLearnerSimulatorAdapter(deterministicClient)
   };
 }
+
+// Card Bank configuration identity — bump when the card prompt/schema/model changes.
+const CARD_BANK_CONFIG_HASH = "card-bank-v1";
 
 type Context = ReturnType<typeof buildContext>;
 type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
@@ -266,22 +290,34 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     `   edges(certain/uncertain)=${certain}/${uncertain} difficulties=${layer.difficulties.length} judge=${layer.judgeModel}`
   );
   for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
-    console.log(`   edge: ${edge.prerequisiteConceptId} -> ${edge.dependentConceptId} (conf=${edge.confidence.toFixed(2)})`);
+    console.log(`   edge: ${edge.prerequisiteDerivedNodeId} -> ${edge.dependentDerivedNodeId} (conf=${edge.confidence.toFixed(2)})`);
   }
 }
 
-async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetConceptId?: string) {
-  if (!enrichmentId || !targetConceptId) {
-    console.error("! compute-learner-path requires <enrichmentId> <targetConceptId>.");
+async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetRef?: string) {
+  if (!enrichmentId || !targetRef) {
+    console.error("! compute-learner-path requires <enrichmentId> <target>.");
     process.exitCode = 1;
     return;
   }
+  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
+  if (!layer) {
+    console.error(`! enrichment ${enrichmentId} not found.`);
+    process.exitCode = 1;
+    return;
+  }
+  // `target` is an operator-friendly reference: an anchor concept_id (resolved to its
+  // derived node) or a derived_node_id directly. The learner path subject identity is
+  // always the derived node (ADR-0025).
+  const resolvedTargetId =
+    layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId ??
+    targetRef;
   const learnerPathId = randomUUID();
-  console.log(`\n>> learner path ${learnerPathId} for target ${targetConceptId} from enrichment ${enrichmentId}`);
+  console.log(`\n>> learner path ${learnerPathId} for target ${targetRef} from enrichment ${enrichmentId}`);
   const path = await computeLearnerPath({
     learnerPathId,
     enrichmentId,
-    targetConceptId,
+    targetDerivedNodeId: resolvedTargetId,
     enrichmentStore: ctx.enrichmentStore,
     learnerState: ctx.learnerState,
     pathStore: ctx.pathStore,
@@ -289,7 +325,109 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   });
   console.log(`   learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
   for (const step of path.steps) {
-    console.log(`   #${step.position} [${step.includedReason}] ${step.conceptId} (difficulty=${step.difficulty.toFixed(2)})`);
+    console.log(`   #${step.position} [${step.includedReason}] ${step.derivedNodeId} (difficulty=${step.difficulty.toFixed(2)})`);
+  }
+}
+
+async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, targetDerivedNodeId?: string, learnerStateRef?: string) {
+  if (!enrichmentId || !targetDerivedNodeId || !learnerStateRef) {
+    console.error("! synthesize-responses requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
+    process.exitCode = 1;
+    return;
+  }
+  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
+  if (!layer) {
+    console.error(`! enrichment ${enrichmentId} not found.`);
+    process.exitCode = 1;
+    return;
+  }
+  const cards = await ctx.cardBankStore.listCardsForEnrichment(enrichmentId);
+  const targetNode = layer.derivedNodes.find((node) => node.derivedNodeId === targetDerivedNodeId);
+  if (!targetNode) {
+    console.error(`! target node ${targetDerivedNodeId} is not in enrichment ${enrichmentId}.`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`\n>> synthesizing responses for learner ${learnerStateRef} toward ${targetDerivedNodeId}`);
+  const result = await synthesizeResponses({
+    learnerStateRef,
+    layer,
+    targetDerivedNodeId,
+    declaredDomain: targetNode.declaredDomain,
+    cards,
+    profile: { difficultyCutoff: 0.6, gradedSampleSize: 4 },
+    simulator: ctx.learnerSimulator,
+    judge: ctx.answerGradingJudge,
+    responseLog: ctx.responseLogStore
+  });
+  console.log(`   self_report=${result.selfReportCount} graded=${result.gradedCount} batch=${result.calibrationBatchId}`);
+}
+
+async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetRef?: string, learnerStateRef?: string) {
+  if (!enrichmentId || !targetRef || !learnerStateRef) {
+    console.error("! compute-adaptive-path requires <enrichmentId> <target> <learnerStateRef>.");
+    process.exitCode = 1;
+    return;
+  }
+  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
+  if (!layer) {
+    console.error(`! enrichment ${enrichmentId} not found.`);
+    process.exitCode = 1;
+    return;
+  }
+  // `target` is an anchor concept_id; the projection works in derived-node space, so
+  // resolve it to the goal anchor's derived node (KTD, ADR-0025).
+  const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId;
+  if (!targetNodeId) {
+    console.error(`! target concept ${targetRef} is not an anchor in enrichment ${enrichmentId}.`);
+    process.exitCode = 1;
+    return;
+  }
+  const learnerState = await loadResponseLogLearnerState({
+    responseLog: ctx.responseLogStore,
+    learnerStateRef
+  });
+
+  const learnerPathId = randomUUID();
+  console.log(`\n>> adaptive path ${learnerPathId} for goal ${targetRef} / learner ${learnerStateRef} (threshold=${ADAPTIVE_MASTERY_THRESHOLD})`);
+  const path = await computeLearnerPath({
+    learnerPathId,
+    enrichmentId,
+    targetDerivedNodeId: targetNodeId,
+    enrichmentStore: ctx.enrichmentStore,
+    learnerState,
+    pathStore: ctx.pathStore,
+    artifacts: ctx.artifacts,
+    masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD,
+    frontierAdvance: true
+  });
+  console.log(`   advancedTarget=${path.targetDerivedNodeId} learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
+  for (const step of path.steps) {
+    console.log(`   #${step.position} [${step.includedReason}] ${step.derivedNodeId} (difficulty=${step.difficulty.toFixed(2)})`);
+  }
+}
+
+async function generateCardsCommand(ctx: Context, enrichmentId?: string) {
+  if (!enrichmentId) {
+    console.error("! generate-cards requires <enrichmentId>.");
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`\n>> generating Card Bank for enrichment ${enrichmentId}`);
+  const result = await generateCardBank({
+    enrichmentId,
+    configHash: CARD_BANK_CONFIG_HASH,
+    graphStore: ctx.graphStore,
+    enrichmentStore: ctx.enrichmentStore,
+    cardGeneration: ctx.cardGeneration,
+    cardBankStore: ctx.cardBankStore
+  });
+  console.log(`   cards=${result.cards.length} rejected=${result.rejected.length} model=${ctx.cardGeneration.model}`);
+  for (const card of result.cards) {
+    console.log(`   card[${card.derivedNodeId}] provenance=${card.groundingProvenance} citations=${card.citations.length}\n     Q: ${card.question}\n     A: ${card.answerKey}`);
+  }
+  for (const rejected of result.rejected) {
+    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}): ${rejected.reason}`);
   }
 }
 
@@ -320,11 +458,20 @@ async function main() {
       case "compute-learner-path":
         await computeLearnerPathCommand(ctx, arg, rest[0]);
         break;
+      case "generate-cards":
+        await generateCardsCommand(ctx, arg);
+        break;
+      case "synthesize-responses":
+        await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
+        break;
+      case "compute-adaptive-path":
+        await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
+        break;
       case "list-sources":
         await listSources(ctx);
         break;
       default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetConceptId> | list-sources>");
+        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-cards <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
     }
   } finally {
     await ctx.sql.end({ timeout: 5 });

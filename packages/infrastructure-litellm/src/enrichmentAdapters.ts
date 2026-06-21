@@ -108,8 +108,8 @@ export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentP
     const resolvable = result.relation === "prerequisite" && (matchesA || matchesB);
     const prerequisiteFirst = !matchesB; // default a->b for nominal/unmatched cases
     return {
-      prerequisiteConceptId: prerequisiteFirst ? input.a.conceptId : input.b.conceptId,
-      dependentConceptId: prerequisiteFirst ? input.b.conceptId : input.a.conceptId,
+      prerequisiteDerivedNodeId: prerequisiteFirst ? input.a.derivedNodeId : input.b.derivedNodeId,
+      dependentDerivedNodeId: prerequisiteFirst ? input.b.derivedNodeId : input.a.derivedNodeId,
       outcome: resolvable ? "directed" : result.relation === "none" ? "none" : "uncertain",
       confidence: result.confidence,
       rationale: result.rationale

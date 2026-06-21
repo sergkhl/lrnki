@@ -35,7 +35,7 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
     // of edge direction. Falls back to the layer-level judge if a pair is missing.
     const judgeModelByPair = new Map<string, string>();
     for (const judgment of artifact.payload.judgments) {
-      judgeModelByPair.set(pairKey(judgment.a.conceptId, judgment.b.conceptId), judgment.judgeModel);
+      judgeModelByPair.set(pairKey(judgment.a.derivedNodeId, judgment.b.derivedNodeId), judgment.judgeModel);
     }
     await this.sql.begin(async (tx) => {
       await tx`
@@ -91,10 +91,10 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       }
 
       for (const edge of layer.prerequisiteEdges) {
-        const judgeModel = judgeModelByPair.get(pairKey(edge.prerequisiteConceptId, edge.dependentConceptId)) ?? layer.judgeModel;
+        const judgeModel = judgeModelByPair.get(pairKey(edge.prerequisiteDerivedNodeId, edge.dependentDerivedNodeId)) ?? layer.judgeModel;
         await tx`
           INSERT INTO inferred_prerequisite_edges (inferred_prerequisite_edge_id, enrichment_id, predicate, prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain, judge_model, provenance)
-          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteConceptId}, ${edge.dependentConceptId}, ${edge.confidence}, ${edge.uncertain}, ${judgeModel}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
+          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteDerivedNodeId}, ${edge.dependentDerivedNodeId}, ${edge.confidence}, ${edge.uncertain}, ${judgeModel}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
       }
 
       // Rescue durability dispositions (U4): the relational mirror of the trace's
@@ -114,8 +114,8 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
       for (const difficulty of layer.difficulties) {
         await tx`
-          INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, derived_node_id, score, method, components)
-          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${difficulty.conceptId}, ${difficulty.score}, ${difficulty.method}, ${tx.json(difficulty.components as Parameters<Sql["json"]>[0])})`;
+          INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, derived_node_id, score, method, components, neural_rationale)
+          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${difficulty.derivedNodeId}, ${difficulty.score}, ${difficulty.method}, ${tx.json(difficulty.components as Parameters<Sql["json"]>[0])}, ${difficulty.neuralRationale})`;
       }
 
       await writeArtifactEnvelope(tx, artifact);
@@ -295,21 +295,22 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       FROM inferred_prerequisite_edges WHERE enrichment_id = ${row.enrichment_id}
       ORDER BY prerequisite_derived_node_id, dependent_derived_node_id`;
     const prerequisiteEdges: InferredPrerequisiteEdge[] = edgeRows.map((edge) => ({
-      prerequisiteConceptId: edge.prerequisite_derived_node_id,
-      dependentConceptId: edge.dependent_derived_node_id,
+      prerequisiteDerivedNodeId: edge.prerequisite_derived_node_id,
+      dependentDerivedNodeId: edge.dependent_derived_node_id,
       predicate: edge.predicate as InferredPrerequisiteEdge["predicate"],
       confidence: edge.confidence,
       uncertain: edge.uncertain,
       provenance: edge.provenance
     }));
 
-    const difficultyRows = await this.sql<{ derived_node_id: string; score: number; method: string; components: ConceptDifficulty["components"] }[]>`
-      SELECT derived_node_id, score, method, components FROM concept_difficulties WHERE enrichment_id = ${row.enrichment_id} ORDER BY derived_node_id`;
+    const difficultyRows = await this.sql<{ derived_node_id: string; score: number; method: string; components: ConceptDifficulty["components"]; neural_rationale: string }[]>`
+      SELECT derived_node_id, score, method, components, neural_rationale FROM concept_difficulties WHERE enrichment_id = ${row.enrichment_id} ORDER BY derived_node_id`;
     const difficulties: ConceptDifficulty[] = difficultyRows.map((difficulty) => ({
-      conceptId: difficulty.derived_node_id,
+      derivedNodeId: difficulty.derived_node_id,
       score: difficulty.score,
       method: difficulty.method,
-      components: difficulty.components
+      components: difficulty.components,
+      neuralRationale: difficulty.neural_rationale
     }));
 
     return {
@@ -340,7 +341,7 @@ type EnrichmentRow = {
 // Learner Path persistence (ADR-0019, ADR-0011). The CLI computes and persists;
 // the Admin Lab Cytoscape view only reads. A path is a pure deterministic
 // projection, so persist replaces any prior path for the same
-// (enrichmentId, targetConceptId, learnerStateRef) — replay, not mutation.
+// (enrichmentId, targetDerivedNodeId, learnerStateRef) — replay, not mutation.
 export class PostgresLearnerPathStore implements LearnerPathStorePort {
   constructor(private readonly sql: Sql) {}
 
@@ -348,27 +349,27 @@ export class PostgresLearnerPathStore implements LearnerPathStorePort {
     await this.sql.begin(async (tx) => {
       const prior = await tx<{ learner_path_id: string }[]>`
         SELECT learner_path_id FROM learner_paths
-        WHERE enrichment_id = ${path.enrichmentId} AND target_derived_node_id = ${path.targetConceptId} AND learner_state_ref = ${path.learnerStateRef}`;
+        WHERE enrichment_id = ${path.enrichmentId} AND target_derived_node_id = ${path.targetDerivedNodeId} AND learner_state_ref = ${path.learnerStateRef}`;
       for (const row of prior) {
         await tx`DELETE FROM learner_path_steps WHERE learner_path_id = ${row.learner_path_id}`;
         await tx`DELETE FROM learner_paths WHERE learner_path_id = ${row.learner_path_id}`;
       }
       await tx`
         INSERT INTO learner_paths (learner_path_id, graph_version_id, enrichment_id, target_derived_node_id, learner_state_ref)
-        VALUES (${path.learnerPathId}, ${path.graphVersionId}, ${path.enrichmentId}, ${path.targetConceptId}, ${path.learnerStateRef})`;
+        VALUES (${path.learnerPathId}, ${path.graphVersionId}, ${path.enrichmentId}, ${path.targetDerivedNodeId}, ${path.learnerStateRef})`;
       for (const step of path.steps) {
         await tx`
           INSERT INTO learner_path_steps (learner_path_step_id, learner_path_id, position, derived_node_id, difficulty, included_reason)
-          VALUES (${randomUUID()}, ${path.learnerPathId}, ${step.position}, ${step.conceptId}, ${step.difficulty}, ${step.includedReason})`;
+          VALUES (${randomUUID()}, ${path.learnerPathId}, ${step.position}, ${step.derivedNodeId}, ${step.difficulty}, ${step.includedReason})`;
       }
     });
   }
 
-  async getPath(input: { enrichmentId: string; targetConceptId: string; learnerStateRef: string }): Promise<LearnerPath | undefined> {
+  async getPath(input: { enrichmentId: string; targetDerivedNodeId: string; learnerStateRef: string }): Promise<LearnerPath | undefined> {
     const rows = await this.sql<{ learner_path_id: string; graph_version_id: string; enrichment_id: string; target_derived_node_id: string; learner_state_ref: string }[]>`
       SELECT learner_path_id, graph_version_id, enrichment_id, target_derived_node_id, learner_state_ref
       FROM learner_paths
-      WHERE enrichment_id = ${input.enrichmentId} AND target_derived_node_id = ${input.targetConceptId} AND learner_state_ref = ${input.learnerStateRef}
+      WHERE enrichment_id = ${input.enrichmentId} AND target_derived_node_id = ${input.targetDerivedNodeId} AND learner_state_ref = ${input.learnerStateRef}
       LIMIT 1`;
     if (rows.length === 0) return undefined;
     const row = rows[0];
@@ -376,7 +377,7 @@ export class PostgresLearnerPathStore implements LearnerPathStorePort {
       SELECT position, derived_node_id, difficulty, included_reason FROM learner_path_steps WHERE learner_path_id = ${row.learner_path_id} ORDER BY position`;
     const steps: LearnerPathStep[] = stepRows.map((step) => ({
       position: step.position,
-      conceptId: step.derived_node_id,
+      derivedNodeId: step.derived_node_id,
       difficulty: step.difficulty,
       includedReason: step.included_reason as LearnerPathStep["includedReason"]
     }));
@@ -384,7 +385,7 @@ export class PostgresLearnerPathStore implements LearnerPathStorePort {
       learnerPathId: row.learner_path_id,
       graphVersionId: row.graph_version_id,
       enrichmentId: row.enrichment_id,
-      targetConceptId: row.target_derived_node_id,
+      targetDerivedNodeId: row.target_derived_node_id,
       learnerStateRef: row.learner_state_ref,
       steps
     };

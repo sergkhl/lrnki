@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DatabaseZapIcon, SearchCodeIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -97,7 +98,9 @@ export default async function RunListPage() {
                     <TableCell>{run.completeProfileCount} / {run.profileCount}</TableCell>
                     <TableCell>{run.definitionCount} / {run.mentionCount} / {run.assertionCount}</TableCell>
                     <TableCell>{run.latencyMs !== null ? `${Math.round(run.latencyMs / 1000)}s` : "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">{run.startedAt.slice(0, 19).replace("T", " ")}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <LocalDateTime iso={run.startedAt} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

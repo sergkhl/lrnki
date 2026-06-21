@@ -263,6 +263,7 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
         JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id AND ad.tier = 'core'
         LEFT JOIN run_optional_assertion_evidence oae ON oae.run_optional_assertion_id = oa.run_optional_assertion_id
         LEFT JOIN source_blocks sb ON sb.source_block_id = oae.source_block_id
+        WHERE p.run_id = ${run.run_id}
         ORDER BY cc.candidate_key, oa.run_optional_assertion_id`;
 
       result.push({

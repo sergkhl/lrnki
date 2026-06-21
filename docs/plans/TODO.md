@@ -6,10 +6,22 @@ by real mixed-domain pipeline output, not by deferred method-stack preference.
 ## TODO
 
 Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
-outputs: intrinsic difficulty is implemented and inspected at `EXPERIMENT_ONLY` trust, and a CEP
-definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighborhood run.
+outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
+`EXPERIMENT_ONLY` trust, and prior CEP definition-quality caveats remain visible in the mixed-domain run.
 
-1. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
+   plausible ordering but confirmed a concentrated broad/evidence-thin distortion, especially relation-like or
+   framework-level labels with sparse evidence. Evidence:
+   `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`.
+   - Do **not** patch prompts with fixture-specific expected answers or named concepts. Any fix must remain
+     domain-neutral and comply with AGENTS rules 16/17.
+   - Prefer persisting difficulty rationales and/or a measured neural judge that can explicitly assess whether a
+     broad, evidence-thin node should be down-weighted. Keep any oracle/benchmark disposable unless it continues to
+     earn its keep.
+   - Population calibration remains deferred until real learner-response data exists; this follow-up is about
+     operator-facing intrinsic ordering, not IRT/KT/Bradley-Terry.
+
+2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
    still found low-value accepted Definition Passages such as heading-only or citation-like snippets in the
    AIRA-dojo Markdown run.
@@ -20,143 +32,141 @@ definition-quality caveat was exposed by the 2026-06-18 structure-aware-neighbor
    - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
      and the inspected newly included adjacent blocks were genuine explaining passages.
 
-2. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
+3. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
+   malformed JSON forced-tool argument during AIRA-dojo Markdown concept admission; rerunning the single source
+   succeeded. Keep fail-closed semantics, but improve retry observability and capture malformed tool-call snippets
+   safely enough to diagnose provider/schema drift without logging secrets or full copyrighted source context.
+
+4. **Improve card-bank inspection around citation exactness.** Persisted cards passed the project verifier
+   (`evidenceQuoteMatches`) 87/87, but only 68/87 citations were byte-exact substrings of source blocks because the
+   verifier intentionally tolerates parser formatting noise (markdown emphasis, curly quotes, line wrapping, HTML
+   entities). Admin/inspection surfaces should label this distinction clearly so operators do not confuse normalized
+   verifier success with exact copied text.
+
+5. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
    - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
-     densification, or non-LLM prerequisite signals from method-stack preference.
+     densification, or non-LLM prerequisite signals from method-stack preference. Population difficulty calibration
+     stays deferred until the study Game UI exists and per-learner calibration is stable (task 1 / ADR-0024).
    - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
      behavior without hiding provenance or identity defects.
 
 ## COMPLETED
 
-- **Prerequisite hint assertion measured and removed (2026-06-19).** Added a disposable enrichment-context
-  probe, ran a real LiteLLM A/B over mixed-domain graph version `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b`, then
-  removed `explicit-prerequisite-hint` after the clean run showed an identical edge set: 13 certain edges with
-  hints fed vs. 13 certain edges with hints suppressed, no endpoint or uncertainty diff. `defines` is now the
-  sole Optional Typed Assertion; prerequisite prose remains ordinary CEP mention evidence consumed by exhaustive
-  Graph Enrichment. Evidence under `tmp/2026-06-18-prerequisite-hint-ab/`.
-- **Learner-neutral intrinsic difficulty implemented (2026-06-18, branch `feat/intrinsic-difficulty-remove-f3`).**
-  Replaced the `dag-depth-mock` port with `intrinsic-fused-v1`: `DifficultyPort.score` now receives per-node
-  evidence contexts, `LiteLlmIntrinsicDifficultyJudgmentAdapter` uses a forced named tool schema on
-  `kg-independent-judge`, and `createIntrinsicDifficultyPort` fuses the neural subscore with deterministic
-  topological depth, transitive ancestors, fan-in, and evidence-density components. The enrichment config hash is
-  now `intrinsic-difficulty-v3`; ADR-0024 records that learner-calibrated IRT/BT remains data-blocked. Rule-14
-  real-use inspection over enrichment `7ff10930-3236-4ea6-99f8-407e3a960d14` classified the signal
-  `EXPERIMENT_ONLY`: useful for plausible secondary ordering, not calibrated learner difficulty.
-- **F3 densification removed through U3 (2026-06-18, branch `feat/intrinsic-difficulty-remove-f3`).** Removed the
-  failed graph-densification experiment from live code: deleted sparse-region detection, the densification
-  experiment runner, the bridge-proposal port/type/schema/adapter/tests, the worker `densify-experiment` command,
-  the `shortestPathHops` thin-connected helper, and the `densification` minting reason. ADR-0019 now records F3
-  as removed rather than dormant.
-- **Structure-aware evidence neighborhood for CEP extraction (2026-06-18).** Added a pure deterministic
-  `selectEvidenceNeighborhood` in `domain-core` that widens CEP input from mention/label blocks to a capped,
-  priority-ordered, extractable-only neighborhood: mention blocks, adjacent extractable body blocks, same
-  `headingPath` siblings, then label/alias blocks. Wired it through `executeExtractionRun` without changing the
-  port shape or the verbatim floor; added `prev`/`next` structural rendering with full-document adjacency for
-  filtered CEP neighborhoods; bumped the worker config hash to `structure-aware-neighborhood-v37`; and registered
-  the datalab Markdown 2507 fixture. Rule-14 mixed-domain re-run: InstructKG incomplete CEPs improved **9 → 3**,
-  economics stayed **1 → 1**, and AIRA-dojo Markdown exposed remaining CEP-quality caveats. Evidence under
+- **Adapted-graph comparison view + full-manifest difficulty-ordering evaluation (2026-06-20).** Completed
+  `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md` U1–U6. Admin Lab now renders one
+  neutral/adapted `DerivedGraphExplorer` pair per distinct learner-path enrichment, badged by synthetic/human
+  response source; the adapted panel colors mastered/frontier/locked nodes, rings the selected frontier target,
+  scales nodes by intrinsic difficulty, and flags cardless nodes while leaving the neutral enrichment view intact.
+  The rule-14 evaluation published/enriched full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` /
+  `223cfb32-47a2-4488-a61a-561f6673f717` with real LiteLLM calls and classified `intrinsic-fused-v1` as
+  `EXPERIMENT_ONLY`, useful for operator inspection but not calibrated learner difficulty. Evidence:
+  `tmp/2026-06-20-intrinsic-difficulty-full-manifest/`.
+- **Derived-node identity naming cleanup + ADR-0025 amendment (2026-06-20).** Renamed every
+  learner-loop / path / difficulty / derived-edge field that carried a `derived_node_id` under the
+  misleading name `conceptId` / `targetConceptId` / `prerequisite|dependentConceptId` to its
+  `derivedNodeId` form across domain-core, ports, application, litellm, Postgres stores, the worker
+  CLI, and Admin Lab; dropped the `derived_node_id AS concept_id` read-layer query aliases; and
+  renamed the card-draft citation key `sourceBlockId → passageId` (including the model-facing
+  forced-tool schema) because a generated card's grounding passage is not a source block. Legitimate
+  asserted `concept_id` fields (Concept, CEP, anchor projection, scaffolded anchors) were left intact.
+  Amended ADR-0025 with the two-identity model (`derived_node_id` = recall subject, `card_id` = item),
+  the append-only log, the one-outcome-per-node invariant (kept as atomic write + per-node unique key,
+  no new outcome table), and the deferred cross-enrichment learner identity. Pure identifier change:
+  the single DB migration was already on `derived_node_id`, so no schema change. Declined the review's
+  suggestions to add a `card_generation_outcomes` table and to remove the synthetic learner simulator
+  (already behind a port and already deferred per "keep deferred methods deferred").
+- **Learner recall loop and adaptive path (2026-06-19 to 2026-06-20).** Built the learner-neutral Card Bank,
+  append-only Response Log, `EXPERIMENT_ONLY` mastery fold, synthetic learner seeding, Admin Lab inspection path,
+  and adaptive projection. Extended cards and response rows to the full Derived Graph Layer so `source_mentioned`
+  and `llm_grounded` Enrichment Nodes can be recall-tested. Latest real-use evidence:
+  `tmp/2026-06-20-multitarget-loop/`.
+- **No-card frontier fallback persisted and exercised live (2026-06-20).** Made a derived node the card generator
+  cannot recall-test a durable fact: new `rejected_cards` table written in the same transaction as an enrichment's
+  cards (delete-then-insert replacement; runs even at 0 surviving cards), `RejectedCard` moved to `domain-core`,
+  `CardBankStorePort.persist` reshaped to `{ graphVersionId, enrichmentId, configHash, cards, rejected }`, and the
+  card-bank artifact bumped `card_bank.v2 → v3` with the JSON_TABLE view following. The Admin Lab path-coverage view
+  now reads the persisted rejection reason instead of guessing from grounding origin. Triggered the fallback live:
+  live `generate-cards` over a real `source_mentioned` node whose grounding was set to the genuine verbatim-floor
+  `failed` state rejected it ("no usable grounding passages"), the adaptive frontier advanced straight to that
+  cardless node, and the real coverage SQL surfaced the persisted reason beside carded `generated`/`source_cep`
+  steps. Closes the previously 3×-deferred no-card live-trigger gap. Evidence:
+  `tmp/2026-06-20-rejected-card-persistence/`.
+- **Card provenance and learner-loop validation hardening (2026-06-20).** Reran the teachable-cards validation
+  with a real LiteLLM key, reset the DB, extracted all six manifest sources, published/enriched graph version
+  `4e6c56a6-...` / `41b80e67-...`, generated 50/50 cards with honest source/generated provenance, and confirmed
+  adaptive pruning over enrichment-node response rows. Evidence: `tmp/2026-06-20-teachable-cards-rerun/`.
+- **Optional Typed Assertion simplification (2026-06-19).** Measured `explicit-prerequisite-hint` with a disposable
+  real LiteLLM A/B and removed it after the edge set stayed identical. `defines` is now the sole Optional Typed
+  Assertion; prerequisite prose remains ordinary CEP mention evidence consumed by exhaustive Graph Enrichment.
+  Evidence: `tmp/2026-06-18-prerequisite-hint-ab/`.
+- **Learner-neutral intrinsic difficulty and F3 removal (2026-06-18).** Replaced the `dag-depth-mock` port with
+  `intrinsic-fused-v1`, recorded the learner-calibrated difficulty deferral in ADR-0024, and removed the failed
+  F3 densification experiment from live code and ADR-0019. F1 prerequisite ordering had already passed over
+  biology, economics, and InstructKG; F3 v1 proposed 0 bridges and v2 had no domain-neutral trigger worth keeping.
+  Evidence: `tmp/2026-06-18-intrinsic-difficulty/`, `tmp/2026-06-17-f1-enrichment-eval/`.
+- **Structure-aware CEP evidence retrieval (2026-06-18).** Added deterministic, capped structural neighborhoods
+  for CEP extraction: mention blocks, adjacent extractable body blocks, same-`headingPath` siblings, then
+  label/alias blocks. The verbatim floor stayed unchanged. InstructKG incomplete CEPs improved 9 to 3; remaining
+  low-value heading/citation-like definitions are now TODO #1. Evidence:
   `tmp/2026-06-18-structure-aware-neighborhood/`.
-- **Enrichment-ordering evaluation gate (F1) and v1 densification experiment (F3) (2026-06-17).** Ran a real
-  mixed-domain F1 evaluation of Graph Enrichment prerequisite ordering over biology, economics, and InstructKG:
-  all three Learner Paths judged `PASS` (no concept before a prerequisite it requires; every step traces to a CEP
-  passage or grounded derived node), and the thin/disconnected regions earning F3 were recorded. Added the
-  `mintingReason: "assumed_prerequisite" | "densification"` facet to `llm_grounded` nodes (ADR-0019 amended, not
-  superseded; ADR-0012/0016 untouched), pure sparse-region detection + connectivity metrics, the
-  `BridgeConceptProposalPort` + forced-tool LiteLLM adapter, `runDensificationExperiment`, and the
-  `densify-experiment` worker command. F3 v1 ran `EXPERIMENT_ONLY` and proposed **0 bridges**: its
-  topology-primary trigger only addresses disconnected/orphan gaps, and the baseline is already
-  same-domain-connected, so densification value remains unmeasured (next task #1). The experiment appended an
-  append-only artifact and left the asserted graph identity unchanged. Evidence under
-  `tmp/2026-06-17-f1-enrichment-eval/` and `tmp/2026-06-17-f3-densification-experiment/`.
-- **Ungroundable core demotion and InstructKG publishability (2026-06-17).** Changed extraction-run completeness
-  policy so an incomplete core CEP demotes the candidate to `optional` with boundary reason
-  `core_demoted_ungroundable` instead of failing the run; added run-level `degraded`, `critical` quality-issue
-  severity, relational persistence, v6 artifact projection, and Admin Lab demotion/degraded surfaces. The real
-  InstructKG re-run published successfully; in that run `Pedagogical Roles` was already corrected to optional by
-  admission evidence validation, so the demotion path was verified by deterministic envelope tests rather than
-  by that live model sample.
-- **Evidence-backed node treatment contract — admission + rescue (2026-06-16, U1–U6).** Gave each promotion
-  gate an evidence-backed treatment contract: (U1) a fourth core-admission criterion requires verbatim-validated
-  definition-bearing source treatment; (U2) that verified evidence is carried into CEP extraction as a hint
-  without bypassing the port or weakening the verbatim floor; (U3) a measured, cross-family, drop-only
-  rescue-durability judge (fail-open-with-flag) gates `source_mentioned` rescue before a derived node exists;
-  (U4) per-pair judge model and rescue dispositions are persisted relationally + in the JSONB trace; (U5) Admin
-  Lab exposes per-domain origin counts, dispositions, per-edge judge model, per-step origin badges, and marks
-  failed runs not publishable. Validated by the rule-14 native re-run (see VALIDATION): Rust/biology/economics
-  succeed with 0 incomplete core CEPs (the String Type / Heap allocation failure mode is gone); the rescue judge
-  drops incidental artifacts with grounded rationales while keeping transferable concepts. One blocker recorded
-  (InstructKG core completeness for a borderline meta-concept). Domain-neutral throughout (rules 16/17).
-- **Evaluation-first roadmap reset (2026-06-16).** Normalized fixture docs so Gate 1 names the manifest-backed
-  native batch including the InstructKG Markdown fixture; ran real extraction/publication/enrichment/path
-  generation over Rust, biology, economics, and InstructKG; recorded disposable inspection notes under
-  `tmp/evaluation-first-roadmap-reset/`; rewrote this roadmap from inspected output. Fixed a real persistence
-  defect discovered by the batch: anchor projection `derivedNodeId`s are now per-enrichment deterministic IDs,
-  while `conceptId` remains the asserted Concept pointer, so repeated enrichment over the same graph version no
-  longer collides on `derived_graph_nodes_pkey`.
-- **Derived-layer prerequisite enrichment — node + edge derivation, U1-U9 (branch
-  `feat/derived-layer-prerequisite-enrichment`).** Graph Enrichment mints `llm_grounded` prerequisite nodes via
-  an explicit anchor-driven proposal port, rescues `source_mentioned` nodes from member runs' non-core mentions,
-  judges anchors + enrichment nodes same-domain, routes generated-node pairs to `kg-generated-prerequisite-judgment`,
-  and keeps the asserted layer untouched. Prior Rust rule-14 run `0911ecd0-11a1-4f6a-97a1-d4cc7f8cb272` produced
-  a useful path to Ownership; current mixed-batch validation is the newer evidence.
-- **Domain-neutral extraction prompts + run-scoped quality issues (2026-06-16).** Removed fixture and benchmark
-  answer-key calibration from model-facing extraction prompts and forced-tool schema descriptions, added AGENTS
-  rule 17, bumped the extraction pipeline config hash to `cep-domain-neutral-prompts-v35`, and added
-  `ExtractionQualityIssue[]` to extraction artifacts for Admin Lab inspection.
-- **Reset milestone 4 — worker/Admin Lab/export reshape + docs (branch `refactor/cep-core-reset`).** Run
-  Inspector reports CEP completeness and quality issues; published Graph Explorer is a zero-edge CEP evidence
-  inspector; Enrichment Run views render the Derived Graph Layer independently of learner paths; RDF export emits
-  Concept identity/labels/aliases only; ADRs, CONTEXT, README, fixtures notes, and roadmap were rewritten for the
-  post-reset architecture.
-- **Reset milestones 1-3 — admission precision, CEP extraction, publication, and exhaustive same-domain
-  enrichment.** Admission emits atomic proposals and uses neural source-role/domain relevance; standing oracle
-  machinery was deleted; CEP extraction replaced claims; Graph-Version Builds explicitly select runs and publish
-  Concepts + CEPs with zero asserted edges; Graph Enrichment judges every unordered same-domain CEP pair without
-  embeddings or candidate groups.
-- **Historical vertical slice and mixed-format ingestion.** Native ingestion, Graph-Version Build, Graph
-  Enrichment, Learner Path projection, Admin Lab read-only views, and Gate 2 Docling PDF ingestion exist as
-  historical capability. Additional DOCX/PPTX expansion is not active work.
+- **Evidence-backed admission, rescue, and ungroundable-core policy (2026-06-16 to 2026-06-17).** Added
+  definition-bearing treatment to core admission, carried verified evidence into CEP extraction without bypassing
+  the port, gated `source_mentioned` rescue with a drop-only measured durability judge, surfaced provenance pressure
+  in Admin Lab, and changed incomplete-core handling from run failure to optional demotion with loud quality issues.
+- **Evaluation-first roadmap reset and domain-neutral extraction cleanup (2026-06-16).** Rebuilt the roadmap from
+  real mixed-domain runs instead of method-stack preference, normalized the manifest-backed fixture batch, fixed the
+  enrichment anchor projection persistence collision, removed fixture-derived model-facing prompt calibration, and
+  added run-scoped quality issues for inspection.
+- **Post-reset graph architecture baseline.** The reset architecture now admits atomic Concepts, publishes
+  source-grounded CEPs with zero asserted edges, builds graph versions explicitly from selected runs, derives
+  prerequisite structure only in Graph Enrichment, keeps learner state downstream, and exposes the current surfaces
+  through Admin Lab, RDF export, native ingestion, and Gate 2 Docling PDF ingestion.
 
 ## VALIDATION
 
-Latest validation (2026-06-19) is the **prerequisite hint A/B removal gate**
-(`docs/plans/2026-06-18-004-refactor-prerequisite-hint-measure-remove-plan.md`):
+Latest change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
 
-- **Static/unit:** focused `pnpm --filter @lrnki/application test -- runGraphEnrichment` passed after the
-  temporary probe was added and refined to suppress only prerequisite hints while preserving `defines`.
-- **Real-use (rule-14 prerequisite hint A/B):** real LiteLLM enrichment over mixed-domain graph version
-  `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b`, using a fixed in-memory enrichment id and serialized pair calls,
-  produced identical inferred edge sets with and without the labeled hint signal: 13 certain edges, 0 uncertain
-  edges, no endpoint diff.
-- **Inspection result:** `PASS`, safe to remove. The prerequisite hint label did not change the derived
-  prerequisite structure, so it was removed from extraction schema, policy, entailment, publication, enrichment
-  context, and docs. Evidence under `tmp/2026-06-18-prerequisite-hint-ab/`.
+- **Static/unit:** `packages/application` 151/0 for the current suite, including `classifyAdaptedNodes` coverage
+  for AE1/AE2 classification, threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with
+  `selectFrontierTarget`, empty frontier, and mastered-over-ready precedence. `apps/admin-lab` 30/0, including U2
+  pure-helper coverage (`dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`) and U3
+  overlay view-model coverage (neutral unchanged, adapted tagging + single frontier mark, cardless in both
+  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck clean after U5
+  page wiring. Page composition remains un-unit-tested by local convention; U5 uses the DB-bound loader and was
+  verified by the same real-use path as U6.
+- **Real-use:** full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` and enrichment
+  `223cfb32-47a2-4488-a61a-561f6673f717` were produced with real LiteLLM calls. The run persisted 50/50
+  `intrinsic-fused-v1` difficulties across all five manifest domains. Inspection result:
+  `EXPERIMENT_ONLY` for intrinsic ordering — broadly plausible chains in every domain, but concentrated broad/thin
+  distortions remain and learner-calibrated difficulty is still data-blocked. Evidence:
+  `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`.
 
-Prior latest validation (2026-06-18) was the **intrinsic difficulty implementation and rule-14 inspection**
-(`docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`):
+Prior change (2026-06-20) is the **derived-node identity naming cleanup** — a deterministic identifier
+refactor (no behavior change), so it is verified statically, not by a new rule-14 real-use run:
 
-- **Static/unit:** focused and package checks passed: `pnpm --filter @lrnki/infrastructure-litellm test`,
-  `pnpm --filter @lrnki/infrastructure-litellm typecheck`, `pnpm --filter @lrnki/ports typecheck`,
-  `pnpm --filter @lrnki/domain-core typecheck`, `pnpm --filter @lrnki/application test`,
-  `pnpm --filter @lrnki/application typecheck`, and `pnpm --filter @lrnki/kg-worker typecheck`.
-- **Real-use (rule-14 intrinsic difficulty):** fresh real enrichment
-  `7ff10930-3236-4ea6-99f8-407e3a960d14` over mixed-domain graph version
-  `ba7f5f9b-241c-4dc3-b265-904ac1bbcb7b` used real LiteLLM calls and produced
-  `enrichmentConfigHash=intrinsic-difficulty-v3`, `difficulty_method=intrinsic-fused-v1`,
-  `nodes(anchor/enrichment)=13/14`, `edges(certain/uncertain)=27/3`, and `difficulties=27`.
-- **Inspection result:** `EXPERIMENT_ONLY`, safe to continue only with difficulty kept as a secondary,
-  non-calibrated signal. Plausible examples: economics progresses from `Propensity to Truck, Barter, and Exchange`
-  0.238 to `Universal Opulence from Division of Labour` 0.519; biology replication-model anchors at equal
-  `topoDepth=2` are differentiated; generated passages remain `not_applicable_by_grounding` while
-  `source_mentioned` passages remain `verified`. Caveats: no learner-data oracle, untuned weights, and some broad
-  rescued nodes may be overestimated. Evidence under `tmp/2026-06-18-intrinsic-difficulty/`.
+- **Static/unit:** full workspace typecheck green (exit 0); unit suites green where DB-free — domain-core,
+  application 144/0, litellm, rdf-export, ingestion, admin-lab 19/0; eslint 0 errors (2 pre-existing
+  unrelated warnings). Postgres integration suite re-run against a live DB (2026-06-20): 19/19 pass, 0 fail,
+  0 skipped — covering both `PostgresLearnerLoopStores` (cards, append-only `response_log`, `rejected_cards`
+  replacement) and `PostgresStores` (transactional CEP run persistence, zero-edge snapshot, enrichment
+  round-trips). The identity rename was pure TS field changes over unchanged SQL columns, and the live
+  round-trip confirms the write and `JSON_TABLE` read paths still match the on-disk schema.
+- **Real-use:** unchanged. The loop's last real-use quality status remains the 2026-06-20 `PASS` /
+  `EXPERIMENT_ONLY` evaluation below; a rename does not alter model output.
 
-### Prior validations (provenance in archived plans)
+Prior real-use validation (2026-06-20) is the **no-card frontier fallback persistence + live-trigger rule-14 evaluation**
+(`tmp/2026-06-20-rejected-card-persistence/rule-14-evaluation.md`):
 
-- 2026-06-18 F3 removal through U3 — `docs/plans/2026-06-18-003-feat-intrinsic-difficulty-f3-removal-plan.md`
-- 2026-06-18 F3 v2 thin-connected-region gate — `docs/plans/2026-06-18-002-feat-densification-thin-region-trigger-plan.md`
-- 2026-06-18 structure-aware evidence-neighborhood — `docs/plans/2026-06-18-001-feat-structure-aware-evidence-neighborhood-plan.md`
-- 2026-06-17 F1 enrichment-ordering gate + F3 v1 — `docs/plans/2026-06-17-002-feat-enrichment-eval-graph-densification-plan.md`
-- 2026-06-17 ungroundable-core demotion — `docs/plans/2026-06-17-001-feat-demote-ungroundable-core-plan.md`
-- 2026-06-16 evidence-backed node treatment — `docs/plans/2026-06-16-002-feat-evidence-backed-node-treatment-plan.md`
-- 2026-06-16 evaluation-first native batch reset — `docs/plans/2026-06-16-001-feat-evaluation-first-roadmap-reset-plan.md`
+- **Static/unit:** full workspace suite green — domain-core 16/0, ingestion 9/0, litellm 35/0, rdf-export 2/0,
+  Postgres integration 19/0 (incl. the new rejected-card persistence + replacement test on live Postgres),
+  application 144/0, admin-lab 19/0; eslint clean on changed files (one pre-existing unrelated warning). Real LLM
+  access via `kg-*` LiteLLM aliases (the `.env` key).
+- **Real-use:** live `generate-cards` over four clean 3-node enrichments produced 15/15 cards, 0 natural rejections
+  (confirming the generator cards ~100%). A faithful verbatim-floor failure on a real `source_mentioned` node
+  (`Borrowing`, enrichment `65aca80d-…`) then produced a real rejection ("no usable grounding passages") persisted
+  to `rejected_cards`; the adaptive frontier advanced to that cardless node, and the actual coverage SQL returned the
+  no-card step with the persisted reason beside carded `generated`/`source_cep` steps.
+- **Inspection result:** `PASS` for the durable closure (rejections are now persisted and honestly surfaced instead
+  of vanishing to console) and the live read-path demonstration. The loop overall stays `EXPERIMENT_ONLY`
+  (uncalibrated learner model). No `FIX_FIRST` defect. Caveat: a *spontaneous* model-driven rejection remains rare
+  and was triggered here via a faithful construction of the real failure mode.

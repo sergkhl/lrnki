@@ -800,7 +800,9 @@ export type RescueDisposition = {
 // and LABELED `defines` assertions. The exhaustive same-domain design (ADR-0019
 // reset) removed contextual-embedding clustering and candidate groups.
 export type PrerequisiteConceptContext = {
-  conceptId: string;
+  // The Derived Graph Layer node being judged (anchor projection OR enrichment node),
+  // never the asserted Concept id — enrichment nodes have no Concept identity.
+  derivedNodeId: string;
   canonicalLabel: string;
   aliases: string[];
   definitions: string[];
@@ -813,7 +815,7 @@ export type PrerequisiteConceptContext = {
 // llm_grounded nodes carry their generated grounding bundle text. This is not a
 // Concept projection and does not weaken the verbatim floor.
 export type DifficultyNodeContext = {
-  conceptId: string;
+  derivedNodeId: string;
   canonicalLabel: string;
   aliases: string[];
   declaredDomain: string;
@@ -826,8 +828,8 @@ export type DifficultyNodeContext = {
 // "uncertain" is flagged for review and excluded from the path, never silently
 // promoted to an edge (concept-first method stack §4; goal 1.6/4).
 export type PrerequisiteJudgment = {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   outcome: "directed" | "none" | "uncertain";
   confidence: number;
   rationale: string;
@@ -838,8 +840,8 @@ export type PrerequisiteJudgment = {
 // weak-edge cut (ADR-0019). `uncertain` edges are retained for inspection but
 // excluded from path traversal.
 export type InferredPrerequisiteEdge = {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   predicate: InferredRelationPredicate;
   confidence: number;
   uncertain: boolean;
@@ -857,8 +859,8 @@ export type PrerequisiteJudgmentTrace = {
 };
 
 export type InferredEdgeDisposition = {
-  prerequisiteConceptId: string;
-  dependentConceptId: string;
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
   disposition: "insufficient_evidence" | "uncertain" | "weak_cut" | "cycle_removed" | "transitive_reduction" | "kept";
 };
 
@@ -881,12 +883,18 @@ export type EnrichmentRunTrace = {
 
 // Node difficulty keeps a stable output shape while the producer evolves. The
 // current direction is learner-neutral intrinsic difficulty; learner-calibrated
-// IRT/BT remains deferred until learner-response data exists.
+// IRT/BT remains deferred until learner-response data exists. Keyed to the Derived
+// Graph Layer node (anchors ∪ enrichment nodes), never the asserted Concept.
 export type ConceptDifficulty = {
-  conceptId: string;
+  derivedNodeId: string;
   score: number;
   method: string;
   components: Record<string, number>;
+  // The neural judge's free-text justification for its difficulty subscore (ADR-0024).
+  // Kept beside the strictly-numeric `components` so an operator can read WHY a node
+  // scored as it did. Empty for deterministic structural-only producers that never
+  // consult the judge; the persisted production port always carries the judge's text.
+  neuralRationale: string;
 };
 
 // The immutable output of Graph Enrichment, keyed to (graphVersionId +
@@ -912,7 +920,7 @@ export type DerivedGraphLayer = {
 
 export type LearnerPathStep = {
   position: number;
-  conceptId: string;
+  derivedNodeId: string;
   difficulty: number;
   includedReason: "prerequisite" | "target";
 };
@@ -921,8 +929,104 @@ export type LearnerPath = {
   learnerPathId: string;
   graphVersionId: string;
   enrichmentId: string;
-  targetConceptId: string;
+  targetDerivedNodeId: string;
   // Identifies the learner state used; the mock is "mock:empty" (knows nothing).
   learnerStateRef: string;
   steps: LearnerPathStep[];
 };
+
+// ---------------------------------------------------------------------------
+// Learner Recall Loop — Card Bank (R1–R3). A learner-NEUTRAL derived asset: one
+// anki-style card per Derived Graph Layer node, conditioned on that node's
+// grounding and keyed to the enrichment node identity. Regenerable without
+// affecting learner state; never written into the asserted graph or the Derived
+// Graph Layer (CONTEXT.md "Learner State", AGENTS rule 3). The two recall modes
+// read ONE card: calibration uses `selfReportPrompt`, measurement grades a written
+// answer against `answerKey` (Key Technical Decisions: one item, two signal types).
+// ---------------------------------------------------------------------------
+
+export type CardGroundingProvenance = "source_cep" | "source_mentioned" | "generated";
+
+// Provenance-tagged citations keep generated grounding honest: source citations
+// must verify against source text, generated citations verify only against the
+// generated grounding bundle and never carry source ids.
+export type CardAnswerKeyCitation =
+  | { provenance: "source"; sourceResourceId: string; sourceBlockId: string; evidenceQuote: string }
+  | { provenance: "generated"; derivedNodeId: string; passageText: string };
+
+export type Card = {
+  cardId: string;
+  graphVersionId: string;
+  enrichmentId: string;
+  derivedNodeId: string;
+  groundingProvenance: CardGroundingProvenance;
+  question: string;
+  answerKey: string;
+  selfReportPrompt: string;
+  citations: CardAnswerKeyCitation[];
+  generatingModel: string;
+  configHash: string;
+};
+
+// A derived node that produced NO recall-testable card, recorded as a durable fact
+// rather than a transient log line. The card generator is the sole authority for
+// recall-testability, so every node it cannot card is persisted here with the exact
+// reason (no grounding, unverifiable citation, generation failure). The no-card
+// frontier fallback reads this reason instead of guessing from grounding origin.
+export type RejectedCard = {
+  derivedNodeId: string;
+  canonicalLabel: string;
+  reason: string;
+};
+
+// The model's PRE-verification card output (U2). The model cites grounding passages
+// by `passageId` + a quote; the application boundary verifies each quote verbatim
+// against the cited grounding passage before promoting a draft to a persisted Card
+// (AGENTS rule 6 fail-closed). `passageId` is a source block id for source-grounded
+// nodes but a synthetic generated-passage id for `llm_grounded` nodes, so the field
+// is NOT a source block id and must never be persisted as one. A draft whose citations
+// do not all verify is rejected, never silently kept.
+export type CardDraft = {
+  question: string;
+  answerKey: string;
+  selfReportPrompt: string;
+  citations: { passageId: string; evidenceQuote: string }[];
+};
+
+// ---------------------------------------------------------------------------
+// Response Log — the durable, append-only commitment (R4–R6). Every recall attempt
+// is an immutable row. `self_report` rows carry an anki-style rating; `graded` rows
+// carry a judged outcome plus a [0,1] score (the partial/binary distinction the
+// estimator and a later IRT/BKT fit need, AE4). The skill is the Derived Graph Layer
+// `derivedNodeId`; the item is `cardId` (per-item IRT key).
+// ---------------------------------------------------------------------------
+
+export type SignalType = "self_report" | "graded";
+export type SelfReportRating = "again" | "hard" | "good" | "easy";
+export type JudgedOutcome = "correct" | "partial" | "incorrect";
+export type ResponseSource = "synthetic" | "human";
+
+export type ResponseLogRow = {
+  responseId: string;
+  learnerStateRef: string;
+  cardId: string;
+  derivedNodeId: string;
+  signalType: SignalType;
+  selfReportRating: SelfReportRating | null;
+  judgedOutcome: JudgedOutcome | null;
+  gradedScore: number | null;
+  evidenceWeight: number;
+  responseSource: ResponseSource;
+  graderIdentity: string | null;
+  // Groups one calibration sweep so re-calibration appends a distinct batch (R10).
+  batchId: string | null;
+  // Monotonic per learner_state_ref — the ordered sequence BKT/IRT consume (R6).
+  attemptSeq: number;
+  submittedAnswer: string | null;
+  // Set by the store (DB default) on append; populated on read.
+  createdAt?: string;
+};
+
+// Append shape: a row before the store stamps `createdAt`. There is deliberately no
+// update/delete shape — corrections APPEND (R5).
+export type NewResponseLogRow = Omit<ResponseLogRow, "createdAt">;

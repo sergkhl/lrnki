@@ -105,11 +105,19 @@ The CEP-shaped, source-quoteless grounding a minting operation generates for one
 _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 
 **Learner Path**:
-A projection of one Derived Graph Layer for one target Concept and Learner State, ordered by prerequisite structure and difficulty.
-_Avoid_: course, personalized graph
+A projection of one Derived Graph Layer for one target derived node (`derived_node_id`, anchor or Enrichment Node) and Learner State, ordered by prerequisite structure and difficulty. The recall-loop subject identity is the derived node throughout, never an asserted `concept_id` (ADR-0025).
+_Avoid_: course, personalized graph, concept-keyed learner state
 
 **Learner State**:
 A learner-specific account of mastery consumed by projection and never stored in the learner-neutral graph.
+
+**Card Bank**:
+A learner-neutral recall asset generated alongside one Derived Graph Layer. Cards are keyed to `derived_node_id`, so anchors and Enrichment Nodes share one response identity. Each card declares grounding provenance: `source_cep`, `source_mentioned`, or `generated`.
+_Avoid_: concept-only cards, asserted graph mutation
+
+**Grounding Provenance**:
+The Card Bank citation contract for a recall card. Source-grounded cards cite verbatim source evidence; generated cards cite generated grounding bundle passages and are labeled as generated, never as source quotes.
+_Avoid_: fake source citation, unlabeled generated quote
 
 ## Flagged Ambiguities
 

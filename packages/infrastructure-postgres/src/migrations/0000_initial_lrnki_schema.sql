@@ -1,7 +1,7 @@
 -- Single initial migration (AGENTS rule 8). Reset local state rather than adding migrations.
 -- This file is the SINGLE SOURCE OF TRUTH for the database schema (AGENTS rule 18):
 -- there is no Drizzle schema and no `drizzle-kit generate` path. Stores query raw SQL
--- via `postgres`; `drizzle-kit migrate` only applies the files in this directory.
+-- via `postgres`; scripts/migrate-db.sh applies this file directly with psql.
 -- Edit this DDL directly (including the JSON_TABLE views and CHECK constraints below).
 
 -- ---------------------------------------------------------------------------
@@ -396,6 +396,29 @@ JSON_TABLE(
 ) AS n
 WHERE a.artifact_type = 'enrichment_run.v2';
 
+-- Flatten card-bank artifact payloads: one row per learner-neutral Card with its
+-- derived node, grounding provenance, question, self-report prompt, and answer-key
+-- citation count, for Admin Lab inspection (R3, R15). Reads the immutable
+-- `card_bank` artifact the Card Bank store writes beside its normalized rows.
+CREATE VIEW artifact_cards AS
+SELECT a.graph_version_id, c.card_id, c.enrichment_id, c.derived_node_id,
+       c.grounding_provenance, c.question, c.self_report_prompt, c.citation_count
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.cards[*]'
+  COLUMNS (
+    card_id text PATH '$.cardId',
+    enrichment_id text PATH '$.enrichmentId',
+    derived_node_id text PATH '$.derivedNodeId',
+    grounding_provenance text PATH '$.groundingProvenance',
+    question text PATH '$.question',
+    self_report_prompt text PATH '$.selfReportPrompt',
+    citation_count integer PATH '$.citations.size()'
+  )
+) AS c
+WHERE a.artifact_type = 'card_bank.v3';
+
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
 -- version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
@@ -488,6 +511,11 @@ CREATE TABLE concept_difficulties (
   score real NOT NULL,
   method text NOT NULL,
   components jsonb NOT NULL,
+  -- The neural judge's free-text difficulty rationale (ADR-0024). Kept beside the
+  -- strictly-numeric `components` JSONB so an operator can read why a node scored as it
+  -- did. NOT NULL: the production judge's forced-tool schema always requires `rationale`,
+  -- so the port always supplies one (empty string for any structural-only producer).
+  neural_rationale text NOT NULL,
   UNIQUE (enrichment_id, derived_node_id)
 );
 
@@ -537,3 +565,107 @@ CREATE TABLE learner_path_steps (
   UNIQUE (learner_path_id, position),
   UNIQUE (learner_path_id, derived_node_id)
 );
+
+-- ---------------------------------------------------------------------------
+-- Learner Recall Loop — learner-neutral Card Bank keyed to the Derived Graph
+-- Layer (R1–R3). One card per derived node, conditioned on that node's grounding.
+-- Cards retain graph_version_id for publication scope and key their subject on
+-- derived_node_id so anchors and enrichment nodes share one identity space.
+-- Regenerable; never mutates the asserted core or the Derived Graph Layer.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE cards (
+  card_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
+  question text NOT NULL,
+  answer_key text NOT NULL,
+  self_report_prompt text NOT NULL,
+  generating_model text NOT NULL,
+  config_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (derived_node_id)
+);
+
+-- Answer-key citations are provenance-tagged. Source citations mirror real source
+-- evidence and require source ids + a verbatim quote. Generated citations point at
+-- generated grounding text only and cannot smuggle nullable source ids through the
+-- schema. Cascade so card regeneration (delete-then-insert) clears citations too.
+CREATE TABLE card_answer_key_citations (
+  card_answer_key_citation_id uuid PRIMARY KEY,
+  card_id uuid NOT NULL REFERENCES cards(card_id) ON DELETE CASCADE,
+  provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
+  source_resource_id uuid REFERENCES source_resources(source_resource_id),
+  source_block_id uuid REFERENCES source_blocks(source_block_id),
+  evidence_quote text,
+  derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  generated_passage_text text,
+  CHECK (
+    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
+    OR
+    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
+  )
+);
+
+-- Derived nodes the card generator could NOT make recall-testable, recorded as a
+-- durable fact (not a transient log line). One of {card, rejection} exists per node;
+-- regeneration replaces an enrichment's rejections alongside its cards. The no-card
+-- frontier fallback reads `reason` instead of guessing from grounding origin.
+CREATE TABLE rejected_cards (
+  rejected_card_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  reason text NOT NULL,
+  config_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (derived_node_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Response Log — the ONE irreversible commitment (R4–R6). Append-only: every
+-- recall attempt is an immutable row. There is no UPDATE or DELETE path in the
+-- store port; re-calibration and Admin Lab resubmission APPEND new rows (R5, R10).
+-- The log stores the derived_node_id as the skill. Field set is deliberately IRT-
+-- and BKT-sufficient: `card_id` is the per-item IRT key, `derived_node_id` the
+-- per-skill BKT key, and `attempt_seq` the monotonic-per-learner sequence both
+-- fits need (R6).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE response_log (
+  response_id uuid PRIMARY KEY,
+  learner_state_ref text NOT NULL,
+  card_id uuid NOT NULL REFERENCES cards(card_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  signal_type text NOT NULL CHECK (signal_type IN ('self_report', 'graded')),
+  self_report_rating text CHECK (self_report_rating IN ('again', 'hard', 'good', 'easy')),
+  judged_outcome text CHECK (judged_outcome IN ('correct', 'partial', 'incorrect')),
+  graded_score real CHECK (graded_score >= 0 AND graded_score <= 1),
+  evidence_weight real NOT NULL,
+  response_source text NOT NULL CHECK (response_source IN ('synthetic', 'human')),
+  grader_identity text,
+  batch_id uuid,
+  attempt_seq integer NOT NULL,
+  submitted_answer text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  -- Signal/outcome coherence: a self_report carries a rating (no graded fields); a
+  -- graded row carries an outcome AND a score (no rating). Fail-closed at the DB
+  -- so no incoherent row can ever enter the durable log.
+  CHECK (
+    (signal_type = 'self_report' AND self_report_rating IS NOT NULL AND judged_outcome IS NULL AND graded_score IS NULL)
+    OR
+    (signal_type = 'graded' AND judged_outcome IS NOT NULL AND graded_score IS NOT NULL AND self_report_rating IS NULL)
+  ),
+  UNIQUE (learner_state_ref, attempt_seq)
+);
+
+-- Flatten Response Log rows for Admin Lab inspection (R15, R16). A plain relational
+-- projection — the log is normalized, not artifact-enveloped (it is learner state,
+-- not a published artifact).
+CREATE VIEW artifact_response_log AS
+SELECT response_id, learner_state_ref, card_id, derived_node_id, signal_type,
+       self_report_rating, judged_outcome, graded_score, evidence_weight,
+       response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
+FROM response_log;

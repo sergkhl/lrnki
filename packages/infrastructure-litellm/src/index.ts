@@ -21,8 +21,26 @@ export {
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
   rescueDurabilityJudgmentSchema,
-  rescueDurabilityJudgmentValidator
+  rescueDurabilityJudgmentValidator,
+  cardGenerationSchema,
+  cardGenerationValidator,
+  answerGradingSchema,
+  answerGradingValidator,
+  learnerAnswerSimulationSchema,
+  learnerAnswerSimulationValidator
 } from "./toolSchemas";
+export {
+  LiteLlmCardGenerationAdapter,
+  CARD_GENERATION_MODEL
+} from "./cardGenerationAdapters";
+export {
+  LiteLlmAnswerGradingJudgeAdapter,
+  ANSWER_GRADING_JUDGE_MODEL
+} from "./answerGradingAdapters";
+export {
+  LiteLlmLearnerSimulatorAdapter,
+  LEARNER_SIMULATOR_MODEL
+} from "./learnerSimulatorAdapters";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,

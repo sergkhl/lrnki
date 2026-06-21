@@ -4,7 +4,12 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
+  Card,
+  CardDraft,
   ConceptDifficulty,
+  JudgedOutcome,
+  NewResponseLogRow,
+  ResponseLogRow,
   DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -21,6 +26,7 @@ import type {
   PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
+  RejectedCard,
   RescueDurabilityJudgment,
   RunForBuild,
   SourceBlock,
@@ -256,19 +262,19 @@ export interface DifficultyPort {
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
   // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
   // nodes are never fabricated into `Concept` values to satisfy the port (handoff
-  // constraint). `nodes[].conceptId` values are `derived_node_id`s; the returned
-  // `conceptId` field carries the derived node id (the difficulty store keys on
-  // derived_node_id).
+  // constraint). Both the input contexts and the returned difficulties key on
+  // `derivedNodeId` (the difficulty store keys on derived_node_id).
   score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock
-// ("knows nothing"): mastery() === 0 for every concept. Real IRT/KT later
+// ("knows nothing"): mastery() === 0 for every derived node. Real IRT/KT later
 // implements the SAME port, so the projection upstream never changes. Pure/sync:
-// the projection is a deterministic CLI operation (ADR-0011).
+// the projection is a deterministic CLI operation (ADR-0011). Mastery is keyed to the
+// Derived Graph Layer node id (the learner-recall subject identity, ADR-0025).
 export interface LearnerStatePort {
   readonly learnerStateRef: string;
-  mastery(conceptId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
+  mastery(derivedNodeId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
 }
 
 // Graph Enrichment persistence (ADR-0019). Append-only; each run has its own
@@ -294,5 +300,85 @@ export interface EnrichmentRunStorePort {
 // Cytoscape view renders; the CLI computes and persists, the UI never computes.
 export interface LearnerPathStorePort {
   persist(path: LearnerPath): Promise<void>;
-  getPath(input: { enrichmentId: string; targetConceptId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
+  getPath(input: { enrichmentId: string; targetDerivedNodeId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
+}
+
+// ---------------------------------------------------------------------------
+// Learner Recall Loop ports (R1–R16). Learner-neutral Card Bank plus the durable
+// append-only Response Log. All learner structures are projection-only: nothing
+// here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
+// ---------------------------------------------------------------------------
+
+// Card Bank persistence (R3). `persist` writes a whole enrichment's cards AND its
+// rejected (no-card) nodes atomically, plus the immutable `card_bank` artifact, in
+// one transaction (no authoritative relational state without its artifact, matching
+// the enrichment/extraction stores). Regeneration replaces an enrichment's cards and
+// rejections (delete-then-insert) rather than silently duplicating against the
+// `derived_node_id` unique key. Rejected nodes are persisted so the no-card frontier
+// fallback reads the real rejection reason instead of guessing from grounding origin.
+export interface CardBankStorePort {
+  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; cards: Card[]; rejected: RejectedCard[] }): Promise<void>;
+  getCard(derivedNodeId: string): Promise<Card | undefined>;
+  listCardsForEnrichment(enrichmentId: string): Promise<Card[]>;
+}
+
+// Card generation (R1, R2). Forced named tool schema routed through LiteLLM; the
+// generator stays DeepSeek-family (AGENTS rule 5). Returns a pre-verification
+// CardDraft conditioned on ONE Concept's published CEP — the application boundary
+// verifies citations verbatim and resolves provenance before persisting (U2).
+// Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ
+// only — there is no update or delete — so the append-only guarantee (R5) is
+// structural, not a convention. `nextAttemptSeq` hands the caller the next monotonic
+// sequence for a learner so calibration/measurement stamp ordered rows.
+export interface ResponseLogStorePort {
+  append(rows: NewResponseLogRow[]): Promise<void>;
+  listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
+  listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]>;
+  nextAttemptSeq(learnerStateRef: string): Promise<number>;
+}
+
+// Learner answer simulator (R14, U7). Generates a learner's free-form written answer
+// for a card at a given competence, so synthetic prefill exercises the REAL grading
+// path (the answer is graded by AnswerGradingJudgePort, not stubbed). DeepSeek-family
+// generator; EXPERIMENT_ONLY scaffolding, never asserted in tests (AGENTS rule 11).
+export interface LearnerAnswerSimulatorPort {
+  readonly model: string;
+  simulateAnswer(input: {
+    declaredDomain: string;
+    question: string;
+    // "strong" → a competent answer; "weak" → a partial or struggling answer.
+    competence: "strong" | "weak";
+  }): Promise<{ answer: string }>;
+}
+
+// Answer grading judge (R9, U5). Grades a free-form written answer against a card's
+// answer-key, cross-family on `kg-independent-judge` so the DeepSeek card generator
+// never grades its own answer-key (KTD, ADR-0023). Forced named tool schema; the
+// adapter validates arguments fail-closed.
+export interface AnswerGradingJudgePort {
+  readonly model: string;
+  grade(input: {
+    declaredDomain: string;
+    question: string;
+    answerKey: string;
+    submittedAnswer: string;
+  }): Promise<{ outcome: JudgedOutcome; score: number; rationale: string }>;
+}
+
+export interface CardGenerationPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: Card["groundingProvenance"];
+    // Grounding passages the card may cite. Source-grounded passages carry source ids
+    // and require verbatim quotes; generated passages carry generated text and no
+    // source ids.
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    // The single guarded `defines` literal, when the CEP carries one (HINT only).
+    definesLiteral: string | null;
+  }): Promise<CardDraft>;
 }
