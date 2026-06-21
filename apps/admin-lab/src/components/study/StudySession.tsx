@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { GraduationCapIcon, SlidersHorizontalIcon } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { GraduationCapIcon, SlidersHorizontalIcon, TrophyIcon } from "lucide-react";
 import type { SelfAssessmentOutcome } from "@lrnki/application";
 import { selfAssessCard, submitCalibration } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
 import { CalibrationSweep, type CalibrationRating } from "@/components/study/CalibrationSweep";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
+import { nextStudyTarget } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,14 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const [sheetOpen, setSheetOpen] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Auto-advance bookkeeping (U4). After an answer we keep the sheet open and snapshot the
+  // CURRENT session object; the advance fires only once a DIFFERENT session arrives (the
+  // server re-fold delivered via revalidatePath), never on the synchronous pending-flag
+  // flip against the stale prop. Refs because neither should trigger a re-render itself.
+  const pendingAdvanceRef = useRef(false);
+  const sessionAtAnswerRef = useRef(session);
 
+  const goalReached = session.classification.selectedFrontierTarget === null;
   const sourceSummary = session.responseSourceSummary;
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
@@ -37,13 +45,31 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     const content = selectedContent;
     if (!content || content.kind !== "frontier_card") return;
     const cardId = content.card.cardId;
+    // Keep the sheet open and arm the advance; the effect below retargets it once the
+    // re-folded session prop arrives (R4). Do NOT close here — that was the drop-out (AE1).
+    pendingAdvanceRef.current = true;
+    sessionAtAnswerRef.current = session;
     startTransition(async () => {
       await selfAssessCard({ learnerStateRef: session.learnerStateRef, cardId, outcome });
-      // The frontier has advanced; close the sheet so the re-coloured graph is the focus (AE2).
-      setSheetOpen(false);
-      setSelectedNodeId(null);
     });
   };
+
+  // Advance effect (U4, R4/AE1): when a DIFFERENT session object arrives after an answer
+  // (the server re-fold), retarget the open sheet to the freshly-advanced frontier target.
+  // A null target means the goal is reached — close the sheet (the completion state shows).
+  // Keyed on `session`: it does not run on the synchronous pending-flag flip (same prop).
+  useEffect(() => {
+    if (!pendingAdvanceRef.current || session === sessionAtAnswerRef.current) return;
+    pendingAdvanceRef.current = false;
+    const target = nextStudyTarget(session.classification);
+    if (target === null) {
+      setSheetOpen(false);
+      setSelectedNodeId(null);
+    } else {
+      setSelectedNodeId(target);
+      setSheetOpen(true);
+    }
+  }, [session]);
 
   const onCalibrate = (ratings: CalibrationRating[]) => {
     startTransition(async () => {
@@ -78,6 +104,20 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
           </div>
         </CardHeader>
       </Card>
+
+      {goalReached ? (
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4 text-sm">
+            <TrophyIcon className="size-5 text-chart-4" />
+            <span>
+              <span className="font-medium">Goal reached.</span>{" "}
+              <span className="text-muted-foreground">
+                Every concept on the path to {session.target.label} is mastered — nothing left to study here.
+              </span>
+            </span>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {calibrating ? (
         <CalibrationSweep items={session.calibrationItems} onSubmit={onCalibrate} pending={pending} />

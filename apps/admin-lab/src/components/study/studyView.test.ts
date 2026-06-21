@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { assessmentDisabled, calibrationRatingFor } from "./studyView";
+import { assessmentDisabled, calibrationRatingFor, nextStudyTarget } from "./studyView";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +18,14 @@ test("assess controls are disabled until the answer is revealed (Covers R6)", ()
 test("'I know it' maps to a propagating 'good'; 'not sure' maps to a non-propagating 'hard' (Covers R2/R3)", () => {
   assert.equal(calibrationRatingFor("know_it"), "good");
   assert.equal(calibrationRatingFor("not_sure"), "hard");
+});
+
+test("nextStudyTarget returns the freshly-advanced frontier target when present (Covers R4)", () => {
+  assert.equal(nextStudyTarget({ selectedFrontierTarget: "node-2" }), "node-2");
+});
+
+test("nextStudyTarget returns null when the goal is reached (no frontier target)", () => {
+  assert.equal(nextStudyTarget({ selectedFrontierTarget: null }), null);
 });
 
 // Covers R15: the transfer-ready modules import no Admin-Lab loader and no server action,

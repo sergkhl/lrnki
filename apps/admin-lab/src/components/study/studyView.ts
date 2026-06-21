@@ -41,3 +41,12 @@ export function calibrationRatingFor(choice: CalibrationChoice): SelfReportRatin
 export function assessmentDisabled(revealed: boolean): boolean {
   return !revealed;
 }
+
+// The next node to study after a frontier item is answered (U4, R4). The server re-folds
+// mastery and re-classifies after each answer; this reads the freshly-advanced frontier
+// target so the open sheet can retarget to it. `null` means the goal is reached (nothing
+// ready+unmastered) — the caller closes the sheet and shows a completion state. Accepts a
+// minimal structural shape so this module stays free of any Admin-Lab / application import.
+export function nextStudyTarget(classification: { selectedFrontierTarget: string | null }): string | null {
+  return classification.selectedFrontierTarget;
+}
