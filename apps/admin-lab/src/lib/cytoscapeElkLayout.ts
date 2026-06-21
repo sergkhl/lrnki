@@ -33,7 +33,40 @@ function elkNodeFor(node: NodeSingular): ElkNode {
   };
 }
 
-export async function applyElkLayeredLayout(cy: Core, isStale: () => boolean): Promise<void> {
+// The closest the focus-fit will zoom (KTD2): a sparse 1-2 node neighborhood would
+// otherwise fit-to-fill at an absurd zoom. When the fit exceeds this, clamp the level and
+// re-center on the focus so the working region stays framed without filling the viewport.
+export const MAX_FOCUS_ZOOM = 1.3;
+
+// Build a Cytoscape collection from node ids, skipping any not present in the graph.
+function collect(cy: Core, nodeIds: string[]) {
+  let collection = cy.collection();
+  for (const id of nodeIds) {
+    const node = cy.getElementById(id);
+    if (!node.empty()) collection = collection.union(node);
+  }
+  return collection;
+}
+
+// Frame the viewport on a focus collection with a max-zoom clamp (KTD2/KTD3). VIEWPORT-ONLY
+// — pan + zoom, never `cy.layout()` — so node positions from the one-time ELK pass survive
+// untouched (the blink-compare invariant, R11). Falls back to fit-to-all when the focus is
+// empty or unresolvable. Reused by both the initial layout framing and the advance-recenter
+// effect so the two can never diverge.
+export function recenterOnFocus(cy: Core, focusNodeIds: string[]): void {
+  const focus = collect(cy, focusNodeIds);
+  if (focus.empty()) {
+    cy.fit(cy.elements(), 28);
+    return;
+  }
+  cy.fit(focus, 60);
+  if (cy.zoom() > MAX_FOCUS_ZOOM) {
+    cy.zoom(MAX_FOCUS_ZOOM);
+    cy.center(focus);
+  }
+}
+
+export async function applyElkLayeredLayout(cy: Core, isStale: () => boolean, focusNodeIds?: string[]): Promise<void> {
   const nodes = cy.nodes().toArray().filter((node) => !node.isParent());
   if (nodes.length === 0) return;
 
@@ -65,7 +98,10 @@ export async function applyElkLayeredLayout(cy: Core, isStale: () => boolean): P
     });
 
     if (isStale() || cy.destroyed()) return;
-    cy.fit(cy.elements(), 28);
+    // Initial framing: focus on the working region when given (study surface), else
+    // fit-to-all (neutral enrichment page + learner-path explorer, byte-unchanged).
+    if (focusNodeIds && focusNodeIds.length > 0) recenterOnFocus(cy, focusNodeIds);
+    else cy.fit(cy.elements(), 28);
   } finally {
     try {
       elk.terminateWorker();

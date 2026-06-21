@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
-import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
-import { buildDerivedGraphView, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
+import { applyElkLayeredLayout, recenterOnFocus } from "@/lib/cytoscapeElkLayout";
+import { buildDerivedGraphView, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,20 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // without re-running layout when the callback identity changes each render.
   const onNodeSelectRef = useRef(onNodeSelect);
   onNodeSelectRef.current = onNodeSelect;
+  // The learner's working region (KTD2): the frontier target's 1-hop closed neighborhood,
+  // or undefined when there's no classification (neutral enrichment page → fit-to-all).
+  // Recomputed only when the target or topology changes.
+  const focusNodeIds = useMemo(
+    () => (adapted?.selectedFrontierTarget ? frontierNeighborhood(adapted.selectedFrontierTarget, detail.edges) : undefined),
+    [adapted?.selectedFrontierTarget, detail.edges]
+  );
+  // Read in the layout effect (keyed on topology only) without making it a dependency, so a
+  // frontier advance never re-runs ELK — it recenters via the viewport-only effect below.
+  const focusRef = useRef(focusNodeIds);
+  focusRef.current = focusNodeIds;
+  // Guards the recenter effect: the async ELK pass resolves after first paint, so until it
+  // does, initial framing is owned by the focus-fit at the end of the layout pass.
+  const layoutReadyRef = useRef(false);
   const hasClassification = adapted != null;
   // The adapted view is the informative one, so default to it when a classification is
   // available; the enrichment page (no classification) is always neutral.
@@ -91,6 +105,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   useEffect(() => {
     if (!containerRef.current) return;
     let stale = false;
+    layoutReadyRef.current = false;
     const styles = getComputedStyle(containerRef.current);
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = 1;
@@ -230,9 +245,14 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
     cytoscapeRef.current = cy;
     // Node-tap → caller (U5). Reads the ref so the handler always calls the latest callback.
     cy.on("tap", "node", (event) => onNodeSelectRef.current?.(event.target.id()));
-    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
-      if (!stale) console.error("Failed to lay out derived graph", error);
-    });
+    void applyElkLayeredLayout(cy, () => stale, focusRef.current)
+      .then(() => {
+        // Layout has positioned nodes and framed the initial focus; advances may now recenter.
+        if (!stale) layoutReadyRef.current = true;
+      })
+      .catch((error: unknown) => {
+        if (!stale) console.error("Failed to lay out derived graph", error);
+      });
     return () => {
       stale = true;
       cy.destroy();
@@ -258,6 +278,19 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
       }
     });
   }, [layoutView, mode, adapted]);
+
+  // Advance-recenter effect (KTD3) — keyed on the classification's frontier target, so it
+  // fires on a FRONTIER ADVANCE, never on the neutral↔adapted mode toggle (which is local
+  // `mode` state, absent from the deps). VIEWPORT-ONLY: it re-frames on the new working
+  // region via `recenterOnFocus` and never re-runs ELK, so pinned positions survive (R11).
+  // Skipped until the one-time layout pass has resolved — initial framing is the focus-fit
+  // at the end of that pass, not this effect.
+  useEffect(() => {
+    const cy = cytoscapeRef.current;
+    if (!cy || cy.destroyed() || !layoutReadyRef.current) return;
+    if (!focusNodeIds || focusNodeIds.length === 0) return;
+    recenterOnFocus(cy, focusNodeIds);
+  }, [focusNodeIds]);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">

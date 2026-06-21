@@ -150,6 +150,24 @@ export interface DerivedGraphView {
   };
 }
 
+// The frontier target's 1-hop CLOSED neighborhood (KTD2): the target plus its direct
+// prerequisites and direct dependents, deduped. This is the learner's working region the
+// study graph frames on — "about five nodes". Computed over RENDERED edges (certain AND
+// uncertain, since the canvas draws both), so the framed region matches the visible graph;
+// contrast U5's calibration, which walks only trusted edges. Pure and direction-agnostic:
+// an isolated node returns just itself.
+export function frontierNeighborhood(
+  targetDerivedNodeId: string,
+  edges: Pick<DerivedGraphEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">[]
+): string[] {
+  const ids = new Set<string>([targetDerivedNodeId]);
+  for (const edge of edges) {
+    if (edge.dependentDerivedNodeId === targetDerivedNodeId) ids.add(edge.prerequisiteDerivedNodeId); // direct prerequisite (upstream)
+    if (edge.prerequisiteDerivedNodeId === targetDerivedNodeId) ids.add(edge.dependentDerivedNodeId); // direct dependent (downstream)
+  }
+  return [...ids];
+}
+
 export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeId: string): string {
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
