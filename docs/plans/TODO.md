@@ -1,13 +1,88 @@
 # TODO
 
-Roadmap reset 2026-06-16, updated by the 2026-06-18 structure-aware-neighborhood run: the next work is earned
-by real mixed-domain pipeline output, not by deferred method-stack preference.
+## ⏳ IN PROGRESS — Typed Study Item model (Plan 2), U6–U8 remaining (2026-06-21)
+
+Plan: `docs/plans/2026-06-21-002-feat-typed-study-item-model-plan.md`. Branch:
+`feat/learner-calibrated-study-loop` (continuing here per user choice; Plan 1's surface work is underneath).
+**U1–U5 are shipped and committed (each unit's own tests green); U6, U7, U8 remain.**
+
+| Unit | State |
+|---|---|
+| U1 typed domain model + ADR-0026 | ✅ committed |
+| U2 deterministic option-select guard (11 tests) | ✅ committed |
+| U3 generation port/adapter + sibling selector (13 tests) | ✅ committed |
+| U4 Postgres reshape — migration + store (9 live-DB tests) | ✅ committed |
+| U5 build fan-out + worker `generate-study-items` (6 tests) | ✅ committed |
+| **U6 auto-graded write + delete self-assessed path** | ⬜ TODO |
+| **U7 typed study UI** | ⬜ TODO |
+| **U8 rule-14 real-use evaluation** (blocked on U6+U7) | ⬜ TODO |
+
+**Mid-rename compile state (expected):** this is a rule-18 full `Card → StudyItem` rename, so the repo does
+NOT fully typecheck yet — that is the work U6+U7 finish. Green now: `domain-core`, `ports`,
+`infrastructure-litellm`, `infrastructure-postgres`. Still broken until U6/U7: `application`
+(`calibration.ts`, `syntheticResponses.ts`, `measurement.ts`, `selfAssessment.ts` still use `cardId`/old
+`Card`), `kg-worker` (the `synthesize-responses` path passes `StudyItem[]` into `synthesizeResponses` —
+reconciled by U6's `syntheticResponses` reshape), and `admin-lab` (study UI + SQL loaders). **Before
+declaring done:** `pnpm -r typecheck && pnpm -r test` must be green (export `DATABASE_URL` from `.env` first).
+
+### U6 — auto-graded option-select write + delete self-assessed study path
+- NEW `packages/application/src/optionSelectOutcome.ts` — `appendOptionSelectOutcome(...)`: `chosen===correct`
+  → `graded(correct,1.0)` else `graded(incorrect,0)`, `graderIdentity:"auto"`, `evidenceWeight:
+  GRADED_EVIDENCE_WEIGHT`, `selfReportRating:null`, `submittedAnswer:null`, `attemptSeq` from `nextAttemptSeq`.
+  Mirror deleted `appendSelfAssessedGrade` (`selfAssessment.ts:28-55`) minus the self-grader identity.
+- NEW `optionSelectOutcome.test.ts` — plan §U6 scenarios (correct→1/auto; wrong→0/auto; fold via
+  `foldConceptMastery`; monotonic `attemptSeq`; `responseSource` passthrough; R15 no graph/enrichment write
+  import; deletion guard — `appendSelfAssessedGrade`/`SELF_GRADER_IDENTITY` no longer exported).
+- DELETE `packages/application/src/selfAssessment.ts` + `selfAssessment.test.ts` (rule 18); drop their exports
+  from `application/src/index.ts`.
+- Rename `cardId`→`studyItemId` in `calibration.ts`, `syntheticResponses.ts`, `measurement.ts` (+ tests) and
+  `responseLogLearnerState.test.ts`. Reshape `synthesizeResponses` to consume `SelfAssessmentItem`/`StudyItem`
+  keyed on `studyItemId` (this also unbreaks the worker `synthesize-responses` path).
+- `apps/admin-lab/src/app/admin/lab/study/actions.ts` — `selfAssessCard`→`submitOptionSelect` (re-derive the
+  keyed-correct option SERVER-side by `studyItemId` from the DB; never trust the client); `submitCalibration`
+  reads `self_assessment` items via `listStudyItemsForEnrichment`. Calibration's `self_report` path is UNTOUCHED.
+
+### U7 — typed study UI (admin-lab)
+- NEW `components/study/OptionSelectCard.tsx` (4 options, click → `onSelect(optionId)`, keyed feedback, disable
+  while `pending`).
+- `studyView.ts`(+`.test.ts`): `SheetContent` → frontier `option_select | cardless`; drop
+  `frontier_card`/`assessmentDisabled`/`SelfAssessmentOutcome`; add `StudyOptionSelectView`; keep
+  `mastered_review`. Keep the prop-only, no-loader/no-action contract (R15).
+- `StudySideSheet.tsx` (render option_select; cardless-for-studying flag when no option_select item — even if a
+  self_assessment item exists, calibration-only now), `RecallCard.tsx` (read-only or delete; remove Got it/Missed
+  it controls, R8), `StudySession.tsx` (`onAssess`→`onSelect` calling `submitOptionSelect`),
+  `lib/studySession.ts`(+`.test.ts`) typed loader, `study/page.tsx` follow-through.
+- ALSO (not in the plan's U7 file list but these query the renamed tables and break the app at runtime — fix in
+  U7): `lib/enrichments.ts` (`JOIN cards`→`study_items`), `lib/derivedGraph.ts`, `lib/learnerLoop.ts`(+`.test.ts`)
+  (`cards`/`card_id`/`rejected_cards` → `study_items`/`study_item_id`/`rejected_study_items`),
+  `app/admin/lab/learner-loop/actions.ts`, `components/LearnerLoopReview.tsx`, `components/study/CalibrationSweep.tsx`.
+
+### U8 — rule-14 real-use evaluation (gate before downstream)
+- The DB schema was already dropped+recreated with the reshaped migration (rule 9), so **prior seed data is
+  gone** — re-seed via `scripts/seed-demo.sh` (real LiteLLM), then `pnpm worker:kg generate-study-items
+  <enrichmentId>` on the Rust ownership enrichment.
+- Inspect per plan §U8 (distractor plausibility + honest labeling AE4/R15; guard rejections are real not
+  over-veto; fan-out correctness; self-assessment-only → cardless-for-studying AE5/R13; click correct → one
+  `graded(auto)` row + mastered + frontier reselect, no got-it/missed-it AE1; click wrong → incorrect).
+- Write `tmp/2026-06-21-typed-study-items/rule-14-evaluation.md`; classify PASS/FIX_FIRST/EXPERIMENT_ONLY/BLOCKED.
+  No test asserts model output quality (rule 11).
+
+### Env notes
+- `DATABASE_URL` in `.env`: `postgresql://lrnki:lrnki@localhost:5432/lrnki` (reachable; reshaped migration applied).
+- Fast single-file test: `npx tsx --test <file>`. Postgres integration tests need
+  `export $(grep -E '^DATABASE_URL=' .env | xargs)` first (else they skip silently).
+
+---
+
+Roadmap reset 2026-06-16, updated by the 2026-06-21 study-advance/spiral-layout rule-14 pass: the next work is earned
+by real mixed-domain pipeline output and inspected learner-loop behavior, not by deferred method-stack preference.
 
 ## TODO
 
 Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
 outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
-`EXPERIMENT_ONLY` trust, and prior CEP definition-quality caveats remain visible in the mixed-domain run.
+`EXPERIMENT_ONLY` trust, the study advance guard plus spiral graph layout passed rule-14 inspection, and prior CEP
+definition-quality caveats remain visible in the mixed-domain run.
 
 1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
    plausible ordering but confirmed a concentrated broad/evidence-thin distortion, especially relation-like or
@@ -44,14 +119,47 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
    verifier success with exact copied text.
 
 5. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
-   - Do not reintroduce Bradley-Terry difficulty, IRT/KT, learner simulation, embeddings, clustering, F3
-     densification, or non-LLM prerequisite signals from method-stack preference. Population difficulty calibration
-     stays deferred until the study Game UI exists and per-learner calibration is stable (task 1 / ADR-0024).
-   - Reconsider one only when a run-scoped inspection or measured experiment shows it beats the current explicit
-     behavior without hiding provenance or identity defects.
+   - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a difficulty or
+     learner model on synthetic or self-assessed responses stay deferred until the study Game UI exists and per-learner
+     calibration is stable (task 1 / ADR-0024). Do not reintroduce embeddings, clustering, or non-LLM prerequisite
+     signals from method-stack preference.
+   - **Graph-growth guard (narrowed).** Do not reintroduce F3-style densification: no ungrounded bridge-node/bridge-edge
+     pass, no embedding/clustering gate, and no method-stack-driven graph growth. Performance-driven graph growth may be
+     reconsidered only as a measured, run-scoped experiment. Learner responses may propose candidate missing
+     prerequisites or candidate edge audits, but they must not directly mutate the asserted graph or silently modify an
+     existing Derived Graph Layer. Any accepted mechanism must be versioned, provenance-visible, validated against
+     held-out learner data or inspected real-use runs, and compared against the current ADR-0019 exhaustive same-domain
+     judgment baseline.
 
 ## COMPLETED
 
+- **Study advance guard + prerequisite-order spiral graph layout (2026-06-21).** Replaced the
+  shared ELK layered placement with deterministic prerequisite-order spiral placement for Admin Lab
+  derived graph canvases, including the learner-path graph. Ordering uses certain prerequisite edges
+  only, keeps uncertain edges visible but placement-neutral, tie-breaks by difficulty/label/id, and
+  terminates deterministically on cycles. The study side sheet now ignores stale dismiss signals while
+  answer-triggered retargeting is guarded, clears selection only on accepted user dismissal or goal
+  completion, and keys recall cards by `cardId` so advanced cards start unrevealed. The earlier
+  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md` success is superseded: the observed
+  `Memory address` -> `Variable` sheet-dismiss regression invalidated its side-sheet continuity
+  evidence. Fresh rule-14 inspection over disposable learner `eval-spiral-advance` classified this
+  fix `PASS`: `Memory address` -> `Reveal answer` -> `Got it` advanced the still-open sheet to
+  `Variable`, the `Variable` card was unrevealed, and both derived-graph and learner-path Cytoscape
+  canvases rendered through the spiral helper. Caveat: the full 50-node mixed-domain spiral still has
+  dense edge crossings; this is deterministic prerequisite placement, not force-directed untangling.
+  Evidence: `tmp/2026-06-21-spiral-study-advance/rule-14-evaluation.md`.
+- **Study surface polish + calibration propagation trust fix (2026-06-21).** Completed
+  `docs/plans/2026-06-21-002-feat-study-surface-polish-plan.md` U1-U6. Admin Lab now uses
+  dedicated graph tokens and a single node-state fill source for legible locked/enrichment/frontier/mastered
+  states, clear button-vs-tag presentation on the study surface, frontier-neighborhood framing with
+  viewport-only recenter on advance, and uninterrupted post-answer retargeting of the open side sheet.
+  Calibration propagation now mirrors readiness trust by excluding uncertain edges while retaining cycle
+  termination. Its original rule-14 pass over the seeded Rust ownership `Move` path is now superseded by
+  the study advance guard evaluation above because the later observed sheet-dismiss regression invalidated
+  the recorded side-sheet continuity evidence. The retained non-retargeting evidence showed that a direct
+  uncertain-cycle propagation probe seeded only the trusted ancestor and did not credit the goal. Superseded
+  evidence:
+  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md`.
 - **Adapted-graph comparison view + full-manifest difficulty-ordering evaluation (2026-06-20).** Completed
   `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md` U1–U6. Admin Lab now renders one
   neutral/adapted `DerivedGraphExplorer` pair per distinct learner-path enrichment, badged by synthetic/human
@@ -124,15 +232,41 @@ outputs: the learner recall/adaptive path loop now runs end-to-end over all mani
 
 ## VALIDATION
 
-Latest change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
+Latest change (2026-06-21) is the **study advance guard + prerequisite-order spiral graph layout**:
 
-- **Static/unit:** `packages/application` 151/0 for the current suite, including `classifyAdaptedNodes` coverage
+- **Static/unit:** `pnpm --filter @lrnki/admin-lab test` passed 66/0, including sheet dismiss guard coverage,
+  spiral ordering coverage for certain-edge precedence, uncertain-edge exclusion, difficulty/label/id tie-breaks,
+  deterministic cycle termination, and shared derived-graph/learner-path helper inputs. `pnpm --filter
+  @lrnki/admin-lab typecheck` passed. `elkjs` and the local bundled type shim were removed from the Admin Lab
+  dependency surface.
+- **Real-use:** Playwright drove the live Admin Lab study route over enrichment
+  `56e55b9a-a62b-43b9-88de-8d5b381a2da8`, disposable learner `eval-spiral-advance`, target `Move`
+  (`1e1d9b1e-8288-4219-a9d1-f55d1d5b74c3`). The page opened with frontier `Memory address`; clicking the
+  Cytoscape frontier node opened the sheet, `Reveal answer` + `Got it` advanced the page and still-open sheet to
+  `Variable`, and the `Variable` card started unrevealed. The derived graph and learner-path canvases both rendered
+  through the spiral helper. Inspection result: `PASS`. Evidence:
+  `tmp/2026-06-21-spiral-study-advance/rule-14-evaluation.md`.
+
+Prior change (2026-06-21) is the **study surface polish + calibration propagation trust fix**:
+
+- **Static/unit:** `pnpm --filter @lrnki/application test` passed 160/0 for that suite, including the R6 regression
+  cases where positive self-report does not seed ancestors reachable only through uncertain edges and an uncertain-edge
+  cycle does not credit the goal. `pnpm --filter @lrnki/admin-lab test` passed 57/0 at that point, including
+  node-state token distinctness, frontier-neighborhood helper coverage, next-study-target helper coverage,
+  transfer-boundary guards, and study-session gating helpers.
+- **Real-use:** superseded for side-sheet continuity by the latest evaluation above. The retained calibration trust
+  evidence remains the direct uncertain-cycle propagation probe in
+  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md`.
+
+Prior change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
+
+- **Static/unit:** `packages/application` 151/0 for that suite, including `classifyAdaptedNodes` coverage
   for AE1/AE2 classification, threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with
   `selectFrontierTarget`, empty frontier, and mastered-over-ready precedence. `apps/admin-lab` 30/0, including U2
   pure-helper coverage (`dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`) and U3
   overlay view-model coverage (neutral unchanged, adapted tagging + single frontier mark, cardless in both
-  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck clean after U5
-  page wiring. Page composition remains un-unit-tested by local convention; U5 uses the DB-bound loader and was
+  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck was clean after
+  U5 page wiring. Page composition remained un-unit-tested by local convention; U5 used the DB-bound loader and was
   verified by the same real-use path as U6.
 - **Real-use:** full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` and enrichment
   `223cfb32-47a2-4488-a61a-561f6673f717` were produced with real LiteLLM calls. The run persisted 50/50

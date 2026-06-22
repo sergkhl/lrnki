@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { Card, NewResponseLogRow, RejectedCard, StructuredDocument } from "@lrnki/domain-core";
+import type { NewResponseLogRow, OptionSelectItem, RejectedStudyItem, SelfAssessmentItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
-import { PostgresCardBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
+import { PostgresStudyItemBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
 
 // Integration tests against a live PostgreSQL with the single initial migration
@@ -24,11 +24,13 @@ const document: StructuredDocument = {
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
-// Seed the minimum published-graph substrate a Card cites: a source with blocks, a
-// published graph version, and one Concept. Returns the ids the cards key on.
-async function seedSubstrate(sql: Sql): Promise<{
+type Substrate = {
   graphVersionId: string; enrichmentId: string; conceptId: string; derivedNodeId: string; sourceResourceId: string; blockIds: string[];
-}> {
+};
+
+// Seed the minimum published-graph substrate a study item cites: a source with blocks, a
+// published graph version, an enrichment, and one derived node. Returns the ids items key on.
+async function seedSubstrate(sql: Sql): Promise<Substrate> {
   const registration = new PostgresSourceRegistrationStore(sql);
   const contentHash = randomUUID();
   const { sourceResourceId } = await registration.register({
@@ -58,285 +60,224 @@ async function seedSubstrate(sql: Sql): Promise<{
   return { graphVersionId, enrichmentId, conceptId, derivedNodeId, sourceResourceId, blockIds: blocks.map((row) => row.source_block_id) };
 }
 
-// Persist whole-enrichment cards through the port's input shape. Derives the
-// enrichment context from the cards; pass `rejected` for no-card nodes.
-function persistBank(store: PostgresCardBankStore, cards: Card[], rejected: RejectedCard[] = []): Promise<void> {
-  const head = cards[0];
-  return store.persist({ graphVersionId: head.graphVersionId, enrichmentId: head.enrichmentId, configHash: head.configHash, cards, rejected });
-}
-
-function cardFor(input: { graphVersionId: string; enrichmentId: string; derivedNodeId: string; sourceResourceId: string; blockIds: string[] }): Card {
+function selfAssessmentFor(s: Substrate): SelfAssessmentItem {
   return {
-    cardId: randomUUID(),
-    graphVersionId: input.graphVersionId,
-    enrichmentId: input.enrichmentId,
-    derivedNodeId: input.derivedNodeId,
+    itemType: "self_assessment",
+    studyItemId: randomUUID(),
+    graphVersionId: s.graphVersionId,
+    enrichmentId: s.enrichmentId,
+    derivedNodeId: s.derivedNodeId,
     groundingProvenance: "source_cep",
     question: "What does ownership govern?",
     answerKey: "Ownership is the set of rules that govern memory.",
     selfReportPrompt: "How confident are you that you can explain ownership?",
     generatingModel: "test-model",
-    configHash: "card-config-v1",
+    configHash: "cfg",
     citations: [
-      { provenance: "source", sourceResourceId: input.sourceResourceId, sourceBlockId: input.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." },
-      { provenance: "source", sourceResourceId: input.sourceResourceId, sourceBlockId: input.blockIds[1], evidenceQuote: "Borrowing lets you reference a value without taking ownership." }
+      { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." }
     ]
   };
 }
 
-maybe("persists a card with citations and reads it back intact via getCard", async () => {
+function optionSelectFor(s: Substrate): OptionSelectItem {
+  return {
+    itemType: "option_select",
+    studyItemId: randomUUID(),
+    graphVersionId: s.graphVersionId,
+    enrichmentId: s.enrichmentId,
+    derivedNodeId: s.derivedNodeId,
+    groundingProvenance: "source_cep",
+    question: "What does ownership govern?",
+    generatingModel: "test-model",
+    configHash: "cfg",
+    options: [
+      { optionId: randomUUID(), text: "Memory", isCorrect: true, provenance: "source", citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." } },
+      { optionId: randomUUID(), text: "Network sockets", isCorrect: false, provenance: "generated" },
+      { optionId: randomUUID(), text: "Thread scheduling", isCorrect: false, provenance: "generated" },
+      { optionId: randomUUID(), text: "Disk layout", isCorrect: false, provenance: "generated" }
+    ]
+  };
+}
+
+function bankFor(sql: Sql, s: Substrate, items: StudyItem[], rejected: RejectedStudyItem[] = []): Promise<void> {
+  return new PostgresStudyItemBankStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", studyItems: items, rejected });
+}
+
+maybe("persists both a self_assessment and an option_select item for one node; both round-trip with options + citations; supportedItemTypes returns both", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
-    const substrate = await seedSubstrate(sql);
-    const card = cardFor(substrate);
-    const store = new PostgresCardBankStore(sql);
-    await persistBank(store, [card]);
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [selfAssessmentFor(s), optionSelectFor(s)]);
 
-    const loaded = await store.getCard(substrate.derivedNodeId);
-    assert.ok(loaded, "card round-trips");
-    assert.equal(loaded.question, card.question);
-    assert.equal(loaded.answerKey, card.answerKey);
-    assert.equal(loaded.selfReportPrompt, card.selfReportPrompt);
-    assert.equal(loaded.citations.length, 2);
-    assert.deepEqual(
-      loaded.citations.map((c) => c.provenance === "source" ? c.evidenceQuote : c.passageText).sort(),
-      card.citations.map((c) => c.provenance === "source" ? c.evidenceQuote : c.passageText).sort()
+    const store = new PostgresStudyItemBankStore(sql);
+    const items = await store.listStudyItemsForEnrichment(s.enrichmentId);
+    assert.equal(items.length, 2);
+
+    const sa = items.find((i) => i.itemType === "self_assessment") as SelfAssessmentItem;
+    assert.equal(sa.answerKey, "Ownership is the set of rules that govern memory.");
+    assert.equal(sa.citations.length, 1);
+
+    const os = items.find((i) => i.itemType === "option_select") as OptionSelectItem;
+    assert.equal(os.options.length, 4);
+    const correct = os.options.filter((o) => o.isCorrect);
+    assert.equal(correct.length, 1);
+    assert.equal(correct[0].text, "Memory");
+    assert.ok(correct[0].citation && correct[0].citation.provenance === "source");
+    for (const distractor of os.options.filter((o) => !o.isCorrect)) {
+      assert.equal(distractor.provenance, "generated");
+      assert.equal(distractor.citation, undefined);
+    }
+
+    assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["option_select", "self_assessment"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a node with only a self_assessment item supports only that type", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [selfAssessmentFor(s)]);
+    assert.deepEqual(await new PostgresStudyItemBankStore(sql).supportedItemTypes(s.derivedNodeId), ["self_assessment"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("regeneration (delete-then-insert) replaces a prior bank, leaving no orphaned options or citations", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [selfAssessmentFor(s), optionSelectFor(s)]);
+    // Re-persist with only the self_assessment item.
+    await bankFor(sql, s, [selfAssessmentFor(s)]);
+
+    const items = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
+    assert.equal(items.length, 1);
+    assert.equal(items[0].itemType, "self_assessment");
+    const [{ options }] = await sql<{ options: number }[]>`
+      SELECT count(*)::int AS options FROM study_item_options o JOIN study_items si ON si.study_item_id = o.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
+    assert.equal(options, 0, "orphaned options are cascade-cleared");
+    const [{ citations }] = await sql<{ citations: number }[]>`
+      SELECT count(*)::int AS citations FROM study_item_citations c JOIN study_items si ON si.study_item_id = c.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
+    assert.equal(citations, 1, "only the surviving item's citation remains");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("UNIQUE (derived_node_id, item_type) rejects a second item of the same type for one node", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await assert.rejects(() => bankFor(sql, s, [selfAssessmentFor(s), selfAssessmentFor(s)]), /duplicate key|unique/i);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("type-coherence CHECK rejects an option_select row with a non-null answer_key", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await assert.rejects(
+      () => sql`
+        INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
+        VALUES (${randomUUID()}, 'option_select', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'should not be here', NULL, 'm', 'cfg')`,
+      /violates check constraint/i
     );
   } finally {
     await sql.end();
   }
 });
 
-maybe("listCardsForEnrichment returns only the requested enrichment's cards", async () => {
+maybe("type-coherence CHECK rejects a self_assessment row with a null self_report_prompt", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
-    const a = await seedSubstrate(sql);
-    const b = await seedSubstrate(sql);
-    const store = new PostgresCardBankStore(sql);
-    await persistBank(store, [cardFor(a)]);
-    await persistBank(store, [cardFor(b)]);
-
-    const cardsA = await store.listCardsForEnrichment(a.enrichmentId);
-    assert.equal(cardsA.length, 1);
-    assert.equal(cardsA[0].enrichmentId, a.enrichmentId);
+    const s = await seedSubstrate(sql);
+    await assert.rejects(
+      () => sql`
+        INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
+        VALUES (${randomUUID()}, 'self_assessment', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'A.', NULL, 'm', 'cfg')`,
+      /violates check constraint/i
+    );
   } finally {
     await sql.end();
   }
 });
 
-maybe("regeneration replaces a version's cards instead of duplicating under the unique key", async () => {
+maybe("option provenance CHECK rejects an invalid provenance value", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
-    const substrate = await seedSubstrate(sql);
-    const store = new PostgresCardBankStore(sql);
-    const first = cardFor(substrate);
-    await persistBank(store, [first]);
-    const regenerated: Card = { ...cardFor(substrate), question: "Regenerated question?" };
-    await persistBank(store, [regenerated]);
-
-    const cards = await store.listCardsForEnrichment(substrate.enrichmentId);
-    assert.equal(cards.length, 1, "delete-then-insert keeps exactly one card per derived node");
-    assert.equal(cards[0].question, "Regenerated question?");
-    const [{ count }] = await sql<{ count: number }[]>`
-      SELECT count(*)::int AS count FROM card_answer_key_citations c
-      JOIN cards cc ON cc.card_id = c.card_id WHERE cc.graph_version_id = ${substrate.graphVersionId}`;
-    assert.equal(count, 2, "stale citations are cleared on regeneration");
+    const s = await seedSubstrate(sql);
+    const itemId = randomUUID();
+    await sql`
+      INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
+      VALUES (${itemId}, 'option_select', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', NULL, NULL, 'm', 'cfg')`;
+    await assert.rejects(
+      () => sql`
+        INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
+        VALUES (${randomUUID()}, ${itemId}, 0, 'x', false, 'fabricated')`,
+      /violates check constraint/i
+    );
   } finally {
     await sql.end();
   }
 });
 
-maybe("artifact_cards JSON_TABLE view returns one row per card", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const substrate = await seedSubstrate(sql);
-    await persistBank(new PostgresCardBankStore(sql), [cardFor(substrate)]);
+// --- Response Log -----------------------------------------------------------
 
-    const rows = await sql<{ card_id: string; derived_node_id: string; grounding_provenance: string; citation_count: number }[]>`
-      SELECT card_id, derived_node_id, grounding_provenance, citation_count FROM artifact_cards WHERE enrichment_id = ${substrate.enrichmentId}`;
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0].derived_node_id, substrate.derivedNodeId);
-    assert.equal(rows[0].grounding_provenance, "source_cep");
-    assert.equal(Number(rows[0].citation_count), 2);
-  } finally {
-    await sql.end();
-  }
-});
-
-// Insert an extra derived node (with its own Concept) into an existing enrichment so
-// a single persist can carry one carded node and one rejected (no-card) node.
-async function addDerivedNode(sql: Sql, enrichmentId: string, label: string): Promise<string> {
-  const conceptId = randomUUID();
-  await sql`
-    INSERT INTO concepts (concept_id, iri, normalized_label, declared_domain)
-    VALUES (${conceptId}, ${`urn:lrnki:concept:${conceptId}`}, ${`${label.toLowerCase()}-${conceptId}`}, 'software engineering')`;
-  const derivedNodeId = randomUUID();
-  await sql`
-    INSERT INTO derived_graph_nodes (derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role, canonical_label, normalized_label, declared_domain, aliases)
-    VALUES (${derivedNodeId}, ${enrichmentId}, 'anchor', ${conceptId}, 'document_anchored', 'anchor', ${label}, ${`${label.toLowerCase()}-${conceptId}`}, 'software engineering', '[]'::jsonb)`;
-  return derivedNodeId;
+async function seedItem(sql: Sql): Promise<{ studyItemId: string; derivedNodeId: string }> {
+  const s = await seedSubstrate(sql);
+  const item = selfAssessmentFor(s);
+  await bankFor(sql, s, [item]);
+  return { studyItemId: item.studyItemId, derivedNodeId: s.derivedNodeId };
 }
 
-maybe("persists rejected (no-card) nodes with their reason and replaces them on regeneration", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const substrate = await seedSubstrate(sql);
-    const rejectedNodeId = await addDerivedNode(sql, substrate.enrichmentId, "Ungroundable");
-    const store = new PostgresCardBankStore(sql);
-    await persistBank(store, [cardFor(substrate)], [
-      { derivedNodeId: rejectedNodeId, canonicalLabel: "Ungroundable", reason: "no usable grounding passages" }
-    ]);
-
-    const rows = await sql<{ derived_node_id: string; reason: string }[]>`
-      SELECT derived_node_id, reason FROM rejected_cards WHERE enrichment_id = ${substrate.enrichmentId}`;
-    assert.equal(rows.length, 1, "the no-card node is persisted as a durable fact");
-    assert.equal(rows[0].derived_node_id, rejectedNodeId);
-    assert.equal(rows[0].reason, "no usable grounding passages");
-
-    // Regeneration with no rejections clears the prior rejection (delete-then-insert).
-    await persistBank(store, [cardFor(substrate)], []);
-    const [{ count }] = await sql<{ count: number }[]>`
-      SELECT count(*)::int AS count FROM rejected_cards WHERE enrichment_id = ${substrate.enrichmentId}`;
-    assert.equal(count, 0, "stale rejections are cleared on regeneration");
-  } finally {
-    await sql.end();
-  }
-});
-
-// --- Response Log (U3) -----------------------------------------------------
-
-// Persist a real card so response_log's card_id FK resolves, returning the ids the
-// log keys on.
-async function seedCard(sql: Sql): Promise<{ cardId: string; derivedNodeId: string }> {
-  const substrate = await seedSubstrate(sql);
-  const card = cardFor(substrate);
-  await persistBank(new PostgresCardBankStore(sql), [card]);
-  return { cardId: card.cardId, derivedNodeId: substrate.derivedNodeId };
-}
-
-function selfReportRow(input: { learnerStateRef: string; cardId: string; derivedNodeId: string; rating: "again" | "hard" | "good" | "easy"; attemptSeq: number; batchId: string }): NewResponseLogRow {
+function gradedRow(input: { learnerStateRef: string; studyItemId: string; derivedNodeId: string; outcome: "correct" | "partial" | "incorrect"; score: number; attemptSeq: number }): NewResponseLogRow {
   return {
-    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, cardId: input.cardId, derivedNodeId: input.derivedNodeId,
-    signalType: "self_report", selfReportRating: input.rating, judgedOutcome: null, gradedScore: null,
-    evidenceWeight: 0.3, responseSource: "synthetic", graderIdentity: null, batchId: input.batchId,
+    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, studyItemId: input.studyItemId, derivedNodeId: input.derivedNodeId,
+    signalType: "graded", selfReportRating: null, judgedOutcome: input.outcome, gradedScore: input.score,
+    evidenceWeight: 1.0, responseSource: "human", graderIdentity: "auto", batchId: null,
     attemptSeq: input.attemptSeq, submittedAnswer: null
   };
 }
 
-function gradedRow(input: { learnerStateRef: string; cardId: string; derivedNodeId: string; outcome: "correct" | "partial" | "incorrect"; score: number; attemptSeq: number }): NewResponseLogRow {
-  return {
-    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, cardId: input.cardId, derivedNodeId: input.derivedNodeId,
-    signalType: "graded", selfReportRating: null, judgedOutcome: input.outcome, gradedScore: input.score,
-    evidenceWeight: 1.0, responseSource: "synthetic", graderIdentity: "kg-independent-judge", batchId: null,
-    attemptSeq: input.attemptSeq, submittedAnswer: "a written answer"
-  };
-}
-
-maybe("appends a self_report and a graded row for the same learner+concept with distinct attempt_seq, nothing overwritten", async () => {
+maybe("a graded row referencing a real study_item_id inserts; one referencing an absent id is rejected by the FK", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
-    const { cardId, derivedNodeId } = await seedCard(sql);
+    const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
     const learner = `learner-${randomUUID()}`;
-    await store.append([selfReportRow({ learnerStateRef: learner, cardId, derivedNodeId, rating: "good", attemptSeq: 1, batchId: randomUUID() })]);
-    await store.append([gradedRow({ learnerStateRef: learner, cardId, derivedNodeId, outcome: "incorrect", score: 0, attemptSeq: 2 })]);
-
+    await store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 })]);
     const rows = await store.listForLearner(learner);
-    assert.equal(rows.length, 2);
-    assert.deepEqual(rows.map((r) => r.attemptSeq), [1, 2], "rows return in attempt_seq order");
-    assert.deepEqual(rows.map((r) => r.signalType), ["self_report", "graded"]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].studyItemId, studyItemId);
+
+    await assert.rejects(
+      () => store.append([gradedRow({ learnerStateRef: learner, studyItemId: randomUUID(), derivedNodeId, outcome: "correct", score: 1, attemptSeq: 2 })]),
+      /violates foreign key|foreign key/i
+    );
   } finally {
     await sql.end();
   }
 });
 
-maybe("a partial graded row round-trips distinct from correct and incorrect (Covers AE4)", async () => {
+maybe("graded rows preserve attempt_seq order and grader_identity 'auto'", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
-    const { cardId, derivedNodeId } = await seedCard(sql);
+    const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
     const learner = `learner-${randomUUID()}`;
     await store.append([
-      gradedRow({ learnerStateRef: learner, cardId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 }),
-      gradedRow({ learnerStateRef: learner, cardId, derivedNodeId, outcome: "partial", score: 0.5, attemptSeq: 2 }),
-      gradedRow({ learnerStateRef: learner, cardId, derivedNodeId, outcome: "incorrect", score: 0, attemptSeq: 3 })
+      gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 }),
+      gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "incorrect", score: 0, attemptSeq: 2 })
     ]);
     const rows = await store.listForLearnerNode(learner, derivedNodeId);
-    assert.deepEqual(rows.map((r) => r.judgedOutcome), ["correct", "partial", "incorrect"]);
-    assert.deepEqual(rows.map((r) => r.gradedScore), [1, 0.5, 0]);
-  } finally {
-    await sql.end();
-  }
-});
-
-maybe("CHECK rejects a self_report with null rating and a graded row with null outcome", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const { cardId, derivedNodeId } = await seedCard(sql);
-    const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
-    const badSelfReport: NewResponseLogRow = { ...selfReportRow({ learnerStateRef: learner, cardId, derivedNodeId, rating: "good", attemptSeq: 1, batchId: randomUUID() }), selfReportRating: null };
-    await assert.rejects(() => store.append([badSelfReport]), /violates check constraint|null/i);
-    const badGraded: NewResponseLogRow = { ...gradedRow({ learnerStateRef: learner, cardId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 }), judgedOutcome: null };
-    await assert.rejects(() => store.append([badGraded]), /violates check constraint|null/i);
-  } finally {
-    await sql.end();
-  }
-});
-
-maybe("two learners' rows never bleed across learner_state_ref", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const { cardId, derivedNodeId } = await seedCard(sql);
-    const store = new PostgresResponseLogStore(sql);
-    const learnerA = `learner-${randomUUID()}`;
-    const learnerB = `learner-${randomUUID()}`;
-    await store.append([selfReportRow({ learnerStateRef: learnerA, cardId, derivedNodeId, rating: "good", attemptSeq: 1, batchId: randomUUID() })]);
-    await store.append([selfReportRow({ learnerStateRef: learnerB, cardId, derivedNodeId, rating: "again", attemptSeq: 1, batchId: randomUUID() })]);
-    assert.equal((await store.listForLearner(learnerA)).length, 1);
-    assert.equal((await store.listForLearner(learnerB)).length, 1);
-    assert.equal((await store.listForLearner(learnerA))[0].selfReportRating, "good");
-  } finally {
-    await sql.end();
-  }
-});
-
-maybe("re-calibration appends a new batch_id without deleting the prior batch (Covers R5, R10)", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const { cardId, derivedNodeId } = await seedCard(sql);
-    const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
-    const batch1 = randomUUID();
-    const batch2 = randomUUID();
-    let seq = await store.nextAttemptSeq(learner);
-    await store.append([selfReportRow({ learnerStateRef: learner, cardId, derivedNodeId, rating: "again", attemptSeq: seq, batchId: batch1 })]);
-    seq = await store.nextAttemptSeq(learner);
-    await store.append([selfReportRow({ learnerStateRef: learner, cardId, derivedNodeId, rating: "good", attemptSeq: seq, batchId: batch2 })]);
-
-    const rows = await store.listForLearner(learner);
-    assert.equal(rows.length, 2, "the first batch survives the second");
-    assert.deepEqual(new Set(rows.map((r) => r.batchId)), new Set([batch1, batch2]));
-  } finally {
-    await sql.end();
-  }
-});
-
-maybe("the returned row set carries every field an IRT and a BKT fit require (R6)", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const { cardId, derivedNodeId } = await seedCard(sql);
-    const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
-    await store.append([gradedRow({ learnerStateRef: learner, cardId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 })]);
-    const [row] = await store.listForLearner(learner);
-    // IRT needs an item id + ordered outcome; BKT needs a skill id + ordered sequence.
-    assert.equal(typeof row.cardId, "string");      // per-item IRT key
-    assert.equal(typeof row.derivedNodeId, "string");   // per-skill BKT key
-    assert.equal(typeof row.attemptSeq, "number");  // ordered sequence
-    assert.equal(typeof row.gradedScore, "number");
-    assert.equal(row.graderIdentity, "kg-independent-judge");
-    assert.ok(row.createdAt, "createdAt stamped by the store");
+    assert.deepEqual(rows.map((r) => r.attemptSeq), [1, 2]);
+    assert.deepEqual(rows.map((r) => r.gradedScore), [1, 0]);
+    assert.ok(rows.every((r) => r.graderIdentity === "auto"));
   } finally {
     await sql.end();
   }

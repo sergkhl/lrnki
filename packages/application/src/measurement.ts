@@ -3,7 +3,7 @@ import type { JudgedOutcome, NewResponseLogRow, ResponseSource } from "@lrnki/do
 import type { AnswerGradingJudgePort, ResponseLogStorePort } from "@lrnki/ports";
 
 // Measurement mode (U5, R4/R9). A free-form written answer is graded against the
-// card's answer-key by the cross-family judge, producing one `graded` row at the
+// studyItem's answer-key by the cross-family judge, producing one `graded` row at the
 // higher evidence weight, recording the judge model as the grader identity. The
 // judge proposes; this deterministic transform maps its verdict into an immutable
 // append — the only thing tests assert (AGENTS rule 11).
@@ -11,7 +11,7 @@ export const GRADED_EVIDENCE_WEIGHT = 1.0;
 
 export async function gradeAndAppend(input: {
   learnerStateRef: string;
-  card: { cardId: string; derivedNodeId: string; question: string; answerKey: string };
+  studyItem: { studyItemId: string; derivedNodeId: string; question: string; answerKey: string };
   declaredDomain: string;
   submittedAnswer: string;
   judge: AnswerGradingJudgePort;
@@ -20,8 +20,8 @@ export async function gradeAndAppend(input: {
 }): Promise<{ row: NewResponseLogRow; judgment: { outcome: JudgedOutcome; score: number; rationale: string } }> {
   const judgment = await input.judge.grade({
     declaredDomain: input.declaredDomain,
-    question: input.card.question,
-    answerKey: input.card.answerKey,
+    question: input.studyItem.question,
+    answerKey: input.studyItem.answerKey,
     submittedAnswer: input.submittedAnswer
   });
 
@@ -29,8 +29,8 @@ export async function gradeAndAppend(input: {
   const row: NewResponseLogRow = {
     responseId: randomUUID(),
     learnerStateRef: input.learnerStateRef,
-    cardId: input.card.cardId,
-    derivedNodeId: input.card.derivedNodeId,
+    studyItemId: input.studyItem.studyItemId,
+    derivedNodeId: input.studyItem.derivedNodeId,
     signalType: "graded",
     selfReportRating: null,
     judgedOutcome: judgment.outcome,

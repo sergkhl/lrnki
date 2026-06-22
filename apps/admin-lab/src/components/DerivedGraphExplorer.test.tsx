@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDerivedGraphView, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
+import { buildDerivedGraphView, distinctDomains, nodeRenderAttrs, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
 
 // The DerivedGraphExplorer renders a Derived Graph Layer (ADR-0019) independently
 // of learner paths (U6 scenario 5) and must carry an equivalent textual
@@ -23,9 +23,9 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasCard: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
-    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasCard: true, grounding: null },
-    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasCard: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
+    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasStudyItem: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasStudyItem: true, grounding: null },
+    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasStudyItem: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
     { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
@@ -139,6 +139,18 @@ test("rescue dispositions distinguish accepted and dropped with rationale", () =
   assert.equal(dropped?.rationale, "incidental artifact");
 });
 
+// --- Region grouping (U3, R2): each declared domain → one compound-parent region ---
+
+test("distinctDomains groups nodes into one sorted region per declared domain", () => {
+  const nodes = [{ domain: "rust" }, { domain: "biology" }, { domain: "rust" }, { domain: "economics" }];
+  assert.deepEqual(distinctDomains(nodes), ["biology", "economics", "rust"]);
+});
+
+test("a single-domain graph yields exactly one region", () => {
+  const view = buildDerivedGraphView(detail); // detail is all-rust
+  assert.deepEqual(distinctDomains(view.cytoscape.nodes), ["rust"]);
+});
+
 // --- U3 adapted overlay view-model (R4/R5/R6/R7) ---------------------------
 
 const classification = {
@@ -166,18 +178,18 @@ test("adapted mode tags each node with its classification and marks the single f
   assert.deepEqual(targets, ["ownership"]);
 });
 
-test("a cardless node carries cardless:true in both cytoscape and textual representations (R6)", () => {
+test("a itemless node carries cardless:true in both cytoscape and textual representations (R6)", () => {
   const view = buildDerivedGraphView(detail, classification);
   assert.equal(view.cytoscape.nodes.find((n) => n.id === "move")?.cardless, true);
   assert.equal(view.textual.nodes.find((n) => n.label === "Move semantics")?.cardless, true);
-  // Carded nodes are not flagged.
+  // Itemed nodes are not flagged.
   assert.equal(view.cytoscape.nodes.find((n) => n.id === "ownership")?.cardless, false);
 });
 
 test("difficulty is present on every node for size mapping; null difficulty is preserved, not coerced to 0", () => {
   const withNull: DerivedGraphDetail = {
     ...detail,
-    nodes: [{ ...detail.nodes[0], derivedNodeId: "nd", label: "No difficulty", difficulty: null, hasCard: true }]
+    nodes: [{ ...detail.nodes[0], derivedNodeId: "nd", label: "No difficulty", difficulty: null, hasStudyItem: true }]
   };
   const view = buildDerivedGraphView(withNull);
   assert.equal(view.cytoscape.nodes[0].difficulty, null);
@@ -191,4 +203,37 @@ test("cytoscape and textual node sets stay equal and describe the same nodes in 
   assert.equal(view.cytoscape.nodes.length, view.textual.nodes.length);
   assert.deepEqual(view.cytoscape.nodes.map((n) => n.label), view.textual.nodes.map((n) => n.label));
   assert.deepEqual(view.cytoscape.nodes.map((n) => n.adaptedState), view.textual.nodes.map((n) => n.adaptedState));
+});
+
+// --- U2 single-canvas restyle attrs (R10/R11/R13) --------------------------
+// `nodeRenderAttrs` is the pure source of the two mode-dependent Cytoscape `data`
+// attributes the restyle effect writes. The one-time layout owns positions; these
+// attrs are the ONLY thing a mode swap changes, so the helper fully captures the swap.
+
+test("neutral mode yields the baseline 'none'/'no' for every node, ignoring any classification", () => {
+  for (const id of ["scope", "ownership", "move", "absent"]) {
+    assert.deepEqual(nodeRenderAttrs("neutral", classification, id), { adaptedState: "none", frontierTarget: "no" });
+  }
+});
+
+test("adapted mode yields each node's mastered/frontier/locked state and marks only the frontier target", () => {
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "scope"), { adaptedState: "mastered", frontierTarget: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "ownership"), { adaptedState: "frontier", frontierTarget: "yes" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "move"), { adaptedState: "locked", frontierTarget: "no" });
+});
+
+test("adapted mode with no classification falls back to the neutral baseline", () => {
+  assert.deepEqual(nodeRenderAttrs("adapted", undefined, "scope"), { adaptedState: "none", frontierTarget: "no" });
+});
+
+test("a node absent from the classification gets 'none' rather than throwing", () => {
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "absent"), { adaptedState: "none", frontierTarget: "no" });
+});
+
+// Covers R11/R13 regression guard: neutral-mode view-model is byte-equivalent to the
+// pre-reshape enrichment render (no classification overlay), so the enrichment page is
+// unaffected by the reshape. A itemless node stays flagged in this neutral view (R13).
+test("neutral-mode view-model equals the no-classification render (enrichment-page regression guard)", () => {
+  assert.deepEqual(buildDerivedGraphView(detail, undefined), buildDerivedGraphView(detail));
+  assert.equal(buildDerivedGraphView(detail).cytoscape.nodes.find((n) => n.id === "move")?.cardless, true);
 });

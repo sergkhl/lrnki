@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Repeatable demo-seed (plan 2026-06-20-002, U2). Produces ONE coherent full-manifest
 # state from an empty database: a published graph version, one enrichment carrying
-# difficulties + cards, and a few named demo learners whose adaptive paths render the
+# difficulties + study items, and a few named demo learners whose adaptive paths render the
 # neutral/adapted graph pair (R1-R4). It is disposable orchestration over the stable
 # worker CLI (KTD5) and hard-resets every run (AGENTS rules 8/9). Real LiteLLM calls
 # (extraction, enrichment, difficulty, cards, synthesis) run, so it needs the .env key
@@ -64,8 +64,8 @@ if [ -z "$ENRICHMENT_ID" ]; then
 fi
 echo "   enrichment: $ENRICHMENT_ID"
 
-step "7/8 generate the Card Bank for the enrichment (real LLM calls)"
-pnpm worker:kg generate-cards "$ENRICHMENT_ID"
+step "7/8 generate the Study Item Bank for the enrichment (real LLM calls)"
+pnpm worker:kg generate-study-items "$ENRICHMENT_ID"
 
 step "8/8 seed demo learners over goal anchors"
 # Pick goal anchors STRUCTURALLY, not by fixture-specific name (AGENTS rule 17): the

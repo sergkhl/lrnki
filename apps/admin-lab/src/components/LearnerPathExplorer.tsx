@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { RouteIcon, TargetIcon } from "lucide-react";
-import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
+import { applySphereGridLayout } from "@/lib/cytoscapeSphereGrid";
 import type { LearnerPathDetail } from "@/lib/learnerPaths";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -59,6 +59,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
           data: {
             id: node.derivedNodeId,
             label: node.inPath ? `${node.position! + 1}. ${node.label}` : node.label,
+            difficulty: node.difficulty,
             inPath: node.inPath ? "yes" : "no",
             target: node.isTarget ? "yes" : "no"
           }
@@ -117,14 +118,14 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
           }
         },
         {
+          // Right-angle FFX "track" edges (R3): Cytoscape-core taxi routing, midpoint turn,
+          // monotone within each edge's bounding box. Single-domain canvas → one region.
           selector: "edge",
           style: {
-            // Taxi (orthogonal) routing keeps prerequisite edges off the nodes in
-            // the top-down ELK layout; edges leave the bottom of a prerequisite and
-            // enter the top of its dependent.
             "curve-style": "taxi",
-            "taxi-direction": "downward",
-            "taxi-turn": 18,
+            "taxi-direction": "auto",
+            "taxi-turn": "50%",
+            "taxi-turn-min-distance": "5px",
             "line-color": color("--border"),
             "target-arrow-color": color("--border"),
             "target-arrow-shape": "triangle",
@@ -154,9 +155,7 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       ]
     });
     cytoscapeRef.current = cy;
-    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
-      if (!stale) console.error("Failed to lay out learner path graph", error);
-    });
+    applySphereGridLayout(cy, () => stale);
     return () => {
       stale = true;
       cy.destroy();

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
-import { applyElkLayeredLayout } from "@/lib/cytoscapeElkLayout";
-import { buildDerivedGraphView, type DerivedGraphDetail } from "@/lib/derivedGraph";
+import { applySphereGridLayout, recenterOnFocus } from "@/lib/cytoscapeSphereGrid";
+import type { SphereGridFlaggedLoop } from "@/lib/sphereGridLayout";
+import { buildDerivedGraphView, distinctDomains, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
+import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -18,7 +21,14 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-type DerivedGraphExplorerProps = Readonly<{ detail: DerivedGraphDetail; adapted?: AdaptedNodeClassification }>;
+type DerivedGraphExplorerProps = Readonly<{
+  detail: DerivedGraphDetail;
+  adapted?: AdaptedNodeClassification;
+  // Optional node-tap handler for the Study surface (U5). When present, tapping a node
+  // reports its derivedNodeId so the caller can open the state-gated side sheet. Absent on
+  // the neutral enrichment page, so that render keeps its read-only behavior unchanged.
+  onNodeSelect?: (derivedNodeId: string) => void;
+}>;
 
 // Difficulty maps to node diameter (R7/KTD3): a bounded range so an operator can spot
 // ordering defects at a glance. A null-difficulty node renders at the base size rather
@@ -50,19 +60,56 @@ const ADAPTED_STATE_BADGE: Record<AdaptedNodeState, "default" | "secondary" | "o
 // because it has zero edges (AE4). Every rendered graph carries an equivalent
 // textual node-and-edge representation for non-visual inspection (U6 scenario 8).
 //
-// With `adapted` present (U4), nodes recolor by learner state (mastered / frontier /
-// locked), the selected frontier target gets a stronger ring, and the header marks the
-// panel as learner-adapted. Without it the render is neutral — node-kind / grounding
-// coloring exactly as before, plus the difficulty-as-size encoding (R7) on both panels.
-export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerProps) {
+// With `adapted` present (U2), the panel shows an internal neutral ↔ adapted segmented
+// control over ONE pinned layout: spiral placement runs once over the neutral topology, and switching
+// mode restyles nodes only (mastered / frontier / locked recolor, frontier target ringed)
+// via `cy.batch()` — never re-running layout, so positions stay fixed for blink
+// comparison (R11, KTD2). Without `adapted` there is no control and the render is neutral
+// — node-kind / grounding coloring exactly as before, plus the difficulty-as-size
+// encoding (R7). The textual node/edge panel re-renders for the active mode (R14).
+export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedGraphExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
-  const isAdapted = adapted != null;
-  const view = useMemo(() => buildDerivedGraphView(detail, adapted), [detail, adapted]);
+  // Held in a ref so the tap handler is bound ONCE in the layout effect (keyed on topology)
+  // without re-running layout when the callback identity changes each render.
+  const onNodeSelectRef = useRef(onNodeSelect);
+  onNodeSelectRef.current = onNodeSelect;
+  // The learner's working region (KTD2): the frontier target's 1-hop closed neighborhood,
+  // or undefined when there's no classification (neutral enrichment page → fit-to-all).
+  // Recomputed only when the target or topology changes.
+  const focusNodeIds = useMemo(
+    () => (adapted?.selectedFrontierTarget ? frontierNeighborhood(adapted.selectedFrontierTarget, detail.edges) : undefined),
+    [adapted?.selectedFrontierTarget, detail.edges]
+  );
+  // Read in the layout effect (keyed on topology only) without making it a dependency, so a
+  // frontier advance never re-runs layout — it recenters via the viewport-only effect below.
+  const focusRef = useRef(focusNodeIds);
+  focusRef.current = focusNodeIds;
+  // Guards the recenter effect: initial framing is owned by the focus-fit at the end of the
+  // layout pass, and later frontier advances are viewport-only.
+  const layoutReadyRef = useRef(false);
+  const hasClassification = adapted != null;
+  // The adapted view is the informative one, so default to it when a classification is
+  // available; the enrichment page (no classification) is always neutral.
+  const [mode, setMode] = useState<DerivedGraphMode>(hasClassification ? "adapted" : "neutral");
+  const isAdaptedMode = hasClassification && mode === "adapted";
+  // Loops the sphere-grid geometry could not embed crossing-free (R10). Populated by the
+  // one-time layout pass and surfaced to the operator below — fail loud, never silent-cross.
+  const [flaggedLoops, setFlaggedLoops] = useState<SphereGridFlaggedLoop[]>([]);
 
+  // Topology view drives the ONE-TIME layout (stable across mode swaps); the textual
+  // view re-renders for the active mode so the non-visual listing matches the canvas (R14).
+  const layoutView = useMemo(() => buildDerivedGraphView(detail), [detail]);
+  const view = useMemo(() => buildDerivedGraphView(detail, isAdaptedMode ? adapted : undefined), [detail, adapted, isAdaptedMode]);
+
+  // Layout effect — runs ONCE per topology (KTD2). It builds the instance and runs spiral placement;
+  // node positions become Cytoscape-owned state. Mode-dependent attrs start at the neutral
+  // baseline and are set by the restyle effect below — never here, so a mode swap cannot
+  // recreate the instance or re-fit the layout.
   useEffect(() => {
     if (!containerRef.current) return;
     let stale = false;
+    layoutReadyRef.current = false;
     const styles = getComputedStyle(containerRef.current);
     const colorCanvas = document.createElement("canvas");
     colorCanvas.width = 1;
@@ -81,20 +128,31 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
     const cy = cytoscape({
       container: containerRef.current,
       elements: [
-        ...view.cytoscape.nodes.map((node) => ({
+        // One compound parent per declared domain = one FFX learning-loop region (R2). The
+        // box + domain label come from Cytoscape core and auto-bound the packed children;
+        // styled by the `node:parent` selector, excluded from every concept-node selector.
+        ...distinctDomains(layoutView.cytoscape.nodes).map((domain) => ({
+          data: { id: `region:${domain}`, label: domain, regionKind: "loop" }
+        })),
+        ...layoutView.cytoscape.nodes.map((node) => ({
           data: {
             id: node.id,
             label: node.label,
             domain: node.domain,
+            // Membership in the domain's region parent. Same-domain edges only, so no edge
+            // ever crosses a region boundary.
+            parent: `region:${node.domain}`,
+            difficulty: node.difficulty,
             nodeKind: node.nodeKind,
             groundingOrigin: node.groundingOrigin,
             size: nodeSize(node.difficulty),
-            adaptedState: node.adaptedState ?? "none",
-            frontierTarget: node.isFrontierTarget ? "yes" : "no",
+            // Neutral baseline; the restyle effect overrides these on the active mode.
+            adaptedState: "none",
+            frontierTarget: "no",
             cardless: node.cardless ? "yes" : "no"
           }
         })),
-        ...view.cytoscape.edges.map((edge) => ({
+        ...layoutView.cytoscape.edges.map((edge) => ({
           data: { id: edge.id, source: edge.source, target: edge.target, uncertain: edge.uncertain }
         }))
       ],
@@ -103,7 +161,31 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
       maxZoom: 3,
       style: [
         {
-          selector: "node",
+          // Region parents (R2): one bordered, labeled box per domain/learning loop. A
+          // subtle dashed border + faint fill reads as an FFX cluster without competing with
+          // the concept nodes; `node:parent` matches ONLY compound parents, never concepts.
+          selector: "node:parent",
+          style: {
+            label: "data(label)",
+            shape: "round-rectangle",
+            "background-color": color("--muted"),
+            "background-opacity": 0.2,
+            "border-color": color("--border"),
+            "border-width": 1.5,
+            "border-style": "dashed",
+            padding: "26px",
+            "text-valign": "top",
+            "text-halign": "center",
+            "text-margin-y": -4,
+            "font-size": 12,
+            "font-weight": 600,
+            color: color("--muted-foreground")
+          }
+        },
+        {
+          // Concept nodes only (`:childless`) — a region parent must never pick up the
+          // concept fill, the difficulty-driven `data(size)`, or the leaf label position.
+          selector: "node:childless",
           style: {
             "background-color": color("--primary"),
             "border-color": color("--border"),
@@ -121,12 +203,13 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
         },
         {
           // Enrichment nodes (minted/rescued) are visually distinct from anchors
-          // (R15): a rounded rectangle in the secondary color so an operator never
-          // confuses a derived node with an asserted anchor.
+          // (R15): a rounded rectangle in the dedicated graph-enrichment fill (KTD1) so an
+          // operator never confuses a derived node with an asserted anchor — and so it
+          // reads on the near-white canvas instead of vanishing into it.
           selector: "node[nodeKind = 'enrichment']",
           style: {
             shape: "round-rectangle",
-            "background-color": color("--secondary"),
+            "background-color": color(graphNodeFillToken("enrichment")),
             "border-color": color("--ring")
           }
         },
@@ -148,17 +231,19 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
         {
           // Mastered — green (chart-1): the learner is at/above the ≈0.7 threshold.
           selector: "node[adaptedState = 'mastered']",
-          style: { "background-color": color("--chart-1"), "border-color": color("--chart-1") }
+          style: { "background-color": color(graphNodeFillToken("mastered")), "border-color": color(graphNodeFillToken("mastered")) }
         },
         {
           // Frontier — amber (chart-4): unmastered but every direct prerequisite met.
           selector: "node[adaptedState = 'frontier']",
-          style: { "background-color": color("--chart-4"), "border-color": color("--chart-4") }
+          style: { "background-color": color(graphNodeFillToken("frontier")), "border-color": color(graphNodeFillToken("frontier")) }
         },
         {
-          // Locked — muted: a direct prerequisite is still unmastered.
+          // Locked — dedicated cool gray (KTD1): a direct prerequisite is still unmastered.
+          // Reads as "inactive" yet stays visible on the canvas, unlike the old --muted fill
+          // that collided with both the background and the enrichment fill.
           selector: "node[adaptedState = 'locked']",
-          style: { "background-color": color("--muted"), "border-color": color("--border"), color: color("--muted-foreground") }
+          style: { "background-color": color(graphNodeFillToken("locked")), "border-color": color("--border"), color: color("--muted-foreground") }
         },
         {
           // The single selected frontier target — the hardest ready unmastered node the
@@ -169,15 +254,16 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
           style: { "border-color": color("--foreground"), "border-width": 4 }
         },
         {
+          // Right-angle FFX "track" edges (R3): Cytoscape-core taxi routing, configured to
+          // turn at the segment midpoint and stay monotone within each edge's bounding box,
+          // so the orthogonal rendering cannot introduce a crossing the pure straight-segment
+          // model (sphereGridLayout) lacks.
           selector: "edge",
           style: {
-            // Taxi (orthogonal) routing keeps edges off the nodes in the top-down
-            // ELK layout — straight bezier lines were cutting through depth-skipping
-            // chains. Edges leave the bottom of a prerequisite and enter the top of
-            // its dependent.
             "curve-style": "taxi",
-            "taxi-direction": "downward",
-            "taxi-turn": 18,
+            "taxi-direction": "auto",
+            "taxi-turn": "50%",
+            "taxi-turn-min-distance": "5px",
             "line-color": color("--muted-foreground"),
             "target-arrow-color": color("--muted-foreground"),
             "target-arrow-shape": "triangle",
@@ -196,15 +282,54 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
       ]
     });
     cytoscapeRef.current = cy;
-    void applyElkLayeredLayout(cy, () => stale).catch((error: unknown) => {
-      if (!stale) console.error("Failed to lay out derived graph", error);
-    });
+    // Node-tap → caller (U5). Scoped to `:childless` so tapping a region parent never
+    // reports a non-concept id. Reads the ref so the handler always calls the latest callback.
+    cy.on("tap", "node:childless", (event) => onNodeSelectRef.current?.(event.target.id()));
+    const layout = applySphereGridLayout(cy, () => stale, focusRef.current);
+    if (!stale) {
+      layoutReadyRef.current = true;
+      // Surface any loop the geometry could not embed crossing-free (R10) — never render a
+      // crossing as if clean. Empty on the sparse near-trees this canvas draws today.
+      setFlaggedLoops(layout?.flaggedLoops ?? []);
+    }
     return () => {
       stale = true;
       cy.destroy();
       cytoscapeRef.current = null;
     };
-  }, [view]);
+  }, [layoutView]);
+
+  // Restyle effect — runs on every (mode, classification) change, AND once after the
+  // layout effect (re)builds the instance. It is restyle-ONLY: it mutates each node's
+  // `adaptedState` / `frontierTarget` data via `cy.batch()` and never calls
+  // `cy.layout().run()` or `cy.fit()`, so positions from the one-time layout pass survive
+  // the swap untouched (R11). This is the structural guard the side-by-side pair lacked.
+  useEffect(() => {
+    const cy = cytoscapeRef.current;
+    if (!cy || cy.destroyed()) return;
+    cy.batch(() => {
+      for (const node of layoutView.cytoscape.nodes) {
+        const element = cy.getElementById(node.id);
+        if (element.empty()) continue;
+        const attrs = nodeRenderAttrs(mode, adapted, node.id);
+        element.data("adaptedState", attrs.adaptedState);
+        element.data("frontierTarget", attrs.frontierTarget);
+      }
+    });
+  }, [layoutView, mode, adapted]);
+
+  // Advance-recenter effect (KTD3) — keyed on the classification's frontier target, so it
+  // fires on a FRONTIER ADVANCE, never on the neutral↔adapted mode toggle (which is local
+  // `mode` state, absent from the deps). VIEWPORT-ONLY: it re-frames on the new working
+  // region via `recenterOnFocus` and never re-runs layout, so pinned positions survive (R11).
+  // Skipped until the one-time layout pass has resolved — initial framing is the focus-fit
+  // at the end of that pass, not this effect.
+  useEffect(() => {
+    const cy = cytoscapeRef.current;
+    if (!cy || cy.destroyed() || !layoutReadyRef.current) return;
+    if (!focusNodeIds || focusNodeIds.length === 0) return;
+    recenterOnFocus(cy, focusNodeIds);
+  }, [focusNodeIds]);
 
   return (
     <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
@@ -213,37 +338,71 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
           <CardTitle className="flex items-center gap-2">
             <GitForkIcon className="size-4" />
             Derived prerequisite DAG
-            {isAdapted ? <Badge variant="secondary">learner-adapted</Badge> : null}
+            {isAdaptedMode ? <Badge variant="secondary">learner-adapted</Badge> : null}
           </CardTitle>
           <CardDescription>
-            {isAdapted
+            {isAdaptedMode
               ? "Nodes recolored by learner state (mastered / frontier / locked); the frontier target is ringed. "
               : null}
             Inferred prerequisite edges over published version{" "}
             <span className="font-mono text-xs">{detail.summary.graphVersionId}</span> · judge {detail.summary.judgeModel}
           </CardDescription>
           <CardAction className="flex flex-wrap items-center justify-end gap-2">
+            {hasClassification ? (
+              // Segmented control over the ONE pinned layout (R10): switching mode
+              // restyles nodes only — positions never move (R11). Rendered only when a
+              // learner classification is present; the neutral enrichment page has none.
+              <div role="group" aria-label="Graph view mode" className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mode === "neutral" ? "default" : "outline"}
+                  aria-pressed={mode === "neutral"}
+                  className="h-7 px-2.5"
+                  onClick={() => setMode("neutral")}
+                >
+                  Neutral
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mode === "adapted" ? "default" : "outline"}
+                  aria-pressed={mode === "adapted"}
+                  className="h-7 px-2.5"
+                  onClick={() => setMode("adapted")}
+                >
+                  Adapted
+                </Button>
+              </div>
+            ) : null}
+            {/* Non-interactive metadata: bordered/light tag pills (KTD5). Kept off the solid
+                `default` register so nothing inert mimics the solid active segmented button. */}
             <Badge variant="outline">{detail.summary.conceptCount} concepts</Badge>
-            <Badge variant="default">{detail.summary.certainEdgeCount} edges</Badge>
-            <Badge variant="secondary">{detail.summary.uncertainEdgeCount} uncertain</Badge>
+            <Badge variant="secondary">{detail.summary.certainEdgeCount} edges</Badge>
+            <Badge variant="outline">{detail.summary.uncertainEdgeCount} uncertain</Badge>
           </CardAction>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
           <p className="text-xs text-muted-foreground">
-            Arrows point from prerequisite to dependent. Dashed = uncertain inferred edges (excluded
-            from learner paths). Scroll to zoom, drag to pan.
+            Right-angle tracks point from prerequisite to dependent; each dashed-bordered region is
+            one domain (a learning loop), and no edge crosses between regions. Dashed edges = uncertain
+            inferred edges (excluded from learner paths). Scroll to zoom, drag to pan.
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block size-3 rounded-[3px] border border-dashed" />
+              domain / learning loop
+            </span>
             <span className="flex items-center gap-1.5">
               <span className="inline-block size-2 rounded-full border" />
               <span className="inline-block size-3 rounded-full border" />
               node size ∝ intrinsic difficulty
             </span>
-            {isAdapted ? (
+            {isAdaptedMode ? (
               <>
-                <LegendSwatch token="--chart-1" label="mastered" />
-                <LegendSwatch token="--chart-4" label="frontier" />
-                <LegendSwatch token="--muted" label="locked" />
+                <LegendSwatch token={graphNodeFillToken("mastered")} label="mastered" />
+                <LegendSwatch token={graphNodeFillToken("frontier")} label="frontier" />
+                <LegendSwatch token={graphNodeFillToken("locked")} label="locked" />
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block size-3 rounded-full" style={{ border: "2px solid var(--foreground)" }} />
                   frontier target
@@ -251,6 +410,13 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
               </>
             ) : null}
           </div>
+          {flaggedLoops.length > 0 ? (
+            // R10: a loop whose reconvergent edges force a crossing is surfaced, not hidden.
+            <div role="alert" className="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {flaggedLoops.length === 1 ? "1 loop" : `${flaggedLoops.length} loops`} could not be drawn crossing-free:{" "}
+              {flaggedLoops.map((loop) => `${loop.domain} (${loop.crossings})`).join(", ")}. Edges in these regions may overlap.
+            </div>
+          ) : null}
           {view.cytoscape.nodes.length > 0 ? (
             <div
               ref={containerRef}
@@ -296,7 +462,7 @@ export function DerivedGraphExplorer({ detail, adapted }: DerivedGraphExplorerPr
                             <Badge variant={ADAPTED_STATE_BADGE[node.adaptedState]}>{ADAPTED_STATE_COPY[node.adaptedState]}</Badge>
                           ) : null}
                           {node.isFrontierTarget ? <Badge variant="default">frontier target</Badge> : null}
-                          {node.cardless ? <Badge variant="outline" title="no recall card exists for this node">no card</Badge> : null}
+                          {node.cardless ? <Badge variant="outline" title="no study item exists for this node">no item</Badge> : null}
                           <Badge variant={node.nodeKind === "anchor" ? "default" : "secondary"}>{node.nodeKind === "anchor" ? "anchor" : "enrichment"}</Badge>
                           <Badge variant="outline">{node.difficulty === null ? "—" : node.difficulty.toFixed(2)}</Badge>
                         </span>

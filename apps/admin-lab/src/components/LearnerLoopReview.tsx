@@ -68,7 +68,8 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
           <CardHeader className="border-b">
             <CardTitle>Adapted graph view</CardTitle>
             <CardDescription>
-              One neutral and learner-adapted graph pair per distinct enrichment in this learner&apos;s paths.
+              One pinned graph per distinct enrichment in this learner&apos;s paths — toggle neutral ↔ adapted in place
+              (positions stay fixed for blink comparison).
             </CardDescription>
             <div className="flex justify-end">
               <Badge variant={adaptedGraphs.responseSourceSummary.synthetic > 0 ? "secondary" : "outline"}>
@@ -90,13 +91,8 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
-                <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
-                  <div className="min-w-0">
-                    <DerivedGraphExplorer detail={graph.detail} />
-                  </div>
-                  <div className="min-w-0">
-                    <DerivedGraphExplorer detail={graph.detail} adapted={graph.classification} />
-                  </div>
+                <div className="min-w-0">
+                  <DerivedGraphExplorer detail={graph.detail} adapted={graph.classification} />
                 </div>
               </CardContent>
             </Card>
@@ -106,7 +102,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
             <AlertTriangleIcon />
             <AlertTitle>No adapted graph scope</AlertTitle>
             <AlertDescription>
-              This learner has no stored path enrichment to render. Responses, conflicts, and card coverage are still shown below.
+              This learner has no stored path enrichment to render. Responses, conflicts, and study item coverage are still shown below.
             </AlertDescription>
           </Alert>
         )}
@@ -115,7 +111,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
       {detail.coverage.map((path) => (
         <Card key={`${path.enrichmentId}:${path.targetDerivedNodeId}`}>
           <CardHeader className="border-b">
-            <CardTitle className="text-base">Path card coverage: {path.targetLabel}</CardTitle>
+            <CardTitle className="text-base">Path study item coverage: {path.targetLabel}</CardTitle>
             <CardDescription>
               Every stored path step is shown with its recall-testability. Generated badges cite generated grounding, not source quotes.
             </CardDescription>
@@ -127,7 +123,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
                   <TableHead className="w-16">Step</TableHead>
                   <TableHead>Node</TableHead>
                   <TableHead>Grounding</TableHead>
-                  <TableHead>Card status</TableHead>
+                  <TableHead>study item status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -144,12 +140,12 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
                       <Badge variant="outline">{step.groundingOrigin}</Badge>
                     </TableCell>
                     <TableCell>
-                      {step.card ? (
+                      {step.studyItem ? (
                         <div className="flex flex-col gap-1">
-                          <Badge variant={step.card.provenance === "generated" ? "secondary" : "outline"}>
-                            {PROVENANCE_LABEL[step.card.provenance]}
+                          <Badge variant={step.studyItem.provenance === "generated" ? "secondary" : "outline"}>
+                            {PROVENANCE_LABEL[step.studyItem.provenance]}
                           </Badge>
-                          <span className="text-muted-foreground text-xs">{step.card.question}</span>
+                          <span className="text-muted-foreground text-xs">{step.studyItem.question}</span>
                         </div>
                       ) : (
                         <span className="text-muted-foreground">{step.fallbackReason}</span>
@@ -191,14 +187,14 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-4">
               <div className="text-sm">
-                <span className="font-medium">Answer key:</span> {response.answerKey}
+                <span className="font-medium">Answer key:</span> {response.answerKey ?? "Auto-graded option select"}
               </div>
-              {response.signalType === "graded" && (
+              {response.signalType === "graded" && response.answerKey && response.submittedAnswer !== null && (
                 <>
                   <Separator />
                   <form action={resubmitEditedAnswer} className="flex flex-col gap-2">
                     <input type="hidden" name="learnerStateRef" value={detail.learnerStateRef} />
-                    <input type="hidden" name="cardId" value={response.cardId} />
+                    <input type="hidden" name="studyItemId" value={response.studyItemId} />
                     <label className="text-sm font-medium" htmlFor={`answer-${response.responseId}`}>
                       Edit &amp; resubmit answer (grades anew, appends a row)
                     </label>

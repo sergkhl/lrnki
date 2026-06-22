@@ -97,9 +97,9 @@ export type LearnerResponseView = {
   attemptSeq: number;
   derivedNodeId: string;
   nodeLabel: string;
-  cardId: string;
+  studyItemId: string;
   question: string;
-  answerKey: string;
+  answerKey: string | null;
   signalType: string;
   selfReportRating: string | null;
   judgedOutcome: string | null;
@@ -116,7 +116,7 @@ export type LearnerLoopDetail = {
   conflicts: ConceptConflict[];
   // Existing paths for this learner, so a resubmit knows which path(s) to recompute.
   paths: { enrichmentId: string; targetDerivedNodeId: string; targetLabel: string }[];
-  coverage: PathCardCoverage[];
+  coverage: PathStudyItemCoverage[];
   // The learner's folded per-derived-node mastery (EXPERIMENT_ONLY trust) and a
   // synthetic-vs-human response-source tally — both feed the adapted-graph overlay (R1, R3).
   masteryByNode: Record<string, number>;
@@ -166,20 +166,20 @@ export function dedupeEnrichmentScopes<T extends { enrichmentId: string }>(paths
   return distinct;
 }
 
-export type PathCardCoverage = {
+export type PathStudyItemCoverage = {
   enrichmentId: string;
   targetDerivedNodeId: string;
   targetLabel: string;
-  steps: PathCardCoverageStep[];
+  steps: PathStudyItemCoverageStep[];
 };
 
-export type PathCardCoverageStep = {
+export type PathStudyItemCoverageStep = {
   position: number;
   derivedNodeId: string;
   label: string;
   groundingOrigin: string;
   includedReason: string;
-  card: { cardId: string; question: string; provenance: "source_cep" | "source_mentioned" | "generated" } | null;
+  studyItem: { studyItemId: string; question: string; provenance: "source_cep" | "source_mentioned" | "generated" } | null;
   fallbackReason: string | null;
 };
 
@@ -189,7 +189,7 @@ function rowToResponseLogRow(row: ResponseRow): TimestampedResponseLogRow {
   return {
     responseId: row.response_id,
     learnerStateRef: row.learner_state_ref,
-    cardId: row.card_id,
+    studyItemId: row.study_item_id,
     derivedNodeId: row.derived_node_id,
     signalType: row.signal_type as ResponseLogRow["signalType"],
     selfReportRating: row.self_report_rating as ResponseLogRow["selfReportRating"],
@@ -206,7 +206,7 @@ function rowToResponseLogRow(row: ResponseRow): TimestampedResponseLogRow {
 }
 
 type ResponseRow = {
-  response_id: string; learner_state_ref: string; card_id: string; derived_node_id: string; signal_type: string;
+  response_id: string; learner_state_ref: string; study_item_id: string; derived_node_id: string; signal_type: string;
   self_report_rating: string | null; judged_outcome: string | null; graded_score: number | null;
   evidence_weight: number; response_source: string; grader_identity: string | null; batch_id: string | null;
   attempt_seq: number; submitted_answer: string | null; created_at: string;
@@ -231,7 +231,7 @@ export function summarizeLearnerStates(rows: TimestampedResponseLogRow[]): Learn
 export async function listLearnerStates(): Promise<LearnerStateSummary[] | undefined> {
   return withClient(async (sql) => {
     const rows = await sql<ResponseRow[]>`
-      SELECT response_id, learner_state_ref, card_id, derived_node_id, signal_type, self_report_rating,
+      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type, self_report_rating,
              judged_outcome, graded_score, evidence_weight, response_source, grader_identity, batch_id,
              attempt_seq, submitted_answer, created_at
       FROM response_log ORDER BY learner_state_ref, attempt_seq`;
@@ -242,13 +242,13 @@ export async function listLearnerStates(): Promise<LearnerStateSummary[] | undef
 export async function getLearnerLoopDetail(learnerStateRef: string): Promise<LearnerLoopDetail | undefined> {
   return withClient(async (sql) => {
     const rows = await sql<(ResponseRow & { concept_label: string; question: string; answer_key: string })[]>`
-      SELECT rl.response_id, rl.learner_state_ref, rl.card_id, rl.derived_node_id, rl.signal_type, rl.self_report_rating,
+      SELECT rl.response_id, rl.learner_state_ref, rl.study_item_id, rl.derived_node_id, rl.signal_type, rl.self_report_rating,
              rl.judged_outcome, rl.graded_score, rl.evidence_weight, rl.response_source, rl.grader_identity, rl.batch_id,
              rl.attempt_seq, rl.submitted_answer, rl.created_at,
              n.canonical_label AS concept_label, cd.question, cd.answer_key
       FROM response_log rl
       JOIN derived_graph_nodes n ON n.derived_node_id = rl.derived_node_id
-      JOIN cards cd ON cd.card_id = rl.card_id
+      JOIN study_items cd ON cd.study_item_id = rl.study_item_id
       WHERE rl.learner_state_ref = ${learnerStateRef}
       ORDER BY rl.attempt_seq`;
     const logRows = rows.map(rowToResponseLogRow);
@@ -259,20 +259,20 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
       ORDER BY p.created_at DESC`;
     const coverageRows = await sql<{
       enrichment_id: string; target_derived_node_id: string; target_label: string; position: number; derived_node_id: string;
-      label: string; grounding_origin: string; included_reason: string; card_id: string | null; question: string | null; grounding_provenance: string | null; rejection_reason: string | null;
+      label: string; grounding_origin: string; included_reason: string; study_item_id: string | null; question: string | null; grounding_provenance: string | null; rejection_reason: string | null;
     }[]>`
       SELECT p.enrichment_id, p.target_derived_node_id, tn.canonical_label AS target_label,
              s.position, s.derived_node_id, n.canonical_label AS label, n.grounding_origin,
-             s.included_reason, c.card_id, c.question, c.grounding_provenance, rc.reason AS rejection_reason
+             s.included_reason, c.study_item_id, c.question, c.grounding_provenance, rc.reason AS rejection_reason
       FROM learner_paths p
       JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
       JOIN learner_path_steps s ON s.learner_path_id = p.learner_path_id
       JOIN derived_graph_nodes n ON n.derived_node_id = s.derived_node_id
-      LEFT JOIN cards c ON c.derived_node_id = s.derived_node_id
-      LEFT JOIN rejected_cards rc ON rc.derived_node_id = s.derived_node_id
+      LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'self_assessment'
+      LEFT JOIN rejected_study_items rc ON rc.derived_node_id = s.derived_node_id
       WHERE p.learner_state_ref = ${learnerStateRef}
       ORDER BY p.created_at DESC, s.position`;
-    const coverageByPath = new Map<string, PathCardCoverage>();
+    const coverageByPath = new Map<string, PathStudyItemCoverage>();
     for (const row of coverageRows) {
       const key = `${row.enrichment_id}:${row.target_derived_node_id}`;
       let coverage = coverageByPath.get(key);
@@ -286,10 +286,10 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         label: row.label,
         groundingOrigin: row.grounding_origin,
         includedReason: row.included_reason,
-        card: row.card_id && row.question && row.grounding_provenance
-          ? { cardId: row.card_id, question: row.question, provenance: row.grounding_provenance as NonNullable<PathCardCoverageStep["card"]>["provenance"] }
+        studyItem: row.study_item_id && row.question && row.grounding_provenance
+          ? { studyItemId: row.study_item_id, question: row.question, provenance: row.grounding_provenance as NonNullable<PathStudyItemCoverageStep["studyItem"]>["provenance"] }
           : null,
-        fallbackReason: row.card_id ? null : (row.rejection_reason ?? fallbackReasonFor(row.grounding_origin))
+        fallbackReason: row.study_item_id ? null : (row.rejection_reason ?? fallbackReasonFor(row.grounding_origin))
       });
     }
 
@@ -300,7 +300,7 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         attemptSeq: Number(row.attempt_seq),
         derivedNodeId: row.derived_node_id,
         nodeLabel: row.concept_label,
-        cardId: row.card_id,
+        studyItemId: row.study_item_id,
         question: row.question,
         answerKey: row.answer_key,
         signalType: row.signal_type,
@@ -375,8 +375,8 @@ export async function getLearnerAdaptedGraphs(learnerStateRef: string): Promise<
   return { learnerStateRef, responseSourceSummary: detail.responseSourceSummary, graphs };
 }
 
-// Generic fallback used ONLY when a step's node has neither a card nor a persisted
-// rejection row (e.g. cards were never generated for the enrichment). When a real
+// Generic fallback used ONLY when a step's node has neither a study item nor a persisted
+// rejection row (e.g. study items were never generated for the enrichment). When a real
 // rejection exists, the coverage view shows its persisted reason instead of this guess.
 function fallbackReasonFor(groundingOrigin: string): string {
   if (groundingOrigin === "llm_grounded") return "Generated prerequisite, not directly recall-tested yet.";
@@ -394,7 +394,7 @@ function fallbackReasonFor(groundingOrigin: string): string {
 // it structurally cannot mutate a published graph (R15, AGENTS rule 12).
 export async function resubmitAndRecompute(deps: {
   learnerStateRef: string;
-  card: { cardId: string; derivedNodeId: string; question: string; answerKey: string };
+  studyItem: { studyItemId: string; derivedNodeId: string; question: string; answerKey: string };
   declaredDomain: string;
   submittedAnswer: string;
   paths: { enrichmentId: string; targetDerivedNodeId: string }[];
@@ -407,7 +407,7 @@ export async function resubmitAndRecompute(deps: {
 }): Promise<{ judgedOutcome: JudgedOutcome; recomputedPaths: number }> {
   const { judgment } = await gradeAndAppend({
     learnerStateRef: deps.learnerStateRef,
-    card: deps.card,
+    studyItem: deps.studyItem,
     declaredDomain: deps.declaredDomain,
     submittedAnswer: deps.submittedAnswer,
     judge: deps.judge,

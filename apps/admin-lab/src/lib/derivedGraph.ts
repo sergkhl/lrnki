@@ -42,10 +42,9 @@ export interface DerivedGraphNode {
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
   role: "anchor" | "prerequisite";
-  // Whether a recall card exists for this derived node (cards are UNIQUE per
-  // derived_node_id). An enrichment-level fact loaded once in `getEnrichmentDetail`, so
-  // a cardless node on a learner's path is rendered and flagged, never dropped (R6).
-  hasCard: boolean;
+  // Whether any study item exists for this derived node. An enrichment-level fact loaded
+  // once in `getEnrichmentDetail`, so an itemless node is rendered and flagged.
+  hasStudyItem: boolean;
   // Present only for enrichment nodes; anchors carry their CEP in the published view.
   grounding: NodeGroundingView | null;
 }
@@ -150,15 +149,63 @@ export interface DerivedGraphView {
   };
 }
 
+// The frontier target's 1-hop CLOSED neighborhood (KTD2): the target plus its direct
+// prerequisites and direct dependents, deduped. This is the learner's working region the
+// study graph frames on — "about five nodes". Computed over RENDERED edges (certain AND
+// uncertain, since the canvas draws both), so the framed region matches the visible graph;
+// contrast U5's calibration, which walks only trusted edges. Pure and direction-agnostic:
+// an isolated node returns just itself.
+export function frontierNeighborhood(
+  targetDerivedNodeId: string,
+  edges: Pick<DerivedGraphEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">[]
+): string[] {
+  const ids = new Set<string>([targetDerivedNodeId]);
+  for (const edge of edges) {
+    if (edge.dependentDerivedNodeId === targetDerivedNodeId) ids.add(edge.prerequisiteDerivedNodeId); // direct prerequisite (upstream)
+    if (edge.prerequisiteDerivedNodeId === targetDerivedNodeId) ids.add(edge.dependentDerivedNodeId); // direct dependent (downstream)
+  }
+  return [...ids];
+}
+
 export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeId: string): string {
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
+}
+
+// The distinct declared domains present on the canvas, sorted deterministically. Each
+// becomes one FFX learning-loop region — a Cytoscape compound parent node wrapping that
+// domain's concepts (U3, R2). A single-domain graph yields exactly one region. Pure so
+// the grouping is unit-testable independently of Cytoscape.
+export function distinctDomains(nodes: ReadonlyArray<{ domain: string }>): string[] {
+  return [...new Set(nodes.map((node) => node.domain))].sort((a, b) => a.localeCompare(b));
+}
+
+// The neutral ↔ adapted display mode of the single pinned canvas (U2, KTD2). One
+// pre-computed layout serves BOTH modes; switching mode restyles nodes only and
+// never re-runs layout, so positions stay fixed for blink comparison (R11).
+export type DerivedGraphMode = "neutral" | "adapted";
+
+// The Cytoscape node `data` attributes that change between modes — and ONLY these.
+// Everything else (id, label, size, nodeKind, grounding, cardless) is mode-invariant and
+// owned by the one-time layout pass. The restyle effect feeds each node these two attrs
+// via `cy.batch()` on a mode/classification change; the style selectors keyed on
+// `adaptedState` / `frontierTarget` then recolor in place. "none"/"no" is the neutral
+// baseline (matching the absent-classification render), so neutral mode is byte-identical
+// to the enrichment-page view regardless of whether a classification is available.
+export type NodeRenderAttrs = { adaptedState: AdaptedNodeState | "none"; frontierTarget: "yes" | "no" };
+
+export function nodeRenderAttrs(mode: DerivedGraphMode, classification: AdaptedNodeClassification | undefined, derivedNodeId: string): NodeRenderAttrs {
+  if (mode === "neutral" || !classification) return { adaptedState: "none", frontierTarget: "no" };
+  return {
+    adaptedState: classification.stateByNode[derivedNodeId] ?? "none",
+    frontierTarget: classification.selectedFrontierTarget === derivedNodeId ? "yes" : "no"
+  };
 }
 
 // Build the view-model, optionally overlaying a learner classification (U3, KTD2). With
 // `adapted` absent the output is neutral — byte-equivalent to the enrichment-page render
 // today, every node `adaptedState: null` / `isFrontierTarget: false`. With `adapted`
 // present each node gains its mastered / frontier / locked state and the single frontier
-// target is marked. `cardless` is derived from `hasCard` in BOTH modes (R6).
+// target is marked. `cardless` is derived from `hasStudyItem` in BOTH modes (R6).
 export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: AdaptedNodeClassification): DerivedGraphView {
   const overlayFor = (derivedNodeId: string): Pick<DerivedGraphViewNode, "adaptedState" | "isFrontierTarget"> => ({
     adaptedState: adapted ? adapted.stateByNode[derivedNodeId] ?? null : null,
@@ -175,7 +222,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         difficultyRationale: node.difficultyRationale,
         nodeKind: node.nodeKind,
         groundingOrigin: node.groundingOrigin,
-        cardless: !node.hasCard,
+        cardless: !node.hasStudyItem,
         ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge, index) => ({
@@ -195,7 +242,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         nodeKind: node.nodeKind,
         groundingOrigin: node.groundingOrigin,
         grounding: node.grounding,
-        cardless: !node.hasCard,
+        cardless: !node.hasStudyItem,
         ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge) => ({

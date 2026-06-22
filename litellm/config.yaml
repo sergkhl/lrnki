@@ -156,7 +156,7 @@ model_list:
       output_cost_per_token: 0.0000012
 
   # NOTE: openrouter flash
-  # turning off thinking does no work via extra body
+  # turning off thinking does no work via extra body, need to find a correct way if forced tool call won't work
   - model_name: "openrouter/deepseek/deepseek-v4-flash-no-thinking"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash"

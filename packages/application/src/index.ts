@@ -13,7 +13,14 @@ export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { computeLearnerPath } from "./computeLearnerPath";
-export { generateCardBank, type CardBankGenerationResult, type RejectedCard } from "./generateCardBank";
+export { generateStudyItemBank, type StudyItemBankGenerationResult, type RejectedStudyItem } from "./generateStudyItemBank";
+export {
+  validateOptionSelectItem,
+  type OptionSelectGrounding,
+  type OptionSelectGroundingPassage,
+  type OptionSelectGuardResult
+} from "./optionSelectGuard";
+export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
 export {
   buildCalibrationSet,
   propagateSelfReport,
@@ -24,6 +31,10 @@ export {
   type SelfReportInput
 } from "./calibration";
 export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
+export {
+  appendOptionSelectOutcome,
+  AUTO_GRADER_IDENTITY
+} from "./optionSelectOutcome";
 export {
   loadResponseLogLearnerState,
   foldConceptMastery,

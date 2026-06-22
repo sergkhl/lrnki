@@ -6,10 +6,10 @@ import { foldConceptMastery, loadResponseLogLearnerState, outcomeToMastery, rati
 
 let seq = 0;
 function selfReport(derivedNodeId: string, rating: SelfReportRating): ResponseLogRow {
-  return { responseId: `r${seq}`, learnerStateRef: "L1", cardId: `card-${derivedNodeId}`, derivedNodeId, signalType: "self_report", selfReportRating: rating, judgedOutcome: null, gradedScore: null, evidenceWeight: 0.3, responseSource: "synthetic", graderIdentity: null, batchId: "b", attemptSeq: ++seq, submittedAnswer: null, createdAt: new Date().toISOString() };
+  return { responseId: `r${seq}`, learnerStateRef: "L1", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "self_report", selfReportRating: rating, judgedOutcome: null, gradedScore: null, evidenceWeight: 0.3, responseSource: "synthetic", graderIdentity: null, batchId: "b", attemptSeq: ++seq, submittedAnswer: null, createdAt: new Date().toISOString() };
 }
 function graded(derivedNodeId: string, outcome: JudgedOutcome, score: number): ResponseLogRow {
-  return { responseId: `r${seq}`, learnerStateRef: "L1", cardId: `card-${derivedNodeId}`, derivedNodeId, signalType: "graded", selfReportRating: null, judgedOutcome: outcome, gradedScore: score, evidenceWeight: 1, responseSource: "synthetic", graderIdentity: "kg-independent-judge", attemptSeq: ++seq, batchId: null, submittedAnswer: "a", createdAt: new Date().toISOString() };
+  return { responseId: `r${seq}`, learnerStateRef: "L1", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", selfReportRating: null, judgedOutcome: outcome, gradedScore: score, evidenceWeight: 1, responseSource: "synthetic", graderIdentity: "kg-independent-judge", attemptSeq: ++seq, batchId: null, submittedAnswer: "a", createdAt: new Date().toISOString() };
 }
 
 test("anki ratings and graded outcomes map to the documented mastery values", () => {
