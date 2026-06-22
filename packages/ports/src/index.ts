@@ -4,6 +4,7 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
+  CalibrationVerdict,
   StudyItem,
   SelfAssessmentItemDraft,
   OptionSelectItemDraft,
@@ -364,13 +365,29 @@ export interface StudyItemGenerationPort {
 
 // Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ
 // only — there is no update or delete — so the append-only guarantee (R5) is
-// structural, not a convention. `nextAttemptSeq` hands the caller the next monotonic
-// sequence for a learner so calibration/measurement stamp ordered rows.
+// structural, not a convention. A per-learner reset (R16) bypasses this port with a
+// direct operator delete, so the structural guarantee is never weakened here.
+// `nextAttemptSeq` hands the caller the next monotonic sequence for a learner so
+// graded measurement stamps ordered rows.
 export interface ResponseLogStorePort {
   append(rows: NewResponseLogRow[]): Promise<void>;
   listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
   listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]>;
   nextAttemptSeq(learnerStateRef: string): Promise<number>;
+}
+
+// Calibration Verdict persistence (R10, KTD1). The MUTABLE counterpart to the
+// append-only Response Log: `upsert` writes the current `known`/`learn` intent per
+// (learner, node), overwriting any prior verdict for that node (one row, never two);
+// `delete` reverses a single node's verdict (R7); `clearLearner` is the per-learner
+// reset's verdict half (R16). The trusted-edge down-closure of the `known` set is
+// derived at read time (calibrationClosure, U3), so this store holds only the direct
+// verdicts — no seeded or materialized closure rows.
+export interface CalibrationVerdictStorePort {
+  upsert(verdict: { learnerStateRef: string; derivedNodeId: string; verdict: CalibrationVerdict["verdict"] }): Promise<void>;
+  delete(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void>;
+  listForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]>;
+  clearLearner(learnerStateRef: string): Promise<void>;
 }
 
 // Learner answer simulator (R14, U7). Generates a learner's free-form written answer

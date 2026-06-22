@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { JudgedOutcome, NewResponseLogRow, ResponseSource } from "@lrnki/domain-core";
 import type { ResponseLogStorePort } from "@lrnki/ports";
-import { GRADED_EVIDENCE_WEIGHT } from "./measurement";
 
 export const AUTO_GRADER_IDENTITY = "auto";
 
@@ -27,10 +26,8 @@ export async function appendOptionSelectOutcome(input: {
     studyItemId: input.item.studyItemId,
     derivedNodeId: input.item.derivedNodeId,
     signalType: "graded",
-    selfReportRating: null,
     judgedOutcome,
     gradedScore,
-    evidenceWeight: GRADED_EVIDENCE_WEIGHT,
     responseSource: input.responseSource,
     graderIdentity: AUTO_GRADER_IDENTITY,
     batchId: null,

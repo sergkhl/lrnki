@@ -43,6 +43,7 @@ import {
   PostgresExtractionRunStore,
   PostgresStudyItemBankStore,
   PostgresResponseLogStore,
+  PostgresCalibrationVerdictStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
@@ -157,6 +158,9 @@ function buildContext() {
     // DeepSeek card generator never grades its own answer-key (ADR-0023).
     answerGradingJudge: new LiteLlmAnswerGradingJudgeAdapter(deterministicClient),
     responseLogStore: new PostgresResponseLogStore(sql),
+    // Mutable calibration verdict store (R10): the synthetic prefill seeds verdicts here,
+    // separate from the append-only graded log.
+    verdictStore: new PostgresCalibrationVerdictStore(sql),
     // Synthetic learner simulator (U7): DeepSeek-family generator whose answers the
     // cross-family judge grades — EXPERIMENT_ONLY scaffolding for the rule-14 run.
     learnerSimulator: new LiteLlmLearnerSimulatorAdapter(deterministicClient)
@@ -359,9 +363,10 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     profile: { difficultyCutoff: 0.6, gradedSampleSize: 4 },
     simulator: ctx.learnerSimulator,
     judge: ctx.answerGradingJudge,
-    responseLog: ctx.responseLogStore
+    responseLog: ctx.responseLogStore,
+    verdictStore: ctx.verdictStore
   });
-  console.log(`   self_report=${result.selfReportCount} graded=${result.gradedCount} batch=${result.calibrationBatchId}`);
+  console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount} · graded=${result.gradedCount}`);
 }
 
 async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetRef?: string, learnerStateRef?: string) {

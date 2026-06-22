@@ -21,16 +21,7 @@ export {
   type OptionSelectGuardResult
 } from "./optionSelectGuard";
 export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
-export {
-  buildCalibrationSet,
-  propagateSelfReport,
-  appendSelfReportBatch,
-  SELF_REPORT_EVIDENCE_WEIGHT,
-  PROPAGATED_SELF_REPORT_EVIDENCE_WEIGHT,
-  type CalibrationItem,
-  type SelfReportInput
-} from "./calibration";
-export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
+export { gradeAndAppend } from "./measurement";
 export {
   appendOptionSelectOutcome,
   AUTO_GRADER_IDENTITY
@@ -38,7 +29,6 @@ export {
 export {
   loadResponseLogLearnerState,
   foldConceptMastery,
-  ratingToMastery,
   outcomeToMastery
 } from "./responseLogLearnerState";
 export {
@@ -52,7 +42,7 @@ export {
 } from "./adaptivePathProjection";
 export {
   synthesizeResponses,
-  rateByDifficulty,
+  verdictByDifficulty,
   type SyntheticLearnerProfile
 } from "./syntheticResponses";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
@@ -63,5 +53,14 @@ export {
   topologicalDepth,
   topologicalOrder,
   prerequisiteAncestors,
-  dagDepthDifficulty
+  dagDepthDifficulty,
+  type PrerequisiteEdgeRef
 } from "./prerequisiteDag";
+export {
+  pruneClosure,
+  composeMastery,
+  struggledNodes,
+  suggestRestorations,
+  CALIBRATION_KNOWN_MASTERY,
+  type ComposedMastery
+} from "./calibrationClosure";

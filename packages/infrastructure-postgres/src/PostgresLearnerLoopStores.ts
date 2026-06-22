@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
-import type { ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { ArtifactEnvelope, CalibrationVerdict, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
+import type { CalibrationVerdictStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
@@ -190,9 +190,50 @@ type CitationRow = {
   generated_passage_text: string | null;
 };
 
+// Calibration Verdict persistence (R10, KTD1). The MUTABLE store: `upsert` writes the
+// current `known`/`learn` intent, overwriting any prior verdict for the node (one row,
+// not two) via ON CONFLICT on the (learner, node) primary key; `delete` reverses a
+// single node's verdict (R7); `clearLearner` is the verdict half of the per-learner
+// reset (R16). No evidence weights, no append-only seeding — a verdict is current intent.
+export class PostgresCalibrationVerdictStore implements CalibrationVerdictStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async upsert(verdict: { learnerStateRef: string; derivedNodeId: string; verdict: CalibrationVerdict["verdict"] }): Promise<void> {
+    await this.sql`
+      INSERT INTO calibration_verdicts (learner_state_ref, derived_node_id, verdict, updated_at)
+      VALUES (${verdict.learnerStateRef}, ${verdict.derivedNodeId}, ${verdict.verdict}, now())
+      ON CONFLICT (learner_state_ref, derived_node_id)
+      DO UPDATE SET verdict = EXCLUDED.verdict, updated_at = now()`;
+  }
+
+  async delete(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void> {
+    await this.sql`
+      DELETE FROM calibration_verdicts
+      WHERE learner_state_ref = ${input.learnerStateRef} AND derived_node_id = ${input.derivedNodeId}`;
+  }
+
+  async listForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]> {
+    const rows = await this.sql<{ learner_state_ref: string; derived_node_id: string; verdict: string; updated_at: string }[]>`
+      SELECT learner_state_ref, derived_node_id, verdict, updated_at
+      FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}
+      ORDER BY derived_node_id`;
+    return rows.map((row) => ({
+      learnerStateRef: row.learner_state_ref,
+      derivedNodeId: row.derived_node_id,
+      verdict: row.verdict as CalibrationVerdict["verdict"],
+      updatedAt: new Date(row.updated_at).toISOString()
+    }));
+  }
+
+  async clearLearner(learnerStateRef: string): Promise<void> {
+    await this.sql`DELETE FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}`;
+  }
+}
+
 // Response Log persistence (R4–R6). APPEND + READ only — there is no update or delete
-// method, so the append-only guarantee is structural. The DB CHECK constraints keep
-// every row signal-coherent; this store never reshapes a row, it only inserts.
+// method, so the append-only guarantee is structural. The log is graded-only (R18);
+// the DB CHECK keeps every row outcome-coherent; this store never reshapes a row, it
+// only inserts.
 export class PostgresResponseLogStore implements ResponseLogStorePort {
   constructor(private readonly sql: Sql) {}
 
@@ -203,12 +244,12 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
         await tx`
           INSERT INTO response_log (
             response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
-            self_report_rating, judged_outcome, graded_score, evidence_weight,
+            judged_outcome, graded_score,
             response_source, grader_identity, batch_id, attempt_seq, submitted_answer
           )
           VALUES (
             ${row.responseId}, ${row.learnerStateRef}, ${row.studyItemId}, ${row.derivedNodeId}, ${row.signalType},
-            ${row.selfReportRating}, ${row.judgedOutcome}, ${row.gradedScore}, ${row.evidenceWeight},
+            ${row.judgedOutcome}, ${row.gradedScore},
             ${row.responseSource}, ${row.graderIdentity}, ${row.batchId}, ${row.attemptSeq}, ${row.submittedAnswer}
           )`;
       }
@@ -218,7 +259,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
   async listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]> {
     const rows = await this.sql<ResponseLogDbRow[]>`
       SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
-             self_report_rating, judged_outcome, graded_score, evidence_weight,
+             judged_outcome, graded_score,
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} ORDER BY attempt_seq`;
     return rows.map(hydrateResponseLogRow);
@@ -227,7 +268,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
   async listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]> {
     const rows = await this.sql<ResponseLogDbRow[]>`
       SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
-             self_report_rating, judged_outcome, graded_score, evidence_weight,
+             judged_outcome, graded_score,
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} AND derived_node_id = ${derivedNodeId} ORDER BY attempt_seq`;
     return rows.map(hydrateResponseLogRow);
@@ -246,10 +287,8 @@ type ResponseLogDbRow = {
   study_item_id: string;
   derived_node_id: string;
   signal_type: string;
-  self_report_rating: string | null;
   judged_outcome: string | null;
   graded_score: number | null;
-  evidence_weight: number;
   response_source: string;
   grader_identity: string | null;
   batch_id: string | null;
@@ -265,10 +304,8 @@ function hydrateResponseLogRow(row: ResponseLogDbRow): ResponseLogRow {
     studyItemId: row.study_item_id,
     derivedNodeId: row.derived_node_id,
     signalType: row.signal_type as ResponseLogRow["signalType"],
-    selfReportRating: row.self_report_rating as ResponseLogRow["selfReportRating"],
     judgedOutcome: row.judged_outcome as ResponseLogRow["judgedOutcome"],
     gradedScore: row.graded_score === null ? null : Number(row.graded_score),
-    evidenceWeight: Number(row.evidence_weight),
     responseSource: row.response_source as ResponseLogRow["responseSource"],
     graderIdentity: row.grader_identity,
     batchId: row.batch_id,

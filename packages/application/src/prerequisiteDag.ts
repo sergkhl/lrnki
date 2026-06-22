@@ -165,8 +165,16 @@ export function topologicalDepth(derivedNodeIds: string[], edges: Edge[]): Map<s
   return depth;
 }
 
-// Transitive prerequisite ancestors of a target — everything that must precede it.
-export function prerequisiteAncestors(targetDerivedNodeId: string, edges: Edge[]): Set<string> {
+// The minimal directed-edge shape the ancestor walk reads — just the two endpoint ids.
+// Both `InferredPrerequisiteEdge` (domain-core) and the loader-facing `DerivedGraphEdge`
+// (admin-lab) satisfy it structurally, so the calibration closure (U3) and the study
+// loader share ONE ancestor definition without a cast (AGENTS rule 18).
+export type PrerequisiteEdgeRef = Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">;
+
+// Transitive prerequisite ancestors of a target — everything that must precede it. The
+// caller pre-filters to the edge set it trusts (e.g. `!uncertain`); this walk does not
+// re-filter. The seen-set terminates on any residual cycle.
+export function prerequisiteAncestors(targetDerivedNodeId: string, edges: ReadonlyArray<PrerequisiteEdgeRef>): Set<string> {
   const prerequisitesOf = new Map<string, string[]>();
   for (const e of edges) addToList(prerequisitesOf, e.dependentDerivedNodeId, e.prerequisiteDerivedNodeId);
   const ancestors = new Set<string>();

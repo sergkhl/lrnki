@@ -1053,15 +1053,35 @@ export type OptionSelectItemDraft = {
 export type StudyItemDraft = SelfAssessmentItemDraft | OptionSelectItemDraft;
 
 // ---------------------------------------------------------------------------
-// Response Log — the durable, append-only commitment (R4–R6). Every recall attempt
-// is an immutable row. `self_report` rows carry an anki-style rating; `graded` rows
-// carry a judged outcome plus a [0,1] score (the partial/binary distinction the
-// estimator and a later IRT/BKT fit need, AE4). The skill is the Derived Graph Layer
-// `derivedNodeId`; the item is `studyItemId` (per-item IRT key).
+// Calibration Verdict — the MUTABLE calibration store (R10, KTD1). One verdict per
+// (learner, node): `known` claims prior mastery (its trusted prerequisite down-closure
+// is treated as mastered, derived at read time); `learn` keeps the node in the study
+// gap. Unlike the append-only Response Log, a verdict is current intent — naturally
+// upsert/delete — so reversal (R7) is a single overwrite or delete, no stale rows and
+// no evidence weights (rule 18, KTD3).
 // ---------------------------------------------------------------------------
 
-export type SignalType = "self_report" | "graded";
-export type SelfReportRating = "again" | "hard" | "good" | "easy";
+export type Verdict = "known" | "learn";
+
+export type CalibrationVerdict = {
+  learnerStateRef: string;
+  derivedNodeId: string;
+  verdict: Verdict;
+  // Set by the store (DB default) on upsert; populated on read.
+  updatedAt?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Response Log — the durable, append-only commitment (R4–R6). Every GRADED recall
+// attempt is an immutable row carrying a judged outcome plus a [0,1] score (the
+// partial/binary distinction the estimator and a later IRT/BKT fit need, AE4). With
+// the weighted self-report sweep retired (R18, KTD5), the log is graded-only: there
+// is no `self_report` signal type, no anki-style rating, and no evidence weight. The
+// skill is the Derived Graph Layer `derivedNodeId`; the item is `studyItemId`
+// (per-item IRT key). Calibration now lives in the mutable CalibrationVerdict store.
+// ---------------------------------------------------------------------------
+
+export type SignalType = "graded";
 export type JudgedOutcome = "correct" | "partial" | "incorrect";
 export type ResponseSource = "synthetic" | "human";
 
@@ -1071,13 +1091,12 @@ export type ResponseLogRow = {
   studyItemId: string;
   derivedNodeId: string;
   signalType: SignalType;
-  selfReportRating: SelfReportRating | null;
   judgedOutcome: JudgedOutcome | null;
   gradedScore: number | null;
-  evidenceWeight: number;
   responseSource: ResponseSource;
   graderIdentity: string | null;
-  // Groups one calibration sweep so re-calibration appends a distinct batch (R10).
+  // Reserved for grouping a batch of appends; unused now the sweep is gone (kept
+  // nullable for IRT/BKT replay grouping later).
   batchId: string | null;
   // Monotonic per learner_state_ref — the ordered sequence BKT/IRT consume (R6).
   attemptSeq: number;

@@ -4,8 +4,6 @@ import { readFileSync } from "node:fs";
 import type { NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
 import type { ResponseLogStorePort } from "@lrnki/ports";
 import { appendOptionSelectOutcome, AUTO_GRADER_IDENTITY } from "./optionSelectOutcome";
-import { appendSelfReportBatch } from "./calibration";
-import { GRADED_EVIDENCE_WEIGHT } from "./measurement";
 import { foldConceptMastery } from "./responseLogLearnerState";
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
@@ -32,8 +30,6 @@ test("a correct option appends one graded(auto) row with score 1 and no submitte
   assert.equal(row.gradedScore, 1);
   assert.equal(row.graderIdentity, AUTO_GRADER_IDENTITY);
   assert.equal(row.submittedAnswer, null);
-  assert.equal(row.selfReportRating, null);
-  assert.equal(row.evidenceWeight, GRADED_EVIDENCE_WEIGHT);
   assert.equal(log.rows.length, 1);
 });
 
@@ -47,18 +43,17 @@ test("a wrong option appends incorrect / score 0 under the auto grader", async (
   assert.equal(row.graderIdentity, AUTO_GRADER_IDENTITY);
 });
 
-test("graded(auto) correct composes with the mastery fold and outranks self_report", async () => {
+test("graded(auto) correct composes with the graded mastery fold to master the node", async () => {
   const log = fakeResponseLog();
-  await appendSelfReportBatch({
-    learnerStateRef: "L1", responseLog: log.store, responseSource: "human",
-    ratings: [{ derivedNodeId: "node-1", studyItemId: "item-1", rating: "again" }]
+  await appendOptionSelectOutcome({
+    learnerStateRef: "L1", item, chosenOptionId: "option-wrong", correctOptionId: "option-correct", responseSource: "human", responseLog: log.store
   });
   await appendOptionSelectOutcome({
     learnerStateRef: "L1", item, chosenOptionId: "option-correct", correctOptionId: "option-correct", responseSource: "human", responseLog: log.store
   });
 
   const nodeRows = (await log.store.listForLearner("L1")).filter((r) => r.derivedNodeId === "node-1");
-  assert.equal(foldConceptMastery(nodeRows), 1, "graded(auto) correct masters the node");
+  assert.equal(foldConceptMastery(nodeRows), 1, "the latest graded(auto) correct masters the node");
 });
 
 test("attemptSeq comes from nextAttemptSeq and rows append in monotonic order", async () => {
