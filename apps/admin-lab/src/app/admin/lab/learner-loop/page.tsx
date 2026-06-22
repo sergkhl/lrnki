@@ -18,8 +18,9 @@ export default async function LearnerLoopListPage() {
         <CardHeader className="border-b">
           <CardTitle>Learner loop</CardTitle>
           <CardDescription>
-            The downstream recall loop over the published graph: synthetic self-report and graded responses in the
-            append-only Response Log. Review, edit, and resubmit answers — learner state only, never a published graph.
+            The downstream recall loop over the published graph: calibration verdicts in the mutable verdict store and
+            graded responses in the append-only Response Log. Review, edit, and resubmit answers — learner state only,
+            never a published graph.
           </CardDescription>
           <CardAction>
             <Badge variant={learners ? "outline" : "destructive"}>
@@ -46,7 +47,7 @@ export default async function LearnerLoopListPage() {
                 <TableRow>
                   <TableHead>Learner</TableHead>
                   <TableHead>Last response</TableHead>
-                  <TableHead className="text-right">Self-report</TableHead>
+                  <TableHead className="text-right">Known</TableHead>
                   <TableHead className="text-right">Graded</TableHead>
                   <TableHead className="text-right">Conflicts</TableHead>
                 </TableRow>
@@ -62,7 +63,7 @@ export default async function LearnerLoopListPage() {
                     <TableCell className="font-mono text-xs">
                       <LocalDateTime iso={learner.latestResponseAt} />
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{learner.selfReportCount}</TableCell>
+                    <TableCell className="text-right tabular-nums">{learner.knownVerdictCount}</TableCell>
                     <TableCell className="text-right tabular-nums">{learner.gradedCount}</TableCell>
                     <TableCell className="text-right">
                       {learner.conflictCount > 0 ? (

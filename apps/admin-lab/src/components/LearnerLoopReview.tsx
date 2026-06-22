@@ -12,8 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 const CONFLICT_COPY: Record<ConceptConflict["kind"], string> = {
-  claimed_known_but_failed: "Claimed known, graded incorrect",
-  claimed_unknown_but_passed: "Claimed unknown, graded correct"
+  claimed_known_but_failed: "Verdict known, graded incorrect",
+  claimed_unknown_but_passed: "Verdict learn, graded correct"
 };
 
 const PROVENANCE_LABEL: Record<"source_cep" | "source_mentioned" | "generated", string> = {
@@ -41,7 +41,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
         <CardHeader className="border-b">
           <CardTitle>Learner {detail.learnerStateRef}</CardTitle>
           <CardDescription>
-            {detail.responses.length} responses · {detail.conflicts.length} self-report↔graded conflicts ·{" "}
+            {detail.responses.length} graded responses · {detail.conflicts.length} calibration↔graded conflicts ·{" "}
             {detail.paths.length} projected path{detail.paths.length === 1 ? "" : "s"}. Editing an answer appends a new
             graded row and recomputes the path — learner state only, never a published graph.
           </CardDescription>
@@ -54,7 +54,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
               <AlertDescription>
                 {detail.conflicts.map((conflict) => (
                   <span key={conflict.derivedNodeId} className="block">
-                    {conflict.derivedNodeId}: {CONFLICT_COPY[conflict.kind]} (self-report {conflict.activeSelfReport} vs graded {conflict.latestGraded})
+                    {conflict.derivedNodeId}: {CONFLICT_COPY[conflict.kind]} (verdict {conflict.verdict} vs graded {conflict.latestGraded})
                   </span>
                 ))}
               </AlertDescription>
@@ -171,9 +171,6 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
                   <Badge variant="outline">{response.signalType}</Badge>
                   <Badge variant="outline">{response.responseSource}</Badge>
                   <LocalDateTime iso={response.createdAt} />
-                  {response.signalType === "self_report" && response.selfReportRating && (
-                    <Badge variant="secondary">{response.selfReportRating}</Badge>
-                  )}
                   {response.signalType === "graded" && response.judgedOutcome && (
                     <Badge variant={response.judgedOutcome === "incorrect" ? "destructive" : "secondary"}>
                       {response.judgedOutcome}

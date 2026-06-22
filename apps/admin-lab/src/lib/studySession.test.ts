@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AdaptedNodeClassification } from "@lrnki/application";
+import type { Verdict } from "@lrnki/domain-core";
 import { sheetContentFor, unmetPrerequisites, selectScopedFrontier } from "./studySession";
 import type { StudyCardView, StudyOptionSelectView } from "@/components/study/studyView";
 import type { DerivedGraphEdge } from "./derivedGraph";
+
+const noVerdicts = new Map<string, Verdict>();
 
 // DAG: scope -> ownership -> move, plus a second prerequisite borrow -> move (uncertain).
 // Pure gating helpers only — the DB-bound loader is verified by the U7 real-use run.
@@ -44,12 +47,44 @@ const classification: AdaptedNodeClassification = {
   selectedFrontierTarget: "ownership"
 };
 
-test("sheetContentFor opens a frontier node's option-select item (Covers R9)", () => {
+test("sheetContentFor opens a frontier node's CALIBRATION card, carrying its option item to study (Covers R5/R9)", () => {
   const content = sheetContentFor({
     derivedNodeId: "ownership",
     classification,
     optionItemsByNode: new Map([["ownership", optionItem("ownership")]]),
     selfAssessmentItemsByNode: new Map([["ownership", card("ownership")]]),
+    verdictByNode: noVerdicts,
+    edges,
+    labelByNode
+  });
+  assert.equal(content.kind, "calibration");
+  assert.equal(content.kind === "calibration" && content.card.studyItemId, "sa-ownership");
+  assert.equal(content.kind === "calibration" && content.optionItem?.studyItemId, "os-ownership");
+  assert.equal(content.kind === "calibration" && content.verdict, null);
+});
+
+test("sheetContentFor shows the current verdict on a frontier calibration card (Covers R7)", () => {
+  const content = sheetContentFor({
+    derivedNodeId: "ownership",
+    classification,
+    optionItemsByNode: new Map(),
+    selfAssessmentItemsByNode: new Map([["ownership", card("ownership")]]),
+    verdictByNode: new Map<string, Verdict>([["ownership", "learn"]]),
+    edges,
+    labelByNode
+  });
+  assert.equal(content.kind, "calibration");
+  assert.equal(content.kind === "calibration" && content.verdict, "learn");
+  assert.equal(content.kind === "calibration" && content.optionItem, null);
+});
+
+test("sheetContentFor falls back to option-select for a frontier node with no self-assessment to reveal (Covers R9)", () => {
+  const content = sheetContentFor({
+    derivedNodeId: "ownership",
+    classification,
+    optionItemsByNode: new Map([["ownership", optionItem("ownership")]]),
+    selfAssessmentItemsByNode: new Map(),
+    verdictByNode: noVerdicts,
     edges,
     labelByNode
   });
@@ -57,12 +92,13 @@ test("sheetContentFor opens a frontier node's option-select item (Covers R9)", (
   assert.equal(content.kind === "option_select" && content.item.studyItemId, "os-ownership");
 });
 
-test("sheetContentFor flags a frontier node without option-select, even with self-assessment (Covers R9/R13)", () => {
+test("sheetContentFor flags a frontier node with neither a self-assessment nor an option item (Covers R13)", () => {
   const content = sheetContentFor({
     derivedNodeId: "ownership",
     classification,
     optionItemsByNode: new Map(),
-    selfAssessmentItemsByNode: new Map([["ownership", card("ownership")]]),
+    selfAssessmentItemsByNode: new Map(),
+    verdictByNode: noVerdicts,
     edges,
     labelByNode
   });
@@ -75,6 +111,7 @@ test("sheetContentFor names a locked node's unmet prerequisites and shows no ite
     classification,
     optionItemsByNode: new Map([["move", optionItem("move")]]),
     selfAssessmentItemsByNode: new Map([["move", card("move")]]),
+    verdictByNode: noVerdicts,
     edges,
     labelByNode
   });
@@ -83,17 +120,19 @@ test("sheetContentFor names a locked node's unmet prerequisites and shows no ite
   assert.deepEqual(content.kind === "locked" && content.unmetPrerequisiteLabels, ["Ownership"]);
 });
 
-test("sheetContentFor opens a mastered node's self-assessment item as a read-only review", () => {
+test("sheetContentFor opens a mastered node as a read-only review carrying its verdict (Covers R7)", () => {
   const content = sheetContentFor({
     derivedNodeId: "scope",
     classification,
     optionItemsByNode: new Map(),
     selfAssessmentItemsByNode: new Map([["scope", card("scope")]]),
+    verdictByNode: new Map<string, Verdict>([["scope", "known"]]),
     edges,
     labelByNode
   });
   assert.equal(content.kind, "mastered_review");
   assert.equal(content.kind === "mastered_review" && content.card?.studyItemId, "sa-scope");
+  assert.equal(content.kind === "mastered_review" && content.verdict, "known");
 });
 
 test("unmetPrerequisites returns only direct, non-mastered prerequisites, excluding uncertain edges", () => {

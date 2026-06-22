@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { GraduationCapIcon, SlidersHorizontalIcon, TrophyIcon } from "lucide-react";
-import { submitOptionSelect, submitCalibration } from "@/app/admin/lab/study/actions";
+import { GraduationCapIcon, RotateCcwIcon, TriangleAlertIcon, TrophyIcon } from "lucide-react";
+import type { Verdict } from "@lrnki/domain-core";
+import { submitOptionSelect, setVerdict, clearVerdict, resetLearner } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
-import { CalibrationSweep, type CalibrationRating } from "@/components/study/CalibrationSweep";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
 import { nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
@@ -12,26 +12,29 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Admin-Lab client driver for one study session (U5). It composes the transfer-ready
-// modules (CalibrationSweep, StudySideSheet) and the reshaped graph: a node tap opens the
-// state-gated sheet, the optional "Calibrate" button reveals the sweep, and every write goes
-// through the U3 server actions. Each action `revalidatePath`s the session route, so the
-// server re-folds mastery and re-classifies and this component re-renders with fresh props —
-// the frontier advances in the same view (R7). Mastery is never held client-side.
+// Admin-Lab client driver for one study session (U6). Calibration is dissolved INTO the
+// graph: tapping a cone node opens the reveal/verdict card (U5), and "I knew it" / "I forgot"
+// upsert a verdict that re-prunes the cone in place. There is no Calibrate toggle and no
+// separate sweep. Every write goes through the U6 server actions; each `revalidatePath`s the
+// session route, so the server re-derives the prune closure + classification and this
+// component re-renders with fresh props. Mastery is never held client-side.
 export function StudySession({ session }: Readonly<{ session: StudySessionData }>) {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [calibrating, setCalibrating] = useState(false);
+  // A foundational root goal opens directly on its single node (R3) — never empty, never
+  // a premature "Goal reached."
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(session.isFoundationalRoot ? session.target.derivedNodeId : null);
+  const [sheetOpen, setSheetOpen] = useState(session.isFoundationalRoot);
   const [pending, startTransition] = useTransition();
-  // Auto-advance bookkeeping (U4). After an answer we keep the sheet open and snapshot the
-  // CURRENT session object; the advance fires only once a DIFFERENT session arrives (the
-  // server re-fold delivered via revalidatePath), never on the synchronous pending-flag
-  // flip against the stale prop. Refs because neither should trigger a re-render itself.
+  // Auto-advance bookkeeping (for graded option-select answers). After an answer we keep the
+  // sheet open and snapshot the CURRENT session; the advance fires only once a DIFFERENT
+  // session arrives (the server re-fold via revalidatePath), never on the synchronous
+  // pending-flag flip against the stale prop.
   const pendingAdvanceRef = useRef(false);
   const autoAdvanceDismissGuardRef = useRef(false);
   const sessionAtAnswerRef = useRef(session);
 
-  const goalReached = session.classification.selectedFrontierTarget === null;
+  // "Goal reached" only when the goal is NOT a foundational root and its whole cone is
+  // mastered. A foundational root always shows its single-node study screen instead (R3/AE1).
+  const goalReached = !session.isFoundationalRoot && session.classification.selectedFrontierTarget === null;
   const sourceSummary = session.responseSourceSummary;
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
@@ -42,11 +45,8 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   };
 
   const onSheetOpenChange = (nextOpen: boolean) => {
-    // Hold the sheet open across the answer → re-fold → advance window. A modal sheet emits a
-    // stale open=false while the option card remounts (key change) and the server re-fold is in
-    // flight; the user's intent was "advance", not "close". `pending` (useTransition) stays true
-    // across that whole window independent of frame timing, so it closes the gap the rAF-reset
-    // guard alone leaves open (AE1). Genuine closes (Escape / X / backdrop) still work once idle.
+    // Hold the sheet open across the answer → re-fold → advance window (a modal sheet emits a
+    // stale open=false while the option card remounts and the server re-fold is in flight).
     if (!nextOpen && (pending || !shouldAcceptSheetOpenChange(nextOpen, autoAdvanceDismissGuardRef.current))) return;
     setSheetOpen(nextOpen);
     if (!nextOpen) setSelectedNodeId(null);
@@ -54,10 +54,11 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
 
   const onSelect = (optionId: string) => {
     const content = selectedContent;
-    if (!content || content.kind !== "option_select") return;
-    const studyItemId = content.item.studyItemId;
+    if (!content) return;
+    const studyItemId = content.kind === "option_select" ? content.item.studyItemId : content.kind === "calibration" ? content.optionItem?.studyItemId : undefined;
+    if (!studyItemId) return;
     // Keep the sheet open and arm the advance; the effect below retargets it once the
-    // re-folded session prop arrives (R4). Do NOT close here — that was the drop-out (AE1).
+    // re-folded session prop arrives (R4).
     pendingAdvanceRef.current = true;
     autoAdvanceDismissGuardRef.current = true;
     sessionAtAnswerRef.current = session;
@@ -72,18 +73,19 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     });
   };
 
-  // Advance effect (U4, R4/AE1): when a DIFFERENT session object arrives after an answer
-  // (the server re-fold), retarget the open sheet to the freshly-advanced frontier target.
-  // A null target means the goal is reached — close the sheet (the completion state shows).
-  // Keyed on `session`: it does not run on the synchronous pending-flag flip (same prop).
+  // Advance effect (R4/AE1): when a DIFFERENT session arrives after a graded answer, retarget
+  // the open sheet to the freshly-advanced frontier target; a null target with no foundational
+  // root means the goal is reached — close the sheet.
   useEffect(() => {
     if (!pendingAdvanceRef.current || session === sessionAtAnswerRef.current) return;
     pendingAdvanceRef.current = false;
     const target = nextStudyTarget(session.classification);
     if (target === null) {
       autoAdvanceDismissGuardRef.current = false;
-      setSheetOpen(false);
-      setSelectedNodeId(null);
+      if (!session.isFoundationalRoot) {
+        setSheetOpen(false);
+        setSelectedNodeId(null);
+      }
     } else {
       setSelectedNodeId(target);
       setSheetOpen(true);
@@ -93,10 +95,28 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     }
   }, [session]);
 
-  const onCalibrate = (ratings: CalibrationRating[]) => {
+  const onVerdict = (verdict: Verdict) => {
+    if (!selectedNodeId) return;
+    const derivedNodeId = selectedNodeId;
     startTransition(async () => {
-      await submitCalibration({ learnerStateRef: session.learnerStateRef, enrichmentId: session.enrichmentId, ratings });
-      setCalibrating(false);
+      await setVerdict({ learnerStateRef: session.learnerStateRef, derivedNodeId, verdict });
+    });
+  };
+
+  const onClear = (derivedNodeId?: string) => {
+    const nodeId = derivedNodeId ?? selectedNodeId;
+    if (!nodeId) return;
+    startTransition(async () => {
+      await clearVerdict({ learnerStateRef: session.learnerStateRef, derivedNodeId: nodeId });
+    });
+  };
+
+  const onReset = () => {
+    if (typeof window !== "undefined" && !window.confirm(`Reset all calibration verdicts and graded responses for ${session.learnerStateRef}? This cannot be undone.`)) return;
+    startTransition(async () => {
+      await resetLearner({ learnerStateRef: session.learnerStateRef });
+      setSheetOpen(false);
+      setSelectedNodeId(null);
     });
   };
 
@@ -112,20 +132,34 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
             Learner <span className="font-mono text-xs">{session.learnerStateRef}</span> · frontier:{" "}
             {session.classification.selectedFrontierTarget
               ? session.detail.nodes.find((n) => n.derivedNodeId === session.classification.selectedFrontierTarget)?.label ?? "—"
-              : "goal reached"}
-            . Tap a node to study it. Toggle neutral ↔ adapted on the graph to compare.
+              : session.isFoundationalRoot ? "foundational — studied directly" : "goal reached"}
+            . Tap a node to reveal its answer and mark &ldquo;I knew it&rdquo; or &ldquo;I forgot&rdquo;.
           </CardDescription>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge variant={sourceSummary.synthetic > 0 ? "secondary" : "outline"}>
               {sourceSummary.synthetic} synthetic · {sourceSummary.human} human
             </Badge>
-            <Button type="button" size="sm" variant={calibrating ? "secondary" : "outline"} onClick={() => setCalibrating((value) => !value)}>
-              <SlidersHorizontalIcon data-icon="inline-start" />
-              {calibrating ? "Hide calibration" : "Calibrate"}
+            <Button type="button" size="sm" variant="outline" onClick={onReset} disabled={pending}>
+              <RotateCcwIcon data-icon="inline-start" />
+              Reset learner
             </Button>
           </div>
         </CardHeader>
       </Card>
+
+      {session.isFoundationalRoot ? (
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4 text-sm">
+            <GraduationCapIcon className="size-5 text-chart-2" />
+            <span>
+              <span className="font-medium">Foundational — studied directly.</span>{" "}
+              <span className="text-muted-foreground">
+                {session.target.label} has no prerequisites. Open it to reveal the answer and calibrate, or study it.
+              </span>
+            </span>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {goalReached ? (
         <Card>
@@ -141,8 +175,62 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         </Card>
       ) : null}
 
-      {calibrating ? (
-        <CalibrationSweep items={session.calibrationItems} onSubmit={onCalibrate} pending={pending} />
+      {session.coexistence.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-1 py-4 text-sm">
+            <span className="flex items-center gap-2 font-medium">
+              <TriangleAlertIcon className="size-4 text-chart-5" /> Calibration ↔ graded coexistence
+            </span>
+            <span className="text-muted-foreground">
+              These nodes are mastered via &ldquo;I knew it&rdquo; but also carry a graded result — surfaced, not silently resolved:
+            </span>
+            <ul className="mt-1 flex flex-col gap-1">
+              {session.coexistence.map((flag) => (
+                <li key={flag.derivedNodeId} className="text-muted-foreground">
+                  <span className="font-medium text-foreground">{flag.label}</span> — graded mastery {flag.gradedMastery.toFixed(2)}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {session.restorations.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-2 py-4 text-sm">
+            <span className="flex items-center gap-2 font-medium">
+              <RotateCcwIcon className="size-4 text-chart-1" /> Restore a skipped prerequisite?
+            </span>
+            <span className="text-muted-foreground">
+              You missed a node you&apos;re studying. A related prerequisite you marked &ldquo;I knew it&rdquo; may be
+              worth revisiting — restoring it returns it to your study gap.
+            </span>
+            <ul className="mt-1 flex flex-col gap-2">
+              {session.restorations.map((suggestion) => (
+                <li key={suggestion.struggledNodeId} className="rounded-md border px-3 py-2">
+                  <span className="block text-xs text-muted-foreground">
+                    Missed <span className="font-medium text-foreground">{suggestion.struggledLabel}</span> — revisit:
+                  </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {suggestion.prerequisites.map((prerequisite) => (
+                      <Button
+                        key={prerequisite.derivedNodeId}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() => onClear(prerequisite.derivedNodeId)}
+                      >
+                        <RotateCcwIcon data-icon="inline-start" />
+                        Restore {prerequisite.label}
+                      </Button>
+                    ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       ) : null}
 
       <Card>
@@ -157,6 +245,8 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         nodeLabel={selectedLabel}
         content={selectedContent}
         onSelect={onSelect}
+        onVerdict={onVerdict}
+        onClear={() => onClear()}
         pending={pending}
       />
     </div>

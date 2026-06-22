@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frontierNeighborhood } from "./derivedGraph";
+import { frontierNeighborhood, filterAndOrderGoals, isFoundationalGoal, journeySize, type GoalCandidate } from "./derivedGraph";
 
 // `frontierNeighborhood` (KTD2) is the pure helper that frames the study graph on the
 // learner's working region: the frontier target plus its direct prerequisites and direct
@@ -44,4 +44,44 @@ test("only DIRECT neighbors — a 2-hop node is not pulled in", () => {
   const withGrandparent = frontierNeighborhood("ownership", [...edges, edge("grandparent", "scope")]);
   assert.equal(new Set(withGrandparent).has("grandparent"), false, "2-hop ancestor excluded");
   assert.ok(hood.has("scope"));
+});
+
+// --- Goal-first picker helpers (U4, R1/R2/R3) ------------------------------
+
+// scope -> ownership -> move ; borrow -> ownership (certain). An uncertain edge into
+// `move` must not inflate its journey (R2/R8 trust model).
+function jEdge(prerequisiteDerivedNodeId: string, dependentDerivedNodeId: string, uncertain = false) {
+  return { prerequisiteDerivedNodeId, dependentDerivedNodeId, uncertain };
+}
+const journeyEdges = [jEdge("scope", "ownership"), jEdge("ownership", "move"), jEdge("borrow", "ownership"), jEdge("flaky", "move", true)];
+
+test("journeySize counts trusted prerequisite ancestors only (Covers R2)", () => {
+  // move's trusted ancestors: ownership, scope, borrow (the uncertain `flaky` is excluded).
+  assert.equal(journeySize("move", journeyEdges), 3);
+  assert.equal(journeySize("ownership", journeyEdges), 2);
+  assert.equal(journeySize("scope", journeyEdges), 0, "a DAG-root goal has a zero journey");
+});
+
+function goal(id: string, journeySize: number, extra: Partial<GoalCandidate> = {}): GoalCandidate {
+  return { derivedNodeId: id, label: extra.label ?? id, aliases: extra.aliases ?? [], declaredDomain: "d", nodeKind: "anchor", hasStudyItem: true, journeySize };
+}
+
+test("filterAndOrderGoals orders by descending journey size, ties by label (Covers R2)", () => {
+  const ordered = filterAndOrderGoals([goal("a", 1), goal("c", 3), goal("b", 3)], "");
+  assert.deepEqual(ordered.map((g) => g.derivedNodeId), ["b", "c", "a"], "larger journeys first; equal journeys by label");
+});
+
+test("filterAndOrderGoals matches label AND alias substrings, case-insensitively (Covers R1)", () => {
+  const candidates = [
+    goal("own", 2, { label: "Ownership", aliases: ["move semantics"] }),
+    goal("bor", 1, { label: "Borrowing", aliases: ["references"] })
+  ];
+  assert.deepEqual(filterAndOrderGoals(candidates, "OWNER").map((g) => g.derivedNodeId), ["own"], "label substring");
+  assert.deepEqual(filterAndOrderGoals(candidates, "referen").map((g) => g.derivedNodeId), ["bor"], "alias substring");
+  assert.equal(filterAndOrderGoals(candidates, "").length, 2, "empty query matches everything");
+});
+
+test("isFoundationalGoal is true only for a zero-journey goal (Covers R3)", () => {
+  assert.equal(isFoundationalGoal({ journeySize: 0 }), true);
+  assert.equal(isFoundationalGoal({ journeySize: 1 }), false);
 });

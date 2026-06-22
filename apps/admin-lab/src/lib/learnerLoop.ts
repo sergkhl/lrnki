@@ -7,7 +7,7 @@ import {
   ADAPTIVE_MASTERY_THRESHOLD,
   type AdaptedNodeClassification
 } from "@lrnki/application";
-import type { JudgedOutcome, ResponseLogRow, SelfReportRating } from "@lrnki/domain-core";
+import type { CalibrationVerdict, JudgedOutcome, ResponseLogRow, Verdict } from "@lrnki/domain-core";
 import { createDatabaseClient, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
 import type {
   AnswerGradingJudgePort,
@@ -40,45 +40,44 @@ async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefine
   }
 }
 
-// --- Conflict detection (R16) ----------------------------------------------
+// --- Conflict detection (R12, AE3) -----------------------------------------
 
 export type ConflictKind = "claimed_known_but_failed" | "claimed_unknown_but_passed";
 
 export type ConceptConflict = {
   derivedNodeId: string;
   kind: ConflictKind;
-  activeSelfReport: SelfReportRating;
+  verdict: Verdict;
   latestGraded: JudgedOutcome;
 };
 
-const KNOWN_RATINGS: SelfReportRating[] = ["good", "easy"];
-
-// A deliberate calibration signal (R16): a concept whose ACTIVE self-report says
-// known but whose LATEST graded says incorrect (claimed-known-but-failed), or the
-// reverse (claimed-unknown-but-passed). Requires both signal types for that concept;
-// agreement is never flagged. Pure over a learner's rows.
-export function detectConflicts(rows: ResponseLogRow[]): ConceptConflict[] {
-  const byNode = new Map<string, ResponseLogRow[]>();
-  for (const row of rows) byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
+// A calibration↔graded conflict (R12, AE3), re-homed off the retired self-report sweep
+// onto VERDICT-vs-graded. A node whose mutable verdict says `known` but whose LATEST graded
+// outcome is `incorrect` (claimed-known-but-failed), or whose verdict says `learn` but whose
+// latest graded is `correct` (claimed-unknown-but-passed). Requires BOTH a verdict and a
+// graded row; agreement is never flagged. Calibration/graded coexistence is SURFACED here,
+// never silently resolved by a precedence rule (KTD4). Pure over the learner's verdicts + rows.
+export function detectConflicts(verdicts: CalibrationVerdict[], gradedRows: ResponseLogRow[]): ConceptConflict[] {
+  const verdictByNode = new Map(verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
+  const latestGradedByNode = new Map<string, ResponseLogRow>();
+  for (const row of gradedRows) {
+    if (row.signalType !== "graded") continue;
+    const current = latestGradedByNode.get(row.derivedNodeId);
+    if (!current || row.attemptSeq > current.attemptSeq) latestGradedByNode.set(row.derivedNodeId, row);
+  }
 
   const conflicts: ConceptConflict[] = [];
-  for (const [derivedNodeId, nodeRows] of byNode) {
-    const ordered = [...nodeRows].sort((a, b) => a.attemptSeq - b.attemptSeq);
-    const selfReports = ordered.filter((row) => row.signalType === "self_report");
-    const graded = ordered.filter((row) => row.signalType === "graded");
-    if (selfReports.length === 0 || graded.length === 0) continue;
-
-    const activeSelfReport = selfReports[selfReports.length - 1].selfReportRating as SelfReportRating;
-    const latestGraded = graded[graded.length - 1].judgedOutcome as JudgedOutcome;
-    const claimedKnown = KNOWN_RATINGS.includes(activeSelfReport);
-
-    if (claimedKnown && latestGraded === "incorrect") {
-      conflicts.push({ derivedNodeId, kind: "claimed_known_but_failed", activeSelfReport, latestGraded });
-    } else if (!claimedKnown && latestGraded === "correct") {
-      conflicts.push({ derivedNodeId, kind: "claimed_unknown_but_passed", activeSelfReport, latestGraded });
+  for (const [derivedNodeId, verdict] of verdictByNode) {
+    const graded = latestGradedByNode.get(derivedNodeId);
+    if (!graded) continue;
+    const latestGraded = graded.judgedOutcome as JudgedOutcome;
+    if (verdict === "known" && latestGraded === "incorrect") {
+      conflicts.push({ derivedNodeId, kind: "claimed_known_but_failed", verdict, latestGraded });
+    } else if (verdict === "learn" && latestGraded === "correct") {
+      conflicts.push({ derivedNodeId, kind: "claimed_unknown_but_passed", verdict, latestGraded });
     }
   }
-  return conflicts;
+  return conflicts.sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
 }
 
 // --- Read loaders ----------------------------------------------------------
@@ -87,7 +86,8 @@ export type LearnerStateSummary = {
   learnerStateRef: string;
   latestResponseAt: string;
   responseCount: number;
-  selfReportCount: number;
+  // Replaces the retired self-report count: how many nodes the learner marked `known`.
+  knownVerdictCount: number;
   gradedCount: number;
   conflictCount: number;
 };
@@ -101,7 +101,6 @@ export type LearnerResponseView = {
   question: string;
   answerKey: string | null;
   signalType: string;
-  selfReportRating: string | null;
   judgedOutcome: string | null;
   gradedScore: number | null;
   responseSource: string;
@@ -192,10 +191,8 @@ function rowToResponseLogRow(row: ResponseRow): TimestampedResponseLogRow {
     studyItemId: row.study_item_id,
     derivedNodeId: row.derived_node_id,
     signalType: row.signal_type as ResponseLogRow["signalType"],
-    selfReportRating: row.self_report_rating as ResponseLogRow["selfReportRating"],
     judgedOutcome: row.judged_outcome as ResponseLogRow["judgedOutcome"],
     gradedScore: row.graded_score === null ? null : Number(row.graded_score),
-    evidenceWeight: Number(row.evidence_weight),
     responseSource: row.response_source as ResponseLogRow["responseSource"],
     graderIdentity: row.grader_identity,
     batchId: row.batch_id,
@@ -207,43 +204,64 @@ function rowToResponseLogRow(row: ResponseRow): TimestampedResponseLogRow {
 
 type ResponseRow = {
   response_id: string; learner_state_ref: string; study_item_id: string; derived_node_id: string; signal_type: string;
-  self_report_rating: string | null; judged_outcome: string | null; graded_score: number | null;
-  evidence_weight: number; response_source: string; grader_identity: string | null; batch_id: string | null;
+  judged_outcome: string | null; graded_score: number | null;
+  response_source: string; grader_identity: string | null; batch_id: string | null;
   attempt_seq: number; submitted_answer: string | null; created_at: string;
 };
 
-export function summarizeLearnerStates(rows: TimestampedResponseLogRow[]): LearnerStateSummary[] {
-  const byLearner = new Map<string, TimestampedResponseLogRow[]>();
-  for (const row of rows) byLearner.set(row.learnerStateRef, [...(byLearner.get(row.learnerStateRef) ?? []), row]);
+// One learner's calibration verdicts, loaded for conflict detection + the known count.
+type VerdictRow = { learner_state_ref: string; derived_node_id: string; verdict: string };
+function rowToVerdict(row: VerdictRow): CalibrationVerdict {
+  return { learnerStateRef: row.learner_state_ref, derivedNodeId: row.derived_node_id, verdict: row.verdict as Verdict };
+}
 
-  return [...byLearner.entries()]
-    .map(([learnerStateRef, learnerRows]) => ({
-      learnerStateRef,
-      latestResponseAt: learnerRows.reduce((latest, row) => row.createdAt > latest ? row.createdAt : latest, learnerRows[0].createdAt),
-      responseCount: learnerRows.length,
-      selfReportCount: learnerRows.filter((r) => r.signalType === "self_report").length,
-      gradedCount: learnerRows.filter((r) => r.signalType === "graded").length,
-      conflictCount: detectConflicts(learnerRows).length
-    }))
+export function summarizeLearnerStates(rows: TimestampedResponseLogRow[], verdicts: CalibrationVerdict[]): LearnerStateSummary[] {
+  const rowsByLearner = new Map<string, TimestampedResponseLogRow[]>();
+  for (const row of rows) rowsByLearner.set(row.learnerStateRef, [...(rowsByLearner.get(row.learnerStateRef) ?? []), row]);
+  const verdictsByLearner = new Map<string, CalibrationVerdict[]>();
+  for (const verdict of verdicts) verdictsByLearner.set(verdict.learnerStateRef, [...(verdictsByLearner.get(verdict.learnerStateRef) ?? []), verdict]);
+
+  // A learner appears if it has rows OR verdicts (a freshly-calibrated learner with no
+  // graded answers yet still belongs in the list).
+  const learnerRefs = new Set<string>([...rowsByLearner.keys(), ...verdictsByLearner.keys()]);
+
+  return [...learnerRefs]
+    .map((learnerStateRef) => {
+      const learnerRows = rowsByLearner.get(learnerStateRef) ?? [];
+      const learnerVerdicts = verdictsByLearner.get(learnerStateRef) ?? [];
+      const latestResponseAt = learnerRows.length > 0
+        ? learnerRows.reduce((latest, row) => (row.createdAt > latest ? row.createdAt : latest), learnerRows[0].createdAt)
+        : "";
+      return {
+        learnerStateRef,
+        latestResponseAt,
+        responseCount: learnerRows.length,
+        knownVerdictCount: learnerVerdicts.filter((verdict) => verdict.verdict === "known").length,
+        gradedCount: learnerRows.filter((row) => row.signalType === "graded").length,
+        conflictCount: detectConflicts(learnerVerdicts, learnerRows).length
+      };
+    })
     .sort((a, b) => b.latestResponseAt.localeCompare(a.latestResponseAt) || a.learnerStateRef.localeCompare(b.learnerStateRef));
 }
 
 export async function listLearnerStates(): Promise<LearnerStateSummary[] | undefined> {
   return withClient(async (sql) => {
     const rows = await sql<ResponseRow[]>`
-      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type, self_report_rating,
-             judged_outcome, graded_score, evidence_weight, response_source, grader_identity, batch_id,
+      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
+             judged_outcome, graded_score, response_source, grader_identity, batch_id,
              attempt_seq, submitted_answer, created_at
       FROM response_log ORDER BY learner_state_ref, attempt_seq`;
-    return summarizeLearnerStates(rows.map(rowToResponseLogRow));
+    const verdictRows = await sql<VerdictRow[]>`
+      SELECT learner_state_ref, derived_node_id, verdict FROM calibration_verdicts`;
+    return summarizeLearnerStates(rows.map(rowToResponseLogRow), verdictRows.map(rowToVerdict));
   });
 }
 
 export async function getLearnerLoopDetail(learnerStateRef: string): Promise<LearnerLoopDetail | undefined> {
   return withClient(async (sql) => {
     const rows = await sql<(ResponseRow & { concept_label: string; question: string; answer_key: string })[]>`
-      SELECT rl.response_id, rl.learner_state_ref, rl.study_item_id, rl.derived_node_id, rl.signal_type, rl.self_report_rating,
-             rl.judged_outcome, rl.graded_score, rl.evidence_weight, rl.response_source, rl.grader_identity, rl.batch_id,
+      SELECT rl.response_id, rl.learner_state_ref, rl.study_item_id, rl.derived_node_id, rl.signal_type,
+             rl.judged_outcome, rl.graded_score, rl.response_source, rl.grader_identity, rl.batch_id,
              rl.attempt_seq, rl.submitted_answer, rl.created_at,
              n.canonical_label AS concept_label, cd.question, cd.answer_key
       FROM response_log rl
@@ -252,6 +270,9 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
       WHERE rl.learner_state_ref = ${learnerStateRef}
       ORDER BY rl.attempt_seq`;
     const logRows = rows.map(rowToResponseLogRow);
+    const verdictRows = await sql<VerdictRow[]>`
+      SELECT learner_state_ref, derived_node_id, verdict FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}`;
+    const verdicts = verdictRows.map(rowToVerdict);
     const pathRows = await sql<{ enrichment_id: string; target_derived_node_id: string; target_label: string }[]>`
       SELECT p.enrichment_id, p.target_derived_node_id, n.canonical_label AS target_label
       FROM learner_paths p JOIN derived_graph_nodes n ON n.derived_node_id = p.target_derived_node_id
@@ -304,7 +325,6 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         question: row.question,
         answerKey: row.answer_key,
         signalType: row.signal_type,
-        selfReportRating: row.self_report_rating,
         judgedOutcome: row.judged_outcome,
         gradedScore: row.graded_score === null ? null : Number(row.graded_score),
         responseSource: row.response_source,
@@ -312,7 +332,7 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         submittedAnswer: row.submitted_answer,
         createdAt: new Date(row.created_at).toISOString()
       })),
-      conflicts: detectConflicts(logRows),
+      conflicts: detectConflicts(verdicts, logRows),
       paths: pathRows.map((row) => ({ enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id, targetLabel: row.target_label })),
       coverage: [...coverageByPath.values()],
       masteryByNode: buildMasteryMap(logRows),

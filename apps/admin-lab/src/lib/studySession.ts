@@ -1,15 +1,17 @@
 import {
   classifyAdaptedNodes,
   prerequisiteAncestors,
-  buildCalibrationSet,
+  pruneClosure,
+  composeMastery,
+  struggledNodes,
+  suggestRestorations,
   ADAPTIVE_MASTERY_THRESHOLD,
   type AdaptedNodeClassification,
-  type CalibrationItem,
   type ReadinessEdge
 } from "@lrnki/application";
-import type { InferredPrerequisiteEdge } from "@lrnki/domain-core";
+import type { Verdict } from "@lrnki/domain-core";
 import type { LearnerStatePort } from "@lrnki/ports";
-import { createDatabaseClient, PostgresStudyItemBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
+import { createDatabaseClient, PostgresStudyItemBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "@lrnki/infrastructure-postgres";
 import { getEnrichmentDetail } from "./enrichments";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoop";
 import { labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
@@ -19,12 +21,13 @@ import type { SheetContent, StudyCardView, StudyOptionSelectView } from "@/compo
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
-// Server-only loader + pure gating helpers for the learner Study surface (U3, KTD3). It
-// composes the read-only enrichment/study-item/response-log loaders with the pure mastery fold
-// and `classifyAdaptedNodes` — no graph or Derived Graph Layer write port is imported, so
-// it structurally cannot mutate a published graph (R16). A study session re-folds mastery
-// live from the append-only log and re-classifies on every response; nothing about the
-// adapted view is persisted (the write actions only append response rows).
+// Server-only loader + pure gating helpers for the learner Study surface. It composes the
+// read-only enrichment/study-item/response-log/verdict loaders with the PURE calibration
+// core (pruneClosure + composeMastery, U3) and `classifyAdaptedNodes` — no graph or Derived
+// Graph Layer write port is imported, so it structurally cannot mutate a published graph
+// (R16). A study session re-derives the prune closure and re-composes mastery live from the
+// mutable verdict store + the append-only graded log on every response; nothing about the
+// adapted view is persisted (the write actions only upsert verdicts or append graded rows).
 
 async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefined> {
   if (!process.env.DATABASE_URL) return undefined;
@@ -50,23 +53,32 @@ export function unmetPrerequisites(nodeId: string, edges: ReadinessEdge[], class
     .filter((prerequisiteId) => classification.stateByNode[prerequisiteId] !== "mastered");
 }
 
+// The state-gated side-sheet payload for one node (R5/R9/R13). A non-mastered cone node with
+// a self-assessment opens the CALIBRATION card (reveal → "I knew it"/"I forgot"), carrying its
+// current verdict and, when present, the option-select item so it can be studied after staying
+// in the gap. A frontier node without a self-assessment falls back to its option-select study,
+// else cardless. A mastered node opens a read-only review carrying its verdict (so a `known`
+// verdict can be cleared, R7); a locked node names its unmet prerequisites.
 export function sheetContentFor(input: {
   derivedNodeId: string;
   classification: AdaptedNodeClassification;
   optionItemsByNode: Map<string, StudyOptionSelectView>;
   selfAssessmentItemsByNode: Map<string, StudyCardView>;
+  verdictByNode: Map<string, Verdict>;
   edges: ReadinessEdge[];
   labelByNode: Map<string, string>;
 }): SheetContent {
   const state = input.classification.stateByNode[input.derivedNodeId] ?? "locked";
   const optionItem = input.optionItemsByNode.get(input.derivedNodeId) ?? null;
-  const selfAssessmentItem = input.selfAssessmentItemsByNode.get(input.derivedNodeId) ?? null;
+  const card = input.selfAssessmentItemsByNode.get(input.derivedNodeId) ?? null;
+  const verdict = input.verdictByNode.get(input.derivedNodeId) ?? null;
   if (state === "locked") {
     const unmet = unmetPrerequisites(input.derivedNodeId, input.edges, input.classification);
     return { kind: "locked", unmetPrerequisiteLabels: unmet.map((id) => input.labelByNode.get(id) ?? id) };
   }
-  if (state === "mastered") return { kind: "mastered_review", card: selfAssessmentItem };
-  // frontier
+  if (state === "mastered") return { kind: "mastered_review", card, verdict };
+  // frontier — calibrate it when there is an answer to reveal, else study/flag it.
+  if (card) return { kind: "calibration", card, verdict, optionItem };
   return optionItem ? { kind: "option_select", item: optionItem } : { kind: "cardless" };
 }
 
@@ -84,7 +96,7 @@ export function selectScopedFrontier(input: {
 }): string | null {
   // Scope on CERTAIN edges only, as the readiness classifier does. `prerequisiteAncestors`
   // reads only the two endpoint ids, so the loader-facing edge shape serves it structurally.
-  const certainEdges = input.edges.filter((edge) => !edge.uncertain) as unknown as InferredPrerequisiteEdge[];
+  const certainEdges = input.edges.filter((edge) => !edge.uncertain);
   const scope = prerequisiteAncestors(input.targetDerivedNodeId, certainEdges);
   scope.add(input.targetDerivedNodeId);
   const frontier = [...scope].filter((id) => input.classification.stateByNode[id] === "frontier");
@@ -92,7 +104,19 @@ export function selectScopedFrontier(input: {
   return frontier.sort((a, b) => (input.difficultyByNode.get(b) ?? 0) - (input.difficultyByNode.get(a) ?? 0) || a.localeCompare(b))[0];
 }
 
-// --- Study-session loader (R5, R7, R9) -------------------------------------
+// --- Study-session loader (R3, R5, R7, R9, R12) ----------------------------
+
+export type CoexistenceFlag = { derivedNodeId: string; label: string; gradedMastery: number };
+
+// A restoration nudge (R13/R14): a gap node the learner answered incorrectly (latest graded
+// = incorrect), paired with the directly-`known` prerequisites it depends on that they had
+// skipped. Restoring one clears that verdict, returning it to the gap. Derived on read, never
+// persisted (KTD6).
+export type RestorationSuggestion = {
+  struggledNodeId: string;
+  struggledLabel: string;
+  prerequisites: { derivedNodeId: string; label: string }[];
+};
 
 export type StudySession = {
   enrichmentId: string;
@@ -103,10 +127,16 @@ export type StudySession = {
   // so the adapted-graph ring marks the node the learner advances to next toward Z.
   classification: AdaptedNodeClassification;
   responseSourceSummary: ResponseSourceSummary;
-  // Hardest-first calibration sweep over the goal's prerequisite-ancestor self-assessment items.
-  calibrationItems: (CalibrationItem & { label: string; question: string })[];
-  // Per-node gated side-sheet payloads (R9) and the item lookups the modules render from.
+  // A DAG-root goal whose trusted prerequisite cone is just itself — studied directly as a
+  // single-node screen; never an empty calibration nor a premature "Goal reached" (R3, AE1).
+  isFoundationalRoot: boolean;
+  // Calibration `known` ∩ graded — coexistence SURFACED, not silently resolved (R12, AE3).
+  coexistence: CoexistenceFlag[];
+  // Restoration nudges for nodes the learner missed while studying the gap (R13, R14).
+  restorations: RestorationSuggestion[];
+  // Per-node gated side-sheet payloads (R5/R9) and the lookups the modules render from.
   sheetByNode: Record<string, SheetContent>;
+  verdictByNode: Record<string, Verdict>;
   selfAssessmentItemsByNode: Record<string, StudyCardView>;
   optionItemsByNode: Record<string, StudyOptionSelectView>;
 };
@@ -124,7 +154,8 @@ export async function getStudySession(
     const layer = await new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId);
     const studyItems = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId);
     const rows = await new PostgresResponseLogStore(sql).listForLearner(learnerStateRef);
-    return { layer, studyItems, rows };
+    const verdicts = await new PostgresCalibrationVerdictStore(sql).listForLearner(learnerStateRef);
+    return { layer, studyItems, rows, verdicts };
   });
   if (!loaded || !loaded.layer) return undefined;
 
@@ -155,10 +186,16 @@ export async function getStudySession(
   const selfAssessmentItemsByNode = new Map(selfAssessmentViews.map((item) => [item.derivedNodeId, item] as const));
   const optionItemsByNode = new Map(optionViews.map((item) => [item.derivedNodeId, item] as const));
 
-  const masteryByNode = buildMasteryMap(loaded.rows);
+  // Calibration ∘ graded composition (U3, R12): the trusted-edge down-closure of the `known`
+  // verdicts is mastered via calibration; un-pruned nodes take their graded mastery; the
+  // coexistence of the two is surfaced, never resolved by a hidden precedence rule.
+  const knownNodes = loaded.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
+  const knownClosure = pruneClosure(knownNodes, detail.edges);
+  const gradedByNode = new Map(Object.entries(buildMasteryMap(loaded.rows)));
+  const composed = composeMastery({ knownClosure, gradedByNode });
   const learnerState: LearnerStatePort = {
     learnerStateRef,
-    mastery: (derivedNodeId: string) => masteryByNode[derivedNodeId] ?? 0
+    mastery: (derivedNodeId: string) => composed.masteryByNode[derivedNodeId] ?? 0
   };
   const difficultyByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node.difficulty ?? 0] as const));
 
@@ -178,6 +215,7 @@ export async function getStudySession(
   const classification: AdaptedNodeClassification = { stateByNode: baseClassification.stateByNode, selectedFrontierTarget };
 
   const labelByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
+  const verdictByNode = new Map(loaded.verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
   const sheetByNode: Record<string, SheetContent> = {};
   for (const node of detail.nodes) {
     sheetByNode[node.derivedNodeId] = sheetContentFor({
@@ -185,20 +223,37 @@ export async function getStudySession(
       classification,
       optionItemsByNode,
       selfAssessmentItemsByNode,
+      verdictByNode,
       edges: detail.edges,
       labelByNode
     });
   }
 
-  const calibrationItems = buildCalibrationSet({
-    layer: loaded.layer,
-    targetDerivedNodeId,
-    studyItems: selfAssessmentViews.map((item) => ({ derivedNodeId: item.derivedNodeId, studyItemId: item.studyItemId }))
-  }).map((item) => ({
-    ...item,
-    label: labelByNode.get(item.derivedNodeId) ?? item.derivedNodeId,
-    question: selfAssessmentItemsByNode.get(item.derivedNodeId)?.question ?? ""
+  // A DAG-root goal: its trusted prerequisite cone is empty, so it is studied directly as a
+  // single node (R3). Detected on the trusted edges, matching the prune/readiness trust model.
+  const certainEdges = detail.edges.filter((edge) => !edge.uncertain);
+  const isFoundationalRoot = prerequisiteAncestors(targetDerivedNodeId, certainEdges).size === 0;
+
+  const coexistence: CoexistenceFlag[] = composed.calibrationGradedCoexistence.map((flag) => ({
+    derivedNodeId: flag.derivedNodeId,
+    label: labelByNode.get(flag.derivedNodeId) ?? flag.derivedNodeId,
+    gradedMastery: flag.gradedMastery
   }));
+
+  // Restoration suggestions (R13/R14): for each gap node whose latest graded is incorrect,
+  // the DIRECTLY-`known` prerequisites it depends on that the learner skipped. We pass the
+  // direct-verdict set (not the full closure) so a "restore" — clearVerdict on the suggested
+  // node — actually returns it to the gap (a transitively-pruned node has no verdict to clear).
+  const directlyKnown = new Set(knownNodes);
+  const restorationMap = suggestRestorations({ struggledNodeIds: struggledNodes(loaded.rows), knownClosure: directlyKnown, edges: detail.edges });
+  const restorations: RestorationSuggestion[] = Object.entries(restorationMap)
+    .filter(([, prerequisiteIds]) => prerequisiteIds.length > 0)
+    .map(([struggledNodeId, prerequisiteIds]) => ({
+      struggledNodeId,
+      struggledLabel: labelByNode.get(struggledNodeId) ?? struggledNodeId,
+      prerequisites: prerequisiteIds.map((id) => ({ derivedNodeId: id, label: labelByNode.get(id) ?? id }))
+    }))
+    .sort((a, b) => a.struggledLabel.localeCompare(b.struggledLabel));
 
   return {
     enrichmentId,
@@ -207,8 +262,11 @@ export async function getStudySession(
     detail,
     classification,
     responseSourceSummary: summarizeResponseSources(loaded.rows),
-    calibrationItems,
+    isFoundationalRoot,
+    coexistence,
+    restorations,
     sheetByNode,
+    verdictByNode: Object.fromEntries(verdictByNode),
     selfAssessmentItemsByNode: Object.fromEntries(selfAssessmentItemsByNode),
     optionItemsByNode: Object.fromEntries(optionItemsByNode)
   };

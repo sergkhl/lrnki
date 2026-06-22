@@ -60,8 +60,8 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     // (R15). Difficulty and edges reference derived_node_id only (KTD2).
     // `study_items` can hold multiple types per derived_node_id, so the EXISTS check keeps
     // one row per node while flagging whether any study item exists for graph inspection.
-    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; neural_rationale: string | null; has_study_item: boolean }[]>`
-      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score, d.neural_rationale,
+    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; aliases: string[]; declared_domain: string; score: number | null; neural_rationale: string | null; has_study_item: boolean }[]>`
+      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.aliases, n.declared_domain, d.score, d.neural_rationale,
              EXISTS (SELECT 1 FROM study_items si WHERE si.derived_node_id = n.derived_node_id) AS has_study_item
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
@@ -131,6 +131,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     const nodes: DerivedGraphNode[] = nodeRows.map((row) => ({
       derivedNodeId: row.derived_node_id,
       label: row.label,
+      aliases: Array.isArray(row.aliases) ? row.aliases : [],
       declaredDomain: row.declared_domain,
       difficulty: row.score === null ? null : Number(row.score),
       difficultyRationale: row.neural_rationale,
