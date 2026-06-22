@@ -49,7 +49,7 @@ export function AdminShell({
 }: Readonly<{ active?: AdminView; children: React.ReactNode }>) {
   return (
     <TooltipProvider>
-      <SidebarProvider defaultOpen>
+      <SidebarProvider defaultOpen={false}>
         <Sidebar collapsible="icon" variant="inset">
           <SidebarHeader>
             <SidebarMenu>

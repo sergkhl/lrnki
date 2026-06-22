@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import cytoscape, { type Core } from "cytoscape";
-import { GitForkIcon, ListTreeIcon } from "lucide-react";
+import { ChevronRightIcon, GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applySphereGridLayout, recenterOnFocus } from "@/lib/cytoscapeSphereGrid";
 import type { SphereGridFlaggedLoop } from "@/lib/sphereGridLayout";
@@ -18,8 +18,11 @@ import {
   CardHeader,
   CardTitle
 } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 type DerivedGraphExplorerProps = Readonly<{
   detail: DerivedGraphDetail;
@@ -96,11 +99,39 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // Loops the sphere-grid geometry could not embed crossing-free (R10). Populated by the
   // one-time layout pass and surfaced to the operator below — fail loud, never silent-cross.
   const [flaggedLoops, setFlaggedLoops] = useState<SphereGridFlaggedLoop[]>([]);
+  // The "Nodes and edges" textual listing lives in a right slide-over drawer, closed by
+  // default so the canvas owns the full width. Summoned from the graph toolbar (item 1).
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // Topology view drives the ONE-TIME layout (stable across mode swaps); the textual
   // view re-renders for the active mode so the non-visual listing matches the canvas (R14).
   const layoutView = useMemo(() => buildDerivedGraphView(detail), [detail]);
   const view = useMemo(() => buildDerivedGraphView(detail, isAdaptedMode ? adapted : undefined), [detail, adapted, isAdaptedMode]);
+
+  // Domain-focus selector (item 2): the distinct domain regions plus an "all" sentinel.
+  // Manual, viewport-only pan — picking a domain frames its region; "all" fits the whole
+  // graph. A later frontier advance still recenters on the working neighborhood by design.
+  const domains = useMemo(() => distinctDomains(layoutView.cytoscape.nodes), [layoutView]);
+  const [focusedDomain, setFocusedDomain] = useState<string>("all");
+
+  // Imperative viewport-only recenter shared by the domain selector (item 2) and the
+  // textual-row clicks (item 3). Reuses `recenterOnFocus` (zoom-clamped fit/center) and
+  // guards a destroyed instance, so it never re-runs layout — pinned positions survive (R11).
+  const focusGraphOn = (nodeIds: string[]) => {
+    const cy = cytoscapeRef.current;
+    if (!cy || cy.destroyed()) return;
+    recenterOnFocus(cy, nodeIds);
+  };
+
+  const onFocusDomain = (value: string | null) => {
+    const domain = value ?? "all";
+    setFocusedDomain(domain);
+    if (domain === "all") {
+      focusGraphOn([]); // empty focus → recenterOnFocus fits all elements
+      return;
+    }
+    focusGraphOn(layoutView.cytoscape.nodes.filter((node) => node.domain === domain).map((node) => node.id));
+  };
 
   // Layout effect — runs ONCE per topology (KTD2). It builds the instance and runs spiral placement;
   // node positions become Cytoscape-owned state. Mode-dependent attrs start at the neutral
@@ -243,7 +274,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
           // Reads as "inactive" yet stays visible on the canvas, unlike the old --muted fill
           // that collided with both the background and the enrichment fill.
           selector: "node[adaptedState = 'locked']",
-          style: { "background-color": color(graphNodeFillToken("locked")), "border-color": color("--border"), color: color("--muted-foreground") }
+          style: { "background-color": color(graphNodeFillToken("locked")), "border-color": color("--border"), color: color("--muted-foreground"), opacity: 0.5 }
         },
         {
           // The single selected frontier target — the hardest ready unmastered node the
@@ -332,7 +363,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   }, [focusNodeIds]);
 
   return (
-    <div className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_26rem]">
+    <div className="flex min-h-0 flex-col gap-4">
       <Card className="min-h-[38rem]">
         <CardHeader className="border-b">
           <CardTitle className="flex items-center gap-2">
@@ -348,6 +379,24 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             <span className="font-mono text-xs">{detail.summary.graphVersionId}</span> · judge {detail.summary.judgeModel}
           </CardDescription>
           <CardAction className="flex flex-wrap items-center justify-end gap-2">
+            {/* Domain / learning-loop focus (item 2). Present in BOTH the study and read-only
+                enrichment renders — it's a viewport pan, independent of any classification. */}
+            <Select value={focusedDomain} onValueChange={onFocusDomain}>
+              <SelectTrigger size="sm" className="h-7" aria-label="Focus a domain region">
+                {/* Function child resolves the label without the lazy portal options being
+                    mounted — otherwise a closed trigger shows the raw "all" value, not the
+                    "All domains" label. Domain values are their own labels. */}
+                <SelectValue>{(value) => (value === "all" || value == null ? "All domains" : value)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All domains</SelectItem>
+                {domains.map((domain) => (
+                  <SelectItem key={domain} value={domain}>
+                    {domain}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {hasClassification ? (
               // Segmented control over the ONE pinned layout (R10): switching mode
               // restyles nodes only — positions never move (R11). Rendered only when a
@@ -380,6 +429,12 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             <Badge variant="outline">{detail.summary.conceptCount} concepts</Badge>
             <Badge variant="secondary">{detail.summary.certainEdgeCount} edges</Badge>
             <Badge variant="outline">{detail.summary.uncertainEdgeCount} uncertain</Badge>
+            {/* Summons the textual node/edge listing as a right slide-over (item 1). Kept in
+                the toolbar so it reads as a graph affordance, not a separate panel. */}
+            <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => setPanelOpen(true)}>
+              <ListTreeIcon className="size-4" />
+              Nodes and edges
+            </Button>
           </CardAction>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
@@ -436,22 +491,36 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
         </CardContent>
       </Card>
 
-      <Card className="min-h-0 xl:max-h-[calc(100svh-7rem)]">
-        <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2">
-            <ListTreeIcon className="size-4" />
-            Nodes and edges
-          </CardTitle>
-          <CardDescription>Equivalent textual representation of the rendered DAG.</CardDescription>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1">
-          <ScrollArea className="h-full max-h-[30rem]">
-            <div className="flex flex-col gap-4 pr-3">
-              <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Nodes (anchors + enrichment)</h3>
+      <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
+        <SheetContent side="right" className="w-[30rem] sm:max-w-[30rem] flex flex-col gap-0 p-0">
+          <SheetHeader className="border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <ListTreeIcon className="size-4" />
+              Nodes and edges
+            </SheetTitle>
+            <SheetDescription>Equivalent textual representation of the rendered DAG.</SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="h-full flex-1">
+            <div className="flex flex-col gap-4 p-4">
+              <CollapsibleSection title="Nodes (anchors + enrichment)">
                 <ul className="flex flex-col gap-1">
                   {view.textual.nodes.map((node) => (
-                    <li key={`${node.domain}-${node.label}`} className="flex flex-col gap-1.5 rounded-md border px-2 py-1.5 text-sm">
+                    <li key={node.derivedNodeId}>
+                      {/* Row → recenter the canvas on this node AND open the state-gated side
+                          sheet (item 3), reusing the same `onNodeSelect` callback the canvas tap
+                          uses. On the enrichment page `onNodeSelect` is absent, so the row just
+                          recenters — no sheet — which is correct. */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          focusGraphOn([node.derivedNodeId]);
+                          onNodeSelect?.(node.derivedNodeId);
+                          // Close our drawer so the recentered canvas is visible and we don't
+                          // stack two right sheets (the study page's node-detail sheet is also right).
+                          setPanelOpen(false);
+                        }}
+                        className="flex w-full flex-col gap-1.5 rounded-md border px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                      >
                       <div className="flex items-center justify-between gap-2">
                         <span className="min-w-0">
                           <span className="block truncate font-medium">{node.label}</span>
@@ -491,35 +560,42 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                           ))}
                         </div>
                       ) : null}
+                      </button>
                     </li>
                   ))}
                 </ul>
-              </section>
-              <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Prerequisite edges</h3>
+              </CollapsibleSection>
+              <CollapsibleSection title="Prerequisite edges">
                 {view.textual.edges.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {view.textual.edges.map((edge, index) => (
-                      <li key={index} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm">
-                        <span className="min-w-0 truncate">
-                          <span className="font-medium">{edge.prerequisiteLabel}</span>
-                          <span className="text-muted-foreground"> → </span>
-                          <span className="font-medium">{edge.dependentLabel}</span>
-                        </span>
-                        <span className="flex shrink-0 items-center gap-1">
-                          {edge.uncertain ? <Badge variant="secondary">uncertain</Badge> : null}
-                          <Badge variant="outline" title="judge model">{edge.judgeModel}</Badge>
-                          <Badge variant="outline">{edge.confidence.toFixed(2)}</Badge>
-                        </span>
+                      <li key={index}>
+                        {/* Edge row → frame BOTH endpoints (item 3). No sheet: an edge has no
+                            single node to study. */}
+                        <button
+                          type="button"
+                          onClick={() => focusGraphOn([edge.prerequisiteDerivedNodeId, edge.dependentDerivedNodeId])}
+                          className="flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        >
+                          <span className="min-w-0 truncate">
+                            <span className="font-medium">{edge.prerequisiteLabel}</span>
+                            <span className="text-muted-foreground"> → </span>
+                            <span className="font-medium">{edge.dependentLabel}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            {edge.uncertain ? <Badge variant="secondary">uncertain</Badge> : null}
+                            <Badge variant="outline" title="judge model">{edge.judgeModel}</Badge>
+                            <Badge variant="outline">{edge.confidence.toFixed(2)}</Badge>
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground">No inferred prerequisite edges.</p>
                 )}
-              </section>
-              <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Origin counts by domain</h3>
+              </CollapsibleSection>
+              <CollapsibleSection title="Origin counts by domain">
                 <ul className="flex flex-col gap-1">
                   {detail.originCounts.map((counts) => (
                     <li key={counts.domain} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm">
@@ -532,9 +608,8 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                     </li>
                   ))}
                 </ul>
-              </section>
-              <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Rescue durability dispositions</h3>
+              </CollapsibleSection>
+              <CollapsibleSection title="Rescue durability dispositions">
                 {detail.rescueDispositions.length > 0 ? (
                   <ul className="flex flex-col gap-1">
                     {detail.rescueDispositions.map((disposition) => (
@@ -552,12 +627,27 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                 ) : (
                   <p className="text-sm text-muted-foreground">No rescue candidates were durability-judged in this run.</p>
                 )}
-              </section>
+              </CollapsibleSection>
             </div>
           </ScrollArea>
-        </CardContent>
-      </Card>
+        </SheetContent>
+      </Sheet>
     </div>
+  );
+}
+
+// One collapsible textual section (item 3): the section's `<h3>` becomes the trigger, with a
+// chevron that rotates open. Collapsed by default so the crowded cross-domain panel opens
+// quiet; the operator expands only the sections they're inspecting.
+function CollapsibleSection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
+  return (
+    <Collapsible defaultOpen={false} className="flex flex-col gap-2">
+      <CollapsibleTrigger className="group flex items-center gap-1.5 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50 rounded-sm">
+        <ChevronRightIcon className="size-3.5 text-muted-foreground transition-transform group-data-[panel-open]:rotate-90" />
+        {title}
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-2">{children}</CollapsibleContent>
+    </Collapsible>
   );
 }
 

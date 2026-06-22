@@ -42,7 +42,12 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   };
 
   const onSheetOpenChange = (nextOpen: boolean) => {
-    if (!shouldAcceptSheetOpenChange(nextOpen, autoAdvanceDismissGuardRef.current)) return;
+    // Hold the sheet open across the answer → re-fold → advance window. A modal sheet emits a
+    // stale open=false while the option card remounts (key change) and the server re-fold is in
+    // flight; the user's intent was "advance", not "close". `pending` (useTransition) stays true
+    // across that whole window independent of frame timing, so it closes the gap the rAF-reset
+    // guard alone leaves open (AE1). Genuine closes (Escape / X / backdrop) still work once idle.
+    if (!nextOpen && (pending || !shouldAcceptSheetOpenChange(nextOpen, autoAdvanceDismissGuardRef.current))) return;
     setSheetOpen(nextOpen);
     if (!nextOpen) setSelectedNodeId(null);
   };

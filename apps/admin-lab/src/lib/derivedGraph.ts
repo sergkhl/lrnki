@@ -144,8 +144,19 @@ export interface DerivedGraphView {
     edges: { id: string; source: string; target: string; uncertain: "yes" | "no"; confidence: number }[];
   };
   textual: {
-    nodes: (DerivedGraphViewNode & { label: string; domain: string; grounding: NodeGroundingView | null })[];
-    edges: { prerequisiteLabel: string; dependentLabel: string; confidence: number; uncertain: boolean; judgeModel: string }[];
+    // `derivedNodeId` / the per-edge endpoint ids are threaded so a textual row can drive a
+    // canvas recenter (and, for a node, the state-gated side sheet) without a parallel id map —
+    // these are the one source of truth for the row→graph link (AGENTS rule 18).
+    nodes: (DerivedGraphViewNode & { derivedNodeId: string; label: string; domain: string; grounding: NodeGroundingView | null })[];
+    edges: {
+      prerequisiteDerivedNodeId: string;
+      dependentDerivedNodeId: string;
+      prerequisiteLabel: string;
+      dependentLabel: string;
+      confidence: number;
+      uncertain: boolean;
+      judgeModel: string;
+    }[];
   };
 }
 
@@ -235,6 +246,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
     },
     textual: {
       nodes: detail.nodes.map((node) => ({
+        derivedNodeId: node.derivedNodeId,
         label: node.label,
         domain: node.declaredDomain,
         difficulty: node.difficulty,
@@ -246,6 +258,8 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge) => ({
+        prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId,
+        dependentDerivedNodeId: edge.dependentDerivedNodeId,
         prerequisiteLabel: labelFor(detail, edge.prerequisiteDerivedNodeId),
         dependentLabel: labelFor(detail, edge.dependentDerivedNodeId),
         confidence: edge.confidence,
