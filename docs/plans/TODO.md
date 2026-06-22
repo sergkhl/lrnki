@@ -3,14 +3,44 @@
 The learner-facing study loop is now merged to `main` (PR #9): a typed Study Item Bank with auto-graded
 option-select studying, the learner-calibrated study route and calibration sweep, the adapted-graph
 comparison view, persisted neural difficulty rationales, a repeatable demo seed, and the FFX sphere-grid
-graph layout. The remaining active work is earned by the latest inspected real-use outputs, not by deferred
+graph layout.
+
+**In-flight branch `feat/graph-dissolved-calibration` (2026-06-22):** the weighted self-report calibration
+sweep from PR #9 is *retired and replaced* by graph-dissolved calibration — the learner picks a goal first,
+then self-assesses cone nodes with a reveal-then-binary "I knew it" / "I forgot" verdict that hard-prunes the
+trusted prerequisite down-closure. Calibration is now a mutable verdict per `(learner, node)` stored apart
+from the now-graded-only Response Log; all evidence weights are removed. Implementation units U1–U7 are done,
+typecheck-clean, and committed (two commits: backend `feat(calibration)…` + UI `feat(admin-lab)…`); **U8
+real-use evaluation is the only remaining unit (TODO #1 below).** Plan:
+`docs/plans/2026-06-22-001-feat-graph-dissolved-calibration-study-loop-plan.md`. Session report:
+`tmp/2026-06-22-calibration-implementation-report.md`.
+
+The remaining active work is earned by the latest inspected real-use outputs, not by deferred
 method-stack preference: the learner recall/adaptive path loop runs end-to-end over all manifest fixtures at
 `EXPERIMENT_ONLY` trust, and prior CEP definition-quality and intrinsic-difficulty caveats remain visible in
 the mixed-domain run.
 
 ## TODO
 
-1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
+1. **Run the U8 real-use quality evaluation for graph-dissolved calibration (`feat/graph-dissolved-calibration`).**
+   U1–U7 are verified only deterministically (typecheck + 349 unit tests; 21 Postgres integration tests still
+   skip without a DB). The acceptance examples AE1–AE5 are **not yet quality-verified against real data**, so
+   this is a `BLOCKED → must-run` gate per AGENTS rule 14, not optional polish.
+   - `DATABASE_URL` and the LiteLLM credentials are already in `.env` — no environment setup needed; just load
+     `.env` and run.
+   - Bring up a live published graph + enrichment + study items, then run the two cones from the plan's U8:
+     the **economics root goal *Surplus Produce of Labour*** (R3 root-goal fix / AE1) and a **deep-narrow Rust
+     cone** (prune + restoration depth). The synthetic seeder is reshaped to verdicts:
+     `worker:kg synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef>`.
+   - Inspect and record: the goal-first picker + journey sizes; the single-node foundational-root screen (no
+     empty calibration, no premature "Goal reached"); cone collapse on "I knew it" and its reversal; a graded
+     miss surfacing the *right* restoration suggestion; per-learner reset to a clean slate; and the
+     calibration↔graded coexistence read-out.
+   - Complete the evaluation note in `tmp/2026-06-22-calibration-implementation-report.md` (currently `BLOCKED`)
+     with concrete artifacts, classify PASS / FIX_FIRST / EXPERIMENT_ONLY, and fix any foundational defect
+     before opening a PR. Do **not** report the green unit suite as quality evidence (rule 11/14).
+
+2. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
    plausible ordering but confirmed a concentrated broad/evidence-thin distortion, especially relation-like or
    framework-level labels with sparse evidence. Evidence:
    `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`. Persisted neural rationales
@@ -22,7 +52,7 @@ the mixed-domain run.
    - Population calibration remains deferred until real learner-response data exists; this follow-up is about
      operator-facing intrinsic ordering, not IRT/KT/Bradley-Terry.
 
-2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+3. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
    still found low-value accepted Definition Passages such as heading-only or citation-like snippets in the
    AIRA-dojo Markdown run.
@@ -33,18 +63,18 @@ the mixed-domain run.
    - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
      and the inspected newly included adjacent blocks were genuine explaining passages.
 
-3. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
+4. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
    malformed JSON forced-tool argument during AIRA-dojo Markdown concept admission; rerunning the single source
    succeeded. Keep fail-closed semantics, but improve retry observability and capture malformed tool-call snippets
    safely enough to diagnose provider/schema drift without logging secrets or full copyrighted source context.
 
-4. **Improve study-item inspection around citation exactness.** Persisted items passed the project verifier
+5. **Improve study-item inspection around citation exactness.** Persisted items passed the project verifier
    (`evidenceQuoteMatches`), but a known fraction of citations are not byte-exact substrings of source blocks
    because the verifier intentionally tolerates parser formatting noise (markdown emphasis, curly quotes, line
    wrapping, HTML entities). Admin/inspection surfaces should label this distinction clearly so operators do not
    confuse normalized verifier success with exact copied text.
 
-5. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
+6. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
    - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a difficulty or
      learner model on synthetic or self-assessed responses stay deferred until per-learner calibration over real
      study-loop responses is stable (task 1 / ADR-0024). Do not reintroduce embeddings, clustering, or non-LLM
@@ -59,6 +89,35 @@ the mixed-domain run.
 
 ## COMPLETED
 
+- **Graph-dissolved calibration & goal-first study loop — implementation (2026-06-22, branch
+  `feat/graph-dissolved-calibration`, NOT yet merged; U8 real-use eval pending — TODO #1).** Retired the
+  weighted self-report calibration sweep and replaced it with explicit calibration dissolved into the study
+  graph:
+  - **Persistence + domain reshape (U1/U2):** new mutable `calibration_verdicts` table +
+    `CalibrationVerdictStorePort` + `PostgresCalibrationVerdictStore`; `response_log` collapsed to graded-only
+    (dropped `evidence_weight`, `self_report_rating`, the `self_report` signal type, and its coherence branch).
+    Deleted `calibration.ts` (`buildCalibrationSet`/`propagateSelfReport`/`appendSelfReportBatch`, the
+    `0.3`/`0.15` + GRADED weights), `ratingToMastery`, and the self-report fold branch (rule 18). The synthetic
+    simulator now seeds verdicts deterministically from difficulty (`verdictByDifficulty`). Per-learner reset
+    nukes verdicts via the store + graded rows via a direct operator DELETE (the log keeps no store-port delete,
+    so its append-only guarantee stays structural).
+  - **Pure deterministic core (U3):** `calibrationClosure.ts` — `pruneClosure` (trusted-edge down-closure),
+    `composeMastery` (calibration `known` masters its closure; coexistence with graded is *surfaced*, not
+    silently resolved — the old "graded always outranks" precedence is gone), `struggledNodes` (latest graded
+    incorrect), `suggestRestorations`. `prerequisiteAncestors` generalized to a minimal edge shape so the loader
+    and a future Learner app share one ancestor definition.
+  - **Goal-first entry (U4):** alias-aware goal search, journey-size (cone-count) ordering, "foundational —
+    studied directly" tag for DAG-root goals; enrichment demoted to a secondary switcher defaulting to latest.
+  - **Calibration UI (U5/U6/U7):** reveal-then-binary "I knew it"/"I forgot" card (verdict shown + clearable,
+    R7); `setVerdict`/`clearVerdict`/`resetLearner` actions; loader derives the prune closure, composes mastery,
+    and flags a foundational root so it opens a single-node screen instead of a premature "Goal reached" (AE1);
+    Calibrate toggle + `CalibrationSweep.tsx` removed; `detectConflicts` re-homed onto verdict-vs-graded; a
+    restoration nudge surfaces directly-known skipped prerequisites on a graded miss and restores via
+    `clearVerdict`.
+  - **Verification:** repo typecheck clean; 349 unit tests pass, 0 fail (21 Postgres integration tests skip
+    without `DATABASE_URL`); grep-clean of all retired symbols. Real-use evaluation BLOCKED in the
+    implementation session (no DB/LLM there) — see TODO #1. Plan:
+    `docs/plans/2026-06-22-001-feat-graph-dissolved-calibration-study-loop-plan.md`.
 - **Learner study loop UI (2026-06-21, PR #9).** Shipped the full learner-facing study surface in Admin Lab,
   built as transfer-ready prop-driven modules over the existing recall/adaptive-path core:
   - **Typed Study Item Bank** (ADR-0026): `Card` → typed `StudyItem` discriminated union; auto-graded

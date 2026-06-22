@@ -7,7 +7,11 @@
       "Write(*)",
       "WebFetch(*)",
       "MultiEdit(*)"
-    ]
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "sandbox": {
+    "enabled": false
   },
   "enabledPlugins": {
     "compound-engineering@compound-engineering-plugin": true,
