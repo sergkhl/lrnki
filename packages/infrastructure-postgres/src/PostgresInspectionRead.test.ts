@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assembleProfiles, toRunSummary } from "./inspection";
+import { assembleProfiles, toRunSummary } from "./PostgresInspectionRead";
 
 // U6 test scenario 3: run summaries report profile completeness and evidence
 // counts rather than verified/rejected claim counts. The summary mapper is pure.

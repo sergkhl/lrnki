@@ -24,5 +24,6 @@
 - [0024-learner-neutral-intrinsic-difficulty](./0024-learner-neutral-intrinsic-difficulty.md) — intrinsic difficulty now; learner-calibrated difficulty remains data-blocked
 - [0025-card-bank-over-derived-graph-layer](./0025-card-bank-over-derived-graph-layer.md) — Card Bank and Response Log keyed to derived nodes, with source/generated grounding provenance; superseded by 0026 for item identity
 - [0026-typed-study-item-bank](./0026-typed-study-item-bank.md) — Card → typed StudyItem discriminated union (`itemType`); auto-graded option-select studying, self-assessment retreats to calibration; supported types are `SELECT DISTINCT item_type`, never a stored map; sibling-conditioned generated distractors + deterministic structural guard
+- [0027-serve-inspection-through-read-model-ports](./0027-serve-inspection-through-read-model-ports.md) — Admin Lab inspection reads go through finished read-model ports (adapter owns the SQL); learner projection reads go through `application` use-cases; inspection types live in `ports` (bounded), real DB errors propagate. First slice: Run + Source inspection
 
 > Numbers 0020–0021 were never issued: the 2026-06-15 complexity reset folded those decisions into in-place rewrites of existing ADRs (0002/0005/0007/0009/0012/0013/0016/0019/0022) rather than new records.

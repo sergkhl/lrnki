@@ -18,6 +18,7 @@ import type {
   DiscoveredCandidate,
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
+  ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
   GraphSnapshot,
@@ -31,6 +32,7 @@ import type {
   RefinementDecisionRecord,
   RejectedStudyItem,
   RescueDurabilityJudgment,
+  RunCandidate,
   RunForBuild,
   SourceBlock,
   StructuredDocument
@@ -397,4 +399,114 @@ export interface AnswerGradingJudgePort {
     answerKey: string;
     submittedAnswer: string;
   }): Promise<{ outcome: JudgedOutcome; score: number; rationale: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Inspection Read Model (ADR-0027). Admin Lab inspection reads — pure read, no
+// adaptation compute — are served by read-only read-model ports that return a
+// finished model; the storage adapter owns every query and verbatim row-stitch,
+// and no UI embeds SQL. These admin-presentation shapes live in the ports
+// contract by accepted exception (bounded to inspection): AGENTS rule 3 keeps
+// them out of domain-core, and the application→ports→domain-core direction keeps
+// them out of application. Learner-facing PROJECTION reads (read + adaptation
+// compute) are served by application use-cases instead and are not modeled here.
+// ---------------------------------------------------------------------------
+
+export interface RunSummary {
+  runId: string;
+  sourceTitle: string;
+  declaredDomain: string;
+  status: string;
+  degraded: boolean;
+  latencyMs: number | null;
+  startedAt: string;
+  candidateCount: number;
+  coreCount: number;
+  // CEP completeness replaces the retired verified/rejected claim counts (R9).
+  profileCount: number;
+  completeProfileCount: number;
+  definitionCount: number;
+  mentionCount: number;
+  assertionCount: number;
+}
+
+export interface ProfilePassage {
+  kind: "definition" | "mention";
+  sourceBlockId: string;
+  headingPath: string[];
+  evidenceQuote: string;
+  salienceRank: number;
+}
+
+export interface ProfileAssertion {
+  assertionType: string;
+  // `defines` carries a literal.
+  target: string;
+  evidenceQuotes: string[];
+}
+
+export interface RunProfile {
+  candidateKey: string;
+  conceptLabel: string;
+  tier: string;
+  complete: boolean;
+  definitions: ProfilePassage[];
+  mentions: ProfilePassage[];
+  assertions: ProfileAssertion[];
+}
+
+export interface RunInspection {
+  run: RunSummary;
+  pipelineConfigHash: string;
+  candidates: {
+    candidateKey: string;
+    discoveredLabel: string;
+    canonicalLabel: string;
+    aliases: string[];
+    mentionCount: number;
+    modelTier: string;
+    tier: string;
+    proposedCanonicalLabel: string;
+    standaloneLearningObjective: RunCandidate["admission"]["standaloneLearningObjective"];
+    establishedDomainMeaning: RunCandidate["admission"]["establishedDomainMeaning"];
+    definitionBearingTreatment: RunCandidate["admission"]["definitionBearingTreatment"];
+    organizingPower: RunCandidate["admission"]["organizingPower"];
+    coreSelected: boolean;
+    selectionReasonCode: string;
+    reasonCodes: string[];
+    boundaryReasonCodes: string[];
+    confidence: number;
+  }[];
+  qualityIssues: ExtractionQualityIssue[];
+  profiles: RunProfile[];
+}
+
+export interface SourceSummary {
+  sourceResourceId: string;
+  title: string;
+  declaredDomain: string;
+  contentType: string;
+  contentHash: string;
+  blockCount: number;
+  runCount: number;
+}
+
+export interface SourceInspection {
+  source: SourceSummary;
+  parserName: string;
+  parserVersion: string;
+  blocks: { blockId: string; blockType: string; headingPath: string[]; text: string }[];
+}
+
+// Run Inspector read surface: list summaries + one run's full inspection. Returns
+// `undefined` only for not-found; real DB errors propagate (ADR-0027 decision 5).
+export interface RunInspectionReadPort {
+  listRunSummaries(): Promise<RunSummary[]>;
+  getRunInspection(runId: string): Promise<RunInspection | undefined>;
+}
+
+// Source Explorer read surface: list source summaries + one source's blocks.
+export interface SourceInspectionReadPort {
+  listSourceSummaries(): Promise<SourceSummary[]>;
+  getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
 }

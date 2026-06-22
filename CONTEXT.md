@@ -119,6 +119,10 @@ _Avoid_: concept-only cards, asserted graph mutation
 The Card Bank citation contract for a recall card. Source-grounded cards cite verbatim source evidence; generated cards cite generated grounding bundle passages and are labeled as generated, never as source quotes.
 _Avoid_: fake source citation, unlabeled generated quote
 
+**Inspection Read Model**:
+A read-only projection of persisted Extraction Run, Source, or Derived Graph Layer state, assembled for Admin Lab inspection and returned finished by a read-model port. The storage adapter owns the queries and the verbatim row-stitching; the UI embeds no SQL. Distinct from a learner-facing **projection**, which fuses reads with adaptation compute behind an application use-case rather than a port.
+_Avoid_: raw UI query, JSON_TABLE in the app, learner projection
+
 ## Flagged Ambiguities
 
 - "Refinement" is ambiguous. Use **Static Graph Refinement** for asserted graph assembly and CEP-evidence union, and **Graph Enrichment** for inferred prerequisite facts.
