@@ -17,15 +17,20 @@ U1–U7 are typecheck/test-clean and committed (two commits: backend `feat(calib
 
 **In-flight branch `feat/enrichment-perf-batched-judging` (2026-06-23):** enrichment speed + token
 reduction via per-node batched prerequisite judging. Plan:
-`docs/plans/2026-06-22-002-perf-enrichment-speed-token-reduction-plan.md`. **Code units U1–U6 are
+`docs/plans/2026-06-22-002-perf-enrichment-speed-token-reduction-plan.md`. **All units U1–U7 are
 shipped, typecheck/test-clean, committed** (U1 stage tags, U2 worker stage-timing, U4 batched
 schema/adapter, U5 runGraphEnrichment reshape, U6 shared `mapWithConcurrency` + parallel-ready
 extraction/study-item seams). The measurement instrument works: per-stage `stage_timing` lines, and
-`/spend/tags` attributes token/cost per stage with no app-computed cost (AE3 PASS). **The U7 rule-14
-parity gate FAILED — FIX_FIRST** (see TODO #6). Next session resumes with **option 1: recover parity,
-keep the speed.** Evidence: `tmp/2026-06-22-enrichment-rule14.md`,
-`tmp/2026-06-22-enrichment-baseline/`, `tmp/2026-06-22-enrichment-after/` (incl.
-`anchor-only-parity/`).
+`/spend/tags` attributes token/cost per stage with no app-computed cost (AE3 PASS). **U7 parity gate
+resolved (option 1 + sign-off):** the batched judge's subject/candidate asymmetry was neutralized to
+the per-pair judge's symmetric Concept A / Concept B framing inside one batched tool call
+(`fix(enrichment): symmetric A/B framing…`). Re-measurement showed the per-pair judge is itself
+non-deterministic now (~6/12 run-to-run, intermittently 12/12) due to OpenRouter/DeepSeek serving
+drift, so symmetric-batched is within per-pair's noise envelope (cross 5.6 ≈ within 6.3) and a clean
+12/12 parity is no longer measurable for any method. **User signed off: accept batched + keep the
+1.4–2× speed win;** enrichment reproducibility is now tracked as its own issue (TODO #6). Evidence:
+`tmp/2026-06-23-enrichment-parity-fix/rule-14-evaluation.md`, `tmp/2026-06-22-enrichment-rule14.md`,
+`tmp/2026-06-22-enrichment-baseline/`, `tmp/2026-06-22-enrichment-after/`.
 
 The remaining active work is earned by the latest inspected real-use outputs, not by deferred
 method-stack preference: the learner recall/adaptive path loop runs end-to-end over all manifest fixtures at
@@ -81,41 +86,44 @@ the mixed-domain run.
      held-out learner data or inspected real-use runs, and compared against the current ADR-0019 exhaustive same-domain
      judgment baseline.
 
-6. **Recover enrichment per-node-batched judging parity, then keep the speedup (branch
-   `feat/enrichment-perf-batched-judging`).** The U7 rule-14 gate found the batched judge produces a
-   reproducibly **different** certain-edge set than the per-pair judge — so the reshape is "a different
-   graph faster," not the plan's promised "same graph faster" (R5/R9/AE2 parity not met). This is
-   FIX_FIRST; the U5 deletion of the per-pair path is not accepted until parity holds. Full evidence:
-   `tmp/2026-06-22-enrichment-rule14.md`.
-   - **Measured (real LLM, graph version `ad675576-43cb-4061-bc0a-253f51f2f6a8`, 14 anchors).** Speed:
-     judging ~2.1× faster (103.9 s vs ~222 s), total enrichment command 1.39× faster (337 s vs 468 s);
-     rescue/mint + difficulty dominate the remainder and are untouched. Parity (controlled **anchor-only**
-     run, fixed node set, no minting, noop difficulty, certain edges as label pairs): per-pair-run1 vs
-     per-pair-run2 = **12/12 identical** (noise floor 0 — per-pair is deterministic at temp 0/seed 7);
-     per-pair vs batched **cap=12 → 4/12**, **cap=4 → 4/12**, **cap=1 → 6/12**.
-   - **Root cause (two factors, prompt-framing dominant).** (1) Even cap=1 (one candidate per call,
-     functionally pairwise) diverges 6/12 — because the batched adapter prompt frames an asymmetric
-     **SUBJECT vs CANDIDATE(s)** where the per-pair judge framed a symmetric **Concept A / Concept B**;
-     the asymmetry alone flips edges, several as pure **direction reversals** on tightly-coupled ambiguous
-     pairs (Rust ownership cluster; Self-Love ↔ Propensity). (2) Listwise batch size adds more (cap 1→12
-     drops 6/12 → 4/12). `maxCandidatesPerBatch` is therefore **not** a sufficient parity lever on its own.
-   - **Option 1 plan (do this next).** (a) Neutralize the batched judge prompt's subject/candidate
-     asymmetry in `LiteLlmPrerequisiteJudgmentAdapter.judge` (`packages/infrastructure-litellm/src/enrichmentAdapters.ts`)
-     so each subject↔candidate decision is presented in the same symmetric framing the per-pair judge used,
-     still inside ONE batched `submit_prerequisite_judgments` tool call. Keep rubric language
-     domain-neutral — no fixture exemplars (AGENTS rule 17). (b) Re-run the anchor-only probe at cap=1; it
-     should return to ~12/12 vs per-pair if framing is the cause. (c) Then raise `maxCandidatesPerBatch`
-     (`DEFAULT_ENRICHMENT_CONFIG`, currently 12) to the **largest value that still holds parity within the
-     noise floor** on the largest domain. (d) Re-confirm the full-pipeline speed win survives the chosen
-     cap. The throwaway anchor-only probe used last session: a temporary `apps/kg-worker/src/_parityProbe.ts`
-     (anchor-only run, noop difficulty, `MAX_CANDIDATES_PER_BATCH` env override) + the worktree-at-`2864336`
-     per-pair baseline — recreate as needed, keep it disposable (rules 10/11), delete before commit.
-   - If symmetric framing cannot recover parity, escalate the original decision: accept the changed graph
-     (needs explicit sign-off — mutates authoritative structure) or revert U5 and pursue speed another way
-     (reserved generate-then-verify).
+6. **Enrichment certain-edge reproducibility — provider-level non-determinism (surfaced
+   2026-06-23 while resolving the batched-judging parity gate).** The anchor-only re-measurement found
+   the prerequisite judge is **non-deterministic run-to-run in the current environment for BOTH judge
+   shapes**: per-pair shares only ~6/12 certain edges across two identical-code runs (intermittently
+   12/12 — it is bimodal), and symmetric-batched ~6/13. Root cause is the serving path, not the reshape:
+   `kg-prerequisite-judgment` → `openrouter/deepseek/deepseek-v4-flash` with global `drop_params: True`
+   (`litellm/config.yaml`); OpenRouter gives no determinism guarantee for DeepSeek (seed is
+   provider-dependent and may be dropped; backend routing can change between sessions) and DeepSeek's MoE
+   serving is non-deterministic across processes (already noted in the worker). The prior session's
+   per-pair 12/12 was a stable-window draw. This means the authoritative certain-edge set is not
+   reproducible run-to-run today — a pipeline-wide reproducibility concern, not specific to batching.
+   - Do **not** chase edge-set stability with fixture-specific tuning (AGENTS rules 16/17).
+   - Investigate a serving-layer determinism fix: confirm whether `seed` survives `drop_params` to the
+     DeepSeek route; consider pinning a deterministic DeepSeek backend / provider; or evaluate a judge
+     alias with stronger determinism. Re-run the matched anchor-only probe (recreate the disposable
+     `apps/kg-worker/src/_parityProbe.ts` + a `2864336` per-pair worktree, rules 10/11) to confirm any fix.
+   - Until then, accept that enrichment ordering varies within the measured noise floor; the batched
+     reshape does not worsen it beyond per-pair's own variance. Evidence:
+     `tmp/2026-06-23-enrichment-parity-fix/rule-14-evaluation.md`.
 
 ## COMPLETED
 
+- **Enrichment per-node batched judging — U7 parity gate resolved (2026-06-23, branch
+  `feat/enrichment-perf-batched-judging`).** The prior FIX_FIRST gate (batched produced a reproducibly
+  different certain-edge set than per-pair) rested on a per-pair noise floor of 0 that no longer holds.
+  Option 1(a): neutralized the batched judge's asymmetric SUBJECT-vs-CANDIDATE framing to the per-pair
+  judge's symmetric Concept A / Concept B framing inside one batched `submit_prerequisite_judgments`
+  call (`fix(enrichment): symmetric A/B framing…`, domain-neutral per rule 17; deterministic mapping +
+  47/47 envelope tests unchanged; full workspace typecheck clean). Real-LLM anchor-only re-measurement
+  (graph version `ad675576-43cb-4061-bc0a-253f51f2f6a8`, 14 anchors, cap=1): symmetric vs the recorded
+  per-pair baseline 10/12, up from asymmetric's 6/12 — the reframe removed the systematic direction
+  reversals. The same probe revealed per-pair is itself non-deterministic now (~6/12 run-to-run,
+  intermittently 12/12; cross-method symmetric-vs-per-pair 5.6 ≈ symmetric within-method 6.3), so a clean
+  12/12 parity is unmeasurable for any method. **User signed off: accept the batched reshape + U5
+  deletion and keep the 1.4–2× speed win** (judging ~2.1× faster, total enrichment command 1.39×);
+  enrichment reproducibility moved to its own active item (TODO #6). Evidence:
+  `tmp/2026-06-23-enrichment-parity-fix/rule-14-evaluation.md`, `tmp/2026-06-22-enrichment-rule14.md`,
+  `tmp/2026-06-22-enrichment-after/`.
 - **Graph-dissolved calibration real-use evaluation (2026-06-22, branch `feat/graph-dissolved-calibration`).**
   U8 passed on a live two-source enrichment using real model calls: economics `wealth-of-nations-bk1-ch1-3`
   extraction run `b57760ba-8047-4f24-a5b1-586b0ae98037`, Rust `rust-book-ch04-01` extraction run
