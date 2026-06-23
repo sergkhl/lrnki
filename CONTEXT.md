@@ -77,8 +77,8 @@ The Graph-Version Build activity that conservatively resolves identity and union
 _Avoid_: Graph Enrichment, inference
 
 **Concept Canonicalization**:
-The deterministic, domain-scoped normalized-label process that decides whether Candidates from different sources represent one Concept. It is the sole merge authority; no embeddings participate.
-_Avoid_: embedding merge, identity clustering
+The domain-scoped process that decides whether Candidates from different sources represent one Concept. Normalized-label exact match is the deterministic baseline; an adjudicated semantic-deduplication decision may also merge near-duplicates (ADR-0012/0015). Embeddings may only *propose* near-duplicate candidates — a separate adjudicator (measured LLM judge or recorded deterministic rule) decides, and every merge is recorded; raw cosine never auto-merges.
+_Avoid_: raw-cosine auto-merge, propose-and-decide in one mechanism, embedding-derived prerequisites
 
 **Graph Enrichment**:
 The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and judges every same-domain pair exhaustively over anchors and those nodes to derive `inferred-prerequisite-of` edges. (Decision: ADR-0019.)
@@ -111,12 +111,12 @@ _Avoid_: course, personalized graph, concept-keyed learner state
 **Learner State**:
 A learner-specific account of mastery consumed by projection and never stored in the learner-neutral graph.
 
-**Card Bank**:
-A learner-neutral recall asset generated alongside one Derived Graph Layer. Cards are keyed to `derived_node_id`, so anchors and Enrichment Nodes share one response identity. Each card declares grounding provenance: `source_cep`, `source_mentioned`, or `generated`.
-_Avoid_: concept-only cards, asserted graph mutation
+**Study Item Bank**:
+A learner-neutral recall asset generated alongside one Derived Graph Layer. Study items are keyed to `derived_node_id`, so anchors and Enrichment Nodes share one response identity, and form a typed discriminated union keyed on `itemType` (ADR-0025/0026). Each study item declares grounding provenance: `source_cep`, `source_mentioned`, or `generated`.
+_Avoid_: Card, Card Bank, recall card, concept-only items, asserted graph mutation
 
 **Grounding Provenance**:
-The Card Bank citation contract for a recall card. Source-grounded cards cite verbatim source evidence; generated cards cite generated grounding bundle passages and are labeled as generated, never as source quotes.
+The Study Item Bank citation contract for a study item. Source-grounded study items cite verbatim source evidence; generated study items cite generated grounding bundle passages and are labeled as generated, never as source quotes.
 _Avoid_: fake source citation, unlabeled generated quote
 
 **Inspection Read Model**:
