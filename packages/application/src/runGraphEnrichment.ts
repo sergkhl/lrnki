@@ -25,6 +25,7 @@ import type {
 import { createHash, randomUUID } from "node:crypto";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { judgeNodeAgainstCandidates } from "./judgeNodeAgainstCandidates";
+import { mapWithConcurrency } from "./mapWithConcurrency";
 import { cutWeakEdges, removeCycles, transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 
@@ -401,25 +402,3 @@ function contextOf(
   };
 }
 
-// Map over items with bounded concurrency, preserving INPUT order in the result
-// regardless of completion order (deterministic trace for replay). Any rejection
-// propagates: a pair whose judge exhausts its forced-tool retry budget throws, so
-// the enrichment run fails before persistence and leaves no partial layer.
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<R>
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  const workerCount = Math.max(1, Math.min(limit, items.length));
-  const worker = async (): Promise<void> => {
-    while (true) {
-      const index = cursor++;
-      if (index >= items.length) return;
-      results[index] = await fn(items[index], index);
-    }
-  };
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
-}

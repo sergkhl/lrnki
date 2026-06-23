@@ -7,7 +7,8 @@ import {
   computeLearnerPath,
   createIntrinsicDifficultyPort,
   emptyLearnerState,
-  executeExtractionRun,
+  runExtractionOverSources,
+  type ExtractionSourceUnit,
   generateStudyItemBank,
   loadResponseLogLearnerState,
   synthesizeResponses,
@@ -201,33 +202,39 @@ async function registerFromManifest(ctx: Context, manifestPath: string) {
 
 async function runExtraction(ctx: Context, sourceResourceId?: string) {
   const sources = sourceResourceId ? [{ sourceResourceId }] : await ctx.registrationStore.listSources();
+  // Resolve each registered source into an extraction unit (skipping any that vanished),
+  // then drive them through the shared parallel-ready seam (U6/R11). Degree defaults to 1,
+  // so the run stays strictly sequential; the per-unit start/complete callbacks keep the
+  // exact per-source logging the prior loop emitted.
+  const units: ExtractionSourceUnit[] = [];
   for (const { sourceResourceId: id } of sources) {
     const source = await ctx.registrationStore.getRegisteredSource(id);
     if (!source) {
       console.error(`! source not found: ${id}`);
       continue;
     }
-    const runId = randomUUID();
-    console.log(`\n>> extraction run ${runId} for ${id} [${source.declaredDomain}]`);
-    const result = await executeExtractionRun({
-      runId,
-      source,
-      pipelineConfigHash: PIPELINE_CONFIG_HASH,
-      discovery: ctx.discovery,
-      admission: ctx.admission,
-      evidenceProfileExtraction: ctx.evidenceProfileExtraction,
-      assertionEntailmentJudge: ctx.assertionEntailmentJudge,
-      admissionLabelJudge: ctx.admissionLabelJudge,
-      store: ctx.runStore
-    });
-    const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
-    const profiles = result.evidenceProfiles;
-    const incomplete = profiles.filter((profile) => !profile.complete).length;
-    const definitions = profiles.reduce((sum, profile) => sum + profile.definitions.length, 0);
-    const mentions = profiles.reduce((sum, profile) => sum + profile.mentions.length, 0);
-    const assertions = profiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
-    console.log(`   status=${result.status} candidates=${result.candidates.length} core=${core} CEPs=${profiles.length}(incomplete=${incomplete}) defs=${definitions} mentions=${mentions} assertions=${assertions} latency=${result.latencyMs}ms`);
+    units.push({ runId: randomUUID(), source });
   }
+  await runExtractionOverSources({
+    units,
+    pipelineConfigHash: PIPELINE_CONFIG_HASH,
+    discovery: ctx.discovery,
+    admission: ctx.admission,
+    evidenceProfileExtraction: ctx.evidenceProfileExtraction,
+    assertionEntailmentJudge: ctx.assertionEntailmentJudge,
+    admissionLabelJudge: ctx.admissionLabelJudge,
+    store: ctx.runStore,
+    onRunStart: (unit) => console.log(`\n>> extraction run ${unit.runId} for ${unit.source.sourceResourceId} [${unit.source.declaredDomain}]`),
+    onRunComplete: (_unit, result) => {
+      const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
+      const profiles = result.evidenceProfiles;
+      const incomplete = profiles.filter((profile) => !profile.complete).length;
+      const definitions = profiles.reduce((sum, profile) => sum + profile.definitions.length, 0);
+      const mentions = profiles.reduce((sum, profile) => sum + profile.mentions.length, 0);
+      const assertions = profiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
+      console.log(`   status=${result.status} candidates=${result.candidates.length} core=${core} CEPs=${profiles.length}(incomplete=${incomplete}) defs=${definitions} mentions=${mentions} assertions=${assertions} latency=${result.latencyMs}ms`);
+    }
+  });
 }
 
 async function buildVersion(ctx: Context, args: string[]) {
