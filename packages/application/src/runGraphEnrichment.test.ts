@@ -333,11 +333,11 @@ test("runGraphEnrichment scores intrinsic difficulty with per-node evidence cont
   assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
 });
 
-test("runGraphEnrichment default config hash reflects the dedup sub-stage", async () => {
+test("runGraphEnrichment default config hash reflects the minting durability sub-stage", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "dedup-v1");
-  assert.equal(layer.enrichmentConfigHash, "dedup-v1");
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "minting-durability-v1");
+  assert.equal(layer.enrichmentConfigHash, "minting-durability-v1");
 });
 
 // Scenario 3: an evidence-free snapshot reaches no judge call and fails closed.

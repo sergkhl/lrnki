@@ -112,6 +112,22 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
           )`;
       }
 
+      // Minting durability dispositions: relational mirror of the trace's reserved
+      // proposal decisions. Dropped proposal ids are correlation-only because no
+      // derived_graph_nodes row exists for them.
+      for (const disposition of artifact.payload.mintingDispositions) {
+        await tx`
+          INSERT INTO minting_dispositions (
+            minting_disposition_id, enrichment_id, derived_node_id, proposed_label,
+            normalized_label, declared_domain, anchor_concept_id, disposition, rationale
+          )
+          VALUES (
+            ${randomUUID()}, ${layer.enrichmentId}, ${disposition.derivedNodeId}, ${disposition.proposedLabel},
+            ${disposition.normalizedLabel}, ${disposition.declaredDomain}, ${disposition.anchorConceptId},
+            ${disposition.disposition}, ${disposition.rationale}
+          )`;
+      }
+
       // Derived-layer semantic merges (U4): one row per absorbed node, the relational
       // mirror of the trace's merge records so Admin Lab reads them without recompute
       // (rules 11/12). The canonical FK resolves to a surviving derived_graph_nodes row;

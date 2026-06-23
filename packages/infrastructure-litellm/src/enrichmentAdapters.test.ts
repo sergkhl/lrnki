@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PrerequisiteConceptContext } from "@lrnki/domain-core";
-import { LiteLlmPrerequisiteJudgmentAdapter, LiteLlmRescueDurabilityJudgmentAdapter, RESCUE_DURABILITY_JUDGE_MODEL } from "./enrichmentAdapters";
+import {
+  LiteLlmMintingDurabilityJudgmentAdapter,
+  LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmRescueDurabilityJudgmentAdapter,
+  MINTING_DURABILITY_JUDGE_MODEL,
+  RESCUE_DURABILITY_JUDGE_MODEL
+} from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { batchedPrerequisiteJudgmentValidator } from "./toolSchemas";
+import { batchedPrerequisiteJudgmentValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
   return { derivedNodeId, canonicalLabel, aliases: [], definitions: [`${canonicalLabel} def`], mentions: [], assertions: [] };
@@ -131,4 +137,47 @@ test("rescue judge passes through the validated verdict and grounding span (appl
   const notDurable = await rescueAdapterReturning({ verdict: "not_durable", groundingSpan: "We ablate variant B in Table 3.", rationale: "ablation label" }).judge(rescueInput);
   assert.equal(notDurable.verdict, "not_durable");
   assert.equal(notDurable.groundingSpan, "We ablate variant B in Table 3.");
+});
+
+// --- Minting durability judge ----------------------------------------------------
+
+function mintingAdapterReturning(canned: { verdict: string; rationale: string }, capture?: { lastCall?: unknown }) {
+  const client = {
+    async call(input: unknown) {
+      if (capture) capture.lastCall = input;
+      return canned;
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmMintingDurabilityJudgmentAdapter(client);
+}
+
+const mintingInput = {
+  declaredDomain: "software engineering",
+  proposal: { proposedLabel: "Lifetime", rationale: "Needed to understand references." },
+  anchor: { canonicalLabel: "Borrowing", definitionQuotes: ["Borrowing lets code access a value without taking ownership."] }
+};
+
+test("minting durability judge runs on the independent cross-family alias", () => {
+  assert.equal(MINTING_DURABILITY_JUDGE_MODEL, "kg-independent-judge");
+  assert.equal(mintingAdapterReturning({ verdict: "durable", rationale: "r" }).model, "kg-independent-judge");
+});
+
+test("minting durability judge passes through the validated verdict", async () => {
+  const durable = await mintingAdapterReturning({ verdict: "durable", rationale: "foundation" }).judge(mintingInput);
+  assert.deepEqual(durable, { verdict: "durable", rationale: "foundation" });
+
+  const notDurable = await mintingAdapterReturning({ verdict: "not_durable", rationale: "tangential" }).judge(mintingInput);
+  assert.deepEqual(notDurable, { verdict: "not_durable", rationale: "tangential" });
+});
+
+test("minting durability validator rejects missing or out-of-enum verdicts", () => {
+  assert.throws(() => mintingDurabilityJudgmentValidator.parse({ rationale: "missing verdict" }));
+  assert.throws(() => mintingDurabilityJudgmentValidator.parse({ verdict: "maybe", rationale: "bad enum" }));
+});
+
+test("minting durability request carries the stage tag and forced tool name", async () => {
+  const capture: { lastCall?: { toolName?: string; tags?: string[] } } = {};
+  await mintingAdapterReturning({ verdict: "durable", rationale: "r" }, capture).judge(mintingInput);
+  assert.equal(capture.lastCall?.toolName, "submit_minting_durability_judgment");
+  assert.deepEqual(capture.lastCall?.tags, ["minting-durability"]);
 });

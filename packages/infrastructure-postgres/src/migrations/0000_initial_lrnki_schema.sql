@@ -539,6 +539,24 @@ CREATE TABLE rescue_dispositions (
   grounding_span text NOT NULL
 );
 
+-- Minting durability dispositions. One row per RESERVED assumed-prerequisite proposal
+-- the minting durability judge ruled on before grounding generation. A `dropped`
+-- proposal has no derived_graph_nodes row, so derived_node_id is correlation-only
+-- (no FK), mirroring rescue_dispositions. The anchor_concept_id records the asserted
+-- Concept the proposal would have scaffolded — always a surviving published Concept, so
+-- it carries a real FK (unlike the correlation-only derived_node_id).
+CREATE TABLE minting_dispositions (
+  minting_disposition_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL,
+  proposed_label text NOT NULL,
+  normalized_label text NOT NULL,
+  declared_domain text NOT NULL,
+  anchor_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  disposition text NOT NULL CHECK (disposition IN ('accepted', 'dropped', 'kept_judge_unavailable')),
+  rationale text NOT NULL
+);
+
 -- Derived-layer semantic merges (plan U4, ADR-0012/0019, AGENTS rule 20). One row per
 -- ABSORBED node the dedup sub-stage collapsed into a canonical near-duplicate (U3). The
 -- canonical node SURVIVES, so canonical_derived_node_id has an FK; the absorbed node is

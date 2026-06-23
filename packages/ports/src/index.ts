@@ -28,6 +28,7 @@ import type {
   LearnerPath,
   MentionedNonCoreCandidate,
   MissingPrerequisiteProposal,
+  MintingDurabilityJudgment,
   NodeMergeAdjudication,
   PrerequisiteConceptContext,
   PublishedConceptIdentity,
@@ -132,6 +133,21 @@ export interface RescueDurabilityJudgmentPort {
     candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
     anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
   }): Promise<RescueDurabilityJudgment>;
+}
+
+// Minting durability judge. A bounded, forced-tool LLM judgment over ONE proposed
+// assumed-prerequisite label before any generated grounding is created. Cross-family
+// from the DeepSeek proposer/generator; used only to DROP a clearly non-durable
+// proposal, never to create or reshape one. The application stage owns fail-open
+// behavior on transport or schema failure because generated proposals have no
+// candidate-owned verbatim source span to ground a veto against.
+export interface MintingDurabilityJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    proposal: { proposedLabel: string; rationale: string };
+    anchor: { canonicalLabel: string; definitionQuotes: string[] };
+  }): Promise<MintingDurabilityJudgment>;
 }
 
 // Derived-node embedding PROPOSE signal for semantic deduplication (plan U1, ADR-0012,

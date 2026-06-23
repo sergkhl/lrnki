@@ -1,5 +1,15 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView, NodeMergeView, RescueDispositionView } from "./derivedGraph";
+import type {
+  DerivedGraphDetail,
+  DerivedGraphEdge,
+  DerivedGraphNode,
+  EnrichmentSummary,
+  GroundingPassageView,
+  MintingDispositionView,
+  NodeGroundingView,
+  NodeMergeView,
+  RescueDispositionView
+} from "./derivedGraph";
 import { summarizeOriginCounts } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
@@ -80,6 +90,14 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       FROM rescue_dispositions
       WHERE enrichment_id = ${header.enrichment_id}
       ORDER BY declared_domain, disposition, canonical_label`;
+
+    // Minting-durability dispositions: each reserved proposal's accept/drop/fail-open
+    // decision before grounding generation. Read-only, no recompute (rule 12).
+    const mintingRows = await sql<{ derived_node_id: string; proposed_label: string; declared_domain: string; anchor_concept_id: string; disposition: string; rationale: string }[]>`
+      SELECT derived_node_id, proposed_label, declared_domain, anchor_concept_id, disposition, rationale
+      FROM minting_dispositions
+      WHERE enrichment_id = ${header.enrichment_id}
+      ORDER BY declared_domain, disposition, proposed_label`;
 
     // Semantic merges (U5): the relational mirror of the run trace's merge records.
     // Read-only, no recompute (rule 12). The absorbed node was removed from the layer, so
@@ -166,6 +184,14 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       rationale: row.rationale,
       groundingSpan: row.grounding_span
     }));
+    const mintingDispositions: MintingDispositionView[] = mintingRows.map((row) => ({
+      derivedNodeId: row.derived_node_id,
+      proposedLabel: row.proposed_label,
+      declaredDomain: row.declared_domain,
+      anchorConceptId: row.anchor_concept_id,
+      disposition: row.disposition as MintingDispositionView["disposition"],
+      rationale: row.rationale
+    }));
     const merges: NodeMergeView[] = mergeRows.map((row) => ({
       declaredDomain: row.declared_domain,
       canonicalDerivedNodeId: row.canonical_derived_node_id,
@@ -178,7 +204,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       canonicalSelectionReason: row.canonical_selection_reason
     }));
 
-    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions, merges };
+    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions, mintingDispositions, merges };
   });
 }
 

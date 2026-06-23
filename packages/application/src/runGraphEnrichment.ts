@@ -7,6 +7,7 @@ import type {
   EnrichmentRunTrace,
   GroundingVerbatimDisposition,
   InferredPrerequisiteEdge,
+  MintingDisposition,
   NodeMergeRecord,
   PrerequisiteConceptContext,
   PrerequisiteJudgment,
@@ -18,6 +19,7 @@ import type {
   DifficultyPort,
   EnrichmentRunStorePort,
   GroundingGenerationPort,
+  MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
   NodeEmbeddingPort,
   NodeMergeAdjudicationPort,
@@ -63,10 +65,9 @@ export type GraphEnrichmentConfig = {
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  // Bumped from `intrinsic-difficulty-v3` because the derived-layer semantic-dedup
-  // sub-stage changes the derivation (ADR-0019 enrichment identity): a re-run produces a
-  // new Derived Graph Layer on the collapsed node set.
-  enrichmentConfigHash: "dedup-v1",
+  // Bumped from `dedup-v1` because minting durability changes assumed-prerequisite
+  // derivation before generated grounding is created.
+  enrichmentConfigHash: "minting-durability-v1",
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
   maxMentionsPerConceptInPair: 6,
@@ -110,6 +111,10 @@ export async function runGraphEnrichment(input: {
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
   // unjudged (prior behavior).
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional measured minting durability judge. When provided, each reserved
+  // assumed-prerequisite proposal is judged before generated grounding is created;
+  // omit it to preserve prior minting behavior.
+  mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
   // Optional semantic-dedup ports (plan U3, AGENTS rule 20). Provide BOTH to enable the
   // dedup sub-stage: the embedding PROPOSES near-duplicate pairs and the cross-family
   // adjudicator DECIDES each merge. Omit either to leave enrichment behavior identical to
@@ -119,6 +124,9 @@ export async function runGraphEnrichment(input: {
   // Optional dedup summary hook (R13): the application reports the merge count and any
   // fail-closed events; the worker formats the structured line (no console I/O here).
   onDedupSummary?: (summary: { merges: number; unavailable: number }) => void;
+  // Optional minting durability summary hook. Reports recorded decision counts for
+  // operator visibility without coupling the application layer to console output.
+  onMintingSummary?: (summary: { accepted: number; dropped: number; unavailable: number }) => void;
   // Optional per-sub-stage wall-clock hook (U2, KTD5, R1). The application stays free
   // of console I/O: it only measures monotonic elapsed ms around each enrichment
   // sub-stage and reports through this callback; the worker formats the structured line.
@@ -163,6 +171,7 @@ export async function runGraphEnrichment(input: {
   let enrichmentNodes: EnrichmentNode[] = [];
   let groundingDispositions: GroundingVerbatimDisposition[] = [];
   let rescueDispositions: RescueDisposition[] = [];
+  let mintingDispositions: MintingDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
     await timeStage("enrichment:rescue-mint", async () => {
       const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
@@ -179,10 +188,17 @@ export async function runGraphEnrichment(input: {
         proposalPort: input.missingPrerequisiteProposal!,
         groundingPort: input.groundingGeneration!,
         rescueDurabilityJudge: input.rescueDurabilityJudge,
+        mintingDurabilityJudge: input.mintingDurabilityJudge,
         bounds: config.mintingBounds,
         newNodeId
       });
       rescueDispositions = assembled.rescueDispositions;
+      mintingDispositions = assembled.mintingDispositions;
+      input.onMintingSummary?.({
+        accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
+        dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
+        unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
+      });
       // The floor verifies source_mentioned passages verbatim against their cited block
       // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
       // does not verify is dropped before it can enter the derived layer.
@@ -354,6 +370,7 @@ export async function runGraphEnrichment(input: {
     ],
     groundingDispositions,
     rescueDispositions,
+    mintingDispositions,
     nodeMerges
   };
   await input.enrichmentStore.persist({
@@ -468,4 +485,3 @@ function contextOf(
     assertions: []
   };
 }
-

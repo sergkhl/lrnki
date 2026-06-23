@@ -40,6 +40,10 @@ const detail: DerivedGraphDetail = {
     { derivedNodeId: "scope", canonicalLabel: "Variable scope", declaredDomain: "rust", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
     { derivedNodeId: "ablation", canonicalLabel: "Table 3 Ablation", declaredDomain: "rust", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
   ],
+  mintingDispositions: [
+    { derivedNodeId: "move", proposedLabel: "Move semantics", declaredDomain: "rust", anchorConceptId: "ownership", disposition: "accepted", rationale: "durable prerequisite" },
+    { derivedNodeId: "raii", proposedLabel: "RAII", declaredDomain: "rust", anchorConceptId: "ownership", disposition: "dropped", rationale: "tangential to this anchor" }
+  ],
   merges: [
     { declaredDomain: "rust", canonicalDerivedNodeId: "ownership", canonicalLabel: "Ownership", absorbedLabel: "Ownership (Rust)", absorbedAliases: ["owning"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
   ]
@@ -76,6 +80,21 @@ test("semantic merges appear in the textual output", () => {
 test("an empty merges list yields an empty textual merges array", () => {
   const view = buildDerivedGraphView({ ...detail, merges: [] });
   assert.deepEqual(view.textual.merges, []);
+});
+
+test("minting durability dispositions appear in the textual output", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.equal(view.textual.mintingDispositions.length, 2);
+  assert.equal(view.textual.mintingDispositions.find((d) => d.proposedLabel === "Move semantics")?.disposition, "accepted");
+  const dropped = view.textual.mintingDispositions.find((d) => d.disposition === "dropped");
+  assert.equal(dropped?.proposedLabel, "RAII");
+  assert.equal(dropped?.anchorConceptId, "ownership");
+  assert.equal(dropped?.rationale, "tangential to this anchor");
+});
+
+test("an empty minting disposition list yields an empty textual array", () => {
+  const view = buildDerivedGraphView({ ...detail, mintingDispositions: [] });
+  assert.deepEqual(view.textual.mintingDispositions, []);
 });
 
 test("uncertain edges are flagged in both representations", () => {
@@ -158,6 +177,13 @@ test("rescue dispositions distinguish accepted and dropped with rationale", () =
   const dropped = detail.rescueDispositions.find((d) => d.disposition === "dropped");
   assert.equal(dropped?.canonicalLabel, "Table 3 Ablation");
   assert.equal(dropped?.rationale, "incidental artifact");
+});
+
+test("minting dispositions distinguish accepted and dropped with rationale", () => {
+  assert.equal(detail.mintingDispositions.find((d) => d.proposedLabel === "Move semantics")?.disposition, "accepted");
+  const dropped = detail.mintingDispositions.find((d) => d.disposition === "dropped");
+  assert.equal(dropped?.proposedLabel, "RAII");
+  assert.equal(dropped?.rationale, "tangential to this anchor");
 });
 
 // --- Region grouping (U3, R2): each declared domain → one compound-parent region ---

@@ -39,6 +39,7 @@ import {
   LiteLlmLearnerSimulatorAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmMintingDurabilityJudgmentAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
   GENERATED_PREREQUISITE_JUDGE_MODEL
 } from "@lrnki/infrastructure-litellm";
@@ -153,6 +154,11 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    // Measured minting durability judge: cross-family independent judge gates
+    // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
+    // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
+    // judge-off baseline.
+    mintingDurabilityJudge: new LiteLlmMintingDurabilityJudgmentAdapter(deterministicClient),
     // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
     // near-duplicate pairs (qwen3-embedding-8b via kg-node-embedding); a cross-family
     // adjudicator DECIDES each merge (kg-independent-judge / gpt-oss-120b, deterministic
@@ -303,6 +309,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
+    mintingDurabilityJudge: process.env.ENRICH_DISABLE_MINTING_DURABILITY ? undefined : ctx.mintingDurabilityJudge,
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
     // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
     nodeEmbedding: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeEmbedding,
@@ -315,7 +322,8 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true }),
     // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
     // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
-    onDedupSummary: (summary) => console.log(`   dedup: merges=${summary.merges} unavailable=${summary.unavailable}`)
+    onDedupSummary: (summary) => console.log(`   dedup: merges=${summary.merges} unavailable=${summary.unavailable}`),
+    onMintingSummary: (summary) => console.log(`   minting: accepted=${summary.accepted} dropped=${summary.dropped} unavailable=${summary.unavailable}`)
   });
   const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
   const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;

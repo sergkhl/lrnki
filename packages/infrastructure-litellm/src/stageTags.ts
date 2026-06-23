@@ -17,6 +17,7 @@ export const STAGE_TAGS = {
   enrichmentJudge: "enrichment-judge",
   generatedEnrichmentJudge: "generated-enrichment-judge",
   rescueDurability: "rescue-durability",
+  mintingDurability: "minting-durability",
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
   groundingGeneration: "grounding-generation",
   intrinsicDifficulty: "intrinsic-difficulty",

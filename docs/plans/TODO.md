@@ -30,40 +30,31 @@ drift, so symmetric-batched is within per-pair's noise envelope (cross 5.6 ≈ w
 `tmp/2026-06-23-enrichment-parity-fix/rule-14-evaluation.md`, `tmp/2026-06-22-enrichment-rule14.md`,
 `tmp/2026-06-22-enrichment-baseline/`, `tmp/2026-06-22-enrichment-after/`.
 
-The remaining active work is earned by the latest inspected real-use outputs, not by deferred
-method-stack preference: the learner recall/adaptive path loop runs end-to-end over all manifest fixtures at
+The current branch resolves the former minting-precision TODO with a minting-durability judge
+(`feat: Minting-durability judge for assumed-prerequisite enrichment nodes`). Rule-14 evaluation on
+2026-06-23 classified it **PASS with caveats**: the enabled Rust + economics run minted four reasonable
+software prerequisites (`Compiler (software tool)`, `Dynamic memory allocation`, `Memory address`,
+`Static analysis (programming)`), persisted four accepted minting dispositions, produced no RAII node or
+drop-function edges, and rescue dropped `Resource Acquisition Is Initialization (RAII)`. The disabled
+baseline still produced `drop function (Rust)` rescue output and edges, but the RAII minting path did not
+reproduce in this draw, so the evaluation records that no real `not_durable` minting drop was observed.
+Evidence: `tmp/2026-06-23-minting-durability-rule14/rule-14-evaluation.md`.
+
+The remaining active work is earned by inspected real-use outputs, not by deferred method-stack
+preference: the learner recall/adaptive path loop runs end-to-end over all manifest fixtures at
 `EXPERIMENT_ONLY` trust, and prior CEP definition-quality and intrinsic-difficulty caveats remain visible in
 the mixed-domain run.
 
 ## TODO
 
-1. **Minting precision: develops-vs-named-in-passing durability for ASSUMED-PREREQUISITE minting
-   (residual of the shipped dedup+rescue work).** The semantic-dedup pass and the **rescue-path** RAII
-   fix shipped on `feat/enrichment-dedup-rescue-precision` (see COMPLETED + report
-   `tmp/2026-06-23-dedup-rescue-rule14-evaluation.md`). The U7 re-run surfaced that the SAME RAII
-   spurious gate can still arise through the **minting** path, which that plan did not scope: the
-   assumed-prerequisite proposal pass minted `RAII (Resource Acquisition Is Initialization)` as an
-   `llm_grounded` node and the prerequisite judge then ordered `RAII → drop` at 0.85 — the original
-   `0a7ed566` defect, via minting rather than rescue. Which path RAII takes is non-deterministic
-   run-to-run. U6 sharpened only the rescue durability judge; minting has no develops-vs-named-in-passing
-   durability check of its own.
-   - Give the **minting proposal pass** the same measured, drop-only durability discipline the rescue
-     path now has (a concept the source only NAMES in passing should not be minted as an assumed
-     prerequisite), or gate minted nodes through the same durability judge. Domain-neutral rubric only;
-     no lexical veto or fixture-specific list (rules 16/17). Evaluate by real-use inspection (rule 14)
-     against the `0a7ed566` sources — confirm `RAII → drop` no longer appears via either path.
-   - The dedup-merge collapse is verified against real models by the rule-14 probe + unit tests but has
-     not yet fired in-pipeline (the duplicate-bearing extraction did not reproduce under MoE
-     non-determinism). Inspect Admin Lab "Semantic merges" on future multi-source runs that do surface
-     anchor↔rescued duplicates to confirm in-pipeline behavior opportunistically.
-
-2. **Replace exhaustive O(n²) pairwise prerequisite judging with a whole-set global ordering (measured
+1. **Replace exhaustive O(n²) pairwise prerequisite judging with a whole-set global ordering (measured
    experiment).** Pairwise LLM judgment is intransitive by nature (A→B→C→A), which is *why* the certain
    edge set is noisy and ordering costs O(n²). Ask the judge for a global prerequisite DAG / topological
    ordering over the small per-domain concept set in one or few calls — cheaper than the current fan-out
    and globally self-consistent by construction (no post-hoc cycle removal of intransitive loops).
    **Direction confirmed (2026-06-23 brainstorm), pending its own dedicated brainstorm/plan; sequenced
-   after task 1 dedup so the DAG ranges over a deduped node set.** Findings parked here:
+   after the dedup + durability cleanup so the DAG ranges over a cleaner derived node set.** Findings
+   parked here:
    - Keep it LLM-judged; embeddings stay out of prerequisite derivation (rule 20, ADR-0019).
    - **Supersede or remove the per-node batched judge** (just merged on `feat/enrichment-perf-batched-judging`):
      it is a speed optimization of the O(n²) approach, made redundant by whole-set ordering (rule 18). Only
@@ -81,7 +72,7 @@ the mixed-domain run.
    - Measured run-scoped experiment compared against the current ADR-0019 exhaustive same-domain baseline
      by real-use inspection (rules 13/14); promote only if edges get more learner-sensible and cheaper.
 
-3. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** Per
+2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** Per
    ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
    signal, not a bug to make deterministic. Sample the judge K times per pair (or per global ordering) and
    route **direction-unstable** pairs to `uncertain` — already excluded from learner paths — instead of
@@ -103,7 +94,7 @@ the mixed-domain run.
      has no such oracle, so a "world-law" validator collapses into either another LLM judge (already covered
      by self-consistency above) or a hardcoded rule set (the forbidden rule-16 symbolic gate). Not now.
 
-4. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found
+3. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found
    broadly plausible ordering but a concentrated broad/evidence-thin distortion, especially relation-like
    or framework-level labels with sparse evidence. Evidence:
    `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`. Persisted neural rationales
@@ -113,7 +104,7 @@ the mixed-domain run.
      oracle/benchmark disposable.
    - Population calibration stays deferred until real learner-response data exists (task 7 / ADR-0024).
 
-5. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+4. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but
    inspection still found low-value accepted Definition Passages such as heading-only or citation-like
    snippets in the AIRA-dojo Markdown run.
@@ -123,7 +114,7 @@ the mixed-domain run.
    - CEP-quality follow-up, not a retrieval-layer blocker: the verbatim floor held and inspected adjacent
      blocks were genuine explaining passages.
 
-6. **Inspection/observability polish.** Two small operator-facing items:
+5. **Inspection/observability polish.** Two small operator-facing items:
    - **Harden forced-tool transport** for long runs: the all-manifest learner-loop hit one malformed JSON
      forced-tool argument during AIRA-dojo admission (rerun succeeded). Keep fail-closed (rule 6), but
      improve retry observability and capture malformed tool-call snippets safely (no secrets, no full
@@ -133,7 +124,7 @@ the mixed-domain run.
      (markdown emphasis, curly quotes, wrapping, HTML entities). Admin surfaces should label normalized-
      vs-exact so operators don't conflate them.
 
-7. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain
+6. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain
    data-blocked.
    - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a
      difficulty or learner model on synthetic or self-assessed responses stay deferred until per-learner

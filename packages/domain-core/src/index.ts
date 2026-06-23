@@ -777,6 +777,17 @@ export type RescueDurabilityJudgment = {
   rationale: string;
 };
 
+// Minting durability judgment. One bounded cross-family verdict over ONE generated
+// assumed-prerequisite proposal before grounding is generated. Unlike rescue
+// durability there is no candidate-owned source span to ground against, so this is
+// decision-only; the application stage owns the drop-only, fail-open semantics.
+export type MintingDurabilityVerdict = "durable" | "not_durable";
+
+export type MintingDurabilityJudgment = {
+  verdict: MintingDurabilityVerdict;
+  rationale: string;
+};
+
 // Merge-adjudication decision for semantic dedup (plan U2, AGENTS rule 20). The
 // DECIDE half of the propose/decide split: given two same-domain near-duplicate
 // candidates the embedding proposer surfaced, a cross-family LLM judge decides whether
@@ -845,6 +856,24 @@ export type RescueDisposition = {
   disposition: RescueDispositionKind;
   rationale: string;
   groundingSpan: string;
+};
+
+// The recorded disposition of one reserved minting proposal after durability judging.
+// `accepted` — the proposal was kept and minted as an `llm_grounded` node; `dropped`
+// — vetoed by a clear `not_durable` verdict; `kept_judge_unavailable` — transport or
+// schema failure, so the proposal is kept and flagged (fail-open). A minting verdict is
+// scoped to ONE anchor, so a `dropped` proposal's label is RELEASED, not kept reserved:
+// a later same-domain anchor that genuinely depends on the concept can re-propose it and
+// be judged independently (unlike rescue, whose verdict is judged against all same-domain
+// anchors and so legitimately reserves a dropped label domain-wide).
+export type MintingDisposition = {
+  derivedNodeId: string;
+  proposedLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+  disposition: RescueDispositionKind;
+  rationale: string;
 };
 
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
@@ -943,6 +972,10 @@ export type EnrichmentRunTrace = {
   // judge-unavailable, so an operator can audit why each rescued node is (or is not)
   // in the derived layer. Persisted in U4.
   rescueDispositions: RescueDisposition[];
+  // Per-reserved-minting-proposal durability dispositions. Records which generated
+  // assumed-prerequisite proposals were accepted, dropped before grounding, or kept
+  // fail-open, so an operator can audit minting without recompute.
+  mintingDispositions: MintingDisposition[];
   // Per-absorbed-node semantic merge records (plan U3/U4, R5). One per derived node the
   // dedup sub-stage absorbed into a canonical near-duplicate, with full propose + decide
   // + canonical-selection provenance. Empty when dedup did not run (opt-in). Persisted in

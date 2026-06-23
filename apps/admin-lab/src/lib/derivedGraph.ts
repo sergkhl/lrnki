@@ -85,6 +85,18 @@ export interface RescueDispositionView {
   groundingSpan: string;
 }
 
+// One recorded minting-durability disposition. `accepted` proposals are minted as
+// llm_grounded nodes; `dropped` proposals never spend grounding generation and have no
+// node row; `kept_judge_unavailable` proposals are minted fail-open.
+export interface MintingDispositionView {
+  derivedNodeId: string;
+  proposedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
+  rationale: string;
+}
+
 // One recorded semantic merge (plan U5, R5). The embedding proposer surfaced two
 // same-domain near-duplicates and the cross-family adjudicator decided to collapse them;
 // the canonical node survived and the absorbed node (a snapshot — its derived_graph_nodes
@@ -126,6 +138,7 @@ export interface DerivedGraphDetail {
   // merges (U5). All read from persisted artifacts; the UI never recomputes them (rule 12).
   originCounts: DomainOriginCounts[];
   rescueDispositions: RescueDispositionView[];
+  mintingDispositions: MintingDispositionView[];
   merges: NodeMergeView[];
 }
 
@@ -182,6 +195,7 @@ export interface DerivedGraphView {
     // The semantic merges (U5), surfaced in the equivalent textual readout so a
     // non-visual reader (or a test) can see each canonical ← absorbed collapse with its
     // proposing signal + score.
+    mintingDispositions: MintingDispositionView[];
     merges: NodeMergeView[];
   };
 }
@@ -348,6 +362,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         uncertain: edge.uncertain,
         judgeModel: edge.judgeModel
       })),
+      mintingDispositions: detail.mintingDispositions,
       merges: detail.merges
     }
   };

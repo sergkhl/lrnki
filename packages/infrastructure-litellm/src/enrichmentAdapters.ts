@@ -1,10 +1,18 @@
-import type { BatchedPrerequisiteJudgment, PrerequisiteConceptContext, PrerequisiteJudgment, RescueDurabilityJudgment } from "@lrnki/domain-core";
-import type { PrerequisiteJudgmentPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import type {
+  BatchedPrerequisiteJudgment,
+  MintingDurabilityJudgment,
+  PrerequisiteConceptContext,
+  PrerequisiteJudgment,
+  RescueDurabilityJudgment
+} from "@lrnki/domain-core";
+import type { MintingDurabilityJudgmentPort, PrerequisiteJudgmentPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "./stageTags";
 import {
   batchedPrerequisiteJudgmentSchema,
   batchedPrerequisiteJudgmentValidator,
+  mintingDurabilityJudgmentSchema,
+  mintingDurabilityJudgmentValidator,
   rescueDurabilityJudgmentSchema,
   rescueDurabilityJudgmentValidator
 } from "./toolSchemas";
@@ -13,6 +21,10 @@ import {
 // independent `kg-independent-judge` alias (gpt-oss-120b) so the DeepSeek generator
 // never grades rescue durability. Goes through LiteLLM, never a raw provider.
 export const RESCUE_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
+
+// Cross-family minting durability judge. Shares the independent alias with rescue
+// durability so the DeepSeek proposer/generator never grades its own mint proposal.
+export const MINTING_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 
 // LiteLLM alias for the third operation (Graph Enrichment, ADR-0019 amended). Each
 // subject node is judged against its same-domain candidates in one batched call
@@ -222,5 +234,56 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
     });
 
     return { verdict: result.verdict, groundingSpan: result.groundingSpan, rationale: result.rationale };
+  }
+}
+
+// Bounded minting-durability judge. Forced named tool schema, deterministic decoding;
+// one decision per proposed assumed-prerequisite label against the anchor it would
+// scaffold. Thin LLM caller only: validation happens here, while the application stage
+// owns the precision-first drop and fail-open handling.
+export class LiteLlmMintingDurabilityJudgmentAdapter implements MintingDurabilityJudgmentPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = MINTING_DURABILITY_JUDGE_MODEL) {
+    this.model = model;
+  }
+
+  async judge(input: {
+    declaredDomain: string;
+    proposal: { proposedLabel: string; rationale: string };
+    anchor: { canonicalLabel: string; definitionQuotes: string[] };
+  }): Promise<MintingDurabilityJudgment> {
+    const system = [
+      "You judge whether a proposed assumed-prerequisite concept is DURABLE enough to mint as a learning prerequisite node for a learner-neutral concept graph.",
+      "The proposal was generated before grounding. It would become a derived prerequisite node scaffolding the anchor concept below — a concept the source teaches in full.",
+      "Decide: must a learner genuinely understand the proposed concept as its own unit of domain knowledge before the anchor, or is it tangential to this anchor — merely named in passing, a cross-reference, comparison, aside, or label dropped without being developed?",
+      "Weigh whether the anchor material genuinely DEPENDS on the proposed concept versus merely being adjacent to it. The source develops a prerequisite when it returns to it, explains or builds on it, or treats it as something the reader must carry forward. It names a concept in passing when it appears as an aside, cross-reference, comparison, or label and is dropped without being developed. A concept only named in passing is NOT a durable prerequisite for this anchor — even if it is a genuine, important concept in some other source.",
+      "Judge from the proposed concept's MEANING, the proposal rationale, and its relationship to the anchor. Never use surface wordform, lexical patterns, or a fixed list of terms.",
+      "Precision-first: this is a veto that removes proposals, so return 'not_durable' ONLY on a clear judgment. When genuinely unsure, return 'durable' and let the proposal stand."
+    ].join("\n");
+    const definitionLines = input.anchor.definitionQuotes.length
+      ? input.anchor.definitionQuotes.map((quote, index) => `  [${index + 1}] "${quote}"`)
+      : ["  (none)"];
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Proposed assumed-prerequisite concept: "${input.proposal.proposedLabel}".`,
+      `Proposal rationale: ${input.proposal.rationale}`,
+      `Anchor concept this proposal would scaffold: "${input.anchor.canonicalLabel}".`,
+      "Anchor definition quotes:",
+      ...definitionLines,
+      "",
+      "Call submit_minting_durability_judgment: is this proposed concept durable for the anchor, or not durable?"
+    ].join("\n");
+
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_minting_durability_judgment",
+      toolDescription: "Submit whether the proposed assumed-prerequisite concept is durable for the anchor.",
+      parameters: mintingDurabilityJudgmentSchema,
+      validator: mintingDurabilityJudgmentValidator,
+      tags: [STAGE_TAGS.mintingDurability]
+    });
+
+    return { verdict: result.verdict, rationale: result.rationale };
   }
 }

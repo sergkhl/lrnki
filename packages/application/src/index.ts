@@ -25,6 +25,7 @@ export {
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
+export { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 export { computeLearnerPath } from "./computeLearnerPath";
 export { generateStudyItemBank, type StudyItemBankGenerationResult, type RejectedStudyItem } from "./generateStudyItemBank";
 export {

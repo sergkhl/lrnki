@@ -76,18 +76,23 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // Held in a ref so the tap handler is bound ONCE in the layout effect (keyed on topology)
   // without re-running layout when the callback identity changes each render.
   const onNodeSelectRef = useRef(onNodeSelect);
-  onNodeSelectRef.current = onNodeSelect;
+  useEffect(() => {
+    onNodeSelectRef.current = onNodeSelect;
+  }, [onNodeSelect]);
+  const selectedFrontierTarget = adapted?.selectedFrontierTarget;
   // The learner's working region (KTD2): the frontier target's 1-hop closed neighborhood,
   // or undefined when there's no classification (neutral enrichment page → fit-to-all).
   // Recomputed only when the target or topology changes.
   const focusNodeIds = useMemo(
-    () => (adapted?.selectedFrontierTarget ? frontierNeighborhood(adapted.selectedFrontierTarget, detail.edges) : undefined),
-    [adapted?.selectedFrontierTarget, detail.edges]
+    () => (selectedFrontierTarget ? frontierNeighborhood(selectedFrontierTarget, detail.edges) : undefined),
+    [selectedFrontierTarget, detail.edges]
   );
   // Read in the layout effect (keyed on topology only) without making it a dependency, so a
   // frontier advance never re-runs layout — it recenters via the viewport-only effect below.
   const focusRef = useRef(focusNodeIds);
-  focusRef.current = focusNodeIds;
+  useEffect(() => {
+    focusRef.current = focusNodeIds;
+  }, [focusNodeIds]);
   // Guards the recenter effect: initial framing is owned by the focus-fit at the end of the
   // layout pass, and later frontier advances are viewport-only.
   const layoutReadyRef = useRef(false);
@@ -626,6 +631,26 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground">No rescue candidates were durability-judged in this run.</p>
+                )}
+              </CollapsibleSection>
+              <CollapsibleSection title="Minting durability">
+                {detail.mintingDispositions.length > 0 ? (
+                  <ul className="flex flex-col gap-1">
+                    {detail.mintingDispositions.map((disposition) => (
+                      <li key={disposition.derivedNodeId} className="flex flex-col gap-1 rounded-md border px-2 py-1.5 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-medium">{disposition.proposedLabel}</span>
+                          <Badge variant={disposition.disposition === "dropped" ? "destructive" : disposition.disposition === "accepted" ? "default" : "secondary"}>
+                            {disposition.disposition}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">anchor {disposition.anchorConceptId}</span>
+                        {disposition.rationale ? <span className="text-xs text-muted-foreground italic">{disposition.rationale}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No minting proposals were durability-judged in this run.</p>
                 )}
               </CollapsibleSection>
               <CollapsibleSection title="Semantic merges">

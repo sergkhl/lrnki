@@ -131,12 +131,6 @@ model_list:
       input_cost_per_token: 0.00000002
 
   # # OpenRouter Models
-  - model_name: "openrouter/qwen/qwen3-embedding-4b"
-    litellm_params:
-      model: "openrouter/qwen/qwen3-embedding-4b"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000002
-
   - model_name: "openrouter/qwen/qwen3-embedding-8b"
     litellm_params:
       model: "openrouter/qwen/qwen3-embedding-8b"
@@ -184,6 +178,16 @@ model_list:
     litellm_params:
       model: "openrouter/xiaomi/mimo-v2.5"
       api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: "openrouter/xiaomi/mimo-v2.5-pro"
+    litellm_params:
+      model: "openrouter/xiaomi/mimo-v2.5-pro"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
 
   # - model_name: "openrouter/mistralai/mistral-small-2603"
   #   litellm_params:

@@ -80,19 +80,23 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     if (!pendingAdvanceRef.current || session === sessionAtAnswerRef.current) return;
     pendingAdvanceRef.current = false;
     const target = nextStudyTarget(session.classification);
+    let frame: number;
     if (target === null) {
-      autoAdvanceDismissGuardRef.current = false;
-      if (!session.isFoundationalRoot) {
-        setSheetOpen(false);
-        setSelectedNodeId(null);
-      }
+      frame = requestAnimationFrame(() => {
+        autoAdvanceDismissGuardRef.current = false;
+        if (!session.isFoundationalRoot) {
+          setSheetOpen(false);
+          setSelectedNodeId(null);
+        }
+      });
     } else {
-      setSelectedNodeId(target);
-      setSheetOpen(true);
-      requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        setSelectedNodeId(target);
+        setSheetOpen(true);
         autoAdvanceDismissGuardRef.current = false;
       });
     }
+    return () => cancelAnimationFrame(frame);
   }, [session]);
 
   const onVerdict = (verdict: Verdict) => {

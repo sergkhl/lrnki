@@ -305,6 +305,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       dispositions: [],
       groundingDispositions: [],
       rescueDispositions: [],
+      mintingDispositions: [],
       nodeMerges: []
     };
     const store = new PostgresEnrichmentRunStore(sql);
@@ -381,6 +382,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     // the rescued (source_mentioned) pair stays on the DeepSeek alias.
     const ctx = (id: string, label: string) => ({ derivedNodeId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
     const droppedId = randomUUID();
+    const droppedMintingId = randomUUID();
     const absorbedMergeId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
       judgments: [
@@ -392,6 +394,10 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     ], rescueDispositions: [
       { derivedNodeId: rescuedId, canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
       { derivedNodeId: droppedId, canonicalLabel: "Table 3 Ablation", normalizedLabel: "table 3 ablation", declaredDomain: "software engineering", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
+    ],
+    mintingDispositions: [
+      { derivedNodeId: mintedId, proposedLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "accepted", rationale: "durable prerequisite" },
+      { derivedNodeId: droppedMintingId, proposedLabel: "Incidental Label", normalizedLabel: "incidental label", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "dropped", rationale: "tangential to the anchor" }
     ],
     // U4: one merge — the anchor (surviving canonical, FK-resolved) absorbed a removed
     // near-duplicate enrichment node (absorbed id correlation-only, no FK violation).
@@ -430,6 +436,19 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const dropped = dispositions.find((d) => d.derived_node_id === droppedId);
     assert.equal(dropped?.disposition, "dropped");
     assert.equal(dropped?.rationale, "incidental artifact");
+
+    // Minting dispositions persisted and read back, including the dropped proposal that
+    // has no derived_graph_nodes row because grounding was never generated.
+    const mintingDispositions = await sql<{ derived_node_id: string; proposed_label: string; anchor_concept_id: string; disposition: string; rationale: string }[]>`
+      SELECT derived_node_id, proposed_label, anchor_concept_id, disposition, rationale
+      FROM minting_dispositions WHERE enrichment_id = ${enrichmentId} ORDER BY proposed_label`;
+    assert.equal(mintingDispositions.length, 2);
+    assert.equal(mintingDispositions.find((d) => d.derived_node_id === mintedId)?.disposition, "accepted");
+    const droppedMinting = mintingDispositions.find((d) => d.derived_node_id === droppedMintingId);
+    assert.equal(droppedMinting?.disposition, "dropped");
+    assert.equal(droppedMinting?.proposed_label, "Incidental Label");
+    assert.equal(droppedMinting?.anchor_concept_id, anchorId);
+    assert.equal(droppedMinting?.rationale, "tangential to the anchor");
 
     // U4: the merge record persisted — canonical FK resolves to a surviving node, the
     // absorbed (removed) id persists without an FK violation, and the snapshot columns

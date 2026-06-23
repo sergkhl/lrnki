@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const LOCAL_DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
   dateStyle: "medium",
@@ -15,12 +15,14 @@ export function formatLocalDateTime(iso: string): string {
   return new Intl.DateTimeFormat(undefined, LOCAL_DATE_TIME_OPTIONS).format(new Date(iso));
 }
 
-export function LocalDateTime({ iso }: Readonly<{ iso: string }>) {
-  const [label, setLabel] = useState(() => formatUtcFallback(iso));
+const subscribeToNoopStore = () => () => {};
 
-  useEffect(() => {
-    setLabel(formatLocalDateTime(iso));
-  }, [iso]);
+export function LocalDateTime({ iso }: Readonly<{ iso: string }>) {
+  const label = useSyncExternalStore(
+    subscribeToNoopStore,
+    () => formatLocalDateTime(iso),
+    () => formatUtcFallback(iso)
+  );
 
   return <time dateTime={iso}>{label}</time>;
 }

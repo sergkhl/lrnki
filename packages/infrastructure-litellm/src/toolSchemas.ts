@@ -597,6 +597,34 @@ export const rescueDurabilityJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Minting durability judgment: submit_minting_durability_judgment -------
+// One bounded judgment over a single proposed assumed-prerequisite label before
+// grounding generation. The model decides whether the proposed label is a DURABLE
+// prerequisite for the anchor or merely tangential/named in passing. Decision-only:
+// there is no generated-node source span to ground against, so the application stage
+// owns drop-only fail-open semantics. Domain-neutral rubric — no fixture-specific
+// labels, lexical lists, or surface patterns (AGENTS rules 16/17).
+
+export const mintingDurabilityJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdict", "rationale"],
+  properties: {
+    verdict: {
+      type: "string",
+      enum: ["durable", "not_durable"],
+      description:
+        "'durable' when the proposed concept is a genuine foundational prerequisite the anchor's material depends on — a transferable unit of domain knowledge a learner should understand first. 'not_durable' when the proposed concept is tangential to this anchor, merely named in passing, a cross-reference/comparison/aside, or a label dropped without being developed. Judge from the proposed concept's meaning, the anchor's meaning, and the proposal rationale, never from surface wordform or a fixed list. When genuinely unsure, prefer 'durable' because this is a precision-first drop-only veto."
+    },
+    rationale: { type: "string", description: "One terse sentence explaining why the proposal is durable or not durable for this anchor." }
+  }
+};
+
+export const mintingDurabilityJudgmentValidator = z.object({
+  verdict: z.enum(["durable", "not_durable"]),
+  rationale: z.string().min(1)
+}).strict();
+
 // --- Node merge adjudication: submit_node_merge_decision (U2, R3/R4) ----------
 // The DECIDE half of semantic dedup (AGENTS rule 20). Embedding cosine PROPOSED that
 // two same-domain nodes may be near-duplicates; this judge decides whether they are two
