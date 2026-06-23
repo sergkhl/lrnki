@@ -52,13 +52,24 @@ function renderConcept(role: string, context: PrerequisiteConceptContext): strin
 
 const normalizeLabel = (label: string) => label.trim().toLowerCase();
 
-// Batched prerequisite-judgment adapter (ADR-0019 amended, plan U4/KTD1). Forced named
-// tool schema; the model returns, per candidate, a DIRECTION between the SUBJECT and
-// that candidate (or none/uncertain) from both concepts' published CEPs. This adapter
-// maps each result to a typed PrerequisiteJudgment fail-closed, IN INPUT-CANDIDATE
-// ORDER, so coverage is exhaustive (R5) and the trace is replay-deterministic (R8).
-// One batched call replaces the per-candidate fan-out; the judge proposes, deterministic
-// cycle removal + transitive reduction dispose downstream.
+// Batched prerequisite-judgment adapter (ADR-0019 amended, plan U4/KTD1, parity fix
+// TODO #6 option 1). Forced named tool schema; the model judges each pairing of one
+// fixed Concept A against every Concept B (or none/uncertain) from both concepts'
+// published CEPs. This adapter maps each result to a typed PrerequisiteJudgment
+// fail-closed, IN INPUT-CANDIDATE ORDER, so coverage is exhaustive (R5) and the trace
+// is replay-deterministic (R8). One batched call replaces the per-candidate fan-out;
+// the judge proposes, deterministic cycle removal + transitive reduction dispose
+// downstream.
+//
+// SYMMETRIC FRAMING (parity). The earlier batched prompt framed an asymmetric
+// SUBJECT-vs-CANDIDATE relation; the U7 rule-14 gate proved that role asymmetry alone
+// flipped edges as pure direction reversals against the per-pair baseline, even at one
+// candidate per call. Because the per-pair loop judged node i (Concept A) against node
+// j>i (Concept B), the batch's subject==Concept A and each candidate==Concept B align
+// POSITIONALLY with that loop. So each {A, B} pair is now presented in the same neutral
+// A/B framing the per-pair judge used — neither side privileged, A/B labeling carrying
+// no directional meaning — restoring parity while keeping ONE batched tool call. The
+// candidate cap (maxCandidatesPerBatch) bounds the residual listwise effect (KTD3).
 export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentPort {
   readonly model: string;
   constructor(private readonly client: LiteLlmForcedToolClient, model: string = PREREQUISITE_JUDGE_MODEL) {
@@ -71,26 +82,27 @@ export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentP
     candidates: PrerequisiteConceptContext[];
   }): Promise<BatchedPrerequisiteJudgment> {
     const system = [
-      "You judge LEARNING PREREQUISITE order between one SUBJECT concept and each of several CANDIDATE concepts, for a learner-neutral concept graph.",
+      "You judge LEARNING PREREQUISITE order between two domain concepts for a learner-neutral concept graph.",
       "Concept X is a prerequisite of concept Y when a learner must understand X before they can understand Y.",
+      "You are given one Concept A and a list of Concept B's from the same domain. Judge EACH pair {Concept A, that Concept B} independently, as two domain concepts where NEITHER side is privileged — the A/B labeling and listing order carry no directional meaning. Decide each pair exactly as you would if it were the only pair given.",
       "Decide from the concepts' meanings and the cited source evidence ONLY. Do not invent relations the evidence and meanings do not support.",
-      "For EACH candidate, judge its relation to the subject independently and be conservative and precision-first:",
-      "- Return relation 'none' when neither the subject nor that candidate must be understood before the other (they are siblings, alternatives, or merely related).",
+      "Be conservative and precision-first:",
+      "- Return relation 'none' when neither concept in the pair must be understood before the other (they are siblings, alternatives, or merely related).",
       "- Return relation 'uncertain' when a prerequisite relation is plausible but the direction is not clearly established. 'uncertain' is flagged for human review and excluded from learner paths, so prefer it over guessing a direction.",
-      "- Return relation 'prerequisite' ONLY when the dependency is clear; then copy the EXACT canonical label of the concept that must be understood FIRST into prerequisiteLabel (it must equal either the subject label or that candidate's label).",
-      "Identify each judgment's candidate by copying its exact label into candidateRef. Return exactly one judgment per provided candidate.",
+      "- Return relation 'prerequisite' ONLY when the dependency is clear; then copy the EXACT canonical label of the concept that must be understood FIRST into prerequisiteLabel (it must equal either Concept A's label or that Concept B's label).",
+      "Identify each judgment's Concept B by copying its exact label into candidateRef. Return exactly one judgment per provided Concept B.",
       "Prerequisite is about conceptual dependency for learning, not temporal order in a process and not part-whole membership alone.",
       "Set confidence honestly in [0,1]; reserve high confidence for clearly-established directions."
     ].join("\n");
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
       "",
-      renderConcept("SUBJECT concept", input.subject),
+      renderConcept("Concept A", input.subject),
       "",
-      "CANDIDATE concepts:",
-      ...input.candidates.map((candidate) => ["", renderConcept("CANDIDATE", candidate)].join("\n")),
+      "Each of the following is a Concept B. Judge each pair {Concept A, Concept B} on its own:",
+      ...input.candidates.map((candidate) => ["", renderConcept("Concept B", candidate)].join("\n")),
       "",
-      "Call submit_prerequisite_judgments with one judgment per candidate. For each, set candidateRef to that candidate's exact label; if one concept must be understood first, set relation='prerequisite' and put that concept's exact label in prerequisiteLabel."
+      "Call submit_prerequisite_judgments with one judgment per Concept B. For each pair, set candidateRef to that Concept B's exact label; if one concept must be understood first, set relation='prerequisite' and put that concept's exact label in prerequisiteLabel (Concept A's label or that Concept B's label)."
     ].join("\n");
 
     const result = await this.client.call({
