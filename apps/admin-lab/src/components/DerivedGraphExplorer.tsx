@@ -628,6 +628,28 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
                   <p className="text-sm text-muted-foreground">No rescue candidates were durability-judged in this run.</p>
                 )}
               </CollapsibleSection>
+              <CollapsibleSection title="Semantic merges">
+                {detail.merges.length > 0 ? (
+                  <ul className="flex flex-col gap-1">
+                    {detail.merges.map((merge) => (
+                      <li key={`${merge.canonicalDerivedNodeId}:${merge.absorbedLabel}`} className="flex flex-col gap-1 rounded-md border px-2 py-1.5 text-sm">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate">
+                            <span className="font-medium">{merge.canonicalLabel}</span>
+                            <span className="text-muted-foreground"> ← {merge.absorbedLabel}</span>
+                          </span>
+                          <Badge variant="secondary" title={`${merge.proposingSignal} · ${merge.canonicalSelectionReason}`}>
+                            {merge.proposingScore.toFixed(2)}
+                          </Badge>
+                        </div>
+                        {merge.rationale ? <span className="text-xs text-muted-foreground italic">{merge.rationale}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No semantic merges in this run.</p>
+                )}
+              </CollapsibleSection>
             </div>
           </ScrollArea>
         </SheetContent>

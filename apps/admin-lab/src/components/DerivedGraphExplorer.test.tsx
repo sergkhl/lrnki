@@ -39,6 +39,9 @@ const detail: DerivedGraphDetail = {
   rescueDispositions: [
     { derivedNodeId: "scope", canonicalLabel: "Variable scope", declaredDomain: "rust", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
     { derivedNodeId: "ablation", canonicalLabel: "Table 3 Ablation", declaredDomain: "rust", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
+  ],
+  merges: [
+    { declaredDomain: "rust", canonicalDerivedNodeId: "ownership", canonicalLabel: "Ownership", absorbedLabel: "Ownership (Rust)", absorbedAliases: ["owning"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
   ]
 };
 
@@ -55,6 +58,24 @@ test("cytoscape and textual views describe the same nodes and edges", () => {
     ["Variable scope", "Ownership"],
     ["Ownership", "Move semantics"]
   ]);
+});
+
+// U5: each semantic merge is surfaced in the equivalent textual readout with canonical
+// label, absorbed label, proposing signal, and score, so a non-visual reader sees it.
+test("semantic merges appear in the textual output", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.equal(view.textual.merges.length, 1);
+  const merge = view.textual.merges[0];
+  assert.equal(merge.canonicalLabel, "Ownership");
+  assert.equal(merge.absorbedLabel, "Ownership (Rust)");
+  assert.equal(merge.proposingSignal, "embedding_cosine");
+  assert.ok(Math.abs(merge.proposingScore - 0.97) < 1e-9);
+  assert.equal(merge.canonicalSelectionReason, "anchor_over_enrichment");
+});
+
+test("an empty merges list yields an empty textual merges array", () => {
+  const view = buildDerivedGraphView({ ...detail, merges: [] });
+  assert.deepEqual(view.textual.merges, []);
 });
 
 test("uncertain edges are flagged in both representations", () => {

@@ -1,5 +1,5 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView, RescueDispositionView } from "./derivedGraph";
+import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView, NodeMergeView, RescueDispositionView } from "./derivedGraph";
 import { summarizeOriginCounts } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
@@ -81,6 +81,16 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       WHERE enrichment_id = ${header.enrichment_id}
       ORDER BY declared_domain, disposition, canonical_label`;
 
+    // Semantic merges (U5): the relational mirror of the run trace's merge records.
+    // Read-only, no recompute (rule 12). The absorbed node was removed from the layer, so
+    // its label/aliases/evidence come from the snapshot columns.
+    const mergeRows = await sql<{ declared_domain: string; canonical_derived_node_id: string; canonical_label: string; absorbed_label: string; absorbed_aliases: string[]; proposing_signal: string; proposing_score: number; rationale: string; canonical_selection_reason: string }[]>`
+      SELECT declared_domain, canonical_derived_node_id, canonical_label, absorbed_label, absorbed_aliases,
+             proposing_signal, proposing_score, rationale, canonical_selection_reason
+      FROM derived_node_merges
+      WHERE enrichment_id = ${header.enrichment_id}
+      ORDER BY declared_domain, canonical_label, absorbed_label`;
+
     // Grounding bundles + passages for the enrichment nodes (R8, R15). The verbatim
     // disposition (R9, AE3) is read from the recorded run trace, falling back to the
     // grounding-origin invariant when the trace is absent.
@@ -156,8 +166,19 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       rationale: row.rationale,
       groundingSpan: row.grounding_span
     }));
+    const merges: NodeMergeView[] = mergeRows.map((row) => ({
+      declaredDomain: row.declared_domain,
+      canonicalDerivedNodeId: row.canonical_derived_node_id,
+      canonicalLabel: row.canonical_label,
+      absorbedLabel: row.absorbed_label,
+      absorbedAliases: Array.isArray(row.absorbed_aliases) ? row.absorbed_aliases : [],
+      proposingSignal: row.proposing_signal,
+      proposingScore: Number(row.proposing_score),
+      rationale: row.rationale,
+      canonicalSelectionReason: row.canonical_selection_reason
+    }));
 
-    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions };
+    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions, merges };
   });
 }
 

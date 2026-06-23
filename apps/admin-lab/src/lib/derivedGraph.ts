@@ -85,6 +85,24 @@ export interface RescueDispositionView {
   groundingSpan: string;
 }
 
+// One recorded semantic merge (plan U5, R5). The embedding proposer surfaced two
+// same-domain near-duplicates and the cross-family adjudicator decided to collapse them;
+// the canonical node survived and the absorbed node (a snapshot — its derived_graph_nodes
+// row is gone) was folded in. Surfaced read-only so an operator audits every merge:
+// canonical ← absorbed, the proposing signal + score, the deciding rationale, and the
+// deterministic canonical-selection reason. Inspect, never recompute (rule 12).
+export interface NodeMergeView {
+  declaredDomain: string;
+  canonicalDerivedNodeId: string;
+  canonicalLabel: string;
+  absorbedLabel: string;
+  absorbedAliases: string[];
+  proposingSignal: string;
+  proposingScore: number;
+  rationale: string;
+  canonicalSelectionReason: string;
+}
+
 export interface EnrichmentSummary {
   enrichmentId: string;
   graphVersionId: string;
@@ -104,10 +122,11 @@ export interface DerivedGraphDetail {
   summary: EnrichmentSummary;
   nodes: DerivedGraphNode[];
   edges: DerivedGraphEdge[];
-  // Per-domain provenance summary and the rescue-durability dispositions (U5). Both
-  // are read from persisted artifacts; the UI never recomputes them (rule 12).
+  // Per-domain provenance summary, the rescue-durability dispositions, and the semantic
+  // merges (U5). All read from persisted artifacts; the UI never recomputes them (rule 12).
   originCounts: DomainOriginCounts[];
   rescueDispositions: RescueDispositionView[];
+  merges: NodeMergeView[];
 }
 
 // Aggregate the derived node space into per-domain origin counts (U5/AE1). Pure and
@@ -160,6 +179,10 @@ export interface DerivedGraphView {
       uncertain: boolean;
       judgeModel: string;
     }[];
+    // The semantic merges (U5), surfaced in the equivalent textual readout so a
+    // non-visual reader (or a test) can see each canonical ← absorbed collapse with its
+    // proposing signal + score.
+    merges: NodeMergeView[];
   };
 }
 
@@ -324,7 +347,8 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         confidence: edge.confidence,
         uncertain: edge.uncertain,
         judgeModel: edge.judgeModel
-      }))
+      })),
+      merges: detail.merges
     }
   };
 }
