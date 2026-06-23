@@ -303,8 +303,10 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
-    nodeEmbedding: ctx.nodeEmbedding,
-    nodeMergeAdjudicator: ctx.nodeMergeAdjudicator,
+    // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
+    // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
+    nodeEmbedding: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeEmbedding,
+    nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
     // Surface enrichment sub-stage wall-clock through the same structured sink as the

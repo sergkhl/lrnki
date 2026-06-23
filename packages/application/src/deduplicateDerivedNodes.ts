@@ -47,7 +47,13 @@ export type DedupConfig = {
 };
 
 export const DEFAULT_DEDUP_CONFIG: DedupConfig = {
-  similarityThreshold: 0.8,
+  // Recall-generous floor (R2): the adjudicator, not this threshold, is the precision
+  // gate. Calibrated to the qwen3-embedding-8b cosine scale in the U7 rule-14 probe,
+  // where genuine same-concept near-duplicates scored ≥ 0.72 and clearly-distinct
+  // same-domain concepts scored ≤ 0.66 — a model-scale calibration, not fixture-fitting.
+  // The probe confirmed the adjudicator keeps a borderline proposed pair distinct, so a
+  // generous floor only adds adjudication calls, never a wrong merge.
+  similarityThreshold: 0.7,
   maxPairsPerNode: 4,
   maxEvidencePerNode: 3,
   adjudicationConcurrency: 4

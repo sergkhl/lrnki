@@ -37,25 +37,25 @@ the mixed-domain run.
 
 ## TODO
 
-1. **Concept deduplication + rescue precision (enrichment node quality) — highest learner-facing
-   defect.** Real two-source enrichment (`0a7ed566`) shows the same idea split into two nodes ordered
-   incoherently: economics anchor "Propensity to Truck, Barter, and Exchange" beside rescued "Barter and
-   Exchange"; "Owner" beside "Ownership (Rust)"; "Move semantics" beside rescued "Function ownership
-   mechanics: move and copy". Exact-normalized-label identity never merges these. Now actionable because
-   the blanket no-embeddings ban is withdrawn (ADR-0012, rule 20). **Brainstormed into a requirements
-   doc** (`docs/brainstorms/2026-06-23-enrichment-concept-dedup-and-rescue-precision-requirements.md`):
-   dedup runs on the **derived layer**, not published canonicalization — the majority defect is
-   anchor↔Enrichment-Node, which canonicalization cannot merge (an Enrichment Node is never asserted),
-   and an uncertain semantic-merge judgment (rule 19) belongs in the regenerable layer rather than
-   hardened into stable Concept IRIs. This is the single buildable arc to ship and inspect first.
-   - Add a **measured semantic-deduplication pass**: embeddings (or an LLM) *propose* same-domain
-     near-duplicate candidates; a separate adjudicator (LLM judge or recorded rule) *decides* and records
-     every merge — never raw-cosine auto-merge, never propose-and-decide in one mechanism (rule 20,
-     ADR-0012/0015). Evaluate against the current exact-label baseline by real-use inspection (rule 14).
-   - **Tighten rescue durability** so incidental mentions do not become high-confidence prerequisites:
-     e.g. RAII is currently a 0.95 prerequisite of `drop function` in `0a7ed566` despite being a passing
-     cross-language aside. Strengthen the measured durability judge (drop-only, rule 16), do not add a
-     lexical veto or fixture-specific list (rules 16/17).
+1. **Minting precision: develops-vs-named-in-passing durability for ASSUMED-PREREQUISITE minting
+   (residual of the shipped dedup+rescue work).** The semantic-dedup pass and the **rescue-path** RAII
+   fix shipped on `feat/enrichment-dedup-rescue-precision` (see COMPLETED + report
+   `tmp/2026-06-23-dedup-rescue-rule14-evaluation.md`). The U7 re-run surfaced that the SAME RAII
+   spurious gate can still arise through the **minting** path, which that plan did not scope: the
+   assumed-prerequisite proposal pass minted `RAII (Resource Acquisition Is Initialization)` as an
+   `llm_grounded` node and the prerequisite judge then ordered `RAII → drop` at 0.85 — the original
+   `0a7ed566` defect, via minting rather than rescue. Which path RAII takes is non-deterministic
+   run-to-run. U6 sharpened only the rescue durability judge; minting has no develops-vs-named-in-passing
+   durability check of its own.
+   - Give the **minting proposal pass** the same measured, drop-only durability discipline the rescue
+     path now has (a concept the source only NAMES in passing should not be minted as an assumed
+     prerequisite), or gate minted nodes through the same durability judge. Domain-neutral rubric only;
+     no lexical veto or fixture-specific list (rules 16/17). Evaluate by real-use inspection (rule 14)
+     against the `0a7ed566` sources — confirm `RAII → drop` no longer appears via either path.
+   - The dedup-merge collapse is verified against real models by the rule-14 probe + unit tests but has
+     not yet fired in-pipeline (the duplicate-bearing extraction did not reproduce under MoE
+     non-determinism). Inspect Admin Lab "Semantic merges" on future multi-source runs that do surface
+     anchor↔rescued duplicates to confirm in-pipeline behavior opportunistically.
 
 2. **Replace exhaustive O(n²) pairwise prerequisite judging with a whole-set global ordering (measured
    experiment).** Pairwise LLM judgment is intransitive by nature (A→B→C→A), which is *why* the certain
@@ -148,6 +148,33 @@ the mixed-domain run.
      baseline.
 
 ## COMPLETED
+
+- **Enrichment semantic dedup + rescue precision (2026-06-23, branch `feat/enrichment-dedup-rescue-precision`,
+  stacked on `feat/enrichment-perf-batched-judging`).** Plan
+  `docs/plans/2026-06-23-002-feat-enrichment-dedup-rescue-precision-plan.md`; rule-14 report
+  `tmp/2026-06-23-dedup-rescue-rule14-evaluation.md`. All units U1–U7 shipped, typecheck/test-clean,
+  committed.
+  - **Semantic-deduplication sub-stage (U1–U5):** a measured derived-layer pass that collapses
+    same-domain near-duplicate nodes before per-node judging, strictly separating PROPOSE from DECIDE
+    (rule 20). Embeddings (`kg-node-embedding` / qwen3-embedding-8b) propose within-domain candidate
+    pairs by cosine; a cross-family adjudicator (`kg-independent-judge` / gpt-oss-120b) decides each
+    `merge`/`keep_distinct`; raw cosine never decides. Deterministic canonical selection (anchor always
+    wins → never absorbs a published Concept; then evidence count, then stable id), union-find for
+    transitive clusters, absorbed evidence threaded into the canonical's judge context, full provenance
+    persisted to `derived_node_merges` and shown in Admin Lab "Semantic merges". Fail-closed everywhere
+    (embedding failure skips a domain; adjudicator failure → keep_distinct), opt-in, `enrichmentConfigHash`
+    → `dedup-v1`. New deterministic-envelope tests only (rules 11/19); no test asserts a merge verdict.
+  - **Rescue durability sharpened (U6):** added a domain-neutral develops-vs-named-in-passing axis to the
+    drop-only rescue judge. **U7 verified the RAII rescue-path defect is fixed** — RAII dropped as "only
+    mentioned once as a C++ comparison and not explained or built upon"; ~40 other passing asides dropped
+    with the same reasoning; only source-developed concepts accepted.
+  - **Threshold calibration (U7):** `DEFAULT_DEDUP_CONFIG.similarityThreshold` 0.8 → 0.7 (recall-generous
+    per R2; model-scale calibration to qwen3-embedding cosine, not fixture-fitting — genuine duplicates
+    ≥0.72, distinct ≤0.66). A real-model probe (`tmp/u7-dedup-probe.ts`) merged a genuine anchor↔variant
+    duplicate (Ownership ← Ownership (Rust), 0.87, anchor canonical) and kept a borderline pair
+    (move/Move semantics, 0.72) distinct — confirming the adjudicator owns precision.
+  - **Residual (now TODO #1):** the same RAII gate can still arise via the **minting** path (baseline
+    minted RAII → `drop` at 0.85); U6 fixed only the rescue path. Minting-precision durability is queued.
 
 - **Enrichment batched judging + determinism governance pivot (2026-06-23, branch `feat/enrichment-perf-batched-judging`).**
   - **Per-node batched judging shipped (U1–U7):** replaced per-pair prerequisite judging with one batched
