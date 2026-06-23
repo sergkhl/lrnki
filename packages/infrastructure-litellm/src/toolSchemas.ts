@@ -310,46 +310,69 @@ export const conceptEvidenceProfileValidator = z.object({
   }).strict())
 }).strict();
 
-// --- Prerequisite judgment: submit_prerequisite_judgment ------------------
-// One bounded judgment over a single gated concept pair (ADR-0019). The model
-// returns a DIRECTION between the two named concepts, not free-form edges; the
-// application boundary maps it to a directed/none/uncertain edge fail-closed.
+// --- Batched prerequisite judgment: submit_prerequisite_judgments ---------
+// One bounded BATCHED judgment over a subject concept and a list of same-domain
+// candidates (ADR-0019 amended, plan U4/KTD1). For each candidate the model returns a
+// DIRECTION between the subject and that candidate, not free-form edges; the
+// application boundary maps each to a directed/none/uncertain edge fail-closed.
 
 const PREREQUISITE_RELATION = ["prerequisite", "none", "uncertain"] as const;
 
 // The judge NAMES the prerequisite concept rather than emitting a positional
-// 'a-is-prerequisite-of-b' token. A real run showed the model reasons correctly but
-// systematically anchors the positional token on the A-side, producing edges that
-// contradict their own rationale. Copying the verbatim label of the concept that
+// 'subject-is-prerequisite-of-candidate' token. A real run showed the model reasons
+// correctly but systematically anchors a positional token on one side, producing edges
+// that contradict their own rationale. Copying the verbatim label of the concept that
 // must be understood FIRST removes the positional mapping the model gets wrong; the
-// application matches the label against the two provided concepts and fails closed
-// to 'uncertain' (flagged, path-excluded) when it names neither — never a guess.
-export const prerequisiteJudgmentSchema: JsonSchema = {
+// application matches the label against the subject and the named candidate and fails
+// closed to 'uncertain' (flagged, path-excluded) when it names neither — never a guess.
+// Each result identifies its candidate by `candidateRef` = the candidate's verbatim
+// canonical label (unique within a same-domain batch under ADR-0015 dedup); a
+// candidateRef matching no provided candidate is dropped fail-closed, never guessed.
+export const batchedPrerequisiteJudgmentSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["relation", "prerequisiteLabel", "confidence", "rationale"],
+  required: ["relations"],
   properties: {
-    relation: {
-      type: "string",
-      enum: [...PREREQUISITE_RELATION],
+    relations: {
+      type: "array",
       description:
-        "'prerequisite' when one concept must be understood before the other; 'none' when neither is a learning prerequisite of the other; 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
-    },
-    prerequisiteLabel: {
-      type: "string",
-      description:
-        "When relation='prerequisite', the EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. It must equal one of the two provided concept labels. Empty string for 'none' or 'uncertain'."
-    },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
-    rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+        "One judgment per candidate concept: the learning-prerequisite direction between the SUBJECT concept and that candidate. Include every provided candidate exactly once.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["candidateRef", "relation", "prerequisiteLabel", "confidence", "rationale"],
+        properties: {
+          candidateRef: {
+            type: "string",
+            description: "The EXACT canonical label (copied verbatim) of the candidate concept this judgment is about. Must equal one of the provided candidate labels."
+          },
+          relation: {
+            type: "string",
+            enum: [...PREREQUISITE_RELATION],
+            description:
+              "'prerequisite' when one of the subject/candidate must be understood before the other; 'none' when neither is a learning prerequisite of the other; 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
+          },
+          prerequisiteLabel: {
+            type: "string",
+            description:
+              "When relation='prerequisite', the EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. It must equal either the subject label or this candidate's label. Empty string for 'none' or 'uncertain'."
+          },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+          rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+        }
+      }
+    }
   }
 };
 
-export const prerequisiteJudgmentValidator = z.object({
-  relation: z.enum(PREREQUISITE_RELATION),
-  prerequisiteLabel: z.string(),
-  confidence: z.number().min(0).max(1),
-  rationale: z.string().min(1)
+export const batchedPrerequisiteJudgmentValidator = z.object({
+  relations: z.array(z.object({
+    candidateRef: z.string().min(1),
+    relation: z.enum(PREREQUISITE_RELATION),
+    prerequisiteLabel: z.string(),
+    confidence: z.number().min(0).max(1),
+    rationale: z.string().min(1)
+  }).strict())
 }).strict();
 
 // --- Generated grounding: submit_generated_grounding_bundle ---------------

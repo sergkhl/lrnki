@@ -835,6 +835,18 @@ export type PrerequisiteJudgment = {
   rationale: string;
 };
 
+// One batched LLM prerequisite judgment over a subject node and a bounded list of
+// same-domain candidates (plan U4, KTD1). `relations` carries exactly one
+// PrerequisiteJudgment per PROVIDED candidate, IN INPUT ORDER (R8), each between the
+// subject and that candidate. Coverage is exhaustive by construction at the adapter
+// boundary: a candidate the model did not address, or whose direction names neither
+// concept, degrades to `uncertain` (flagged, path-excluded) — never a dropped relation
+// and never an invented edge (R5, R6). A returned relation whose candidateRef matches
+// no provided candidate is dropped fail-closed, never mapped to a guessed candidate.
+export type BatchedPrerequisiteJudgment = {
+  relations: PrerequisiteJudgment[];
+};
+
 // An edge of the inferred prerequisite DAG: prerequisite must precede dependent.
 // Survives only after deterministic cycle removal + transitive reduction +
 // weak-edge cut (ADR-0019). `uncertain` edges are retained for inspection but
@@ -905,7 +917,8 @@ export type DerivedGraphLayer = {
   enrichmentConfigHash: string;
   // The bounded prerequisite-judge model (provenance for the inferred DAG). The
   // embedding model and candidate groups were removed with the embedding tier
-  // (ADR-0019 reset): every same-domain CEP pair is judged exhaustively.
+  // (ADR-0019 reset): every same-domain relation is judged exhaustively, now via
+  // per-node batched calls (plan U5) rather than one call per pair.
   judgeModel: string;
   derivedNodes: DerivedGraphNode[];
   prerequisiteEdges: InferredPrerequisiteEdge[];

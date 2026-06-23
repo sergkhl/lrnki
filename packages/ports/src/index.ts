@@ -22,13 +22,13 @@ import type {
   ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
+  BatchedPrerequisiteJudgment,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
   MentionedNonCoreCandidate,
   MissingPrerequisiteProposal,
   PrerequisiteConceptContext,
-  PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
   RejectedStudyItem,
@@ -202,20 +202,25 @@ export interface SourceObjectStoragePort {
 // learner-neutral intrinsic; learner-calibrated IRT/BT remains data-blocked.
 // ---------------------------------------------------------------------------
 
-// Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
-// reset). Every same-domain CEP pair is judged exhaustively — there is no
-// embedding clustering or candidate-group gate. Each side carries its published
-// CEP (definitions, bounded mentions, labeled `defines` assertions). Forced named tool schema;
-// the application validates arguments and maps "uncertain" to a flagged,
-// path-excluded edge. The judge proposes; cycle removal + transitive reduction
-// dispose.
+// Bounded LLM prerequisite judgment over a subject node and a BOUNDED LIST of
+// same-domain candidates (ADR-0019, amended — per-node batched judging, plan U4/KTD1).
+// One batched forced-tool call resolves the subject against many candidates at once,
+// regrouping the exhaustive per-pair coverage from O(n^2) calls into ~O(n) without
+// dropping any relation (R4, R5). Each side carries its published CEP (definitions,
+// bounded mentions, labeled `defines` assertions). The application validates arguments
+// and maps each candidate fail-closed: a direction naming neither concept, or a
+// candidate the model never addressed, degrades to "uncertain" (flagged, path-excluded),
+// never an invented edge (R6). The judge proposes; cycle removal + transitive reduction
+// dispose. This is also the incremental-growth primitive (R7): "enrich one new node
+// against an existing candidate layer" is exactly this call with a one-node candidate
+// set absent or a full layer present.
 export interface PrerequisiteJudgmentPort {
   readonly model: string;
   judge(input: {
     declaredDomain: string;
-    a: PrerequisiteConceptContext;
-    b: PrerequisiteConceptContext;
-  }): Promise<PrerequisiteJudgment>;
+    subject: PrerequisiteConceptContext;
+    candidates: PrerequisiteConceptContext[];
+  }): Promise<BatchedPrerequisiteJudgment>;
 }
 
 export interface GroundingGenerationPort {

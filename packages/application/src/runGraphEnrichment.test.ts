@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type {
   AnchorProjectionNode,
+  BatchedPrerequisiteJudgment,
   DerivedGraphLayer,
   DifficultyNodeContext,
   EnrichmentRunTrace,
@@ -18,8 +19,8 @@ import type {
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment } from "./runGraphEnrichment";
 
 // Two Declared Domains: "x" has 3 concepts, "y" has 2. Prerequisites are always
-// same-domain (ADR-0015), so the exhaustive judge (ADR-0019 reset) must see
-// exactly C(3,2)+C(2,2)=3+1=4 unordered pairs and never a cross-domain pair.
+// same-domain (ADR-0015), so per-node forward batching (KTD1) must cover exactly
+// C(3,2)+C(2,2)=3+1=4 unordered relations and never a cross-domain pair.
 function concept(id: string, label: string, domain: string, aliases: string[] = []) {
   return {
     conceptId: id,
@@ -84,25 +85,36 @@ const snapshot: GraphSnapshot = {
   ]
 };
 
-type JudgeFn = (input: { declaredDomain: string; a: PrerequisiteConceptContext; b: PrerequisiteConceptContext }) => PrerequisiteJudgment | Promise<PrerequisiteJudgment>;
+// A per-candidate verdict over the subject and one candidate context. The fake judge
+// maps it across each candidate to build the batched result, mirroring the production
+// adapter's one-judgment-per-candidate contract.
+type CandidateVerdict = (subject: PrerequisiteConceptContext, candidate: PrerequisiteConceptContext) => PrerequisiteJudgment;
 
-// Default mock: directs cx2->cx1, cx1/cx3 is a plain directed edge, cx2/cx3 is
-// uncertain, and cy1/cy2 is none (dropped).
-const defaultJudge: JudgeFn = (input) => {
-  const labels = [input.a.canonicalLabel, input.b.canonicalLabel];
-  const j = (p: string, d: string, outcome: PrerequisiteJudgment["outcome"], confidence: number): PrerequisiteJudgment =>
-    ({ prerequisiteDerivedNodeId: p, dependentDerivedNodeId: d, outcome, confidence, rationale: "mock" });
-  const idByLabel = new Map([[input.a.canonicalLabel, input.a.derivedNodeId], [input.b.canonicalLabel, input.b.derivedNodeId]]);
-  if (labels.includes("X One") && labels.includes("X Two")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X One") ?? "", "directed", 0.9);
-  if (labels.includes("X One") && labels.includes("X Three")) return j(idByLabel.get("X One") ?? "", idByLabel.get("X Three") ?? "", "directed", 0.9);
-  if (labels.includes("X Two") && labels.includes("X Three")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X Three") ?? "", "uncertain", 0.4);
-  return j(input.a.derivedNodeId, input.b.derivedNodeId, "none", 0.1);
+// Default verdict: directs cx2->cx1, cx1->cx3 (plain directed), cx2/cx3 uncertain, and
+// the y-domain pair none (dropped). Direction is label-driven, never positional.
+const defaultVerdict: CandidateVerdict = (subject, candidate) => {
+  const labels = [subject.canonicalLabel, candidate.canonicalLabel];
+  const directed = (prereqLabel: string): PrerequisiteJudgment => ({
+    prerequisiteDerivedNodeId: prereqLabel === subject.canonicalLabel ? subject.derivedNodeId : candidate.derivedNodeId,
+    dependentDerivedNodeId: prereqLabel === subject.canonicalLabel ? candidate.derivedNodeId : subject.derivedNodeId,
+    outcome: "directed",
+    confidence: 0.9,
+    rationale: "mock"
+  });
+  const nominal = (outcome: PrerequisiteJudgment["outcome"], confidence: number): PrerequisiteJudgment =>
+    ({ prerequisiteDerivedNodeId: subject.derivedNodeId, dependentDerivedNodeId: candidate.derivedNodeId, outcome, confidence, rationale: "mock" });
+  if (labels.includes("X One") && labels.includes("X Two")) return directed("X Two");
+  if (labels.includes("X One") && labels.includes("X Three")) return directed("X One");
+  if (labels.includes("X Two") && labels.includes("X Three")) return nominal("uncertain", 0.4);
+  return nominal("none", 0.1);
 };
 
-function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {}) {
+type JudgeInput = { declaredDomain: string; subject: PrerequisiteConceptContext; candidates: PrerequisiteConceptContext[] };
+
+function buildPorts(options: { verdict?: CandidateVerdict; snapshot?: GraphSnapshot; onJudge?: (input: JudgeInput) => Promise<void> } = {}) {
   const active = options.snapshot ?? snapshot;
-  const judgeFn = options.judge ?? defaultJudge;
-  const judgedInputs: { declaredDomain: string; a: PrerequisiteConceptContext; b: PrerequisiteConceptContext }[] = [];
+  const verdict = options.verdict ?? defaultVerdict;
+  const judgedInputs: JudgeInput[] = [];
   let inFlight = 0;
   let maxInFlight = 0;
 
@@ -113,12 +125,13 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
   };
   const prerequisiteJudge: PrerequisiteJudgmentPort = {
     model: "mock-judge",
-    async judge(input) {
+    async judge(input): Promise<BatchedPrerequisiteJudgment> {
       judgedInputs.push(input);
       inFlight += 1;
       maxInFlight = Math.max(maxInFlight, inFlight);
       try {
-        return await judgeFn(input);
+        if (options.onJudge) await options.onJudge(input);
+        return { relations: input.candidates.map((candidate) => verdict(input.subject, candidate)) };
       } finally {
         inFlight -= 1;
       }
@@ -156,6 +169,15 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
   };
 }
 
+// Flatten the batched calls into the unordered (subject, candidate) relations evaluated.
+function evaluatedPairs(judgedInputs: JudgeInput[]): [PrerequisiteConceptContext, PrerequisiteConceptContext][] {
+  return judgedInputs.flatMap((input) => input.candidates.map((candidate) => [input.subject, candidate] as [PrerequisiteConceptContext, PrerequisiteConceptContext]));
+}
+
+function allContexts(judgedInputs: JudgeInput[]): PrerequisiteConceptContext[] {
+  return judgedInputs.flatMap((input) => [input.subject, ...input.candidates]);
+}
+
 function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters<typeof runGraphEnrichment>[0]> = {}) {
   return runGraphEnrichment({
     enrichmentId: "e1",
@@ -168,37 +190,38 @@ function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters
   });
 }
 
-// Scenario 1: exactly the same-domain pairs are judged; no cross-domain pair leaks.
-test("runGraphEnrichment judges every same-domain pair and never a cross-domain pair", async () => {
+// Scenario 1: exactly the same-domain relations are evaluated; no cross-domain leak.
+test("runGraphEnrichment evaluates every same-domain relation and never a cross-domain one", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
   const domainByDerivedId = new Map(layer.derivedNodes.map((node) => [node.derivedNodeId, node.declaredDomain]));
 
-  assert.equal(ports.judgedInputs.length, 4); // C(3,2)+C(2,2)
-  for (const input of ports.judgedInputs) {
-    assert.equal(domainByDerivedId.get(input.a.derivedNodeId), domainByDerivedId.get(input.b.derivedNodeId), `cross-domain pair leaked: ${input.a.derivedNodeId}/${input.b.derivedNodeId}`);
+  const pairs = evaluatedPairs(ports.judgedInputs);
+  assert.equal(pairs.length, 4); // C(3,2)+C(2,2)
+  for (const [a, b] of pairs) {
+    assert.equal(domainByDerivedId.get(a.derivedNodeId), domainByDerivedId.get(b.derivedNodeId), `cross-domain pair leaked: ${a.derivedNodeId}/${b.derivedNodeId}`);
   }
+  // Each unordered pair appears exactly once (no double-counting).
+  const keys = pairs.map(([a, b]) => [a.canonicalLabel, b.canonicalLabel].sort().join("|"));
+  assert.equal(new Set(keys).size, 4);
 });
 
-// Scenario 2: each judge call receives both Concepts' full CEPs (definitions,
-// bounded mentions, labeled typed assertions) — never bare labels alone.
-test("runGraphEnrichment passes both Concepts' CEPs to the judge with bounded mentions", async () => {
+// Scenario 2: each judge call receives full CEPs (definitions, bounded mentions,
+// labeled typed assertions) — never bare labels alone.
+test("runGraphEnrichment passes Concepts' CEPs to the judge with bounded mentions", async () => {
   const ports = buildPorts();
   await run(ports);
 
-  const cx1cx2 = ports.judgedInputs.find((i) => [i.a.canonicalLabel, i.b.canonicalLabel].includes("X One") && [i.a.canonicalLabel, i.b.canonicalLabel].includes("X Two"));
-  assert.ok(cx1cx2, "expected the cx1/cx2 pair");
-  const cx1 = cx1cx2.a.canonicalLabel === "X One" ? cx1cx2.a : cx1cx2.b;
-  const cx2 = cx1cx2.a.canonicalLabel === "X Two" ? cx1cx2.a : cx1cx2.b;
+  const cx1 = allContexts(ports.judgedInputs).find((context) => context.canonicalLabel === "X One");
+  const cx2 = allContexts(ports.judgedInputs).find((context) => context.canonicalLabel === "X Two");
+  assert.ok(cx1 && cx2, "expected X One and X Two to be judged");
 
   assert.deepEqual(cx1.definitions, ["X One is the definition of X One"]);
   assert.deepEqual(cx2.definitions, ["X Two is the definition of X Two"]);
   // Default bound of six mentions is applied even though the CEP holds seven.
   assert.equal(cx1.mentions.length, 6);
   assert.deepEqual(cx1.mentions, ["mention one", "mention two", "mention three", "mention four", "mention five", "mention six"]);
-  assert.deepEqual(cx1.assertions, [
-    { type: "defines", detail: "the first X concept" }
-  ]);
+  assert.deepEqual(cx1.assertions, [{ type: "defines", detail: "the first X concept" }]);
   assert.deepEqual(cx1.aliases, ["XOne"]);
 });
 
@@ -207,15 +230,16 @@ test("runGraphEnrichment honors a non-default mention bound and preserves neural
   const ports = buildPorts();
   await run(ports, {
     config: {
-      enrichmentConfigHash: "cep-pair-enrichment-v1",
+      enrichmentConfigHash: "cep-node-enrichment-v1",
       minEdgeConfidence: 0.5,
       judgeConcurrency: 4,
       maxMentionsPerConceptInPair: 2,
+      maxCandidatesPerBatch: 12,
       mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
     }
   });
 
-  const cx1 = ports.judgedInputs.flatMap((i) => [i.a, i.b]).find((c) => c.canonicalLabel === "X One");
+  const cx1 = allContexts(ports.judgedInputs).find((context) => context.canonicalLabel === "X One");
   assert.ok(cx1);
   assert.deepEqual(cx1.mentions, ["mention one", "mention two"]);
 });
@@ -250,7 +274,8 @@ test("runGraphEnrichment follows the judge, drops 'none', flags 'uncertain'", as
   assert.ok(dispositions.includes("kept"));
 });
 
-// Scenario 6: the persisted layer and trace carry no embedding/candidate-group fields.
+// Scenario 6: the persisted layer and trace carry no embedding/candidate-group fields,
+// and the trace records one per-candidate judgment with the judge model used.
 test("runGraphEnrichment persists a layer free of embedding and candidate-group fields", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
@@ -264,10 +289,11 @@ test("runGraphEnrichment persists a layer free of embedding and candidate-group 
   }
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
   assert.equal(ports.getArtifactType(), "enrichment_run.v2");
+  // One per-candidate trace per evaluated relation (4 same-domain relations).
   assert.equal(ports.getTrace()?.judgments.length, 4);
-  // U4: each pair judgment records which judge model ordered it (anchor-only run -> all DeepSeek).
+  // Each per-candidate judgment records which judge model ordered it (anchor-only -> all DeepSeek).
   assert.ok(ports.getTrace()?.judgments.every((judgment) => judgment.judgeModel === "mock-judge"));
-  // U4: an anchor-only run (no enrichment-node ports) has no rescue dispositions.
+  // An anchor-only run (no enrichment-node ports) has no rescue dispositions.
   assert.deepEqual(ports.getTrace()?.rescueDispositions, []);
 });
 
@@ -310,11 +336,9 @@ test("runGraphEnrichment default config hash reflects intrinsic difficulty", asy
   const layer = await run(ports);
   assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "intrinsic-difficulty-v3");
   assert.equal(layer.enrichmentConfigHash, "intrinsic-difficulty-v3");
-  assert.notEqual(layer.enrichmentConfigHash, "cep-node-enrichment-rescue-judged-v2");
 });
 
-// Scenario 3: a concept pair with no CEP evidence cannot reach the judge and fails
-// closed if an invalid (evidence-free) snapshot is injected.
+// Scenario 3: an evidence-free snapshot reaches no judge call and fails closed.
 test("runGraphEnrichment fails closed on an evidence-free snapshot without judging", async () => {
   const ungrounded: GraphSnapshot = {
     graphVersionId: "v1",
@@ -330,49 +354,84 @@ test("runGraphEnrichment fails closed on an evidence-free snapshot without judgi
   assert.deepEqual(ports.getTrace()?.dispositions.map((d) => d.disposition), ["insufficient_evidence"]);
 });
 
-// Scenario 8a: judge calls never exceed the configured concurrency and the trace
-// keeps deterministic pair order regardless of completion order.
-test("runGraphEnrichment bounds concurrency and keeps deterministic pair order", async () => {
-  const completionOrder: string[] = [];
-  let callIndex = 0;
-  // Resolve later pairs first so completion order differs from input order.
-  const judge: JudgeFn = async (input) => {
-    const key = `${input.a.canonicalLabel}/${input.b.canonicalLabel}`;
-    const index = callIndex++;
-    // Make only the first sorted pair slow so later pairs complete before it.
-    const delay = index === 0 ? 30 : 1;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    completionOrder.push(key);
-    return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
+// Coverage under chunking (KTD3): a domain whose forward candidate list exceeds the cap
+// splits into deterministic chunks and STILL resolves every relation exactly once.
+test("runGraphEnrichment resolves every relation under a small per-batch cap", async () => {
+  const labels = ["N0", "N1", "N2", "N3", "N4"]; // 5 same-domain nodes -> C(5,2)=10 relations
+  const chunked: GraphSnapshot = {
+    graphVersionId: "v1",
+    baseGraphVersionId: null,
+    concepts: labels.map((label, index) => concept(`c${index}`, label, "x")),
+    evidenceProfiles: labels.map((label, index) => ({
+      conceptId: `c${index}`,
+      definitions: [passage(`def-${index}`, `${label} is the definition of ${label}`)],
+      mentions: [],
+      assertions: []
+    }))
   };
-  const ports = buildPorts({ judge });
+  const ports = buildPorts({ snapshot: chunked });
   await run(ports, {
     config: {
-      enrichmentConfigHash: "cep-pair-enrichment-v1",
+      enrichmentConfigHash: "cep-node-enrichment-v1",
+      minEdgeConfidence: 0.5,
+      judgeConcurrency: 4,
+      maxMentionsPerConceptInPair: 6,
+      maxCandidatesPerBatch: 2, // force multi-chunk subjects
+      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
+    }
+  });
+
+  // Some subject must have produced more than one batched call (chunked).
+  const callsBySubject = new Map<string, number>();
+  for (const input of ports.judgedInputs) callsBySubject.set(input.subject.derivedNodeId, (callsBySubject.get(input.subject.derivedNodeId) ?? 0) + 1);
+  assert.ok([...callsBySubject.values()].some((count) => count > 1), "expected at least one subject to chunk into multiple calls");
+
+  // Every unordered relation is evaluated exactly once across all chunks.
+  const keys = evaluatedPairs(ports.judgedInputs).map(([a, b]) => [a.canonicalLabel, b.canonicalLabel].sort().join("|"));
+  assert.equal(keys.length, 10);
+  assert.equal(new Set(keys).size, 10);
+});
+
+// Scenario 8a: judge calls never exceed the configured concurrency and the trace keeps
+// deterministic subject/candidate order regardless of completion order.
+test("runGraphEnrichment bounds concurrency and keeps deterministic order", async () => {
+  const completionOrder: string[] = [];
+  let callIndex = 0;
+  const ports = buildPorts({
+    onJudge: async (input) => {
+      const index = callIndex++;
+      // Make only the first dispatched call slow so later calls complete before it.
+      await new Promise((resolve) => setTimeout(resolve, index === 0 ? 30 : 1));
+      for (const candidate of input.candidates) completionOrder.push(`${input.subject.canonicalLabel}/${candidate.canonicalLabel}`);
+    }
+  });
+  await run(ports, {
+    config: {
+      enrichmentConfigHash: "cep-node-enrichment-v1",
       minEdgeConfidence: 0.5,
       judgeConcurrency: 2,
       maxMentionsPerConceptInPair: 6,
+      maxCandidatesPerBatch: 12,
       mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
     }
   });
 
   assert.ok(ports.getMaxInFlight() <= 2, `concurrency exceeded: ${ports.getMaxInFlight()}`);
-  // Trace order follows sorted pair order, not completion order.
+  // Trace order follows deterministic subject/candidate dispatch order, not completion.
   const traceOrder = ports.getTrace()?.judgments.map((j) => `${j.a.canonicalLabel}/${j.b.canonicalLabel}`) ?? [];
-  const dispatchOrder = ports.judgedInputs.map((j) => `${j.a.canonicalLabel}/${j.b.canonicalLabel}`);
+  const dispatchOrder = evaluatedPairs(ports.judgedInputs).map(([a, b]) => `${a.canonicalLabel}/${b.canonicalLabel}`);
   assert.deepEqual(traceOrder, dispatchOrder);
   assert.notDeepEqual(completionOrder, traceOrder, "test setup should produce out-of-order completion");
 });
 
-// Scenario 8b: one exhausted pair (judge throws) fails the run before persistence.
-test("runGraphEnrichment fails the run without persisting when a pair exhausts its budget", async () => {
-  const judge: JudgeFn = (input) => {
-    if (input.a.canonicalLabel === "X Two" && input.b.canonicalLabel === "X Three") {
-      throw new Error("forced-tool retry budget exhausted");
+// Scenario 8b: one exhausted batched call (judge throws) fails the run before persistence.
+test("runGraphEnrichment fails the run without persisting when a batched call exhausts its budget", async () => {
+  const ports = buildPorts({
+    onJudge: async (input) => {
+      const present = new Set([input.subject.canonicalLabel, ...input.candidates.map((c) => c.canonicalLabel)]);
+      if (present.has("X Two") && present.has("X Three")) throw new Error("forced-tool retry budget exhausted");
     }
-    return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
-  };
-  const ports = buildPorts({ judge });
+  });
   await assert.rejects(() => run(ports), /retry budget exhausted/);
   assert.equal(ports.getPersistCalls(), 0, "no partial enrichment run may be persisted");
 });
@@ -400,9 +459,17 @@ function buildNodePorts(options: {
   const labelOf = (context: PrerequisiteConceptContext) => context.canonicalLabel;
   const judgeRecording = (sink: string[]): PrerequisiteJudgmentPort => ({
     model: sink === deepseekPairs ? "deepseek-judge" : "cross-family-judge",
-    async judge(input) {
-      sink.push([labelOf(input.a), labelOf(input.b)].sort().join("|"));
-      return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
+    async judge(input): Promise<BatchedPrerequisiteJudgment> {
+      for (const candidate of input.candidates) sink.push([labelOf(input.subject), labelOf(candidate)].sort().join("|"));
+      return {
+        relations: input.candidates.map((candidate) => ({
+          prerequisiteDerivedNodeId: input.subject.derivedNodeId,
+          dependentDerivedNodeId: candidate.derivedNodeId,
+          outcome: "none" as const,
+          confidence: 0.1,
+          rationale: "mock"
+        }))
+      };
     }
   });
   const prerequisiteJudge = judgeRecording(deepseekPairs);

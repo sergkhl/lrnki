@@ -278,9 +278,10 @@ router_settings:
     kg-concept-discovery: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-concept-admission: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-claim-extraction: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    # Graph Enrichment, third operation (ADR-0019 reset): every same-domain CEP
-    # pair is judged exhaustively (no embedding clustering tier); the bounded judge
-    # proposes the inferred DAG using the same no-thinking extractor.
+    # Graph Enrichment, third operation (ADR-0019 amended): every same-domain relation
+    # is judged exhaustively (no embedding clustering tier), now via per-node batched
+    # calls (plan U5); the bounded judge proposes the inferred DAG using the same
+    # no-thinking extractor.
     kg-prerequisite-judgment: openrouter/deepseek/deepseek-v4-flash-no-thinking
     # Cross-family generated-node ordering judge (ADR-0023, U7). Any prerequisite
     # pair touching an `llm_grounded` minted node is ordered HERE, on gpt-oss-120b,

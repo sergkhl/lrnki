@@ -1,10 +1,10 @@
-import type { PrerequisiteConceptContext, PrerequisiteJudgment, RescueDurabilityJudgment } from "@lrnki/domain-core";
+import type { BatchedPrerequisiteJudgment, PrerequisiteConceptContext, PrerequisiteJudgment, RescueDurabilityJudgment } from "@lrnki/domain-core";
 import type { PrerequisiteJudgmentPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "./stageTags";
 import {
-  prerequisiteJudgmentSchema,
-  prerequisiteJudgmentValidator,
+  batchedPrerequisiteJudgmentSchema,
+  batchedPrerequisiteJudgmentValidator,
   rescueDurabilityJudgmentSchema,
   rescueDurabilityJudgmentValidator
 } from "./toolSchemas";
@@ -14,10 +14,10 @@ import {
 // never grades rescue durability. Goes through LiteLLM, never a raw provider.
 export const RESCUE_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 
-// LiteLLM alias for the third operation (Graph Enrichment, ADR-0019 reset). Every
-// same-domain CEP pair is judged exhaustively — there is no embedding clustering
-// tier — so the judge is the only enrichment model. It goes through LiteLLM, never
-// a raw provider.
+// LiteLLM alias for the third operation (Graph Enrichment, ADR-0019 amended). Each
+// subject node is judged against its same-domain candidates in one batched call
+// (per-node batched judging, plan U4) — there is no embedding clustering tier — so the
+// judge is the only enrichment model. It goes through LiteLLM, never a raw provider.
 export const PREREQUISITE_JUDGE_MODEL = "kg-prerequisite-judgment";
 
 // Cross-family generated-node ordering judge (ADR-0023, U7, KTD7). Reuses the same
@@ -27,11 +27,11 @@ export const PREREQUISITE_JUDGE_MODEL = "kg-prerequisite-judgment";
 // raw provider.
 export const GENERATED_PREREQUISITE_JUDGE_MODEL = "kg-generated-prerequisite-judgment";
 
-// Render one Concept's published CEP for the judge: its label, aliases, verbatim
+// Render one Concept's published CEP for the judge: its role, label, aliases, verbatim
 // definition and mention quotes, and LABELED `defines` assertions.
-function renderConcept(side: "A" | "B", context: PrerequisiteConceptContext): string {
+function renderConcept(role: string, context: PrerequisiteConceptContext): string {
   const lines = [
-    `Concept ${side}: "${context.canonicalLabel}"${context.aliases.length ? ` (aka ${context.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
+    `${role}: "${context.canonicalLabel}"${context.aliases.length ? ` (aka ${context.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
     "  Definitions:",
     ...(context.definitions.length
       ? context.definitions.map((quote, index) => `    [${index + 1}] "${quote}"`)
@@ -50,11 +50,15 @@ function renderConcept(side: "A" | "B", context: PrerequisiteConceptContext): st
   return lines.join("\n");
 }
 
-// Bounded prerequisite-judgment adapter (ADR-0019 reset). Forced named tool schema;
-// the model returns a DIRECTION between the two named concepts (or none/uncertain)
-// from both concepts' published CEPs, and this adapter maps it to a typed
-// PrerequisiteJudgment fail-closed. The judge proposes; deterministic cycle removal
-// + transitive reduction dispose downstream.
+const normalizeLabel = (label: string) => label.trim().toLowerCase();
+
+// Batched prerequisite-judgment adapter (ADR-0019 amended, plan U4/KTD1). Forced named
+// tool schema; the model returns, per candidate, a DIRECTION between the SUBJECT and
+// that candidate (or none/uncertain) from both concepts' published CEPs. This adapter
+// maps each result to a typed PrerequisiteJudgment fail-closed, IN INPUT-CANDIDATE
+// ORDER, so coverage is exhaustive (R5) and the trace is replay-deterministic (R8).
+// One batched call replaces the per-candidate fan-out; the judge proposes, deterministic
+// cycle removal + transitive reduction dispose downstream.
 export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentPort {
   readonly model: string;
   constructor(private readonly client: LiteLlmForcedToolClient, model: string = PREREQUISITE_JUDGE_MODEL) {
@@ -63,62 +67,89 @@ export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentP
 
   async judge(input: {
     declaredDomain: string;
-    a: PrerequisiteConceptContext;
-    b: PrerequisiteConceptContext;
-  }): Promise<PrerequisiteJudgment> {
+    subject: PrerequisiteConceptContext;
+    candidates: PrerequisiteConceptContext[];
+  }): Promise<BatchedPrerequisiteJudgment> {
     const system = [
-      "You judge LEARNING PREREQUISITE order between two domain concepts for a learner-neutral concept graph.",
+      "You judge LEARNING PREREQUISITE order between one SUBJECT concept and each of several CANDIDATE concepts, for a learner-neutral concept graph.",
       "Concept X is a prerequisite of concept Y when a learner must understand X before they can understand Y.",
       "Decide from the concepts' meanings and the cited source evidence ONLY. Do not invent relations the evidence and meanings do not support.",
-      "Be conservative and precision-first:",
-      "- Return relation 'none' when neither concept must be understood before the other (they are siblings, alternatives, or merely related).",
+      "For EACH candidate, judge its relation to the subject independently and be conservative and precision-first:",
+      "- Return relation 'none' when neither the subject nor that candidate must be understood before the other (they are siblings, alternatives, or merely related).",
       "- Return relation 'uncertain' when a prerequisite relation is plausible but the direction is not clearly established. 'uncertain' is flagged for human review and excluded from learner paths, so prefer it over guessing a direction.",
-      "- Return relation 'prerequisite' ONLY when the dependency is clear; then copy the EXACT canonical label of the concept that must be understood FIRST into prerequisiteLabel (it must equal one of the two provided labels).",
+      "- Return relation 'prerequisite' ONLY when the dependency is clear; then copy the EXACT canonical label of the concept that must be understood FIRST into prerequisiteLabel (it must equal either the subject label or that candidate's label).",
+      "Identify each judgment's candidate by copying its exact label into candidateRef. Return exactly one judgment per provided candidate.",
       "Prerequisite is about conceptual dependency for learning, not temporal order in a process and not part-whole membership alone.",
       "Set confidence honestly in [0,1]; reserve high confidence for clearly-established directions."
     ].join("\n");
     const user = [
       `Declared domain: ${input.declaredDomain}.`,
       "",
-      renderConcept("A", input.a),
+      renderConcept("SUBJECT concept", input.subject),
       "",
-      renderConcept("B", input.b),
+      "CANDIDATE concepts:",
+      ...input.candidates.map((candidate) => ["", renderConcept("CANDIDATE", candidate)].join("\n")),
       "",
-      "Call submit_prerequisite_judgment. If one concept must be understood first, set relation='prerequisite' and put that concept's exact label in prerequisiteLabel."
+      "Call submit_prerequisite_judgments with one judgment per candidate. For each, set candidateRef to that candidate's exact label; if one concept must be understood first, set relation='prerequisite' and put that concept's exact label in prerequisiteLabel."
     ].join("\n");
 
     const result = await this.client.call({
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_prerequisite_judgment",
-      toolDescription: "Submit the learning-prerequisite direction between concept A and concept B.",
-      parameters: prerequisiteJudgmentSchema,
-      validator: prerequisiteJudgmentValidator,
+      toolName: "submit_prerequisite_judgments",
+      toolDescription: "Submit the learning-prerequisite direction between the subject concept and each candidate concept.",
+      parameters: batchedPrerequisiteJudgmentSchema,
+      validator: batchedPrerequisiteJudgmentValidator,
       // The same adapter serves both the DeepSeek route and the cross-family
       // generated-node route (only the alias differs), so the spend tag tracks the
       // model actually used: generated-node ordering attributes separately (KTD2/KTD4).
       tags: [this.model === GENERATED_PREREQUISITE_JUDGE_MODEL ? STAGE_TAGS.generatedEnrichmentJudge : STAGE_TAGS.enrichmentJudge]
     });
 
-    // Map the NAMED prerequisite onto the typed judgment by matching the model's
-    // label against the two provided concepts (case-insensitive, trimmed). A
-    // 'prerequisite' relation whose label matches neither concept fails closed to
-    // 'uncertain' (flagged, path-excluded) rather than guessing a direction. For
-    // 'none'/'uncertain' the prerequisite/dependent ids are nominal (a->b); the
-    // application drops 'none' and keeps 'uncertain' out of the traversable DAG.
-    const normalize = (label: string) => label.trim().toLowerCase();
-    const named = normalize(result.prerequisiteLabel);
-    const matchesA = named === normalize(input.a.canonicalLabel);
-    const matchesB = named === normalize(input.b.canonicalLabel);
-    const resolvable = result.relation === "prerequisite" && (matchesA || matchesB);
-    const prerequisiteFirst = !matchesB; // default a->b for nominal/unmatched cases
-    return {
-      prerequisiteDerivedNodeId: prerequisiteFirst ? input.a.derivedNodeId : input.b.derivedNodeId,
-      dependentDerivedNodeId: prerequisiteFirst ? input.b.derivedNodeId : input.a.derivedNodeId,
-      outcome: resolvable ? "directed" : result.relation === "none" ? "none" : "uncertain",
-      confidence: result.confidence,
-      rationale: result.rationale
-    };
+    // Index the model's results by candidateRef. First write wins on a duplicate ref;
+    // a ref matching no provided candidate is simply never looked up (dropped
+    // fail-closed, never mapped to a guessed candidate — R6).
+    const byRef = new Map<string, (typeof result.relations)[number]>();
+    for (const relation of result.relations) {
+      const ref = normalizeLabel(relation.candidateRef);
+      if (!byRef.has(ref)) byRef.set(ref, relation);
+    }
+
+    // Resolve EVERY provided candidate, in input order, so coverage stays exhaustive
+    // (R5, R8). A candidate the model did not address degrades to 'uncertain' (flagged,
+    // path-excluded), never a dropped relation or an invented edge.
+    const subjectLabel = normalizeLabel(input.subject.canonicalLabel);
+    const relations: PrerequisiteJudgment[] = input.candidates.map((candidate) => {
+      const found = byRef.get(normalizeLabel(candidate.canonicalLabel));
+      if (!found) {
+        return {
+          prerequisiteDerivedNodeId: input.subject.derivedNodeId,
+          dependentDerivedNodeId: candidate.derivedNodeId,
+          outcome: "uncertain",
+          confidence: 0,
+          rationale: "No judgment returned for this candidate."
+        };
+      }
+      // Map the NAMED prerequisite onto the typed judgment by matching the model's
+      // label against the subject and THIS candidate (case-insensitive, trimmed). A
+      // 'prerequisite' relation whose label matches neither fails closed to 'uncertain'
+      // rather than guessing a direction. For 'none'/'uncertain' the prerequisite/
+      // dependent ids are nominal (subject->candidate); the application drops 'none' and
+      // keeps 'uncertain' out of the traversable DAG.
+      const named = normalizeLabel(found.prerequisiteLabel);
+      const matchesSubject = named === subjectLabel;
+      const matchesCandidate = named === normalizeLabel(candidate.canonicalLabel);
+      const resolvable = found.relation === "prerequisite" && (matchesSubject || matchesCandidate);
+      const candidateIsPrerequisite = matchesCandidate; // else subject leads (matched or nominal)
+      return {
+        prerequisiteDerivedNodeId: candidateIsPrerequisite ? candidate.derivedNodeId : input.subject.derivedNodeId,
+        dependentDerivedNodeId: candidateIsPrerequisite ? input.subject.derivedNodeId : candidate.derivedNodeId,
+        outcome: resolvable ? "directed" : found.relation === "none" ? "none" : "uncertain",
+        confidence: found.confidence,
+        rationale: found.rationale
+      };
+    });
+    return { relations };
   }
 }
 

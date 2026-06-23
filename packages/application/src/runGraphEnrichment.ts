@@ -24,6 +24,7 @@ import type {
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
+import { judgeNodeAgainstCandidates } from "./judgeNodeAgainstCandidates";
 import { cutWeakEdges, removeCycles, transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 
@@ -35,13 +36,20 @@ export type GraphEnrichmentConfig = {
   enrichmentConfigHash: string;
   // Weak-edge cut floor applied before cycle removal.
   minEdgeConfidence: number;
-  // Bounded concurrency for the per-pair judge calls (ADR-0019 reset). Results are
-  // collected in deterministic pair order regardless of completion order.
+  // Bounded concurrency for the per-NODE batched judge calls (ADR-0019 amended, U5).
+  // Bounds concurrent SUBJECTS; each subject runs its routing/chunk calls serially, so
+  // at most this many batched calls are ever in flight (R10). Results are collected in
+  // deterministic subject-then-candidate order regardless of completion order (R8).
   judgeConcurrency: number;
-  // Bound on mention passages passed per node into a pair judgment (R11). The
-  // published CEP is already mention-bounded at extraction; this is a further
-  // deterministic cap so a pair prompt cannot grow unbounded.
+  // Bound on mention passages passed per node into a judgment (R11). The published CEP
+  // is already mention-bounded at extraction; this is a further deterministic cap so a
+  // judgment prompt cannot grow unbounded per concept.
   maxMentionsPerConceptInPair: number;
+  // Max candidates per batched judge call (U5/KTD3). A subject's same-domain candidate
+  // list (within a routing class) is split into deterministic sorted chunks of at most
+  // this size, keeping listwise judge quality while staying ~O(n) in the small-graph
+  // regime. Tuned in the U7 rule-14 pass against the largest domain.
+  maxCandidatesPerBatch: number;
   // Bounds on the anchor-driven node-minting pass (KTD6, R7).
   mintingBounds: EnrichmentMintingBounds;
 };
@@ -51,23 +59,27 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
   maxMentionsPerConceptInPair: 6,
+  maxCandidatesPerBatch: 12,
   mintingBounds: DEFAULT_MINTING_BOUNDS
 };
 
 // Graph Enrichment — the third operation, generalized to NODE + EDGE derivation
-// (ADR-0019, U5). The asserted snapshot supplies anchors; enrichment additionally
-// RESCUES `source_mentioned` nodes from the member runs' non-core mentions and MINTS
-// `llm_grounded` nodes via an explicit anchor-driven proposal pass, so a sparse
-// source still yields a usable learner path. Every same-domain pair across anchors ∪
-// enrichment nodes is judged; any pair touching a GENERATED (`llm_grounded`) node is
-// routed to a CROSS-FAMILY judge (R13) so the DeepSeek self-loop cannot grade its own
-// minted output, while anchor/anchor and anchor/source_mentioned pairs stay on the
-// validated DeepSeek judge. The symbolic helpers dispose (weak-edge cut -> cycle
-// removal -> transitive reduction); intrinsic difficulty scores ALL derived nodes
-// from the same evidence contexts. The asserted core is never touched (R5): no enrichment node is ever
-// published. Node minting + rescue are OPT-IN — when the proposal/grounding ports are
-// omitted the run is anchor-only (the pre-node-minting behavior). Fails the run
-// WITHOUT persistence if any pair exhausts the forced-tool retry budget.
+// (ADR-0019, amended for per-node batched judging — plan U5). The asserted snapshot
+// supplies anchors; enrichment additionally RESCUES `source_mentioned` nodes from the
+// member runs' non-core mentions and MINTS `llm_grounded` nodes via an explicit
+// anchor-driven proposal pass, so a sparse source still yields a usable learner path.
+// Each subject node is judged against its FORWARD same-domain candidates (j > i over the
+// stable-id sort) in ONE batched call, covering every unordered same-domain relation
+// exactly once — identical coverage to the prior per-pair loop, regrouped from O(n^2)
+// calls into ~O(n) (KTD1). Candidates are split by routing class so any pair touching a
+// GENERATED (`llm_grounded`) node goes to a CROSS-FAMILY judge (R13) and the DeepSeek
+// self-loop never grades its own minted output, while anchor/anchor and
+// anchor/source_mentioned stay on the validated DeepSeek judge. The symbolic helpers
+// dispose (weak-edge cut -> cycle removal -> transitive reduction); intrinsic difficulty
+// scores ALL derived nodes from the same evidence contexts. The asserted core is never
+// touched (R5): no enrichment node is ever published. Node minting + rescue are OPT-IN —
+// when the proposal/grounding ports are omitted the run is anchor-only. Fails the run
+// WITHOUT persistence if any batched call exhausts the forced-tool retry budget.
 export async function runGraphEnrichment(input: {
   enrichmentId: string;
   graphVersionId: string;
@@ -184,40 +196,42 @@ export async function runGraphEnrichment(input: {
     definitions: node.context.definitions,
     mentions: node.context.mentions
   }));
-  type PairingNode = (typeof pairingNodes)[number];
+  // Step 1 — group anchors ∪ enrichment nodes by Declared Domain (ADR-0015 keeps pairs
+  // same-domain), and for each subject select its FORWARD candidates over the stable-id
+  // sort. The union of forward batches covers every unordered same-domain relation
+  // exactly once (KTD1) — the asserted version stays anchors-only; this union is the
+  // DERIVED node space.
+  const subjectsWithCandidates = forwardCandidatesByDomain(pairingNodes);
 
-  // Step 1 — every unordered same-domain pair over anchors ∪ enrichment nodes (R12).
-  // Cross-domain pairs are never proposed (ADR-0015 Declared-Domain gate). The
-  // asserted version stays anchors-only; this union is the DERIVED node space.
-  const pairs = sameDomainPairs(pairingNodes);
-
-  // Step 2 — bounded LLM prerequisite judgment per pair (neural proposes). A pair
-  // touching a GENERATED node routes cross-family (R13); anchor/anchor and
-  // anchor/source_mentioned stay on the validated DeepSeek judge (no regression).
+  // Step 2 — per-node batched prerequisite judgment (neural proposes). Each subject is
+  // judged against its candidates in one batched call per routing class + chunk; the
+  // cross-family judge handles any generated-touching candidate (R13). Concurrency is
+  // bounded across subjects (R10) and results are collected in deterministic
+  // subject-then-candidate order (R8). The per-node unit is the incremental-growth
+  // primitive (R7, KTD6).
   const generatedJudge = input.generatedPrerequisiteJudge ?? input.prerequisiteJudge;
-  const isGenerated = (node: PairingNode) => node.groundingOrigin === "llm_grounded";
-  type PairOutcome = { judgment?: PrerequisiteJudgment; trace?: PrerequisiteJudgmentTrace; insufficient?: EnrichmentRunTrace["dispositions"][number] };
-  const outcomes = await mapWithConcurrency(pairs, config.judgeConcurrency, async ([a, b]): Promise<PairOutcome> => {
-    const hasEvidence = (context: PrerequisiteConceptContext) => context.definitions.length > 0 || context.mentions.length > 0;
-    if (!hasEvidence(a.context) || !hasEvidence(b.context)) {
-      return { insufficient: { prerequisiteDerivedNodeId: a.derivedNodeId, dependentDerivedNodeId: b.derivedNodeId, disposition: "insufficient_evidence" } };
-    }
-    const judge = isGenerated(a) || isGenerated(b) ? generatedJudge : input.prerequisiteJudge;
-    const judgeInput = { declaredDomain: a.declaredDomain, a: a.context, b: b.context };
-    const judgment = await judge.judge(judgeInput);
-    // Record the judge model actually used for this pair (U4): cross-family for any
-    // pair touching a generated node, the validated DeepSeek judge otherwise.
-    return { judgment, trace: { ...judgeInput, judgeModel: judge.model, judgment } };
-  });
+  const nodeResults = await timeStage("enrichment:judging", () =>
+    mapWithConcurrency(subjectsWithCandidates, config.judgeConcurrency, ({ subject, candidates }) =>
+      judgeNodeAgainstCandidates({
+        declaredDomain: subject.declaredDomain,
+        subject,
+        candidates,
+        prerequisiteJudge: input.prerequisiteJudge,
+        generatedPrerequisiteJudge: generatedJudge,
+        maxCandidatesPerBatch: config.maxCandidatesPerBatch
+      })
+    )
+  );
 
-  // Collect in deterministic pair order regardless of completion order.
+  // Collect in deterministic subject order; each subject's results are already in
+  // candidate order (R8).
   const judgments: PrerequisiteJudgment[] = [];
   const judgmentTraces: PrerequisiteJudgmentTrace[] = [];
   const insufficientEvidence: EnrichmentRunTrace["dispositions"][number][] = [];
-  for (const outcome of outcomes) {
-    if (outcome.insufficient) insufficientEvidence.push(outcome.insufficient);
-    if (outcome.judgment) judgments.push(outcome.judgment);
-    if (outcome.trace) judgmentTraces.push(outcome.trace);
+  for (const result of nodeResults) {
+    judgments.push(...result.judgments);
+    judgmentTraces.push(...result.traces);
+    insufficientEvidence.push(...result.insufficient);
   }
 
   // Step 3 — map judgments to raw edges. "none" is dropped; "uncertain" is flagged
@@ -233,14 +247,19 @@ export async function runGraphEnrichment(input: {
       provenance: { judgmentRationale: judgment.rationale }
     }));
 
-  // Step 4 — symbolic disposal over CERTAIN edges only (symbolic constrains).
-  const uncertainEdges = rawEdges.filter((edge) => edge.uncertain);
-  const { kept: strongEdges, cut: weakEdges } = cutWeakEdges(
-    rawEdges.filter((edge) => !edge.uncertain),
-    config.minEdgeConfidence
-  );
-  const { edges: acyclicEdges, removed: cycleRemovedEdges } = removeCycles(strongEdges);
-  const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(acyclicEdges);
+  // Step 4 — symbolic disposal over CERTAIN edges only (symbolic constrains). Pure and
+  // fast, but bracketed so its share of the run is visible in the timing split (U2).
+  const disposal = await timeStage("enrichment:symbolic-disposal", async () => {
+    const uncertainEdges = rawEdges.filter((edge) => edge.uncertain);
+    const { kept: strongEdges, cut: weakEdges } = cutWeakEdges(
+      rawEdges.filter((edge) => !edge.uncertain),
+      config.minEdgeConfidence
+    );
+    const { edges: acyclicEdges, removed: cycleRemovedEdges } = removeCycles(strongEdges);
+    const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(acyclicEdges);
+    return { uncertainEdges, weakEdges, cycleRemovedEdges, reducedEdges, transitiveEdges };
+  });
+  const { uncertainEdges, weakEdges, cycleRemovedEdges, reducedEdges, transitiveEdges } = disposal;
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
   // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
@@ -313,28 +332,30 @@ function deterministicUuid(...parts: string[]): string {
   return `${hash.slice(0, 8).join("")}-${hash.slice(8, 12).join("")}-${hash.slice(12, 16).join("")}-${hash.slice(16, 20).join("")}-${hash.slice(20, 32).join("")}`;
 }
 
-// Every unordered same-domain pair over the derived node space (R12). Nodes are
-// grouped by Declared Domain (ADR-0015) so a cross-domain pair is never proposed;
-// both the domain order and the within-domain member order are sorted by stable
-// derived-node id so the pair sequence — and therefore the persisted trace — is
-// replay-deterministic. The judge decides direction, so within-pair order is moot.
-function sameDomainPairs<T extends { derivedNodeId: string; declaredDomain: string }>(nodes: T[]): [T, T][] {
+// For each subject node, its FORWARD same-domain candidates over the derived node space
+// (KTD1). Nodes are grouped by Declared Domain (ADR-0015) so a cross-domain pair is never
+// proposed; both the domain order and the within-domain member order are sorted by stable
+// derived-node id, so subject `i`'s candidates are exactly the higher-id nodes `j > i`.
+// The union of these forward batches covers every unordered same-domain relation exactly
+// once, and the subject/candidate sequence is replay-deterministic (R8). The judge
+// decides direction, so within-pair order is moot.
+function forwardCandidatesByDomain<T extends { derivedNodeId: string; declaredDomain: string }>(
+  nodes: T[]
+): { subject: T; candidates: T[] }[] {
   const byDomain = new Map<string, T[]>();
   for (const node of nodes) {
     const existing = byDomain.get(node.declaredDomain);
     if (existing) existing.push(node);
     else byDomain.set(node.declaredDomain, [node]);
   }
-  const pairs: [T, T][] = [];
+  const subjects: { subject: T; candidates: T[] }[] = [];
   for (const [, members] of [...byDomain.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const sorted = [...members].sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
     for (let i = 0; i < sorted.length; i++) {
-      for (let j = i + 1; j < sorted.length; j++) {
-        pairs.push([sorted[i], sorted[j]]);
-      }
+      subjects.push({ subject: sorted[i], candidates: sorted.slice(i + 1) });
     }
   }
-  return pairs;
+  return subjects;
 }
 
 // Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor
