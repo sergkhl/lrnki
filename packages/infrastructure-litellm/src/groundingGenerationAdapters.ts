@@ -1,6 +1,7 @@
 import type { GeneratedGroundingBundle } from "@lrnki/domain-core";
 import type { GroundingGenerationPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
 import { generatedGroundingBundleSchema, generatedGroundingBundleValidator } from "./toolSchemas";
 
@@ -47,7 +48,8 @@ export class LiteLlmGroundingGenerationAdapter implements GroundingGenerationPor
       toolName: "submit_generated_grounding_bundle",
       toolDescription: "Submit generated grounding passages for one LLM-grounded prerequisite node.",
       parameters: generatedGroundingBundleSchema,
-      validator: generatedGroundingBundleValidator
+      validator: generatedGroundingBundleValidator,
+      tags: [STAGE_TAGS.groundingGeneration]
     });
 
     const notApplicable = {

@@ -225,6 +225,13 @@ model_list:
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY # Required for API key management
   block_robots: true
+  # Spend attribution (plan U1/KTD4): the proxy persists per-request token/cost to
+  # `LiteLLM_SpendLogs` in a DEDICATED `litellm` Postgres DB, queryable per pipeline
+  # stage via `/spend/tags`. The connection is wired by docker-compose.yml
+  # (`DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/litellm`), and the DB itself
+  # is provisioned by scripts/docker/postgres/01-init-litellm-db.sh. That env var takes
+  # precedence, so the inline `database_url` below stays commented out (moot under
+  # compose). The app only LABELS requests with `metadata.tags`; it computes no cost.
   # database_url: "sqlite:///litellm.db"
   store_prompts_in_spend_logs: true
   disable_error_logs: True # turn off writing LLM Exceptions to DB

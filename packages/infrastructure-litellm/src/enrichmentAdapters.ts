@@ -1,6 +1,7 @@
 import type { PrerequisiteConceptContext, PrerequisiteJudgment, RescueDurabilityJudgment } from "@lrnki/domain-core";
 import type { PrerequisiteJudgmentPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import {
   prerequisiteJudgmentSchema,
   prerequisiteJudgmentValidator,
@@ -92,7 +93,11 @@ export class LiteLlmPrerequisiteJudgmentAdapter implements PrerequisiteJudgmentP
       toolName: "submit_prerequisite_judgment",
       toolDescription: "Submit the learning-prerequisite direction between concept A and concept B.",
       parameters: prerequisiteJudgmentSchema,
-      validator: prerequisiteJudgmentValidator
+      validator: prerequisiteJudgmentValidator,
+      // The same adapter serves both the DeepSeek route and the cross-family
+      // generated-node route (only the alias differs), so the spend tag tracks the
+      // model actually used: generated-node ordering attributes separately (KTD2/KTD4).
+      tags: [this.model === GENERATED_PREREQUISITE_JUDGE_MODEL ? STAGE_TAGS.generatedEnrichmentJudge : STAGE_TAGS.enrichmentJudge]
     });
 
     // Map the NAMED prerequisite onto the typed judgment by matching the model's
@@ -168,7 +173,8 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
       toolName: "submit_rescue_durability_judgment",
       toolDescription: "Submit whether the rescue candidate is a durable prerequisite or an incidental artifact.",
       parameters: rescueDurabilityJudgmentSchema,
-      validator: rescueDurabilityJudgmentValidator
+      validator: rescueDurabilityJudgmentValidator,
+      tags: [STAGE_TAGS.rescueDurability]
     });
 
     return { verdict: result.verdict, groundingSpan: result.groundingSpan, rationale: result.rationale };
