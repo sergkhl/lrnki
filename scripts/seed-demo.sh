@@ -17,7 +17,19 @@ psql_scalar() {
   psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c "$1" | tr -d '[:space:]'
 }
 
-step() { printf '\n=== %s ===\n' "$1"; }
+# Convenience per-step elapsed wall-clock (plan U2). This is a human-facing aid only;
+# the worker's structured `stage_timing` lines remain the single measured source (R1).
+RUN_STARTED=$SECONDS
+_LAST_STEP_TS=$SECONDS
+step() {
+  local now=$SECONDS
+  if [ -n "${_CURRENT_STEP:-}" ]; then
+    printf '    (prev step %ds | total %ds)\n' "$((now - _LAST_STEP_TS))" "$((now - RUN_STARTED))"
+  fi
+  _CURRENT_STEP="$1"
+  _LAST_STEP_TS=$now
+  printf '\n=== %s ===\n' "$1"
+}
 
 step "1/8 reset database (DROP SCHEMA + migrate)"
 scripts/reset-db.sh

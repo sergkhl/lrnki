@@ -86,9 +86,22 @@ export async function runGraphEnrichment(input: {
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
   // unjudged (prior behavior).
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional per-sub-stage wall-clock hook (U2, KTD5, R1). The application stays free
+  // of console I/O: it only measures monotonic elapsed ms around each enrichment
+  // sub-stage and reports through this callback; the worker formats the structured line.
+  onStageTiming?: (timing: { stage: string; ms: number }) => void;
   newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
+  // Bracket one enrichment sub-stage and report its wall-clock through onStageTiming.
+  // Reports on success only; a thrown sub-stage fails the whole run, which the
+  // worker-level command timer records as a failed stage (U2).
+  const timeStage = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
+    const startedAt = performance.now();
+    const result = await fn();
+    input.onStageTiming?.({ stage, ms: Math.max(0, Math.round(performance.now() - startedAt)) });
+    return result;
+  };
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
   if (!snapshot) {
     throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
@@ -118,34 +131,36 @@ export async function runGraphEnrichment(input: {
   let groundingDispositions: GroundingVerbatimDisposition[] = [];
   let rescueDispositions: RescueDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
-    const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
-    const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
-      conceptId: concept.conceptId,
-      canonicalLabel: concept.canonicalLabel,
-      normalizedLabel: concept.normalizedLabel,
-      declaredDomain: concept.declaredDomain,
-      definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
-    }));
-    const assembled = await assembleEnrichmentNodes({
-      anchors: mintingAnchors,
-      rescueCandidates,
-      proposalPort: input.missingPrerequisiteProposal,
-      groundingPort: input.groundingGeneration,
-      rescueDurabilityJudge: input.rescueDurabilityJudge,
-      bounds: config.mintingBounds,
-      newNodeId
+    await timeStage("enrichment:rescue-mint", async () => {
+      const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
+      const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
+        conceptId: concept.conceptId,
+        canonicalLabel: concept.canonicalLabel,
+        normalizedLabel: concept.normalizedLabel,
+        declaredDomain: concept.declaredDomain,
+        definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
+      }));
+      const assembled = await assembleEnrichmentNodes({
+        anchors: mintingAnchors,
+        rescueCandidates,
+        proposalPort: input.missingPrerequisiteProposal!,
+        groundingPort: input.groundingGeneration!,
+        rescueDurabilityJudge: input.rescueDurabilityJudge,
+        bounds: config.mintingBounds,
+        newNodeId
+      });
+      rescueDispositions = assembled.rescueDispositions;
+      // The floor verifies source_mentioned passages verbatim against their cited block
+      // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
+      // does not verify is dropped before it can enter the derived layer.
+      const blockTextById = new Map<string, string>();
+      for (const candidate of rescueCandidates) {
+        for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
+      }
+      const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
+      enrichmentNodes = floored.nodes;
+      groundingDispositions = floored.dispositions;
     });
-    rescueDispositions = assembled.rescueDispositions;
-    // The floor verifies source_mentioned passages verbatim against their cited block
-    // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
-    // does not verify is dropped before it can enter the derived layer.
-    const blockTextById = new Map<string, string>();
-    for (const candidate of rescueCandidates) {
-      for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
-    }
-    const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
-    enrichmentNodes = floored.nodes;
-    groundingDispositions = floored.dispositions;
   }
 
   const allNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
@@ -230,7 +245,9 @@ export async function runGraphEnrichment(input: {
 
   // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
   // — anchors AND enrichment nodes (R12, handoff constraint).
-  const difficulties = await input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges });
+  const difficulties = await timeStage("enrichment:difficulty", () =>
+    input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges })
+  );
 
   const layer: DerivedGraphLayer = {
     enrichmentId: input.enrichmentId,

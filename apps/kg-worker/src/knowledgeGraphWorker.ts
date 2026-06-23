@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { defaultStageTimingSink, withStageTiming } from "./stageTiming";
 import {
   buildGraphVersion,
   computeLearnerPath,
@@ -283,7 +284,11 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
     difficulty: ctx.difficulty,
-    enrichmentStore: ctx.enrichmentStore
+    enrichmentStore: ctx.enrichmentStore,
+    // Surface enrichment sub-stage wall-clock through the same structured sink as the
+    // top-level commands (U2, R1). The application reports {stage, ms}; sub-stages that
+    // complete are ok:true (a thrown sub-stage fails the command, timed at top level).
+    onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true })
   });
   const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
   const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;
@@ -449,42 +454,50 @@ async function listSources(ctx: Context) {
   }
 }
 
+async function dispatch(ctx: Context, command: string | undefined, arg: string | undefined, rest: string[]) {
+  switch (command) {
+    case "register-from-manifest":
+      await registerFromManifest(ctx, arg ?? "fixtures/manifest.json");
+      break;
+    case "run-extraction":
+      await runExtraction(ctx, arg === "--all" || arg === undefined ? undefined : arg);
+      break;
+    case "build-graph-version":
+      // All positional args after the command are run IDs to publish.
+      await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
+      break;
+    case "enrich-graph-version":
+      await enrichGraphVersion(ctx, arg);
+      break;
+    case "compute-learner-path":
+      await computeLearnerPathCommand(ctx, arg, rest[0]);
+      break;
+    case "generate-study-items":
+      await generateStudyItemsCommand(ctx, arg);
+      break;
+    case "synthesize-responses":
+      await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
+      break;
+    case "compute-adaptive-path":
+      await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
+      break;
+    case "list-sources":
+      await listSources(ctx);
+      break;
+    default:
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
+  }
+}
+
 async function main() {
   const [command, arg, ...rest] = process.argv.slice(2);
   const ctx = buildContext();
   try {
-    switch (command) {
-      case "register-from-manifest":
-        await registerFromManifest(ctx, arg ?? "fixtures/manifest.json");
-        break;
-      case "run-extraction":
-        await runExtraction(ctx, arg === "--all" || arg === undefined ? undefined : arg);
-        break;
-      case "build-graph-version":
-        // All positional args after the command are run IDs to publish.
-        await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
-        break;
-      case "enrich-graph-version":
-        await enrichGraphVersion(ctx, arg);
-        break;
-      case "compute-learner-path":
-        await computeLearnerPathCommand(ctx, arg, rest[0]);
-        break;
-      case "generate-study-items":
-        await generateStudyItemsCommand(ctx, arg);
-        break;
-      case "synthesize-responses":
-        await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
-        break;
-      case "compute-adaptive-path":
-        await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
-        break;
-      case "list-sources":
-        await listSources(ctx);
-        break;
-      default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
-    }
+    // Bracket the whole command (U2, R1): one structured `stage_timing` line per
+    // top-level worker invocation. Each `worker:kg` command is its own process in the
+    // serial seed chain, so these lines plus the enrichment sub-stage lines give the
+    // full-run wall-clock split. The usage/default branch is timed too (harmless).
+    await withStageTiming(command ?? "usage", () => dispatch(ctx, command, arg, rest));
   } finally {
     await ctx.sql.end({ timeout: 5 });
   }
