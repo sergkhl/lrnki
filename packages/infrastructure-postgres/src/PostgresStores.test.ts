@@ -304,7 +304,8 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       judgments: [],
       dispositions: [],
       groundingDispositions: [],
-      rescueDispositions: []
+      rescueDispositions: [],
+      nodeMerges: []
     };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({
@@ -380,6 +381,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     // the rescued (source_mentioned) pair stays on the DeepSeek alias.
     const ctx = (id: string, label: string) => ({ derivedNodeId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
     const droppedId = randomUUID();
+    const absorbedMergeId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
       judgments: [
         { declaredDomain: "software engineering", judgeModel: "kg-generated-prerequisite-judgment", a: ctx(mintedId, "Stack allocation"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.8, rationale: "r" } },
@@ -390,6 +392,13 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     ], rescueDispositions: [
       { derivedNodeId: rescuedId, canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
       { derivedNodeId: droppedId, canonicalLabel: "Table 3 Ablation", normalizedLabel: "table 3 ablation", declaredDomain: "software engineering", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
+    ],
+    // U4: one merge — the anchor (surviving canonical, FK-resolved) absorbed a removed
+    // near-duplicate enrichment node (absorbed id correlation-only, no FK violation).
+    nodeMerges: [
+      { declaredDomain: "software engineering", canonicalDerivedNodeId: anchorId, canonicalLabel: anchorLabel, canonicalNodeKind: "anchor",
+        absorbedDerivedNodeId: absorbedMergeId, absorbedLabel: "Ownership (Rust)", absorbedAliases: ["owning"], absorbedNodeKind: "enrichment",
+        absorbedEvidence: ["the owner frees memory"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
     ] };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
@@ -421,6 +430,28 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const dropped = dispositions.find((d) => d.derived_node_id === droppedId);
     assert.equal(dropped?.disposition, "dropped");
     assert.equal(dropped?.rationale, "incidental artifact");
+
+    // U4: the merge record persisted — canonical FK resolves to a surviving node, the
+    // absorbed (removed) id persists without an FK violation, and the snapshot columns
+    // (label/aliases/evidence/signal/score/reason) round-trip.
+    const merges = await sql<{
+      canonical_derived_node_id: string; absorbed_derived_node_id: string; absorbed_label: string;
+      absorbed_aliases: string[]; absorbed_evidence: string[]; proposing_signal: string; proposing_score: number;
+      canonical_selection_reason: string; canonical_node_kind: string; absorbed_node_kind: string;
+    }[]>`SELECT canonical_derived_node_id, absorbed_derived_node_id, absorbed_label, absorbed_aliases, absorbed_evidence,
+            proposing_signal, proposing_score, canonical_selection_reason, canonical_node_kind, absorbed_node_kind
+         FROM derived_node_merges WHERE enrichment_id = ${enrichmentId}`;
+    assert.equal(merges.length, 1);
+    assert.equal(merges[0].canonical_derived_node_id, anchorId);
+    assert.equal(merges[0].absorbed_derived_node_id, absorbedMergeId);
+    assert.equal(merges[0].absorbed_label, "Ownership (Rust)");
+    assert.deepEqual(merges[0].absorbed_aliases, ["owning"]);
+    assert.deepEqual(merges[0].absorbed_evidence, ["the owner frees memory"]);
+    assert.equal(merges[0].proposing_signal, "embedding_cosine");
+    assert.ok(Math.abs(Number(merges[0].proposing_score) - 0.97) < 1e-5);
+    assert.equal(merges[0].canonical_selection_reason, "anchor_over_enrichment");
+    assert.equal(merges[0].canonical_node_kind, "anchor");
+    assert.equal(merges[0].absorbed_node_kind, "enrichment");
   } finally {
     await sql.end();
   }

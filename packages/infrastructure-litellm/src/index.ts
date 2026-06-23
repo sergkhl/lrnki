@@ -1,5 +1,12 @@
 export { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 export type { JsonSchema, ToolMessage } from "./LiteLlmForcedToolClient";
+export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
+export {
+  LiteLlmNodeEmbeddingAdapter,
+  LiteLlmNodeMergeAdjudicationAdapter,
+  NODE_EMBEDDING_MODEL,
+  NODE_MERGE_ADJUDICATION_MODEL
+} from "./dedupAdapters";
 export {
   conceptDiscoverySchema,
   conceptDiscoveryValidator,

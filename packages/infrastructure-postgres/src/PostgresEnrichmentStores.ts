@@ -112,6 +112,26 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
           )`;
       }
 
+      // Derived-layer semantic merges (U4): one row per absorbed node, the relational
+      // mirror of the trace's merge records so Admin Lab reads them without recompute
+      // (rules 11/12). The canonical FK resolves to a surviving derived_graph_nodes row;
+      // the absorbed id is correlation-only (the node was removed from the layer).
+      for (const merge of artifact.payload.nodeMerges) {
+        await tx`
+          INSERT INTO derived_node_merges (
+            derived_node_merge_id, enrichment_id, declared_domain,
+            canonical_derived_node_id, canonical_label, canonical_node_kind,
+            absorbed_derived_node_id, absorbed_label, absorbed_aliases, absorbed_node_kind, absorbed_evidence,
+            proposing_signal, proposing_score, rationale, canonical_selection_reason
+          )
+          VALUES (
+            ${randomUUID()}, ${layer.enrichmentId}, ${merge.declaredDomain},
+            ${merge.canonicalDerivedNodeId}, ${merge.canonicalLabel}, ${merge.canonicalNodeKind},
+            ${merge.absorbedDerivedNodeId}, ${merge.absorbedLabel}, ${tx.json(merge.absorbedAliases)}, ${merge.absorbedNodeKind}, ${tx.json(merge.absorbedEvidence)},
+            ${merge.proposingSignal}, ${merge.proposingScore}, ${merge.rationale}, ${merge.canonicalSelectionReason}
+          )`;
+      }
+
       for (const difficulty of layer.difficulties) {
         await tx`
           INSERT INTO concept_difficulties (concept_difficulty_id, enrichment_id, derived_node_id, score, method, components, neural_rationale)

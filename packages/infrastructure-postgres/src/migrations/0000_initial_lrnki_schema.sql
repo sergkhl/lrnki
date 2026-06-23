@@ -539,6 +539,34 @@ CREATE TABLE rescue_dispositions (
   grounding_span text NOT NULL
 );
 
+-- Derived-layer semantic merges (plan U4, ADR-0012/0019, AGENTS rule 20). One row per
+-- ABSORBED node the dedup sub-stage collapsed into a canonical near-duplicate (U3). The
+-- canonical node SURVIVES, so canonical_derived_node_id has an FK; the absorbed node is
+-- REMOVED from the layer, so absorbed_derived_node_id is correlation-only with NO FK
+-- (exactly as rescue_dispositions.derived_node_id is correlation-only for dropped
+-- candidates). The absorbed node's label/aliases/kind/evidence are SNAPSHOTTED here so
+-- Admin Lab reads a merge without rehydrating a deleted node (U5). Lives only on the
+-- derived layer; published Concept identity and IRIs are untouched (R7). The absorbed
+-- node is always an enrichment node — an anchor is never absorbed (KTD6).
+CREATE TABLE derived_node_merges (
+  derived_node_merge_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  declared_domain text NOT NULL,
+  canonical_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  canonical_label text NOT NULL,
+  canonical_node_kind text NOT NULL CHECK (canonical_node_kind IN ('anchor', 'enrichment')),
+  absorbed_derived_node_id uuid NOT NULL,
+  absorbed_label text NOT NULL,
+  absorbed_aliases jsonb NOT NULL,
+  absorbed_node_kind text NOT NULL CHECK (absorbed_node_kind IN ('anchor', 'enrichment')),
+  absorbed_evidence jsonb NOT NULL,
+  proposing_signal text NOT NULL CHECK (proposing_signal IN ('embedding_cosine')),
+  proposing_score real NOT NULL,
+  rationale text NOT NULL,
+  canonical_selection_reason text NOT NULL CHECK (canonical_selection_reason IN ('anchor_over_enrichment', 'higher_evidence_count', 'stable_id_tiebreak')),
+  CHECK (canonical_derived_node_id <> absorbed_derived_node_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Learner Path — vertical-slice projection output (ADR-0019). CLI computes and
 -- persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).

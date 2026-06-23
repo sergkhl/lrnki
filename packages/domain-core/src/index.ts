@@ -777,6 +777,58 @@ export type RescueDurabilityJudgment = {
   rationale: string;
 };
 
+// Merge-adjudication decision for semantic dedup (plan U2, AGENTS rule 20). The
+// DECIDE half of the propose/decide split: given two same-domain near-duplicate
+// candidates the embedding proposer surfaced, a cross-family LLM judge decides whether
+// they are two surface forms of the SAME domain concept (`merge`) or genuinely distinct
+// (`keep_distinct`). Decision-only — no score; the proposing cosine score is recorded
+// separately on the merge record. Mirrors the advisory shape of RescueDurabilityJudgment;
+// the dedup stage owns the fail-closed default (transport/validation failure →
+// keep_distinct, no merge — R13).
+export type NodeMergeDecision = "merge" | "keep_distinct";
+
+export type NodeMergeAdjudication = {
+  decision: NodeMergeDecision;
+  rationale: string;
+};
+
+// The proposing signal behind a merge (plan U3/U4, AGENTS rule 20). Today only
+// embedding cosine proposes; kept as a named union so a future propose signal records
+// its own provenance rather than overloading one string.
+export type NodeMergeProposingSignal = "embedding_cosine";
+
+// Why the canonical side won canonical selection (plan KTD6, deterministic + recorded).
+// An anchor always beats an enrichment node (preserves published Concept identity / IRI
+// permanence, R7); a same-kind tie breaks by evidence count, then by stable derived-node
+// id. Stored on the merge record so replay and audit are deterministic.
+export type CanonicalSelectionReason =
+  | "anchor_over_enrichment"
+  | "higher_evidence_count"
+  | "stable_id_tiebreak";
+
+// One recorded derived-layer semantic merge (plan U3/U4, R5/R6). Provenance for a
+// collapsed near-duplicate pair: the surviving canonical node, a SNAPSHOT of the
+// absorbed node (its derived_graph_nodes row never persists, so the label/aliases/kind/
+// evidence are captured here for Admin Lab), the proposing signal + score, the deciding
+// rationale, and the canonical-selection reason. The absorbed node is always an
+// enrichment node — an anchor is never absorbed (KTD6). Lives on the Derived Graph Layer
+// only; published Concept identity and IRIs are untouched (R7).
+export type NodeMergeRecord = {
+  declaredDomain: string;
+  canonicalDerivedNodeId: string;
+  canonicalLabel: string;
+  canonicalNodeKind: "anchor" | "enrichment";
+  absorbedDerivedNodeId: string;
+  absorbedLabel: string;
+  absorbedAliases: string[];
+  absorbedNodeKind: "anchor" | "enrichment";
+  absorbedEvidence: string[];
+  proposingSignal: NodeMergeProposingSignal;
+  proposingScore: number;
+  rationale: string;
+  canonicalSelectionReason: CanonicalSelectionReason;
+};
+
 // The recorded disposition of one aggregated rescue candidate after durability
 // judging (U3/R4). `accepted` — a derived `source_mentioned` node exists; `dropped`
 // — vetoed on a CONFIDENT, source-grounded `not_durable` verdict; `kept_judge_unavailable`
@@ -891,6 +943,11 @@ export type EnrichmentRunTrace = {
   // judge-unavailable, so an operator can audit why each rescued node is (or is not)
   // in the derived layer. Persisted in U4.
   rescueDispositions: RescueDisposition[];
+  // Per-absorbed-node semantic merge records (plan U3/U4, R5). One per derived node the
+  // dedup sub-stage absorbed into a canonical near-duplicate, with full propose + decide
+  // + canonical-selection provenance. Empty when dedup did not run (opt-in). Persisted in
+  // U4 to `derived_node_merges` for Admin Lab.
+  nodeMerges: NodeMergeRecord[];
 };
 
 // Node difficulty keeps a stable output shape while the producer evolves. The

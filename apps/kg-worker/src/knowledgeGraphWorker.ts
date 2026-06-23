@@ -31,6 +31,9 @@ import {
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
+  LiteLlmEmbeddingClient,
+  LiteLlmNodeEmbeddingAdapter,
+  LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmGroundingGenerationAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmLearnerSimulatorAdapter,
@@ -109,6 +112,9 @@ function buildContext() {
   // the three fixtures); claims are per-subject and benefit from stable text. Not
   // bit-exact on DeepSeek's MoE, so a small residual remains.
   const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
+  // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
+  // options as the forced-tool clients; embeddings have no sampling knobs.
+  const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
   return {
     sql,
     registrationStore,
@@ -147,6 +153,13 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
+    // near-duplicate pairs (qwen3-embedding-8b via kg-node-embedding); a cross-family
+    // adjudicator DECIDES each merge (kg-independent-judge / gpt-oss-120b, deterministic
+    // decoding) so the DeepSeek family never decides its own merges. Both opt-in: enrich
+    // without them for the U7 baseline.
+    nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
+    nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
     difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
@@ -290,12 +303,17 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
+    nodeEmbedding: ctx.nodeEmbedding,
+    nodeMergeAdjudicator: ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
     // Surface enrichment sub-stage wall-clock through the same structured sink as the
     // top-level commands (U2, R1). The application reports {stage, ms}; sub-stages that
     // complete are ok:true (a thrown sub-stage fails the command, timed at top level).
-    onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true })
+    onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true }),
+    // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
+    // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
+    onDedupSummary: (summary) => console.log(`   dedup: merges=${summary.merges} unavailable=${summary.unavailable}`)
   });
   const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
   const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;

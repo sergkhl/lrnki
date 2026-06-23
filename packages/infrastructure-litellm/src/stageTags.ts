@@ -20,6 +20,11 @@ export const STAGE_TAGS = {
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
   groundingGeneration: "grounding-generation",
   intrinsicDifficulty: "intrinsic-difficulty",
+  // Derived-node semantic deduplication (plan U1/U2). The embedding PROPOSE signal and
+  // the cross-family merge-adjudication DECISION attribute separately so the recall vs
+  // precision halves of the pass are individually visible in spend (AGENTS rule 20).
+  nodeEmbedding: "node-embedding",
+  nodeMergeAdjudication: "node-merge-adjudication",
   // Learner Study Loop.
   studyItemGeneration: "study-item-generation",
   answerGrading: "answer-grading",

@@ -28,6 +28,7 @@ import type {
   LearnerPath,
   MentionedNonCoreCandidate,
   MissingPrerequisiteProposal,
+  NodeMergeAdjudication,
   PrerequisiteConceptContext,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
@@ -131,6 +132,35 @@ export interface RescueDurabilityJudgmentPort {
     candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
     anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
   }): Promise<RescueDurabilityJudgment>;
+}
+
+// Derived-node embedding PROPOSE signal for semantic deduplication (plan U1, ADR-0012,
+// AGENTS rule 20). Returns one vector per derived-node text so the dedup stage can
+// compute within-domain cosine and surface candidate near-duplicate pairs. Embeddings
+// PROPOSE only: this port never decides similarity, never merges, and is never used to
+// derive a prerequisite. `embed` preserves input order (vectors[i] is texts[i]) and
+// fails closed (throws) on any shape mismatch so the stage treats the signal as
+// unavailable and skips dedup (R13).
+export interface NodeEmbeddingPort {
+  readonly model: string;
+  embed(texts: string[]): Promise<number[][]>;
+}
+
+// Merge-adjudication DECISION for semantic deduplication (plan U2, AGENTS rule 20). A
+// SEPARATE mechanism from the embedding proposer: it decides whether two proposed
+// near-duplicate nodes are two surface forms of the SAME domain concept (`merge`) or
+// genuinely distinct (`keep_distinct`). A measured cross-family LLM judge; raw cosine
+// never decides. Decision-only (no scores). The adapter validates tool arguments and
+// returns the typed decision; fail-closed semantics (transport/validation failure →
+// the application stage treats the pair as keep-distinct) live in the dedup stage (U3),
+// matching how applyRescueDurabilityJudge owns its fail-open grounding decision.
+export interface NodeMergeAdjudicationPort {
+  readonly model: string;
+  adjudicate(input: {
+    declaredDomain: string;
+    a: { label: string; aliases: string[]; evidence: string[] };
+    b: { label: string; aliases: string[]; evidence: string[] };
+  }): Promise<NodeMergeAdjudication>;
 }
 
 export interface ArtifactRepositoryPort {

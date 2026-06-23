@@ -17,6 +17,7 @@ import type {
   PrerequisiteJudgmentPort
 } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment } from "./runGraphEnrichment";
+import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
 
 // Two Declared Domains: "x" has 3 concepts, "y" has 2. Prerequisites are always
 // same-domain (ADR-0015), so per-node forward batching (KTD1) must cover exactly
@@ -235,7 +236,8 @@ test("runGraphEnrichment honors a non-default mention bound and preserves neural
       judgeConcurrency: 4,
       maxMentionsPerConceptInPair: 2,
       maxCandidatesPerBatch: 12,
-      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
+      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 },
+      dedup: DEFAULT_DEDUP_CONFIG
     }
   });
 
@@ -331,11 +333,11 @@ test("runGraphEnrichment scores intrinsic difficulty with per-node evidence cont
   assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
 });
 
-test("runGraphEnrichment default config hash reflects intrinsic difficulty", async () => {
+test("runGraphEnrichment default config hash reflects the dedup sub-stage", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "intrinsic-difficulty-v3");
-  assert.equal(layer.enrichmentConfigHash, "intrinsic-difficulty-v3");
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "dedup-v1");
+  assert.equal(layer.enrichmentConfigHash, "dedup-v1");
 });
 
 // Scenario 3: an evidence-free snapshot reaches no judge call and fails closed.
@@ -377,7 +379,8 @@ test("runGraphEnrichment resolves every relation under a small per-batch cap", a
       judgeConcurrency: 4,
       maxMentionsPerConceptInPair: 6,
       maxCandidatesPerBatch: 2, // force multi-chunk subjects
-      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
+      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 },
+      dedup: DEFAULT_DEDUP_CONFIG
     }
   });
 
@@ -412,7 +415,8 @@ test("runGraphEnrichment bounds concurrency and keeps deterministic order", asyn
       judgeConcurrency: 2,
       maxMentionsPerConceptInPair: 6,
       maxCandidatesPerBatch: 12,
-      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
+      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 },
+      dedup: DEFAULT_DEDUP_CONFIG
     }
   });
 

@@ -7,6 +7,7 @@ import type {
   EnrichmentRunTrace,
   GroundingVerbatimDisposition,
   InferredPrerequisiteEdge,
+  NodeMergeRecord,
   PrerequisiteConceptContext,
   PrerequisiteJudgment,
   PrerequisiteJudgmentTrace,
@@ -18,11 +19,14 @@ import type {
   EnrichmentRunStorePort,
   GroundingGenerationPort,
   MissingPrerequisiteProposalPort,
+  NodeEmbeddingPort,
+  NodeMergeAdjudicationPort,
   PrerequisiteJudgmentPort,
   RescueDurabilityJudgmentPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
+import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { judgeNodeAgainstCandidates } from "./judgeNodeAgainstCandidates";
 import { mapWithConcurrency } from "./mapWithConcurrency";
@@ -53,15 +57,22 @@ export type GraphEnrichmentConfig = {
   maxCandidatesPerBatch: number;
   // Bounds on the anchor-driven node-minting pass (KTD6, R7).
   mintingBounds: EnrichmentMintingBounds;
+  // Semantic-dedup knobs (plan U3). Only consulted when both dedup ports are provided;
+  // tuned in the U7 rule-14 pass against the largest domain.
+  dedup: DedupConfig;
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  enrichmentConfigHash: "intrinsic-difficulty-v3",
+  // Bumped from `intrinsic-difficulty-v3` because the derived-layer semantic-dedup
+  // sub-stage changes the derivation (ADR-0019 enrichment identity): a re-run produces a
+  // new Derived Graph Layer on the collapsed node set.
+  enrichmentConfigHash: "dedup-v1",
   minEdgeConfidence: 0.5,
   judgeConcurrency: 4,
   maxMentionsPerConceptInPair: 6,
   maxCandidatesPerBatch: 12,
-  mintingBounds: DEFAULT_MINTING_BOUNDS
+  mintingBounds: DEFAULT_MINTING_BOUNDS,
+  dedup: DEFAULT_DEDUP_CONFIG
 };
 
 // Graph Enrichment — the third operation, generalized to NODE + EDGE derivation
@@ -99,6 +110,15 @@ export async function runGraphEnrichment(input: {
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
   // unjudged (prior behavior).
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional semantic-dedup ports (plan U3, AGENTS rule 20). Provide BOTH to enable the
+  // dedup sub-stage: the embedding PROPOSES near-duplicate pairs and the cross-family
+  // adjudicator DECIDES each merge. Omit either to leave enrichment behavior identical to
+  // today (opt-in, like node minting) — this is how the U7 baseline run is produced.
+  nodeEmbedding?: NodeEmbeddingPort;
+  nodeMergeAdjudicator?: NodeMergeAdjudicationPort;
+  // Optional dedup summary hook (R13): the application reports the merge count and any
+  // fail-closed events; the worker formats the structured line (no console I/O here).
+  onDedupSummary?: (summary: { merges: number; unavailable: number }) => void;
   // Optional per-sub-stage wall-clock hook (U2, KTD5, R1). The application stays free
   // of console I/O: it only measures monotonic elapsed ms around each enrichment
   // sub-stage and reports through this callback; the worker formats the structured line.
@@ -176,17 +196,56 @@ export async function runGraphEnrichment(input: {
     });
   }
 
-  const allNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
+  const assembledNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
+
+  // Step 0.5 — semantic deduplication of the derived node set (plan U3, ADR-0012, AGENTS
+  // rule 20). Runs BEFORE per-node judging so duplicate nodes never reach the judge and
+  // prerequisite chains form on the collapsed set (KTD4). Opt-in: only when both dedup
+  // ports are provided. Embeddings PROPOSE within-domain near-duplicate pairs; a
+  // cross-family adjudicator DECIDES each merge; raw cosine never merges (R2/R3). Absorbed
+  // evidence is threaded into the canonical node's judge context below (R6). Published
+  // identity is never touched — an anchor is never absorbed (R7/KTD6).
+  let allNodes = assembledNodes;
+  let nodeMerges: NodeMergeRecord[] = [];
+  let absorbedGroundingByCanonical = new Map<string, string[]>();
+  if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
+    await timeStage("enrichment:dedup", async () => {
+      // Reduce each node to its dedup context from the SAME contextOf reduction the judge
+      // uses (label + verbatim definition/mention quotes), without absorbed grounding yet.
+      const dedupContext = new Map<string, DedupNodeContext>(
+        assembledNodes.map((node) => {
+          const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
+          return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
+        })
+      );
+      let unavailable = 0;
+      const result = await deduplicateDerivedNodes({
+        nodes: assembledNodes,
+        contextByNodeId: dedupContext,
+        embedding: input.nodeEmbedding,
+        adjudicator: input.nodeMergeAdjudicator,
+        config: config.dedup,
+        onUnavailable: () => {
+          unavailable += 1;
+        }
+      });
+      allNodes = result.nodes;
+      nodeMerges = result.merges;
+      absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
+      input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
+    });
+  }
 
   // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
   // their published CEP; enrichment nodes use their grounding (generated text for
   // llm_grounded, verbatim mention quotes for source_mentioned). The bare label is
-  // never the evidence — an empty context is treated as insufficient upstream.
+  // never the evidence — an empty context is treated as insufficient upstream. A
+  // canonical node also carries its absorbed nodes' evidence (R6).
   const pairingNodes = allNodes.map((node) => ({
     derivedNodeId: node.derivedNodeId,
     declaredDomain: node.declaredDomain,
     groundingOrigin: node.groundingOrigin,
-    context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair)
+    context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair, absorbedGroundingByCanonical.get(node.derivedNodeId))
   }));
   const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
     derivedNodeId: node.derivedNodeId,
@@ -294,7 +353,8 @@ export async function runGraphEnrichment(input: {
       ...reducedEdges.map((edge) => disposition(edge, "kept"))
     ],
     groundingDispositions,
-    rescueDispositions
+    rescueDispositions,
+    nodeMerges
   };
   await input.enrichmentStore.persist({
     layer,
@@ -368,8 +428,15 @@ function forwardCandidatesByDomain<T extends { derivedNodeId: string; declaredDo
 function contextOf(
   node: DerivedGraphNode,
   profileByConcept: Map<string, PublishedConceptEvidenceProfile>,
-  maxMentions: number
+  maxMentions: number,
+  // Absorbed nodes' evidence (R6, KTD5): when this canonical node absorbed near-duplicate
+  // nodes during dedup, their verbatim quotes are appended to its mentions so the judge
+  // sees the unioned evidence. Undefined for a node that absorbed nothing (or when dedup
+  // did not run).
+  absorbedGrounding?: string[]
 ): PrerequisiteConceptContext {
+  const withAbsorbed = (mentions: string[]): string[] =>
+    absorbedGrounding && absorbedGrounding.length ? [...mentions, ...absorbedGrounding] : mentions;
   if (node.nodeKind === "anchor") {
     const profile = profileByConcept.get(node.conceptId);
     const publishedAssertions = profile?.assertions ?? [];
@@ -378,7 +445,7 @@ function contextOf(
       canonicalLabel: node.canonicalLabel,
       aliases: node.aliases,
       definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
-      mentions: (profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote),
+      mentions: withAbsorbed((profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote)),
       assertions: publishedAssertions.map((assertion) => ({ type: assertion.type, detail: assertion.literalValue }))
     };
   }
@@ -388,7 +455,7 @@ function contextOf(
       canonicalLabel: node.canonicalLabel,
       aliases: node.aliases,
       definitions: [],
-      mentions: node.groundingPassages.slice(0, maxMentions).map((passage) => passage.evidenceQuote),
+      mentions: withAbsorbed(node.groundingPassages.slice(0, maxMentions).map((passage) => passage.evidenceQuote)),
       assertions: []
     };
   }
@@ -397,7 +464,7 @@ function contextOf(
     canonicalLabel: node.canonicalLabel,
     aliases: node.aliases,
     definitions: node.groundingBundle.definitions.map((passage) => passage.text),
-    mentions: node.groundingBundle.mentions.slice(0, maxMentions).map((passage) => passage.text),
+    mentions: withAbsorbed(node.groundingBundle.mentions.slice(0, maxMentions).map((passage) => passage.text)),
     assertions: []
   };
 }

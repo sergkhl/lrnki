@@ -12,6 +12,16 @@ export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+export {
+  deduplicateDerivedNodes,
+  cosineSimilarity,
+  candidatePairsByDomain,
+  DEFAULT_DEDUP_CONFIG,
+  type DedupConfig,
+  type DedupNodeContext,
+  type DeduplicateResult,
+  type DedupUnavailable
+} from "./deduplicateDerivedNodes";
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";

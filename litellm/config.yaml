@@ -295,3 +295,8 @@ router_settings:
     # extractor grading its own output. (The off-core oracle triangle and label
     # aligner were retired after the admission-precision fix; see ADR-0013/0022.)
     kg-independent-judge: openrouter/openai/gpt-oss-120b
+    # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
+    # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;
+    # a separate cross-family adjudicator (kg-independent-judge) DECIDES each merge.
+    # Never used to derive prerequisites.
+    kg-node-embedding: openrouter/qwen/qwen3-embedding-8b

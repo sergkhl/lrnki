@@ -597,6 +597,34 @@ export const rescueDurabilityJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Node merge adjudication: submit_node_merge_decision (U2, R3/R4) ----------
+// The DECIDE half of semantic dedup (AGENTS rule 20). Embedding cosine PROPOSED that
+// two same-domain nodes may be near-duplicates; this judge decides whether they are two
+// surface forms of the SAME domain concept or genuinely distinct. Decision-only output
+// (the proposing score is recorded separately, never re-derived here). Domain-neutral
+// rubric — no fixture labels, no lexical patterns (AGENTS rules 16/17). The two sides
+// are presented symmetrically with neither privileged; the application stage defaults a
+// transport/validation failure to keep_distinct (fail-closed, no merge — R13).
+export const nodeMergeAdjudicationSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["decision", "rationale"],
+  properties: {
+    decision: {
+      type: "string",
+      enum: ["merge", "keep_distinct"],
+      description:
+        "'merge' ONLY when the two labels denote the SAME underlying unit of domain knowledge — two surface forms of one concept (for example a singular/possessive/abbreviated variant, or a paraphrase that a learner would not study as a separate idea). 'keep_distinct' when they are genuinely different concepts, even if lexically or topically close (a concept and a specialization of it, a part and its whole, two siblings, a general idea and one mechanism within it). Decide from the concepts' MEANING and the cited evidence, never from surface wordform overlap; when unsure, prefer 'keep_distinct' (merging is the irreversible-feeling action that fragments or fuses a learner's graph)."
+    },
+    rationale: { type: "string", description: "One terse sentence naming what makes the two the same concept or distinct." }
+  }
+};
+
+export const nodeMergeAdjudicationValidator = z.object({
+  decision: z.enum(["merge", "keep_distinct"]),
+  rationale: z.string().min(1)
+}).strict();
+
 // --- Card generation: submit_recall_card (U2, R1/R2) ----------------------
 // One anki-style recall card per derived learning node, conditioned on its grounding.
 // The answer-key cites provided grounding passages by passage id + quote; the
