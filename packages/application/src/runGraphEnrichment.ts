@@ -81,10 +81,13 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
   // re-derives the layer. Unversioned `kind` name, consistent with the abolished `.vN`
   // convention (KTD7) — K-sampling supersedes single-draw whole-set ordering.
   enrichmentConfigHash: "k-sample-ordering",
-  // Provisional K and contest fraction — CALIBRATED against real multi-draw output in U6
-  // (D8); the K=8 probe surfaced the phenomena but is too small to set production values.
+  // CALIBRATED in the U6 rule-14 pass against real K=8 gpt-oss-120b draws over the Rust +
+  // economics fixtures (D8; tmp/2026-06-24-k-sample-ordering-rule14/). K=8 is the
+  // probe-validated draw count. The contest fraction 0.1 catches a genuine 7:1 directional
+  // flip at K=8 (min/K = 0.125 ≥ 0.1 → `uncertain`) while scaling with K — a single stray
+  // reverse at K≥16 (≤0.0625) stays committed, so a robust pair is not routed to `uncertain`.
   orderingSampleCount: 8,
-  directionContestMinorityFraction: 0.2,
+  directionContestMinorityFraction: 0.1,
   // Now gates an AGREEMENT fraction (max(f,r)/K), not a 0.85-scale self-report — so 0.5
   // means "present in at least half the draws". Recalibrated in U6 (KTD2).
   minEdgeConfidence: 0.5,
