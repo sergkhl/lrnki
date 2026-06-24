@@ -385,9 +385,9 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const absorbedMergeId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
       orderings: [
-        { declaredDomain: "software engineering", judgeModel: "mock-judge", nodeCount: 3, reprompted: false, cycleRoutedEdges: [], assertedEdges: [
-          { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, confidence: 0.8, rationale: "r" },
-          { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, confidence: 0.7, rationale: "r" }
+        { declaredDomain: "software engineering", judgeModel: "mock-judge", nodeCount: 3, k: 8, cycleRoutedEdges: [], pairVotes: [
+          { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, forward: 8, reverse: 0, k: 8, consensusConfidence: 1, classification: "consensus" },
+          { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, forward: 7, reverse: 1, k: 8, consensusConfidence: 0.875, classification: "consensus" }
         ] }
       ], nodeExclusions: [], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
