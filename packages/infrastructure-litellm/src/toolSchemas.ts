@@ -310,52 +310,35 @@ export const conceptEvidenceProfileValidator = z.object({
   }).strict())
 }).strict();
 
-// --- Batched prerequisite judgment: submit_prerequisite_judgments ---------
-// One bounded BATCHED judgment over a subject concept and a list of same-domain
-// candidates (ADR-0019 amended, plan U4/KTD1). For each candidate the model returns a
-// DIRECTION between the subject and that candidate, not free-form edges; the
-// application boundary maps each to a directed/none/uncertain edge fail-closed.
-
-const PREREQUISITE_RELATION = ["prerequisite", "none", "uncertain"] as const;
-
-// The judge NAMES the prerequisite concept rather than emitting a positional
-// 'subject-is-prerequisite-of-candidate' token. A real run showed the model reasons
-// correctly but systematically anchors a positional token on one side, producing edges
-// that contradict their own rationale. Copying the verbatim label of the concept that
-// must be understood FIRST removes the positional mapping the model gets wrong; the
-// application matches the label against the subject and the named candidate and fails
-// closed to 'uncertain' (flagged, path-excluded) when it names neither — never a guess.
-// Each result identifies its candidate by `candidateRef` = the candidate's verbatim
-// canonical label (unique within a same-domain batch under ADR-0015 dedup); a
-// candidateRef matching no provided candidate is dropped fail-closed, never guessed.
-export const batchedPrerequisiteJudgmentSchema: JsonSchema = {
+// --- Whole-set prerequisite ordering: submit_prerequisite_ordering --------
+// ONE whole-set ordering over all evidenced nodes in a Declared Domain (ADR-0019
+// amended — whole-set ordering, plan U2/KTD2). The model returns a directed acyclic
+// edge list over the listed concepts; it is globally self-consistent by construction,
+// so a non-edge is simply absent — there is no per-edge 'none'/'uncertain' token. Each
+// edge NAMES its two endpoints by verbatim canonical label (unique within a same-domain
+// set under ADR-0015 dedup); the application maps labels → ids fail-closed (R9, KTD3)
+// and an endpoint matching no listed node is rejected, never guessed.
+export const prerequisiteOrderingSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["relations"],
+  required: ["edges"],
   properties: {
-    relations: {
+    edges: {
       type: "array",
       description:
-        "One judgment per candidate concept: the learning-prerequisite direction between the SUBJECT concept and that candidate. Include every provided candidate exactly once.",
+        "The directed prerequisite edges over the listed concepts, forming one acyclic ordering. Omit a pair entirely when neither concept must be understood before the other. Do not emit a cycle: if you cannot decide a direction, leave the pair out.",
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["candidateRef", "relation", "prerequisiteLabel", "confidence", "rationale"],
+        required: ["prerequisiteLabel", "dependentLabel", "confidence", "rationale"],
         properties: {
-          candidateRef: {
-            type: "string",
-            description: "The EXACT canonical label (copied verbatim) of the candidate concept this judgment is about. Must equal one of the provided candidate labels."
-          },
-          relation: {
-            type: "string",
-            enum: [...PREREQUISITE_RELATION],
-            description:
-              "'prerequisite' when one of the subject/candidate must be understood before the other; 'none' when neither is a learning prerequisite of the other; 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
-          },
           prerequisiteLabel: {
             type: "string",
-            description:
-              "When relation='prerequisite', the EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. It must equal either the subject label or this candidate's label. Empty string for 'none' or 'uncertain'."
+            description: "The EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. Must equal one of the listed concept labels."
+          },
+          dependentLabel: {
+            type: "string",
+            description: "The EXACT canonical label (copied verbatim) of the concept that depends on the prerequisite. Must equal a DIFFERENT listed concept label."
           },
           confidence: { type: "number", minimum: 0, maximum: 1 },
           rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
@@ -365,11 +348,10 @@ export const batchedPrerequisiteJudgmentSchema: JsonSchema = {
   }
 };
 
-export const batchedPrerequisiteJudgmentValidator = z.object({
-  relations: z.array(z.object({
-    candidateRef: z.string().min(1),
-    relation: z.enum(PREREQUISITE_RELATION),
-    prerequisiteLabel: z.string(),
+export const prerequisiteOrderingValidator = z.object({
+  edges: z.array(z.object({
+    prerequisiteLabel: z.string().min(1),
+    dependentLabel: z.string().min(1),
     confidence: z.number().min(0).max(1),
     rationale: z.string().min(1)
   }).strict())

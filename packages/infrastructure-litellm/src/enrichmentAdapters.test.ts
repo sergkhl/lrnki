@@ -3,112 +3,100 @@ import { test } from "node:test";
 import type { PrerequisiteConceptContext } from "@lrnki/domain-core";
 import {
   LiteLlmMintingDurabilityJudgmentAdapter,
-  LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
   MINTING_DURABILITY_JUDGE_MODEL,
+  PREREQUISITE_ORDERING_MODEL,
   RESCUE_DURABILITY_JUDGE_MODEL
 } from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { batchedPrerequisiteJudgmentValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
+import { prerequisiteOrderingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
   return { derivedNodeId, canonicalLabel, aliases: [], definitions: [`${canonicalLabel} def`], mentions: [], assertions: [] };
 }
 
-type Relation = { candidateRef: string; relation: string; prerequisiteLabel: string; confidence: number; rationale: string };
+type OrderingEdge = { prerequisiteLabel: string; dependentLabel: string; confidence: number; rationale: string };
 
-// Stub the forced-tool client so the test exercises ONLY the adapter's batched
-// candidateRef/label -> id mapping, not the network. The canned object stands in for
-// the validated tool args (a deterministic envelope over a canned response — rule 11).
-function adapterReturning(canned: { relations: Relation[] }) {
-  const client = { async call() { return canned; } } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmPrerequisiteJudgmentAdapter(client);
+// Stub the forced-tool client so the test exercises ONLY the adapter's render + validate
+// + passthrough, not the network. The canned object stands in for the validated tool
+// args (a deterministic envelope over a canned response — rule 11). `capture` records the
+// last client call so the re-prompt test can assert the prompt carries the cycle path.
+function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string } }) {
+  const client = {
+    async call(input: unknown) {
+      if (capture) capture.lastCall = input as { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string };
+      return canned;
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmPrerequisiteOrderingAdapter(client);
 }
 
-const subject = context("idS", "Ownership");
+const ownership = context("idS", "Ownership");
 const moveSemantics = context("idA", "Move semantics");
 const borrowing = context("idB", "Borrowing");
 
-test("names the SUBJECT as prerequisite -> directed subject->candidate", async () => {
-  const { relations } = await adapterReturning({
-    relations: [{ candidateRef: "Move semantics", relation: "prerequisite", prerequisiteLabel: "Ownership", confidence: 0.9, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(relations.length, 1);
-  assert.equal(relations[0].outcome, "directed");
-  assert.equal(relations[0].prerequisiteDerivedNodeId, "idS");
-  assert.equal(relations[0].dependentDerivedNodeId, "idA");
+test("ordering adapter runs on the single non-DeepSeek ordering alias", () => {
+  assert.equal(PREREQUISITE_ORDERING_MODEL, "kg-prerequisite-ordering");
+  assert.equal(adapterReturning({ edges: [] }).model, "kg-prerequisite-ordering");
 });
 
-test("names the CANDIDATE as prerequisite -> directed candidate->subject (no positional bias)", async () => {
-  const { relations } = await adapterReturning({
-    relations: [{ candidateRef: "Move semantics", relation: "prerequisite", prerequisiteLabel: "Move semantics", confidence: 0.9, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(relations[0].outcome, "directed");
-  assert.equal(relations[0].prerequisiteDerivedNodeId, "idA");
-  assert.equal(relations[0].dependentDerivedNodeId, "idS");
-});
-
-test("candidateRef and prerequisiteLabel match are case-insensitive and trimmed", async () => {
-  const { relations } = await adapterReturning({
-    relations: [{ candidateRef: "  move SEMANTICS ", relation: "prerequisite", prerequisiteLabel: "  OWNERSHIP ", confidence: 0.8, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(relations[0].outcome, "directed");
-  assert.equal(relations[0].prerequisiteDerivedNodeId, "idS");
-});
-
-// AE1: a 'prerequisite' relation whose label matches neither concept degrades to
-// 'uncertain' rather than producing an edge.
-test("a 'prerequisite' relation naming neither subject nor candidate fails closed to uncertain", async () => {
-  const { relations } = await adapterReturning({
-    relations: [{ candidateRef: "Move semantics", relation: "prerequisite", prerequisiteLabel: "Pointers", confidence: 0.9, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(relations[0].outcome, "uncertain");
-});
-
-test("'none' maps to none; 'uncertain' maps to uncertain", async () => {
-  const none = await adapterReturning({
-    relations: [{ candidateRef: "Move semantics", relation: "none", prerequisiteLabel: "", confidence: 0.1, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(none.relations[0].outcome, "none");
-  const uncertain = await adapterReturning({
-    relations: [{ candidateRef: "Move semantics", relation: "uncertain", prerequisiteLabel: "", confidence: 0.4, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(uncertain.relations[0].outcome, "uncertain");
-});
-
-// Per-candidate results map to the correct candidate ids regardless of array order.
-test("results map to the correct candidate regardless of returned order", async () => {
-  const { relations } = await adapterReturning({
-    relations: [
-      { candidateRef: "Borrowing", relation: "prerequisite", prerequisiteLabel: "Borrowing", confidence: 0.9, rationale: "r" },
-      { candidateRef: "Move semantics", relation: "none", prerequisiteLabel: "", confidence: 0.1, rationale: "r" }
+// Happy path: a well-formed edges array parses to a typed WholeSetOrdering in input order.
+test("returns the validated label-cited edges verbatim, in order", async () => {
+  const { edges } = await adapterReturning({
+    edges: [
+      { prerequisiteLabel: "Ownership", dependentLabel: "Move semantics", confidence: 0.9, rationale: "r1" },
+      { prerequisiteLabel: "Ownership", dependentLabel: "Borrowing", confidence: 0.8, rationale: "r2" }
     ]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics, borrowing] });
-  // Results follow INPUT candidate order: [moveSemantics, borrowing].
-  assert.equal(relations.length, 2);
-  assert.equal(relations[0].outcome, "none"); // moveSemantics
-  assert.equal(relations[1].outcome, "directed"); // borrowing
-  assert.equal(relations[1].prerequisiteDerivedNodeId, "idB");
-  assert.equal(relations[1].dependentDerivedNodeId, "idS");
+  }).order({ declaredDomain: "software engineering", nodes: [ownership, moveSemantics, borrowing] });
+  assert.equal(edges.length, 2);
+  assert.equal(edges[0].prerequisiteLabel, "Ownership");
+  assert.equal(edges[0].dependentLabel, "Move semantics");
+  assert.equal(edges[1].dependentLabel, "Borrowing");
 });
 
-// Fail-closed: a candidateRef matching no provided candidate is dropped (never mapped
-// to a guessed candidate), and a provided candidate the model omitted degrades to
-// uncertain — so coverage stays exhaustive without inventing an edge.
-test("unmatched candidateRef is dropped; an omitted candidate degrades to uncertain", async () => {
-  const { relations } = await adapterReturning({
-    relations: [{ candidateRef: "Nonexistent", relation: "prerequisite", prerequisiteLabel: "Ownership", confidence: 0.9, rationale: "r" }]
-  }).judge({ declaredDomain: "x", subject, candidates: [moveSemantics] });
-  assert.equal(relations.length, 1, "exactly one result per provided candidate");
-  assert.equal(relations[0].dependentDerivedNodeId, "idA");
-  assert.equal(relations[0].outcome, "uncertain");
-  assert.equal(relations[0].confidence, 0);
+// Edge case: an empty edges array (the judge asserts no relations) is a valid empty ordering.
+test("an empty edges array parses to an empty ordering", async () => {
+  const { edges } = await adapterReturning({ edges: [] }).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
+  assert.deepEqual(edges, []);
 });
 
-// Fail-closed (rule 6): the validator rejects a relation missing a required field.
-test("validator rejects a relation missing a required field", () => {
-  assert.throws(() => batchedPrerequisiteJudgmentValidator.parse({
-    relations: [{ candidateRef: "x", relation: "none", confidence: 0.1, rationale: "r" }] // missing prerequisiteLabel
+// The request carries the forced tool name and the single ordering stage tag (R19).
+test("ordering request carries the stage tag and forced tool name", async () => {
+  const capture: { lastCall?: { toolName?: string; tags?: string[] } } = {};
+  await adapterReturning({ edges: [] }, capture).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
+  assert.equal(capture.lastCall?.toolName, "submit_prerequisite_ordering");
+  assert.deepEqual(capture.lastCall?.tags, ["prerequisite-ordering"]);
+});
+
+// Re-prompt (R10): given a correction, the adapter includes the violating cycle path in
+// the prompt and still returns a validated ordering. The routing decision itself is U4.
+test("a correction includes the violating-cycle path in the prompt", async () => {
+  const capture: { lastCall?: { messages?: { role: string; content: string }[] } } = {};
+  const { edges } = await adapterReturning({
+    edges: [{ prerequisiteLabel: "Ownership", dependentLabel: "Move semantics", confidence: 0.9, rationale: "r" }]
+  }, capture).order({
+    declaredDomain: "software engineering",
+    nodes: [ownership, moveSemantics, borrowing],
+    correction: { cyclePath: ["Ownership", "Move semantics", "Borrowing", "Ownership"] }
+  });
+  const userPrompt = capture.lastCall?.messages?.find((m) => m.role === "user")?.content ?? "";
+  assert.match(userPrompt, /CYCLE/);
+  assert.match(userPrompt, /"Ownership" → "Move semantics" → "Borrowing" → "Ownership"/);
+  assert.equal(edges.length, 1);
+});
+
+// Fail-closed (rule 6): the validator rejects an edge with confidence out of [0,1].
+test("validator rejects confidence out of [0,1]", () => {
+  assert.throws(() => prerequisiteOrderingValidator.parse({
+    edges: [{ prerequisiteLabel: "a", dependentLabel: "b", confidence: 1.5, rationale: "r" }]
+  }));
+});
+
+// Fail-closed (rule 6): the validator rejects an edge missing a required field.
+test("validator rejects an edge missing dependentLabel", () => {
+  assert.throws(() => prerequisiteOrderingValidator.parse({
+    edges: [{ prerequisiteLabel: "a", confidence: 0.5, rationale: "r" }] // missing dependentLabel
   }));
 });
 

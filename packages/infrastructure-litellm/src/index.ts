@@ -17,8 +17,8 @@ export {
   conceptCoreSelectionValidator,
   conceptEvidenceProfileSchema,
   conceptEvidenceProfileValidator,
-  batchedPrerequisiteJudgmentSchema,
-  batchedPrerequisiteJudgmentValidator,
+  prerequisiteOrderingSchema,
+  prerequisiteOrderingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalSchema,
@@ -65,11 +65,10 @@ export {
   ADMISSION_LABEL_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
-  LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
-  PREREQUISITE_JUDGE_MODEL,
-  GENERATED_PREREQUISITE_JUDGE_MODEL,
+  PREREQUISITE_ORDERING_MODEL,
   RESCUE_DURABILITY_JUDGE_MODEL,
   MINTING_DURABILITY_JUDGE_MODEL
 } from "./enrichmentAdapters";

@@ -13,9 +13,10 @@ export const STAGE_TAGS = {
   admissionLabelJudge: "admission-label-judge",
   cepExtraction: "cep-extraction",
   assertionEntailment: "assertion-entailment",
-  // Graph Enrichment (runGraphEnrichment).
-  enrichmentJudge: "enrichment-judge",
-  generatedEnrichmentJudge: "generated-enrichment-judge",
+  // Graph Enrichment (runGraphEnrichment). ONE whole-set ordering call per Declared
+  // Domain (plan U2/U5): the prior per-pair `enrichment-judge` + cross-family
+  // `generated-enrichment-judge` tags collapse into this single attribution bucket.
+  prerequisiteOrdering: "prerequisite-ordering",
   rescueDurability: "rescue-durability",
   mintingDurability: "minting-durability",
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
