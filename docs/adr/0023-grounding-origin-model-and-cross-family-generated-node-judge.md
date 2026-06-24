@@ -1,6 +1,6 @@
 # Grounding-origin model, recorded verbatim exemption, and a cross-family generated-node judge
 
-Status: Accepted (2026-06-16)
+Status: Accepted (2026-06-16; amended 2026-06-24 — a single cross-family whole-set ordering alias replaces the per-pair anchor/generated routing split)
 
 ## Decision
 
@@ -8,7 +8,7 @@ Every node in the graph carries a `grounding_origin` ∈ {`document_anchored`, `
 
 The deterministic verbatim evidence floor (AGENTS rule 16) is applied **per passage by provenance**. A passage that claims a source quote — anchor evidence or `source_mentioned` rescue evidence — must verify verbatim against its cited block or be rejected. A `llm_grounded` generated passage has no source quote, so it is **exempt** — but the exemption is recorded as an explicit `not_applicable_by_grounding` disposition on the node, never a silent skip. The floor therefore still hard-vetoes every passage that asserts a verifiable source claim; the non-verbatim trust contract for generated grounding is explicit and inspectable, not a relaxation of the floor.
 
-Any prerequisite pair touching a generated (`llm_grounded`, later `web_grounded`) node is ordered by a dedicated **cross-family** judge alias (`kg-generated-prerequisite-judgment` → gpt-oss-120b), distinct from the DeepSeek-family generator that minted the node and its grounding. Anchor-only and anchor/`source_mentioned` ordering stays on the validated DeepSeek judge (`kg-prerequisite-judgment`), so the existing anchor-only ordering is not re-validated. The judge reuses the existing direction-bias mitigations unchanged: it names the prerequisite by exact canonical label and may return `uncertain` (flagged and path-excluded).
+Prerequisite ordering is done by a **single cross-family ordering alias** (`kg-prerequisite-ordering` → a non-DeepSeek model, default gpt-oss-120b) over the whole domain at once (ADR-0019, amended 2026-06-24). The cross-family requirement is what this ADR contributes: because the one alias is cross-family from the DeepSeek extractor + grounding generator, the generator can never grade its own minted output — **structurally**, with no per-pair routing split to maintain. **This supersedes the prior dual-judge routing (rule 18):** the earlier design ordered any generated-node-touching pair on a dedicated `kg-generated-prerequisite-judgment` alias while anchor-only pairs stayed on a DeepSeek `kg-prerequisite-judgment` judge; with one whole-set call there is no per-pair routing and both aliases are deleted. The ordering judge cites each edge's endpoints by exact canonical label (the application maps labels → ids fail-closed), and direction-instability on genuinely ambiguous pairs is handled by the acyclicity envelope's cycle→`uncertain` routing rather than a per-pair `uncertain` outcome.
 
 ## Context
 

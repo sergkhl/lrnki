@@ -81,11 +81,11 @@ The domain-scoped process that decides whether Candidates from different sources
 _Avoid_: raw-cosine auto-merge, propose-and-decide in one mechanism, embedding-derived prerequisites
 
 **Graph Enrichment**:
-The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and judges every same-domain pair exhaustively over anchors and those nodes to derive `inferred-prerequisite-of` edges. (Decision: ADR-0019.)
+The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and issues one whole-set ordering call per Declared Domain over anchors and those nodes to derive a globally self-consistent set of `inferred-prerequisite-of` edges (acyclicity verified, one corrective re-prompt, still-cyclic edges routed to `uncertain`). (Decision: ADR-0019.)
 _Avoid_: graph mutation, Static Graph Refinement, embedding blocking
 
 **Enrichment Run**:
-One execution of Graph Enrichment against one published graph version and one enrichment configuration, retaining its pair judgments and dispositions.
+One execution of Graph Enrichment against one published graph version and one enrichment configuration, retaining its per-domain ordering traces and edge dispositions.
 _Avoid_: Derived Graph Layer
 
 **Derived Graph Layer**:

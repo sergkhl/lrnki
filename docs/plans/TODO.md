@@ -2,40 +2,25 @@
 
 ## TODO
 
-1. **Replace exhaustive O(n²) pairwise prerequisite judging with a whole-set global ordering (measured
-   experiment).** Pairwise LLM judgment is intransitive by nature (A→B→C→A), which is *why* the certain
-   edge set is noisy and ordering costs O(n²). Ask the judge for a global prerequisite DAG / topological
-   ordering over the small per-domain concept set in one or few calls — cheaper than the current fan-out
-   and globally self-consistent by construction (no post-hoc cycle removal of intransitive loops).
-   **Direction confirmed (2026-06-23 brainstorm), pending its own dedicated brainstorm/plan; sequenced
-   after the dedup + durability cleanup so the DAG ranges over a cleaner derived node set.** Findings
-   parked here:
-   - Keep it LLM-judged; embeddings stay out of prerequisite derivation (rule 20, ADR-0019).
-   - **Supersede or remove the per-node batched judge** (just merged on `feat/enrichment-perf-batched-judging`):
-     it is a speed optimization of the O(n²) approach, made redundant by whole-set ordering (rule 18). Only
-     the measurement instrument (per-stage `stage_timing`, `/spend/tags`) carries forward.
-   - **This is the governance-compliant form of self-validation.** A whole-set DAG introduces a *structural*
-     correctness notion — **acyclicity** — that lives in the provable deterministic envelope (rules 11/19),
-     unlike pairwise edges whose only correctness is semantic (rule-16 no-gate territory). The provable check
-     informs, never silently vetoes meaning.
-   - **Validation handling = verify-and-route, plus at most one bounded corrective re-prompt** (not an agentic
-     tool-call loop). The model returns the DAG + per-edge confidence in one forced-tool call; the application
-     boundary verifies acyclicity and that edges cite real concepts; a cycle triggers one corrective re-prompt
-     showing the specific violation, and a still-cyclic result routes the offending edges to `uncertain`. The
-     open agentic loop (model self-electing to call checkers, looping) is an explicit **non-goal** — speculative
-     complexity, non-deterministic call timing, hard to measure.
-   - Measured run-scoped experiment compared against the current ADR-0019 exhaustive same-domain baseline
-     by real-use inspection (rules 13/14); promote only if edges get more learner-sensible and cheaper.
+1. **Whole-set global prerequisite ordering.** → **SHIPPED** on `feat/whole-set-prerequisite-ordering`
+   (plan `docs/plans/2026-06-24-001-feat-whole-set-prerequisite-ordering-plan.md`, U1–U6). One whole-set
+   ordering call per Declared Domain replaces the per-pair / per-node-batched judge; acyclicity is verified
+   with one corrective re-prompt and still-cyclic edges route to `uncertain`; the two judge aliases and the
+   `removeCycles` heuristic are deleted (rule 18). **Promotion out of `EXPERIMENT_ONLY` is gated on U7's
+   absolute study-value evaluation** (ADR-0019 KTD1), not parity with the deleted baseline — see COMPLETED
+   once U7 records its verdict and committed backing model.
 
 2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** Per
    ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
-   signal, not a bug to make deterministic. Sample the judge K times per pair (or per global ordering) and
-   route **direction-unstable** pairs to `uncertain` — already excluded from learner paths — instead of
-   committing one arbitrary draw. This both calibrates edge confidence and dissolves the TODO-#6 "noise".
-   - Costs K× judge calls; sequence it *after* task 1 so K× applies to the cheaper global-ordering call,
-     not the O(n²) fan-out. **Gate on observed instability:** ship task 1 single-sample first, inspect it
-     (rule 14), and add K-sampling only if the real defect is direction-instability — do not pre-build K×
-     before the instability it measures is observed. Measured, domain-neutral, disposable (rules 11/16/17).
+   signal, not a bug to make deterministic. Sample the ordering call K times and route **direction-unstable**
+   pairs to `uncertain` — already excluded from learner paths — instead of committing one arbitrary draw.
+   This both calibrates edge confidence and dissolves the former pairwise "noise".
+   - **Trigger (now concrete): task 1's U7 KTD5 inspection.** Single-sample whole-set ordering re-sourced
+     `uncertain` from a per-pair verdict to cycle-routing only, so a genuinely direction-ambiguous pair may
+     now be committed as a directed edge. Build K-sampling only if U7 finds direction-instability on
+     ambiguous pairs is the live study-value defect — do not pre-build K× before that instability is observed.
+   - Costs K× ordering calls, applied to the cheap one-call-per-domain volume (not an O(n²) fan-out).
+     Measured, domain-neutral, disposable (rules 11/16/17).
    - This closes the former enrichment-reproducibility item: root cause is intra-backend MoE
      non-determinism (probe `tmp/2026-06-23-enrichment-determinism-probe/findings.md`), unfixable with
      seed/provider-pinning; `litellm/config.yaml` was correctly left unchanged. Do **not** re-open a
