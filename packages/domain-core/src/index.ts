@@ -451,6 +451,59 @@ export type RunCandidate = {
 // `string[]` reason code into invisibility.
 export const CORE_DEMOTED_UNGROUNDABLE_REASON = "core_demoted_ungroundable";
 
+// The boundary reason code stamped on a candidate whose admitted `core` tier was
+// demoted to `optional` because its ONLY Definition Passage was verbatim-grounded
+// but conveyed no meaning — a bare repetition of the name, a heading/title, or a
+// citation/bibliographic snippet — and the Definition-Passage quality judge vetoed
+// it (ADR-0007 extension). DISTINCT from CORE_DEMOTED_UNGROUNDABLE_REASON ("the
+// extractor never produced a verifiable definition at all"): the two codes split
+// "genuinely never defined" from "defined only by a hollow passage", the measurement
+// hook layer B (TODO #3) consumes. One exported token shared by the demotion policy
+// that writes it onto `boundaryReasonCodes` and every reader (quality-issue detector,
+// Admin Lab), so a rename can never silently desync the `string[]` code (AGENTS rule 18).
+export const CORE_DEMOTED_HOLLOW_DEFINITION_REASON = "core_demoted_hollow_definition";
+
+// Structural verdict categories the Definition-Passage quality judge returns per
+// passage (ADR-0007 extension). DOMAIN-NEUTRAL — each names a structural shape of a
+// non-defining passage, never a fixture concept (AGENTS rule 17). `establishes_meaning`
+// is the keep verdict; the other three are veto reasons the judge surfaces for the
+// run trace and the operator.
+export type DefinitionPassageVetoCategory =
+  | "establishes_meaning"
+  | "bare_name_repetition"
+  | "heading_or_title"
+  | "citation_or_bibliographic";
+
+// One bounded LLM judgment over a single already-verbatim-verified Definition Passage
+// (ADR-0007 extension). The judge decides whether the passage ESTABLISHES the Concept's
+// meaning (defining properties, distinguishing criteria, mechanism, or contrast) versus
+// being a hollow passage. `judgedSpan` must be a verbatim substring of the passage; the
+// application boundary fails closed to `establishesMeaning: true` (keep) when the span
+// does not ground, so the judge can never veto on text absent from the passage.
+export type DefinitionPassageQualityJudgment = {
+  establishesMeaning: boolean;
+  category: DefinitionPassageVetoCategory;
+  judgedSpan: string;
+  rationale: string;
+};
+
+// The recorded disposition of one Definition Passage after quality judging (ADR-0007
+// extension). `kept` — establishes meaning (or no veto applied); `vetoed` — dropped on
+// a confident, source-grounded hollow verdict; `kept_judge_unavailable` — transport
+// failure, invalid tool args, or an ungrounded verdict, so the passage is KEPT and
+// flagged (fail-closed = preserve recall, AGENTS rule 16). Persisted on the run artifact
+// JSONB (KTD8) so the demotions are auditable and replayable for rule-14 inspection.
+export type DefinitionPassageDispositionKind = "kept" | "vetoed" | "kept_judge_unavailable";
+
+export type DefinitionPassageDisposition = {
+  candidateKey: string;
+  sourceBlockId: string;
+  evidenceQuote: string;
+  disposition: DefinitionPassageDispositionKind;
+  category: DefinitionPassageVetoCategory;
+  rationale: string;
+};
+
 export type ExtractionRunResult = {
   runId: string;
   sourceResourceId: string;
@@ -462,6 +515,10 @@ export type ExtractionRunResult = {
   maxMentionsPerConceptPerSource: number;
   candidates: RunCandidate[];
   evidenceProfiles: RunEvidenceProfile[];
+  // Per-passage Definition-Passage quality dispositions (ADR-0007 extension, KTD8).
+  // Captured in the immutable artifact envelope payload (rule 7 JSONB) so the hollow
+  // demotions are inspectable and replayable without a relational migration.
+  definitionQualityDispositions: DefinitionPassageDisposition[];
   qualityIssues: ExtractionQualityIssue[];
   // A run with an incomplete core Concept demotes that Concept to optional before
   // publication. Genuine non-succeeded runs remain reserved for pipeline or

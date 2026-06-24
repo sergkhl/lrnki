@@ -11,6 +11,7 @@ import type {
   StudyItemGroundingProvenance,
   StudyItemType,
   ConceptDifficulty,
+  DefinitionPassageQualityJudgment,
   JudgedOutcome,
   NewResponseLogRow,
   ResponseLogRow,
@@ -96,6 +97,30 @@ export interface AssertionEntailmentJudgmentPort {
     definition: string;
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
   }): Promise<AssertionEntailmentJudgment>;
+}
+
+// Definition-Passage quality judge (ADR-0007 extension). A bounded, forced-tool LLM
+// judgment that re-reads a core Concept's already-verbatim-verified Definition
+// Passages and decides, per passage, whether it ESTABLISHES the Concept's meaning or
+// is a hollow passage (bare name repetition, heading/title, citation/bibliographic).
+// Run on the independent cross-family alias (`kg-independent-judge`) so the DeepSeek
+// extractor never grades its own definitions. BATCHED per Concept (KTD4): one call
+// judges all of a Concept's definition passages, returning one judgment per passage,
+// index-aligned to the input order. Drop-only: a veto removes the hollow passage; it
+// never adds, promotes, or reorders. The adapter grounds each veto fail-closed (an
+// ungrounded `judgedSpan` is coerced to a keep), so the application stage drops only
+// on a confident, source-grounded hollow verdict and a transport blip never shrinks
+// the published core (D3, AGENTS rule 16).
+export interface DefinitionPassageQualityJudgmentPort {
+  readonly model: string;
+  judgeDefinitions(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    // Each passage already verbatim-verified against its cited block by the floor.
+    // `blockType` / `headingPath` are passed as CONTEXT so the judge can recognize
+    // heading/title/citation structure — never as a deterministic gate (KTD7, rule 16).
+    passages: { sourceBlockId: string; evidenceQuote: string; blockType: string; headingPath: string[] }[];
+  }): Promise<DefinitionPassageQualityJudgment[]>; // one per input passage, index-aligned
 }
 
 // Concept-vs-proposition admission judge (ADR-0005). A bounded, forced-tool LLM

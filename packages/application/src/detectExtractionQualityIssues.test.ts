@@ -64,6 +64,7 @@ function run(overrides: Partial<ExtractionRunResult> = {}): ExtractionRunResult 
     maxMentionsPerConceptPerSource: 6,
     candidates: [],
     evidenceProfiles: [],
+    definitionQualityDispositions: [],
     qualityIssues: [],
     status: "succeeded",
     degraded: false,

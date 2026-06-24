@@ -58,11 +58,13 @@ export {
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmAssertionEntailmentJudgmentAdapter,
   LiteLlmAdmissionLabelJudgmentAdapter,
+  LiteLlmDefinitionPassageQualityJudgmentAdapter,
   DISCOVERY_MODEL,
   ADMISSION_MODEL,
   EVIDENCE_PROFILE_MODEL,
   ASSERTION_ENTAILMENT_JUDGE_MODEL,
-  ADMISSION_LABEL_JUDGE_MODEL
+  ADMISSION_LABEL_JUDGE_MODEL,
+  DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
   LiteLlmPrerequisiteOrderingAdapter,

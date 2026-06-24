@@ -12,6 +12,7 @@ export const STAGE_TAGS = {
   admission: "admission",
   admissionLabelJudge: "admission-label-judge",
   cepExtraction: "cep-extraction",
+  definitionPassageQuality: "definition-passage-quality",
   assertionEntailment: "assertion-entailment",
   // Graph Enrichment (runGraphEnrichment). ONE whole-set ordering call per Declared
   // Domain (plan U2/U5): the prior per-pair `enrichment-judge` + cross-family

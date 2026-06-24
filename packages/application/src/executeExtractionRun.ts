@@ -145,6 +145,7 @@ export async function executeExtractionRun(input: {
     maxMentionsPerConceptPerSource,
     candidates: reconciled.candidates,
     evidenceProfiles: reconciled.evidenceProfiles,
+    definitionQualityDispositions: [],
     qualityIssues: [],
     status: "succeeded",
     degraded: reconciled.demotedCoreCount > 0 && remainingCoreCount === 0,

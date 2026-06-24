@@ -32,6 +32,7 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
     maxMentionsPerConceptPerSource: 6,
     status: "succeeded",
     degraded: false,
+    definitionQualityDispositions: [],
     qualityIssues: [],
     candidates: [
       candidate("ownership", "Ownership", "core"),
@@ -486,7 +487,7 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
     // (Borrowing, optional, NO definition passage) — the rescue candidate.
     const result: ExtractionRunResult = {
       runId, sourceResourceId, sourceDocumentId, declaredDomain: "software engineering",
-      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false, qualityIssues: [],
+      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false, definitionQualityDispositions: [], qualityIssues: [],
       candidates: [
         candidate("ownership", "Ownership", "core"),
         candidate("borrowing", "Borrowing", "optional")

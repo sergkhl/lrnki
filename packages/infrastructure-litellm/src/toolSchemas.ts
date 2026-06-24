@@ -504,6 +504,68 @@ export const definitionEntailmentJudgmentValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
+// --- Definition-Passage quality judgment: submit_definition_passage_quality_judgments
+// BATCHED judgment over ONE core Concept's already-verbatim-verified Definition
+// Passages (ADR-0007 extension, KTD4). The model returns one verdict per passage,
+// keyed by the passage's input `index`, deciding whether each passage ESTABLISHES the
+// Concept's meaning or is a hollow passage. `category` is a DOMAIN-NEUTRAL structural
+// shape (AGENTS rule 17 — names no fixture concept); `judgedSpan` is the minimal
+// verbatim sub-quote the verdict rests on, ground-checked fail-closed-to-keep at the
+// application boundary so an ungrounded veto never drops a passage.
+
+export const definitionPassageQualityJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["judgments"],
+  properties: {
+    judgments: {
+      type: "array",
+      description: "One verdict per provided Definition Passage, identified by its input index.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["index", "establishesMeaning", "category", "judgedSpan", "rationale"],
+        properties: {
+          index: {
+            type: "integer",
+            minimum: 0,
+            description: "The 0-based index of the passage this verdict applies to, copied from the listed passage."
+          },
+          establishesMeaning: {
+            type: "boolean",
+            description:
+              "true when the passage actually conveys the concept's meaning — it states defining properties, distinguishing criteria, the mechanism, or a contrast that pins down what the concept IS. false when the passage is hollow: a bare repetition of the concept's own name, a section heading or title, or a citation/bibliographic reference, with no defining content."
+          },
+          category: {
+            type: "string",
+            enum: ["establishes_meaning", "bare_name_repetition", "heading_or_title", "citation_or_bibliographic"],
+            description:
+              "The structural shape of the passage. 'establishes_meaning' when establishesMeaning is true. Otherwise the kind of hollow passage: 'bare_name_repetition' (the passage only restates the concept's name or label), 'heading_or_title' (the passage is a section heading or document title, not prose about the concept), or 'citation_or_bibliographic' (the passage is a reference, citation, or bibliographic phrase). Judge by what the text MEANS, not solely by the block's structural type, which is provided only as context."
+          },
+          judgedSpan: {
+            type: "string",
+            description:
+              "The minimal exact sub-quote (copied verbatim from this passage) the verdict rests on. For a veto, the span the model judged hollow. Must be a verbatim substring of the passage."
+          },
+          rationale: { type: "string", description: "One terse sentence." }
+        }
+      }
+    }
+  }
+};
+
+export const definitionPassageQualityJudgmentValidator = z.object({
+  judgments: z.array(
+    z.object({
+      index: z.number().int().min(0),
+      establishesMeaning: z.boolean(),
+      category: z.enum(["establishes_meaning", "bare_name_repetition", "heading_or_title", "citation_or_bibliographic"]),
+      judgedSpan: z.string(),
+      rationale: z.string().min(1)
+    }).strict()
+  )
+}).strict();
+
 // --- Admission label judgment: submit_admission_label_judgment ------------
 // One bounded judgment over a single admitted-`core` label (ADR-0005). The model
 // decides whether the label NAMES a concept or ASSERTS a proposition/claim about

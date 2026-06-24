@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { SourceBlock } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmAssertionEntailmentJudgmentAdapter, renderBlocks } from "./extractionAdapters";
-import { admissionLabelJudgmentValidator } from "./toolSchemas";
+import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmAssertionEntailmentJudgmentAdapter, LiteLlmDefinitionPassageQualityJudgmentAdapter, renderBlocks } from "./extractionAdapters";
+import { admissionLabelJudgmentValidator, definitionPassageQualityJudgmentValidator } from "./toolSchemas";
 
 function sourceBlock(blockId: string, text: string, headingPath: string[] = []): SourceBlock {
   return {
@@ -218,5 +218,111 @@ test("admission label validator rejects a verdict missing labelKind (fail-closed
   assert.equal(
     admissionLabelJudgmentValidator.safeParse({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "x" }).success,
     true
+  );
+});
+
+// --- Definition-Passage quality judge (ADR-0007 extension) -----------------
+// The canned judgments below are INPUT to the adapter's deterministic grounding and
+// index-mapping transform (AGENTS rule 11); the assertions check that transform —
+// the verbatim grounding of a veto and the fail-closed-to-keep coercion — never the
+// model's judgment content.
+
+function definitionQualityAdapterReturning(judgments: {
+  index: number;
+  establishesMeaning: boolean;
+  category: "establishes_meaning" | "bare_name_repetition" | "heading_or_title" | "citation_or_bibliographic";
+  judgedSpan: string;
+  rationale: string;
+}[]) {
+  const client = {
+    call: async (input: { toolName: string }) => {
+      assert.equal(input.toolName, "submit_definition_passage_quality_judgments");
+      return { judgments };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmDefinitionPassageQualityJudgmentAdapter(client);
+}
+
+const ownershipPassages = {
+  declaredDomain: "software engineering",
+  subject: { canonicalLabel: "Ownership", aliases: [] },
+  passages: [
+    { sourceBlockId: "b1", evidenceQuote: "Ownership is the rule that each value has a single owner that frees it when it goes out of scope.", blockType: "paragraph", headingPath: ["Memory"] },
+    { sourceBlockId: "b2", evidenceQuote: "Ownership", blockType: "heading", headingPath: ["Memory"] }
+  ]
+};
+
+test("definition quality judge keeps a defining passage and vetoes a grounded hollow one, index-aligned", async () => {
+  const adapter = definitionQualityAdapterReturning([
+    { index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "states the rule" },
+    { index: 1, establishesMeaning: false, category: "heading_or_title", judgedSpan: "Ownership", rationale: "bare heading" }
+  ]);
+  const result = await adapter.judgeDefinitions(ownershipPassages);
+  assert.equal(result.length, 2);
+  assert.equal(result[0].establishesMeaning, true);
+  assert.equal(result[1].establishesMeaning, false);
+  assert.equal(result[1].category, "heading_or_title");
+  assert.equal(result[1].judgedSpan, "Ownership");
+});
+
+test("definition quality judge coerces an ungrounded veto back to keep (fail closed)", async () => {
+  const adapter = definitionQualityAdapterReturning([
+    { index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "fine" },
+    { index: 1, establishesMeaning: false, category: "heading_or_title", judgedSpan: "text not in the passage", rationale: "claims a span absent from the quote" }
+  ]);
+  const result = await adapter.judgeDefinitions(ownershipPassages);
+  assert.equal(result[1].establishesMeaning, true);
+  assert.equal(result[1].category, "establishes_meaning");
+});
+
+test("definition quality judge keeps a passage with no returned verdict (fail closed)", async () => {
+  const adapter = definitionQualityAdapterReturning([
+    { index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "fine" }
+    // no verdict for index 1
+  ]);
+  const result = await adapter.judgeDefinitions(ownershipPassages);
+  assert.equal(result.length, 2);
+  assert.equal(result[1].establishesMeaning, true);
+});
+
+test("definition quality judge grounding tolerates markdown and typographic-quote noise", async () => {
+  const adapter = definitionQualityAdapterReturning([
+    { index: 0, establishesMeaning: false, category: "citation_or_bibliographic", judgedSpan: 'see "Smith et al."', rationale: "citation" }
+  ]);
+  const result = await adapter.judgeDefinitions({
+    declaredDomain: "software engineering",
+    subject: { canonicalLabel: "Evolutionary Search", aliases: [] },
+    passages: [{ sourceBlockId: "b1", evidenceQuote: "Evolutionary Search; see **“Smith et al.”** for details.", blockType: "paragraph", headingPath: [] }]
+  });
+  assert.equal(result[0].establishesMeaning, false);
+  assert.equal(result[0].category, "citation_or_bibliographic");
+});
+
+test("definition quality validator rejects malformed batched arguments (fail-closed arg validation)", () => {
+  assert.equal(
+    definitionPassageQualityJudgmentValidator.safeParse({
+      judgments: [{ index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "ok" }]
+    }).success,
+    true
+  );
+  // missing category
+  assert.equal(
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: true, judgedSpan: "", rationale: "x" }] }).success,
+    false
+  );
+  // unknown enum value
+  assert.equal(
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: false, category: "weird", judgedSpan: "x", rationale: "x" }] }).success,
+    false
+  );
+  // extra property (additionalProperties: false)
+  assert.equal(
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "x", extra: 1 }] }).success,
+    false
+  );
+  // empty rationale
+  assert.equal(
+    definitionPassageQualityJudgmentValidator.safeParse({ judgments: [{ index: 0, establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "" }] }).success,
+    false
   );
 });

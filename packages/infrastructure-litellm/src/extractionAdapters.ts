@@ -3,6 +3,8 @@ import type {
   AdmissionProposal,
   AssertionEntailmentJudgment,
   BlockEvidence,
+  DefinitionPassageQualityJudgment,
+  DefinitionPassageVetoCategory,
   DiscoveredCandidate,
   ExtractedEvidenceProfile,
   ExtractedTypedAssertion,
@@ -16,7 +18,8 @@ import type {
   AssertionEntailmentJudgmentPort,
   ConceptAdmissionPort,
   ConceptConditionedEvidenceProfileExtractionPort,
-  ConceptDiscoveryPort
+  ConceptDiscoveryPort,
+  DefinitionPassageQualityJudgmentPort
 } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "./stageTags";
@@ -32,7 +35,9 @@ import {
   conceptDiscoverySchema,
   conceptDiscoveryValidator,
   definitionEntailmentJudgmentSchema,
-  definitionEntailmentJudgmentValidator
+  definitionEntailmentJudgmentValidator,
+  definitionPassageQualityJudgmentSchema,
+  definitionPassageQualityJudgmentValidator
 } from "./toolSchemas";
 
 // LiteLLM aliases (litellm/config.yaml router model_group_alias). Production
@@ -52,6 +57,11 @@ export const ASSERTION_ENTAILMENT_JUDGE_MODEL = "kg-independent-judge";
 // (ADR-0005): the judge must not be the admission extractor (DeepSeek) re-deciding
 // its own label.
 export const ADMISSION_LABEL_JUDGE_MODEL = "kg-independent-judge";
+// Same independent production judge for the Definition-Passage quality judge (ADR-0007
+// extension): the meaning-quality verdict must not come from the DeepSeek extractor
+// that produced the passage. Reuses the `kg-independent-judge` alias unchanged, so
+// litellm/config.yaml routing is untouched (no restart needed).
+export const DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL = "kg-independent-judge";
 
 export function renderBlocks(blocks: SourceBlock[], options: { adjacencyBlocks?: SourceBlock[] } = {}): string {
   const adjacency = new Map<string, { previous?: string; next?: string }>();
@@ -425,6 +435,86 @@ export class LiteLlmAssertionEntailmentJudgmentAdapter implements AssertionEntai
   }
 }
 
+// Definition-Passage quality judge (ADR-0007 extension). Forced named tool, temp 0,
+// ONE batched call per core Concept that judges all of its already-verbatim-verified
+// Definition Passages together (KTD4): shared subject context (canonical label +
+// aliases) is established once, and each verdict is keyed back to its passage by the
+// input `index`. The cited block's `blockType` / `headingPath` are passed as CONTEXT so
+// the judge can recognize heading/title/citation structure — the application NEVER
+// vetoes deterministically on block type (KTD7, AGENTS rule 16). Fail closed = keep:
+// a veto (`establishesMeaning: false`) is honored only when its `judgedSpan` grounds in
+// that passage under the deterministic evidence normalizer; an ungrounded veto, a
+// missing index, or an out-of-range index all coerce to keep, so the judge can never
+// drop a passage on text absent from it and a transport blip never shrinks the core.
+export class LiteLlmDefinitionPassageQualityJudgmentAdapter implements DefinitionPassageQualityJudgmentPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL) {
+    this.model = model;
+  }
+
+  async judgeDefinitions(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    passages: { sourceBlockId: string; evidenceQuote: string; blockType: string; headingPath: string[] }[];
+  }): Promise<DefinitionPassageQualityJudgment[]> {
+    const keep = (rationale: string): DefinitionPassageQualityJudgment => ({
+      establishesMeaning: true,
+      category: "establishes_meaning",
+      judgedSpan: "",
+      rationale
+    });
+    if (input.passages.length === 0) return [];
+
+    const system = [
+      "You judge whether quoted source text actually DEFINES a domain concept, for a learner-neutral concept graph.",
+      "Each quote is already verified verbatim from the source; you are NOT checking grounding, only whether the quote conveys the concept's MEANING.",
+      "A quote establishes meaning when it states the concept's defining properties, distinguishing criteria, the mechanism by which it works, or a contrast that pins down what the concept IS. Judge meaning, not length or wording: a terse but genuinely defining clause establishes meaning.",
+      "A quote is HOLLOW when it carries no defining content: a bare repetition of the concept's own name or label (bare_name_repetition), a section heading or document title rather than prose about the concept (heading_or_title), or a citation, reference, or bibliographic phrase (citation_or_bibliographic).",
+      "The blockType and headingPath are CONTEXT to help you recognize structure; they do not decide the verdict. A paragraph can still be hollow, and a list item can still define. Judge the text's meaning.",
+      "Precision-first: when a quote plausibly defines the concept, set establishesMeaning=true. Only veto on a clear hollow passage. For judgedSpan, copy the minimal exact sub-quote your verdict rests on; it MUST be a verbatim substring of that passage.",
+      "Return one judgment per listed passage, each carrying that passage's index."
+    ].join("\n");
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Subject concept: "${input.subject.canonicalLabel}" (aliases: ${renderAliases(input.subject.aliases)}).`,
+      "",
+      "Candidate Definition Passages:",
+      ...input.passages.map((passage, index) =>
+        `[${index}] blockType=${passage.blockType}; headingPath=${renderHeadingPath(passage.headingPath)}; quote="${passage.evidenceQuote}"`
+      ),
+      "",
+      "Call submit_definition_passage_quality_judgments: for each index, does the quote establish the concept's meaning, or is it a hollow passage?"
+    ].join("\n");
+
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_definition_passage_quality_judgments",
+      toolDescription: "Submit, per Definition Passage index, whether the quote establishes the concept's meaning or is a hollow passage.",
+      parameters: definitionPassageQualityJudgmentSchema,
+      validator: definitionPassageQualityJudgmentValidator,
+      tags: [STAGE_TAGS.definitionPassageQuality]
+    });
+
+    const byIndex = new Map(result.judgments.map((judgment) => [judgment.index, judgment] as const));
+    return input.passages.map((passage, index) => {
+      const judgment = byIndex.get(index);
+      if (!judgment) return keep(`[no verdict for index ${index}: kept]`);
+      if (judgment.establishesMeaning) {
+        return { establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: judgment.rationale };
+      }
+      const span = judgment.judgedSpan.trim();
+      const grounded = span.length > 0 && evidenceQuoteMatches(passage.evidenceQuote, span);
+      if (!grounded) {
+        return keep(`${judgment.rationale} [ungrounded veto kept: judgedSpan=${JSON.stringify(span)}]`);
+      }
+      const category: DefinitionPassageVetoCategory =
+        judgment.category === "establishes_meaning" ? "bare_name_repetition" : judgment.category;
+      return { establishesMeaning: false, category, judgedSpan: span, rationale: judgment.rationale };
+    });
+  }
+}
+
 // Concept-vs-proposition admission judge (ADR-0005). Mirrors the claim-entailment
 // adapter: forced named tool, independent model family, one bounded judgment per
 // admitted-`core` label. The judge sees the proposed canonical label (+aliases)
@@ -521,4 +611,8 @@ function groundedJudgment(
 
 function renderAliases(aliases: string[]): string {
   return aliases.length > 0 ? aliases.map((alias) => `"${alias}"`).join(", ") : "none";
+}
+
+function renderHeadingPath(headingPath: string[]): string {
+  return headingPath.length > 0 ? headingPath.map((heading) => `"${heading}"`).join(" › ") : "none";
 }
