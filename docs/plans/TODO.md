@@ -2,45 +2,7 @@
 
 ## TODO
 
-1. **Whole-set global prerequisite ordering.** → **DONE** (U7 rule-14 PASS, promoted to core, gpt-oss-120b
-   committed). See the COMPLETED entry below for the verdict, closures, and evidence.
-
-2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** →
-   **DONE** (2026-06-24, branch `feat/prerequisite-ordering-k-sampling`, plan `2026-06-24-002`, U6 rule-14
-   PASS, promoted to core). See the COMPLETED entry below for the calibrated knobs, verdict, and evidence.
-   Per ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
-   signal, not a bug to make deterministic. Sample the ordering call K times and route **direction-unstable**
-   pairs to `uncertain` — already excluded from learner paths — instead of committing one arbitrary draw.
-   This both calibrates edge confidence and dissolves the former pairwise "noise".
-   - **Trigger FIRED (2026-06-24): the K-sample probe confirmed committed direction instability.** A
-     run-scoped disposable probe (`tmp/2026-06-24-k-sample-ordering-probe/`) froze the real per-domain
-     ordering input from published version `9eb3e44d` and replayed ONLY the ordering call K=8× per domain.
-     Result: one genuinely direction-ambiguous economics pair — `Saving of Time in Passing from One Work to
-     Another` ↔ `Three Circumstances Increasing the Quantity of Work from Division of Labour` (a member-of
-     relation) — flips 7:1 across draws **and is committed as a CERTAIN edge at conf 0.85** in the
-     single-sample layer (verified against enrichment `3ac291cf`). This is exactly the committed
-     direction-instability the trigger required → **build core K-sampling.** Secondary finding: presence
-     instability is broader (3 of 15 committed certain edges appear in <8/8 replays, one in just 1/8), so the
-     committed edge *set* is itself one noisy draw — consider a presence quorum alongside direction routing.
-     Evidence + design notes: `tmp/2026-06-24-k-sample-ordering-probe/rule-14-evaluation.md`. K=8 surfaced
-     the phenomenon but is small (flip 1/8); calibrate production K and quorum/flip thresholds in the build's
-     own rule-14 pass.
-   - Costs K× ordering calls, applied to the cheap one-call-per-domain volume (not an O(n²) fan-out).
-     Measured, domain-neutral, disposable (rules 11/16/17).
-   - This closes the former enrichment-reproducibility item: root cause is intra-backend MoE
-     non-determinism (probe `tmp/2026-06-23-enrichment-determinism-probe/findings.md`), unfixable with
-     seed/provider-pinning; `litellm/config.yaml` was correctly left unchanged. Do **not** re-open a
-     serving-determinism investigation (ADR-0028).
-   - **Deferred sibling finding (2026-06-23 brainstorm) — LLM-invoked "world-law/science" deterministic
-     checks.** Defer to a future run-scoped experiment, admissible **only in a sub-domain with a genuine
-     formal oracle** (dimensional/unit analysis, a type system, arithmetic/temporal logic), and even there
-     the check *informs* the judge, never silently vetoes (rule 16). Rationale: self-correction reliably
-     helps only when grounded in an external verifier (Huang et al. 2023 — intrinsic self-correction without
-     an external signal does not reliably improve and can degrade); domain-general prerequisite derivation
-     has no such oracle, so a "world-law" validator collapses into either another LLM judge (already covered
-     by self-consistency above) or a hardcoded rule set (the forbidden rule-16 symbolic gate). Not now.
-
-3. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found
+1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found
    broadly plausible ordering but a concentrated broad/evidence-thin distortion, especially relation-like
    or framework-level labels with sparse evidence. Evidence:
    `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`. Persisted neural rationales
@@ -50,7 +12,7 @@
      oracle/benchmark disposable.
    - Population calibration stays deferred until real learner-response data exists (task 6 / ADR-0024).
 
-4. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but
    inspection still found low-value accepted Definition Passages such as heading-only or citation-like
    snippets in the AIRA-dojo Markdown run.
@@ -60,7 +22,7 @@
    - CEP-quality follow-up, not a retrieval-layer blocker: the verbatim floor held and inspected adjacent
      blocks were genuine explaining passages.
 
-5. **Inspection/observability polish.** Two small operator-facing items:
+3. **Inspection/observability polish.** Two small operator-facing items:
    - **Harden forced-tool transport** for long runs: the all-manifest learner-loop hit one malformed JSON
      forced-tool argument during AIRA-dojo admission (rerun succeeded). Keep fail-closed (rule 6), but
      improve retry observability and capture malformed tool-call snippets safely (no secrets, no full
@@ -70,7 +32,7 @@
      (markdown emphasis, curly quotes, wrapping, HTML entities). Admin surfaces should label normalized-
      vs-exact so operators don't conflate them.
 
-6. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain
+4. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain
    data-blocked.
    - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a
      difficulty or learner model on synthetic or self-assessed responses stay deferred until per-learner
@@ -83,6 +45,13 @@
      edge audits but must not directly mutate the asserted graph or silently modify a Derived Graph Layer;
      any accepted mechanism must be versioned, provenance-visible, and compared against the ADR-0019
      baseline.
+   - **LLM-invoked "world-law/science" deterministic checks (2026-06-23 brainstorm).** Admissible only in
+     a sub-domain with a genuine formal oracle (dimensional/unit analysis, a type system, arithmetic/
+     temporal logic), and even there the check *informs* the judge, never silently vetoes (rule 16).
+     Self-correction reliably helps only when grounded in an external verifier (Huang et al. 2023);
+     domain-general prerequisite derivation has no such oracle, so a "world-law" validator collapses into
+     either another LLM judge (already covered by the shipped K-sampled self-consistency, ADR-0028) or a
+     hardcoded rule set (the forbidden rule-16 symbolic gate). Not now.
 
 ## COMPLETED
 

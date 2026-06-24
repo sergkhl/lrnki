@@ -27,7 +27,7 @@ Two structural problems followed from the old `Card` shape:
 The single `Card` shape becomes a **typed Study Item** discriminated union, keyed on
 `itemType`. The rename is full (AGENTS rule 18): `Card` → `StudyItem`, the item identity
 `cardId` → `studyItemId`, the column `card_id` → `study_item_id`, the bank/generation/
-store names, and the `card_bank.v3` artifact → `study_item_bank.v4`. No stale "card"
+store names, and the `card_bank` artifact → `study_item_bank`. No stale "card"
 name survives pointing at a typed item.
 
 ### Discriminant
