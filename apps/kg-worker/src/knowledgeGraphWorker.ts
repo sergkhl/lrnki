@@ -97,7 +97,7 @@ function buildContext() {
   const baseClient = {
     baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
     apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "300") * 1000
+    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
   };
   // Discovery stays at default sampling. It is the recall stage and, empirically,
   // greedy decoding (temperature 0) makes DeepSeek emit a MORE exhaustive candidate

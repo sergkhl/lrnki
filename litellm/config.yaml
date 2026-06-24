@@ -150,7 +150,6 @@ model_list:
       output_cost_per_token: 0.0000012
 
   # NOTE: openrouter flash
-  # turning off thinking does no work via extra body, need to find a correct way if forced tool call won't work
   - model_name: "openrouter/deepseek/deepseek-v4-flash-no-thinking"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash"
@@ -160,6 +159,16 @@ model_list:
       extra_body:
         thinking:
           type: "disabled"
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
+
+  - model_name: "openrouter/deepseek/deepseek-v4-pro"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-pro"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
     model_info:
       max_input_tokens: 1048576
       max_output_tokens: 393216
@@ -283,12 +292,15 @@ router_settings:
     kg-concept-admission: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-claim-extraction: openrouter/deepseek/deepseek-v4-flash-no-thinking
     # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
-    # U2/U5): ONE non-DeepSeek ordering call per Declared Domain returns the directed
-    # prerequisite DAG over the deduplicated node set. The single alias is CROSS-FAMILY
-    # from the DeepSeek extractor + grounding generator (ADR-0023), so the generator
-    # never grades its own minted output and the per-pair anchor/generated routing split
-    # is gone. The backing model is selected by the U7 sweep behind this alias (R8);
-    # gpt-oss-120b is the validated forced-tool default.
+    # U2/U5): ONE ordering call per Declared Domain returns the directed prerequisite
+    # DAG over the deduplicated node set. Backed by gpt-oss-120b (reasoning-grade,
+    # forced-tool-ok). MEASURED 2026-06-24 (tmp/2026-06-24-deepseek-flash-ordering-rebaseline):
+    # deepseek-flash-no-thinking is forced-tool-ok + fast (10s) BUT INADEQUATE for the
+    # holistic ordering task — it returned 0 edges for an 11-node Rust domain where
+    # gpt-oss-120b produced a correct 11-edge DAG (same node set). Whole-set ordering
+    # needs a reasoning model; flash is disproven. OPEN: test deepseek-v4-pro (reasoning,
+    # forced-tool-ok @6.7s) as a faster reasoning-grade replacement for gpt-oss-120b's
+    # high latency before the TODO #2 stability/K-sampling work.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is

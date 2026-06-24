@@ -10,10 +10,19 @@
    signal, not a bug to make deterministic. Sample the ordering call K times and route **direction-unstable**
    pairs to `uncertain` — already excluded from learner paths — instead of committing one arbitrary draw.
    This both calibrates edge confidence and dissolves the former pairwise "noise".
-   - **Trigger (now concrete): task 1's U7 KTD5 inspection.** Single-sample whole-set ordering re-sourced
-     `uncertain` from a per-pair verdict to cycle-routing only, so a genuinely direction-ambiguous pair may
-     now be committed as a directed edge. Build K-sampling only if U7 finds direction-instability on
-     ambiguous pairs is the live study-value defect — do not pre-build K× before that instability is observed.
+   - **Trigger FIRED (2026-06-24): the K-sample probe confirmed committed direction instability.** A
+     run-scoped disposable probe (`tmp/2026-06-24-k-sample-ordering-probe/`) froze the real per-domain
+     ordering input from published version `9eb3e44d` and replayed ONLY the ordering call K=8× per domain.
+     Result: one genuinely direction-ambiguous economics pair — `Saving of Time in Passing from One Work to
+     Another` ↔ `Three Circumstances Increasing the Quantity of Work from Division of Labour` (a member-of
+     relation) — flips 7:1 across draws **and is committed as a CERTAIN edge at conf 0.85** in the
+     single-sample layer (verified against enrichment `3ac291cf`). This is exactly the committed
+     direction-instability the trigger required → **build core K-sampling.** Secondary finding: presence
+     instability is broader (3 of 15 committed certain edges appear in <8/8 replays, one in just 1/8), so the
+     committed edge *set* is itself one noisy draw — consider a presence quorum alongside direction routing.
+     Evidence + design notes: `tmp/2026-06-24-k-sample-ordering-probe/rule-14-evaluation.md`. K=8 surfaced
+     the phenomenon but is small (flip 1/8); calibrate production K and quorum/flip thresholds in the build's
+     own rule-14 pass.
    - Costs K× ordering calls, applied to the cheap one-call-per-domain volume (not an O(n²) fan-out).
      Measured, domain-neutral, disposable (rules 11/16/17).
    - This closes the former enrichment-reproducibility item: root cause is intra-backend MoE
