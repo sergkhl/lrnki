@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CORE_DEMOTED_UNGROUNDABLE_REASON, type AdmissionProposal, type DiscoveredCandidate, type RunCandidate, type RunEvidenceProfile } from "@lrnki/domain-core";
+import { CORE_DEMOTED_HOLLOW_DEFINITION_REASON, CORE_DEMOTED_UNGROUNDABLE_REASON, type AdmissionProposal, type DiscoveredCandidate, type RunCandidate, type RunEvidenceProfile } from "@lrnki/domain-core";
 import { applyAdmissionPolicy } from "./applyAdmissionPolicy";
 import { reconcileUngroundableCores } from "./reconcileUngroundableCores";
 
@@ -65,6 +65,23 @@ test("demotes a core with an incomplete CEP to optional and tags the reason, imm
   assert.equal(candidates[0].admission.tier, "core");
   assert.equal(profiles[0].tier, "core");
   assert.ok(!candidates[0].admission.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON));
+});
+
+test("stamps the hollow-definition reason for a key whose last definition was vetoed", async () => {
+  const candidates = [coreCandidate()];
+  const profiles = [profile(false)];
+  const result = reconcileUngroundableCores({
+    candidates,
+    evidenceProfiles: profiles,
+    coreKeys: new Set(["stack"]),
+    hollowDefinitionKeys: new Set(["stack"])
+  });
+
+  assert.equal(result.demotedCoreCount, 1);
+  assert.equal(result.candidates[0].admission.tier, "optional");
+  assert.ok(result.candidates[0].admission.boundaryReasonCodes.includes(CORE_DEMOTED_HOLLOW_DEFINITION_REASON));
+  // The distinct code replaces the generic ungroundable code for this cause.
+  assert.ok(!result.candidates[0].admission.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON));
 });
 
 test("keeps a core with a complete CEP and returns the same array references", async () => {
