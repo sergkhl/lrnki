@@ -22,7 +22,8 @@ import type {
   ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
-  BatchedPrerequisiteJudgment,
+  WholeSetOrdering,
+  PrerequisiteOrderingCorrection,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
@@ -248,25 +249,24 @@ export interface SourceObjectStoragePort {
 // learner-neutral intrinsic; learner-calibrated IRT/BT remains data-blocked.
 // ---------------------------------------------------------------------------
 
-// Bounded LLM prerequisite judgment over a subject node and a BOUNDED LIST of
-// same-domain candidates (ADR-0019, amended — per-node batched judging, plan U4/KTD1).
-// One batched forced-tool call resolves the subject against many candidates at once,
-// regrouping the exhaustive per-pair coverage from O(n^2) calls into ~O(n) without
-// dropping any relation (R4, R5). Each side carries its published CEP (definitions,
-// bounded mentions, labeled `defines` assertions). The application validates arguments
-// and maps each candidate fail-closed: a direction naming neither concept, or a
-// candidate the model never addressed, degrades to "uncertain" (flagged, path-excluded),
-// never an invented edge (R6). The judge proposes; cycle removal + transitive reduction
-// dispose. This is also the incremental-growth primitive (R7): "enrich one new node
-// against an existing candidate layer" is exactly this call with a one-node candidate
-// set absent or a full layer present.
-export interface PrerequisiteJudgmentPort {
+// Whole-set prerequisite ordering over ALL evidenced nodes in one Declared Domain
+// (ADR-0019, amended — whole-set ordering, plan U1/U2, R1/R2). ONE forced-tool call
+// returns a directed prerequisite edge list over the listed nodes; it is globally
+// self-consistent by construction, so cycles are the rare residue rather than the
+// expected residue of intransitive per-pair judging. Each node is listed with its CEP
+// evidence; each edge cites its endpoints by EXACT canonical label, which the
+// application maps → derivedNodeIds fail-closed (KTD3, R9). The optional `correction`
+// carries the violating cycle on the AT-MOST-ONE re-prompt (R10) — a parameter of the
+// same call, never a second method. The judge proposes directed edges only; the boundary
+// verifies acyclicity and routes a stubborn cycle to `uncertain` (rules 16/19), and the
+// symbolic disposal (weak-cut → transitive reduction) runs over the certain edges.
+export interface PrerequisiteOrderingPort {
   readonly model: string;
-  judge(input: {
+  order(input: {
     declaredDomain: string;
-    subject: PrerequisiteConceptContext;
-    candidates: PrerequisiteConceptContext[];
-  }): Promise<BatchedPrerequisiteJudgment>;
+    nodes: PrerequisiteConceptContext[];
+    correction?: PrerequisiteOrderingCorrection;
+  }): Promise<WholeSetOrdering>;
 }
 
 export interface GroundingGenerationPort {
