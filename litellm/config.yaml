@@ -198,7 +198,7 @@ model_list:
   # Qwen3-235B-A22B-Instruct-2507 is a multilingual MoE model with 22B active
   # parameters, 262K context, strong instruction following / logical reasoning /
   # tool-use positioning, and no thinking-mode blocks. Consider as a non-OpenAI,
-  # non-DeepSeek primary judge candidate for kg-prerequisite-judgment.
+  # non-DeepSeek backing-model candidate for kg-prerequisite-ordering (U7 sweep).
   # OpenRouter list price: $0.09 input / $0.10 output per 1M tokens.
   - model_name: "openrouter/qwen/qwen3-235b-a22b-2507"
     litellm_params:
@@ -282,16 +282,14 @@ router_settings:
     kg-concept-discovery: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-concept-admission: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-claim-extraction: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    # Graph Enrichment, third operation (ADR-0019 amended): every same-domain relation
-    # is judged exhaustively (no embedding clustering tier), now via per-node batched
-    # calls (plan U5); the bounded judge proposes the inferred DAG using the same
-    # no-thinking extractor.
-    kg-prerequisite-judgment: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    # Cross-family generated-node ordering judge (ADR-0023, U7). Any prerequisite
-    # pair touching an `llm_grounded` minted node is ordered HERE, on gpt-oss-120b,
-    # so the DeepSeek generator never grades its own minted output (KTD7). Anchor-only
-    # ordering stays on kg-prerequisite-judgment -> DeepSeek (no re-validation).
-    kg-generated-prerequisite-judgment: openrouter/openai/gpt-oss-120b
+    # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
+    # U2/U5): ONE non-DeepSeek ordering call per Declared Domain returns the directed
+    # prerequisite DAG over the deduplicated node set. The single alias is CROSS-FAMILY
+    # from the DeepSeek extractor + grounding generator (ADR-0023), so the generator
+    # never grades its own minted output and the per-pair anchor/generated routing split
+    # is gone. The backing model is selected by the U7 sweep behind this alias (R8);
+    # gpt-oss-120b is the validated forced-tool default.
+    kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
     # cross-family independent of the DeepSeek extractor, supports forced

@@ -38,10 +38,9 @@ import {
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmLearnerSimulatorAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
-  LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter,
-  GENERATED_PREREQUISITE_JUDGE_MODEL
+  LiteLlmRescueDurabilityJudgmentAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -135,16 +134,14 @@ function buildContext() {
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
-    // Graph Enrichment ports (ADR-0019 reset). Every same-domain CEP pair is judged
-    // exhaustively — no embedding clustering tier; the bounded judge proposes the
-    // inferred DAG (deterministic decoding for stable re-derivation). Difficulty is
-    // learner-neutral intrinsic: a cross-family neural subscore fused with
-    // deterministic graph/evidence components.
-    prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
-    // Cross-family generated-node ordering judge (ADR-0023, U7): any pair touching an
-    // `llm_grounded` minted node routes here (gpt-oss-120b) so the DeepSeek generator
-    // never grades its own minted output; anchor-only ordering stays on DeepSeek.
-    generatedPrerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient, GENERATED_PREREQUISITE_JUDGE_MODEL),
+    // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
+    // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
+    // the directed prerequisite DAG over the deduplicated node set; it is cross-family
+    // from the DeepSeek extractor + grounding generator (ADR-0023), so a single judge
+    // never grades its own minted output and the per-pair routing split is gone.
+    // Deterministic decoding for stable re-derivation. Difficulty is learner-neutral
+    // intrinsic: a cross-family neural subscore fused with deterministic components.
+    prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
     // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
@@ -304,8 +301,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     enrichmentId,
     graphVersionId: targetVersionId,
     graphStore: ctx.graphStore,
-    prerequisiteJudge: ctx.prerequisiteJudge,
-    generatedPrerequisiteJudge: ctx.generatedPrerequisiteJudge,
+    prerequisiteOrdering: ctx.prerequisiteOrdering,
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,

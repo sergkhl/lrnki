@@ -9,7 +9,7 @@ import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
 const validator = z.object({ ok: z.boolean() }).strict();
 const baseInput = {
-  model: "kg-prerequisite-judgment",
+  model: "kg-prerequisite-ordering",
   messages: [{ role: "user" as const, content: "hi" }],
   toolName: "submit_thing",
   toolDescription: "Submit the thing.",

@@ -423,11 +423,11 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     assert.equal(hydrated.prerequisiteEdges.length, 2);
     assert.equal(hydrated.difficulties.length, 3);
 
-    // U4: per-pair judge model persisted on the edges and matches the routing.
+    // U4: whole-set ordering — every edge carries the single layer-level ordering model
+    // (the per-pair judge-model split was deleted, rule 18).
     const edgeModels = await sql<{ prerequisite_derived_node_id: string; judge_model: string }[]>`
       SELECT prerequisite_derived_node_id, judge_model FROM inferred_prerequisite_edges WHERE enrichment_id = ${enrichmentId}`;
-    assert.equal(edgeModels.find((e) => e.prerequisite_derived_node_id === mintedId)?.judge_model, "kg-generated-prerequisite-judgment");
-    assert.equal(edgeModels.find((e) => e.prerequisite_derived_node_id === rescuedId)?.judge_model, "mock-judge");
+    assert.ok(edgeModels.length === 2 && edgeModels.every((e) => e.judge_model === "mock-judge"));
 
     // U4: rescue dispositions persisted and read back, including the dropped candidate
     // that has no derived_graph_nodes row.
