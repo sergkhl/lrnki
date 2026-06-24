@@ -141,7 +141,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
         derived_node_id text PATH '$.derivedNodeId',
         outcome text PATH '$.outcome'
       )) AS d
-      WHERE a.artifact_type = 'enrichment_run.v2' AND a.payload->>'enrichmentId' = ${header.enrichment_id}`;
+      WHERE a.artifact_type = 'enrichment_run.v3' AND a.payload->>'enrichmentId' = ${header.enrichment_id}`;
     const dispositionByNode = new Map(dispositionRows.map((row) => [row.derived_node_id, row.outcome]));
 
     const groundingFor = (row: { derived_node_id: string; node_kind: string; grounding_origin: string }): NodeGroundingView | null => {

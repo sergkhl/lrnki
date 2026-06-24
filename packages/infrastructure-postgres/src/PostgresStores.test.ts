@@ -301,7 +301,8 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       graphVersionId,
       enrichmentConfigHash: "test-enrichment",
       derivedNodes: layer.derivedNodes,
-      judgments: [],
+      orderings: [],
+      nodeExclusions: [],
       dispositions: [],
       groundingDispositions: [],
       rescueDispositions: [],
@@ -312,7 +313,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     await store.persist({
       layer,
       artifact: {
-        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId,
+        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId,
         producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace
       }
     });
@@ -378,17 +379,18 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         { derivedNodeId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 }, neuralRationale: "anchor concept" }
       ]
     };
-    // U4: per-pair judge model — the minted (llm_grounded) pair routes cross-family,
-    // the rescued (source_mentioned) pair stays on the DeepSeek alias.
-    const ctx = (id: string, label: string) => ({ derivedNodeId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
+    // U4: whole-set ordering trace — ONE per-domain ordering records the asserted edges;
+    // there is no per-pair judge-model split any more (every edge uses layer.judgeModel).
     const droppedId = randomUUID();
     const droppedMintingId = randomUUID();
     const absorbedMergeId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
-      judgments: [
-        { declaredDomain: "software engineering", judgeModel: "kg-generated-prerequisite-judgment", a: ctx(mintedId, "Stack allocation"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.8, rationale: "r" } },
-        { declaredDomain: "software engineering", judgeModel: "mock-judge", a: ctx(rescuedId, "Borrowing"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.7, rationale: "r" } }
-      ], dispositions: [], groundingDispositions: [
+      orderings: [
+        { declaredDomain: "software engineering", judgeModel: "mock-judge", nodeCount: 3, reprompted: false, cycleRoutedEdges: [], assertedEdges: [
+          { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, confidence: 0.8, rationale: "r" },
+          { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, confidence: 0.7, rationale: "r" }
+        ] }
+      ], nodeExclusions: [], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
       { derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", outcome: "verified", rationale: "mention verified verbatim" }
     ], rescueDispositions: [
@@ -407,7 +409,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         absorbedEvidence: ["the owner frees memory"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
     ] };
     const store = new PostgresEnrichmentRunStore(sql);
-    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
+    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
 
     const hydrated = await store.getLayer(enrichmentId);
     assert.ok(hydrated);
