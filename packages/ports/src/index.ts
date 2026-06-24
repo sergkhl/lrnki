@@ -23,7 +23,6 @@ import type {
   ExtractionRunResult,
   GeneratedGroundingBundle,
   WholeSetOrdering,
-  PrerequisiteOrderingCorrection,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
@@ -250,22 +249,22 @@ export interface SourceObjectStoragePort {
 // ---------------------------------------------------------------------------
 
 // Whole-set prerequisite ordering over ALL evidenced nodes in one Declared Domain
-// (ADR-0019, amended — whole-set ordering, plan U1/U2, R1/R2). ONE forced-tool call
-// returns a directed prerequisite edge list over the listed nodes; it is globally
-// self-consistent by construction, so cycles are the rare residue rather than the
-// expected residue of intransitive per-pair judging. Each node is listed with its CEP
-// evidence; each edge cites its endpoints by EXACT canonical label, which the
-// application maps → derivedNodeIds fail-closed (KTD3, R9). The optional `correction`
-// carries the violating cycle on the AT-MOST-ONE re-prompt (R10) — a parameter of the
-// same call, never a second method. The judge proposes directed edges only; the boundary
-// verifies acyclicity and routes a stubborn cycle to `uncertain` (rules 16/19), and the
-// symbolic disposal (weak-cut → transitive reduction) runs over the certain edges.
+// (ADR-0019, amended — K-sampled whole-set ordering, plan U2/U4, D1/D2). ONE forced-tool
+// call returns a directed prerequisite edge list over the listed nodes — ONE draw from a
+// non-deterministic distribution (ADR-0028). `order` is a thin single-call caller: the
+// APPLICATION invokes it K times on the SAME input and tallies a per-pair directional vote
+// (D1/D2), so this method neither knows K nor aggregates. Each node is listed with its CEP
+// evidence; each edge cites its endpoints by EXACT canonical label, which the application
+// maps → derivedNodeIds fail-closed (KTD3, R9). The judge proposes directed edges only; the
+// boundary derives consensus confidence, routes direction-contested pairs and aggregate
+// cycles to `uncertain` (D3/D6, rules 16/19), and runs the symbolic disposal (weak-cut →
+// transitive reduction) over the consensus certain edges. There is no corrective re-prompt
+// (KTD4, rule 18): acyclicity is enforced on the aggregate, not by re-prompting one draw.
 export interface PrerequisiteOrderingPort {
   readonly model: string;
   order(input: {
     declaredDomain: string;
     nodes: PrerequisiteConceptContext[];
-    correction?: PrerequisiteOrderingCorrection;
   }): Promise<WholeSetOrdering>;
 }
 

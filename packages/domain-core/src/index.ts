@@ -917,20 +917,12 @@ export type WholeSetPrerequisiteEdge = {
 };
 
 // One whole-set prerequisite ordering over a Declared Domain's deduplicated node set
-// (R1, R2). `edges` is the directed acyclic edge list the judge proposes in one call
-// (and its at-most-one corrective re-prompt). Acyclicity and real-node citation are
-// verified in the application boundary, never asserted by the model (R9, rules 16/19).
+// (R1, R2). `edges` is the directed edge list the judge proposes in ONE draw. The
+// application draws this ordering K times on the same input and tallies a per-pair
+// directional vote (D1/D2); acyclicity, real-node citation, and the consensus across
+// draws are computed in the boundary, never asserted by the model (R9, rules 16/19).
 export type WholeSetOrdering = {
   edges: WholeSetPrerequisiteEdge[];
-};
-
-// The one corrective re-prompt payload (R10, KTD2). When the first ordering response is
-// cyclic, the boundary issues exactly ONE re-prompt carrying the violating cycle as an
-// ordered list of canonical labels (`a → b → … → a`), so the judge can revise the
-// offending edges into an acyclic ordering. Carried as a parameter of the SAME ordering
-// call, never a second port method.
-export type PrerequisiteOrderingCorrection = {
-  cyclePath: string[];
 };
 
 // An edge of the inferred prerequisite DAG: prerequisite must precede dependent.
@@ -946,27 +938,45 @@ export type InferredPrerequisiteEdge = {
   provenance: { judgmentRationale: string };
 };
 
-// One whole-set ordering call's trace for a single Declared Domain (plan U1, R15). One
-// call (plus its at-most-one re-prompt) orders the whole domain, so the trace is
-// per-domain, not per-pair: it records the ordering model, how many nodes were judged,
-// the asserted directed edges (endpoint ids resolved from labels), whether the corrective
-// re-prompt fired, and which edges were cycle-routed to `uncertain` (R11). There is no
-// per-pair `a`/`b` shape any more — the per-pair judge was deleted (rule 18).
+// One unordered concept pair's directional vote across the K ordering draws (D2, KTD2).
+// `forward`/`reverse` count how many draws cited the pair prerequisite→dependent in the
+// MAJORITY direction vs. the minority; the endpoints are stored in that majority direction.
+// `consensusConfidence` is the empirical agreement max(f,r)/K that replaces the model's
+// per-draw self-report (D4) and feeds the existing weak-edge floor as a presence quorum
+// (D5/KTD2). `classification` records why the pair was routed: a stable majority is
+// `consensus`; a pair contested in both directions beyond the calibrated minority fraction
+// is `direction_contested` and goes to `uncertain` (D3/D6). A pair never cited in any draw
+// produces no vote at all.
+export type PairDirectionVote = {
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
+  forward: number;
+  reverse: number;
+  k: number;
+  consensusConfidence: number;
+  classification: "consensus" | "direction_contested";
+};
+
+// One K-sampled ordering stage's trace for a single Declared Domain (D1/D2, R15). The
+// application draws the whole-set ordering call K times on the same input and tallies a
+// per-pair directional vote, so the trace is per-domain and records the FULL judgment
+// distribution: the ordering model, how many nodes were judged, K, the per-pair vote
+// distribution (`pairVotes`), and which edges were cycle-routed to `uncertain` because a
+// cycle survived in the aggregated certain set (R11/KTD3). There is no single-draw
+// re-prompt any more — acyclicity is enforced on the aggregate via cycle-routing (KTD4,
+// rule 18), so `reprompted`/`assertedEdges` are gone.
 export type PrerequisiteOrderingTrace = {
   declaredDomain: string;
   // The single non-DeepSeek ordering alias that ordered this domain (R5).
   judgeModel: string;
   nodeCount: number;
-  assertedEdges: {
-    prerequisiteDerivedNodeId: string;
-    dependentDerivedNodeId: string;
-    confidence: number;
-    rationale: string;
-  }[];
-  // Whether the one bounded corrective re-prompt was issued for this domain (R10).
-  reprompted: boolean;
-  // Edges routed wholesale to `uncertain` because a cycle survived the re-prompt (R11).
-  // Empty on the acyclic happy path; never silently dropped.
+  // The number of ordering draws taken for this domain (D1/D8). 0 for a singleton domain.
+  k: number;
+  // The per-pair directional vote distribution across the K draws (D2). The auditable,
+  // replayable record from which consensus confidence and routing were derived.
+  pairVotes: PairDirectionVote[];
+  // Edges routed wholesale to `uncertain` because a cycle survived in the aggregated
+  // certain set (KTD3). Empty on the acyclic happy path; never silently dropped.
   cycleRoutedEdges: { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string }[];
 };
 
@@ -994,8 +1004,8 @@ export type EnrichmentRunTrace = {
   graphVersionId: string;
   enrichmentConfigHash: string;
   derivedNodes: DerivedGraphNode[];
-  // One ordering trace per Declared Domain (R1, R15): the whole-set call's asserted
-  // edges, re-prompt flag, and cycle-routed edges. Replaces the per-pair judgment list.
+  // One ordering trace per Declared Domain (R1, R15): K, the per-pair vote distribution,
+  // and cycle-routed edges. Records the full judgment distribution, not one draw.
   orderings: PrerequisiteOrderingTrace[];
   // Per-node insufficient-evidence exclusions (R4), recorded once per node. Replaces the
   // per-pair `insufficient_evidence` edge dispositions the per-node judge produced.
