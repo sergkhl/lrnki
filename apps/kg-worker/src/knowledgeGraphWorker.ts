@@ -25,6 +25,7 @@ import {
 import {
   LiteLlmAdmissionLabelJudgmentAdapter,
   LiteLlmAssertionEntailmentJudgmentAdapter,
+  LiteLlmDefinitionPassageQualityJudgmentAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmAnswerGradingJudgeAdapter,
@@ -57,7 +58,7 @@ import {
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "structure-aware-neighborhood-v37";
+const PIPELINE_CONFIG_HASH = "definition-quality-judge-v38";
 
 import { existsSync } from "node:fs";
 
@@ -134,6 +135,12 @@ function buildContext() {
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
+    // Definition-Passage quality judge (ADR-0007 extension). Same independent
+    // production judge (kg-independent-judge) and deterministic decoding; runs after
+    // the verbatim floor and drops hollow Definition Passages (bare name, heading,
+    // title, citation), routing a last-passage veto into the existing demotion with a
+    // distinct reason code.
+    definitionPassageQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient),
     // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
     // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
     // the directed prerequisite DAG over the deduplicated node set; it is cross-family
@@ -239,6 +246,7 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
     evidenceProfileExtraction: ctx.evidenceProfileExtraction,
     assertionEntailmentJudge: ctx.assertionEntailmentJudge,
     admissionLabelJudge: ctx.admissionLabelJudge,
+    definitionPassageQualityJudge: ctx.definitionPassageQualityJudge,
     store: ctx.runStore,
     onRunStart: (unit) => console.log(`\n>> extraction run ${unit.runId} for ${unit.source.sourceResourceId} [${unit.source.declaredDomain}]`),
     onRunComplete: (_unit, result) => {

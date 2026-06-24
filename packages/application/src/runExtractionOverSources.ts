@@ -5,6 +5,7 @@ import type {
   ConceptAdmissionPort,
   ConceptConditionedEvidenceProfileExtractionPort,
   ConceptDiscoveryPort,
+  DefinitionPassageQualityJudgmentPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
@@ -34,6 +35,7 @@ export async function runExtractionOverSources(input: {
   evidenceProfileExtraction: ConceptConditionedEvidenceProfileExtractionPort;
   assertionEntailmentJudge: AssertionEntailmentJudgmentPort;
   admissionLabelJudge: AdmissionLabelJudgmentPort;
+  definitionPassageQualityJudge: DefinitionPassageQualityJudgmentPort;
   store: ExtractionRunStorePort;
   concurrency?: number;
   onRunStart?: (unit: ExtractionSourceUnit) => void;
@@ -53,6 +55,7 @@ export async function runExtractionOverSources(input: {
         evidenceProfileExtraction: input.evidenceProfileExtraction,
         assertionEntailmentJudge: input.assertionEntailmentJudge,
         admissionLabelJudge: input.admissionLabelJudge,
+        definitionPassageQualityJudge: input.definitionPassageQualityJudge,
         store: input.store
       });
       input.onRunComplete?.(unit, result);

@@ -12,6 +12,7 @@ import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
   ConceptConditionedEvidenceProfileExtractionPort,
+  DefinitionPassageQualityJudgmentPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
@@ -30,6 +31,28 @@ const entailEverything: AssertionEntailmentJudgmentPort = {
 const everythingIsAConcept: AdmissionLabelJudgmentPort = {
   model: "test-admission-judge",
   judge: async () => ({ labelKind: "concept", underlyingNounPhrase: "", groundingSpan: "", rationale: "test" })
+};
+
+// Default definition-quality judge keeps every passage, so these orchestration tests
+// see unchanged definitions; the drop/demote routing is exercised below with a vetoing
+// judge and in applyDefinitionPassageQualityJudge.test.ts.
+const keepAllDefinitions: DefinitionPassageQualityJudgmentPort = {
+  model: "test-definition-quality-judge",
+  judgeDefinitions: async (input) =>
+    input.passages.map(() => ({ establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "test" }))
+};
+
+// A judge that vetoes EVERY definition passage as a heading, grounding on the whole
+// quote so the stage honors the veto. Drops a core Concept's last definition.
+const vetoAllDefinitions: DefinitionPassageQualityJudgmentPort = {
+  model: "test-definition-quality-judge",
+  judgeDefinitions: async (input) =>
+    input.passages.map((passage) => ({ establishesMeaning: false, category: "heading_or_title", judgedSpan: passage.evidenceQuote, rationale: "hollow" }))
+};
+
+const throwingDefinitionJudge: DefinitionPassageQualityJudgmentPort = {
+  model: "test-definition-quality-judge",
+  judgeDefinitions: async () => { throw new Error("judge transport down"); }
 };
 
 const frameworkQuote = "INSTRUCTKG is part of Signal Systems and INSTRUCTKG works by leveraging temporal signals.";
@@ -105,7 +128,7 @@ function harness(
   extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
   selectedCandidates = candidates,
   admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission,
-  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number } } = {}
+  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort } = {}
 ) {
   let persisted: ExtractionRunResult | undefined;
   let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
@@ -129,6 +152,7 @@ function harness(
       evidenceProfileExtraction: { extract },
       assertionEntailmentJudge: entailEverything,
       admissionLabelJudge: everythingIsAConcept,
+      definitionPassageQualityJudge: options.definitionPassageQualityJudge ?? keepAllDefinitions,
       store
     }),
     persisted: () => persisted,
@@ -190,6 +214,86 @@ test("produces one complete CEP per admitted concept and marks the run succeeded
   assert.equal(framework?.mentions.length, 1);
   assert.equal(result.maxMentionsPerConceptPerSource, 6);
   assert.ok(result.candidates.every((candidate) => !candidate.admission.boundaryReasonCodes.includes("core_demoted_ungroundable")));
+});
+
+// --- Definition-Passage quality judge wiring (ADR-0007 extension, U5) -------
+
+test("a vetoed last definition demotes the core with the hollow reason code and the run still succeeds", async () => {
+  const h = harness(
+    async (input) => definitionFor[input.subject.candidateKey],
+    candidates,
+    admission,
+    { definitionPassageQualityJudge: vetoAllDefinitions }
+  );
+  const result = await h.run();
+
+  assert.equal(result.status, "succeeded");
+  const framework = result.candidates.find((c) => c.candidateKey === "framework");
+  assert.equal(framework?.admission.tier, "optional");
+  assert.ok(framework?.admission.boundaryReasonCodes.includes("core_demoted_hollow_definition"));
+  assert.ok(!framework?.admission.boundaryReasonCodes.includes("core_demoted_ungroundable"));
+  assert.equal(result.evidenceProfiles.find((p) => p.candidateKey === "framework")?.complete, false);
+  assert.ok(result.definitionQualityDispositions.some((d) => d.candidateKey === "framework" && d.disposition === "vetoed"));
+  // The distinct hollow quality issue is surfaced, separate from the ungroundable one.
+  assert.ok(result.qualityIssues.some((issue) => issue.issueType === "core_demoted_hollow_definition" && issue.candidateKey === "framework"));
+});
+
+test("a surviving definition keeps the core complete when only one of two passages is vetoed", async () => {
+  const vetoSecondOnly: DefinitionPassageQualityJudgmentPort = {
+    model: "test",
+    judgeDefinitions: async (input) =>
+      input.passages.map((passage, index) =>
+        index === 0
+          ? { establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "ok" }
+          : { establishesMeaning: false, category: "heading_or_title", judgedSpan: passage.evidenceQuote, rationale: "hollow" }
+      )
+  };
+  const h = harness(
+    async (input) =>
+      input.subject.candidateKey === "framework"
+        ? { definitions: [
+            { blockId: "block-1", evidenceQuote: frameworkQuote },
+            { blockId: "block-1", evidenceQuote: "INSTRUCTKG works by leveraging temporal signals" }
+          ], mentions: [], assertions: [] }
+        : definitionFor[input.subject.candidateKey],
+    candidates,
+    admission,
+    { definitionPassageQualityJudge: vetoSecondOnly }
+  );
+  const result = await h.run();
+
+  const framework = result.candidates.find((c) => c.candidateKey === "framework");
+  assert.equal(framework?.admission.tier, "core");
+  const profile = result.evidenceProfiles.find((p) => p.candidateKey === "framework");
+  assert.equal(profile?.complete, true);
+  assert.equal(profile?.definitions.length, 1);
+});
+
+test("a throwing definition-quality judge demotes nothing and records kept_judge_unavailable", async () => {
+  const h = harness(
+    async (input) => definitionFor[input.subject.candidateKey],
+    candidates,
+    admission,
+    { definitionPassageQualityJudge: throwingDefinitionJudge }
+  );
+  const result = await h.run();
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.candidates.find((c) => c.candidateKey === "framework")?.admission.tier, "core");
+  assert.ok(result.candidates.every((c) => !c.admission.boundaryReasonCodes.includes("core_demoted_hollow_definition")));
+  assert.ok(result.definitionQualityDispositions.every((d) => d.disposition === "kept_judge_unavailable"));
+});
+
+test("definition-quality dispositions are carried on the persisted run artifact payload", async () => {
+  const h = harness(
+    async (input) => definitionFor[input.subject.candidateKey],
+    candidates,
+    admission,
+    { definitionPassageQualityJudge: vetoAllDefinitions }
+  );
+  await h.run();
+  const payload = h.artifact()?.payload;
+  assert.ok(payload?.definitionQualityDispositions.some((d) => d.disposition === "vetoed"));
 });
 
 test("passes adjacent definition blocks into the concept-conditioned extractor while preserving verbatim validation", async () => {
@@ -438,6 +542,7 @@ function runSplit(admitProposals: AdmissionProposal[]): Promise<ExtractionRunRes
     },
     assertionEntailmentJudge: entailEverything,
     admissionLabelJudge: everythingIsAConcept,
+    definitionPassageQualityJudge: keepAllDefinitions,
     store
   });
 }

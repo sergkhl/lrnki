@@ -54,6 +54,31 @@ test("flags proposition-label demotions and out-of-domain illustration rejects",
   assert.ok(issues.some((issue) => issue.issueType === "possible_out_of_domain_illustration" && issue.candidateKey === "foreign" && issue.severity === "info"));
 });
 
+test("flags a demoted hollow-definition core distinctly from the ungroundable issue", () => {
+  const issues = detectExtractionQualityIssues(run({
+    candidates: [candidate({ candidateKey: "alpha", label: "Alpha", tier: "optional", modelTier: "core", boundaryReasonCodes: ["core_demoted_hollow_definition"] })],
+    evidenceProfiles: [{ candidateKey: "alpha", tier: "optional", definitions: [], mentions: [], assertions: [], complete: false }]
+  }));
+
+  const hollow = issues.filter((item) => item.issueType === "core_demoted_hollow_definition");
+  assert.equal(hollow.length, 1);
+  assert.equal(hollow[0].candidateKey, "alpha");
+  assert.equal(hollow[0].severity, "warning");
+  // It is NOT also reported as the generic ungroundable issue, nor as core-poor.
+  assert.ok(!issues.some((item) => item.issueType === "core_demoted_ungroundable"));
+  assert.ok(!issues.some((item) => item.issueType === "possible_missing_core_concept"));
+});
+
+test("a degraded hollow demotion is critical severity", () => {
+  const issues = detectExtractionQualityIssues(run({
+    degraded: true,
+    candidates: [candidate({ candidateKey: "alpha", label: "Alpha", tier: "optional", modelTier: "core", boundaryReasonCodes: ["core_demoted_hollow_definition"] })],
+    evidenceProfiles: [{ candidateKey: "alpha", tier: "optional", definitions: [], mentions: [], assertions: [], complete: false }]
+  }));
+
+  assert.ok(issues.some((item) => item.issueType === "core_demoted_hollow_definition" && item.severity === "critical"));
+});
+
 function run(overrides: Partial<ExtractionRunResult> = {}): ExtractionRunResult {
   return {
     runId: "run-1",

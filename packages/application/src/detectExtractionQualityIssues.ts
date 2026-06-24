@@ -1,4 +1,4 @@
-import { CORE_DEMOTED_UNGROUNDABLE_REASON, type ExtractionQualityIssue, type ExtractionRunResult, type RunCandidate } from "@lrnki/domain-core";
+import { CORE_DEMOTED_HOLLOW_DEFINITION_REASON, CORE_DEMOTED_UNGROUNDABLE_REASON, type ExtractionQualityIssue, type ExtractionRunResult, type RunCandidate } from "@lrnki/domain-core";
 
 export function detectExtractionQualityIssues(run: ExtractionRunResult): ExtractionQualityIssue[] {
   const issues: ExtractionQualityIssue[] = [genericDomainNeutralPromptIssue()];
@@ -6,8 +6,11 @@ export function detectExtractionQualityIssues(run: ExtractionRunResult): Extract
   const demotedUngroundableCandidates = run.candidates.filter((candidate) =>
     candidate.admission.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON)
   );
+  const demotedHollowCandidates = run.candidates.filter((candidate) =>
+    candidate.admission.boundaryReasonCodes.includes(CORE_DEMOTED_HOLLOW_DEFINITION_REASON)
+  );
 
-  if (coreCandidates.length === 0 && demotedUngroundableCandidates.length === 0) {
+  if (coreCandidates.length === 0 && demotedUngroundableCandidates.length === 0 && demotedHollowCandidates.length === 0) {
     issues.push({
       stage: "admission",
       issueType: "possible_missing_core_concept",
@@ -26,6 +29,18 @@ export function detectExtractionQualityIssues(run: ExtractionRunResult): Extract
       severity: run.degraded ? "critical" : "warning",
       evidenceQuotes: candidateEvidenceQuotes(candidate),
       rationale: "A core Concept admitted with definition-bearing treatment could not be grounded with a verbatim Definition Passage, so it was demoted to optional and the run succeeded with the remaining cores."
+    });
+  }
+
+  for (const candidate of demotedHollowCandidates) {
+    issues.push({
+      stage: "definition_passage_quality",
+      candidateKey: candidate.candidateKey,
+      conceptLabel: candidate.canonicalLabel,
+      issueType: CORE_DEMOTED_HOLLOW_DEFINITION_REASON,
+      severity: run.degraded ? "critical" : "warning",
+      evidenceQuotes: candidateEvidenceQuotes(candidate),
+      rationale: "A core Concept was demoted because its only Definition Passage conveyed no meaning (a bare name, heading, title, or citation), so it was demoted to optional and the run succeeded with the remaining cores. Whether the source defines it elsewhere across a chunk boundary is a separate retrieval question (layer B)."
     });
   }
 

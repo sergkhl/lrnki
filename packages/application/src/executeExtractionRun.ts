@@ -14,10 +14,12 @@ import type {
   ConceptAdmissionPort,
   ConceptConditionedEvidenceProfileExtractionPort,
   ConceptDiscoveryPort,
+  DefinitionPassageQualityJudgmentPort,
   ExtractionRunStorePort
 } from "@lrnki/ports";
 import { admitSource } from "./admitSource";
 import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
+import { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQualityJudge";
 import { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 import { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
 import { reconcileUngroundableCores } from "./reconcileUngroundableCores";
@@ -47,6 +49,7 @@ export async function executeExtractionRun(input: {
   evidenceProfileExtraction: ConceptConditionedEvidenceProfileExtractionPort;
   assertionEntailmentJudge: AssertionEntailmentJudgmentPort;
   admissionLabelJudge: AdmissionLabelJudgmentPort;
+  definitionPassageQualityJudge: DefinitionPassageQualityJudgmentPort;
   store: ExtractionRunStorePort;
 }): Promise<ExtractionRunResult> {
   const startedAt = Date.now();
@@ -123,9 +126,26 @@ export async function executeExtractionRun(input: {
     });
   });
 
+  // Stage 3b — Definition-Passage quality judge (ADR-0007 extension). Runs on the
+  // already-verbatim-verified core definitions, drops hollow passages (bare name,
+  // heading, title, citation), and recomputes `complete`. The recomputed flag flows
+  // naturally into reconciliation below; a vetoed last definition adds its key to
+  // `hollowDefinitionKeys`, which selects the distinct demotion reason code. Block
+  // structure is passed only as judge CONTEXT (KTD7), never as a deterministic gate.
+  const blockContextById = new Map(
+    document.blocks.map((block) => [block.blockId, { blockType: block.blockType, headingPath: block.headingPath }] as const)
+  );
+  const definitionQuality = await applyDefinitionPassageQualityJudge({
+    profiles: rawProfiles,
+    declaredDomain,
+    conceptsByKey,
+    blockContextById,
+    judge: input.definitionPassageQualityJudge
+  });
+
   // Stage 4 — neural acceptance of optional typed assertions only.
   const evidenceProfiles: RunEvidenceProfile[] = await applyAssertionEntailmentJudge({
-    profiles: rawProfiles,
+    profiles: definitionQuality.profiles,
     declaredDomain,
     conceptsByKey,
     judge: input.assertionEntailmentJudge
@@ -133,7 +153,13 @@ export async function executeExtractionRun(input: {
 
   // Post-CEP tier reconciliation: a core whose CEP came back incomplete is demoted to
   // optional. Pure/immutable, so `admission.tier` has a single writer in this phase.
-  const reconciled = reconcileUngroundableCores({ candidates, evidenceProfiles, coreKeys });
+  // Keys whose LAST definition was vetoed as hollow carry the distinct reason code.
+  const reconciled = reconcileUngroundableCores({
+    candidates,
+    evidenceProfiles,
+    coreKeys,
+    hollowDefinitionKeys: definitionQuality.hollowDefinitionKeys
+  });
   const remainingCoreCount = reconciled.candidates.filter((candidate) => candidate.admission.tier === "core").length;
 
   const runResult: ExtractionRunResult = {
@@ -145,7 +171,7 @@ export async function executeExtractionRun(input: {
     maxMentionsPerConceptPerSource,
     candidates: reconciled.candidates,
     evidenceProfiles: reconciled.evidenceProfiles,
-    definitionQualityDispositions: [],
+    definitionQualityDispositions: definitionQuality.dispositions,
     qualityIssues: [],
     status: "succeeded",
     degraded: reconciled.demotedCoreCount > 0 && remainingCoreCount === 0,
