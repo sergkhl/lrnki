@@ -155,6 +155,10 @@ export async function runGraphEnrichment(input: {
   // Optional minting durability summary hook. Reports recorded decision counts for
   // operator visibility without coupling the application layer to console output.
   onMintingSummary?: (summary: { accepted: number; dropped: number; unavailable: number }) => void;
+  // Optional K-sampling ordering summary hook (U5): the K used and the committed /
+  // direction-contested / weak-cut / cycle-routed edge counts, for operator visibility. The
+  // application stays free of console I/O; the worker formats the structured line.
+  onOrderingSummary?: (summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number }) => void;
   // Optional per-sub-stage wall-clock hook (U2, KTD5, R1). The application stays free
   // of console I/O: it only measures monotonic elapsed ms around each enrichment
   // sub-stage and reports through this callback; the worker formats the structured line.
@@ -472,6 +476,17 @@ export async function runGraphEnrichment(input: {
     return { reducedEdges, transitiveEdges };
   });
   const { reducedEdges, transitiveEdges } = disposal;
+
+  // Ordering summary (U5): committed certain edges (post-reduction DAG), direction-contested
+  // and cycle-routed counts from the per-domain traces, and the weak-cut count — for operator
+  // visibility. The application only reports; the worker formats the structured log line.
+  input.onOrderingSummary?.({
+    k: K,
+    committed: reducedEdges.length,
+    contested: orderingTraces.reduce((sum, trace) => sum + trace.pairVotes.filter((vote) => vote.classification === "direction_contested").length, 0),
+    weakCut: weakEdges.length,
+    cycleRouted: orderingTraces.reduce((sum, trace) => sum + trace.cycleRoutedEdges.length, 0)
+  });
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
   // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
