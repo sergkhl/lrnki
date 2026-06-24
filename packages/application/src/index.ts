@@ -62,7 +62,7 @@ export {
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,
-  removeCycles,
+  findCycleEdges,
   transitiveReduction,
   topologicalDepth,
   topologicalOrder,
