@@ -36,4 +36,4 @@ registry, relation-recall retries, and a missing-concept escape hatch that the l
 consumed. The reset makes the product path explicit: admission decides the small Concept set, the CEP
 preserves what curated sources teach about each Concept, and Graph Enrichment owns all prerequisite
 structure. Verbatim grounding stays a provable deterministic guarantee; semantic acceptance of the
-two optional assertion types belongs to a measured neural judge.
+sole optional `defines` assertion belongs to a measured neural judge (ADR-0016).

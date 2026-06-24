@@ -15,7 +15,7 @@
 - [0013-verify-quality-by-real-source-inspection](./0013-verify-quality-by-real-source-inspection.md)
 - [0014-defer-learner-modeling](./0014-defer-learner-modeling.md)
 - [0015-deterministic-cross-source-identity](./0015-deterministic-cross-source-identity.md)
-- [0016-retire-relation-registry-keep-two-cep-assertions](./0016-retire-relation-registry-keep-two-cep-assertions.md)
+- [0016-retire-relation-registry-keep-one-cep-assertion](./0016-retire-relation-registry-keep-one-cep-assertion.md)
 - [0017-split-extraction-runs-from-graph-version-builds](./0017-split-extraction-runs-from-graph-version-builds.md)
 - [0018-deterministic-extraction-sampling](./0018-deterministic-extraction-sampling.md)
 - [0019-graph-enrichment-derived-layer](./0019-graph-enrichment-derived-layer.md)

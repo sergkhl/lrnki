@@ -1,50 +1,5 @@
 # TODO
 
-The learner-facing study loop is now merged to `main` (PR #9): a typed Study Item Bank with auto-graded
-option-select studying, the learner-calibrated study route and calibration sweep, the adapted-graph
-comparison view, persisted neural difficulty rationales, a repeatable demo seed, and the FFX sphere-grid
-graph layout.
-
-**In-flight branch `feat/graph-dissolved-calibration` (2026-06-22):** the weighted self-report calibration
-sweep from PR #9 is *retired and replaced* by graph-dissolved calibration — the learner picks a goal first,
-then self-assesses cone nodes with a reveal-then-binary "I knew it" / "I forgot" verdict that hard-prunes the
-trusted prerequisite down-closure. Calibration is now a mutable verdict per `(learner, node)` stored apart
-from the now-graded-only Response Log; all evidence weights are removed. Implementation units U1–U8 are done:
-U1–U7 are typecheck/test-clean and committed (two commits: backend `feat(calibration)…` + UI
-`feat(admin-lab)…`), and U8 real-use evaluation passed on the live two-source enrichment (see COMPLETED).
-Session report: `tmp/2026-06-22-calibration-implementation-report.md`.
-
-**In-flight branch `feat/enrichment-perf-batched-judging` (2026-06-23):** enrichment speed + token
-reduction via per-node batched prerequisite judging (see COMPLETED). **All units U1–U7 are
-shipped, typecheck/test-clean, committed** (U1 stage tags, U2 worker stage-timing, U4 batched
-schema/adapter, U5 runGraphEnrichment reshape, U6 shared `mapWithConcurrency` + parallel-ready
-extraction/study-item seams). The measurement instrument works: per-stage `stage_timing` lines, and
-`/spend/tags` attributes token/cost per stage with no app-computed cost (AE3 PASS). **U7 parity gate
-resolved (option 1 + sign-off):** the batched judge's subject/candidate asymmetry was neutralized to
-the per-pair judge's symmetric Concept A / Concept B framing inside one batched tool call
-(`fix(enrichment): symmetric A/B framing…`). Re-measurement showed the per-pair judge is itself
-non-deterministic now (~6/12 run-to-run, intermittently 12/12) due to OpenRouter/DeepSeek serving
-drift, so symmetric-batched is within per-pair's noise envelope (cross 5.6 ≈ within 6.3) and a clean
-12/12 parity is no longer measurable for any method. **User signed off: accept batched + keep the
-1.4–2× speed win;** enrichment reproducibility is now tracked as its own issue (TODO #6). Evidence:
-`tmp/2026-06-23-enrichment-parity-fix/rule-14-evaluation.md`, `tmp/2026-06-22-enrichment-rule14.md`,
-`tmp/2026-06-22-enrichment-baseline/`, `tmp/2026-06-22-enrichment-after/`.
-
-The current branch resolves the former minting-precision TODO with a minting-durability judge
-(`feat: Minting-durability judge for assumed-prerequisite enrichment nodes`). Rule-14 evaluation on
-2026-06-23 classified it **PASS with caveats**: the enabled Rust + economics run minted four reasonable
-software prerequisites (`Compiler (software tool)`, `Dynamic memory allocation`, `Memory address`,
-`Static analysis (programming)`), persisted four accepted minting dispositions, produced no RAII node or
-drop-function edges, and rescue dropped `Resource Acquisition Is Initialization (RAII)`. The disabled
-baseline still produced `drop function (Rust)` rescue output and edges, but the RAII minting path did not
-reproduce in this draw, so the evaluation records that no real `not_durable` minting drop was observed.
-Evidence: `tmp/2026-06-23-minting-durability-rule14/rule-14-evaluation.md`.
-
-The remaining active work is earned by inspected real-use outputs, not by deferred method-stack
-preference: the learner recall/adaptive path loop runs end-to-end over all manifest fixtures at
-`EXPERIMENT_ONLY` trust, and prior CEP definition-quality and intrinsic-difficulty caveats remain visible in
-the mixed-domain run.
-
 ## TODO
 
 1. **Replace exhaustive O(n²) pairwise prerequisite judging with a whole-set global ordering (measured
@@ -77,8 +32,8 @@ the mixed-domain run.
    signal, not a bug to make deterministic. Sample the judge K times per pair (or per global ordering) and
    route **direction-unstable** pairs to `uncertain` — already excluded from learner paths — instead of
    committing one arbitrary draw. This both calibrates edge confidence and dissolves the TODO-#6 "noise".
-   - Costs K× judge calls; sequence it *after* task 2 so K× applies to the cheaper global-ordering call,
-     not the O(n²) fan-out. **Gate on observed instability:** ship task 2 single-sample first, inspect it
+   - Costs K× judge calls; sequence it *after* task 1 so K× applies to the cheaper global-ordering call,
+     not the O(n²) fan-out. **Gate on observed instability:** ship task 1 single-sample first, inspect it
      (rule 14), and add K-sampling only if the real defect is direction-instability — do not pre-build K×
      before the instability it measures is observed. Measured, domain-neutral, disposable (rules 11/16/17).
    - This closes the former enrichment-reproducibility item: root cause is intra-backend MoE
@@ -102,7 +57,7 @@ the mixed-domain run.
    - Prefer a measured neural judge that explicitly assesses whether a broad, evidence-thin node should be
      down-weighted; do not patch prompts with fixture-specific answers (rules 16/17). Keep any
      oracle/benchmark disposable.
-   - Population calibration stays deferred until real learner-response data exists (task 7 / ADR-0024).
+   - Population calibration stays deferred until real learner-response data exists (task 6 / ADR-0024).
 
 4. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
    neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but
@@ -131,7 +86,7 @@ the mixed-domain run.
      calibration over real study-loop responses is stable (ADR-0024).
    - **Graph-growth guard (narrowed).** Do not reintroduce F3-style densification: no ungrounded
      bridge-node/bridge-edge pass and no method-stack-driven graph growth. **Embeddings are now permitted
-     for concept identity/dedup and similarity (task 1, ADR-0012) but never to derive prerequisites or
+     for concept identity/dedup and similarity (ADR-0012) but never to derive prerequisites or
      gate/grow the graph** (rule 20). Performance-driven graph growth may be reconsidered only as a
      measured, run-scoped experiment. Learner responses may propose candidate missing prerequisites or
      edge audits but must not directly mutate the asserted graph or silently modify a Derived Graph Layer;
@@ -140,9 +95,18 @@ the mixed-domain run.
 
 ## COMPLETED
 
+- **Minting-durability judge for assumed-prerequisite enrichment nodes (2026-06-23, branch
+  `feat/enrichment-dedup-rescue-precision`).** Opt-in cross-family (`kg-independent-judge`) drop-only gate
+  that vetoes `not_durable` assumed-prerequisite proposals before any grounding call is spent, persisting
+  `minting_dispositions` (ADR-0019). Rule-14 **PASS with caveats**: the enabled Rust + economics run minted
+  four reasonable software prerequisites (`Compiler (software tool)`, `Dynamic memory allocation`,
+  `Memory address`, `Static analysis (programming)`), persisted four accepted dispositions, and produced no
+  RAII node or drop-function edges; rescue dropped `Resource Acquisition Is Initialization (RAII)`. Caveat:
+  the RAII minting path did not reproduce in this draw, so no real `not_durable` minting drop was observed.
+  Evidence: `tmp/2026-06-23-minting-durability-rule14/rule-14-evaluation.md`.
+
 - **Enrichment semantic dedup + rescue precision (2026-06-23, branch `feat/enrichment-dedup-rescue-precision`,
-  stacked on `feat/enrichment-perf-batched-judging`).** Plan
-  `docs/plans/2026-06-23-002-feat-enrichment-dedup-rescue-precision-plan.md`; rule-14 report
+  stacked on `feat/enrichment-perf-batched-judging`).** Rule-14 report
   `tmp/2026-06-23-dedup-rescue-rule14-evaluation.md`. All units U1–U7 shipped, typecheck/test-clean,
   committed.
   - **Semantic-deduplication sub-stage (U1–U5):** a measured derived-layer pass that collapses
@@ -164,8 +128,9 @@ the mixed-domain run.
     ≥0.72, distinct ≤0.66). A real-model probe (`tmp/u7-dedup-probe.ts`) merged a genuine anchor↔variant
     duplicate (Ownership ← Ownership (Rust), 0.87, anchor canonical) and kept a borderline pair
     (move/Move semantics, 0.72) distinct — confirming the adjudicator owns precision.
-  - **Residual (now TODO #1):** the same RAII gate can still arise via the **minting** path (baseline
-    minted RAII → `drop` at 0.85); U6 fixed only the rescue path. Minting-precision durability is queued.
+  - **Residual → resolved:** the same RAII gate could still arise via the **minting** path (baseline
+    minted RAII → `drop` at 0.85); U6 fixed only the rescue path, and the minting-durability judge above
+    now closes the minting path.
 
 - **Enrichment batched judging + determinism governance pivot (2026-06-23, branch `feat/enrichment-perf-batched-judging`).**
   - **Per-node batched judging shipped (U1–U7):** replaced per-pair prerequisite judging with one batched
@@ -185,13 +150,13 @@ the mixed-domain run.
     ambiguous flip even with a pinned backend + honored `seed: 7` + `temperature: 0`). `deepseek-v4-flash`
     has 19 OpenRouter backends, so the prior 12/12 was a lucky draw; no serving/config lever fixes it and
     `litellm/config.yaml` was left unchanged, so clean 12/12 parity is unmeasurable for any method and
-    reproducibility moved to its own active item (TODO #3/#6). **Governance updated:** new ADR-0028 + rule
+    reproducibility is folded into TODO #2 (prerequisite-direction self-consistency). **Governance updated:** new ADR-0028 + rule
     19 (measure non-deterministic quality with LLM/self-consistency, not determinism-chasing); ADR-0012
     rewritten + rule 20 (blanket no-embeddings ban withdrawn — embeddings permitted for
     identity/dedup/similarity, propose-only with separate adjudication, never for prerequisites);
     ADR-0015/CONTEXT reconciled. Inspecting real enrichment `0a7ed566` surfaced the larger learner-facing
     defect — concept fragmentation (barter×2, owner≈ownership, move×2) + permissive rescue (RAII→drop
-    @0.95) — now TODO #1.
+    @0.95) — since resolved by the semantic dedup + rescue-precision work above.
 - **Graph-dissolved calibration & goal-first study loop (2026-06-22, branch
   `feat/graph-dissolved-calibration`, committed not merged).** Retired the
   weighted self-report calibration sweep and replaced it with explicit calibration dissolved into the study
@@ -284,7 +249,13 @@ the mixed-domain run.
 
 ## VALIDATION
 
-Latest merged change (2026-06-21, PR #9) is the **learner study loop UI** (typed Study Item Bank + sphere-grid
+**Stale — needs a fresh run.** The consolidated suite breakdown below is the last full-suite validation
+(2026-06-21, PR #9). The later 2026-06-23 enrichment branches (batched judging, semantic dedup + rescue
+precision, minting-durability judge) are each reported typecheck/test-clean with deterministic-envelope
+tests only (rule 11) in their COMPLETED entries above, but a fresh consolidated `pnpm -r typecheck` + suite
+run has not been recorded here and should replace this section.
+
+Last full-suite run (2026-06-21, PR #9) — the **learner study loop UI** (typed Study Item Bank + sphere-grid
 layout + learner-calibrated study route + adapted-graph view + demo seed):
 
 - **Static/unit:** full workspace typecheck green (`pnpm -r typecheck`, exit 0) — the earlier mid-rename compile
@@ -302,4 +273,4 @@ layout + learner-calibrated study route + adapted-graph view + demo seed):
   (`tmp/2026-06-21-typed-study-items/rule-14-evaluation.md`). Caveat: this seed produced no natural
   self-assessment-only (cardless-for-studying) frontier because every node yielded a valid option-select item —
   worth re-confirming as generation scales. The loop overall remains `EXPERIMENT_ONLY` (uncalibrated learner
-  model); intrinsic difficulty remains `EXPERIMENT_ONLY` with the broad/thin distortion noted in TODO #1.
+  model); intrinsic difficulty remains `EXPERIMENT_ONLY` with the broad/thin distortion noted in TODO #3.
