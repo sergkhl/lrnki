@@ -70,8 +70,7 @@ export async function computeLearnerPath(input: {
   await input.pathStore.persist(path);
   await input.artifacts.append({
     artifactId: `${input.learnerPathId}:learner-path`,
-    artifactType: "learner_path.v1",
-    schemaVersion: "1",
+    artifactType: "learner_path",
     graphVersionId: layer.graphVersionId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,

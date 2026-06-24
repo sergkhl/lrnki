@@ -614,7 +614,6 @@ export type RefinementDecisionRecord = {
 export type ArtifactEnvelope<TPayload = unknown> = {
   artifactId: string;
   artifactType: string;
-  schemaVersion: string;
   runId?: string;
   graphVersionId?: string;
   producer: string;

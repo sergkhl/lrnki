@@ -24,8 +24,7 @@ import { reconcileUngroundableCores } from "./reconcileUngroundableCores";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.5.0";
-const EXTRACTION_RUN_ARTIFACT_TYPE = "extraction_run.v6";
-const EXTRACTION_RUN_SCHEMA_VERSION = "6";
+const EXTRACTION_RUN_ARTIFACT_TYPE = "extraction_run";
 
 // Default mention bound per Concept per source (R4, KTD). Overridable per run; part
 // of the pipeline configuration hash so a change is reflected in the artifact.
@@ -156,7 +155,6 @@ export async function executeExtractionRun(input: {
   const artifact: ArtifactEnvelope<ExtractionRunResult> = {
     artifactId: `${input.runId}:run`,
     artifactType: EXTRACTION_RUN_ARTIFACT_TYPE,
-    schemaVersion: EXTRACTION_RUN_SCHEMA_VERSION,
     runId: input.runId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,

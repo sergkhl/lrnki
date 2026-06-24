@@ -245,7 +245,6 @@ CREATE TABLE refinement_decisions (
 CREATE TABLE artifact_versions (
   artifact_id text PRIMARY KEY,
   artifact_type text NOT NULL,
-  schema_version text NOT NULL,
   run_id uuid REFERENCES extraction_runs(run_id),
   graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   producer text NOT NULL,
@@ -293,7 +292,7 @@ JSON_TABLE(
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type LIKE 'extraction_run.%';
+WHERE a.artifact_type = 'extraction_run';
 
 -- Flatten extraction-run artifact payloads: one row per Concept Evidence Profile
 -- with its definition/mention/assertion counts, for the Admin Lab Run Inspector.
@@ -313,7 +312,7 @@ JSON_TABLE(
     assertion_count integer PATH '$.assertions.size()'
   )
 ) AS p
-WHERE a.artifact_type LIKE 'extraction_run.%';
+WHERE a.artifact_type = 'extraction_run';
 
 -- Flatten graph-snapshot artifact payloads: one row per published Concept with its
 -- identity and trust tier, for the Admin Lab published view (ADR-0007 reset).
@@ -334,7 +333,7 @@ JSON_TABLE(
     homograph boolean PATH '$.homograph'
   )
 ) AS c
-WHERE a.artifact_type = 'graph_snapshot.v2';
+WHERE a.artifact_type = 'graph_snapshot';
 
 -- Flatten graph-snapshot CEPs: one row per Concept Evidence Profile with its
 -- definition/mention/assertion counts and zero asserted edges (R5).
@@ -352,7 +351,7 @@ JSON_TABLE(
     assertion_count integer PATH '$.assertions.size()'
   )
 ) AS p
-WHERE a.artifact_type = 'graph_snapshot.v2';
+WHERE a.artifact_type = 'graph_snapshot';
 
 -- Flatten graph-snapshot typed assertions: one row per optional `defines`
 -- assertion inside a published CEP.
@@ -371,7 +370,7 @@ JSON_TABLE(
     )
   )
 ) AS t
-WHERE a.artifact_type = 'graph_snapshot.v2' AND t.assertion_type IS NOT NULL;
+WHERE a.artifact_type = 'graph_snapshot' AND t.assertion_type IS NOT NULL;
 
 -- Flatten enrichment-run artifact payloads: one row per derived graph node with
 -- node kind, grounding origin, and role for Admin Lab inspection.
@@ -394,7 +393,7 @@ JSON_TABLE(
     declared_domain text PATH '$.declaredDomain'
   )
 ) AS n
-WHERE a.artifact_type = 'enrichment_run.v2';
+WHERE a.artifact_type = 'enrichment_run';
 
 -- Flatten study-item-bank artifact payloads: one row per typed Study Item with its
 -- item type, derived node, grounding provenance, question, self-report prompt (null for
@@ -420,7 +419,7 @@ JSON_TABLE(
     option_count integer PATH '$.options.size()'
   )
 ) AS si
-WHERE a.artifact_type = 'study_item_bank.v4';
+WHERE a.artifact_type = 'study_item_bank';
 
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published

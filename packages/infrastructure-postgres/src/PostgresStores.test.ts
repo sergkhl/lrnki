@@ -84,8 +84,7 @@ function candidate(candidateKey: string, label: string, tier: "core" | "optional
 function artifactFor(result: ExtractionRunResult): ArtifactEnvelope<ExtractionRunResult> {
   return {
     artifactId: `${result.runId}:run`,
-    artifactType: "extraction_run.v6",
-    schemaVersion: "6",
+    artifactType: "extraction_run",
     runId: result.runId,
     producer: "test",
     producerVersion: "0",
@@ -206,7 +205,7 @@ maybe("publish writes a CEP snapshot with zero asserted edges and round-trips th
       }]
     };
     const artifact: ArtifactEnvelope<GraphSnapshot> = {
-      artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId,
+      artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId,
       producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot
     };
     const store = new PostgresGraphVersionStore(sql);
@@ -260,7 +259,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       runMemberships: [{ runId, sourceResourceId }],
       refinementDecisions: [],
       artifact: {
-        artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId,
+        artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId,
         producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot
       }
     });
@@ -313,7 +312,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     await store.persist({
       layer,
       artifact: {
-        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId,
+        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run", graphVersionId,
         producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace
       }
     });
@@ -354,7 +353,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     };
     await new PostgresGraphVersionStore(sql).publish({
       snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
-      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
     });
 
     const enrichmentId = randomUUID();
@@ -409,7 +408,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         absorbedEvidence: ["the owner frees memory"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
     ] };
     const store = new PostgresEnrichmentRunStore(sql);
-    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
+    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
 
     const hydrated = await store.getLayer(enrichmentId);
     assert.ok(hydrated);
@@ -512,7 +511,7 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
     };
     await new PostgresGraphVersionStore(sql).publish({
       snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
-      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
     });
 
     const rescue = await new PostgresEnrichmentRunStore(sql).mentionedNonCoreCandidates(graphVersionId);

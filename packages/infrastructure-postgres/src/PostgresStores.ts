@@ -193,8 +193,8 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
       // The immutable run artifact is written in the SAME transaction, so no
       // authoritative relational state exists without its artifact envelope.
       await tx`
-        INSERT INTO artifact_versions (artifact_id, artifact_type, schema_version, run_id, producer, producer_version, config_hash, payload)
-        VALUES (${artifact.artifactId}, ${artifact.artifactType}, ${artifact.schemaVersion}, ${result.runId}, ${artifact.producer}, ${artifact.producerVersion}, ${artifact.configHash}, ${tx.json(artifact.payload as Parameters<Sql["json"]>[0])})`;
+        INSERT INTO artifact_versions (artifact_id, artifact_type, run_id, producer, producer_version, config_hash, payload)
+        VALUES (${artifact.artifactId}, ${artifact.artifactType}, ${result.runId}, ${artifact.producer}, ${artifact.producerVersion}, ${artifact.configHash}, ${tx.json(artifact.payload as Parameters<Sql["json"]>[0])})`;
     });
   }
 

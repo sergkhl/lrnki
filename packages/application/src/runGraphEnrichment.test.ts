@@ -381,7 +381,7 @@ test("persists a layer free of embedding and candidate-group fields and bumps th
     assert.ok(!("evidencePacketRef" in edge.provenance));
   }
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
-  assert.equal(ports.getArtifactType(), "enrichment_run.v3");
+  assert.equal(ports.getArtifactType(), "enrichment_run");
   // One ordering trace per domain (R1), each naming the ordering model used.
   assert.equal(ports.getTrace()?.orderings.length, 2);
   assert.ok(ports.getTrace()?.orderings.every((o) => o.judgeModel === "mock-ordering"));

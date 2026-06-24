@@ -15,8 +15,7 @@ import type { GraphVersionStorePort, ExtractionRunStorePort } from "@lrnki/ports
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.6.0";
 const REFINEMENT_CONFIG_HASH = "cep-union-build-v1";
-const GRAPH_SNAPSHOT_ARTIFACT_TYPE = "graph_snapshot.v2";
-const GRAPH_SNAPSHOT_SCHEMA_VERSION = "2";
+const GRAPH_SNAPSHOT_ARTIFACT_TYPE = "graph_snapshot";
 
 type IdentityKey = string; // `${declaredDomain}::${normalizedLabel}`
 const identityKey = (declaredDomain: string, normalizedLabel: string): IdentityKey => `${declaredDomain}::${normalizedLabel}`;
@@ -304,7 +303,6 @@ export async function buildGraphVersion(input: {
   const artifact: ArtifactEnvelope<GraphSnapshot> = {
     artifactId: `${input.graphVersionId}:snapshot`,
     artifactType: GRAPH_SNAPSHOT_ARTIFACT_TYPE,
-    schemaVersion: GRAPH_SNAPSHOT_SCHEMA_VERSION,
     graphVersionId: input.graphVersionId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,

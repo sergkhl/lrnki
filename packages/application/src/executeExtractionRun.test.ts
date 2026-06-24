@@ -369,8 +369,7 @@ test("persists the run with its immutable extraction artifact in the same call",
   const result = await h.run();
   assert.equal(h.persisted()?.runId, "run-1");
   const artifact = h.artifact();
-  assert.equal(artifact?.artifactType, "extraction_run.v6");
-  assert.equal(artifact?.schemaVersion, "6");
+  assert.equal(artifact?.artifactType, "extraction_run");
   assert.equal(artifact?.runId, "run-1");
   assert.equal(artifact?.payload, result);
   assert.ok(result.qualityIssues.some((issue) => issue.issueType === "generic_domain_neutral_prompt"));

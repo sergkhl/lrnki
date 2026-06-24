@@ -7,8 +7,8 @@ export async function writeArtifactEnvelope<TPayload>(
   artifact: ArtifactEnvelope<TPayload>
 ): Promise<void> {
   await sql`
-    INSERT INTO artifact_versions (artifact_id, artifact_type, schema_version, run_id, graph_version_id, producer, producer_version, config_hash, payload)
-    VALUES (${artifact.artifactId}, ${artifact.artifactType}, ${artifact.schemaVersion}, ${artifact.runId ?? null}, ${artifact.graphVersionId ?? null}, ${artifact.producer}, ${artifact.producerVersion}, ${artifact.configHash}, ${sql.json(artifact.payload as Parameters<Sql["json"]>[0])})
+    INSERT INTO artifact_versions (artifact_id, artifact_type, run_id, graph_version_id, producer, producer_version, config_hash, payload)
+    VALUES (${artifact.artifactId}, ${artifact.artifactType}, ${artifact.runId ?? null}, ${artifact.graphVersionId ?? null}, ${artifact.producer}, ${artifact.producerVersion}, ${artifact.configHash}, ${sql.json(artifact.payload as Parameters<Sql["json"]>[0])})
     ON CONFLICT (artifact_id) DO NOTHING`;
 }
 

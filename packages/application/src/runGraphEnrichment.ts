@@ -411,8 +411,7 @@ export async function runGraphEnrichment(input: {
     layer,
     artifact: {
       artifactId: `${input.enrichmentId}:enrichment-run`,
-      artifactType: "enrichment_run.v3",
-      schemaVersion: "3",
+      artifactType: "enrichment_run",
       graphVersionId: input.graphVersionId,
       producer: PRODUCER,
       producerVersion: PRODUCER_VERSION,

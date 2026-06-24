@@ -182,6 +182,6 @@ test("the published snapshot is written with its immutable artifact envelope", a
   const { runStore, graphStore, artifacts } = fakes([runForBuild()]);
   await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore });
   assert.equal(artifacts.length, 1);
-  assert.equal(artifacts[0].artifactType, "graph_snapshot.v2");
+  assert.equal(artifacts[0].artifactType, "graph_snapshot");
   assert.equal(artifacts[0].graphVersionId, "gv-1");
 });
