@@ -7,19 +7,21 @@ import type {
   EnrichmentRunTrace,
   GraphSnapshot,
   PrerequisiteConceptContext,
-  PrerequisiteJudgment
+  PrerequisiteOrderingCorrection,
+  WholeSetOrdering
 } from "@lrnki/domain-core";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
-  PrerequisiteJudgmentPort
+  PrerequisiteOrderingPort
 } from "@lrnki/ports";
-import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment } from "./runGraphEnrichment";
+import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
 
-// Two Declared Domains: "x" has 3 concepts, "y" has 2. Prerequisites are always
-// same-domain (ADR-0015), so the exhaustive judge (ADR-0019 reset) must see
-// exactly C(3,2)+C(2,2)=3+1=4 unordered pairs and never a cross-domain pair.
+// Two Declared Domains: "x" has 3 concepts, "y" has 2. Ordering is always same-domain
+// (ADR-0015), so the whole-set reshape (R1) issues exactly ONE ordering call per domain
+// over that domain's evidenced nodes and never mixes domains in one call.
 function concept(id: string, label: string, domain: string, aliases: string[] = []) {
   return {
     conceptId: id,
@@ -40,7 +42,7 @@ function passage(blockId: string, quote: string) {
   return { sourceResourceId: "s1", sourceBlockId: blockId, evidenceQuote: quote, headingPath: ["X"], locator: {} };
 }
 
-// cx1 carries a `defines` assertion and a multi-mention CEP so the bound is observable.
+// cx1 carries a `defines` assertion and a multi-mention CEP so the mention bound is observable.
 const snapshot: GraphSnapshot = {
   graphVersionId: "v1",
   baseGraphVersionId: null,
@@ -84,44 +86,40 @@ const snapshot: GraphSnapshot = {
   ]
 };
 
-type JudgeFn = (input: { declaredDomain: string; a: PrerequisiteConceptContext; b: PrerequisiteConceptContext }) => PrerequisiteJudgment | Promise<PrerequisiteJudgment>;
+type OrderInput = { declaredDomain: string; nodes: PrerequisiteConceptContext[]; correction?: PrerequisiteOrderingCorrection };
+type Responder = (input: OrderInput) => WholeSetOrdering;
 
-// Default mock: directs cx2->cx1, cx1/cx3 is a plain directed edge, cx2/cx3 is
-// uncertain, and cy1/cy2 is none (dropped).
-const defaultJudge: JudgeFn = (input) => {
-  const labels = [input.a.canonicalLabel, input.b.canonicalLabel];
-  const j = (p: string, d: string, outcome: PrerequisiteJudgment["outcome"], confidence: number): PrerequisiteJudgment =>
-    ({ prerequisiteDerivedNodeId: p, dependentDerivedNodeId: d, outcome, confidence, rationale: "mock" });
-  const idByLabel = new Map([[input.a.canonicalLabel, input.a.derivedNodeId], [input.b.canonicalLabel, input.b.derivedNodeId]]);
-  if (labels.includes("X One") && labels.includes("X Two")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X One") ?? "", "directed", 0.9);
-  if (labels.includes("X One") && labels.includes("X Three")) return j(idByLabel.get("X One") ?? "", idByLabel.get("X Three") ?? "", "directed", 0.9);
-  if (labels.includes("X Two") && labels.includes("X Three")) return j(idByLabel.get("X Two") ?? "", idByLabel.get("X Three") ?? "", "uncertain", 0.4);
-  return j(input.a.derivedNodeId, input.b.derivedNodeId, "none", 0.1);
-};
+// A canned edge over two canonical labels; only edges whose endpoints are in the call's
+// node set are emitted (mirrors a sane model). Confidence defaults high (survives the cut).
+function edgeOf(prerequisiteLabel: string, dependentLabel: string, confidence = 0.9, rationale = "mock"): WholeSetOrdering["edges"][number] {
+  return { prerequisiteLabel, dependentLabel, confidence, rationale };
+}
+function presentEdges(input: OrderInput, edges: WholeSetOrdering["edges"]): WholeSetOrdering {
+  const labels = new Set(input.nodes.map((n) => n.canonicalLabel));
+  return { edges: edges.filter((e) => labels.has(e.prerequisiteLabel) && labels.has(e.dependentLabel)) };
+}
 
-function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {}) {
+// Default ordering: in domain "x" assert X Two -> X One and X One -> X Three (acyclic);
+// in domain "y" assert nothing. Label-driven, no positional meaning.
+const defaultResponder: Responder = (input) =>
+  presentEdges(input, [edgeOf("X Two", "X One"), edgeOf("X One", "X Three")]);
+
+function buildPorts(options: { responder?: Responder; snapshot?: GraphSnapshot; onOrder?: (input: OrderInput) => Promise<void> } = {}) {
   const active = options.snapshot ?? snapshot;
-  const judgeFn = options.judge ?? defaultJudge;
-  const judgedInputs: { declaredDomain: string; a: PrerequisiteConceptContext; b: PrerequisiteConceptContext }[] = [];
-  let inFlight = 0;
-  let maxInFlight = 0;
+  const responder = options.responder ?? defaultResponder;
+  const calls: OrderInput[] = [];
 
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
     async getPublishedSnapshot(graphVersionId) {
       return graphVersionId === active.graphVersionId ? active : undefined;
     }
   };
-  const prerequisiteJudge: PrerequisiteJudgmentPort = {
-    model: "mock-judge",
-    async judge(input) {
-      judgedInputs.push(input);
-      inFlight += 1;
-      maxInFlight = Math.max(maxInFlight, inFlight);
-      try {
-        return await judgeFn(input);
-      } finally {
-        inFlight -= 1;
-      }
+  const prerequisiteOrdering: PrerequisiteOrderingPort = {
+    model: "mock-ordering",
+    async order(input) {
+      calls.push(input);
+      if (options.onOrder) await options.onOrder(input);
+      return responder(input);
     }
   };
   const difficulty: DifficultyPort = {
@@ -143,17 +141,20 @@ function buildPorts(options: { judge?: JudgeFn; snapshot?: GraphSnapshot } = {})
     }
   };
   return {
-    judgedInputs,
+    calls,
     graphStore,
-    prerequisiteJudge,
+    prerequisiteOrdering,
     difficulty,
     enrichmentStore,
     getPersisted: () => persisted,
     getTrace: () => trace,
     getArtifactType: () => artifactType,
-    getPersistCalls: () => persistCalls,
-    getMaxInFlight: () => maxInFlight
+    getPersistCalls: () => persistCalls
   };
+}
+
+function configWith(overrides: Partial<GraphEnrichmentConfig>): GraphEnrichmentConfig {
+  return { ...DEFAULT_ENRICHMENT_CONFIG, dedup: DEFAULT_DEDUP_CONFIG, ...overrides };
 }
 
 function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters<typeof runGraphEnrichment>[0]> = {}) {
@@ -161,120 +162,235 @@ function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters
     enrichmentId: "e1",
     graphVersionId: "v1",
     graphStore: ports.graphStore as GraphVersionStorePort,
-    prerequisiteJudge: ports.prerequisiteJudge,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
     difficulty: ports.difficulty,
     enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
     ...overrides
   });
 }
 
-// Scenario 1: exactly the same-domain pairs are judged; no cross-domain pair leaks.
-test("runGraphEnrichment judges every same-domain pair and never a cross-domain pair", async () => {
-  const ports = buildPorts();
-  const layer = await run(ports);
-  const domainByDerivedId = new Map(layer.derivedNodes.map((node) => [node.derivedNodeId, node.declaredDomain]));
+const idByLabel = (layer: DerivedGraphLayer) =>
+  new Map(layer.derivedNodes.map((node) => [node.canonicalLabel, node.derivedNodeId] as const));
 
-  assert.equal(ports.judgedInputs.length, 4); // C(3,2)+C(2,2)
-  for (const input of ports.judgedInputs) {
-    assert.equal(domainByDerivedId.get(input.a.derivedNodeId), domainByDerivedId.get(input.b.derivedNodeId), `cross-domain pair leaked: ${input.a.derivedNodeId}/${input.b.derivedNodeId}`);
+// R1 grouping: exactly one ordering call per domain, each over that domain's nodes only.
+test("issues exactly one ordering call per Declared Domain, never cross-domain", async () => {
+  const ports = buildPorts();
+  await run(ports);
+  assert.equal(ports.calls.length, 2, "one call for domain x and one for domain y");
+  const domains = ports.calls.map((call) => call.declaredDomain).sort();
+  assert.deepEqual(domains, ["x", "y"]);
+  for (const call of ports.calls) {
+    const callDomains = new Set(call.nodes.map((node) => node.canonicalLabel.startsWith("X") ? "x" : "y"));
+    assert.equal(callDomains.size, 1, "a single call never mixes domains");
   }
 });
 
-// Scenario 2: each judge call receives both Concepts' full CEPs (definitions,
-// bounded mentions, labeled typed assertions) — never bare labels alone.
-test("runGraphEnrichment passes both Concepts' CEPs to the judge with bounded mentions", async () => {
+// Each ordering call receives full CEPs (definitions, bounded mentions, labeled typed
+// assertions, aliases) — never bare labels alone.
+test("passes Concepts' CEPs to the ordering call with bounded mentions", async () => {
   const ports = buildPorts();
   await run(ports);
-
-  const cx1cx2 = ports.judgedInputs.find((i) => [i.a.canonicalLabel, i.b.canonicalLabel].includes("X One") && [i.a.canonicalLabel, i.b.canonicalLabel].includes("X Two"));
-  assert.ok(cx1cx2, "expected the cx1/cx2 pair");
-  const cx1 = cx1cx2.a.canonicalLabel === "X One" ? cx1cx2.a : cx1cx2.b;
-  const cx2 = cx1cx2.a.canonicalLabel === "X Two" ? cx1cx2.a : cx1cx2.b;
-
+  const xCall = ports.calls.find((call) => call.declaredDomain === "x");
+  assert.ok(xCall);
+  const cx1 = xCall.nodes.find((node) => node.canonicalLabel === "X One");
+  assert.ok(cx1);
   assert.deepEqual(cx1.definitions, ["X One is the definition of X One"]);
-  assert.deepEqual(cx2.definitions, ["X Two is the definition of X Two"]);
-  // Default bound of six mentions is applied even though the CEP holds seven.
-  assert.equal(cx1.mentions.length, 6);
+  assert.equal(cx1.mentions.length, 6, "default bound of six even though the CEP holds seven");
   assert.deepEqual(cx1.mentions, ["mention one", "mention two", "mention three", "mention four", "mention five", "mention six"]);
-  assert.deepEqual(cx1.assertions, [
-    { type: "defines", detail: "the first X concept" }
-  ]);
+  assert.deepEqual(cx1.assertions, [{ type: "defines", detail: "the first X concept" }]);
   assert.deepEqual(cx1.aliases, ["XOne"]);
 });
 
-// Scenario 2b: a non-default mention bound is honored without reordering.
-test("runGraphEnrichment honors a non-default mention bound and preserves neural order", async () => {
+test("honors a non-default mention bound without reordering", async () => {
   const ports = buildPorts();
-  await run(ports, {
-    config: {
-      enrichmentConfigHash: "cep-pair-enrichment-v1",
-      minEdgeConfidence: 0.5,
-      judgeConcurrency: 4,
-      maxMentionsPerConceptInPair: 2,
-      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
-    }
-  });
-
-  const cx1 = ports.judgedInputs.flatMap((i) => [i.a, i.b]).find((c) => c.canonicalLabel === "X One");
+  await run(ports, { config: configWith({ maxMentionsPerConceptInPair: 2 }) });
+  const cx1 = ports.calls.flatMap((call) => call.nodes).find((node) => node.canonicalLabel === "X One");
   assert.ok(cx1);
   assert.deepEqual(cx1.mentions, ["mention one", "mention two"]);
 });
 
-// Scenario 4 + 5: the judge's verdict sets direction; 'none' is dropped;
-// 'uncertain' is retained flagged and path-excluded; directed survives.
-test("runGraphEnrichment follows the judge, drops 'none', flags 'uncertain'", async () => {
+// R3 + R13: the ordering's certain edges survive disposal; an unasserted pair produces no
+// edge and no disposition; no uncertain edges arise on an acyclic single-sample run.
+test("follows the ordering: certain edges survive, unasserted pairs produce nothing", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-  const idByConceptId = new Map(
-    layer.derivedNodes
-      .filter((node) => node.nodeKind === "anchor")
-      .map((node) => [node.conceptId, node.derivedNodeId] as const)
-  );
-  const cx1 = idByConceptId.get("cx1") ?? "";
-  const cx2 = idByConceptId.get("cx2") ?? "";
-  const cx3 = idByConceptId.get("cx3") ?? "";
-  const cy1 = idByConceptId.get("cy1") ?? "";
+  const id = idByLabel(layer);
+  const has = (prereq: string, dep: string) =>
+    layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get(prereq) && e.dependentDerivedNodeId === id.get(dep) && !e.uncertain);
+  assert.ok(has("X Two", "X One"));
+  assert.ok(has("X One", "X Three"));
+  assert.equal(layer.prerequisiteEdges.length, 2, "only the two asserted edges; the unasserted X Two/X Three pair yields nothing (R3)");
+  assert.ok(layer.prerequisiteEdges.every((e) => !e.uncertain), "an acyclic single-sample run has no uncertain edges");
 
-  // The edge follows the judge.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === cx2 && e.dependentDerivedNodeId === cx1 && !e.uncertain));
-  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === cx1 && e.dependentDerivedNodeId === cx2));
-  // plain directed edge survives.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === cx1 && e.dependentDerivedNodeId === cx3 && !e.uncertain));
-  // uncertain edge retained but flagged.
-  assert.ok(layer.prerequisiteEdges.some((e) => e.uncertain));
-  // 'none' (cy1/cy2) produced no edge.
-  assert.ok(!layer.prerequisiteEdges.some((e) => [e.prerequisiteDerivedNodeId, e.dependentDerivedNodeId].includes(cy1)));
+  const dispositions = ports.getTrace()?.dispositions ?? [];
+  assert.deepEqual(dispositions.map((d) => d.disposition).sort(), ["kept", "kept"]);
+  // R3: no disposition row for the pair the judge never asserted.
+  assert.ok(!dispositions.some((d) => d.prerequisiteDerivedNodeId === id.get("X Two") && d.dependentDerivedNodeId === id.get("X Three")));
+});
 
+// AE1 / R9, R10: a first cyclic response triggers exactly ONE re-prompt naming the cycle;
+// the revised acyclic response persists normally.
+test("a cyclic first response triggers exactly one re-prompt naming the cycle", async () => {
+  let corrections: PrerequisiteOrderingCorrection[] = [];
+  const responder: Responder = (input) => {
+    if (input.declaredDomain !== "x") return { edges: [] };
+    if (input.correction) {
+      corrections.push(input.correction);
+      return presentEdges(input, [edgeOf("X One", "X Two"), edgeOf("X One", "X Three")]); // acyclic
+    }
+    return presentEdges(input, [edgeOf("X One", "X Two"), edgeOf("X Two", "X Three"), edgeOf("X Three", "X One")]); // cycle
+  };
+  const ports = buildPorts({ responder });
+  const layer = await run(ports);
+
+  const xCalls = ports.calls.filter((call) => call.declaredDomain === "x");
+  assert.equal(xCalls.length, 2, "exactly one corrective re-prompt for domain x");
+  assert.equal(corrections.length, 1);
+  // The correction frames the violating cycle as an ordered label path looping back.
+  const path = corrections[0].cyclePath;
+  assert.equal(path[0], path[path.length - 1], "cycle path loops back to its start");
+  assert.deepEqual([...new Set(path)].sort(), ["X One", "X Three", "X Two"]);
+
+  const xTrace = ports.getTrace()?.orderings.find((o) => o.declaredDomain === "x");
+  assert.equal(xTrace?.reprompted, true);
+  assert.deepEqual(xTrace?.cycleRoutedEdges, [], "the re-prompt fixed it; nothing routed to uncertain");
+  assert.ok(layer.prerequisiteEdges.every((e) => !e.uncertain));
+  assert.equal(ports.getPersistCalls(), 1);
+});
+
+// AE2 / R11: a still-cyclic response after the one re-prompt routes every edge in the
+// offending cycle to uncertain (kept + excluded from the DAG); the rest is unaffected.
+test("a still-cyclic response routes the cycle edges to uncertain and keeps the rest", async () => {
+  // Domain x with FOUR nodes: A,B,C cycle, plus D->A outside the cycle (must survive).
+  const fourNode: GraphSnapshot = {
+    graphVersionId: "v1",
+    baseGraphVersionId: null,
+    concepts: [concept("a", "A", "x"), concept("b", "B", "x"), concept("c", "C", "x"), concept("d", "D", "x")],
+    evidenceProfiles: ["a", "b", "c", "d"].map((cid, i) => ({ conceptId: cid, definitions: [passage(`d${i}`, `${cid} def`)], mentions: [], assertions: [] }))
+  };
+  const responder: Responder = (input) =>
+    presentEdges(input, [edgeOf("A", "B"), edgeOf("B", "C"), edgeOf("C", "A"), edgeOf("D", "A")]); // always cyclic
+  const ports = buildPorts({ responder, snapshot: fourNode });
+  const layer = await run(ports);
+
+  const id = idByLabel(layer);
+  const xCalls = ports.calls.filter((call) => call.declaredDomain === "x");
+  assert.equal(xCalls.length, 2, "one re-prompt, then route — never an agentic loop of calls");
+
+  const certain = layer.prerequisiteEdges.filter((e) => !e.uncertain);
+  const uncertain = layer.prerequisiteEdges.filter((e) => e.uncertain);
+  // D -> A is outside the cycle and survives as a certain edge.
+  assert.ok(certain.some((e) => e.prerequisiteDerivedNodeId === id.get("D") && e.dependentDerivedNodeId === id.get("A")));
+  // The three cycle edges are routed to uncertain (kept, not dropped).
+  assert.equal(uncertain.length, 3);
+  assert.equal(certain.length, 1, "only D->A stays certain");
+  // Nothing dropped: all four asserted edges are present in the persisted layer.
+  assert.equal(layer.prerequisiteEdges.length, 4);
+
+  const xTrace = ports.getTrace()?.orderings.find((o) => o.declaredDomain === "x");
+  assert.equal(xTrace?.reprompted, true);
+  assert.equal(xTrace?.cycleRoutedEdges.length, 3);
+  assert.ok((ports.getTrace()?.dispositions ?? []).filter((d) => d.disposition === "uncertain").length === 3);
+});
+
+// AE5 / R4: an evidence-free node is excluded from the ordering input and recorded ONCE.
+test("excludes an evidence-free node from ordering and records it once", async () => {
+  const withEmpty: GraphSnapshot = {
+    graphVersionId: "v1",
+    baseGraphVersionId: null,
+    concepts: [concept("g", "Grounded", "x"), concept("e", "Empty", "x"), concept("h", "Helper", "x")],
+    evidenceProfiles: [
+      { conceptId: "g", definitions: [passage("b1", "Grounded def")], mentions: [], assertions: [] },
+      { conceptId: "e", definitions: [], mentions: [], assertions: [] }, // no evidence
+      { conceptId: "h", definitions: [passage("b2", "Helper def")], mentions: [], assertions: [] }
+    ]
+  };
+  const ports = buildPorts({ snapshot: withEmpty });
+  const layer = await run(ports);
+  const xCall = ports.calls.find((call) => call.declaredDomain === "x");
+  assert.ok(xCall);
+  assert.ok(!xCall.nodes.some((node) => node.canonicalLabel === "Empty"), "the empty node never reaches the ordering call");
+  assert.equal(xCall.nodes.length, 2);
+
+  const exclusions = ports.getTrace()?.nodeExclusions ?? [];
+  assert.equal(exclusions.length, 1, "recorded exactly once, not once per pair");
+  assert.equal(exclusions[0].reason, "insufficient_evidence");
+  assert.equal(exclusions[0].declaredDomain, "x");
+  // The excluded node is still a derived node (anchor projection) and scored for difficulty.
+  assert.ok(layer.derivedNodes.some((node) => node.canonicalLabel === "Empty"));
+});
+
+// AE4 / R16: a domain over the token budget fails closed with no partial layer; no chunking.
+test("fails closed without persisting when a domain exceeds the token budget", async () => {
+  const ports = buildPorts();
+  await assert.rejects(() => run(ports, { config: configWith({ maxDomainPromptChars: 5 }) }), /exceeds the budget/);
+  assert.equal(ports.getPersistCalls(), 0, "no partial layer persisted");
+});
+
+// R9: an edge citing a label not in the judged set is rejected fail-closed, never guessed.
+test("rejects an edge citing a label outside the judged set (rule 6)", async () => {
+  const responder: Responder = (input) =>
+    input.declaredDomain === "x" ? { edges: [edgeOf("X One", "Nonexistent Concept")] } : { edges: [] };
+  const ports = buildPorts({ responder });
+  await assert.rejects(() => run(ports), /cites a label not in domain/);
+  assert.equal(ports.getPersistCalls(), 0);
+});
+
+// R9: an edge naming one concept as its own prerequisite is rejected fail-closed.
+test("rejects a self-edge (one concept as its own prerequisite)", async () => {
+  const responder: Responder = (input) =>
+    input.declaredDomain === "x" ? { edges: [edgeOf("X One", "X One")] } : { edges: [] };
+  const ports = buildPorts({ responder });
+  await assert.rejects(() => run(ports), /its own prerequisite/);
+  assert.equal(ports.getPersistCalls(), 0);
+});
+
+// R13: a redundant transitive shortcut is reduced; the disposition trace records it.
+test("transitive reduction drops a redundant shortcut among certain edges", async () => {
+  const responder: Responder = (input) =>
+    input.declaredDomain === "x"
+      ? presentEdges(input, [edgeOf("X One", "X Two"), edgeOf("X Two", "X Three"), edgeOf("X One", "X Three")])
+      : { edges: [] };
+  const ports = buildPorts({ responder });
+  const layer = await run(ports);
+  const id = idByLabel(layer);
+  // X One -> X Three is redundant given X One -> X Two -> X Three.
+  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("X One") && e.dependentDerivedNodeId === id.get("X Three")));
   const dispositions = ports.getTrace()?.dispositions.map((d) => d.disposition) ?? [];
-  assert.ok(dispositions.includes("uncertain"));
+  assert.ok(dispositions.includes("transitive_reduction"));
   assert.ok(dispositions.includes("kept"));
 });
 
-// Scenario 6: the persisted layer and trace carry no embedding/candidate-group fields.
-test("runGraphEnrichment persists a layer free of embedding and candidate-group fields", async () => {
+// A weak edge below the confidence floor is cut and recorded.
+test("cuts an edge below the confidence floor", async () => {
+  const responder: Responder = (input) =>
+    input.declaredDomain === "x" ? presentEdges(input, [edgeOf("X Two", "X One", 0.2)]) : { edges: [] };
+  const ports = buildPorts({ responder });
+  const layer = await run(ports);
+  assert.equal(layer.prerequisiteEdges.length, 0, "the weak edge is cut");
+  assert.ok((ports.getTrace()?.dispositions ?? []).some((d) => d.disposition === "weak_cut"));
+});
+
+test("persists a layer free of embedding and candidate-group fields and bumps the artifact type", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-
-  assert.equal(layer.judgeModel, "mock-judge");
-  assert.ok(!("embeddingModel" in layer), "layer must not carry embeddingModel");
-  assert.ok(!("prerequisiteCandidateGroups" in layer), "layer must not carry candidate groups");
+  assert.equal(layer.judgeModel, "mock-ordering");
+  assert.ok(!("embeddingModel" in layer));
   for (const edge of layer.prerequisiteEdges) {
-    assert.ok(!("candidateGroupId" in edge), "edge must not carry candidateGroupId");
-    assert.ok(!("evidencePacketRef" in edge.provenance), "provenance must not carry an evidence-packet ref");
+    assert.ok(!("candidateGroupId" in edge));
+    assert.ok(!("evidencePacketRef" in edge.provenance));
   }
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
-  assert.equal(ports.getArtifactType(), "enrichment_run.v2");
-  assert.equal(ports.getTrace()?.judgments.length, 4);
-  // U4: each pair judgment records which judge model ordered it (anchor-only run -> all DeepSeek).
-  assert.ok(ports.getTrace()?.judgments.every((judgment) => judgment.judgeModel === "mock-judge"));
-  // U4: an anchor-only run (no enrichment-node ports) has no rescue dispositions.
+  assert.equal(ports.getArtifactType(), "enrichment_run.v3");
+  // One ordering trace per domain (R1), each naming the ordering model used.
+  assert.equal(ports.getTrace()?.orderings.length, 2);
+  assert.ok(ports.getTrace()?.orderings.every((o) => o.judgeModel === "mock-ordering"));
   assert.deepEqual(ports.getTrace()?.rescueDispositions, []);
 });
 
 test("anchor derived node ids are per enrichment run, while concept ids stay stable", async () => {
   const first = await run(buildPorts(), { enrichmentId: "11111111-1111-4111-8111-111111111111" });
   const second = await run(buildPorts(), { enrichmentId: "22222222-2222-4222-8222-222222222222" });
-
   const isCx1Anchor = (node: (typeof first.derivedNodes)[number]): node is AnchorProjectionNode =>
     node.nodeKind === "anchor" && node.conceptId === "cx1";
   const firstAnchor = first.derivedNodes.find(isCx1Anchor);
@@ -284,8 +400,7 @@ test("anchor derived node ids are per enrichment run, while concept ids stay sta
   assert.notEqual(firstAnchor.derivedNodeId, secondAnchor.derivedNodeId);
 });
 
-// Scenario 7: difficulty receives per-node evidence contexts over all derived nodes.
-test("runGraphEnrichment scores intrinsic difficulty with per-node evidence contexts", async () => {
+test("scores intrinsic difficulty with per-node evidence contexts over all derived nodes", async () => {
   const scoredInputs: DifficultyNodeContext[][] = [];
   const ports = buildPorts();
   ports.difficulty = {
@@ -297,7 +412,6 @@ test("runGraphEnrichment scores intrinsic difficulty with per-node evidence cont
   };
   const layer = await run(ports);
   assert.equal(layer.difficulties.length, 5);
-  assert.ok(layer.difficulties.every((d) => d.method === "intrinsic-fused-v1"));
   assert.equal(scoredInputs.length, 1);
   assert.equal(scoredInputs[0].length, layer.derivedNodes.length);
   const xOne = scoredInputs[0].find((node) => node.canonicalLabel === "X One");
@@ -305,17 +419,15 @@ test("runGraphEnrichment scores intrinsic difficulty with per-node evidence cont
   assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
 });
 
-test("runGraphEnrichment default config hash reflects intrinsic difficulty", async () => {
+test("default config hash reflects the whole-set ordering reshape", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "intrinsic-difficulty-v3");
-  assert.equal(layer.enrichmentConfigHash, "intrinsic-difficulty-v3");
-  assert.notEqual(layer.enrichmentConfigHash, "cep-node-enrichment-rescue-judged-v2");
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "whole-set-ordering-v1");
+  assert.equal(layer.enrichmentConfigHash, "whole-set-ordering-v1");
 });
 
-// Scenario 3: a concept pair with no CEP evidence cannot reach the judge and fails
-// closed if an invalid (evidence-free) snapshot is injected.
-test("runGraphEnrichment fails closed on an evidence-free snapshot without judging", async () => {
+// An evidence-free snapshot reaches no ordering call and persists with only exclusions.
+test("fails closed on an evidence-free snapshot without an ordering call", async () => {
   const ungrounded: GraphSnapshot = {
     graphVersionId: "v1",
     baseGraphVersionId: null,
@@ -324,66 +436,26 @@ test("runGraphEnrichment fails closed on an evidence-free snapshot without judgi
   };
   const ports = buildPorts({ snapshot: ungrounded });
   const layer = await run(ports);
-
-  assert.equal(ports.judgedInputs.length, 0);
+  assert.equal(ports.calls.length, 0, "no ordering call when nothing is evidenced");
   assert.equal(layer.prerequisiteEdges.length, 0);
-  assert.deepEqual(ports.getTrace()?.dispositions.map((d) => d.disposition), ["insufficient_evidence"]);
+  assert.equal(ports.getTrace()?.nodeExclusions.length, 2);
+  assert.deepEqual(ports.getTrace()?.dispositions, []);
 });
 
-// Scenario 8a: judge calls never exceed the configured concurrency and the trace
-// keeps deterministic pair order regardless of completion order.
-test("runGraphEnrichment bounds concurrency and keeps deterministic pair order", async () => {
-  const completionOrder: string[] = [];
-  let callIndex = 0;
-  // Resolve later pairs first so completion order differs from input order.
-  const judge: JudgeFn = async (input) => {
-    const key = `${input.a.canonicalLabel}/${input.b.canonicalLabel}`;
-    const index = callIndex++;
-    // Make only the first sorted pair slow so later pairs complete before it.
-    const delay = index === 0 ? 30 : 1;
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    completionOrder.push(key);
-    return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
-  };
-  const ports = buildPorts({ judge });
-  await run(ports, {
-    config: {
-      enrichmentConfigHash: "cep-pair-enrichment-v1",
-      minEdgeConfidence: 0.5,
-      judgeConcurrency: 2,
-      maxMentionsPerConceptInPair: 6,
-      mintingBounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 }
-    }
-  });
-
-  assert.ok(ports.getMaxInFlight() <= 2, `concurrency exceeded: ${ports.getMaxInFlight()}`);
-  // Trace order follows sorted pair order, not completion order.
-  const traceOrder = ports.getTrace()?.judgments.map((j) => `${j.a.canonicalLabel}/${j.b.canonicalLabel}`) ?? [];
-  const dispatchOrder = ports.judgedInputs.map((j) => `${j.a.canonicalLabel}/${j.b.canonicalLabel}`);
-  assert.deepEqual(traceOrder, dispatchOrder);
-  assert.notDeepEqual(completionOrder, traceOrder, "test setup should produce out-of-order completion");
-});
-
-// Scenario 8b: one exhausted pair (judge throws) fails the run before persistence.
-test("runGraphEnrichment fails the run without persisting when a pair exhausts its budget", async () => {
-  const judge: JudgeFn = (input) => {
-    if (input.a.canonicalLabel === "X Two" && input.b.canonicalLabel === "X Three") {
-      throw new Error("forced-tool retry budget exhausted");
-    }
-    return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
-  };
-  const ports = buildPorts({ judge });
+// An ordering call that exhausts its forced-tool retry budget fails the run before persistence.
+test("fails the run without persisting when an ordering call throws", async () => {
+  const ports = buildPorts({ onOrder: async (input) => { if (input.declaredDomain === "x") throw new Error("forced-tool retry budget exhausted"); } });
   await assert.rejects(() => run(ports), /retry budget exhausted/);
   assert.equal(ports.getPersistCalls(), 0, "no partial enrichment run may be persisted");
 });
 
-// --- U5/U7: node minting + rescue + cross-family routing -----------------------
+// --- Node minting + rescue (sub-stages unchanged; ordering consumes their nodes) ------
 
 import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
 
 // A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
-// expand it with a rescued node and a minted node.
+// expand it with a rescued node and a minted node, then order all three together.
 const sparseSnapshot: GraphSnapshot = {
   graphVersionId: "v1",
   baseGraphVersionId: null,
@@ -394,20 +466,16 @@ const sparseSnapshot: GraphSnapshot = {
 function buildNodePorts(options: {
   rescue?: MentionedNonCoreCandidate[];
   proposals?: MissingPrerequisiteProposal[];
+  responder?: Responder;
 }) {
-  const deepseekPairs: string[] = [];
-  const crossFamilyPairs: string[] = [];
-  const labelOf = (context: PrerequisiteConceptContext) => context.canonicalLabel;
-  const judgeRecording = (sink: string[]): PrerequisiteJudgmentPort => ({
-    model: sink === deepseekPairs ? "deepseek-judge" : "cross-family-judge",
-    async judge(input) {
-      sink.push([labelOf(input.a), labelOf(input.b)].sort().join("|"));
-      return { prerequisiteDerivedNodeId: input.a.derivedNodeId, dependentDerivedNodeId: input.b.derivedNodeId, outcome: "none", confidence: 0.1, rationale: "mock" };
+  const orderedLabels: string[][] = [];
+  const prerequisiteOrdering: PrerequisiteOrderingPort = {
+    model: "mock-ordering",
+    async order(input) {
+      orderedLabels.push(input.nodes.map((node) => node.canonicalLabel));
+      return (options.responder ?? (() => ({ edges: [] })))(input);
     }
-  });
-  const prerequisiteJudge = judgeRecording(deepseekPairs);
-  const generatedPrerequisiteJudge = judgeRecording(crossFamilyPairs);
-
+  };
   let counter = 0;
   const newNodeId = () => `dn-${++counter}`;
   const proposalPort: MissingPrerequisiteProposalPort = {
@@ -438,7 +506,7 @@ function buildNodePorts(options: {
     async persist(input) { persisted = input.layer; },
     async mentionedNonCoreCandidates() { return options.rescue ?? []; }
   };
-  return { deepseekPairs, crossFamilyPairs, newNodeId, proposalPort, groundingPort, prerequisiteJudge, generatedPrerequisiteJudge, graphStore, difficulty, enrichmentStore, getPersisted: () => persisted };
+  return { orderedLabels, newNodeId, proposalPort, groundingPort, prerequisiteOrdering, graphStore, difficulty, enrichmentStore, getPersisted: () => persisted };
 }
 
 function rescueCandidate(label: string): MentionedNonCoreCandidate {
@@ -452,8 +520,7 @@ function runNodes(ports: ReturnType<typeof buildNodePorts>) {
   return runGraphEnrichment({
     enrichmentId: "e1", graphVersionId: "v1",
     graphStore: ports.graphStore as GraphVersionStorePort,
-    prerequisiteJudge: ports.prerequisiteJudge,
-    generatedPrerequisiteJudge: ports.generatedPrerequisiteJudge,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
     missingPrerequisiteProposal: ports.proposalPort,
     groundingGeneration: ports.groundingPort,
     difficulty: ports.difficulty,
@@ -463,13 +530,18 @@ function runNodes(ports: ReturnType<typeof buildNodePorts>) {
 }
 
 test("rescues a source_mentioned node from a member-run mention and orders it as an edge", async () => {
-  const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")] });
+  const ports = buildNodePorts({
+    rescue: [rescueCandidate("Pointer")],
+    responder: (input) => presentEdges(input, [edgeOf("Pointer", "Move Semantics")])
+  });
   const layer = await runNodes(ports);
   const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
   assert.ok(rescued, "a source_mentioned rescued node is present");
   assert.equal(rescued.role, "prerequisite");
   // Its relationship to the anchor is judged as an edge, never a node attribute.
   assert.ok(!("prerequisiteOf" in rescued));
+  const id = idByLabel(layer);
+  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("Pointer") && e.dependentDerivedNodeId === id.get("Move Semantics")));
 });
 
 test("mints an llm_grounded node for an anchor and never publishes it asserted", async () => {
@@ -478,31 +550,24 @@ test("mints an llm_grounded node for an anchor and never publishes it asserted",
   const minted = layer.derivedNodes.filter((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "llm_grounded");
   assert.equal(minted.length, 1);
   assert.equal(minted[0].layer, "derived");
-  // The single anchor stays the only asserted node; enrichment nodes are all derived.
   const asserted = layer.derivedNodes.filter((node) => node.layer === "asserted");
   assert.equal(asserted.length, 1);
   assert.equal(asserted[0].nodeKind, "anchor");
 });
 
-test("routes generated-node pairs cross-family and anchor/source_mentioned pairs to deepseek", async () => {
+test("orders the rescued + minted + anchor node set in one whole-set call", async () => {
   const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
   await runNodes(ports);
-  // Pairs: {Move Semantics, Pointer} -> deepseek; {Move Semantics, Stack allocation}
-  // and {Pointer, Stack allocation} both touch the generated node -> cross-family.
-  assert.ok(ports.deepseekPairs.includes("Move Semantics|Pointer"), `deepseek pairs: ${ports.deepseekPairs.join(", ")}`);
-  assert.ok(ports.crossFamilyPairs.includes("Move Semantics|Stack allocation"), `cross-family pairs: ${ports.crossFamilyPairs.join(", ")}`);
-  assert.ok(ports.crossFamilyPairs.includes("Pointer|Stack allocation"));
-  // No generated pair leaks onto deepseek.
-  assert.ok(!ports.deepseekPairs.some((pair) => pair.includes("Stack allocation")));
+  // One call covering all three same-domain nodes (anchor ∪ rescued ∪ minted).
+  assert.equal(ports.orderedLabels.length, 1);
+  assert.deepEqual([...ports.orderedLabels[0]].sort(), ["Move Semantics", "Pointer", "Stack allocation"]);
 });
 
 test("records the verbatim-floor grounding dispositions on the run", async () => {
   const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
   const layer = await runNodes(ports);
-  // The minted node is exempt-recorded; the rescued mention verifies against its block.
   const minted = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "llm_grounded");
   const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
   assert.ok(minted && rescued, "both enrichment node kinds survive the floor");
-  // difficulty scores every derived node (anchor + enrichment).
   assert.equal(layer.difficulties.length, layer.derivedNodes.length);
 });

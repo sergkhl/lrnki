@@ -1,4 +1,4 @@
-import type { SelfReportRating, StudyItemGroundingProvenance } from "@lrnki/domain-core";
+import type { Verdict, StudyItemGroundingProvenance } from "@lrnki/domain-core";
 
 // Pure presentation contract for the transfer-ready study modules (U4, R15). These
 // types and helpers carry NO Admin-Lab coupling — they import only `@lrnki/domain-core`
@@ -28,25 +28,27 @@ export type StudyOptionSelectView = {
   }[];
 };
 
-// Side-sheet content gated by the node's learner state. A frontier node opens its
-// option-select item; a frontier node without one is flagged, never dropped; a locked node
-// names its unmet direct prerequisites; a mastered node opens its self-assessment item as
-// a read-only review when one exists.
+// Side-sheet content gated by the node's learner state (R5/R9/R13). A non-mastered cone
+// node with a self-assessment opens the CALIBRATION card — reveal the answer, then "I knew
+// it" / "I forgot" — and carries its current verdict plus, when present, the option-select
+// item so the learner can study it after keeping it in the gap. A frontier node WITHOUT a
+// self-assessment falls back to its option-select study, else is flagged cardless. A locked
+// node names its unmet prerequisites; a mastered node opens a read-only review that can
+// CLEAR a `known` verdict (R7 reversal).
 export type SheetContent =
+  | { kind: "calibration"; card: StudyCardView; verdict: Verdict | null; optionItem: StudyOptionSelectView | null }
   | { kind: "option_select"; item: StudyOptionSelectView }
   | { kind: "cardless" }
   | { kind: "locked"; unmetPrerequisiteLabels: string[] }
-  | { kind: "mastered_review"; card: StudyCardView | null };
+  | { kind: "mastered_review"; card: StudyCardView | null; verdict: Verdict | null };
 
-// A learner's per-item calibration choice (R2): "I know it" claims prior mastery (a
-// positive recall that propagates DOWN the DAG); "not sure" leaves the concept in the gap.
-export type CalibrationChoice = "know_it" | "not_sure";
+// The learner's binary self-assessment (R5). "I knew it" claims prior mastery → a `known`
+// verdict (prunes the trusted prerequisite down-closure); "I forgot" → a `learn` verdict
+// (the node stays in the study gap). Pure — the action upserts the returned verdict.
+export type CalibrationChoice = "knew_it" | "forgot";
 
-// "I know it" maps to a positive `good` rating (≥ threshold, propagates to ancestors);
-// "not sure" maps to `hard` (below threshold, never propagates). Pure — the action maps the
-// emitted ratings into self-report rows.
-export function calibrationRatingFor(choice: CalibrationChoice): SelfReportRating {
-  return choice === "know_it" ? "good" : "hard";
+export function verdictForChoice(choice: CalibrationChoice): Verdict {
+  return choice === "knew_it" ? "known" : "learn";
 }
 
 // Radix/Base sheet primitives can emit `open=false` while focus/animation state is

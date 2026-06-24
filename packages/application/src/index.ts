@@ -1,4 +1,6 @@
 export { executeExtractionRun, DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE } from "./executeExtractionRun";
+export { runExtractionOverSources, DEFAULT_EXTRACTION_OVER_SOURCES_CONCURRENCY, type ExtractionSourceUnit } from "./runExtractionOverSources";
+export { mapWithConcurrency } from "./mapWithConcurrency";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { admitSource } from "./admitSource";
 export { reconcileUngroundableCores } from "./reconcileUngroundableCores";
@@ -9,9 +11,20 @@ export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+export {
+  deduplicateDerivedNodes,
+  cosineSimilarity,
+  candidatePairsByDomain,
+  DEFAULT_DEDUP_CONFIG,
+  type DedupConfig,
+  type DedupNodeContext,
+  type DeduplicateResult,
+  type DedupUnavailable
+} from "./deduplicateDerivedNodes";
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
+export { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 export { computeLearnerPath } from "./computeLearnerPath";
 export { generateStudyItemBank, type StudyItemBankGenerationResult, type RejectedStudyItem } from "./generateStudyItemBank";
 export {
@@ -21,16 +34,7 @@ export {
   type OptionSelectGuardResult
 } from "./optionSelectGuard";
 export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
-export {
-  buildCalibrationSet,
-  propagateSelfReport,
-  appendSelfReportBatch,
-  SELF_REPORT_EVIDENCE_WEIGHT,
-  PROPAGATED_SELF_REPORT_EVIDENCE_WEIGHT,
-  type CalibrationItem,
-  type SelfReportInput
-} from "./calibration";
-export { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
+export { gradeAndAppend } from "./measurement";
 export {
   appendOptionSelectOutcome,
   AUTO_GRADER_IDENTITY
@@ -38,7 +42,6 @@ export {
 export {
   loadResponseLogLearnerState,
   foldConceptMastery,
-  ratingToMastery,
   outcomeToMastery
 } from "./responseLogLearnerState";
 export {
@@ -52,16 +55,25 @@ export {
 } from "./adaptivePathProjection";
 export {
   synthesizeResponses,
-  rateByDifficulty,
+  verdictByDifficulty,
   type SyntheticLearnerProfile
 } from "./syntheticResponses";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export {
   cutWeakEdges,
-  removeCycles,
+  findCycleEdges,
   transitiveReduction,
   topologicalDepth,
   topologicalOrder,
   prerequisiteAncestors,
-  dagDepthDifficulty
+  dagDepthDifficulty,
+  type PrerequisiteEdgeRef
 } from "./prerequisiteDag";
+export {
+  pruneClosure,
+  composeMastery,
+  struggledNodes,
+  suggestRestorations,
+  CALIBRATION_KNOWN_MASTERY,
+  type ComposedMastery
+} from "./calibrationClosure";

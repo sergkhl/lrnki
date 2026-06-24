@@ -1,306 +1,270 @@
 # TODO
 
-## ⏳ IN PROGRESS — Typed Study Item model (Plan 2), U6–U8 remaining (2026-06-21)
-
-Plan: `docs/plans/2026-06-21-002-feat-typed-study-item-model-plan.md`. Branch:
-`feat/learner-calibrated-study-loop` (continuing here per user choice; Plan 1's surface work is underneath).
-**U1–U5 are shipped and committed (each unit's own tests green); U6, U7, U8 remain.**
-
-| Unit | State |
-|---|---|
-| U1 typed domain model + ADR-0026 | ✅ committed |
-| U2 deterministic option-select guard (11 tests) | ✅ committed |
-| U3 generation port/adapter + sibling selector (13 tests) | ✅ committed |
-| U4 Postgres reshape — migration + store (9 live-DB tests) | ✅ committed |
-| U5 build fan-out + worker `generate-study-items` (6 tests) | ✅ committed |
-| **U6 auto-graded write + delete self-assessed path** | ⬜ TODO |
-| **U7 typed study UI** | ⬜ TODO |
-| **U8 rule-14 real-use evaluation** (blocked on U6+U7) | ⬜ TODO |
-
-**Mid-rename compile state (expected):** this is a rule-18 full `Card → StudyItem` rename, so the repo does
-NOT fully typecheck yet — that is the work U6+U7 finish. Green now: `domain-core`, `ports`,
-`infrastructure-litellm`, `infrastructure-postgres`. Still broken until U6/U7: `application`
-(`calibration.ts`, `syntheticResponses.ts`, `measurement.ts`, `selfAssessment.ts` still use `cardId`/old
-`Card`), `kg-worker` (the `synthesize-responses` path passes `StudyItem[]` into `synthesizeResponses` —
-reconciled by U6's `syntheticResponses` reshape), and `admin-lab` (study UI + SQL loaders). **Before
-declaring done:** `pnpm -r typecheck && pnpm -r test` must be green (export `DATABASE_URL` from `.env` first).
-
-### U6 — auto-graded option-select write + delete self-assessed study path
-- NEW `packages/application/src/optionSelectOutcome.ts` — `appendOptionSelectOutcome(...)`: `chosen===correct`
-  → `graded(correct,1.0)` else `graded(incorrect,0)`, `graderIdentity:"auto"`, `evidenceWeight:
-  GRADED_EVIDENCE_WEIGHT`, `selfReportRating:null`, `submittedAnswer:null`, `attemptSeq` from `nextAttemptSeq`.
-  Mirror deleted `appendSelfAssessedGrade` (`selfAssessment.ts:28-55`) minus the self-grader identity.
-- NEW `optionSelectOutcome.test.ts` — plan §U6 scenarios (correct→1/auto; wrong→0/auto; fold via
-  `foldConceptMastery`; monotonic `attemptSeq`; `responseSource` passthrough; R15 no graph/enrichment write
-  import; deletion guard — `appendSelfAssessedGrade`/`SELF_GRADER_IDENTITY` no longer exported).
-- DELETE `packages/application/src/selfAssessment.ts` + `selfAssessment.test.ts` (rule 18); drop their exports
-  from `application/src/index.ts`.
-- Rename `cardId`→`studyItemId` in `calibration.ts`, `syntheticResponses.ts`, `measurement.ts` (+ tests) and
-  `responseLogLearnerState.test.ts`. Reshape `synthesizeResponses` to consume `SelfAssessmentItem`/`StudyItem`
-  keyed on `studyItemId` (this also unbreaks the worker `synthesize-responses` path).
-- `apps/admin-lab/src/app/admin/lab/study/actions.ts` — `selfAssessCard`→`submitOptionSelect` (re-derive the
-  keyed-correct option SERVER-side by `studyItemId` from the DB; never trust the client); `submitCalibration`
-  reads `self_assessment` items via `listStudyItemsForEnrichment`. Calibration's `self_report` path is UNTOUCHED.
-
-### U7 — typed study UI (admin-lab)
-- NEW `components/study/OptionSelectCard.tsx` (4 options, click → `onSelect(optionId)`, keyed feedback, disable
-  while `pending`).
-- `studyView.ts`(+`.test.ts`): `SheetContent` → frontier `option_select | cardless`; drop
-  `frontier_card`/`assessmentDisabled`/`SelfAssessmentOutcome`; add `StudyOptionSelectView`; keep
-  `mastered_review`. Keep the prop-only, no-loader/no-action contract (R15).
-- `StudySideSheet.tsx` (render option_select; cardless-for-studying flag when no option_select item — even if a
-  self_assessment item exists, calibration-only now), `RecallCard.tsx` (read-only or delete; remove Got it/Missed
-  it controls, R8), `StudySession.tsx` (`onAssess`→`onSelect` calling `submitOptionSelect`),
-  `lib/studySession.ts`(+`.test.ts`) typed loader, `study/page.tsx` follow-through.
-- ALSO (not in the plan's U7 file list but these query the renamed tables and break the app at runtime — fix in
-  U7): `lib/enrichments.ts` (`JOIN cards`→`study_items`), `lib/derivedGraph.ts`, `lib/learnerLoop.ts`(+`.test.ts`)
-  (`cards`/`card_id`/`rejected_cards` → `study_items`/`study_item_id`/`rejected_study_items`),
-  `app/admin/lab/learner-loop/actions.ts`, `components/LearnerLoopReview.tsx`, `components/study/CalibrationSweep.tsx`.
-
-### U8 — rule-14 real-use evaluation (gate before downstream)
-- The DB schema was already dropped+recreated with the reshaped migration (rule 9), so **prior seed data is
-  gone** — re-seed via `scripts/seed-demo.sh` (real LiteLLM), then `pnpm worker:kg generate-study-items
-  <enrichmentId>` on the Rust ownership enrichment.
-- Inspect per plan §U8 (distractor plausibility + honest labeling AE4/R15; guard rejections are real not
-  over-veto; fan-out correctness; self-assessment-only → cardless-for-studying AE5/R13; click correct → one
-  `graded(auto)` row + mastered + frontier reselect, no got-it/missed-it AE1; click wrong → incorrect).
-- Write `tmp/2026-06-21-typed-study-items/rule-14-evaluation.md`; classify PASS/FIX_FIRST/EXPERIMENT_ONLY/BLOCKED.
-  No test asserts model output quality (rule 11).
-
-### Env notes
-- `DATABASE_URL` in `.env`: `postgresql://lrnki:lrnki@localhost:5432/lrnki` (reachable; reshaped migration applied).
-- Fast single-file test: `npx tsx --test <file>`. Postgres integration tests need
-  `export $(grep -E '^DATABASE_URL=' .env | xargs)` first (else they skip silently).
-
----
-
-Roadmap reset 2026-06-16, updated by the 2026-06-21 study-advance/spiral-layout rule-14 pass: the next work is earned
-by real mixed-domain pipeline output and inspected learner-loop behavior, not by deferred method-stack preference.
-
 ## TODO
 
-Most reset-roadmap items have moved to COMPLETED. The remaining active work is earned by the latest inspected
-outputs: the learner recall/adaptive path loop now runs end-to-end over all manifest fixtures at
-`EXPERIMENT_ONLY` trust, the study advance guard plus spiral graph layout passed rule-14 inspection, and prior CEP
-definition-quality caveats remain visible in the mixed-domain run.
+1. **Whole-set global prerequisite ordering.** → **DONE** (U7 rule-14 PASS, promoted to core, gpt-oss-120b
+   committed). See the COMPLETED entry below for the verdict, closures, and evidence.
 
-1. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found broadly
-   plausible ordering but confirmed a concentrated broad/evidence-thin distortion, especially relation-like or
-   framework-level labels with sparse evidence. Evidence:
-   `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`.
-   - Do **not** patch prompts with fixture-specific expected answers or named concepts. Any fix must remain
-     domain-neutral and comply with AGENTS rules 16/17.
-   - Prefer persisting difficulty rationales and/or a measured neural judge that can explicitly assess whether a
-     broad, evidence-thin node should be down-weighted. Keep any oracle/benchmark disposable unless it continues to
-     earn its keep.
-   - Population calibration remains deferred until real learner-response data exists; this follow-up is about
-     operator-facing intrinsic ordering, not IRT/KT/Bradley-Terry.
+2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** Per
+   ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
+   signal, not a bug to make deterministic. Sample the ordering call K times and route **direction-unstable**
+   pairs to `uncertain` — already excluded from learner paths — instead of committing one arbitrary draw.
+   This both calibrates edge confidence and dissolves the former pairwise "noise".
+   - **Trigger (now concrete): task 1's U7 KTD5 inspection.** Single-sample whole-set ordering re-sourced
+     `uncertain` from a per-pair verdict to cycle-routing only, so a genuinely direction-ambiguous pair may
+     now be committed as a directed edge. Build K-sampling only if U7 finds direction-instability on
+     ambiguous pairs is the live study-value defect — do not pre-build K× before that instability is observed.
+   - Costs K× ordering calls, applied to the cheap one-call-per-domain volume (not an O(n²) fan-out).
+     Measured, domain-neutral, disposable (rules 11/16/17).
+   - This closes the former enrichment-reproducibility item: root cause is intra-backend MoE
+     non-determinism (probe `tmp/2026-06-23-enrichment-determinism-probe/findings.md`), unfixable with
+     seed/provider-pinning; `litellm/config.yaml` was correctly left unchanged. Do **not** re-open a
+     serving-determinism investigation (ADR-0028).
+   - **Deferred sibling finding (2026-06-23 brainstorm) — LLM-invoked "world-law/science" deterministic
+     checks.** Defer to a future run-scoped experiment, admissible **only in a sub-domain with a genuine
+     formal oracle** (dimensional/unit analysis, a type system, arithmetic/temporal logic), and even there
+     the check *informs* the judge, never silently vetoes (rule 16). Rationale: self-correction reliably
+     helps only when grounded in an external verifier (Huang et al. 2023 — intrinsic self-correction without
+     an external signal does not reliably improve and can degrade); domain-general prerequisite derivation
+     has no such oracle, so a "world-law" validator collapses into either another LLM judge (already covered
+     by self-consistency above) or a hardcoded rule set (the forbidden rule-16 symbolic gate). Not now.
 
-2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
-   neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but inspection
-   still found low-value accepted Definition Passages such as heading-only or citation-like snippets in the
-   AIRA-dojo Markdown run.
-   - Do **not** add a hardcoded symbolic section-role or lexical veto. Any fix must stay domain-neutral and comply
-     with AGENTS rules 16/17.
-   - Prefer improving the neural CEP extraction/judgment contract or adding a measured, disposable experiment that
-     proves a generic definition-quality guard raises precision without dropping valid adjacent definitions.
-   - Treat this as a CEP-quality follow-up, not a blocker for the retrieval-layer milestone: the verbatim floor held,
-     and the inspected newly included adjacent blocks were genuine explaining passages.
+3. **Intrinsic-difficulty broad/thin follow-up.** The full-manifest read of `intrinsic-fused-v1` found
+   broadly plausible ordering but a concentrated broad/evidence-thin distortion, especially relation-like
+   or framework-level labels with sparse evidence. Evidence:
+   `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`. Persisted neural rationales
+   make this inspectable per node.
+   - Prefer a measured neural judge that explicitly assesses whether a broad, evidence-thin node should be
+     down-weighted; do not patch prompts with fixture-specific answers (rules 16/17). Keep any
+     oracle/benchmark disposable.
+   - Population calibration stays deferred until real learner-response data exists (task 6 / ADR-0024).
 
-3. **Harden forced-tool transport for long extraction/card runs.** The all-manifest learner-loop evaluation hit one
-   malformed JSON forced-tool argument during AIRA-dojo Markdown concept admission; rerunning the single source
-   succeeded. Keep fail-closed semantics, but improve retry observability and capture malformed tool-call snippets
-   safely enough to diagnose provider/schema drift without logging secrets or full copyrighted source context.
+4. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
+   neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but
+   inspection still found low-value accepted Definition Passages such as heading-only or citation-like
+   snippets in the AIRA-dojo Markdown run.
+   - Prefer improving the neural CEP extraction/judgment contract or a measured disposable experiment that
+     proves a generic definition-quality guard raises precision without dropping valid adjacent
+     definitions; no hardcoded symbolic section-role or lexical veto (rules 16/17).
+   - CEP-quality follow-up, not a retrieval-layer blocker: the verbatim floor held and inspected adjacent
+     blocks were genuine explaining passages.
 
-4. **Improve card-bank inspection around citation exactness.** Persisted cards passed the project verifier
-   (`evidenceQuoteMatches`) 87/87, but only 68/87 citations were byte-exact substrings of source blocks because the
-   verifier intentionally tolerates parser formatting noise (markdown emphasis, curly quotes, line wrapping, HTML
-   entities). Admin/inspection surfaces should label this distinction clearly so operators do not confuse normalized
-   verifier success with exact copied text.
+5. **Inspection/observability polish.** Two small operator-facing items:
+   - **Harden forced-tool transport** for long runs: the all-manifest learner-loop hit one malformed JSON
+     forced-tool argument during AIRA-dojo admission (rerun succeeded). Keep fail-closed (rule 6), but
+     improve retry observability and capture malformed tool-call snippets safely (no secrets, no full
+     copyrighted source context) to diagnose provider/schema drift.
+   - **Label study-item citation exactness:** persisted items pass `evidenceQuoteMatches`, but a known
+     fraction are not byte-exact substrings because the verifier tolerates parser formatting noise
+     (markdown emphasis, curly quotes, wrapping, HTML entities). Admin surfaces should label normalized-
+     vs-exact so operators don't conflate them.
 
-5. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain data-blocked.
-   - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a difficulty or
-     learner model on synthetic or self-assessed responses stay deferred until the study Game UI exists and per-learner
-     calibration is stable (task 1 / ADR-0024). Do not reintroduce embeddings, clustering, or non-LLM prerequisite
-     signals from method-stack preference.
-   - **Graph-growth guard (narrowed).** Do not reintroduce F3-style densification: no ungrounded bridge-node/bridge-edge
-     pass, no embedding/clustering gate, and no method-stack-driven graph growth. Performance-driven graph growth may be
-     reconsidered only as a measured, run-scoped experiment. Learner responses may propose candidate missing
-     prerequisites or candidate edge audits, but they must not directly mutate the asserted graph or silently modify an
-     existing Derived Graph Layer. Any accepted mechanism must be versioned, provenance-visible, validated against
-     held-out learner data or inspected real-use runs, and compared against the current ADR-0019 exhaustive same-domain
-     judgment baseline.
+6. **Keep standing deferred methods deferred.** Learner-calibrated difficulty and learner state remain
+   data-blocked.
+   - Population difficulty calibration (Bradley-Terry, IRT/KT), learner simulation, and any fitting of a
+     difficulty or learner model on synthetic or self-assessed responses stay deferred until per-learner
+     calibration over real study-loop responses is stable (ADR-0024).
+   - **Graph-growth guard (narrowed).** Do not reintroduce F3-style densification: no ungrounded
+     bridge-node/bridge-edge pass and no method-stack-driven graph growth. **Embeddings are now permitted
+     for concept identity/dedup and similarity (ADR-0012) but never to derive prerequisites or
+     gate/grow the graph** (rule 20). Performance-driven graph growth may be reconsidered only as a
+     measured, run-scoped experiment. Learner responses may propose candidate missing prerequisites or
+     edge audits but must not directly mutate the asserted graph or silently modify a Derived Graph Layer;
+     any accepted mechanism must be versioned, provenance-visible, and compared against the ADR-0019
+     baseline.
 
 ## COMPLETED
 
-- **Study advance guard + prerequisite-order spiral graph layout (2026-06-21).** Replaced the
-  shared ELK layered placement with deterministic prerequisite-order spiral placement for Admin Lab
-  derived graph canvases, including the learner-path graph. Ordering uses certain prerequisite edges
-  only, keeps uncertain edges visible but placement-neutral, tie-breaks by difficulty/label/id, and
-  terminates deterministically on cycles. The study side sheet now ignores stale dismiss signals while
-  answer-triggered retargeting is guarded, clears selection only on accepted user dismissal or goal
-  completion, and keys recall cards by `cardId` so advanced cards start unrevealed. The earlier
-  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md` success is superseded: the observed
-  `Memory address` -> `Variable` sheet-dismiss regression invalidated its side-sheet continuity
-  evidence. Fresh rule-14 inspection over disposable learner `eval-spiral-advance` classified this
-  fix `PASS`: `Memory address` -> `Reveal answer` -> `Got it` advanced the still-open sheet to
-  `Variable`, the `Variable` card was unrevealed, and both derived-graph and learner-path Cytoscape
-  canvases rendered through the spiral helper. Caveat: the full 50-node mixed-domain spiral still has
-  dense edge crossings; this is deterministic prerequisite placement, not force-directed untangling.
-  Evidence: `tmp/2026-06-21-spiral-study-advance/rule-14-evaluation.md`.
-- **Study surface polish + calibration propagation trust fix (2026-06-21).** Completed
-  `docs/plans/2026-06-21-002-feat-study-surface-polish-plan.md` U1-U6. Admin Lab now uses
-  dedicated graph tokens and a single node-state fill source for legible locked/enrichment/frontier/mastered
-  states, clear button-vs-tag presentation on the study surface, frontier-neighborhood framing with
-  viewport-only recenter on advance, and uninterrupted post-answer retargeting of the open side sheet.
-  Calibration propagation now mirrors readiness trust by excluding uncertain edges while retaining cycle
-  termination. Its original rule-14 pass over the seeded Rust ownership `Move` path is now superseded by
-  the study advance guard evaluation above because the later observed sheet-dismiss regression invalidated
-  the recorded side-sheet continuity evidence. The retained non-retargeting evidence showed that a direct
-  uncertain-cycle propagation probe seeded only the trusted ancestor and did not credit the goal. Superseded
-  evidence:
-  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md`.
-- **Adapted-graph comparison view + full-manifest difficulty-ordering evaluation (2026-06-20).** Completed
-  `docs/plans/2026-06-20-001-feat-adapted-graph-view-difficulty-eval-plan.md` U1–U6. Admin Lab now renders one
-  neutral/adapted `DerivedGraphExplorer` pair per distinct learner-path enrichment, badged by synthetic/human
-  response source; the adapted panel colors mastered/frontier/locked nodes, rings the selected frontier target,
-  scales nodes by intrinsic difficulty, and flags cardless nodes while leaving the neutral enrichment view intact.
-  The rule-14 evaluation published/enriched full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` /
-  `223cfb32-47a2-4488-a61a-561f6673f717` with real LiteLLM calls and classified `intrinsic-fused-v1` as
-  `EXPERIMENT_ONLY`, useful for operator inspection but not calibrated learner difficulty. Evidence:
-  `tmp/2026-06-20-intrinsic-difficulty-full-manifest/`.
-- **Derived-node identity naming cleanup + ADR-0025 amendment (2026-06-20).** Renamed every
-  learner-loop / path / difficulty / derived-edge field that carried a `derived_node_id` under the
-  misleading name `conceptId` / `targetConceptId` / `prerequisite|dependentConceptId` to its
-  `derivedNodeId` form across domain-core, ports, application, litellm, Postgres stores, the worker
-  CLI, and Admin Lab; dropped the `derived_node_id AS concept_id` read-layer query aliases; and
-  renamed the card-draft citation key `sourceBlockId → passageId` (including the model-facing
-  forced-tool schema) because a generated card's grounding passage is not a source block. Legitimate
-  asserted `concept_id` fields (Concept, CEP, anchor projection, scaffolded anchors) were left intact.
-  Amended ADR-0025 with the two-identity model (`derived_node_id` = recall subject, `card_id` = item),
-  the append-only log, the one-outcome-per-node invariant (kept as atomic write + per-node unique key,
-  no new outcome table), and the deferred cross-enrichment learner identity. Pure identifier change:
-  the single DB migration was already on `derived_node_id`, so no schema change. Declined the review's
-  suggestions to add a `card_generation_outcomes` table and to remove the synthetic learner simulator
-  (already behind a port and already deferred per "keep deferred methods deferred").
-- **Learner recall loop and adaptive path (2026-06-19 to 2026-06-20).** Built the learner-neutral Card Bank,
-  append-only Response Log, `EXPERIMENT_ONLY` mastery fold, synthetic learner seeding, Admin Lab inspection path,
-  and adaptive projection. Extended cards and response rows to the full Derived Graph Layer so `source_mentioned`
-  and `llm_grounded` Enrichment Nodes can be recall-tested. Latest real-use evidence:
-  `tmp/2026-06-20-multitarget-loop/`.
-- **No-card frontier fallback persisted and exercised live (2026-06-20).** Made a derived node the card generator
-  cannot recall-test a durable fact: new `rejected_cards` table written in the same transaction as an enrichment's
-  cards (delete-then-insert replacement; runs even at 0 surviving cards), `RejectedCard` moved to `domain-core`,
-  `CardBankStorePort.persist` reshaped to `{ graphVersionId, enrichmentId, configHash, cards, rejected }`, and the
-  card-bank artifact bumped `card_bank.v2 → v3` with the JSON_TABLE view following. The Admin Lab path-coverage view
-  now reads the persisted rejection reason instead of guessing from grounding origin. Triggered the fallback live:
-  live `generate-cards` over a real `source_mentioned` node whose grounding was set to the genuine verbatim-floor
-  `failed` state rejected it ("no usable grounding passages"), the adaptive frontier advanced straight to that
-  cardless node, and the real coverage SQL surfaced the persisted reason beside carded `generated`/`source_cep`
-  steps. Closes the previously 3×-deferred no-card live-trigger gap. Evidence:
-  `tmp/2026-06-20-rejected-card-persistence/`.
-- **Card provenance and learner-loop validation hardening (2026-06-20).** Reran the teachable-cards validation
-  with a real LiteLLM key, reset the DB, extracted all six manifest sources, published/enriched graph version
-  `4e6c56a6-...` / `41b80e67-...`, generated 50/50 cards with honest source/generated provenance, and confirmed
-  adaptive pruning over enrichment-node response rows. Evidence: `tmp/2026-06-20-teachable-cards-rerun/`.
-- **Optional Typed Assertion simplification (2026-06-19).** Measured `explicit-prerequisite-hint` with a disposable
-  real LiteLLM A/B and removed it after the edge set stayed identical. `defines` is now the sole Optional Typed
-  Assertion; prerequisite prose remains ordinary CEP mention evidence consumed by exhaustive Graph Enrichment.
-  Evidence: `tmp/2026-06-18-prerequisite-hint-ab/`.
+- **Whole-set prerequisite ordering (2026-06-24, branch `feat/whole-set-prerequisite-ordering`,
+  plan `2026-06-24-001`).** One whole-set ordering call per Declared Domain over the deduplicated derived
+  node set replaces per-pair / per-node-batched judging; acyclicity verified with one corrective re-prompt,
+  still-cyclic edges routed to `uncertain`; the two judge aliases + `removeCycles` heuristic deleted (rule
+  18); trace → `enrichment_run.v3`. **U7 rule-14 PASS** on the real Rust + economics run
+  `28c3398c` (`kg-prerequisite-ordering` → gpt-oss-120b): both domains returned an acyclic DAG on the FIRST
+  call (0 re-prompts, 0 cycle-routing), and every KTD1 study-value defect is fixed — `Passing values →
+  Compiler` scaffold inversion gone (foundations are DAG roots); `Return values` closure 12→**1**; `Memory
+  safety` closure 9→**4**; economics chain preserved. KTD5: no direction-instability committed (ambiguous
+  pairs omitted, not mis-directed) → K-sampling (TODO #2) NOT triggered. Cost collapsed to ≈1 call/domain.
+  **Committed model:** `kg-prerequisite-ordering → openrouter/openai/gpt-oss-120b` (config default; R8
+  closed). Evidence: `tmp/2026-06-24-whole-set-ordering-rule14/rule-14-evaluation.md`. Caveat: single
+  fixture-pair; real-data cycle-routing unverified (no cycle arose), unit-tested only (U4 AE2).
+
+- **Minting-durability judge for assumed-prerequisite enrichment nodes (2026-06-23, branch
+  `feat/enrichment-dedup-rescue-precision`).** Opt-in cross-family (`kg-independent-judge`) drop-only gate
+  that vetoes `not_durable` assumed-prerequisite proposals before any grounding call is spent, persisting
+  `minting_dispositions` (ADR-0019). Rule-14 **PASS with caveats**: the enabled Rust + economics run minted
+  four reasonable software prerequisites (`Compiler (software tool)`, `Dynamic memory allocation`,
+  `Memory address`, `Static analysis (programming)`), persisted four accepted dispositions, and produced no
+  RAII node or drop-function edges; rescue dropped `Resource Acquisition Is Initialization (RAII)`. Caveat:
+  the RAII minting path did not reproduce in this draw, so no real `not_durable` minting drop was observed.
+  Evidence: `tmp/2026-06-23-minting-durability-rule14/rule-14-evaluation.md`.
+
+- **Enrichment semantic dedup + rescue precision (2026-06-23, branch `feat/enrichment-dedup-rescue-precision`,
+  stacked on `feat/enrichment-perf-batched-judging`).** Rule-14 report
+  `tmp/2026-06-23-dedup-rescue-rule14-evaluation.md`. All units U1–U7 shipped, typecheck/test-clean,
+  committed.
+  - **Semantic-deduplication sub-stage (U1–U5):** a measured derived-layer pass that collapses
+    same-domain near-duplicate nodes before per-node judging, strictly separating PROPOSE from DECIDE
+    (rule 20). Embeddings (`kg-node-embedding` / qwen3-embedding-8b) propose within-domain candidate
+    pairs by cosine; a cross-family adjudicator (`kg-independent-judge` / gpt-oss-120b) decides each
+    `merge`/`keep_distinct`; raw cosine never decides. Deterministic canonical selection (anchor always
+    wins → never absorbs a published Concept; then evidence count, then stable id), union-find for
+    transitive clusters, absorbed evidence threaded into the canonical's judge context, full provenance
+    persisted to `derived_node_merges` and shown in Admin Lab "Semantic merges". Fail-closed everywhere
+    (embedding failure skips a domain; adjudicator failure → keep_distinct), opt-in, `enrichmentConfigHash`
+    → `dedup-v1`. New deterministic-envelope tests only (rules 11/19); no test asserts a merge verdict.
+  - **Rescue durability sharpened (U6):** added a domain-neutral develops-vs-named-in-passing axis to the
+    drop-only rescue judge. **U7 verified the RAII rescue-path defect is fixed** — RAII dropped as "only
+    mentioned once as a C++ comparison and not explained or built upon"; ~40 other passing asides dropped
+    with the same reasoning; only source-developed concepts accepted.
+  - **Threshold calibration (U7):** `DEFAULT_DEDUP_CONFIG.similarityThreshold` 0.8 → 0.7 (recall-generous
+    per R2; model-scale calibration to qwen3-embedding cosine, not fixture-fitting — genuine duplicates
+    ≥0.72, distinct ≤0.66). A real-model probe (`tmp/u7-dedup-probe.ts`) merged a genuine anchor↔variant
+    duplicate (Ownership ← Ownership (Rust), 0.87, anchor canonical) and kept a borderline pair
+    (move/Move semantics, 0.72) distinct — confirming the adjudicator owns precision.
+  - **Residual → resolved:** the same RAII gate could still arise via the **minting** path (baseline
+    minted RAII → `drop` at 0.85); U6 fixed only the rescue path, and the minting-durability judge above
+    now closes the minting path.
+
+- **Enrichment batched judging + determinism governance pivot (2026-06-23, branch `feat/enrichment-perf-batched-judging`).**
+  - **Per-node batched judging shipped (U1–U7):** replaced per-pair prerequisite judging with one batched
+    `submit_prerequisite_judgments` call per node (U1 stage tags, U2 worker stage-timing, U4 batched
+    schema/adapter, U5 reshape, U6 shared `mapWithConcurrency`), using the per-pair judge's symmetric
+    Concept A / Concept B framing inside the batched call (`fix(enrichment): symmetric A/B framing…`,
+    domain-neutral per rule 17; deterministic mapping + 47/47 envelope tests unchanged; typecheck clean).
+    Per-stage `stage_timing` + `/spend/tags` instrument token/cost with no app-computed cost (AE3 PASS).
+    Symmetric re-measurement (graph version `ad675576…`, 14 anchors, cap=1) scored 10/12 vs the per-pair
+    baseline, up from asymmetric's 6/12. **User signed off: accept the batched reshape + U5 deletion for
+    the 1.4–2× speed win** (judging ~2.1×, total enrichment 1.39×). Evidence:
+    `tmp/2026-06-23-enrichment-parity-fix/`, `tmp/2026-06-22-enrichment-after/`,
+    `tmp/2026-06-22-enrichment-rule14.md`.
+  - **Determinism root-caused → governance pivot:** a disposable through-proxy probe
+    (`tmp/2026-06-23-enrichment-determinism-probe/`) proved certain-edge run-to-run variance is
+    **intra-backend MoE non-determinism** on genuinely-ambiguous pairs (clear pairs decision-stable 8/8;
+    ambiguous flip even with a pinned backend + honored `seed: 7` + `temperature: 0`). `deepseek-v4-flash`
+    has 19 OpenRouter backends, so the prior 12/12 was a lucky draw; no serving/config lever fixes it and
+    `litellm/config.yaml` was left unchanged, so clean 12/12 parity is unmeasurable for any method and
+    reproducibility is folded into TODO #2 (prerequisite-direction self-consistency). **Governance updated:** new ADR-0028 + rule
+    19 (measure non-deterministic quality with LLM/self-consistency, not determinism-chasing); ADR-0012
+    rewritten + rule 20 (blanket no-embeddings ban withdrawn — embeddings permitted for
+    identity/dedup/similarity, propose-only with separate adjudication, never for prerequisites);
+    ADR-0015/CONTEXT reconciled. Inspecting real enrichment `0a7ed566` surfaced the larger learner-facing
+    defect — concept fragmentation (barter×2, owner≈ownership, move×2) + permissive rescue (RAII→drop
+    @0.95) — since resolved by the semantic dedup + rescue-precision work above.
+- **Graph-dissolved calibration & goal-first study loop (2026-06-22, branch
+  `feat/graph-dissolved-calibration`, committed not merged).** Retired the
+  weighted self-report calibration sweep and replaced it with explicit calibration dissolved into the study
+  graph:
+  - **Persistence + domain reshape (U1/U2):** new mutable `calibration_verdicts` table +
+    `CalibrationVerdictStorePort` + `PostgresCalibrationVerdictStore`; `response_log` collapsed to graded-only
+    (dropped `evidence_weight`, `self_report_rating`, the `self_report` signal type, and its coherence branch).
+    Deleted `calibration.ts` (`buildCalibrationSet`/`propagateSelfReport`/`appendSelfReportBatch`, the
+    `0.3`/`0.15` + GRADED weights), `ratingToMastery`, and the self-report fold branch (rule 18). The synthetic
+    simulator now seeds verdicts deterministically from difficulty (`verdictByDifficulty`). Per-learner reset
+    nukes verdicts via the store + graded rows via a direct operator DELETE (the log keeps no store-port delete,
+    so its append-only guarantee stays structural).
+  - **Pure deterministic core (U3):** `calibrationClosure.ts` — `pruneClosure` (trusted-edge down-closure),
+    `composeMastery` (calibration `known` masters its closure; coexistence with graded is *surfaced*, not
+    silently resolved — the old "graded always outranks" precedence is gone), `struggledNodes` (latest graded
+    incorrect), `suggestRestorations`. `prerequisiteAncestors` generalized to a minimal edge shape so the loader
+    and a future Learner app share one ancestor definition.
+  - **Goal-first entry (U4):** alias-aware goal search, journey-size (cone-count) ordering, "foundational —
+    studied directly" tag for DAG-root goals; enrichment demoted to a secondary switcher defaulting to latest.
+  - **Calibration UI (U5/U6/U7):** reveal-then-binary "I knew it"/"I forgot" card (verdict shown + clearable,
+    R7); `setVerdict`/`clearVerdict`/`resetLearner` actions; loader derives the prune closure, composes mastery,
+    and flags a foundational root so it opens a single-node screen instead of a premature "Goal reached" (AE1);
+    Calibrate toggle + `CalibrationSweep.tsx` removed; `detectConflicts` re-homed onto verdict-vs-graded; a
+    restoration nudge surfaces directly-known skipped prerequisites on a graded miss and restores via
+    `clearVerdict`.
+  - **Verification + real-use eval (U8):** repo typecheck clean; 349 unit tests pass, 0 fail (21 Postgres
+    integration tests skip without `DATABASE_URL`); grep-clean of all retired symbols. U8 PASS on a live
+    two-source enrichment with real model calls (economics `wealth-of-nations-bk1-ch1-3` run `b57760ba…`,
+    Rust `rust-book-ch04-01` run `ba630d89…`, graph version `ad675576…`, enrichment `0a7ed566…`): 24 nodes,
+    27 edges (23 trusted / 4 uncertain), 24 difficulty rows, 48 study items, 0 rejected. Headless inspection
+    verified AE1–AE5 (foundational root single-node calibration screen; Rust cone pruning mastered 15/15
+    trusted-closure nodes and reversed cleanly; calibration/graded coexistence surfaced; restoration
+    suggested the skipped prerequisite; per-learner reset cleared verdicts + graded rows). PASS for
+    calibration mechanics; learner model + intrinsic difficulty remain `EXPERIMENT_ONLY`. Evidence:
+    `tmp/2026-06-22-calibration-implementation-report.md`, `tmp/2026-06-22-u8-eval/`.
+- **Learner study loop UI (2026-06-21, PR #9).** Shipped the full learner-facing study surface in Admin Lab,
+  built as transfer-ready prop-driven modules over the existing recall/adaptive-path core:
+  - **Typed Study Item Bank** (ADR-0026): `Card` → typed `StudyItem` discriminated union; auto-graded
+    option-select studying with a deterministic structural distractor guard and sibling-conditioned generated
+    distractors; self-assessment retreats to calibration only. Supported types come from `SELECT DISTINCT
+    item_type`. The `Card → StudyItem` rename (rule 18) is fully complete: `selfAssessment.ts` deleted,
+    `optionSelectOutcome.ts` added, no `cardId`/old `Card` remnants; full workspace typecheck green. Rule-14 PASS
+    (`tmp/2026-06-21-typed-study-items/`).
+  - **Learner-calibrated study loop + adapted-graph view:** a Study route where a learner picks a goal node,
+    optionally calibrates via a card sweep, and studies only the unmet gap while one pinned neutral↔adapted graph
+    re-shapes (mastered/frontier/locked) per response — proving real skip-ahead divergence vs. an empty-mastery
+    learner. Calibration is optional (separate button, never gating). Self-report propagates only along trusted
+    (certain) edges.
+  - **FFX sphere-grid graph layout:** replaced the spiral placement with an in-house, pure, synchronous
+    per-domain serpentine grid layout with Cytoscape-native `taxi` edges and a provable zero-crossing invariant
+    (deterministic crossing counter asserted `=== 0` on real seeded data; fail-loud flag if a loop is
+    non-embeddable). Rejected re-adding ELK/dagre (async, ~1.5 MB, only *minimizes* crossings). The spiral module
+    and its test were deleted in the same change. Rule-14 PASS (`tmp/2026-06-21-ffx-sphere-grid/`).
+  - **Repeatable demo seed + difficulty-rationale persistence:** `scripts/seed-demo.sh` resets to one coherent
+    full-manifest state with named demo learners and adaptive paths; the neural difficulty rationale the judge
+    already returns is now persisted to `concept_difficulties` and surfaced on adapted nodes (labeled generated,
+    no scoring-formula change).
+- **Adapted-graph comparison view + full-manifest difficulty evaluation (2026-06-20).** One neutral/adapted
+  `DerivedGraphExplorer` pair per distinct learner-path enrichment, badged by synthetic/human response source,
+  scaling nodes by intrinsic difficulty and flagging cardless nodes. The full-manifest run classified
+  `intrinsic-fused-v1` as `EXPERIMENT_ONLY` (useful for operator inspection, not calibrated learner difficulty).
+  Evidence: `tmp/2026-06-20-intrinsic-difficulty-full-manifest/`.
+- **Learner recall loop, adaptive path, and no-card fallback (2026-06-19 to 2026-06-20).** Built the
+  learner-neutral Card/Study-Item Bank, append-only Response Log, `EXPERIMENT_ONLY` mastery fold, synthetic
+  learner seeding, Admin Lab inspection path, and adaptive projection over the full Derived Graph Layer
+  (`source_mentioned` and `llm_grounded` nodes are recall-testable). A derived node the generator cannot
+  recall-test is persisted to `rejected_cards` in the same transaction and surfaced with its reason; the
+  fallback was triggered live. Derived-node identity was renamed off the misleading `conceptId` to
+  `derivedNodeId` across all layers (ADR-0025 two-identity amendment). Evidence:
+  `tmp/2026-06-20-multitarget-loop/`, `tmp/2026-06-20-rejected-card-persistence/`,
+  `tmp/2026-06-20-teachable-cards-rerun/`.
 - **Learner-neutral intrinsic difficulty and F3 removal (2026-06-18).** Replaced the `dag-depth-mock` port with
-  `intrinsic-fused-v1`, recorded the learner-calibrated difficulty deferral in ADR-0024, and removed the failed
-  F3 densification experiment from live code and ADR-0019. F1 prerequisite ordering had already passed over
-  biology, economics, and InstructKG; F3 v1 proposed 0 bridges and v2 had no domain-neutral trigger worth keeping.
+  `intrinsic-fused-v1` (ADR-0024) and removed the failed F3 densification experiment from live code and ADR-0019.
   Evidence: `tmp/2026-06-18-intrinsic-difficulty/`, `tmp/2026-06-17-f1-enrichment-eval/`.
-- **Structure-aware CEP evidence retrieval (2026-06-18).** Added deterministic, capped structural neighborhoods
-  for CEP extraction: mention blocks, adjacent extractable body blocks, same-`headingPath` siblings, then
-  label/alias blocks. The verbatim floor stayed unchanged. InstructKG incomplete CEPs improved 9 to 3; remaining
-  low-value heading/citation-like definitions are now TODO #1. Evidence:
-  `tmp/2026-06-18-structure-aware-neighborhood/`.
+- **CEP simplification and structure-aware evidence retrieval (2026-06-18 to 2026-06-19).** Measured
+  `explicit-prerequisite-hint` redundant against exhaustive enrichment and removed it, leaving `defines` as the
+  sole Optional Typed Assertion. Added deterministic capped structural neighborhoods for CEP extraction
+  (mention/adjacent/sibling/label blocks); the verbatim floor stayed unchanged and InstructKG incomplete CEPs
+  improved 9 → 3. Evidence: `tmp/2026-06-18-prerequisite-hint-ab/`, `tmp/2026-06-18-structure-aware-neighborhood/`.
 - **Evidence-backed admission, rescue, and ungroundable-core policy (2026-06-16 to 2026-06-17).** Added
   definition-bearing treatment to core admission, carried verified evidence into CEP extraction without bypassing
-  the port, gated `source_mentioned` rescue with a drop-only measured durability judge, surfaced provenance pressure
-  in Admin Lab, and changed incomplete-core handling from run failure to optional demotion with loud quality issues.
-- **Evaluation-first roadmap reset and domain-neutral extraction cleanup (2026-06-16).** Rebuilt the roadmap from
-  real mixed-domain runs instead of method-stack preference, normalized the manifest-backed fixture batch, fixed the
-  enrichment anchor projection persistence collision, removed fixture-derived model-facing prompt calibration, and
-  added run-scoped quality issues for inspection.
-- **Post-reset graph architecture baseline.** The reset architecture now admits atomic Concepts, publishes
+  the port, gated `source_mentioned` rescue with a drop-only measured durability judge, surfaced provenance
+  pressure in Admin Lab, and changed incomplete-core handling from run failure to optional demotion with loud
+  quality issues.
+- **Post-reset graph architecture baseline (2026-06-15 to 2026-06-16).** Rebuilt the roadmap from real
+  mixed-domain runs instead of method-stack preference. The reset architecture admits atomic Concepts, publishes
   source-grounded CEPs with zero asserted edges, builds graph versions explicitly from selected runs, derives
-  prerequisite structure only in Graph Enrichment, keeps learner state downstream, and exposes the current surfaces
-  through Admin Lab, RDF export, native ingestion, and Gate 2 Docling PDF ingestion.
+  prerequisite structure only in Graph Enrichment, keeps learner state downstream, and exposes the current
+  surfaces through Admin Lab, RDF export, native ingestion, and Gate 2 Docling PDF ingestion.
 
 ## VALIDATION
 
-Latest change (2026-06-21) is the **study advance guard + prerequisite-order spiral graph layout**:
+**Stale — needs a fresh run.** The consolidated suite breakdown below is the last full-suite validation
+(2026-06-21, PR #9). The later 2026-06-23 enrichment branches (batched judging, semantic dedup + rescue
+precision, minting-durability judge) are each reported typecheck/test-clean with deterministic-envelope
+tests only (rule 11) in their COMPLETED entries above, but a fresh consolidated `pnpm -r typecheck` + suite
+run has not been recorded here and should replace this section.
 
-- **Static/unit:** `pnpm --filter @lrnki/admin-lab test` passed 66/0, including sheet dismiss guard coverage,
-  spiral ordering coverage for certain-edge precedence, uncertain-edge exclusion, difficulty/label/id tie-breaks,
-  deterministic cycle termination, and shared derived-graph/learner-path helper inputs. `pnpm --filter
-  @lrnki/admin-lab typecheck` passed. `elkjs` and the local bundled type shim were removed from the Admin Lab
-  dependency surface.
-- **Real-use:** Playwright drove the live Admin Lab study route over enrichment
-  `56e55b9a-a62b-43b9-88de-8d5b381a2da8`, disposable learner `eval-spiral-advance`, target `Move`
-  (`1e1d9b1e-8288-4219-a9d1-f55d1d5b74c3`). The page opened with frontier `Memory address`; clicking the
-  Cytoscape frontier node opened the sheet, `Reveal answer` + `Got it` advanced the page and still-open sheet to
-  `Variable`, and the `Variable` card started unrevealed. The derived graph and learner-path canvases both rendered
-  through the spiral helper. Inspection result: `PASS`. Evidence:
-  `tmp/2026-06-21-spiral-study-advance/rule-14-evaluation.md`.
+Last full-suite run (2026-06-21, PR #9) — the **learner study loop UI** (typed Study Item Bank + sphere-grid
+layout + learner-calibrated study route + adapted-graph view + demo seed):
 
-Prior change (2026-06-21) is the **study surface polish + calibration propagation trust fix**:
-
-- **Static/unit:** `pnpm --filter @lrnki/application test` passed 160/0 for that suite, including the R6 regression
-  cases where positive self-report does not seed ancestors reachable only through uncertain edges and an uncertain-edge
-  cycle does not credit the goal. `pnpm --filter @lrnki/admin-lab test` passed 57/0 at that point, including
-  node-state token distinctness, frontier-neighborhood helper coverage, next-study-target helper coverage,
-  transfer-boundary guards, and study-session gating helpers.
-- **Real-use:** superseded for side-sheet continuity by the latest evaluation above. The retained calibration trust
-  evidence remains the direct uncertain-cycle propagation probe in
-  `tmp/2026-06-21-study-surface-polish/rule-14-evaluation.md`.
-
-Prior change (2026-06-20) is the **adapted-graph comparison view + full-manifest difficulty evaluation**:
-
-- **Static/unit:** `packages/application` 151/0 for that suite, including `classifyAdaptedNodes` coverage
-  for AE1/AE2 classification, threshold boundary, uncertain-edge exclusion, shared-helper frontier parity with
-  `selectFrontierTarget`, empty frontier, and mastered-over-ready precedence. `apps/admin-lab` 30/0, including U2
-  pure-helper coverage (`dedupeEnrichmentScopes`, `summarizeResponseSources`, `buildMasteryMap`) and U3
-  overlay view-model coverage (neutral unchanged, adapted tagging + single frontier mark, cardless in both
-  representations, null-difficulty preserved, R5 node-set equivalence). `apps/admin-lab` typecheck was clean after
-  U5 page wiring. Page composition remained un-unit-tested by local convention; U5 used the DB-bound loader and was
-  verified by the same real-use path as U6.
-- **Real-use:** full-manifest graph version `c40fe70d-17ff-451c-995f-ff28d40660c6` and enrichment
-  `223cfb32-47a2-4488-a61a-561f6673f717` were produced with real LiteLLM calls. The run persisted 50/50
-  `intrinsic-fused-v1` difficulties across all five manifest domains. Inspection result:
-  `EXPERIMENT_ONLY` for intrinsic ordering — broadly plausible chains in every domain, but concentrated broad/thin
-  distortions remain and learner-calibrated difficulty is still data-blocked. Evidence:
-  `tmp/2026-06-20-intrinsic-difficulty-full-manifest/rule-14-evaluation.md`.
-
-Prior change (2026-06-20) is the **derived-node identity naming cleanup** — a deterministic identifier
-refactor (no behavior change), so it is verified statically, not by a new rule-14 real-use run:
-
-- **Static/unit:** full workspace typecheck green (exit 0); unit suites green where DB-free — domain-core,
-  application 144/0, litellm, rdf-export, ingestion, admin-lab 19/0; eslint 0 errors (2 pre-existing
-  unrelated warnings). Postgres integration suite re-run against a live DB (2026-06-20): 19/19 pass, 0 fail,
-  0 skipped — covering both `PostgresLearnerLoopStores` (cards, append-only `response_log`, `rejected_cards`
-  replacement) and `PostgresStores` (transactional CEP run persistence, zero-edge snapshot, enrichment
-  round-trips). The identity rename was pure TS field changes over unchanged SQL columns, and the live
-  round-trip confirms the write and `JSON_TABLE` read paths still match the on-disk schema.
-- **Real-use:** unchanged. The loop's last real-use quality status remains the 2026-06-20 `PASS` /
-  `EXPERIMENT_ONLY` evaluation below; a rename does not alter model output.
-
-Prior real-use validation (2026-06-20) is the **no-card frontier fallback persistence + live-trigger rule-14 evaluation**
-(`tmp/2026-06-20-rejected-card-persistence/rule-14-evaluation.md`):
-
-- **Static/unit:** full workspace suite green — domain-core 16/0, ingestion 9/0, litellm 35/0, rdf-export 2/0,
-  Postgres integration 19/0 (incl. the new rejected-card persistence + replacement test on live Postgres),
-  application 144/0, admin-lab 19/0; eslint clean on changed files (one pre-existing unrelated warning). Real LLM
-  access via `kg-*` LiteLLM aliases (the `.env` key).
-- **Real-use:** live `generate-cards` over four clean 3-node enrichments produced 15/15 cards, 0 natural rejections
-  (confirming the generator cards ~100%). A faithful verbatim-floor failure on a real `source_mentioned` node
-  (`Borrowing`, enrichment `65aca80d-…`) then produced a real rejection ("no usable grounding passages") persisted
-  to `rejected_cards`; the adaptive frontier advanced to that cardless node, and the actual coverage SQL returned the
-  no-card step with the persisted reason beside carded `generated`/`source_cep` steps.
-- **Inspection result:** `PASS` for the durable closure (rejections are now persisted and honestly surfaced instead
-  of vanishing to console) and the live read-path demonstration. The loop overall stays `EXPERIMENT_ONLY`
-  (uncalibrated learner model). No `FIX_FIRST` defect. Caveat: a *spontaneous* model-driven rejection remains rare
-  and was triggered here via a faithful construction of the real failure mode.
+- **Static/unit:** full workspace typecheck green (`pnpm -r typecheck`, exit 0) — the earlier mid-rename compile
+  caveat is resolved. `pnpm --filter @lrnki/admin-lab test` 74/0, including the sphere-grid zero-crossing
+  invariant on real-shape data, serpentine/region-packing geometry, determinism, and the deterministic
+  option-select structural guard. `packages/application` and `packages/infrastructure-postgres` suites green,
+  including the neural-rationale round-trip on every difficulty row and append-only option-select outcome folds.
+  No test asserts model output quality (rule 11).
+- **Real-use:** rule-14 PASS on both final milestones. Sphere grid: `countEdgeCrossings === 0` on the seeded
+  mixed-domain enrichment, right-angle taxi edges, visually separated per-domain regions, difficulty-size and
+  learner-state overlays preserved, frontier advance recenters without relayout
+  (`tmp/2026-06-21-ffx-sphere-grid/rule-14-evaluation.md`). Typed study items: clicking the correct option wrote
+  one `graded(auto)` row and advanced the frontier with no got-it/missed-it controls; distractors were plausible
+  and honestly labeled; the deterministic guard's rejections were genuine
+  (`tmp/2026-06-21-typed-study-items/rule-14-evaluation.md`). Caveat: this seed produced no natural
+  self-assessment-only (cardless-for-studying) frontier because every node yielded a valid option-select item —
+  worth re-confirming as generation scales. The loop overall remains `EXPERIMENT_ONLY` (uncalibrated learner
+  model); intrinsic difficulty remains `EXPERIMENT_ONLY` with the broad/thin distortion noted in TODO #3.

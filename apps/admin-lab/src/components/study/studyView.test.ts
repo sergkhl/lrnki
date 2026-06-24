@@ -3,16 +3,16 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { calibrationRatingFor, nextStudyTarget, shouldAcceptSheetOpenChange } from "./studyView";
+import { verdictForChoice, nextStudyTarget, shouldAcceptSheetOpenChange } from "./studyView";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// Pure presentation helpers only — component rendering is verified by the U7 real-use run
+// Pure presentation helpers only — component rendering is verified by the U8 real-use run
 // (no jsdom in this project's test convention).
 
-test("'I know it' maps to a propagating 'good'; 'not sure' maps to a non-propagating 'hard' (Covers R2/R3)", () => {
-  assert.equal(calibrationRatingFor("know_it"), "good");
-  assert.equal(calibrationRatingFor("not_sure"), "hard");
+test("'I knew it' maps to the known verdict; 'I forgot' maps to learn (Covers R5)", () => {
+  assert.equal(verdictForChoice("knew_it"), "known");
+  assert.equal(verdictForChoice("forgot"), "learn");
 });
 
 test("nextStudyTarget returns the freshly-advanced frontier target when present (Covers R4)", () => {
@@ -38,7 +38,7 @@ test("sheet open is always accepted, including during answer-triggered retargeti
 // Covers R15: the transfer-ready modules import no Admin-Lab loader and no server action,
 // so a later Learner app consumes them unchanged. A structural guard on the import surface.
 test("study modules import no @/lib loader and no server action (Covers R15)", () => {
-  for (const file of ["OptionSelectCard.tsx", "RecallCard.tsx", "CalibrationSweep.tsx", "StudySideSheet.tsx", "studyView.ts"]) {
+  for (const file of ["OptionSelectCard.tsx", "RecallCard.tsx", "StudySideSheet.tsx", "studyView.ts"]) {
     const source = readFileSync(join(here, file), "utf8");
     assert.equal(source.includes("@/lib/"), false, `${file} must not import an Admin-Lab loader`);
     assert.equal(source.includes("/study/actions"), false, `${file} must not import a study server action`);

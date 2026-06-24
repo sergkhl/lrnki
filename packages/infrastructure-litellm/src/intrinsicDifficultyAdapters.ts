@@ -1,6 +1,7 @@
 import type { DifficultyNodeContext } from "@lrnki/domain-core";
 import type { IntrinsicDifficultyJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import { intrinsicDifficultySchema, intrinsicDifficultyValidator } from "./toolSchemas";
 
 export const INTRINSIC_DIFFICULTY_JUDGE_MODEL = "kg-independent-judge";
@@ -39,7 +40,8 @@ export class LiteLlmIntrinsicDifficultyJudgmentAdapter implements IntrinsicDiffi
       toolName: "submit_intrinsic_difficulty",
       toolDescription: "Submit a learner-neutral intrinsic difficulty judgment for one concept.",
       parameters: intrinsicDifficultySchema,
-      validator: intrinsicDifficultyValidator
+      validator: intrinsicDifficultyValidator,
+      tags: [STAGE_TAGS.intrinsicDifficulty]
     });
 
     return { neuralScore: result.neuralScore, rationale: result.rationale };

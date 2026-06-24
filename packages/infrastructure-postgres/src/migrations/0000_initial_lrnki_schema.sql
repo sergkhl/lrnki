@@ -539,6 +539,52 @@ CREATE TABLE rescue_dispositions (
   grounding_span text NOT NULL
 );
 
+-- Minting durability dispositions. One row per RESERVED assumed-prerequisite proposal
+-- the minting durability judge ruled on before grounding generation. A `dropped`
+-- proposal has no derived_graph_nodes row, so derived_node_id is correlation-only
+-- (no FK), mirroring rescue_dispositions. The anchor_concept_id records the asserted
+-- Concept the proposal would have scaffolded — always a surviving published Concept, so
+-- it carries a real FK (unlike the correlation-only derived_node_id).
+CREATE TABLE minting_dispositions (
+  minting_disposition_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL,
+  proposed_label text NOT NULL,
+  normalized_label text NOT NULL,
+  declared_domain text NOT NULL,
+  anchor_concept_id uuid NOT NULL REFERENCES concepts(concept_id),
+  disposition text NOT NULL CHECK (disposition IN ('accepted', 'dropped', 'kept_judge_unavailable')),
+  rationale text NOT NULL
+);
+
+-- Derived-layer semantic merges (plan U4, ADR-0012/0019, AGENTS rule 20). One row per
+-- ABSORBED node the dedup sub-stage collapsed into a canonical near-duplicate (U3). The
+-- canonical node SURVIVES, so canonical_derived_node_id has an FK; the absorbed node is
+-- REMOVED from the layer, so absorbed_derived_node_id is correlation-only with NO FK
+-- (exactly as rescue_dispositions.derived_node_id is correlation-only for dropped
+-- candidates). The absorbed node's label/aliases/kind/evidence are SNAPSHOTTED here so
+-- Admin Lab reads a merge without rehydrating a deleted node (U5). Lives only on the
+-- derived layer; published Concept identity and IRIs are untouched (R7). The absorbed
+-- node is always an enrichment node — an anchor is never absorbed (KTD6).
+CREATE TABLE derived_node_merges (
+  derived_node_merge_id uuid PRIMARY KEY,
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  declared_domain text NOT NULL,
+  canonical_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  canonical_label text NOT NULL,
+  canonical_node_kind text NOT NULL CHECK (canonical_node_kind IN ('anchor', 'enrichment')),
+  absorbed_derived_node_id uuid NOT NULL,
+  absorbed_label text NOT NULL,
+  absorbed_aliases jsonb NOT NULL,
+  absorbed_node_kind text NOT NULL CHECK (absorbed_node_kind IN ('anchor', 'enrichment')),
+  absorbed_evidence jsonb NOT NULL,
+  proposing_signal text NOT NULL CHECK (proposing_signal IN ('embedding_cosine')),
+  proposing_score real NOT NULL,
+  rationale text NOT NULL,
+  canonical_selection_reason text NOT NULL CHECK (canonical_selection_reason IN ('anchor_over_enrichment', 'higher_evidence_count', 'stable_id_tiebreak')),
+  CHECK (canonical_derived_node_id <> absorbed_derived_node_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Learner Path — vertical-slice projection output (ADR-0019). CLI computes and
 -- persists; the Admin Lab Cytoscape view renders read-only (ADR-0011, rule 12).
@@ -656,13 +702,37 @@ CREATE TABLE rejected_study_items (
 );
 
 -- ---------------------------------------------------------------------------
+-- Calibration Verdicts — the MUTABLE calibration store (R10, KTD1). Deliberately
+-- the opposite of the response log: a calibration verdict is the learner's CURRENT
+-- intent per (learner, node), so it is naturally upsert/delete. Revealing a node's
+-- answer and tapping "I knew it" writes `known`; "I forgot" writes `learn`. Reversal
+-- (R7) is a single-row delete/overwrite — no append-only seeded rows to reconcile.
+-- The trusted-edge prerequisite down-closure of the `known` set is derived at read
+-- time (not materialized), so this table holds only the direct verdicts. There are
+-- no evidence weights (rule 18): a verdict is a discrete intent, not a graded score.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE calibration_verdicts (
+  learner_state_ref text NOT NULL,
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  verdict text NOT NULL CHECK (verdict IN ('known', 'learn')),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (learner_state_ref, derived_node_id)
+);
+
+-- ---------------------------------------------------------------------------
 -- Response Log — the ONE irreversible commitment (R4–R6). Append-only: every
--- recall attempt is an immutable row. There is no UPDATE or DELETE path in the
--- store port; re-calibration and Admin Lab resubmission APPEND new rows (R5, R10).
--- The log stores the derived_node_id as the skill. Field set is deliberately IRT-
--- and BKT-sufficient: `study_item_id` is the per-item IRT key, `derived_node_id` the
+-- GRADED recall attempt is an immutable row. There is no UPDATE or DELETE path in
+-- the store port; Admin Lab resubmission APPENDS new rows (R5). The append-only
+-- invariant holds for the LOG; the mutable calibration_verdicts table above is the
+-- explicit exception, kept separate by nature (KTD1). With the weighted self-report
+-- sweep retired (R18), the log is graded-only: the `self_report` signal type, the
+-- `self_report_rating` column, and the `evidence_weight` column are gone. The log
+-- stores the derived_node_id as the skill. Field set is deliberately IRT- and BKT-
+-- sufficient: `study_item_id` is the per-item IRT key, `derived_node_id` the
 -- per-skill BKT key, and `attempt_seq` the monotonic-per-learner sequence both
--- fits need (R6).
+-- fits need (R6). A per-learner reset (R16) is an explicit operator nuke that deletes
+-- rows directly, never a store-port path — the append-only guarantee stands.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE response_log (
@@ -670,25 +740,18 @@ CREATE TABLE response_log (
   learner_state_ref text NOT NULL,
   study_item_id uuid NOT NULL REFERENCES study_items(study_item_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
-  signal_type text NOT NULL CHECK (signal_type IN ('self_report', 'graded')),
-  self_report_rating text CHECK (self_report_rating IN ('again', 'hard', 'good', 'easy')),
+  signal_type text NOT NULL CHECK (signal_type IN ('graded')),
   judged_outcome text CHECK (judged_outcome IN ('correct', 'partial', 'incorrect')),
   graded_score real CHECK (graded_score >= 0 AND graded_score <= 1),
-  evidence_weight real NOT NULL,
   response_source text NOT NULL CHECK (response_source IN ('synthetic', 'human')),
   grader_identity text,
   batch_id uuid,
   attempt_seq integer NOT NULL,
   submitted_answer text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  -- Signal/outcome coherence: a self_report carries a rating (no graded fields); a
-  -- graded row carries an outcome AND a score (no rating). Fail-closed at the DB
-  -- so no incoherent row can ever enter the durable log.
-  CHECK (
-    (signal_type = 'self_report' AND self_report_rating IS NOT NULL AND judged_outcome IS NULL AND graded_score IS NULL)
-    OR
-    (signal_type = 'graded' AND judged_outcome IS NOT NULL AND graded_score IS NOT NULL AND self_report_rating IS NULL)
-  ),
+  -- Outcome coherence: a graded row carries an outcome AND a score. Fail-closed at
+  -- the DB so no incoherent row can ever enter the durable log.
+  CHECK (signal_type = 'graded' AND judged_outcome IS NOT NULL AND graded_score IS NOT NULL),
   UNIQUE (learner_state_ref, attempt_seq)
 );
 
@@ -697,6 +760,6 @@ CREATE TABLE response_log (
 -- not a published artifact).
 CREATE VIEW artifact_response_log AS
 SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
-       self_report_rating, judged_outcome, graded_score, evidence_weight,
+       judged_outcome, graded_score,
        response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
 FROM response_log;

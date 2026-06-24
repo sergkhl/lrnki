@@ -1,5 +1,6 @@
 import type { LearnerAnswerSimulatorPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
 import { learnerAnswerSimulationSchema, learnerAnswerSimulationValidator } from "./toolSchemas";
 
@@ -42,7 +43,8 @@ export class LiteLlmLearnerSimulatorAdapter implements LearnerAnswerSimulatorPor
       toolName: "submit_simulated_answer",
       toolDescription: "Submit a simulated learner's written answer to one recall question.",
       parameters: learnerAnswerSimulationSchema,
-      validator: learnerAnswerSimulationValidator
+      validator: learnerAnswerSimulationValidator,
+      tags: [STAGE_TAGS.learnerSimulation]
     });
     return { answer: result.answer };
   }

@@ -5,8 +5,9 @@ export {
   PostgresGraphVersionStore
 } from "./PostgresStores";
 export { PostgresArtifactRepository } from "./PostgresArtifactRepository";
+export { PostgresInspectionRead } from "./PostgresInspectionRead";
 export {
   PostgresEnrichmentRunStore,
   PostgresLearnerPathStore
 } from "./PostgresEnrichmentStores";
-export { PostgresStudyItemBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
+export { PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";

@@ -2,11 +2,18 @@ import { normalizeConceptLabel } from "@lrnki/domain-core";
 import type {
   LlmGroundedEnrichmentNode,
   MentionedNonCoreCandidate,
+  MintingDisposition,
   RescueDisposition,
   SourceMentionedEnrichmentNode,
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import type {
+  GroundingGenerationPort,
+  MintingDurabilityJudgmentPort,
+  MissingPrerequisiteProposalPort,
+  RescueDurabilityJudgmentPort
+} from "@lrnki/ports";
+import { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
 
 // Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep minting
@@ -52,12 +59,17 @@ export async function assembleEnrichmentNodes(input: {
   // disposition. Omitted -> rescue is unjudged (prior behavior) and every aggregated
   // node is accepted. Dropped labels stay "taken" so minting never resurrects them.
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional measured minting durability judge. When provided, each reserved
+  // assumed-prerequisite proposal is judged before grounding generation. Omitted ->
+  // minting is identical to prior behavior and emits no minting dispositions.
+  mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
   bounds?: EnrichmentMintingBounds;
   newNodeId: () => string;
 }): Promise<{
   rescuedNodes: SourceMentionedEnrichmentNode[];
   mintedNodes: LlmGroundedEnrichmentNode[];
   rescueDispositions: RescueDisposition[];
+  mintingDispositions: MintingDisposition[];
 }> {
   const bounds = input.bounds ?? DEFAULT_MINTING_BOUNDS;
 
@@ -70,6 +82,14 @@ export async function assembleEnrichmentNodes(input: {
     const set = takenByDomain.get(domain) ?? new Set<string>();
     set.add(normalized);
     takenByDomain.set(domain, set);
+  };
+  // Release a reservation. Used only to un-reserve a minting label whose proposal was
+  // dropped: a minting verdict is anchor-scoped, so the label must stay available for a
+  // later same-domain anchor (reservation scope = verdict scope). Safe because a label
+  // is only reserved here after passing `isTaken`, so a dropped proposal is its sole
+  // holder — releasing it never frees a label an anchor, rescued, or minted node owns.
+  const untake = (domain: string, normalized: string) => {
+    takenByDomain.get(domain)?.delete(normalized);
   };
   for (const anchor of input.anchors) take(anchor.declaredDomain, anchor.normalizedLabel);
 
@@ -125,6 +145,7 @@ export async function assembleEnrichmentNodes(input: {
 
   // --- Mint: anchor-driven bounded llm_grounded nodes ----------------------------
   const mintedNodes: LlmGroundedEnrichmentNode[] = [];
+  const mintingDispositions: MintingDisposition[] = [];
   let runBudget = bounds.maxMintedPerRun;
   // Deterministic anchor order so a replayed run proposes in the same sequence.
   const anchors = [...input.anchors].sort((a, b) => a.conceptId.localeCompare(b.conceptId));
@@ -139,28 +160,57 @@ export async function assembleEnrichmentNodes(input: {
       maxProposals
     });
 
-    let mintedForAnchor = 0;
+    const reserved: ReservedMintingProposal[] = [];
     for (const proposal of proposals) {
-      if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) break;
+      // Never reserve more than the budget can mint, regardless of whether the port
+      // honored `maxProposals`. This bounds judge calls and guarantees reserved.length
+      // <= runBudget, so every KEPT proposal is mintable: a dropped proposal frees no
+      // budget but no kept proposal is ever recorded `accepted` without a node.
+      if (reserved.length >= maxProposals) break;
       const normalized = normalizeConceptLabel(proposal.proposedLabel);
       if (normalized.length === 0 || isTaken(anchor.declaredDomain, normalized)) continue;
       take(anchor.declaredDomain, normalized);
       const derivedNodeId = input.newNodeId();
-      const groundingBundle = await input.groundingPort.generate({
+      reserved.push({
         derivedNodeId,
+        proposedLabel: proposal.proposedLabel,
+        normalizedLabel: normalized,
+        declaredDomain: anchor.declaredDomain,
+        rationale: proposal.rationale,
+        anchor: { conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }
+      });
+    }
+
+    const keptProposals = input.mintingDurabilityJudge && reserved.length > 0
+      ? await applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge })
+      : { keptProposals: reserved, dispositions: [] };
+    mintingDispositions.push(...keptProposals.dispositions);
+    // A `dropped` verdict is scoped to THIS anchor, so release the label: a later
+    // same-domain anchor that genuinely depends on the concept can re-propose and be
+    // judged independently (Option 1 — reservation scope follows verdict scope). Kept
+    // and fail-open labels stay reserved because they become real nodes.
+    for (const disposition of keptProposals.dispositions) {
+      if (disposition.disposition === "dropped") untake(disposition.declaredDomain, disposition.normalizedLabel);
+    }
+
+    let mintedForAnchor = 0;
+    for (const proposal of keptProposals.keptProposals) {
+      if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) break;
+      const groundingBundle = await input.groundingPort.generate({
+        derivedNodeId: proposal.derivedNodeId,
         declaredDomain: anchor.declaredDomain,
         nodeLabel: proposal.proposedLabel,
         scaffoldedAnchors: [{ conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }]
       });
       mintedNodes.push({
         nodeKind: "enrichment",
-        derivedNodeId,
+        derivedNodeId: proposal.derivedNodeId,
         groundingOrigin: "llm_grounded",
         mintingReason: "assumed_prerequisite",
         role: "prerequisite",
         layer: "derived",
         canonicalLabel: proposal.proposedLabel,
-        normalizedLabel: normalized,
+        normalizedLabel: proposal.normalizedLabel,
         declaredDomain: anchor.declaredDomain,
         aliases: [],
         groundingBundle
@@ -170,7 +220,7 @@ export async function assembleEnrichmentNodes(input: {
     }
   }
 
-  return { rescuedNodes, mintedNodes, rescueDispositions };
+  return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions };
 }
 
 function rescuePassages(candidate: MentionedNonCoreCandidate): SourceMentionGroundingPassage[] {

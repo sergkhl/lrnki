@@ -1,5 +1,12 @@
 export { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 export type { JsonSchema, ToolMessage } from "./LiteLlmForcedToolClient";
+export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
+export {
+  LiteLlmNodeEmbeddingAdapter,
+  LiteLlmNodeMergeAdjudicationAdapter,
+  NODE_EMBEDDING_MODEL,
+  NODE_MERGE_ADJUDICATION_MODEL
+} from "./dedupAdapters";
 export {
   conceptDiscoverySchema,
   conceptDiscoveryValidator,
@@ -10,8 +17,8 @@ export {
   conceptCoreSelectionValidator,
   conceptEvidenceProfileSchema,
   conceptEvidenceProfileValidator,
-  prerequisiteJudgmentSchema,
-  prerequisiteJudgmentValidator,
+  prerequisiteOrderingSchema,
+  prerequisiteOrderingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalSchema,
@@ -22,6 +29,8 @@ export {
   admissionLabelJudgmentValidator,
   rescueDurabilityJudgmentSchema,
   rescueDurabilityJudgmentValidator,
+  mintingDurabilityJudgmentSchema,
+  mintingDurabilityJudgmentValidator,
   cardGenerationSchema,
   cardGenerationValidator,
   optionSelectSchema,
@@ -56,11 +65,12 @@ export {
   ADMISSION_LABEL_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
-  LiteLlmPrerequisiteJudgmentAdapter,
+  LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
-  PREREQUISITE_JUDGE_MODEL,
-  GENERATED_PREREQUISITE_JUDGE_MODEL,
-  RESCUE_DURABILITY_JUDGE_MODEL
+  LiteLlmMintingDurabilityJudgmentAdapter,
+  PREREQUISITE_ORDERING_MODEL,
+  RESCUE_DURABILITY_JUDGE_MODEL,
+  MINTING_DURABILITY_JUDGE_MODEL
 } from "./enrichmentAdapters";
 export {
   LiteLlmGroundingGenerationAdapter,

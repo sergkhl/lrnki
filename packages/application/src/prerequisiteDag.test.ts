@@ -4,8 +4,8 @@ import type { InferredPrerequisiteEdge } from "@lrnki/domain-core";
 import {
   cutWeakEdges,
   dagDepthDifficulty,
+  findCycleEdges,
   prerequisiteAncestors,
-  removeCycles,
   topologicalDepth,
   topologicalOrder,
   transitiveReduction
@@ -22,28 +22,27 @@ function edge(prereq: string, dependent: string, confidence = 0.9, uncertain = f
   };
 }
 
-test("removeCycles breaks a cycle by dropping its lowest-confidence edge", () => {
-  // a -> b -> c -> a, with c -> a the weakest.
-  const { edges, removed } = removeCycles([edge("a", "b", 0.9), edge("b", "c", 0.8), edge("c", "a", 0.7)]);
-  assert.equal(removed.length, 1);
-  assert.equal(removed[0].prerequisiteDerivedNodeId, "c");
-  assert.equal(removed[0].dependentDerivedNodeId, "a");
-  assert.equal(edges.length, 2);
+test("findCycleEdges returns null for an acyclic graph", () => {
+  assert.equal(findCycleEdges([edge("a", "b"), edge("b", "c")]), null);
 });
 
-test("removeCycles leaves an already-acyclic graph untouched", () => {
-  const input = [edge("a", "b"), edge("b", "c")];
-  const { edges, removed } = removeCycles(input);
-  assert.equal(removed.length, 0);
-  assert.equal(edges.length, 2);
+test("findCycleEdges returns exactly the cycle's edges, deterministically", () => {
+  // a -> b -> c -> a.
+  const input = [edge("a", "b", 0.9), edge("b", "c", 0.8), edge("c", "a", 0.7)];
+  const cycle = findCycleEdges(input);
+  assert.ok(cycle, "a cycle is detected");
+  const key = (es: typeof input) => es.map((e) => `${e.prerequisiteDerivedNodeId}->${e.dependentDerivedNodeId}`).join(",");
+  assert.equal(key(cycle!), "a->b,b->c,c->a");
+  // Replay determinism: identical input yields the identical violating cycle.
+  assert.equal(key(findCycleEdges([...input])!), key(cycle!));
 });
 
-test("removeCycles drops a self-loop", () => {
-  const { edges, removed } = removeCycles([edge("a", "a"), edge("a", "b")]);
-  assert.equal(removed.length, 1);
-  assert.equal(removed[0].prerequisiteDerivedNodeId, "a");
-  assert.equal(removed[0].dependentDerivedNodeId, "a");
-  assert.equal(edges.length, 1);
+test("findCycleEdges detects a self-loop rather than silently passing it", () => {
+  // Should never occur (the boundary excludes equal endpoints), but if it does it is a cycle.
+  const cycle = findCycleEdges([edge("a", "a"), edge("a", "b")]);
+  assert.ok(cycle, "the self-loop is detected as a cycle");
+  assert.equal(cycle![0].prerequisiteDerivedNodeId, "a");
+  assert.equal(cycle![0].dependentDerivedNodeId, "a");
 });
 
 test("transitiveReduction removes the redundant shortcut edge", () => {

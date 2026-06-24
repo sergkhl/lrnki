@@ -23,9 +23,9 @@ const detail: DerivedGraphDetail = {
     completedAt: "2026-06-15T10:05:00.000Z"
   },
   nodes: [
-    { derivedNodeId: "scope", label: "Variable scope", declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasStudyItem: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
-    { derivedNodeId: "ownership", label: "Ownership", declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasStudyItem: true, grounding: null },
-    { derivedNodeId: "move", label: "Move semantics", declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasStudyItem: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
+    { derivedNodeId: "scope", label: "Variable scope", aliases: [], declaredDomain: "rust", difficulty: 0, difficultyRationale: "Foundational, concrete, low background load.", nodeKind: "enrichment", groundingOrigin: "source_mentioned", role: "prerequisite", hasStudyItem: true, grounding: { generatingModel: null, rationale: null, passages: [{ passageType: "mention", text: "Variable scope is mentioned in prose.", groundingOrigin: "source_mentioned" }], verbatimDisposition: "verified" } },
+    { derivedNodeId: "ownership", label: "Ownership", aliases: ["owning"], declaredDomain: "rust", difficulty: 1, difficultyRationale: "Abstract, composes several prior mechanics.", nodeKind: "anchor", groundingOrigin: "document_anchored", role: "anchor", hasStudyItem: true, grounding: null },
+    { derivedNodeId: "move", label: "Move semantics", aliases: [], declaredDomain: "rust", difficulty: 2, difficultyRationale: "Builds directly on ownership transfer.", nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "prerequisite", hasStudyItem: false, grounding: { generatingModel: "mock-gen", rationale: "scaffolds Ownership", passages: [{ passageType: "definition", text: "Move semantics transfer ownership.", groundingOrigin: "llm_grounded" }], verbatimDisposition: "not_applicable_by_grounding" } }
   ],
   edges: [
     { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
@@ -39,6 +39,13 @@ const detail: DerivedGraphDetail = {
   rescueDispositions: [
     { derivedNodeId: "scope", canonicalLabel: "Variable scope", declaredDomain: "rust", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
     { derivedNodeId: "ablation", canonicalLabel: "Table 3 Ablation", declaredDomain: "rust", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
+  ],
+  mintingDispositions: [
+    { derivedNodeId: "move", proposedLabel: "Move semantics", declaredDomain: "rust", anchorConceptId: "ownership", disposition: "accepted", rationale: "durable prerequisite" },
+    { derivedNodeId: "raii", proposedLabel: "RAII", declaredDomain: "rust", anchorConceptId: "ownership", disposition: "dropped", rationale: "tangential to this anchor" }
+  ],
+  merges: [
+    { declaredDomain: "rust", canonicalDerivedNodeId: "ownership", canonicalLabel: "Ownership", absorbedLabel: "Ownership (Rust)", absorbedAliases: ["owning"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
   ]
 };
 
@@ -55,6 +62,39 @@ test("cytoscape and textual views describe the same nodes and edges", () => {
     ["Variable scope", "Ownership"],
     ["Ownership", "Move semantics"]
   ]);
+});
+
+// U5: each semantic merge is surfaced in the equivalent textual readout with canonical
+// label, absorbed label, proposing signal, and score, so a non-visual reader sees it.
+test("semantic merges appear in the textual output", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.equal(view.textual.merges.length, 1);
+  const merge = view.textual.merges[0];
+  assert.equal(merge.canonicalLabel, "Ownership");
+  assert.equal(merge.absorbedLabel, "Ownership (Rust)");
+  assert.equal(merge.proposingSignal, "embedding_cosine");
+  assert.ok(Math.abs(merge.proposingScore - 0.97) < 1e-9);
+  assert.equal(merge.canonicalSelectionReason, "anchor_over_enrichment");
+});
+
+test("an empty merges list yields an empty textual merges array", () => {
+  const view = buildDerivedGraphView({ ...detail, merges: [] });
+  assert.deepEqual(view.textual.merges, []);
+});
+
+test("minting durability dispositions appear in the textual output", () => {
+  const view = buildDerivedGraphView(detail);
+  assert.equal(view.textual.mintingDispositions.length, 2);
+  assert.equal(view.textual.mintingDispositions.find((d) => d.proposedLabel === "Move semantics")?.disposition, "accepted");
+  const dropped = view.textual.mintingDispositions.find((d) => d.disposition === "dropped");
+  assert.equal(dropped?.proposedLabel, "RAII");
+  assert.equal(dropped?.anchorConceptId, "ownership");
+  assert.equal(dropped?.rationale, "tangential to this anchor");
+});
+
+test("an empty minting disposition list yields an empty textual array", () => {
+  const view = buildDerivedGraphView({ ...detail, mintingDispositions: [] });
+  assert.deepEqual(view.textual.mintingDispositions, []);
 });
 
 test("uncertain edges are flagged in both representations", () => {
@@ -137,6 +177,13 @@ test("rescue dispositions distinguish accepted and dropped with rationale", () =
   const dropped = detail.rescueDispositions.find((d) => d.disposition === "dropped");
   assert.equal(dropped?.canonicalLabel, "Table 3 Ablation");
   assert.equal(dropped?.rationale, "incidental artifact");
+});
+
+test("minting dispositions distinguish accepted and dropped with rationale", () => {
+  assert.equal(detail.mintingDispositions.find((d) => d.proposedLabel === "Move semantics")?.disposition, "accepted");
+  const dropped = detail.mintingDispositions.find((d) => d.disposition === "dropped");
+  assert.equal(dropped?.proposedLabel, "RAII");
+  assert.equal(dropped?.rationale, "tangential to this anchor");
 });
 
 // --- Region grouping (U3, R2): each declared domain → one compound-parent region ---

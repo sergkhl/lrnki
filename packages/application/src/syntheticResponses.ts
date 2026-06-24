@@ -1,27 +1,30 @@
-import type { SelfAssessmentItem, DerivedGraphLayer, SelfReportRating } from "@lrnki/domain-core";
-import type { AnswerGradingJudgePort, LearnerAnswerSimulatorPort, ResponseLogStorePort } from "@lrnki/ports";
-import { appendSelfReportBatch, buildCalibrationSet, type SelfReportInput } from "./calibration";
+import type { SelfAssessmentItem, DerivedGraphLayer, Verdict } from "@lrnki/domain-core";
+import type { AnswerGradingJudgePort, CalibrationVerdictStorePort, LearnerAnswerSimulatorPort, ResponseLogStorePort } from "@lrnki/ports";
+import { prerequisiteAncestors } from "./prerequisiteDag";
 import { gradeAndAppend } from "./measurement";
 
-// Synthetic prefill (U7, R14). Seeds BOTH recall modes with `synthetic` rows so the
-// end-to-end loop is inspectable pre-launch (the milestone's rule-14 artifact). It is
-// EXPERIMENT_ONLY scaffolding that lives OUTSIDE the authoritative core. Crucially it
-// routes self-report through U4's appendSelfReportBatch and graded answers through
-// U5's gradeAndAppend with the REAL judge — one code path, not a parallel writer.
+// Synthetic prefill (R14, EXPERIMENT_ONLY scaffolding that lives OUTSIDE the
+// authoritative core). Seeds BOTH halves of the graph-dissolved loop so the end-to-end
+// study surface is inspectable pre-launch (the milestone's rule-14 artifact):
+//   1. Calibration VERDICTS over the goal's trusted prerequisite cone, seeded
+//      deterministically from each node's difficulty (mutable store, not the log).
+//   2. GRADED answers for a hardest-first sample, routed through the REAL judge via
+//      gradeAndAppend — one code path, not a parallel writer.
+// The retired weighted self-report sweep (buildCalibrationSet/appendSelfReportBatch) is
+// gone (R18); this writes the new verdict store directly.
 
 export type SyntheticLearnerProfile = {
-  // A learner who masters concepts below `difficultyCutoff` and struggles at/above it.
+  // A learner who already knows concepts below `difficultyCutoff` and must study at/above it.
   difficultyCutoff: number;
   // How many studyItems to actually answer-and-grade (bounds LLM calls). Hardest-first.
   gradedSampleSize: number;
 };
 
-// Deterministic self-rating from a concept's difficulty (pure, testable). Below the
-// cutoff the learner reports recall ("good"/"easy"); at/above it they struggle
-// ("hard"/"again"). The exact split is a fixed, domain-neutral mapping.
-export function rateByDifficulty(difficulty: number, cutoff: number): SelfReportRating {
-  if (difficulty < cutoff) return difficulty < cutoff / 2 ? "easy" : "good";
-  return difficulty >= (cutoff + 1) / 2 ? "again" : "hard";
+// Deterministic verdict from a concept's difficulty (pure, testable). Below the cutoff
+// the learner already knows it (`known`); at/above it they must study it (`learn`). A
+// fixed, domain-neutral mapping — never tuned to a fixture (AGENTS rule 17).
+export function verdictByDifficulty(difficulty: number, cutoff: number): Verdict {
+  return difficulty < cutoff ? "known" : "learn";
 }
 
 export async function synthesizeResponses(input: {
@@ -34,31 +37,31 @@ export async function synthesizeResponses(input: {
   simulator: LearnerAnswerSimulatorPort;
   judge: AnswerGradingJudgePort;
   responseLog: ResponseLogStorePort;
-}): Promise<{ calibrationBatchId: string; selfReportCount: number; gradedCount: number }> {
+  verdictStore: CalibrationVerdictStorePort;
+}): Promise<{ knownCount: number; learnCount: number; gradedCount: number }> {
   const studyItemByNode = new Map(input.studyItems.map((studyItem) => [studyItem.derivedNodeId, studyItem] as const));
-  const calibration = buildCalibrationSet({ layer: input.layer, targetDerivedNodeId: input.targetDerivedNodeId, studyItems: input.studyItems });
+  const difficultyByNode = new Map(input.layer.difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty.score] as const));
 
-  // 1. Calibration: deterministically rate every set item, then append ONE batch via
-  //    U4's single append path (self-report rows tagged synthetic).
-  const ratings: SelfReportInput[] = calibration.map((item) => ({
-    derivedNodeId: item.derivedNodeId,
-    studyItemId: item.studyItemId,
-    rating: rateByDifficulty(item.difficulty, input.profile.difficultyCutoff)
-  }));
-  const { batchId } = await appendSelfReportBatch({
-    learnerStateRef: input.learnerStateRef,
-    responseLog: input.responseLog,
-    ratings,
-    responseSource: "synthetic"
-  });
+  // 1. Calibration: seed a verdict for every node in the goal's TRUSTED prerequisite cone
+  //    (certain edges only — mirroring the down-closure walk, R8), deterministically from
+  //    difficulty. Upserts into the mutable verdict store; no log rows, no evidence weights.
+  const certainEdges = input.layer.prerequisiteEdges.filter((edge) => !edge.uncertain);
+  const cone = prerequisiteAncestors(input.targetDerivedNodeId, certainEdges);
+  let knownCount = 0;
+  let learnCount = 0;
+  for (const derivedNodeId of [...cone].sort()) {
+    const verdict = verdictByDifficulty(difficultyByNode.get(derivedNodeId) ?? 1, input.profile.difficultyCutoff);
+    await input.verdictStore.upsert({ learnerStateRef: input.learnerStateRef, derivedNodeId, verdict });
+    if (verdict === "known") knownCount += 1;
+    else learnCount += 1;
+  }
 
-  // 2. Measurement: answer-and-grade a hardest-first sample, including the target's
-  //    own studyItem. Each answer is simulated then graded by the REAL judge through U5's
+  // 2. Measurement: answer-and-grade a hardest-first sample, including the target's own
+  //    studyItem. Each answer is simulated then graded by the REAL judge through
   //    gradeAndAppend — exercising the true measurement path, not a stub.
-  const gradeOrder = [
-    ...(studyItemByNode.has(input.targetDerivedNodeId) ? [{ derivedNodeId: input.targetDerivedNodeId, difficulty: difficultyOfNode(input.layer, input.targetDerivedNodeId) }] : []),
-    ...calibration.map((item) => ({ derivedNodeId: item.derivedNodeId, difficulty: item.difficulty }))
-  ];
+  const gradeOrder = [input.targetDerivedNodeId, ...cone]
+    .map((derivedNodeId) => ({ derivedNodeId, difficulty: difficultyByNode.get(derivedNodeId) ?? 1 }))
+    .sort((a, b) => b.difficulty - a.difficulty || a.derivedNodeId.localeCompare(b.derivedNodeId));
   const seen = new Set<string>();
   let gradedCount = 0;
   for (const candidate of gradeOrder) {
@@ -81,9 +84,5 @@ export async function synthesizeResponses(input: {
     gradedCount++;
   }
 
-  return { calibrationBatchId: batchId, selfReportCount: ratings.length, gradedCount };
-}
-
-function difficultyOfNode(layer: DerivedGraphLayer, derivedNodeId: string): number {
-  return layer.difficulties.find((difficulty) => difficulty.derivedNodeId === derivedNodeId)?.score ?? 1;
+  return { knownCount, learnCount, gradedCount };
 }

@@ -1,5 +1,15 @@
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import type { DerivedGraphDetail, DerivedGraphEdge, DerivedGraphNode, EnrichmentSummary, GroundingPassageView, NodeGroundingView, RescueDispositionView } from "./derivedGraph";
+import type {
+  DerivedGraphDetail,
+  DerivedGraphEdge,
+  DerivedGraphNode,
+  EnrichmentSummary,
+  GroundingPassageView,
+  MintingDispositionView,
+  NodeGroundingView,
+  NodeMergeView,
+  RescueDispositionView
+} from "./derivedGraph";
 import { summarizeOriginCounts } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
@@ -60,8 +70,8 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     // (R15). Difficulty and edges reference derived_node_id only (KTD2).
     // `study_items` can hold multiple types per derived_node_id, so the EXISTS check keeps
     // one row per node while flagging whether any study item exists for graph inspection.
-    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; declared_domain: string; score: number | null; neural_rationale: string | null; has_study_item: boolean }[]>`
-      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.declared_domain, d.score, d.neural_rationale,
+    const nodeRows = await sql<{ derived_node_id: string; node_kind: string; grounding_origin: string; role: string; label: string; aliases: string[]; declared_domain: string; score: number | null; neural_rationale: string | null; has_study_item: boolean }[]>`
+      SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.aliases, n.declared_domain, d.score, d.neural_rationale,
              EXISTS (SELECT 1 FROM study_items si WHERE si.derived_node_id = n.derived_node_id) AS has_study_item
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
@@ -80,6 +90,24 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       FROM rescue_dispositions
       WHERE enrichment_id = ${header.enrichment_id}
       ORDER BY declared_domain, disposition, canonical_label`;
+
+    // Minting-durability dispositions: each reserved proposal's accept/drop/fail-open
+    // decision before grounding generation. Read-only, no recompute (rule 12).
+    const mintingRows = await sql<{ derived_node_id: string; proposed_label: string; declared_domain: string; anchor_concept_id: string; disposition: string; rationale: string }[]>`
+      SELECT derived_node_id, proposed_label, declared_domain, anchor_concept_id, disposition, rationale
+      FROM minting_dispositions
+      WHERE enrichment_id = ${header.enrichment_id}
+      ORDER BY declared_domain, disposition, proposed_label`;
+
+    // Semantic merges (U5): the relational mirror of the run trace's merge records.
+    // Read-only, no recompute (rule 12). The absorbed node was removed from the layer, so
+    // its label/aliases/evidence come from the snapshot columns.
+    const mergeRows = await sql<{ declared_domain: string; canonical_derived_node_id: string; canonical_label: string; absorbed_label: string; absorbed_aliases: string[]; proposing_signal: string; proposing_score: number; rationale: string; canonical_selection_reason: string }[]>`
+      SELECT declared_domain, canonical_derived_node_id, canonical_label, absorbed_label, absorbed_aliases,
+             proposing_signal, proposing_score, rationale, canonical_selection_reason
+      FROM derived_node_merges
+      WHERE enrichment_id = ${header.enrichment_id}
+      ORDER BY declared_domain, canonical_label, absorbed_label`;
 
     // Grounding bundles + passages for the enrichment nodes (R8, R15). The verbatim
     // disposition (R9, AE3) is read from the recorded run trace, falling back to the
@@ -113,7 +141,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
         derived_node_id text PATH '$.derivedNodeId',
         outcome text PATH '$.outcome'
       )) AS d
-      WHERE a.artifact_type = 'enrichment_run.v2' AND a.payload->>'enrichmentId' = ${header.enrichment_id}`;
+      WHERE a.artifact_type = 'enrichment_run.v3' AND a.payload->>'enrichmentId' = ${header.enrichment_id}`;
     const dispositionByNode = new Map(dispositionRows.map((row) => [row.derived_node_id, row.outcome]));
 
     const groundingFor = (row: { derived_node_id: string; node_kind: string; grounding_origin: string }): NodeGroundingView | null => {
@@ -131,6 +159,7 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
     const nodes: DerivedGraphNode[] = nodeRows.map((row) => ({
       derivedNodeId: row.derived_node_id,
       label: row.label,
+      aliases: Array.isArray(row.aliases) ? row.aliases : [],
       declaredDomain: row.declared_domain,
       difficulty: row.score === null ? null : Number(row.score),
       difficultyRationale: row.neural_rationale,
@@ -155,8 +184,27 @@ export async function getEnrichmentDetail(enrichmentId: string): Promise<Derived
       rationale: row.rationale,
       groundingSpan: row.grounding_span
     }));
+    const mintingDispositions: MintingDispositionView[] = mintingRows.map((row) => ({
+      derivedNodeId: row.derived_node_id,
+      proposedLabel: row.proposed_label,
+      declaredDomain: row.declared_domain,
+      anchorConceptId: row.anchor_concept_id,
+      disposition: row.disposition as MintingDispositionView["disposition"],
+      rationale: row.rationale
+    }));
+    const merges: NodeMergeView[] = mergeRows.map((row) => ({
+      declaredDomain: row.declared_domain,
+      canonicalDerivedNodeId: row.canonical_derived_node_id,
+      canonicalLabel: row.canonical_label,
+      absorbedLabel: row.absorbed_label,
+      absorbedAliases: Array.isArray(row.absorbed_aliases) ? row.absorbed_aliases : [],
+      proposingSignal: row.proposing_signal,
+      proposingScore: Number(row.proposing_score),
+      rationale: row.rationale,
+      canonicalSelectionReason: row.canonical_selection_reason
+    }));
 
-    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions };
+    return { summary: toEnrichmentSummary(header), nodes, edges, originCounts: summarizeOriginCounts(nodes), rescueDispositions, mintingDispositions, merges };
   });
 }
 

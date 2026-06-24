@@ -1,24 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { appendOptionSelectOutcome } from "@lrnki/application";
+import type { Verdict } from "@lrnki/domain-core";
 import {
-  appendOptionSelectOutcome,
-  appendSelfReportBatch,
-  propagateSelfReport,
-  type SelfReportInput
-} from "@lrnki/application";
-import type { SelfReportRating } from "@lrnki/domain-core";
-import {
-  PostgresStudyItemBankStore,
-  PostgresEnrichmentRunStore,
+  PostgresCalibrationVerdictStore,
   PostgresResponseLogStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
-// The Study surface's two write paths. Both mutate LEARNER STATE ONLY — they
-// append `responseSource: "human"` rows to the append-only Response Log and never open a
-// graph-version or enrichment write port, so they cannot touch a published graph or the
-// Derived Graph Layer. There is no LLM call in either action.
+// The Study surface's write paths. All mutate LEARNER STATE ONLY — calibration verdicts in
+// the mutable verdict store and graded rows in the append-only Response Log — and never open
+// a graph-version or enrichment write port, so they cannot touch a published graph or the
+// Derived Graph Layer (AGENTS rule 12). There is no LLM call in any of them. Each
+// `revalidatePath`s the session route so the server re-derives the prune closure, recomposes
+// mastery, and re-classifies, and the driver re-renders in place.
 
 function sessionPath(learnerStateRef: string): string {
   return `/admin/lab/study/${encodeURIComponent(learnerStateRef)}`;
@@ -55,39 +51,46 @@ export async function submitOptionSelect(input: {
   revalidatePath(sessionPath(learnerStateRef));
 }
 
-// Calibration sweep submit (R2, R3, R4). The learner's per-item ratings seed prior mastery;
-// an "I know it" (`good`) propagates DOWN the prerequisite DAG to its ancestors so they are
-// not separately asked (R3, AE1). Direct + propagated rows are appended in ONE batch through
-// the same source-agnostic path the synthetic simulator uses.
-export async function submitCalibration(input: {
-  learnerStateRef: string;
-  enrichmentId: string;
-  ratings: { derivedNodeId: string; studyItemId: string; rating: SelfReportRating }[];
-}): Promise<void> {
-  const { learnerStateRef, enrichmentId, ratings } = input;
-  if (!learnerStateRef || !enrichmentId || ratings.length === 0) return;
-
+// Calibration verdict write (R5/R7). Upserts the learner's `known`/`learn` intent for one
+// node into the MUTABLE verdict store. "I knew it" (`known`) prunes the node's trusted
+// prerequisite down-closure on the next re-derive; "I forgot" (`learn`) keeps it in the gap.
+export async function setVerdict(input: { learnerStateRef: string; derivedNodeId: string; verdict: Verdict }): Promise<void> {
+  const { learnerStateRef, derivedNodeId, verdict } = input;
+  if (!learnerStateRef || !derivedNodeId) return;
   const sql = createDatabaseClient();
   try {
-    const layer = await new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId);
-    if (!layer) return;
-    const studyItems = (await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId))
-      .filter((item) => item.itemType === "self_assessment")
-      .map((item) => ({ derivedNodeId: item.derivedNodeId, studyItemId: item.studyItemId }));
+    await new PostgresCalibrationVerdictStore(sql).upsert({ learnerStateRef, derivedNodeId, verdict });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+  revalidatePath(sessionPath(learnerStateRef));
+}
 
-    const directRatings: SelfReportInput[] = ratings.map((rating) => ({
-      derivedNodeId: rating.derivedNodeId,
-      studyItemId: rating.studyItemId,
-      rating: rating.rating
-    }));
-    const seeded = propagateSelfReport({ layer, directRatings, studyItems });
+// Clear a verdict (R7 reversal; also the U7 restoration restore). Deletes the single
+// (learner, node) row, returning the node to the study gap. Mutable store; no log mutation.
+export async function clearVerdict(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void> {
+  const { learnerStateRef, derivedNodeId } = input;
+  if (!learnerStateRef || !derivedNodeId) return;
+  const sql = createDatabaseClient();
+  try {
+    await new PostgresCalibrationVerdictStore(sql).delete({ learnerStateRef, derivedNodeId });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+  revalidatePath(sessionPath(learnerStateRef));
+}
 
-    await appendSelfReportBatch({
-      learnerStateRef,
-      responseLog: new PostgresResponseLogStore(sql),
-      ratings: [...directRatings, ...seeded],
-      responseSource: "human"
-    });
+// Per-learner reset (R16, AE5): an explicit operator nuke of ALL the learner's verdicts AND
+// graded rows. Verdicts go through the mutable store; the graded rows are deleted directly —
+// the append-only Response Log has no store-port delete, so the structural append-only
+// guarantee is never weakened; this direct DELETE is the explicit, operator-only exception.
+export async function resetLearner(input: { learnerStateRef: string }): Promise<void> {
+  const { learnerStateRef } = input;
+  if (!learnerStateRef) return;
+  const sql = createDatabaseClient();
+  try {
+    await new PostgresCalibrationVerdictStore(sql).clearLearner(learnerStateRef);
+    await sql`DELETE FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
   } finally {
     await sql.end({ timeout: 5 });
   }

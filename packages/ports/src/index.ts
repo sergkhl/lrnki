@@ -4,6 +4,7 @@ import type {
   ArtifactEnvelope,
   AssertionEntailmentJudgment,
   BlockEvidence,
+  CalibrationVerdict,
   StudyItem,
   SelfAssessmentItemDraft,
   OptionSelectItemDraft,
@@ -18,19 +19,24 @@ import type {
   DiscoveredCandidate,
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
+  ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
+  WholeSetOrdering,
+  PrerequisiteOrderingCorrection,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
   MentionedNonCoreCandidate,
   MissingPrerequisiteProposal,
+  MintingDurabilityJudgment,
+  NodeMergeAdjudication,
   PrerequisiteConceptContext,
-  PrerequisiteJudgment,
   PublishedConceptIdentity,
   RefinementDecisionRecord,
   RejectedStudyItem,
   RescueDurabilityJudgment,
+  RunCandidate,
   RunForBuild,
   SourceBlock,
   StructuredDocument
@@ -130,6 +136,50 @@ export interface RescueDurabilityJudgmentPort {
   }): Promise<RescueDurabilityJudgment>;
 }
 
+// Minting durability judge. A bounded, forced-tool LLM judgment over ONE proposed
+// assumed-prerequisite label before any generated grounding is created. Cross-family
+// from the DeepSeek proposer/generator; used only to DROP a clearly non-durable
+// proposal, never to create or reshape one. The application stage owns fail-open
+// behavior on transport or schema failure because generated proposals have no
+// candidate-owned verbatim source span to ground a veto against.
+export interface MintingDurabilityJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    proposal: { proposedLabel: string; rationale: string };
+    anchor: { canonicalLabel: string; definitionQuotes: string[] };
+  }): Promise<MintingDurabilityJudgment>;
+}
+
+// Derived-node embedding PROPOSE signal for semantic deduplication (plan U1, ADR-0012,
+// AGENTS rule 20). Returns one vector per derived-node text so the dedup stage can
+// compute within-domain cosine and surface candidate near-duplicate pairs. Embeddings
+// PROPOSE only: this port never decides similarity, never merges, and is never used to
+// derive a prerequisite. `embed` preserves input order (vectors[i] is texts[i]) and
+// fails closed (throws) on any shape mismatch so the stage treats the signal as
+// unavailable and skips dedup (R13).
+export interface NodeEmbeddingPort {
+  readonly model: string;
+  embed(texts: string[]): Promise<number[][]>;
+}
+
+// Merge-adjudication DECISION for semantic deduplication (plan U2, AGENTS rule 20). A
+// SEPARATE mechanism from the embedding proposer: it decides whether two proposed
+// near-duplicate nodes are two surface forms of the SAME domain concept (`merge`) or
+// genuinely distinct (`keep_distinct`). A measured cross-family LLM judge; raw cosine
+// never decides. Decision-only (no scores). The adapter validates tool arguments and
+// returns the typed decision; fail-closed semantics (transport/validation failure →
+// the application stage treats the pair as keep-distinct) live in the dedup stage (U3),
+// matching how applyRescueDurabilityJudge owns its fail-open grounding decision.
+export interface NodeMergeAdjudicationPort {
+  readonly model: string;
+  adjudicate(input: {
+    declaredDomain: string;
+    a: { label: string; aliases: string[]; evidence: string[] };
+    b: { label: string; aliases: string[]; evidence: string[] };
+  }): Promise<NodeMergeAdjudication>;
+}
+
 export interface ArtifactRepositoryPort {
   append<TPayload>(artifact: ArtifactEnvelope<TPayload>): Promise<void>;
 }
@@ -199,20 +249,24 @@ export interface SourceObjectStoragePort {
 // learner-neutral intrinsic; learner-calibrated IRT/BT remains data-blocked.
 // ---------------------------------------------------------------------------
 
-// Bounded LLM prerequisite judgment over ONE same-domain concept pair (ADR-0019
-// reset). Every same-domain CEP pair is judged exhaustively — there is no
-// embedding clustering or candidate-group gate. Each side carries its published
-// CEP (definitions, bounded mentions, labeled `defines` assertions). Forced named tool schema;
-// the application validates arguments and maps "uncertain" to a flagged,
-// path-excluded edge. The judge proposes; cycle removal + transitive reduction
-// dispose.
-export interface PrerequisiteJudgmentPort {
+// Whole-set prerequisite ordering over ALL evidenced nodes in one Declared Domain
+// (ADR-0019, amended — whole-set ordering, plan U1/U2, R1/R2). ONE forced-tool call
+// returns a directed prerequisite edge list over the listed nodes; it is globally
+// self-consistent by construction, so cycles are the rare residue rather than the
+// expected residue of intransitive per-pair judging. Each node is listed with its CEP
+// evidence; each edge cites its endpoints by EXACT canonical label, which the
+// application maps → derivedNodeIds fail-closed (KTD3, R9). The optional `correction`
+// carries the violating cycle on the AT-MOST-ONE re-prompt (R10) — a parameter of the
+// same call, never a second method. The judge proposes directed edges only; the boundary
+// verifies acyclicity and routes a stubborn cycle to `uncertain` (rules 16/19), and the
+// symbolic disposal (weak-cut → transitive reduction) runs over the certain edges.
+export interface PrerequisiteOrderingPort {
   readonly model: string;
-  judge(input: {
+  order(input: {
     declaredDomain: string;
-    a: PrerequisiteConceptContext;
-    b: PrerequisiteConceptContext;
-  }): Promise<PrerequisiteJudgment>;
+    nodes: PrerequisiteConceptContext[];
+    correction?: PrerequisiteOrderingCorrection;
+  }): Promise<WholeSetOrdering>;
 }
 
 export interface GroundingGenerationPort {
@@ -362,13 +416,29 @@ export interface StudyItemGenerationPort {
 
 // Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ
 // only — there is no update or delete — so the append-only guarantee (R5) is
-// structural, not a convention. `nextAttemptSeq` hands the caller the next monotonic
-// sequence for a learner so calibration/measurement stamp ordered rows.
+// structural, not a convention. A per-learner reset (R16) bypasses this port with a
+// direct operator delete, so the structural guarantee is never weakened here.
+// `nextAttemptSeq` hands the caller the next monotonic sequence for a learner so
+// graded measurement stamps ordered rows.
 export interface ResponseLogStorePort {
   append(rows: NewResponseLogRow[]): Promise<void>;
   listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
   listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]>;
   nextAttemptSeq(learnerStateRef: string): Promise<number>;
+}
+
+// Calibration Verdict persistence (R10, KTD1). The MUTABLE counterpart to the
+// append-only Response Log: `upsert` writes the current `known`/`learn` intent per
+// (learner, node), overwriting any prior verdict for that node (one row, never two);
+// `delete` reverses a single node's verdict (R7); `clearLearner` is the per-learner
+// reset's verdict half (R16). The trusted-edge down-closure of the `known` set is
+// derived at read time (calibrationClosure, U3), so this store holds only the direct
+// verdicts — no seeded or materialized closure rows.
+export interface CalibrationVerdictStorePort {
+  upsert(verdict: { learnerStateRef: string; derivedNodeId: string; verdict: CalibrationVerdict["verdict"] }): Promise<void>;
+  delete(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void>;
+  listForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]>;
+  clearLearner(learnerStateRef: string): Promise<void>;
 }
 
 // Learner answer simulator (R14, U7). Generates a learner's free-form written answer
@@ -397,4 +467,114 @@ export interface AnswerGradingJudgePort {
     answerKey: string;
     submittedAnswer: string;
   }): Promise<{ outcome: JudgedOutcome; score: number; rationale: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Inspection Read Model (ADR-0027). Admin Lab inspection reads — pure read, no
+// adaptation compute — are served by read-only read-model ports that return a
+// finished model; the storage adapter owns every query and verbatim row-stitch,
+// and no UI embeds SQL. These admin-presentation shapes live in the ports
+// contract by accepted exception (bounded to inspection): AGENTS rule 3 keeps
+// them out of domain-core, and the application→ports→domain-core direction keeps
+// them out of application. Learner-facing PROJECTION reads (read + adaptation
+// compute) are served by application use-cases instead and are not modeled here.
+// ---------------------------------------------------------------------------
+
+export interface RunSummary {
+  runId: string;
+  sourceTitle: string;
+  declaredDomain: string;
+  status: string;
+  degraded: boolean;
+  latencyMs: number | null;
+  startedAt: string;
+  candidateCount: number;
+  coreCount: number;
+  // CEP completeness replaces the retired verified/rejected claim counts (R9).
+  profileCount: number;
+  completeProfileCount: number;
+  definitionCount: number;
+  mentionCount: number;
+  assertionCount: number;
+}
+
+export interface ProfilePassage {
+  kind: "definition" | "mention";
+  sourceBlockId: string;
+  headingPath: string[];
+  evidenceQuote: string;
+  salienceRank: number;
+}
+
+export interface ProfileAssertion {
+  assertionType: string;
+  // `defines` carries a literal.
+  target: string;
+  evidenceQuotes: string[];
+}
+
+export interface RunProfile {
+  candidateKey: string;
+  conceptLabel: string;
+  tier: string;
+  complete: boolean;
+  definitions: ProfilePassage[];
+  mentions: ProfilePassage[];
+  assertions: ProfileAssertion[];
+}
+
+export interface RunInspection {
+  run: RunSummary;
+  pipelineConfigHash: string;
+  candidates: {
+    candidateKey: string;
+    discoveredLabel: string;
+    canonicalLabel: string;
+    aliases: string[];
+    mentionCount: number;
+    modelTier: string;
+    tier: string;
+    proposedCanonicalLabel: string;
+    standaloneLearningObjective: RunCandidate["admission"]["standaloneLearningObjective"];
+    establishedDomainMeaning: RunCandidate["admission"]["establishedDomainMeaning"];
+    definitionBearingTreatment: RunCandidate["admission"]["definitionBearingTreatment"];
+    organizingPower: RunCandidate["admission"]["organizingPower"];
+    coreSelected: boolean;
+    selectionReasonCode: string;
+    reasonCodes: string[];
+    boundaryReasonCodes: string[];
+    confidence: number;
+  }[];
+  qualityIssues: ExtractionQualityIssue[];
+  profiles: RunProfile[];
+}
+
+export interface SourceSummary {
+  sourceResourceId: string;
+  title: string;
+  declaredDomain: string;
+  contentType: string;
+  contentHash: string;
+  blockCount: number;
+  runCount: number;
+}
+
+export interface SourceInspection {
+  source: SourceSummary;
+  parserName: string;
+  parserVersion: string;
+  blocks: { blockId: string; blockType: string; headingPath: string[]; text: string }[];
+}
+
+// Run Inspector read surface: list summaries + one run's full inspection. Returns
+// `undefined` only for not-found; real DB errors propagate (ADR-0027 decision 5).
+export interface RunInspectionReadPort {
+  listRunSummaries(): Promise<RunSummary[]>;
+  getRunInspection(runId: string): Promise<RunInspection | undefined>;
+}
+
+// Source Explorer read surface: list source summaries + one source's blocks.
+export interface SourceInspectionReadPort {
+  listSourceSummaries(): Promise<SourceSummary[]>;
+  getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
 }

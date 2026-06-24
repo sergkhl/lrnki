@@ -1,6 +1,7 @@
 import type { OptionSelectItemDraft, SelfAssessmentItemDraft, StudyItemOptionDraft } from "@lrnki/domain-core";
 import type { StudyItemGenerationPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
 import { cardGenerationSchema, cardGenerationValidator, optionSelectSchema, optionSelectValidator } from "./toolSchemas";
 
@@ -58,7 +59,8 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       toolName: "submit_recall_card",
       toolDescription: "Submit one anki-style recall card grounded in the provided CEP passages.",
       parameters: cardGenerationSchema,
-      validator: cardGenerationValidator
+      validator: cardGenerationValidator,
+      tags: [STAGE_TAGS.studyItemGeneration]
     });
     return { itemType: "self_assessment", ...args };
   }
@@ -100,7 +102,8 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       toolName: "submit_option_select_item",
       toolDescription: "Submit one four-option study item: a grounded correct answer plus three sibling-flavored distractors.",
       parameters: optionSelectSchema,
-      validator: optionSelectValidator
+      validator: optionSelectValidator,
+      tags: [STAGE_TAGS.studyItemGeneration]
     });
 
     // The correct option's provenance reflects the grounding contract; distractors are

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import type {
+  GroundingGenerationPort,
+  MintingDurabilityJudgmentPort,
+  MissingPrerequisiteProposalPort,
+  RescueDurabilityJudgmentPort
+} from "@lrnki/ports";
 import { assembleEnrichmentNodes, type MintingAnchor } from "./enrichmentNodeMinting";
 
 function anchor(id: string, label: string, domain = "software engineering"): MintingAnchor {
@@ -31,6 +36,16 @@ const grounder: GroundingGenerationPort = {
     };
   }
 };
+
+function recordingGrounder(calls: string[]): GroundingGenerationPort {
+  return {
+    model: "mock-gen",
+    async generate(input) {
+      calls.push(input.nodeLabel);
+      return grounder.generate(input);
+    }
+  };
+}
 
 function mention(label: string, runId: string): MentionedNonCoreCandidate {
   return {
@@ -219,4 +234,117 @@ test("a proposal duplicating an anchor or rescued label is dropped", async () =>
     newNodeId
   });
   assert.equal(mintedNodes.length, 0, "duplicates of existing node labels are not minted");
+});
+
+test("minting durability drops not_durable proposals before grounding generation", async () => {
+  counter = 0;
+  const groundingCalls: string[] = [];
+  const judge: MintingDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async (input) =>
+      input.proposal.proposedLabel === "Incidental Label"
+        ? { verdict: "not_durable", rationale: "tangential" }
+        : { verdict: "durable", rationale: "foundation" }
+  };
+  const { mintedNodes, mintingDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing")],
+    rescueCandidates: [],
+    proposalPort: proposer({ a: [
+      { proposedLabel: "Incidental Label", rationale: "named in passing" },
+      { proposedLabel: "Lifetime", rationale: "needed first" }
+    ] }),
+    groundingPort: recordingGrounder(groundingCalls),
+    mintingDurabilityJudge: judge,
+    newNodeId
+  });
+  assert.deepEqual(mintedNodes.map((node) => node.canonicalLabel), ["Lifetime"]);
+  assert.deepEqual(groundingCalls, ["Lifetime"], "dropped proposal spent no grounding call");
+  assert.equal(mintingDispositions.find((item) => item.proposedLabel === "Incidental Label")?.disposition, "dropped");
+  assert.equal(mintingDispositions.find((item) => item.proposedLabel === "Lifetime")?.disposition, "accepted");
+  assert.equal(mintingDispositions[0].anchorConceptId, "a");
+});
+
+test("minting durability judge failure keeps and mints fail-open", async () => {
+  counter = 0;
+  const judge: MintingDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => {
+      throw new Error("transport");
+    }
+  };
+  const { mintedNodes, mintingDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing")],
+    rescueCandidates: [],
+    proposalPort: proposer({ a: [{ proposedLabel: "Lifetime", rationale: "needed first" }] }),
+    groundingPort: grounder,
+    mintingDurabilityJudge: judge,
+    newNodeId
+  });
+  assert.deepEqual(mintedNodes.map((node) => node.canonicalLabel), ["Lifetime"]);
+  assert.equal(mintingDispositions[0].disposition, "kept_judge_unavailable");
+});
+
+test("a minting-dropped label is released so a later same-domain anchor can re-propose and mint it", async () => {
+  counter = 0;
+  // The verdict is anchor-scoped: tangential to "Borrowing" but durable for "Move
+  // Semantics". Anchors are processed in conceptId order ("a" before "b").
+  const judge: MintingDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async (input) =>
+      input.anchor.canonicalLabel === "Borrowing"
+        ? { verdict: "not_durable", rationale: "tangential here" }
+        : { verdict: "durable", rationale: "durable for this anchor" }
+  };
+  const { mintedNodes, mintingDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing"), anchor("b", "Move Semantics")],
+    rescueCandidates: [],
+    proposalPort: proposer({
+      a: [{ proposedLabel: "RAII", rationale: "first anchor proposes it" }],
+      b: [{ proposedLabel: "RAII", rationale: "later anchor genuinely needs it" }]
+    }),
+    groundingPort: grounder,
+    mintingDurabilityJudge: judge,
+    newNodeId
+  });
+  // The drop for "a" releases the label, so "b" re-proposes it and mints it: reservation
+  // scope follows verdict scope, never suppressing a durable prerequisite for another anchor.
+  assert.deepEqual(mintedNodes.map((node) => node.canonicalLabel), ["RAII"]);
+  assert.equal(mintingDispositions.length, 2);
+  assert.equal(mintingDispositions.find((item) => item.anchorConceptId === "a")?.disposition, "dropped");
+  assert.equal(mintingDispositions.find((item) => item.anchorConceptId === "b")?.disposition, "accepted");
+});
+
+test("a minting-dropped label that no later anchor needs is never minted", async () => {
+  counter = 0;
+  // Both anchors find RAII tangential; releasing the label must not cause a spurious mint.
+  const judge: MintingDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => ({ verdict: "not_durable", rationale: "tangential everywhere" })
+  };
+  const { mintedNodes, mintingDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing"), anchor("b", "Move Semantics")],
+    rescueCandidates: [],
+    proposalPort: proposer({
+      a: [{ proposedLabel: "RAII", rationale: "first anchor proposes it" }],
+      b: [{ proposedLabel: "RAII", rationale: "later anchor proposes it too" }]
+    }),
+    groundingPort: grounder,
+    mintingDurabilityJudge: judge,
+    newNodeId
+  });
+  assert.deepEqual(mintedNodes.map((node) => node.canonicalLabel), []);
+  assert.deepEqual(mintingDispositions.map((item) => item.disposition), ["dropped", "dropped"]);
+});
+
+test("omitting minting durability judge preserves prior minting and emits no dispositions", async () => {
+  counter = 0;
+  const { mintedNodes, mintingDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing")],
+    rescueCandidates: [],
+    proposalPort: proposer({ a: [{ proposedLabel: "Lifetime", rationale: "needed first" }] }),
+    groundingPort: grounder,
+    newNodeId
+  });
+  assert.deepEqual(mintedNodes.map((node) => node.canonicalLabel), ["Lifetime"]);
+  assert.deepEqual(mintingDispositions, []);
 });

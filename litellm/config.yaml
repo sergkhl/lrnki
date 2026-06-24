@@ -131,12 +131,6 @@ model_list:
       input_cost_per_token: 0.00000002
 
   # # OpenRouter Models
-  - model_name: "openrouter/qwen/qwen3-embedding-4b"
-    litellm_params:
-      model: "openrouter/qwen/qwen3-embedding-4b"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000002
-
   - model_name: "openrouter/qwen/qwen3-embedding-8b"
     litellm_params:
       model: "openrouter/qwen/qwen3-embedding-8b"
@@ -185,6 +179,16 @@ model_list:
       model: "openrouter/xiaomi/mimo-v2.5"
       api_key: os.environ/OPENROUTER_API_KEY
 
+  - model_name: "openrouter/xiaomi/mimo-v2.5-pro"
+    litellm_params:
+      model: "openrouter/xiaomi/mimo-v2.5-pro"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
+
   # - model_name: "openrouter/mistralai/mistral-small-2603"
   #   litellm_params:
   #     model: "openrouter/mistralai/mistral-small-2603"
@@ -194,7 +198,7 @@ model_list:
   # Qwen3-235B-A22B-Instruct-2507 is a multilingual MoE model with 22B active
   # parameters, 262K context, strong instruction following / logical reasoning /
   # tool-use positioning, and no thinking-mode blocks. Consider as a non-OpenAI,
-  # non-DeepSeek primary judge candidate for kg-prerequisite-judgment.
+  # non-DeepSeek backing-model candidate for kg-prerequisite-ordering (U7 sweep).
   # OpenRouter list price: $0.09 input / $0.10 output per 1M tokens.
   - model_name: "openrouter/qwen/qwen3-235b-a22b-2507"
     litellm_params:
@@ -225,6 +229,13 @@ model_list:
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY # Required for API key management
   block_robots: true
+  # Spend attribution (plan U1/KTD4): the proxy persists per-request token/cost to
+  # `LiteLLM_SpendLogs` in a DEDICATED `litellm` Postgres DB, queryable per pipeline
+  # stage via `/spend/tags`. The connection is wired by docker-compose.yml
+  # (`DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/litellm`), and the DB itself
+  # is provisioned by scripts/docker/postgres/01-init-litellm-db.sh. That env var takes
+  # precedence, so the inline `database_url` below stays commented out (moot under
+  # compose). The app only LABELS requests with `metadata.tags`; it computes no cost.
   # database_url: "sqlite:///litellm.db"
   store_prompts_in_spend_logs: true
   disable_error_logs: True # turn off writing LLM Exceptions to DB
@@ -271,15 +282,14 @@ router_settings:
     kg-concept-discovery: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-concept-admission: openrouter/deepseek/deepseek-v4-flash-no-thinking
     kg-claim-extraction: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    # Graph Enrichment, third operation (ADR-0019 reset): every same-domain CEP
-    # pair is judged exhaustively (no embedding clustering tier); the bounded judge
-    # proposes the inferred DAG using the same no-thinking extractor.
-    kg-prerequisite-judgment: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    # Cross-family generated-node ordering judge (ADR-0023, U7). Any prerequisite
-    # pair touching an `llm_grounded` minted node is ordered HERE, on gpt-oss-120b,
-    # so the DeepSeek generator never grades its own minted output (KTD7). Anchor-only
-    # ordering stays on kg-prerequisite-judgment -> DeepSeek (no re-validation).
-    kg-generated-prerequisite-judgment: openrouter/openai/gpt-oss-120b
+    # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
+    # U2/U5): ONE non-DeepSeek ordering call per Declared Domain returns the directed
+    # prerequisite DAG over the deduplicated node set. The single alias is CROSS-FAMILY
+    # from the DeepSeek extractor + grounding generator (ADR-0023), so the generator
+    # never grades its own minted output and the per-pair anchor/generated routing split
+    # is gone. The backing model is selected by the U7 sweep behind this alias (R8);
+    # gpt-oss-120b is the validated forced-tool default.
+    kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
     # cross-family independent of the DeepSeek extractor, supports forced
@@ -287,3 +297,8 @@ router_settings:
     # extractor grading its own output. (The off-core oracle triangle and label
     # aligner were retired after the admission-precision fix; see ADR-0013/0022.)
     kg-independent-judge: openrouter/openai/gpt-oss-120b
+    # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
+    # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;
+    # a separate cross-family adjudicator (kg-independent-judge) DECIDES each merge.
+    # Never used to derive prerequisites.
+    kg-node-embedding: openrouter/qwen/qwen3-embedding-8b

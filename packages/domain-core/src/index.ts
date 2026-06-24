@@ -777,6 +777,69 @@ export type RescueDurabilityJudgment = {
   rationale: string;
 };
 
+// Minting durability judgment. One bounded cross-family verdict over ONE generated
+// assumed-prerequisite proposal before grounding is generated. Unlike rescue
+// durability there is no candidate-owned source span to ground against, so this is
+// decision-only; the application stage owns the drop-only, fail-open semantics.
+export type MintingDurabilityVerdict = "durable" | "not_durable";
+
+export type MintingDurabilityJudgment = {
+  verdict: MintingDurabilityVerdict;
+  rationale: string;
+};
+
+// Merge-adjudication decision for semantic dedup (plan U2, AGENTS rule 20). The
+// DECIDE half of the propose/decide split: given two same-domain near-duplicate
+// candidates the embedding proposer surfaced, a cross-family LLM judge decides whether
+// they are two surface forms of the SAME domain concept (`merge`) or genuinely distinct
+// (`keep_distinct`). Decision-only — no score; the proposing cosine score is recorded
+// separately on the merge record. Mirrors the advisory shape of RescueDurabilityJudgment;
+// the dedup stage owns the fail-closed default (transport/validation failure →
+// keep_distinct, no merge — R13).
+export type NodeMergeDecision = "merge" | "keep_distinct";
+
+export type NodeMergeAdjudication = {
+  decision: NodeMergeDecision;
+  rationale: string;
+};
+
+// The proposing signal behind a merge (plan U3/U4, AGENTS rule 20). Today only
+// embedding cosine proposes; kept as a named union so a future propose signal records
+// its own provenance rather than overloading one string.
+export type NodeMergeProposingSignal = "embedding_cosine";
+
+// Why the canonical side won canonical selection (plan KTD6, deterministic + recorded).
+// An anchor always beats an enrichment node (preserves published Concept identity / IRI
+// permanence, R7); a same-kind tie breaks by evidence count, then by stable derived-node
+// id. Stored on the merge record so replay and audit are deterministic.
+export type CanonicalSelectionReason =
+  | "anchor_over_enrichment"
+  | "higher_evidence_count"
+  | "stable_id_tiebreak";
+
+// One recorded derived-layer semantic merge (plan U3/U4, R5/R6). Provenance for a
+// collapsed near-duplicate pair: the surviving canonical node, a SNAPSHOT of the
+// absorbed node (its derived_graph_nodes row never persists, so the label/aliases/kind/
+// evidence are captured here for Admin Lab), the proposing signal + score, the deciding
+// rationale, and the canonical-selection reason. The absorbed node is always an
+// enrichment node — an anchor is never absorbed (KTD6). Lives on the Derived Graph Layer
+// only; published Concept identity and IRIs are untouched (R7).
+export type NodeMergeRecord = {
+  declaredDomain: string;
+  canonicalDerivedNodeId: string;
+  canonicalLabel: string;
+  canonicalNodeKind: "anchor" | "enrichment";
+  absorbedDerivedNodeId: string;
+  absorbedLabel: string;
+  absorbedAliases: string[];
+  absorbedNodeKind: "anchor" | "enrichment";
+  absorbedEvidence: string[];
+  proposingSignal: NodeMergeProposingSignal;
+  proposingScore: number;
+  rationale: string;
+  canonicalSelectionReason: CanonicalSelectionReason;
+};
+
 // The recorded disposition of one aggregated rescue candidate after durability
 // judging (U3/R4). `accepted` — a derived `source_mentioned` node exists; `dropped`
 // — vetoed on a CONFIDENT, source-grounded `not_durable` verdict; `kept_judge_unavailable`
@@ -793,6 +856,24 @@ export type RescueDisposition = {
   disposition: RescueDispositionKind;
   rationale: string;
   groundingSpan: string;
+};
+
+// The recorded disposition of one reserved minting proposal after durability judging.
+// `accepted` — the proposal was kept and minted as an `llm_grounded` node; `dropped`
+// — vetoed by a clear `not_durable` verdict; `kept_judge_unavailable` — transport or
+// schema failure, so the proposal is kept and flagged (fail-open). A minting verdict is
+// scoped to ONE anchor, so a `dropped` proposal's label is RELEASED, not kept reserved:
+// a later same-domain anchor that genuinely depends on the concept can re-propose it and
+// be judged independently (unlike rescue, whose verdict is judged against all same-domain
+// anchors and so legitimately reserves a dropped label domain-wide).
+export type MintingDisposition = {
+  derivedNodeId: string;
+  proposedLabel: string;
+  normalizedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+  disposition: RescueDispositionKind;
+  rationale: string;
 };
 
 // Each Concept's published CEP reduced to what the prerequisite judge needs (R11):
@@ -824,15 +905,33 @@ export type DifficultyNodeContext = {
   mentions: string[];
 };
 
-// One bounded LLM prerequisite judgment over an evidence-packed same-domain pair.
-// "uncertain" is flagged for review and excluded from the path, never silently
-// promoted to an edge (concept-first method stack §4; goal 1.6/4).
-export type PrerequisiteJudgment = {
-  prerequisiteDerivedNodeId: string;
-  dependentDerivedNodeId: string;
-  outcome: "directed" | "none" | "uncertain";
+// One directed edge of a whole-set prerequisite ordering (plan U1, KTD2/KTD3). The
+// judge cites each endpoint by its EXACT canonical label; the application maps labels →
+// derivedNodeIds fail-closed (KTD3, R9). A non-edge is simply absent — there is no
+// `none`/`uncertain` per-edge OUTCOME from the whole-set judge: it asserts directed
+// edges only, and uncertainty re-sources to cycle-routing in the boundary (KTD5).
+export type WholeSetPrerequisiteEdge = {
+  prerequisiteLabel: string;
+  dependentLabel: string;
   confidence: number;
   rationale: string;
+};
+
+// One whole-set prerequisite ordering over a Declared Domain's deduplicated node set
+// (R1, R2). `edges` is the directed acyclic edge list the judge proposes in one call
+// (and its at-most-one corrective re-prompt). Acyclicity and real-node citation are
+// verified in the application boundary, never asserted by the model (R9, rules 16/19).
+export type WholeSetOrdering = {
+  edges: WholeSetPrerequisiteEdge[];
+};
+
+// The one corrective re-prompt payload (R10, KTD2). When the first ordering response is
+// cyclic, the boundary issues exactly ONE re-prompt carrying the violating cycle as an
+// ordered list of canonical labels (`a → b → … → a`), so the judge can revise the
+// offending edges into an acyclic ordering. Carried as a parameter of the SAME ordering
+// call, never a second port method.
+export type PrerequisiteOrderingCorrection = {
+  cyclePath: string[];
 };
 
 // An edge of the inferred prerequisite DAG: prerequisite must precede dependent.
@@ -848,20 +947,47 @@ export type InferredPrerequisiteEdge = {
   provenance: { judgmentRationale: string };
 };
 
-export type PrerequisiteJudgmentTrace = {
+// One whole-set ordering call's trace for a single Declared Domain (plan U1, R15). One
+// call (plus its at-most-one re-prompt) orders the whole domain, so the trace is
+// per-domain, not per-pair: it records the ordering model, how many nodes were judged,
+// the asserted directed edges (endpoint ids resolved from labels), whether the corrective
+// re-prompt fired, and which edges were cycle-routed to `uncertain` (R11). There is no
+// per-pair `a`/`b` shape any more — the per-pair judge was deleted (rule 18).
+export type PrerequisiteOrderingTrace = {
   declaredDomain: string;
-  // Which judge model ordered this pair (U4): the cross-family generated-node alias
-  // for any pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
+  // The single non-DeepSeek ordering alias that ordered this domain (R5).
   judgeModel: string;
-  a: PrerequisiteConceptContext;
-  b: PrerequisiteConceptContext;
-  judgment: PrerequisiteJudgment;
+  nodeCount: number;
+  assertedEdges: {
+    prerequisiteDerivedNodeId: string;
+    dependentDerivedNodeId: string;
+    confidence: number;
+    rationale: string;
+  }[];
+  // Whether the one bounded corrective re-prompt was issued for this domain (R10).
+  reprompted: boolean;
+  // Edges routed wholesale to `uncertain` because a cycle survived the re-prompt (R11).
+  // Empty on the acyclic happy path; never silently dropped.
+  cycleRoutedEdges: { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string }[];
 };
 
+// A derived node excluded from prerequisite ordering because it had no definition or
+// mention evidence to ground a judgment (R4). Recorded ONCE per node — not once per
+// pair as the per-node judge did — so an operator audits each exclusion directly.
+export type NodeEvidenceExclusion = {
+  derivedNodeId: string;
+  declaredDomain: string;
+  reason: "insufficient_evidence";
+};
+
+// The disposal outcome of an asserted edge in the deterministic envelope (plan U1). A
+// surviving cycle is routed to `uncertain` (kept, flagged, path-excluded), never
+// removed — so there is no `cycle_removed` disposition any more (KTD4, rule 18). Per-node
+// insufficient-evidence is its own NodeEvidenceExclusion record, not an edge disposition.
 export type InferredEdgeDisposition = {
   prerequisiteDerivedNodeId: string;
   dependentDerivedNodeId: string;
-  disposition: "insufficient_evidence" | "uncertain" | "weak_cut" | "cycle_removed" | "transitive_reduction" | "kept";
+  disposition: "uncertain" | "weak_cut" | "transitive_reduction" | "kept";
 };
 
 export type EnrichmentRunTrace = {
@@ -869,7 +995,12 @@ export type EnrichmentRunTrace = {
   graphVersionId: string;
   enrichmentConfigHash: string;
   derivedNodes: DerivedGraphNode[];
-  judgments: PrerequisiteJudgmentTrace[];
+  // One ordering trace per Declared Domain (R1, R15): the whole-set call's asserted
+  // edges, re-prompt flag, and cycle-routed edges. Replaces the per-pair judgment list.
+  orderings: PrerequisiteOrderingTrace[];
+  // Per-node insufficient-evidence exclusions (R4), recorded once per node. Replaces the
+  // per-pair `insufficient_evidence` edge dispositions the per-node judge produced.
+  nodeExclusions: NodeEvidenceExclusion[];
   dispositions: InferredEdgeDisposition[];
   // Per-node verbatim-floor outcomes for enrichment nodes (R9, AE3). Recorded so the
   // `not_applicable_by_grounding` exemption for generated passages is never silent.
@@ -879,6 +1010,15 @@ export type EnrichmentRunTrace = {
   // judge-unavailable, so an operator can audit why each rescued node is (or is not)
   // in the derived layer. Persisted in U4.
   rescueDispositions: RescueDisposition[];
+  // Per-reserved-minting-proposal durability dispositions. Records which generated
+  // assumed-prerequisite proposals were accepted, dropped before grounding, or kept
+  // fail-open, so an operator can audit minting without recompute.
+  mintingDispositions: MintingDisposition[];
+  // Per-absorbed-node semantic merge records (plan U3/U4, R5). One per derived node the
+  // dedup sub-stage absorbed into a canonical near-duplicate, with full propose + decide
+  // + canonical-selection provenance. Empty when dedup did not run (opt-in). Persisted in
+  // U4 to `derived_node_merges` for Admin Lab.
+  nodeMerges: NodeMergeRecord[];
 };
 
 // Node difficulty keeps a stable output shape while the producer evolves. The
@@ -905,7 +1045,8 @@ export type DerivedGraphLayer = {
   enrichmentConfigHash: string;
   // The bounded prerequisite-judge model (provenance for the inferred DAG). The
   // embedding model and candidate groups were removed with the embedding tier
-  // (ADR-0019 reset): every same-domain CEP pair is judged exhaustively.
+  // (ADR-0019 reset): every same-domain relation is judged exhaustively, now via
+  // per-node batched calls (plan U5) rather than one call per pair.
   judgeModel: string;
   derivedNodes: DerivedGraphNode[];
   prerequisiteEdges: InferredPrerequisiteEdge[];
@@ -1053,15 +1194,35 @@ export type OptionSelectItemDraft = {
 export type StudyItemDraft = SelfAssessmentItemDraft | OptionSelectItemDraft;
 
 // ---------------------------------------------------------------------------
-// Response Log — the durable, append-only commitment (R4–R6). Every recall attempt
-// is an immutable row. `self_report` rows carry an anki-style rating; `graded` rows
-// carry a judged outcome plus a [0,1] score (the partial/binary distinction the
-// estimator and a later IRT/BKT fit need, AE4). The skill is the Derived Graph Layer
-// `derivedNodeId`; the item is `studyItemId` (per-item IRT key).
+// Calibration Verdict — the MUTABLE calibration store (R10, KTD1). One verdict per
+// (learner, node): `known` claims prior mastery (its trusted prerequisite down-closure
+// is treated as mastered, derived at read time); `learn` keeps the node in the study
+// gap. Unlike the append-only Response Log, a verdict is current intent — naturally
+// upsert/delete — so reversal (R7) is a single overwrite or delete, no stale rows and
+// no evidence weights (rule 18, KTD3).
 // ---------------------------------------------------------------------------
 
-export type SignalType = "self_report" | "graded";
-export type SelfReportRating = "again" | "hard" | "good" | "easy";
+export type Verdict = "known" | "learn";
+
+export type CalibrationVerdict = {
+  learnerStateRef: string;
+  derivedNodeId: string;
+  verdict: Verdict;
+  // Set by the store (DB default) on upsert; populated on read.
+  updatedAt?: string;
+};
+
+// ---------------------------------------------------------------------------
+// Response Log — the durable, append-only commitment (R4–R6). Every GRADED recall
+// attempt is an immutable row carrying a judged outcome plus a [0,1] score (the
+// partial/binary distinction the estimator and a later IRT/BKT fit need, AE4). With
+// the weighted self-report sweep retired (R18, KTD5), the log is graded-only: there
+// is no `self_report` signal type, no anki-style rating, and no evidence weight. The
+// skill is the Derived Graph Layer `derivedNodeId`; the item is `studyItemId`
+// (per-item IRT key). Calibration now lives in the mutable CalibrationVerdict store.
+// ---------------------------------------------------------------------------
+
+export type SignalType = "graded";
 export type JudgedOutcome = "correct" | "partial" | "incorrect";
 export type ResponseSource = "synthetic" | "human";
 
@@ -1071,13 +1232,12 @@ export type ResponseLogRow = {
   studyItemId: string;
   derivedNodeId: string;
   signalType: SignalType;
-  selfReportRating: SelfReportRating | null;
   judgedOutcome: JudgedOutcome | null;
   gradedScore: number | null;
-  evidenceWeight: number;
   responseSource: ResponseSource;
   graderIdentity: string | null;
-  // Groups one calibration sweep so re-calibration appends a distinct batch (R10).
+  // Reserved for grouping a batch of appends; unused now the sweep is gone (kept
+  // nullable for IRT/BKT replay grouping later).
   batchId: string | null;
   // Monotonic per learner_state_ref — the ordered sequence BKT/IRT consume (R6).
   attemptSeq: number;

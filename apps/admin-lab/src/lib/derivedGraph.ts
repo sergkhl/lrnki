@@ -5,7 +5,7 @@
 // `tsx --test` and feed both the Cytoscape render and its required equivalent
 // textual node-and-edge representation (U6 test scenario 8).
 
-import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
+import { prerequisiteAncestors, type AdaptedNodeClassification, type AdaptedNodeState } from "@lrnki/application";
 
 export type DerivedNodeKind = "anchor" | "enrichment";
 export type DerivedGroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
@@ -32,6 +32,9 @@ export interface NodeGroundingView {
 export interface DerivedGraphNode {
   derivedNodeId: string;
   label: string;
+  // Alternate surface labels for this concept; the goal-first picker searches them
+  // alongside the canonical label (R1).
+  aliases: string[];
   declaredDomain: string;
   difficulty: number | null;
   // The difficulty judge's generated rationale for this node's score (R6). `null` when
@@ -82,6 +85,36 @@ export interface RescueDispositionView {
   groundingSpan: string;
 }
 
+// One recorded minting-durability disposition. `accepted` proposals are minted as
+// llm_grounded nodes; `dropped` proposals never spend grounding generation and have no
+// node row; `kept_judge_unavailable` proposals are minted fail-open.
+export interface MintingDispositionView {
+  derivedNodeId: string;
+  proposedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
+  rationale: string;
+}
+
+// One recorded semantic merge (plan U5, R5). The embedding proposer surfaced two
+// same-domain near-duplicates and the cross-family adjudicator decided to collapse them;
+// the canonical node survived and the absorbed node (a snapshot — its derived_graph_nodes
+// row is gone) was folded in. Surfaced read-only so an operator audits every merge:
+// canonical ← absorbed, the proposing signal + score, the deciding rationale, and the
+// deterministic canonical-selection reason. Inspect, never recompute (rule 12).
+export interface NodeMergeView {
+  declaredDomain: string;
+  canonicalDerivedNodeId: string;
+  canonicalLabel: string;
+  absorbedLabel: string;
+  absorbedAliases: string[];
+  proposingSignal: string;
+  proposingScore: number;
+  rationale: string;
+  canonicalSelectionReason: string;
+}
+
 export interface EnrichmentSummary {
   enrichmentId: string;
   graphVersionId: string;
@@ -101,10 +134,12 @@ export interface DerivedGraphDetail {
   summary: EnrichmentSummary;
   nodes: DerivedGraphNode[];
   edges: DerivedGraphEdge[];
-  // Per-domain provenance summary and the rescue-durability dispositions (U5). Both
-  // are read from persisted artifacts; the UI never recomputes them (rule 12).
+  // Per-domain provenance summary, the rescue-durability dispositions, and the semantic
+  // merges (U5). All read from persisted artifacts; the UI never recomputes them (rule 12).
   originCounts: DomainOriginCounts[];
   rescueDispositions: RescueDispositionView[];
+  mintingDispositions: MintingDispositionView[];
+  merges: NodeMergeView[];
 }
 
 // Aggregate the derived node space into per-domain origin counts (U5/AE1). Pure and
@@ -144,8 +179,24 @@ export interface DerivedGraphView {
     edges: { id: string; source: string; target: string; uncertain: "yes" | "no"; confidence: number }[];
   };
   textual: {
-    nodes: (DerivedGraphViewNode & { label: string; domain: string; grounding: NodeGroundingView | null })[];
-    edges: { prerequisiteLabel: string; dependentLabel: string; confidence: number; uncertain: boolean; judgeModel: string }[];
+    // `derivedNodeId` / the per-edge endpoint ids are threaded so a textual row can drive a
+    // canvas recenter (and, for a node, the state-gated side sheet) without a parallel id map —
+    // these are the one source of truth for the row→graph link (AGENTS rule 18).
+    nodes: (DerivedGraphViewNode & { derivedNodeId: string; label: string; domain: string; grounding: NodeGroundingView | null })[];
+    edges: {
+      prerequisiteDerivedNodeId: string;
+      dependentDerivedNodeId: string;
+      prerequisiteLabel: string;
+      dependentLabel: string;
+      confidence: number;
+      uncertain: boolean;
+      judgeModel: string;
+    }[];
+    // The semantic merges (U5), surfaced in the equivalent textual readout so a
+    // non-visual reader (or a test) can see each canonical ← absorbed collapse with its
+    // proposing signal + score.
+    mintingDispositions: MintingDispositionView[];
+    merges: NodeMergeView[];
   };
 }
 
@@ -169,6 +220,62 @@ export function frontierNeighborhood(
 
 export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeId: string): string {
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
+}
+
+// --- Goal-first picker helpers (U4, R1/R2/R3) ------------------------------
+
+// One goal candidate for the goal-first study start. `journeySize` is how many concepts
+// must be learned before this goal — its TRUSTED (certain-edge) prerequisite-ancestor
+// count (R2). A zero-journey goal is foundational (R3).
+export interface GoalCandidate {
+  derivedNodeId: string;
+  label: string;
+  aliases: string[];
+  declaredDomain: string;
+  nodeKind: DerivedNodeKind;
+  hasStudyItem: boolean;
+  journeySize: number;
+}
+
+// Journey size = the count of trusted prerequisite ancestors (R2). Uncertain edges are
+// excluded, matching the readiness/down-closure trust model. Pure and unit-testable.
+export function journeySize(
+  targetDerivedNodeId: string,
+  edges: Pick<DerivedGraphEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId" | "uncertain">[]
+): number {
+  return prerequisiteAncestors(targetDerivedNodeId, edges.filter((edge) => !edge.uncertain)).size;
+}
+
+// Build goal candidates from a graph detail, each tagged with its journey size (R1/R2).
+export function goalCandidates(detail: Pick<DerivedGraphDetail, "nodes" | "edges">): GoalCandidate[] {
+  return detail.nodes.map((node) => ({
+    derivedNodeId: node.derivedNodeId,
+    label: node.label,
+    aliases: node.aliases,
+    declaredDomain: node.declaredDomain,
+    nodeKind: node.nodeKind,
+    hasStudyItem: node.hasStudyItem,
+    journeySize: journeySize(node.derivedNodeId, detail.edges)
+  }));
+}
+
+// Filter + order goal candidates for the picker (R1/R2): a case-insensitive substring
+// match on the label OR any alias; larger journeys first, ties broken by label. An empty
+// query matches everything. Pure, unit-testable; the page wiring is inspected in U8.
+export function filterAndOrderGoals(candidates: GoalCandidate[], query: string): GoalCandidate[] {
+  const q = query.trim().toLowerCase();
+  const matches = (candidate: GoalCandidate): boolean =>
+    q.length === 0 ||
+    candidate.label.toLowerCase().includes(q) ||
+    candidate.aliases.some((alias) => alias.toLowerCase().includes(q));
+  return candidates
+    .filter(matches)
+    .sort((a, b) => b.journeySize - a.journeySize || a.label.localeCompare(b.label));
+}
+
+// A zero-journey goal is foundational — studied directly, no prerequisite cone (R3).
+export function isFoundationalGoal(candidate: Pick<GoalCandidate, "journeySize">): boolean {
+  return candidate.journeySize === 0;
 }
 
 // The distinct declared domains present on the canvas, sorted deterministically. Each
@@ -235,6 +342,7 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
     },
     textual: {
       nodes: detail.nodes.map((node) => ({
+        derivedNodeId: node.derivedNodeId,
         label: node.label,
         domain: node.declaredDomain,
         difficulty: node.difficulty,
@@ -246,12 +354,16 @@ export function buildDerivedGraphView(detail: DerivedGraphDetail, adapted?: Adap
         ...overlayFor(node.derivedNodeId)
       })),
       edges: detail.edges.map((edge) => ({
+        prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId,
+        dependentDerivedNodeId: edge.dependentDerivedNodeId,
         prerequisiteLabel: labelFor(detail, edge.prerequisiteDerivedNodeId),
         dependentLabel: labelFor(detail, edge.dependentDerivedNodeId),
         confidence: edge.confidence,
         uncertain: edge.uncertain,
         judgeModel: edge.judgeModel
-      }))
+      })),
+      mintingDispositions: detail.mintingDispositions,
+      merges: detail.merges
     }
   };
 }

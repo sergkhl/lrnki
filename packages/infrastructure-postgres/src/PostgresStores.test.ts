@@ -301,16 +301,19 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       graphVersionId,
       enrichmentConfigHash: "test-enrichment",
       derivedNodes: layer.derivedNodes,
-      judgments: [],
+      orderings: [],
+      nodeExclusions: [],
       dispositions: [],
       groundingDispositions: [],
-      rescueDispositions: []
+      rescueDispositions: [],
+      mintingDispositions: [],
+      nodeMerges: []
     };
     const store = new PostgresEnrichmentRunStore(sql);
     await store.persist({
       layer,
       artifact: {
-        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId,
+        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId,
         producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace
       }
     });
@@ -376,23 +379,37 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         { derivedNodeId: anchorId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 }, neuralRationale: "anchor concept" }
       ]
     };
-    // U4: per-pair judge model — the minted (llm_grounded) pair routes cross-family,
-    // the rescued (source_mentioned) pair stays on the DeepSeek alias.
-    const ctx = (id: string, label: string) => ({ derivedNodeId: id, canonicalLabel: label, aliases: [], definitions: [], mentions: [], assertions: [] });
+    // U4: whole-set ordering trace — ONE per-domain ordering records the asserted edges;
+    // there is no per-pair judge-model split any more (every edge uses layer.judgeModel).
     const droppedId = randomUUID();
+    const droppedMintingId = randomUUID();
+    const absorbedMergeId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
-      judgments: [
-        { declaredDomain: "software engineering", judgeModel: "kg-generated-prerequisite-judgment", a: ctx(mintedId, "Stack allocation"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.8, rationale: "r" } },
-        { declaredDomain: "software engineering", judgeModel: "mock-judge", a: ctx(rescuedId, "Borrowing"), b: ctx(anchorId, anchorLabel), judgment: { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, outcome: "directed", confidence: 0.7, rationale: "r" } }
-      ], dispositions: [], groundingDispositions: [
+      orderings: [
+        { declaredDomain: "software engineering", judgeModel: "mock-judge", nodeCount: 3, reprompted: false, cycleRoutedEdges: [], assertedEdges: [
+          { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, confidence: 0.8, rationale: "r" },
+          { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, confidence: 0.7, rationale: "r" }
+        ] }
+      ], nodeExclusions: [], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
       { derivedNodeId: rescuedId, groundingOrigin: "source_mentioned", outcome: "verified", rationale: "mention verified verbatim" }
     ], rescueDispositions: [
       { derivedNodeId: rescuedId, canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
       { derivedNodeId: droppedId, canonicalLabel: "Table 3 Ablation", normalizedLabel: "table 3 ablation", declaredDomain: "software engineering", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
+    ],
+    mintingDispositions: [
+      { derivedNodeId: mintedId, proposedLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "accepted", rationale: "durable prerequisite" },
+      { derivedNodeId: droppedMintingId, proposedLabel: "Incidental Label", normalizedLabel: "incidental label", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "dropped", rationale: "tangential to the anchor" }
+    ],
+    // U4: one merge — the anchor (surviving canonical, FK-resolved) absorbed a removed
+    // near-duplicate enrichment node (absorbed id correlation-only, no FK violation).
+    nodeMerges: [
+      { declaredDomain: "software engineering", canonicalDerivedNodeId: anchorId, canonicalLabel: anchorLabel, canonicalNodeKind: "anchor",
+        absorbedDerivedNodeId: absorbedMergeId, absorbedLabel: "Ownership (Rust)", absorbedAliases: ["owning"], absorbedNodeKind: "enrichment",
+        absorbedEvidence: ["the owner frees memory"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
     ] };
     const store = new PostgresEnrichmentRunStore(sql);
-    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
+    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
 
     const hydrated = await store.getLayer(enrichmentId);
     assert.ok(hydrated);
@@ -406,11 +423,11 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     assert.equal(hydrated.prerequisiteEdges.length, 2);
     assert.equal(hydrated.difficulties.length, 3);
 
-    // U4: per-pair judge model persisted on the edges and matches the routing.
+    // U4: whole-set ordering — every edge carries the single layer-level ordering model
+    // (the per-pair judge-model split was deleted, rule 18).
     const edgeModels = await sql<{ prerequisite_derived_node_id: string; judge_model: string }[]>`
       SELECT prerequisite_derived_node_id, judge_model FROM inferred_prerequisite_edges WHERE enrichment_id = ${enrichmentId}`;
-    assert.equal(edgeModels.find((e) => e.prerequisite_derived_node_id === mintedId)?.judge_model, "kg-generated-prerequisite-judgment");
-    assert.equal(edgeModels.find((e) => e.prerequisite_derived_node_id === rescuedId)?.judge_model, "mock-judge");
+    assert.ok(edgeModels.length === 2 && edgeModels.every((e) => e.judge_model === "mock-judge"));
 
     // U4: rescue dispositions persisted and read back, including the dropped candidate
     // that has no derived_graph_nodes row.
@@ -421,6 +438,41 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const dropped = dispositions.find((d) => d.derived_node_id === droppedId);
     assert.equal(dropped?.disposition, "dropped");
     assert.equal(dropped?.rationale, "incidental artifact");
+
+    // Minting dispositions persisted and read back, including the dropped proposal that
+    // has no derived_graph_nodes row because grounding was never generated.
+    const mintingDispositions = await sql<{ derived_node_id: string; proposed_label: string; anchor_concept_id: string; disposition: string; rationale: string }[]>`
+      SELECT derived_node_id, proposed_label, anchor_concept_id, disposition, rationale
+      FROM minting_dispositions WHERE enrichment_id = ${enrichmentId} ORDER BY proposed_label`;
+    assert.equal(mintingDispositions.length, 2);
+    assert.equal(mintingDispositions.find((d) => d.derived_node_id === mintedId)?.disposition, "accepted");
+    const droppedMinting = mintingDispositions.find((d) => d.derived_node_id === droppedMintingId);
+    assert.equal(droppedMinting?.disposition, "dropped");
+    assert.equal(droppedMinting?.proposed_label, "Incidental Label");
+    assert.equal(droppedMinting?.anchor_concept_id, anchorId);
+    assert.equal(droppedMinting?.rationale, "tangential to the anchor");
+
+    // U4: the merge record persisted — canonical FK resolves to a surviving node, the
+    // absorbed (removed) id persists without an FK violation, and the snapshot columns
+    // (label/aliases/evidence/signal/score/reason) round-trip.
+    const merges = await sql<{
+      canonical_derived_node_id: string; absorbed_derived_node_id: string; absorbed_label: string;
+      absorbed_aliases: string[]; absorbed_evidence: string[]; proposing_signal: string; proposing_score: number;
+      canonical_selection_reason: string; canonical_node_kind: string; absorbed_node_kind: string;
+    }[]>`SELECT canonical_derived_node_id, absorbed_derived_node_id, absorbed_label, absorbed_aliases, absorbed_evidence,
+            proposing_signal, proposing_score, canonical_selection_reason, canonical_node_kind, absorbed_node_kind
+         FROM derived_node_merges WHERE enrichment_id = ${enrichmentId}`;
+    assert.equal(merges.length, 1);
+    assert.equal(merges[0].canonical_derived_node_id, anchorId);
+    assert.equal(merges[0].absorbed_derived_node_id, absorbedMergeId);
+    assert.equal(merges[0].absorbed_label, "Ownership (Rust)");
+    assert.deepEqual(merges[0].absorbed_aliases, ["owning"]);
+    assert.deepEqual(merges[0].absorbed_evidence, ["the owner frees memory"]);
+    assert.equal(merges[0].proposing_signal, "embedding_cosine");
+    assert.ok(Math.abs(Number(merges[0].proposing_score) - 0.97) < 1e-5);
+    assert.equal(merges[0].canonical_selection_reason, "anchor_over_enrichment");
+    assert.equal(merges[0].canonical_node_kind, "anchor");
+    assert.equal(merges[0].absorbed_node_kind, "enrichment");
   } finally {
     await sql.end();
   }

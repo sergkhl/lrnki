@@ -11,11 +11,11 @@
 - [0009-apply-conservative-refinement](./0009-apply-conservative-refinement.md)
 - [0010-publish-static-graph-versions-atomically](./0010-publish-static-graph-versions-atomically.md)
 - [0011-retain-minimal-admin-lab](./0011-retain-minimal-admin-lab.md)
-- [0012-remove-embeddings-deterministic-identity-only](./0012-remove-embeddings-deterministic-identity-only.md)
+- [0012-embeddings-permitted-except-prerequisite-derivation](./0012-embeddings-permitted-except-prerequisite-derivation.md) — 2026-06-23 withdraws the blanket no-embeddings ban; embeddings permitted for identity/dedup/similarity/recall (propose-only, separate adjudication), never for prerequisite derivation
 - [0013-verify-quality-by-real-source-inspection](./0013-verify-quality-by-real-source-inspection.md)
 - [0014-defer-learner-modeling](./0014-defer-learner-modeling.md)
 - [0015-deterministic-cross-source-identity](./0015-deterministic-cross-source-identity.md)
-- [0016-retire-relation-registry-keep-two-cep-assertions](./0016-retire-relation-registry-keep-two-cep-assertions.md)
+- [0016-retire-relation-registry-keep-one-cep-assertion](./0016-retire-relation-registry-keep-one-cep-assertion.md)
 - [0017-split-extraction-runs-from-graph-version-builds](./0017-split-extraction-runs-from-graph-version-builds.md)
 - [0018-deterministic-extraction-sampling](./0018-deterministic-extraction-sampling.md)
 - [0019-graph-enrichment-derived-layer](./0019-graph-enrichment-derived-layer.md)
@@ -24,5 +24,7 @@
 - [0024-learner-neutral-intrinsic-difficulty](./0024-learner-neutral-intrinsic-difficulty.md) — intrinsic difficulty now; learner-calibrated difficulty remains data-blocked
 - [0025-card-bank-over-derived-graph-layer](./0025-card-bank-over-derived-graph-layer.md) — Card Bank and Response Log keyed to derived nodes, with source/generated grounding provenance; superseded by 0026 for item identity
 - [0026-typed-study-item-bank](./0026-typed-study-item-bank.md) — Card → typed StudyItem discriminated union (`itemType`); auto-graded option-select studying, self-assessment retreats to calibration; supported types are `SELECT DISTINCT item_type`, never a stored map; sibling-conditioned generated distractors + deterministic structural guard
+- [0027-serve-inspection-through-read-model-ports](./0027-serve-inspection-through-read-model-ports.md) — Admin Lab inspection reads go through finished read-model ports (adapter owns the SQL); learner projection reads go through `application` use-cases; inspection types live in `ports` (bounded), real DB errors propagate. First slice: Run + Source inspection
+- [0028-measure-non-deterministic-quality-with-non-deterministic-methods](./0028-measure-non-deterministic-quality-with-non-deterministic-methods.md) — measure judgment-based quality (concept/edge correctness, prereq direction, dedup, difficulty) with LLM evaluation + self-consistency/calibration, not deterministic proxies; do not chase MoE output determinism (measure uncertainty instead); deterministic checks stay only for the deterministic envelope
 
 > Numbers 0020–0021 were never issued: the 2026-06-15 complexity reset folded those decisions into in-place rewrites of existing ADRs (0002/0005/0007/0009/0012/0013/0016/0019/0022) rather than new records.

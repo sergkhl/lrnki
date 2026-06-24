@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { JudgedOutcome, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort, ResponseLogStorePort } from "@lrnki/ports";
-import { gradeAndAppend, GRADED_EVIDENCE_WEIGHT } from "./measurement";
-import { appendSelfReportBatch, SELF_REPORT_EVIDENCE_WEIGHT } from "./calibration";
+import { gradeAndAppend } from "./measurement";
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
   const rows: NewResponseLogRow[] = [];
@@ -50,18 +49,6 @@ test("canned 'correct' and 'incorrect' verdicts map to graded_score 1.0 and 0", 
   assert.equal(correct.row.gradedScore, 1.0);
   assert.equal(incorrect.row.gradedScore, 0);
   assert.deepEqual(log.rows.map((r) => r.attemptSeq), [1, 2], "graded rows take monotonic attempt_seq");
-});
-
-test("the graded row's evidence weight exceeds a self-report row's weight", async () => {
-  assert.ok(GRADED_EVIDENCE_WEIGHT > SELF_REPORT_EVIDENCE_WEIGHT);
-  const log = fakeResponseLog();
-  await appendSelfReportBatch({ learnerStateRef: "L1", responseLog: log.store, ratings: [{ derivedNodeId: "node-1", studyItemId: "studyItem-1", rating: "good" }], responseSource: "human" });
-  const { row } = await gradeAndAppend({
-    learnerStateRef: "L1", studyItem, declaredDomain: "d", submittedAnswer: "answer",
-    judge: judgeReturning({ outcome: "correct", score: 1, rationale: "ok" }), responseLog: log.store, responseSource: "human"
-  });
-  const selfReport = log.rows.find((r) => r.signalType === "self_report")!;
-  assert.ok(row.evidenceWeight > selfReport.evidenceWeight);
 });
 
 test("a judge transport/validation failure propagates and appends nothing (fail-closed)", async () => {

@@ -11,9 +11,6 @@ import type { ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-
 
 type Edge = InferredPrerequisiteEdge;
 
-const edgeKey = (e: Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">): string =>
-  `${e.prerequisiteDerivedNodeId}->${e.dependentDerivedNodeId}`;
-
 function sortEdges(edges: Edge[]): Edge[] {
   return [...edges].sort(
     (a, b) =>
@@ -37,8 +34,15 @@ export function cutWeakEdges(edges: Edge[], minConfidence: number): { kept: Edge
   return { kept, cut };
 }
 
-// Find one cycle's edges (deterministic DFS), or null if the graph is acyclic.
-function findCycleEdges(edges: Edge[]): Edge[] | null {
+// Acyclicity verifier (plan U3, KTD4, R9/R12). Returns one cycle's edges as an ordered
+// path (deterministic DFS back-edge detection over sorted input), or null if the graph
+// is acyclic. This is the PROVABLE structural guarantee in the deterministic envelope:
+// the application calls it to decide whether to issue the one corrective re-prompt and to
+// frame the violating cycle, and to route a still-cyclic edge set to `uncertain` (R11).
+// No edge is ever dropped here — disposal of a stubborn cycle is the application's routing
+// decision (rules 16/19). The sorted-input DFS makes the SAME edge set always yield the
+// SAME violating cycle, so a replayed enrichment re-derives an identical re-prompt.
+export function findCycleEdges(edges: Edge[]): Edge[] | null {
   const adj = new Map<string, Edge[]>();
   const nodes = new Set<string>();
   for (const e of sortEdges(edges)) {
@@ -85,29 +89,7 @@ function findCycleEdges(edges: Edge[]): Edge[] | null {
   return cycle;
 }
 
-// Break every cycle by removing the lowest-confidence edge on each cycle found.
-// Deterministic: sorted inputs + lowest-confidence (earliest on ties) selection.
-// Self-loops (should never occur — the boundary excludes them) are removed first.
-export function removeCycles(edges: Edge[]): { edges: Edge[]; removed: Edge[] } {
-  const removed: Edge[] = [];
-  let working = sortEdges(edges).filter((e) => {
-    if (e.prerequisiteDerivedNodeId === e.dependentDerivedNodeId) {
-      removed.push(e);
-      return false;
-    }
-    return true;
-  });
-  for (;;) {
-    const cycle = findCycleEdges(working);
-    if (!cycle) break;
-    const weakest = cycle.reduce((min, e) => (e.confidence < min.confidence ? e : min), cycle[0]);
-    removed.push(weakest);
-    working = working.filter((e) => edgeKey(e) !== edgeKey(weakest));
-  }
-  return { edges: working, removed };
-}
-
-// Transitive reduction of a DAG (run AFTER removeCycles): drop edge (u,v) when a
+// Transitive reduction of a DAG (run AFTER the acyclicity envelope): drop edge (u,v) when a
 // path u -> ... -> v of length >= 2 already exists. The reduction of a DAG is
 // unique, so testing each edge against the full reachable set is correct.
 export function transitiveReduction(edges: Edge[]): { edges: Edge[]; removed: Edge[] } {
@@ -165,8 +147,16 @@ export function topologicalDepth(derivedNodeIds: string[], edges: Edge[]): Map<s
   return depth;
 }
 
-// Transitive prerequisite ancestors of a target — everything that must precede it.
-export function prerequisiteAncestors(targetDerivedNodeId: string, edges: Edge[]): Set<string> {
+// The minimal directed-edge shape the ancestor walk reads — just the two endpoint ids.
+// Both `InferredPrerequisiteEdge` (domain-core) and the loader-facing `DerivedGraphEdge`
+// (admin-lab) satisfy it structurally, so the calibration closure (U3) and the study
+// loader share ONE ancestor definition without a cast (AGENTS rule 18).
+export type PrerequisiteEdgeRef = Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">;
+
+// Transitive prerequisite ancestors of a target — everything that must precede it. The
+// caller pre-filters to the edge set it trusts (e.g. `!uncertain`); this walk does not
+// re-filter. The seen-set terminates on any residual cycle.
+export function prerequisiteAncestors(targetDerivedNodeId: string, edges: ReadonlyArray<PrerequisiteEdgeRef>): Set<string> {
   const prerequisitesOf = new Map<string, string[]>();
   for (const e of edges) addToList(prerequisitesOf, e.dependentDerivedNodeId, e.prerequisiteDerivedNodeId);
   const ancestors = new Set<string>();

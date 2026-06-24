@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import type { NewResponseLogRow, OptionSelectItem, RejectedStudyItem, SelfAssessmentItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
-import { PostgresStudyItemBankStore, PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
+import { PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
 
 // Integration tests against a live PostgreSQL with the single initial migration
@@ -238,8 +238,8 @@ async function seedItem(sql: Sql): Promise<{ studyItemId: string; derivedNodeId:
 function gradedRow(input: { learnerStateRef: string; studyItemId: string; derivedNodeId: string; outcome: "correct" | "partial" | "incorrect"; score: number; attemptSeq: number }): NewResponseLogRow {
   return {
     responseId: randomUUID(), learnerStateRef: input.learnerStateRef, studyItemId: input.studyItemId, derivedNodeId: input.derivedNodeId,
-    signalType: "graded", selfReportRating: null, judgedOutcome: input.outcome, gradedScore: input.score,
-    evidenceWeight: 1.0, responseSource: "human", graderIdentity: "auto", batchId: null,
+    signalType: "graded", judgedOutcome: input.outcome, gradedScore: input.score,
+    responseSource: "human", graderIdentity: "auto", batchId: null,
     attemptSeq: input.attemptSeq, submittedAnswer: null
   };
 }
@@ -278,6 +278,88 @@ maybe("graded rows preserve attempt_seq order and grader_identity 'auto'", async
     assert.deepEqual(rows.map((r) => r.attemptSeq), [1, 2]);
     assert.deepEqual(rows.map((r) => r.gradedScore), [1, 0]);
     assert.ok(rows.every((r) => r.graderIdentity === "auto"));
+  } finally {
+    await sql.end();
+  }
+});
+
+// --- Calibration Verdicts (U1, R10/R16) -------------------------------------
+
+maybe("upsert writes a verdict that reads back; a second upsert OVERWRITES it (one row, not two)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { derivedNodeId } = await seedItem(sql);
+    const store = new PostgresCalibrationVerdictStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    await store.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
+    let verdicts = await store.listForLearner(learner);
+    assert.equal(verdicts.length, 1);
+    assert.equal(verdicts[0].verdict, "known");
+
+    // Same node, different verdict — overwrites, never duplicates.
+    await store.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "learn" });
+    verdicts = await store.listForLearner(learner);
+    assert.equal(verdicts.length, 1, "the (learner, node) PK overwrites rather than appending");
+    assert.equal(verdicts[0].verdict, "learn");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("delete removes one node's verdict (R7 reversal); clearLearner removes only that learner's verdicts (R16)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { derivedNodeId } = await seedItem(sql);
+    const store = new PostgresCalibrationVerdictStore(sql);
+    const learnerA = `learner-${randomUUID()}`;
+    const learnerB = `learner-${randomUUID()}`;
+    await store.upsert({ learnerStateRef: learnerA, derivedNodeId, verdict: "known" });
+    await store.upsert({ learnerStateRef: learnerB, derivedNodeId, verdict: "known" });
+
+    await store.delete({ learnerStateRef: learnerA, derivedNodeId });
+    assert.equal((await store.listForLearner(learnerA)).length, 0, "delete reverses the single verdict");
+    assert.equal((await store.listForLearner(learnerB)).length, 1, "another learner is untouched");
+
+    await store.clearLearner(learnerB);
+    assert.equal((await store.listForLearner(learnerB)).length, 0, "clearLearner nukes only that learner");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("the verdict CHECK rejects a value outside known/learn", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { derivedNodeId } = await seedItem(sql);
+    const learner = `learner-${randomUUID()}`;
+    await assert.rejects(
+      () => sql`
+        INSERT INTO calibration_verdicts (learner_state_ref, derived_node_id, verdict)
+        VALUES (${learner}, ${derivedNodeId}, 'maybe')`,
+      /violates check constraint/i
+    );
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with zero verdicts and zero rows (Covers AE5)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { studyItemId, derivedNodeId } = await seedItem(sql);
+    const verdicts = new PostgresCalibrationVerdictStore(sql);
+    const log = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    await verdicts.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
+    await log.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 })]);
+
+    // The per-learner reset: clear verdicts via the store, nuke graded rows via a direct
+    // operator delete (the log has no store-port delete — the append-only guarantee stands).
+    await verdicts.clearLearner(learner);
+    await sql`DELETE FROM response_log WHERE learner_state_ref = ${learner}`;
+
+    assert.equal((await verdicts.listForLearner(learner)).length, 0);
+    assert.equal((await log.listForLearner(learner)).length, 0);
   } finally {
     await sql.end();
   }

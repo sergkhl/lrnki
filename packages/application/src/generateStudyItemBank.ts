@@ -12,8 +12,15 @@ import {
   type StudyItemGroundingProvenance
 } from "@lrnki/domain-core";
 import type { EnrichmentRunStorePort, GraphVersionStorePort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
+import { mapWithConcurrency } from "./mapWithConcurrency";
 import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSelectGuard";
 import { selectSiblingContext } from "./selectSiblingContext";
+
+// Bounded concurrency for per-node study-item generation (plan U6/R11). Defaults to 1 so
+// behavior is byte-identical to the prior sequential loop; raising it later parallelizes
+// the seam without an architectural change. The per-node units are independent and the
+// shared helper preserves input order, so the persisted item order is unchanged.
+export const DEFAULT_STUDY_ITEM_CONCURRENCY = 1;
 
 export type { RejectedStudyItem };
 
@@ -43,6 +50,9 @@ export async function generateStudyItemBank(input: {
   studyItemBankStore: StudyItemBankStorePort;
   newStudyItemId?: () => string;
   newOptionId?: () => string;
+  // Parallel-ready seam (R11): bounded degree over the independent per-node units.
+  // Defaults to 1 (sequential, unchanged behavior).
+  concurrency?: number;
 }): Promise<StudyItemBankGenerationResult> {
   const newStudyItemId = input.newStudyItemId ?? randomUUID;
   const newOptionId = input.newOptionId ?? randomUUID;
@@ -55,11 +65,14 @@ export async function generateStudyItemBank(input: {
   const studyItems: StudyItem[] = [];
   const rejected: RejectedStudyItem[] = [];
 
-  for (const node of layer.derivedNodes) {
+  // Each derived node is an independent generation unit (R11). Driving them through the
+  // shared bounded mapper at degree 1 is identical to the prior sequential loop; the seam
+  // admits future parallelism (raise `concurrency`) without an architectural change.
+  const perNode = await mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
+    const items: StudyItem[] = [];
     const grounding = selectNodeGrounding(node, snapshot, profileByConcept);
     if (!grounding || grounding.passages.length === 0) {
-      rejected.push({ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" });
-      continue;
+      return { items, rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" }] };
     }
 
     let nodeHasItem = false;
@@ -90,7 +103,7 @@ export async function generateStudyItemBank(input: {
           selfReportPrompt: draft.selfReportPrompt,
           citations: verified
         };
-        studyItems.push(item);
+        items.push(item);
         nodeHasItem = true;
       } else {
         selfAssessmentFailure = "unverifiable answer-key citation";
@@ -123,7 +136,7 @@ export async function generateStudyItemBank(input: {
       const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
       if (guarded.ok) {
         const item: OptionSelectItem = guarded.item;
-        studyItems.push(item);
+        items.push(item);
         nodeHasItem = true;
       }
     } catch {
@@ -131,12 +144,23 @@ export async function generateStudyItemBank(input: {
     }
 
     if (!nodeHasItem) {
-      rejected.push({
-        derivedNodeId: node.derivedNodeId,
-        canonicalLabel: node.canonicalLabel,
-        reason: selfAssessmentFailure ?? "no study item could be grounded"
-      });
+      return {
+        items,
+        rejected: [{
+          derivedNodeId: node.derivedNodeId,
+          canonicalLabel: node.canonicalLabel,
+          reason: selfAssessmentFailure ?? "no study item could be grounded"
+        }]
+      };
     }
+    return { items, rejected: [] };
+  });
+
+  // Flatten per-node results in input order so the persisted item/rejected order is
+  // deterministic and unchanged from the prior sequential path.
+  for (const result of perNode) {
+    studyItems.push(...result.items);
+    rejected.push(...result.rejected);
   }
 
   await input.studyItemBankStore.persist({

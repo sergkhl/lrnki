@@ -1,0 +1,89 @@
+import { LiteLlmHttpError } from "./LiteLlmForcedToolClient";
+
+// Embedding transport (plan U1, ADR-0012). The first embedding client since the CEP
+// reset removed the old clustering tier. A SIBLING of LiteLlmForcedToolClient, not an
+// extension of it: `/v1/embeddings` has a different request/response shape than
+// `/v1/chat/completions` and no forced-tool envelope. It mirrors the forced-tool
+// client's constructor options, retry/back-off, and `metadata.tags` forwarding so the
+// transport contract stays uniform. The client stays a neutral forwarder — it never
+// reads, sums, or persists spend; the application only LABELS requests with a stage tag.
+//
+// Fail-closed by construction (R13): a response whose vector count, dimensionality, or
+// numeric content does not match the request throws, so the calling propose stage can
+// treat the embedding signal as UNAVAILABLE and skip dedup rather than proposing pairs
+// from a malformed signal. Embeddings only PROPOSE candidate pairs; a separate
+// adjudicator decides each merge (AGENTS rule 20).
+type EmbeddingResponse = {
+  data?: Array<{ embedding?: unknown; index?: unknown }>;
+};
+
+export class LiteLlmEmbeddingClient {
+  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number }) {}
+
+  async embed(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
+    // No texts → no HTTP call; an empty embedding set is a valid (degenerate) result,
+    // never an error.
+    if (input.texts.length === 0) return [];
+    // Retry budget for transient blips, mirroring the forced-tool client's posture.
+    const maxRetries = this.options.maxRetries ?? 2;
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.embedOnce(input);
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          const status = error instanceof LiteLlmHttpError ? error.status : undefined;
+          const base = status === 429 ? 2000 : 500;
+          await delay(base * 2 ** attempt);
+        }
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private async embedOnce(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
+    const response = await fetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/embeddings`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },
+      signal: AbortSignal.timeout(this.options.timeoutMs),
+      body: JSON.stringify({
+        model: input.model,
+        input: input.texts,
+        // Same proxy-side spend tag mechanism as the forced-tool client (`metadata.tags`).
+        // Omitted entirely when no tag travels, so no empty `metadata` key is ever sent.
+        ...(input.tags && input.tags.length ? { metadata: { tags: input.tags } } : {})
+      })
+    });
+    if (!response.ok) throw new LiteLlmHttpError(response.status);
+    const payload = await response.json() as EmbeddingResponse;
+    const rows = payload.data;
+    // One vector per input, fail closed otherwise (a partial response would silently
+    // mis-align nodes to vectors).
+    if (!Array.isArray(rows) || rows.length !== input.texts.length) {
+      throw new Error(`Embedding response shape mismatch: expected ${input.texts.length} vectors, got ${Array.isArray(rows) ? rows.length : "none"}.`);
+    }
+    // Preserve input order: OpenAI-style responses may arrive out of order but carry an
+    // `index`; restore the request order when present so vectors[i] is texts[i].
+    const ordered = rows.every((row) => typeof row.index === "number")
+      ? [...rows].sort((a, b) => (a.index as number) - (b.index as number))
+      : rows;
+    const vectors = ordered.map((row, i) => {
+      const vector = row.embedding;
+      if (!Array.isArray(vector) || vector.length === 0 || !vector.every((value) => typeof value === "number" && Number.isFinite(value))) {
+        throw new Error(`Embedding row ${i} is not a non-empty finite-number vector.`);
+      }
+      return vector as number[];
+    });
+    // Cosine similarity needs uniform dimensionality; a ragged response is malformed.
+    const dimension = vectors[0]?.length ?? 0;
+    if (vectors.some((vector) => vector.length !== dimension)) {
+      throw new Error("Embedding response has inconsistent vector dimensions.");
+    }
+    return vectors;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -1,6 +1,7 @@
 import type { MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import type { MissingPrerequisiteProposalPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
 import { missingPrerequisiteProposalSchema, missingPrerequisiteProposalValidator } from "./toolSchemas";
 
@@ -55,7 +56,8 @@ export class LiteLlmMissingPrerequisiteProposalAdapter implements MissingPrerequ
       toolName: "submit_missing_prerequisites",
       toolDescription: "Submit the prerequisite concepts the source assumes but does not teach for one anchor.",
       parameters: missingPrerequisiteProposalSchema,
-      validator: missingPrerequisiteProposalValidator
+      validator: missingPrerequisiteProposalValidator,
+      tags: [STAGE_TAGS.missingPrerequisiteProposal]
     });
 
     // The model is asked to honor the cap, but the bound is enforced deterministically

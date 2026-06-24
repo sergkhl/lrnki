@@ -19,6 +19,7 @@ import type {
   ConceptDiscoveryPort
 } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import {
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
@@ -99,7 +100,8 @@ export class LiteLlmConceptDiscoveryAdapter implements ConceptDiscoveryPort {
       toolName: "submit_concept_candidates",
       toolDescription: "Submit the recall-oriented set of concept candidates discovered in the source.",
       parameters: conceptDiscoverySchema,
-      validator: conceptDiscoveryValidator
+      validator: conceptDiscoveryValidator,
+      tags: [STAGE_TAGS.conceptDiscovery]
     });
     return result.candidates;
   }
@@ -167,7 +169,8 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
         toolName: "submit_admission_decisions",
         toolDescription: "Submit one precision-first admission decision per candidate in the requested batch.",
         parameters: conceptAdmissionSchemaForCandidateKeys(batch.map((candidate) => candidate.candidateKey)),
-        validator: conceptAdmissionValidator
+        validator: conceptAdmissionValidator,
+        tags: [STAGE_TAGS.admission]
       });
       const batchKeys = new Set(batch.map((candidate) => candidate.candidateKey));
       // Keep every atomic decision whose parent is in this batch. One parent may
@@ -242,7 +245,8 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       toolName: "submit_core_selection",
       toolDescription: "Select or demote every individually eligible candidate at source level.",
       parameters: conceptCoreSelectionSchemaForCandidateKeys(individuallyEligible.map((decision) => decision.atomicKey)),
-      validator: conceptCoreSelectionValidator
+      validator: conceptCoreSelectionValidator,
+      tags: [STAGE_TAGS.admission]
     });
     const selectionCounts = new Map<string, number>();
     for (const selection of selectionResult.selections) {
@@ -325,7 +329,8 @@ export class LiteLlmEvidenceProfileExtractionAdapter implements ConceptCondition
       toolName: "submit_concept_evidence_profile",
       toolDescription: "Submit the subject concept's definition passages, salience-ordered mention passages, and optional typed assertions.",
       parameters: conceptEvidenceProfileSchema,
-      validator: conceptEvidenceProfileValidator
+      validator: conceptEvidenceProfileValidator,
+      tags: [STAGE_TAGS.cepExtraction]
     });
 
     const assertions: ExtractedTypedAssertion[] = [];
@@ -397,7 +402,8 @@ export class LiteLlmAssertionEntailmentJudgmentAdapter implements AssertionEntai
       toolName: "submit_definition_entailment_judgment",
       toolDescription: "Submit the subject-identity classification and whether the candidate definition is stated.",
       parameters: definitionEntailmentJudgmentSchema,
-      validator: definitionEntailmentJudgmentValidator
+      validator: definitionEntailmentJudgmentValidator,
+      tags: [STAGE_TAGS.assertionEntailment]
     });
 
     const subjectSpan = result.subjectSpan.trim();
@@ -464,7 +470,8 @@ export class LiteLlmAdmissionLabelJudgmentAdapter implements AdmissionLabelJudgm
       toolName: "submit_admission_label_judgment",
       toolDescription: "Submit whether the candidate label names a concept or asserts a proposition, with the underlying noun phrase when it is a proposition.",
       parameters: admissionLabelJudgmentSchema,
-      validator: admissionLabelJudgmentValidator
+      validator: admissionLabelJudgmentValidator,
+      tags: [STAGE_TAGS.admissionLabelJudge]
     });
 
     return groundedAdmissionLabelJudgment(result, input.evidenceQuotes);

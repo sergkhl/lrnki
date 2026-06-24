@@ -1,53 +1,103 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PrerequisiteConceptContext } from "@lrnki/domain-core";
-import { LiteLlmPrerequisiteJudgmentAdapter, LiteLlmRescueDurabilityJudgmentAdapter, RESCUE_DURABILITY_JUDGE_MODEL } from "./enrichmentAdapters";
+import {
+  LiteLlmMintingDurabilityJudgmentAdapter,
+  LiteLlmPrerequisiteOrderingAdapter,
+  LiteLlmRescueDurabilityJudgmentAdapter,
+  MINTING_DURABILITY_JUDGE_MODEL,
+  PREREQUISITE_ORDERING_MODEL,
+  RESCUE_DURABILITY_JUDGE_MODEL
+} from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { prerequisiteOrderingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
   return { derivedNodeId, canonicalLabel, aliases: [], definitions: [`${canonicalLabel} def`], mentions: [], assertions: [] };
 }
 
-// Stub the forced-tool client so the test exercises ONLY the adapter's label->id
-// mapping, not the network. The canned object stands in for the validated tool args.
-function adapterReturning(canned: { relation: string; prerequisiteLabel: string; confidence: number; rationale: string }) {
-  const client = { async call() { return canned; } } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmPrerequisiteJudgmentAdapter(client);
+type OrderingEdge = { prerequisiteLabel: string; dependentLabel: string; confidence: number; rationale: string };
+
+// Stub the forced-tool client so the test exercises ONLY the adapter's render + validate
+// + passthrough, not the network. The canned object stands in for the validated tool
+// args (a deterministic envelope over a canned response — rule 11). `capture` records the
+// last client call so the re-prompt test can assert the prompt carries the cycle path.
+function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string } }) {
+  const client = {
+    async call(input: unknown) {
+      if (capture) capture.lastCall = input as { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string };
+      return canned;
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmPrerequisiteOrderingAdapter(client);
 }
 
-const a = context("idA", "Ownership");
-const b = context("idB", "Move semantics");
+const ownership = context("idS", "Ownership");
+const moveSemantics = context("idA", "Move semantics");
+const borrowing = context("idB", "Borrowing");
 
-test("names the A-side concept as prerequisite -> directed a->b", async () => {
-  const judgment = await adapterReturning({ relation: "prerequisite", prerequisiteLabel: "Ownership", confidence: 0.9, rationale: "r" }).judge({ declaredDomain: "x", a, b });
-  assert.equal(judgment.outcome, "directed");
-  assert.equal(judgment.prerequisiteDerivedNodeId, "idA");
-  assert.equal(judgment.dependentDerivedNodeId, "idB");
+test("ordering adapter runs on the single non-DeepSeek ordering alias", () => {
+  assert.equal(PREREQUISITE_ORDERING_MODEL, "kg-prerequisite-ordering");
+  assert.equal(adapterReturning({ edges: [] }).model, "kg-prerequisite-ordering");
 });
 
-test("names the B-side concept as prerequisite -> directed b->a (no positional bias)", async () => {
-  const judgment = await adapterReturning({ relation: "prerequisite", prerequisiteLabel: "Move semantics", confidence: 0.9, rationale: "r" }).judge({ declaredDomain: "x", a, b });
-  assert.equal(judgment.outcome, "directed");
-  assert.equal(judgment.prerequisiteDerivedNodeId, "idB");
-  assert.equal(judgment.dependentDerivedNodeId, "idA");
+// Happy path: a well-formed edges array parses to a typed WholeSetOrdering in input order.
+test("returns the validated label-cited edges verbatim, in order", async () => {
+  const { edges } = await adapterReturning({
+    edges: [
+      { prerequisiteLabel: "Ownership", dependentLabel: "Move semantics", confidence: 0.9, rationale: "r1" },
+      { prerequisiteLabel: "Ownership", dependentLabel: "Borrowing", confidence: 0.8, rationale: "r2" }
+    ]
+  }).order({ declaredDomain: "software engineering", nodes: [ownership, moveSemantics, borrowing] });
+  assert.equal(edges.length, 2);
+  assert.equal(edges[0].prerequisiteLabel, "Ownership");
+  assert.equal(edges[0].dependentLabel, "Move semantics");
+  assert.equal(edges[1].dependentLabel, "Borrowing");
 });
 
-test("label match is case-insensitive and trimmed", async () => {
-  const judgment = await adapterReturning({ relation: "prerequisite", prerequisiteLabel: "  move SEMANTICS ", confidence: 0.8, rationale: "r" }).judge({ declaredDomain: "x", a, b });
-  assert.equal(judgment.outcome, "directed");
-  assert.equal(judgment.prerequisiteDerivedNodeId, "idB");
+// Edge case: an empty edges array (the judge asserts no relations) is a valid empty ordering.
+test("an empty edges array parses to an empty ordering", async () => {
+  const { edges } = await adapterReturning({ edges: [] }).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
+  assert.deepEqual(edges, []);
 });
 
-test("a 'prerequisite' relation naming neither concept fails closed to uncertain", async () => {
-  const judgment = await adapterReturning({ relation: "prerequisite", prerequisiteLabel: "Borrowing", confidence: 0.9, rationale: "r" }).judge({ declaredDomain: "x", a, b });
-  assert.equal(judgment.outcome, "uncertain");
+// The request carries the forced tool name and the single ordering stage tag (R19).
+test("ordering request carries the stage tag and forced tool name", async () => {
+  const capture: { lastCall?: { toolName?: string; tags?: string[] } } = {};
+  await adapterReturning({ edges: [] }, capture).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
+  assert.equal(capture.lastCall?.toolName, "submit_prerequisite_ordering");
+  assert.deepEqual(capture.lastCall?.tags, ["prerequisite-ordering"]);
 });
 
-test("'none' is mapped to none; 'uncertain' to uncertain", async () => {
-  const none = await adapterReturning({ relation: "none", prerequisiteLabel: "", confidence: 0.1, rationale: "r" }).judge({ declaredDomain: "x", a, b });
-  assert.equal(none.outcome, "none");
-  const uncertain = await adapterReturning({ relation: "uncertain", prerequisiteLabel: "", confidence: 0.4, rationale: "r" }).judge({ declaredDomain: "x", a, b });
-  assert.equal(uncertain.outcome, "uncertain");
+// Re-prompt (R10): given a correction, the adapter includes the violating cycle path in
+// the prompt and still returns a validated ordering. The routing decision itself is U4.
+test("a correction includes the violating-cycle path in the prompt", async () => {
+  const capture: { lastCall?: { messages?: { role: string; content: string }[] } } = {};
+  const { edges } = await adapterReturning({
+    edges: [{ prerequisiteLabel: "Ownership", dependentLabel: "Move semantics", confidence: 0.9, rationale: "r" }]
+  }, capture).order({
+    declaredDomain: "software engineering",
+    nodes: [ownership, moveSemantics, borrowing],
+    correction: { cyclePath: ["Ownership", "Move semantics", "Borrowing", "Ownership"] }
+  });
+  const userPrompt = capture.lastCall?.messages?.find((m) => m.role === "user")?.content ?? "";
+  assert.match(userPrompt, /CYCLE/);
+  assert.match(userPrompt, /"Ownership" → "Move semantics" → "Borrowing" → "Ownership"/);
+  assert.equal(edges.length, 1);
+});
+
+// Fail-closed (rule 6): the validator rejects an edge with confidence out of [0,1].
+test("validator rejects confidence out of [0,1]", () => {
+  assert.throws(() => prerequisiteOrderingValidator.parse({
+    edges: [{ prerequisiteLabel: "a", dependentLabel: "b", confidence: 1.5, rationale: "r" }]
+  }));
+});
+
+// Fail-closed (rule 6): the validator rejects an edge missing a required field.
+test("validator rejects an edge missing dependentLabel", () => {
+  assert.throws(() => prerequisiteOrderingValidator.parse({
+    edges: [{ prerequisiteLabel: "a", confidence: 0.5, rationale: "r" }] // missing dependentLabel
+  }));
 });
 
 // --- Rescue durability judge (U3) -----------------------------------------------
@@ -75,4 +125,47 @@ test("rescue judge passes through the validated verdict and grounding span (appl
   const notDurable = await rescueAdapterReturning({ verdict: "not_durable", groundingSpan: "We ablate variant B in Table 3.", rationale: "ablation label" }).judge(rescueInput);
   assert.equal(notDurable.verdict, "not_durable");
   assert.equal(notDurable.groundingSpan, "We ablate variant B in Table 3.");
+});
+
+// --- Minting durability judge ----------------------------------------------------
+
+function mintingAdapterReturning(canned: { verdict: string; rationale: string }, capture?: { lastCall?: unknown }) {
+  const client = {
+    async call(input: unknown) {
+      if (capture) capture.lastCall = input;
+      return canned;
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmMintingDurabilityJudgmentAdapter(client);
+}
+
+const mintingInput = {
+  declaredDomain: "software engineering",
+  proposal: { proposedLabel: "Lifetime", rationale: "Needed to understand references." },
+  anchor: { canonicalLabel: "Borrowing", definitionQuotes: ["Borrowing lets code access a value without taking ownership."] }
+};
+
+test("minting durability judge runs on the independent cross-family alias", () => {
+  assert.equal(MINTING_DURABILITY_JUDGE_MODEL, "kg-independent-judge");
+  assert.equal(mintingAdapterReturning({ verdict: "durable", rationale: "r" }).model, "kg-independent-judge");
+});
+
+test("minting durability judge passes through the validated verdict", async () => {
+  const durable = await mintingAdapterReturning({ verdict: "durable", rationale: "foundation" }).judge(mintingInput);
+  assert.deepEqual(durable, { verdict: "durable", rationale: "foundation" });
+
+  const notDurable = await mintingAdapterReturning({ verdict: "not_durable", rationale: "tangential" }).judge(mintingInput);
+  assert.deepEqual(notDurable, { verdict: "not_durable", rationale: "tangential" });
+});
+
+test("minting durability validator rejects missing or out-of-enum verdicts", () => {
+  assert.throws(() => mintingDurabilityJudgmentValidator.parse({ rationale: "missing verdict" }));
+  assert.throws(() => mintingDurabilityJudgmentValidator.parse({ verdict: "maybe", rationale: "bad enum" }));
+});
+
+test("minting durability request carries the stage tag and forced tool name", async () => {
+  const capture: { lastCall?: { toolName?: string; tags?: string[] } } = {};
+  await mintingAdapterReturning({ verdict: "durable", rationale: "r" }, capture).judge(mintingInput);
+  assert.equal(capture.lastCall?.toolName, "submit_minting_durability_judgment");
+  assert.deepEqual(capture.lastCall?.tags, ["minting-durability"]);
 });

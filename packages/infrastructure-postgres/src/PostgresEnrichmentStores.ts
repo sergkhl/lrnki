@@ -29,14 +29,9 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
   }): Promise<void> {
     const { layer, artifact } = input;
     const difficultyMethod = layer.difficulties[0]?.method ?? "dag-depth-mock";
-    // Per-pair judge model (U4): the immutable trace records which model ordered each
-    // pair (cross-family for generated-node pairs, DeepSeek otherwise). Key by the
-    // unordered derived-node pair so an edge resolves to its judging model regardless
-    // of edge direction. Falls back to the layer-level judge if a pair is missing.
-    const judgeModelByPair = new Map<string, string>();
-    for (const judgment of artifact.payload.judgments) {
-      judgeModelByPair.set(pairKey(judgment.a.derivedNodeId, judgment.b.derivedNodeId), judgment.judgeModel);
-    }
+    // Whole-set ordering (U4): ONE non-DeepSeek ordering alias orders every domain, so
+    // every edge's judging model is the layer-level `judgeModel` — there is no per-pair
+    // model split any more (the per-pair routing was deleted, rule 18).
     await this.sql.begin(async (tx) => {
       await tx`
         INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method, completed_at)
@@ -91,10 +86,9 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       }
 
       for (const edge of layer.prerequisiteEdges) {
-        const judgeModel = judgeModelByPair.get(pairKey(edge.prerequisiteDerivedNodeId, edge.dependentDerivedNodeId)) ?? layer.judgeModel;
         await tx`
           INSERT INTO inferred_prerequisite_edges (inferred_prerequisite_edge_id, enrichment_id, predicate, prerequisite_derived_node_id, dependent_derived_node_id, confidence, uncertain, judge_model, provenance)
-          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteDerivedNodeId}, ${edge.dependentDerivedNodeId}, ${edge.confidence}, ${edge.uncertain}, ${judgeModel}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
+          VALUES (${randomUUID()}, ${layer.enrichmentId}, ${edge.predicate}, ${edge.prerequisiteDerivedNodeId}, ${edge.dependentDerivedNodeId}, ${edge.confidence}, ${edge.uncertain}, ${layer.judgeModel}, ${tx.json(edge.provenance as Parameters<Sql["json"]>[0])})`;
       }
 
       // Rescue durability dispositions (U4): the relational mirror of the trace's
@@ -109,6 +103,42 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
             ${randomUUID()}, ${layer.enrichmentId}, ${disposition.derivedNodeId}, ${disposition.canonicalLabel},
             ${disposition.normalizedLabel}, ${disposition.declaredDomain}, ${disposition.disposition},
             ${disposition.rationale}, ${disposition.groundingSpan}
+          )`;
+      }
+
+      // Minting durability dispositions: relational mirror of the trace's reserved
+      // proposal decisions. Dropped proposal ids are correlation-only because no
+      // derived_graph_nodes row exists for them.
+      for (const disposition of artifact.payload.mintingDispositions) {
+        await tx`
+          INSERT INTO minting_dispositions (
+            minting_disposition_id, enrichment_id, derived_node_id, proposed_label,
+            normalized_label, declared_domain, anchor_concept_id, disposition, rationale
+          )
+          VALUES (
+            ${randomUUID()}, ${layer.enrichmentId}, ${disposition.derivedNodeId}, ${disposition.proposedLabel},
+            ${disposition.normalizedLabel}, ${disposition.declaredDomain}, ${disposition.anchorConceptId},
+            ${disposition.disposition}, ${disposition.rationale}
+          )`;
+      }
+
+      // Derived-layer semantic merges (U4): one row per absorbed node, the relational
+      // mirror of the trace's merge records so Admin Lab reads them without recompute
+      // (rules 11/12). The canonical FK resolves to a surviving derived_graph_nodes row;
+      // the absorbed id is correlation-only (the node was removed from the layer).
+      for (const merge of artifact.payload.nodeMerges) {
+        await tx`
+          INSERT INTO derived_node_merges (
+            derived_node_merge_id, enrichment_id, declared_domain,
+            canonical_derived_node_id, canonical_label, canonical_node_kind,
+            absorbed_derived_node_id, absorbed_label, absorbed_aliases, absorbed_node_kind, absorbed_evidence,
+            proposing_signal, proposing_score, rationale, canonical_selection_reason
+          )
+          VALUES (
+            ${randomUUID()}, ${layer.enrichmentId}, ${merge.declaredDomain},
+            ${merge.canonicalDerivedNodeId}, ${merge.canonicalLabel}, ${merge.canonicalNodeKind},
+            ${merge.absorbedDerivedNodeId}, ${merge.absorbedLabel}, ${tx.json(merge.absorbedAliases)}, ${merge.absorbedNodeKind}, ${tx.json(merge.absorbedEvidence)},
+            ${merge.proposingSignal}, ${merge.proposingScore}, ${merge.rationale}, ${merge.canonicalSelectionReason}
           )`;
       }
 
@@ -323,12 +353,6 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       difficulties
     };
   }
-}
-
-// Unordered pair key over two derived-node ids, so an edge resolves to its judging
-// model regardless of the prerequisite/dependent direction.
-function pairKey(a: string, b: string): string {
-  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
 type EnrichmentRow = {

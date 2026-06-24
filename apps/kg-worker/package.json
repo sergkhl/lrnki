@@ -2,7 +2,7 @@
   "name": "@lrnki/kg-worker",
   "private": true,
   "type": "module",
-  "scripts": { "worker:kg": "tsx src/knowledgeGraphWorker.ts", "typecheck": "tsc -p tsconfig.json --noEmit" },
+  "scripts": { "worker:kg": "tsx src/knowledgeGraphWorker.ts", "test": "tsx --test src/*.test.ts", "typecheck": "tsc -p tsconfig.json --noEmit" },
   "dependencies": {
     "@lrnki/application": "workspace:*",
     "@lrnki/domain-core": "workspace:*",

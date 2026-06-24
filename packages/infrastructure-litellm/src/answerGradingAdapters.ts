@@ -1,6 +1,7 @@
 import type { JudgedOutcome } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { STAGE_TAGS } from "./stageTags";
 import { answerGradingSchema, answerGradingValidator } from "./toolSchemas";
 
 // Cross-family grading judge (ADR-0023): the card answer-keys are generated
@@ -45,7 +46,8 @@ export class LiteLlmAnswerGradingJudgeAdapter implements AnswerGradingJudgePort 
       toolName: "submit_answer_grade",
       toolDescription: "Grade one free-form learner answer against the provided answer-key.",
       parameters: answerGradingSchema,
-      validator: answerGradingValidator
+      validator: answerGradingValidator,
+      tags: [STAGE_TAGS.answerGrading]
     });
 
     return { outcome: result.outcome, score: result.score, rationale: result.rationale };

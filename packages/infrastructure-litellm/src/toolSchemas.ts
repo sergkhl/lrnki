@@ -310,46 +310,51 @@ export const conceptEvidenceProfileValidator = z.object({
   }).strict())
 }).strict();
 
-// --- Prerequisite judgment: submit_prerequisite_judgment ------------------
-// One bounded judgment over a single gated concept pair (ADR-0019). The model
-// returns a DIRECTION between the two named concepts, not free-form edges; the
-// application boundary maps it to a directed/none/uncertain edge fail-closed.
-
-const PREREQUISITE_RELATION = ["prerequisite", "none", "uncertain"] as const;
-
-// The judge NAMES the prerequisite concept rather than emitting a positional
-// 'a-is-prerequisite-of-b' token. A real run showed the model reasons correctly but
-// systematically anchors the positional token on the A-side, producing edges that
-// contradict their own rationale. Copying the verbatim label of the concept that
-// must be understood FIRST removes the positional mapping the model gets wrong; the
-// application matches the label against the two provided concepts and fails closed
-// to 'uncertain' (flagged, path-excluded) when it names neither — never a guess.
-export const prerequisiteJudgmentSchema: JsonSchema = {
+// --- Whole-set prerequisite ordering: submit_prerequisite_ordering --------
+// ONE whole-set ordering over all evidenced nodes in a Declared Domain (ADR-0019
+// amended — whole-set ordering, plan U2/KTD2). The model returns a directed acyclic
+// edge list over the listed concepts; it is globally self-consistent by construction,
+// so a non-edge is simply absent — there is no per-edge 'none'/'uncertain' token. Each
+// edge NAMES its two endpoints by verbatim canonical label (unique within a same-domain
+// set under ADR-0015 dedup); the application maps labels → ids fail-closed (R9, KTD3)
+// and an endpoint matching no listed node is rejected, never guessed.
+export const prerequisiteOrderingSchema: JsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["relation", "prerequisiteLabel", "confidence", "rationale"],
+  required: ["edges"],
   properties: {
-    relation: {
-      type: "string",
-      enum: [...PREREQUISITE_RELATION],
+    edges: {
+      type: "array",
       description:
-        "'prerequisite' when one concept must be understood before the other; 'none' when neither is a learning prerequisite of the other; 'uncertain' when a relation is plausible but the evidence does not establish a clear direction."
-    },
-    prerequisiteLabel: {
-      type: "string",
-      description:
-        "When relation='prerequisite', the EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. It must equal one of the two provided concept labels. Empty string for 'none' or 'uncertain'."
-    },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
-    rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+        "The directed prerequisite edges over the listed concepts, forming one acyclic ordering. Omit a pair entirely when neither concept must be understood before the other. Do not emit a cycle: if you cannot decide a direction, leave the pair out.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["prerequisiteLabel", "dependentLabel", "confidence", "rationale"],
+        properties: {
+          prerequisiteLabel: {
+            type: "string",
+            description: "The EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. Must equal one of the listed concept labels."
+          },
+          dependentLabel: {
+            type: "string",
+            description: "The EXACT canonical label (copied verbatim) of the concept that depends on the prerequisite. Must equal a DIFFERENT listed concept label."
+          },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+          rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+        }
+      }
+    }
   }
 };
 
-export const prerequisiteJudgmentValidator = z.object({
-  relation: z.enum(PREREQUISITE_RELATION),
-  prerequisiteLabel: z.string(),
-  confidence: z.number().min(0).max(1),
-  rationale: z.string().min(1)
+export const prerequisiteOrderingValidator = z.object({
+  edges: z.array(z.object({
+    prerequisiteLabel: z.string().min(1),
+    dependentLabel: z.string().min(1),
+    confidence: z.number().min(0).max(1),
+    rationale: z.string().min(1)
+  }).strict())
 }).strict();
 
 // --- Generated grounding: submit_generated_grounding_bundle ---------------
@@ -571,6 +576,62 @@ export const rescueDurabilityJudgmentSchema: JsonSchema = {
 export const rescueDurabilityJudgmentValidator = z.object({
   verdict: z.enum(["durable", "not_durable"]),
   groundingSpan: z.string(),
+  rationale: z.string().min(1)
+}).strict();
+
+// --- Minting durability judgment: submit_minting_durability_judgment -------
+// One bounded judgment over a single proposed assumed-prerequisite label before
+// grounding generation. The model decides whether the proposed label is a DURABLE
+// prerequisite for the anchor or merely tangential/named in passing. Decision-only:
+// there is no generated-node source span to ground against, so the application stage
+// owns drop-only fail-open semantics. Domain-neutral rubric — no fixture-specific
+// labels, lexical lists, or surface patterns (AGENTS rules 16/17).
+
+export const mintingDurabilityJudgmentSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["verdict", "rationale"],
+  properties: {
+    verdict: {
+      type: "string",
+      enum: ["durable", "not_durable"],
+      description:
+        "'durable' when the proposed concept is a genuine foundational prerequisite the anchor's material depends on — a transferable unit of domain knowledge a learner should understand first. 'not_durable' when the proposed concept is tangential to this anchor, merely named in passing, a cross-reference/comparison/aside, or a label dropped without being developed. Judge from the proposed concept's meaning, the anchor's meaning, and the proposal rationale, never from surface wordform or a fixed list. When genuinely unsure, prefer 'durable' because this is a precision-first drop-only veto."
+    },
+    rationale: { type: "string", description: "One terse sentence explaining why the proposal is durable or not durable for this anchor." }
+  }
+};
+
+export const mintingDurabilityJudgmentValidator = z.object({
+  verdict: z.enum(["durable", "not_durable"]),
+  rationale: z.string().min(1)
+}).strict();
+
+// --- Node merge adjudication: submit_node_merge_decision (U2, R3/R4) ----------
+// The DECIDE half of semantic dedup (AGENTS rule 20). Embedding cosine PROPOSED that
+// two same-domain nodes may be near-duplicates; this judge decides whether they are two
+// surface forms of the SAME domain concept or genuinely distinct. Decision-only output
+// (the proposing score is recorded separately, never re-derived here). Domain-neutral
+// rubric — no fixture labels, no lexical patterns (AGENTS rules 16/17). The two sides
+// are presented symmetrically with neither privileged; the application stage defaults a
+// transport/validation failure to keep_distinct (fail-closed, no merge — R13).
+export const nodeMergeAdjudicationSchema: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["decision", "rationale"],
+  properties: {
+    decision: {
+      type: "string",
+      enum: ["merge", "keep_distinct"],
+      description:
+        "'merge' ONLY when the two labels denote the SAME underlying unit of domain knowledge — two surface forms of one concept (for example a singular/possessive/abbreviated variant, or a paraphrase that a learner would not study as a separate idea). 'keep_distinct' when they are genuinely different concepts, even if lexically or topically close (a concept and a specialization of it, a part and its whole, two siblings, a general idea and one mechanism within it). Decide from the concepts' MEANING and the cited evidence, never from surface wordform overlap; when unsure, prefer 'keep_distinct' (merging is the irreversible-feeling action that fragments or fuses a learner's graph)."
+    },
+    rationale: { type: "string", description: "One terse sentence naming what makes the two the same concept or distinct." }
+  }
+};
+
+export const nodeMergeAdjudicationValidator = z.object({
+  decision: z.enum(["merge", "keep_distinct"]),
   rationale: z.string().min(1)
 }).strict();
 

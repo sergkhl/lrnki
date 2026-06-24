@@ -1,12 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { defaultStageTimingSink, withStageTiming } from "./stageTiming";
 import {
   buildGraphVersion,
   computeLearnerPath,
   createIntrinsicDifficultyPort,
   emptyLearnerState,
-  executeExtractionRun,
+  runExtractionOverSources,
+  type ExtractionSourceUnit,
   generateStudyItemBank,
   loadResponseLogLearnerState,
   synthesizeResponses,
@@ -29,13 +31,16 @@ import {
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
+  LiteLlmEmbeddingClient,
+  LiteLlmNodeEmbeddingAdapter,
+  LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmGroundingGenerationAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmLearnerSimulatorAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
-  LiteLlmPrerequisiteJudgmentAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter,
-  GENERATED_PREREQUISITE_JUDGE_MODEL
+  LiteLlmPrerequisiteOrderingAdapter,
+  LiteLlmMintingDurabilityJudgmentAdapter,
+  LiteLlmRescueDurabilityJudgmentAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -43,6 +48,7 @@ import {
   PostgresExtractionRunStore,
   PostgresStudyItemBankStore,
   PostgresResponseLogStore,
+  PostgresCalibrationVerdictStore,
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
@@ -106,6 +112,9 @@ function buildContext() {
   // the three fixtures); claims are per-subject and benefit from stable text. Not
   // bit-exact on DeepSeek's MoE, so a small residual remains.
   const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
+  // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
+  // options as the forced-tool clients; embeddings have no sampling knobs.
+  const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
   return {
     sql,
     registrationStore,
@@ -125,16 +134,14 @@ function buildContext() {
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
-    // Graph Enrichment ports (ADR-0019 reset). Every same-domain CEP pair is judged
-    // exhaustively — no embedding clustering tier; the bounded judge proposes the
-    // inferred DAG (deterministic decoding for stable re-derivation). Difficulty is
-    // learner-neutral intrinsic: a cross-family neural subscore fused with
-    // deterministic graph/evidence components.
-    prerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient),
-    // Cross-family generated-node ordering judge (ADR-0023, U7): any pair touching an
-    // `llm_grounded` minted node routes here (gpt-oss-120b) so the DeepSeek generator
-    // never grades its own minted output; anchor-only ordering stays on DeepSeek.
-    generatedPrerequisiteJudge: new LiteLlmPrerequisiteJudgmentAdapter(deterministicClient, GENERATED_PREREQUISITE_JUDGE_MODEL),
+    // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
+    // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
+    // the directed prerequisite DAG over the deduplicated node set; it is cross-family
+    // from the DeepSeek extractor + grounding generator (ADR-0023), so a single judge
+    // never grades its own minted output and the per-pair routing split is gone.
+    // Deterministic decoding for stable re-derivation. Difficulty is learner-neutral
+    // intrinsic: a cross-family neural subscore fused with deterministic components.
+    prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
     // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
@@ -144,6 +151,18 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    // Measured minting durability judge: cross-family independent judge gates
+    // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
+    // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
+    // judge-off baseline.
+    mintingDurabilityJudge: new LiteLlmMintingDurabilityJudgmentAdapter(deterministicClient),
+    // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
+    // near-duplicate pairs (qwen3-embedding-8b via kg-node-embedding); a cross-family
+    // adjudicator DECIDES each merge (kg-independent-judge / gpt-oss-120b, deterministic
+    // decoding) so the DeepSeek family never decides its own merges. Both opt-in: enrich
+    // without them for the U7 baseline.
+    nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
+    nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
     difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
@@ -157,6 +176,9 @@ function buildContext() {
     // DeepSeek card generator never grades its own answer-key (ADR-0023).
     answerGradingJudge: new LiteLlmAnswerGradingJudgeAdapter(deterministicClient),
     responseLogStore: new PostgresResponseLogStore(sql),
+    // Mutable calibration verdict store (R10): the synthetic prefill seeds verdicts here,
+    // separate from the append-only graded log.
+    verdictStore: new PostgresCalibrationVerdictStore(sql),
     // Synthetic learner simulator (U7): DeepSeek-family generator whose answers the
     // cross-family judge grades — EXPERIMENT_ONLY scaffolding for the rule-14 run.
     learnerSimulator: new LiteLlmLearnerSimulatorAdapter(deterministicClient)
@@ -196,33 +218,39 @@ async function registerFromManifest(ctx: Context, manifestPath: string) {
 
 async function runExtraction(ctx: Context, sourceResourceId?: string) {
   const sources = sourceResourceId ? [{ sourceResourceId }] : await ctx.registrationStore.listSources();
+  // Resolve each registered source into an extraction unit (skipping any that vanished),
+  // then drive them through the shared parallel-ready seam (U6/R11). Degree defaults to 1,
+  // so the run stays strictly sequential; the per-unit start/complete callbacks keep the
+  // exact per-source logging the prior loop emitted.
+  const units: ExtractionSourceUnit[] = [];
   for (const { sourceResourceId: id } of sources) {
     const source = await ctx.registrationStore.getRegisteredSource(id);
     if (!source) {
       console.error(`! source not found: ${id}`);
       continue;
     }
-    const runId = randomUUID();
-    console.log(`\n>> extraction run ${runId} for ${id} [${source.declaredDomain}]`);
-    const result = await executeExtractionRun({
-      runId,
-      source,
-      pipelineConfigHash: PIPELINE_CONFIG_HASH,
-      discovery: ctx.discovery,
-      admission: ctx.admission,
-      evidenceProfileExtraction: ctx.evidenceProfileExtraction,
-      assertionEntailmentJudge: ctx.assertionEntailmentJudge,
-      admissionLabelJudge: ctx.admissionLabelJudge,
-      store: ctx.runStore
-    });
-    const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
-    const profiles = result.evidenceProfiles;
-    const incomplete = profiles.filter((profile) => !profile.complete).length;
-    const definitions = profiles.reduce((sum, profile) => sum + profile.definitions.length, 0);
-    const mentions = profiles.reduce((sum, profile) => sum + profile.mentions.length, 0);
-    const assertions = profiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
-    console.log(`   status=${result.status} candidates=${result.candidates.length} core=${core} CEPs=${profiles.length}(incomplete=${incomplete}) defs=${definitions} mentions=${mentions} assertions=${assertions} latency=${result.latencyMs}ms`);
+    units.push({ runId: randomUUID(), source });
   }
+  await runExtractionOverSources({
+    units,
+    pipelineConfigHash: PIPELINE_CONFIG_HASH,
+    discovery: ctx.discovery,
+    admission: ctx.admission,
+    evidenceProfileExtraction: ctx.evidenceProfileExtraction,
+    assertionEntailmentJudge: ctx.assertionEntailmentJudge,
+    admissionLabelJudge: ctx.admissionLabelJudge,
+    store: ctx.runStore,
+    onRunStart: (unit) => console.log(`\n>> extraction run ${unit.runId} for ${unit.source.sourceResourceId} [${unit.source.declaredDomain}]`),
+    onRunComplete: (_unit, result) => {
+      const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
+      const profiles = result.evidenceProfiles;
+      const incomplete = profiles.filter((profile) => !profile.complete).length;
+      const definitions = profiles.reduce((sum, profile) => sum + profile.definitions.length, 0);
+      const mentions = profiles.reduce((sum, profile) => sum + profile.mentions.length, 0);
+      const assertions = profiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
+      console.log(`   status=${result.status} candidates=${result.candidates.length} core=${core} CEPs=${profiles.length}(incomplete=${incomplete}) defs=${definitions} mentions=${mentions} assertions=${assertions} latency=${result.latencyMs}ms`);
+    }
+  });
 }
 
 async function buildVersion(ctx: Context, args: string[]) {
@@ -273,13 +301,25 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     enrichmentId,
     graphVersionId: targetVersionId,
     graphStore: ctx.graphStore,
-    prerequisiteJudge: ctx.prerequisiteJudge,
-    generatedPrerequisiteJudge: ctx.generatedPrerequisiteJudge,
+    prerequisiteOrdering: ctx.prerequisiteOrdering,
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
+    mintingDurabilityJudge: process.env.ENRICH_DISABLE_MINTING_DURABILITY ? undefined : ctx.mintingDurabilityJudge,
+    // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
+    // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
+    nodeEmbedding: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeEmbedding,
+    nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
-    enrichmentStore: ctx.enrichmentStore
+    enrichmentStore: ctx.enrichmentStore,
+    // Surface enrichment sub-stage wall-clock through the same structured sink as the
+    // top-level commands (U2, R1). The application reports {stage, ms}; sub-stages that
+    // complete are ok:true (a thrown sub-stage fails the command, timed at top level).
+    onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true }),
+    // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
+    // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
+    onDedupSummary: (summary) => console.log(`   dedup: merges=${summary.merges} unavailable=${summary.unavailable}`),
+    onMintingSummary: (summary) => console.log(`   minting: accepted=${summary.accepted} dropped=${summary.dropped} unavailable=${summary.unavailable}`)
   });
   const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
   const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;
@@ -359,9 +399,10 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     profile: { difficultyCutoff: 0.6, gradedSampleSize: 4 },
     simulator: ctx.learnerSimulator,
     judge: ctx.answerGradingJudge,
-    responseLog: ctx.responseLogStore
+    responseLog: ctx.responseLogStore,
+    verdictStore: ctx.verdictStore
   });
-  console.log(`   self_report=${result.selfReportCount} graded=${result.gradedCount} batch=${result.calibrationBatchId}`);
+  console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount} · graded=${result.gradedCount}`);
 }
 
 async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetRef?: string, learnerStateRef?: string) {
@@ -444,42 +485,50 @@ async function listSources(ctx: Context) {
   }
 }
 
+async function dispatch(ctx: Context, command: string | undefined, arg: string | undefined, rest: string[]) {
+  switch (command) {
+    case "register-from-manifest":
+      await registerFromManifest(ctx, arg ?? "fixtures/manifest.json");
+      break;
+    case "run-extraction":
+      await runExtraction(ctx, arg === "--all" || arg === undefined ? undefined : arg);
+      break;
+    case "build-graph-version":
+      // All positional args after the command are run IDs to publish.
+      await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
+      break;
+    case "enrich-graph-version":
+      await enrichGraphVersion(ctx, arg);
+      break;
+    case "compute-learner-path":
+      await computeLearnerPathCommand(ctx, arg, rest[0]);
+      break;
+    case "generate-study-items":
+      await generateStudyItemsCommand(ctx, arg);
+      break;
+    case "synthesize-responses":
+      await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
+      break;
+    case "compute-adaptive-path":
+      await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
+      break;
+    case "list-sources":
+      await listSources(ctx);
+      break;
+    default:
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
+  }
+}
+
 async function main() {
   const [command, arg, ...rest] = process.argv.slice(2);
   const ctx = buildContext();
   try {
-    switch (command) {
-      case "register-from-manifest":
-        await registerFromManifest(ctx, arg ?? "fixtures/manifest.json");
-        break;
-      case "run-extraction":
-        await runExtraction(ctx, arg === "--all" || arg === undefined ? undefined : arg);
-        break;
-      case "build-graph-version":
-        // All positional args after the command are run IDs to publish.
-        await buildVersion(ctx, [arg, ...rest].filter((value): value is string => Boolean(value)));
-        break;
-      case "enrich-graph-version":
-        await enrichGraphVersion(ctx, arg);
-        break;
-      case "compute-learner-path":
-        await computeLearnerPathCommand(ctx, arg, rest[0]);
-        break;
-      case "generate-study-items":
-        await generateStudyItemsCommand(ctx, arg);
-        break;
-      case "synthesize-responses":
-        await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
-        break;
-      case "compute-adaptive-path":
-        await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
-        break;
-      case "list-sources":
-        await listSources(ctx);
-        break;
-      default:
-        console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
-    }
+    // Bracket the whole command (U2, R1): one structured `stage_timing` line per
+    // top-level worker invocation. Each `worker:kg` command is its own process in the
+    // serial seed chain, so these lines plus the enrichment sub-stage lines give the
+    // full-run wall-clock split. The usage/default branch is timed too (harmless).
+    await withStageTiming(command ?? "usage", () => dispatch(ctx, command, arg, rest));
   } finally {
     await ctx.sql.end({ timeout: 5 });
   }
