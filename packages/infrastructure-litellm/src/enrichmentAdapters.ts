@@ -1,7 +1,6 @@
 import type {
   MintingDurabilityJudgment,
   PrerequisiteConceptContext,
-  PrerequisiteOrderingCorrection,
   RescueDurabilityJudgment,
   WholeSetOrdering
 } from "@lrnki/domain-core";
@@ -74,7 +73,6 @@ export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingP
   async order(input: {
     declaredDomain: string;
     nodes: PrerequisiteConceptContext[];
-    correction?: PrerequisiteOrderingCorrection;
   }): Promise<WholeSetOrdering> {
     const system = [
       "You order a set of domain concepts by LEARNING PREREQUISITE dependency for a learner-neutral concept graph.",
@@ -94,14 +92,6 @@ export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingP
       "",
       "Concepts to order:",
       ...input.nodes.map((node, index) => ["", renderConcept(`Concept ${index + 1}`, node)].join("\n")),
-      ...(input.correction
-        ? [
-            "",
-            "Your previous ordering contained a CYCLE, which is not allowed. The following concepts form a prerequisite cycle (each said to precede the next, looping back):",
-            `  ${input.correction.cyclePath.map((label) => `"${label}"`).join(" → ")}`,
-            "Revise your edges so the whole set is acyclic: drop or reverse the weakest edge(s) in this loop. Keep every other well-supported edge."
-          ]
-        : []),
       "",
       "Call submit_prerequisite_ordering with the directed acyclic edge list. Each edge sets prerequisiteLabel to the concept that must be understood first and dependentLabel to the concept that needs it; copy both labels exactly."
     ].join("\n");

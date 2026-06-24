@@ -21,7 +21,7 @@ type OrderingEdge = { prerequisiteLabel: string; dependentLabel: string; confide
 // Stub the forced-tool client so the test exercises ONLY the adapter's render + validate
 // + passthrough, not the network. The canned object stands in for the validated tool
 // args (a deterministic envelope over a canned response — rule 11). `capture` records the
-// last client call so the re-prompt test can assert the prompt carries the cycle path.
+// last client call so a test can assert the prompt's forced tool name and stage tag.
 function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string } }) {
   const client = {
     async call(input: unknown) {
@@ -67,23 +67,6 @@ test("ordering request carries the stage tag and forced tool name", async () => 
   await adapterReturning({ edges: [] }, capture).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
   assert.equal(capture.lastCall?.toolName, "submit_prerequisite_ordering");
   assert.deepEqual(capture.lastCall?.tags, ["prerequisite-ordering"]);
-});
-
-// Re-prompt (R10): given a correction, the adapter includes the violating cycle path in
-// the prompt and still returns a validated ordering. The routing decision itself is U4.
-test("a correction includes the violating-cycle path in the prompt", async () => {
-  const capture: { lastCall?: { messages?: { role: string; content: string }[] } } = {};
-  const { edges } = await adapterReturning({
-    edges: [{ prerequisiteLabel: "Ownership", dependentLabel: "Move semantics", confidence: 0.9, rationale: "r" }]
-  }, capture).order({
-    declaredDomain: "software engineering",
-    nodes: [ownership, moveSemantics, borrowing],
-    correction: { cyclePath: ["Ownership", "Move semantics", "Borrowing", "Ownership"] }
-  });
-  const userPrompt = capture.lastCall?.messages?.find((m) => m.role === "user")?.content ?? "";
-  assert.match(userPrompt, /CYCLE/);
-  assert.match(userPrompt, /"Ownership" → "Move semantics" → "Borrowing" → "Ownership"/);
-  assert.equal(edges.length, 1);
 });
 
 // Fail-closed (rule 6): the validator rejects an edge with confidence out of [0,1].
