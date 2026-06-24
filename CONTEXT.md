@@ -81,11 +81,11 @@ The domain-scoped process that decides whether Candidates from different sources
 _Avoid_: raw-cosine auto-merge, propose-and-decide in one mechanism, embedding-derived prerequisites
 
 **Graph Enrichment**:
-The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and issues one whole-set ordering call per Declared Domain over anchors and those nodes to derive a globally self-consistent set of `inferred-prerequisite-of` edges (acyclicity verified, one corrective re-prompt, still-cyclic edges routed to `uncertain`). (Decision: ADR-0019.)
+The operation that derives learner-neutral graph facts not asserted by a source from one published graph version: it rescues and mints **Enrichment Nodes** beyond the published anchors and takes **K whole-set ordering draws per Declared Domain** over anchors and those nodes, aggregating a per-pair directional vote into `inferred-prerequisite-of` edges — direction-contested pairs route to `uncertain`, committed confidence is the empirical agreement `max(f,r)/K`, the existing weak-edge floor doubles as a presence quorum, and any aggregate cycle routes to `uncertain` (no re-prompt). (Decision: ADR-0019, K-sampled per ADR-0028.)
 _Avoid_: graph mutation, Static Graph Refinement, embedding blocking
 
 **Enrichment Run**:
-One execution of Graph Enrichment against one published graph version and one enrichment configuration, retaining its per-domain ordering traces and edge dispositions.
+One execution of Graph Enrichment against one published graph version and one enrichment configuration, retaining its per-domain ordering traces (K and the per-pair vote distribution `pairVotes`, cycle-routed edges) and edge dispositions. A replay draws fresh samples and may commit a different edge set (ADR-0028); the persisted artifact is the immutable record, never re-derivation.
 _Avoid_: Derived Graph Layer
 
 **Derived Graph Layer**:

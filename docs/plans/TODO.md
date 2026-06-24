@@ -5,8 +5,10 @@
 1. **Whole-set global prerequisite ordering.** → **DONE** (U7 rule-14 PASS, promoted to core, gpt-oss-120b
    committed). See the COMPLETED entry below for the verdict, closures, and evidence.
 
-2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** Per
-   ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
+2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** →
+   **DONE** (2026-06-24, branch `feat/prerequisite-ordering-k-sampling`, plan `2026-06-24-002`, U6 rule-14
+   PASS, promoted to core). See the COMPLETED entry below for the calibrated knobs, verdict, and evidence.
+   Per ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
    signal, not a bug to make deterministic. Sample the ordering call K times and route **direction-unstable**
    pairs to `uncertain` — already excluded from learner paths — instead of committing one arbitrary draw.
    This both calibrates edge confidence and dissolves the former pairwise "noise".
@@ -83,6 +85,26 @@
      baseline.
 
 ## COMPLETED
+
+- **Prerequisite-ordering K-sampling + artifact-version-ceremony abolition (2026-06-24, branch
+  `feat/prerequisite-ordering-k-sampling`, plan `2026-06-24-002`).** The whole-set ordering call is now
+  **drawn K=8 times per Declared Domain** and aggregated by a per-pair directional vote: direction-contested
+  pairs (`min(f,r)/K ≥ 0.1`) route to `uncertain`, committed edge confidence becomes the empirical agreement
+  `max(f,r)/K` (replacing the model self-report), and the existing weak-edge floor (0.5) doubles as a
+  presence quorum (a 1/8 edge is `weak_cut`). The single-draw corrective re-prompt is **deleted** —
+  acyclicity is enforced on the aggregate via cycle-routing (KTD4, rule 18). **U6 rule-14 PASS** on the real
+  Rust + economics run `ccd94ad7` (`kg-prerequisite-ordering` → gpt-oss-120b, K=8): the live direction
+  instability surfaced as a 7:1 `Memory management ↔ Ownership` flip now routed to `uncertain` (not frozen at
+  0.875); four 1/8 lucky-draw over-commits (e.g. `Pointers → Memory safety`) are `weak_cut` not committed;
+  robust 8/8 edges kept; both domains acyclic without a re-prompt; cost ≈ K calls/domain. Calibrated knobs
+  (`DEFAULT_ENRICHMENT_CONFIG`): K=8, `directionContestMinorityFraction`=0.1, `minEdgeConfidence`=0.5.
+  Evidence: `tmp/2026-06-24-k-sample-ordering-rule14/rule-14-evaluation.md`. **Folded-in cleanup:** the
+  project-wide `.vN` artifact-version suffix convention is abolished (all 5 artifact types → unversioned
+  `kind` discriminators; reader `LIKE` wildcards → exact `=`, fixing the stale `enrichment_run.v2` view) and
+  the write-only `schemaVersion` field + `schema_version` column are removed as dead state (rule 18).
+  Per-draw replay determinism is intentionally removed (ADR-0028 governance, KTD6): reproducibility is the
+  stored immutable `pairVotes`, not re-derivation. Caveat: contest fraction tuned at K=8 on two fixtures;
+  re-confirm (not re-derive) at materially different K.
 
 - **Whole-set prerequisite ordering (2026-06-24, branch `feat/whole-set-prerequisite-ordering`,
   plan `2026-06-24-001`).** One whole-set ordering call per Declared Domain over the deduplicated derived

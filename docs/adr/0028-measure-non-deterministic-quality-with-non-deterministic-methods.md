@@ -19,7 +19,12 @@ Concretely:
   serving stack cannot be pinned. A flipping result on a genuinely ambiguous input is *signal*, not a
   bug to suppress: it is epistemic uncertainty. The correct response is to **measure** that uncertainty
   — e.g. sample a judge K times and route direction-unstable prerequisite pairs to `uncertain`
-  (already excluded from learner paths) — not to freeze one arbitrary draw.
+  (already excluded from learner paths) — not to freeze one arbitrary draw. **Realized 2026-06-24**
+  (plan 2026-06-24-002, ADR-0019 K-sampling amendment): the whole-set prerequisite ordering call is
+  drawn K times per domain, a per-pair directional vote is tallied, direction-contested pairs route to
+  `uncertain`, and committed edge confidence becomes the empirical agreement `max(f,r)/K` — the
+  self-consistency measurement this ADR prescribes. Reproducibility is the stored immutable artifact
+  (the persisted per-pair `pairVotes`), not re-derivation of identical model output.
 
 - **Remove deterministic proxies for ambiguous quality.** A deterministic test or gate that stands in
   for a non-deterministic quality judgment (asserting one "correct" edge set, one canonical ordering,
