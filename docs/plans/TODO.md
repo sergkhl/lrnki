@@ -2,13 +2,8 @@
 
 ## TODO
 
-1. **Whole-set global prerequisite ordering.** → **SHIPPED** on `feat/whole-set-prerequisite-ordering`
-   (plan `docs/plans/2026-06-24-001-feat-whole-set-prerequisite-ordering-plan.md`, U1–U6). One whole-set
-   ordering call per Declared Domain replaces the per-pair / per-node-batched judge; acyclicity is verified
-   with one corrective re-prompt and still-cyclic edges route to `uncertain`; the two judge aliases and the
-   `removeCycles` heuristic are deleted (rule 18). **Promotion out of `EXPERIMENT_ONLY` is gated on U7's
-   absolute study-value evaluation** (ADR-0019 KTD1), not parity with the deleted baseline — see COMPLETED
-   once U7 records its verdict and committed backing model.
+1. **Whole-set global prerequisite ordering.** → **DONE** (U7 rule-14 PASS, promoted to core, gpt-oss-120b
+   committed). See the COMPLETED entry below for the verdict, closures, and evidence.
 
 2. **Prerequisite-direction uncertainty via self-consistency (supersedes determinism-chasing).** Per
    ADR-0028 / rule 19, the MoE judge's run-to-run flips on ambiguous pairs are epistemic-uncertainty
@@ -79,6 +74,20 @@
      baseline.
 
 ## COMPLETED
+
+- **Whole-set prerequisite ordering (2026-06-24, branch `feat/whole-set-prerequisite-ordering`,
+  plan `2026-06-24-001`).** One whole-set ordering call per Declared Domain over the deduplicated derived
+  node set replaces per-pair / per-node-batched judging; acyclicity verified with one corrective re-prompt,
+  still-cyclic edges routed to `uncertain`; the two judge aliases + `removeCycles` heuristic deleted (rule
+  18); trace → `enrichment_run.v3`. **U7 rule-14 PASS** on the real Rust + economics run
+  `28c3398c` (`kg-prerequisite-ordering` → gpt-oss-120b): both domains returned an acyclic DAG on the FIRST
+  call (0 re-prompts, 0 cycle-routing), and every KTD1 study-value defect is fixed — `Passing values →
+  Compiler` scaffold inversion gone (foundations are DAG roots); `Return values` closure 12→**1**; `Memory
+  safety` closure 9→**4**; economics chain preserved. KTD5: no direction-instability committed (ambiguous
+  pairs omitted, not mis-directed) → K-sampling (TODO #2) NOT triggered. Cost collapsed to ≈1 call/domain.
+  **Committed model:** `kg-prerequisite-ordering → openrouter/openai/gpt-oss-120b` (config default; R8
+  closed). Evidence: `tmp/2026-06-24-whole-set-ordering-rule14/rule-14-evaluation.md`. Caveat: single
+  fixture-pair; real-data cycle-routing unverified (no cycle arose), unit-tested only (U4 AE2).
 
 - **Minting-durability judge for assumed-prerequisite enrichment nodes (2026-06-23, branch
   `feat/enrichment-dedup-rescue-precision`).** Opt-in cross-family (`kg-independent-judge`) drop-only gate
