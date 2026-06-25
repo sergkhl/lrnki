@@ -1,21 +1,44 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type {
-  AdmissionProposal,
-  ArtifactEnvelope,
-  DiscoveredCandidate,
-  ExtractedEvidenceProfile,
-  ExtractionRunResult,
-  StructuredDocument
+import {
+  STAGE_TAGS,
+  type AdmissionProposal,
+  type ArtifactEnvelope,
+  type DiscoveredCandidate,
+  type ExtractedEvidenceProfile,
+  type ExtractionRunResult,
+  type StructuredDocument
 } from "@lrnki/domain-core";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
   ConceptConditionedEvidenceProfileExtractionPort,
   DefinitionPassageQualityJudgmentPort,
-  ExtractionRunStorePort
+  ExtractionRunStorePort,
+  RunProgressReporterPort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
+
+// A recording reporter fake: captures the ordered reporter calls so tests assert the
+// timeline lifecycle (begin → stages → complete) without a database (rule 11).
+type ReporterCall =
+  | { method: "beginOperation"; operationType: string; operationId: string }
+  | { method: "enterStage"; stage: string; total?: number }
+  | { method: "recordProgress"; stage: string; done: number }
+  | { method: "completeStage"; stage: string; ok: boolean }
+  | { method: "completeOperation"; status: string };
+
+function recordingReporter() {
+  const calls: ReporterCall[] = [];
+  const reporter: RunProgressReporterPort = {
+    async beginOperation(i) { calls.push({ method: "beginOperation", operationType: i.operationType, operationId: i.operationId }); },
+    async enterStage(i) { calls.push({ method: "enterStage", stage: i.stage, total: i.total }); },
+    async recordProgress(i) { calls.push({ method: "recordProgress", stage: i.stage, done: i.done }); },
+    async completeStage(i) { calls.push({ method: "completeStage", stage: i.stage, ok: i.ok }); },
+    async completeOperation(i) { calls.push({ method: "completeOperation", status: i.status }); }
+  };
+  return { reporter, calls };
+}
 
 // Default judge accepts every optional assertion so these tests exercise the
 // deterministic + orchestration behavior; rejection is covered in
@@ -128,7 +151,7 @@ function harness(
   extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
   selectedCandidates = candidates,
   admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission,
-  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort } = {}
+  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort; reporter?: RunProgressReporterPort } = {}
 ) {
   let persisted: ExtractionRunResult | undefined;
   let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
@@ -153,7 +176,8 @@ function harness(
       assertionEntailmentJudge: entailEverything,
       admissionLabelJudge: everythingIsAConcept,
       definitionPassageQualityJudge: options.definitionPassageQualityJudge ?? keepAllDefinitions,
-      store
+      store,
+      reporter: options.reporter
     }),
     persisted: () => persisted,
     artifact: () => persistedArtifact
@@ -564,4 +588,82 @@ test("splits one conflated candidate into independently-tiered atomic concepts r
   // admitSource through to CEP extraction. The fail-closed cross-atom invariants
   // (duplicate atomic keys, unknown parent) are unit-tested in admitSource.test.ts.
   assert.equal(result.evidenceProfiles.length, 2);
+});
+
+// --- U4: run-progress reporter instrumentation -----------------------------
+
+test("a successful run reports beginOperation → stages in pipeline order → completeOperation succeeded", async () => {
+  const { reporter, calls } = recordingReporter();
+  await harness(async (input) => definitionFor[input.subject.candidateKey], candidates, admission, { reporter }).run();
+
+  // The parent row is created at entry, keyed extraction/runId.
+  assert.deepEqual(calls[0], { method: "beginOperation", operationType: "extraction", operationId: "run-1" });
+  assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "succeeded" });
+
+  // Stages enter in pipeline order, each closed ok:true; persist is the non-LLM tail.
+  const entered = calls.filter((c) => c.method === "enterStage").map((c) => (c as { stage: string }).stage);
+  assert.deepEqual(entered, [
+    STAGE_TAGS.conceptDiscovery,
+    STAGE_TAGS.admission,
+    STAGE_TAGS.cepExtraction,
+    STAGE_TAGS.definitionPassageQuality,
+    STAGE_TAGS.assertionEntailment,
+    "persist"
+  ]);
+  assert.ok(calls.filter((c) => c.method === "completeStage").every((c) => (c as { ok: boolean }).ok === true));
+  // No failed status is ever emitted on a clean run.
+  assert.ok(!calls.some((c) => c.method === "completeOperation" && (c as { status: string }).status === "failed"));
+});
+
+test("the cep-extraction stage emits recordProgress once per admitted concept, final done = admitted count", async () => {
+  const { reporter, calls } = recordingReporter();
+  await harness(async (input) => definitionFor[input.subject.candidateKey], candidates, admission, { reporter }).run();
+
+  const cepEnter = calls.find((c) => c.method === "enterStage" && (c as { stage: string }).stage === STAGE_TAGS.cepExtraction) as { total?: number };
+  assert.equal(cepEnter.total, 2); // two admitted concepts
+  const progress = calls.filter((c) => c.method === "recordProgress" && (c as { stage: string }).stage === STAGE_TAGS.cepExtraction) as { done: number }[];
+  assert.equal(progress.length, 2);
+  assert.deepEqual(progress.map((c) => c.done), [1, 2]);
+});
+
+test("a thrown stage closes that stage ok:false and reports completeOperation failed, never succeeded", async () => {
+  // CEP per-item extractor errors are SWALLOWED by design (fail-closed to an empty
+  // profile), so the error path is driven through discovery, which propagates. The
+  // mechanism — completeStage(ok:false) then completeOperation('failed') — is identical
+  // for any stage that throws.
+  const { reporter, calls } = recordingReporter();
+  await assert.rejects(
+    executeExtractionRun({
+      runId: "run-throw",
+      source: { sourceResourceId: "source-1", sourceDocumentId: "document-1", declaredDomain: "educational technology", document },
+      pipelineConfigHash: "test-v1",
+      discovery: { discover: async () => { throw new Error("discovery transport down"); } },
+      admission: { admit: async () => [] },
+      evidenceProfileExtraction: { extract: async () => ({ definitions: [], mentions: [], assertions: [] }) },
+      assertionEntailmentJudge: entailEverything,
+      admissionLabelJudge: everythingIsAConcept,
+      definitionPassageQualityJudge: keepAllDefinitions,
+      store: { persist: async () => {}, runsForBuildByIds: async () => [] },
+      reporter
+    })
+  );
+
+  assert.deepEqual(calls[0], { method: "beginOperation", operationType: "extraction", operationId: "run-throw" });
+  assert.ok(calls.some((c) => c.method === "completeStage" && (c as { stage: string; ok: boolean }).stage === STAGE_TAGS.conceptDiscovery && (c as { ok: boolean }).ok === false));
+  assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "failed" });
+  assert.ok(!calls.some((c) => c.method === "completeOperation" && (c as { status: string }).status === "succeeded"));
+});
+
+test("the no-op default leaves the run result unchanged by reporter presence", async () => {
+  // Behavior is byte-identical whether or not a reporter is injected (default-safe).
+  const withoutReporter = await harness(async (input) => definitionFor[input.subject.candidateKey]).run();
+  const { reporter } = recordingReporter();
+  const withReporter = await harness(async (input) => definitionFor[input.subject.candidateKey], candidates, admission, { reporter }).run();
+
+  assert.equal(withoutReporter.status, withReporter.status);
+  assert.equal(withoutReporter.degraded, withReporter.degraded);
+  assert.deepEqual(
+    withoutReporter.evidenceProfiles.map((p) => ({ key: p.candidateKey, complete: p.complete, defs: p.definitions.length })),
+    withReporter.evidenceProfiles.map((p) => ({ key: p.candidateKey, complete: p.complete, defs: p.definitions.length }))
+  );
 });

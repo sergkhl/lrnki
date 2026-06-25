@@ -53,6 +53,7 @@ import {
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
+  PostgresRunProgressReporter,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
@@ -81,6 +82,10 @@ function buildContext() {
   const sql = createDatabaseClient();
   const registrationStore = new PostgresSourceRegistrationStore(sql);
   const runStore = new PostgresExtractionRunStore(sql);
+  // Run-progress reporter (KTD3): its own autocommit writes on the shared `sql`
+  // handle, never enlisted in a store's persist transaction, drive the durable
+  // timeline that the live progress view (U6) and bottleneck report (U7) read.
+  const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
   const artifacts = new PostgresArtifactRepository(sql);
   const parsers = new StructuredDocumentParserRegistry([
@@ -120,6 +125,7 @@ function buildContext() {
     sql,
     registrationStore,
     runStore,
+    runProgressReporter,
     graphStore,
     artifacts,
     parsers,
@@ -248,6 +254,7 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
     admissionLabelJudge: ctx.admissionLabelJudge,
     definitionPassageQualityJudge: ctx.definitionPassageQualityJudge,
     store: ctx.runStore,
+    reporter: ctx.runProgressReporter,
     onRunStart: (unit) => console.log(`\n>> extraction run ${unit.runId} for ${unit.source.sourceResourceId} [${unit.source.declaredDomain}]`),
     onRunComplete: (_unit, result) => {
       const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
