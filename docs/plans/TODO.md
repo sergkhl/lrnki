@@ -12,15 +12,24 @@
      oracle/benchmark disposable.
    - Population calibration stays deferred until real learner-response data exists (task 6 / ADR-0024).
 
-2. **CEP Definition Passage precision cleanup — heading/citation-like definitions.** The structure-aware
-   neighborhood pass recovered useful adjacent definitions and reduced InstructKG incomplete CEPs, but
-   inspection still found low-value accepted Definition Passages such as heading-only or citation-like
-   snippets in the AIRA-dojo Markdown run.
-   - Prefer improving the neural CEP extraction/judgment contract or a measured disposable experiment that
-     proves a generic definition-quality guard raises precision without dropping valid adjacent
-     definitions; no hardcoded symbolic section-role or lexical veto (rules 16/17).
-   - CEP-quality follow-up, not a retrieval-layer blocker: the verbatim floor held and inspected adjacent
-     blocks were genuine explaining passages.
+2. **CEP definition-evidence retrieval / chunking (layer B) — NEEDS A `/ce-brainstorm`, research-first.
+   Now UNBLOCKED by layer A (TODO-item shipped, see COMPLETED).** Layer A emits the distinct
+   `core_demoted_hollow_definition` reason code on every hollow-definition demotion — that code is the
+   measurement input this item consumes to separate the two causes below.
+   Open question split off from layer A: are the heading/citation-like Definition Passages caused by the
+   source genuinely never defining the Concept (correctly demoted by layer A), or by our block
+   segmentation **fragmenting a definition across chunk boundaries** so the meaning-bearing passage is
+   never in the extraction window?
+   - Per rule 21, research established retrieval best practices before patching: candidate approaches are
+     **parent-child / hierarchical retrieval** (retrieve on precise child passages, return the parent
+     section as definition context) and overlapping semantic chunking, versus the current deterministic
+     structure-aware neighborhood. Embeddings for *retrieval* are permitted as a **propose-only** signal
+     (rule 20); the verbatim floor + layer-A definition-quality judge remain the deciders.
+   - Hard constraint: every stored CEP passage must still map to a verifiable source block so the verbatim
+     floor passes (ADR-0004/0007) — chunking proposes better evidence windows, it cannot replace block/
+     locator identity.
+   - Gate it on measurement: first inspect real AIRA-dojo output to quantify fragmentation-vs-genuine-
+     absence before committing to an approach (rules 13/14/21).
 
 3. **Inspection/observability polish.** Two small operator-facing items:
    - **Harden forced-tool transport** for long runs: the all-manifest learner-loop hit one malformed JSON
@@ -54,6 +63,34 @@
      hardcoded rule set (the forbidden rule-16 symbolic gate). Not now.
 
 ## COMPLETED
+
+- **CEP Definition-Passage quality judge (layer A) (2026-06-24, branch
+  `feat/cep-definition-quality-judge`, shipped on branch — not yet merged).** A measured drop-only
+  cross-family (`kg-independent-judge` → gpt-oss-120b) Definition-Passage quality judge now runs in
+  `executeExtractionRun`, composed **after** the deterministic verbatim floor and **before** the
+  assertion-entailment judge (U1–U3 port/schema/adapter, U4 stage + hollow-reason routing, U5 pipeline +
+  worker wiring, U6 demoted-hollow → rescue-pool test + ADR-0007 amendment). It vetoes verbatim-grounded
+  but meaning-empty passages (bare name / heading / title / citation); a last-passage veto routes into the
+  **existing** ungroundable demotion (core→optional, not published) under the distinct
+  `core_demoted_hollow_definition` reason code with a loud quality issue, and the demoted-but-mentioned
+  Concept flows into the **existing** rescue pool (`mentionedNonCoreCandidates`) — no new promotion
+  machinery, grounding-origin wall holds (ADR-0023). Domain-neutral rubric + tool `description` (rules
+  16/17), fail-closed = preserve recall. **Rule-14 PASS (with caveats)** on real AIRA-dojo 2507.02554v2
+  (datalab Markdown, `kg-independent-judge`, worker hash `definition-quality-judge-v38`): `Overfitting`'s
+  only passage (describes the dynamic, never states what the term means) was vetoed → demoted with the
+  distinct code + warning issue, run still `succeeded`; the named control `Generalization Gap` kept its
+  genuine definition; 1 of 7 core definitions vetoed; 0 `kept_judge_unavailable` (no transport blip shrank
+  the core). Evidence: `tmp/2026-06-24-definition-quality-judge/rule-14-evaluation.md`. **Caveats (both
+  watch-items, not FIX_FIRST):** (1) the exact motivating passages (`Graph-based Search Framework` heading,
+  `Evolutionary Search` citation) were **not in this stochastic run's core set** (MoE non-determinism +
+  re-registered source, rule 19) so they weren't re-confirmed directly — a structurally equivalent hollow
+  case (`Overfitting`) was caught instead, and the heading/citation shapes are pinned by the U3 adapter
+  tests; (2) the `Overfitting` veto is borderline and was tagged `bare_name_repetition` when it is really
+  **non-defining descriptive prose** — a shape none of the three structural categories captures cleanly.
+  Per the plan (start permissive, calibrate only on clear leakage) **no rubric change was made**; the
+  concept is demoted-not-deleted and rescue-eligible. **Watch-trigger:** if non-defining-prose cases
+  accumulate, add a `non_defining_prose` veto category. (Layer B / chunking follow-up = TODO #2, which
+  consumes the `core_demoted_hollow_definition` code this item emits.)
 
 - **Prerequisite-ordering K-sampling + artifact-version-ceremony abolition (2026-06-24, branch
   `feat/prerequisite-ordering-k-sampling`, plan `2026-06-24-002`).** The whole-set ordering call is now
