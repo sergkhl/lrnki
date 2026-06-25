@@ -122,8 +122,8 @@ export class PostgresExtractionRunStore implements ExtractionRunStorePort {
       };
 
       await tx`
-        INSERT INTO extraction_runs (run_id, source_resource_id, source_document_id, pipeline_config_hash, status, degraded, cost_usd, latency_ms, completed_at)
-        VALUES (${result.runId}, ${result.sourceResourceId}, ${result.sourceDocumentId}, ${result.pipelineConfigHash}, ${result.status}, ${result.degraded}, ${result.costUsd ?? null}, ${result.latencyMs ?? null}, now())`;
+        INSERT INTO extraction_runs (run_id, source_resource_id, source_document_id, pipeline_config_hash, status, degraded, latency_ms, completed_at)
+        VALUES (${result.runId}, ${result.sourceResourceId}, ${result.sourceDocumentId}, ${result.pipelineConfigHash}, ${result.status}, ${result.degraded}, ${result.latencyMs ?? null}, now())`;
 
       const candidateIdByKey = new Map<string, string>();
       for (const candidate of result.candidates) {
