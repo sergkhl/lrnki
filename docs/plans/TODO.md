@@ -2,24 +2,35 @@
 
 ## TODO
 
-1. **Implement section-scoped parent-child CEP definition retrieval.** Follow the active
-   [implementation plan](./2026-06-25-001-feat-cep-definition-section-retrieval-plan.md): measure
-   genuine absence vs. retrieval-window misses first, replace the adjacency/sibling heuristics only
-   when the real-source evidence supports it, and run the rule-14 gate before promotion.
+1. **Fix CEP definition-passage in-window mis-pick (recall recovery).** Real measurement on the
+   AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to an *in-window
+   mis-pick*: the defining block was already inside the extractor's evidence window, but the
+   extractor quoted a hollow heading/title/citation block instead (zero retrieval-window misses,
+   zero genuine absence across the sampled runs). Add a domain-neutral CEP-extraction prompt clause
+   preferring a meaning-bearing block over a heading/title/citation already in context (rules
+   16/17); measure on real output; escalate to re-pick-on-veto or a stronger extractor only if the
+   clause underperforms
+   ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 
-2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+2. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
+   instrument found zero retrieval-window misses on the AIRA-dojo fixture, so replacing the
+   adjacency/sibling-cap heuristics recovers nothing today. Revisit only behind a fresh requirements
+   document and plan — the earlier draft will drift as the in-window mis-pick fix above lands, so it
+   is intentionally not linked here.
+
+3. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-3. **Improve operator observability.**
+4. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
 
-4. **Keep data-blocked and unearned methods deferred.**
+5. **Keep data-blocked and unearned methods deferred.**
    - Do not fit population difficulty, IRT, KT, or learner models from synthetic or self-assessed
      responses.
    - Do not reintroduce ungrounded graph densification or embedding-derived prerequisite structure.
