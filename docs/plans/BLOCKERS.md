@@ -1,11 +1,16 @@
 # Blockers
 
-- **LLM provider returns 403 on the extraction aliases — blocks rule-14 real-use measurement.**
-  As of 2026-06-25 the `kg-concept-discovery` (and extraction) alias returns HTTP 403 in ~0.4s
-  through the local LiteLLM proxy (proxy itself reports alive). Because discovery is the first
-  pipeline stage, every real extraction run fails immediately, so the rule-14 A/B for the CEP
-  definition in-window mis-pick prompt clause (TODO #1) could not be completed. Preliminary signal
-  from runs before the outage was positive (baseline run: 1 hollow demotion / 3 vetoes; one clean
-  post-clause run: 0 / 0), but this is not a rule-14 PASS. **Manual action:** restore provider
-  access (credits / key / routing) for the extraction aliases, then re-run the A/B with
-  `bash tmp/2026-06-25-cep-defn-retrieval/ab.sh` (SKIP_SCAN fast variant) and record the result.
+No open blockers.
+
+- **RESOLVED 2026-06-25 — extraction prefix-cache reuse + provider access.** The prior blocker
+  ("no dedicated OpenRouter key, so the per-host DeepSeek cache never reused the ~23k-token admission
+  document, ~0.7% hit") is closed by routing the extraction aliases (`kg-concept-discovery`,
+  `kg-concept-admission`, `kg-claim-extraction`, `default-model`) to **DeepSeek first-party**
+  (`deepseek/deepseek-v4-flash-no-thinking`) instead of OpenRouter (`litellm/config.yaml`). First-party
+  credits are live, and DeepSeek's prefix cache is per-ACCOUNT and automatic — no host pinning and no
+  dedicated OpenRouter key required. Measured on a real AIRA-dojo run (2026-06-25,
+  `tmp/2026-06-25-run-timing-spike/FINDINGS.md`): concept-discovery 162 s → 24 s/call, admission
+  59 s → 17 s/call, cep-extraction cache 21% → 53%. The latency motivation (TODO #2) is met by the
+  provider switch alone; the admission document-prefix cache warming further is a minor open
+  optimization, not a blocker.
+</content>

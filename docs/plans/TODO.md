@@ -2,37 +2,63 @@
 
 ## TODO
 
-1. **Validate the CEP in-window mis-pick prompt fix — rule-14 BLOCKED.** Real measurement on the
-   AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to an *in-window
-   mis-pick* (defining block already in the extractor's window, but it quoted a passing-mention /
-   heading / title / citation instead; zero retrieval-window misses, zero genuine absence). The
-   domain-neutral definition-passage clause is **implemented and committed** — broadened reject list
-   plus a positive tie-break preferring the block that states defining properties/criteria/mechanism
-   (rules 16/17). Remaining: the real-use A/B is pending because the extraction provider returns 403
-   ([BLOCKERS.md](./BLOCKERS.md)); re-run `tmp/2026-06-25-cep-defn-retrieval/ab.sh` once access is
-   restored, then escalate to re-pick-on-veto or a stronger extractor only if the clause
-   underperforms
+1. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
+   measurement on the AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to
+   an *in-window mis-pick* (defining block already in the extractor's window, but it quoted a
+   passing-mention / heading / title / citation instead; zero retrieval-window misses, zero genuine
+   absence). The domain-neutral definition-passage clause is **implemented and committed** — broadened
+   reject list plus a positive tie-break preferring the block that states defining
+   properties/criteria/mechanism (rules 16/17). Extraction is fully unblocked: the aliases now route to
+   DeepSeek first-party and a real run on 2026-06-25 succeeded (demoted_hollow=1, 4 bare-name vetoes).
+   `tmp/2026-06-25-cep-defn-retrieval/ab.sh` (SKIP_SCAN fast variant, baseline-no-clause vs after-clause)
+   is being re-run to record the result; escalate to re-pick-on-veto or a stronger extractor only if the
+   clause underperforms
    ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 
-2. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
+2. **Cut extraction latency + build durable run observability (active thread, 2026-06-25).** A
+   single small document takes >10 min to extract. A disposable LiteLLM `LiteLLM_SpendLogs`
+   diagnostic (re-runnable: `tmp/2026-06-25-run-timing-spike/stage-timing.sh`) located the
+   bottleneck: **Concept Admission re-sends the whole ~23k-token document on every 5-candidate
+   batch** (`extractionAdapters.ts`, ~10 calls × ~59 s/call ≈ the bulk of the run); concept-discovery
+   is one ~162 s whole-document call. Two levers, fully written up in
+   `tmp/2026-06-25-run-timing-spike/FINDINGS.md`:
+   - **Provider switch to DeepSeek first-party — DONE (2026-06-25), largest lever.** Routing the
+     extraction aliases off OpenRouter onto `deepseek/deepseek-v4-flash-no-thinking` cut the two
+     payload-bound stages without any prompt change: concept-discovery 162 s → 24 s/call, admission
+     59 s → 17 s/call (real AIRA-dojo run; `tmp/2026-06-25-run-timing-spike/FINDINGS.md`). The gain is
+     raw first-party throughput (no OpenRouter proxy/host-routing hop), not caching — discovery sped up
+     6.7× with zero cache. This resolves the >10-min latency motivation. DeepSeek's per-account prefix
+     cache also works (cep-extraction 21% → 53%), removing the dedicated-key blocker entirely.
+   - **Admission document-prefix caching — minor open optimization.** Even document-first, the ~23k-token
+     admission prefix warmed only to the system-message level (~1.5k tok, 5% hit) across sequential
+     batches, while an isolated identical-prefix probe caches 99.8%. Net it would take admission ~17 s →
+     ~5 s, but it is off the critical path now and a prompt reorder is a behavior-changing prompt edit
+     (rule 14) — deferred, not shipped. Caching-independent alternative if pursued: fewer/larger
+     admission batches or neighborhood-scope each batch (reuse `selectEvidenceNeighborhood`), gated by a
+     measured multi-sample admission-recall (core-set) comparison (rules 14/19), not N=1.
+   - The durable companion is a per-operation run-stage timeline serving both live client progress
+     and speed/cost measurement — chosen direction, ready for `/ce-plan`:
+     [run-observability requirements](../brainstorms/2026-06-25-run-observability-and-progress-requirements.md).
+
+3. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
    instrument found zero retrieval-window misses on the AIRA-dojo fixture, so replacing the
    adjacency/sibling-cap heuristics recovers nothing today. Revisit only behind a fresh requirements
    document and plan — the earlier draft will drift as the in-window mis-pick fix above lands, so it
    is intentionally not linked here.
 
-3. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+4. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-4. **Improve operator observability.**
+5. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
 
-5. **Keep data-blocked and unearned methods deferred.**
+6. **Keep data-blocked and unearned methods deferred.**
    - Do not fit population difficulty, IRT, KT, or learner models from synthetic or self-assessed
      responses.
    - Do not reintroduce ungrounded graph densification or embedding-derived prerequisite structure.
@@ -94,9 +120,17 @@
   caveat recorded above; the June 24 K-sampled prerequisite-ordering run passed on real Rust and
   economics sources, surfacing unstable directions as `uncertain` while retaining robust edges.
 - **Pending real-use evidence:** the rule-14 A/B for the June 25 CEP in-window mis-pick prompt fix
-  (TODO #1) is **not yet run** — extraction provider 403 ([BLOCKERS.md](./BLOCKERS.md)). Preliminary
-  pre-outage signal was positive (baseline 1 demotion / 3 vetoes vs one clean post-clause run 0 / 0)
-  but is not a PASS.
+  (TODO #1) is **running** on the now-unblocked first-party route. A single real run on 2026-06-25
+  succeeded (demoted_hollow=1, 4 bare-name vetoes); `tmp/2026-06-25-cep-defn-retrieval/ab.sh`
+  (baseline-no-clause vs after-clause) is being re-run to record the A/B comparison.
+- **Extraction latency spike (TODO #2), 2026-06-25 — RESOLVED by provider switch.** Real per-stage
+  timing from `LiteLLM_SpendLogs` attributed the >10-min run to admission's whole-document re-send per
+  batch on the OpenRouter route (admission ~59 s/call, per-host cache ~0.7%). Routing the extraction
+  aliases to **DeepSeek first-party** (`litellm/config.yaml`) cut concept-discovery 162 s → 24 s/call
+  and admission 59 s → 17 s/call on a real AIRA-dojo run, and lifted per-account caching
+  (cep-extraction 21% → 53%). The OpenRouter host-pin path is abandoned (it needed a dedicated key);
+  the admission document-prefix cache warming further is a deferred minor optimization. Full trail:
+  `tmp/2026-06-25-run-timing-spike/FINDINGS.md`.
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims above come from
   inspected real model output.
