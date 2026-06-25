@@ -20,7 +20,7 @@ import type {
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { admitSource } from "./admitSource";
-import { NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 import { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQualityJudge";
 import { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
@@ -63,21 +63,9 @@ export async function executeExtractionRun(input: {
   const operationId = input.runId;
   const { document, declaredDomain } = input.source;
 
-  // Bracket one stage: open it, run it, close it ok:true. A throw closes it ok:false,
-  // records the operation `failed`, and propagates — so a thrown stage leaves a
-  // readable failed timeline without wrapping the whole body in a try (R1).
-  const runStage = async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
-    await reporter.enterStage({ operationId, stage, total });
-    try {
-      const result = await fn();
-      await reporter.completeStage({ operationId, stage, ok: true });
-      return result;
-    } catch (error) {
-      await reporter.completeStage({ operationId, stage, ok: false });
-      await reporter.completeOperation({ operationId, status: "failed" });
-      throw error;
-    }
-  };
+  // Bracket each stage onto the timeline; a thrown stage marks the operation failed and
+  // propagates, so a failed run leaves a readable timeline without a whole-body try (R1).
+  const runStage = bracketStage(reporter, operationId);
 
   // The parent `running` row exists from entry — the fix for "no row until done".
   await reporter.beginOperation({ operationType: "extraction", operationId });

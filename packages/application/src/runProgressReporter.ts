@@ -37,3 +37,23 @@ export type NonLlmStage = (typeof NON_LLM_STAGES)[keyof typeof NON_LLM_STAGES];
 // one application-facing surface, while the membership set stays a single source of
 // truth shared with the infrastructure spend projection (U7).
 export const isLlmStage = isStageTag;
+
+// Stage-bracket factory shared by every instrumented operation (R1). Open a stage, run
+// it, close it ok:true; a throw closes it ok:false, marks the OPERATION failed, and
+// rethrows — so a thrown stage always leaves a readable failed timeline without each
+// operation re-implementing the try/catch (and the failure semantics stay one source
+// of truth). `total` seeds an N-of-M heartbeat for stages that iterate.
+export function bracketStage(reporter: RunProgressReporterPort, operationId: string) {
+  return async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
+    await reporter.enterStage({ operationId, stage, total });
+    try {
+      const result = await fn();
+      await reporter.completeStage({ operationId, stage, ok: true });
+      return result;
+    } catch (error) {
+      await reporter.completeStage({ operationId, stage, ok: false });
+      await reporter.completeOperation({ operationId, status: "failed" });
+      throw error;
+    }
+  };
+}

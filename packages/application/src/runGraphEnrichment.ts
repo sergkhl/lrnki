@@ -32,7 +32,7 @@ import type {
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
-import { NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { cutWeakEdges, findCycleEdges, transitiveReduction } from "./prerequisiteDag";
@@ -174,21 +174,10 @@ export async function runGraphEnrichment(input: {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
-  // Bracket one enrichment sub-stage onto the durable timeline. A throw closes the
-  // stage ok:false and records the operation `failed` before propagating, so a failed
-  // enrichment leaves a readable timeline (R1) — no partial layer is ever persisted.
-  const runStage = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
-    await reporter.enterStage({ operationId, stage });
-    try {
-      const result = await fn();
-      await reporter.completeStage({ operationId, stage, ok: true });
-      return result;
-    } catch (error) {
-      await reporter.completeStage({ operationId, stage, ok: false });
-      await reporter.completeOperation({ operationId, status: "failed" });
-      throw error;
-    }
-  };
+  // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
+  // the operation failed before propagating, so a failed enrichment leaves a readable
+  // timeline (R1) — no partial layer is ever persisted.
+  const runStage = bracketStage(reporter, operationId);
   await reporter.beginOperation({ operationType: "enrichment", operationId });
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
   if (!snapshot) {
