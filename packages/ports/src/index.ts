@@ -633,3 +633,48 @@ export interface RunProgressReporterPort {
   // Set the parent's terminal status + completed_at.
   completeOperation(input: { operationId: string; status: "succeeded" | "failed" }): Promise<void>;
 }
+
+// ---------------------------------------------------------------------------
+// Operation timeline read model (R4, ADR-0027). The live "where is this
+// operation, is it moving" surface. Pure read over operation_runs +
+// operation_run_stages; the adapter owns the query and row-stitch, no SQL in UI.
+// Returns finished models or `undefined`-for-not-found; real DB errors propagate.
+// ---------------------------------------------------------------------------
+
+export interface OperationTimelineStage {
+  stage: string;
+  startedAt: string;
+  endedAt: string | null;
+  // null while the stage is open; ended_at - started_at once closed (R5 wall-clock).
+  durationMs: number | null;
+  ok: boolean | null;
+  progressDone: number | null;
+  progressTotal: number | null;
+}
+
+export interface OperationTimelineSummary {
+  operationRunId: string;
+  operationType: OperationType;
+  operationId: string;
+  status: "running" | "succeeded" | "failed";
+  currentStage: string | null;
+  progressDone: number | null;
+  progressTotal: number | null;
+  lastProgressAt: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  // Wall-clock since start: completed_at - started_at, or now - started_at while running.
+  // A long-stale lastProgressAt on a `running` row is the "hung run" signal (KTD3 risk).
+  elapsedMs: number;
+  stageCount: number;
+}
+
+export interface OperationTimelineDetail {
+  summary: OperationTimelineSummary;
+  stages: OperationTimelineStage[];
+}
+
+export interface OperationTimelineReadPort {
+  listOperationTimelines(): Promise<OperationTimelineSummary[]>;
+  getOperationTimeline(operationId: string): Promise<OperationTimelineDetail | undefined>;
+}
