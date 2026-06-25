@@ -1,7 +1,7 @@
 import type { GeneratedGroundingBundle } from "@lrnki/domain-core";
 import type { GroundingGenerationPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
 import { generatedGroundingBundleSchema, generatedGroundingBundleValidator } from "./toolSchemas";
 

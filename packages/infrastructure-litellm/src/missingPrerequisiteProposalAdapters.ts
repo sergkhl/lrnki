@@ -1,7 +1,7 @@
 import type { MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import type { MissingPrerequisiteProposalPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
 import { missingPrerequisiteProposalSchema, missingPrerequisiteProposalValidator } from "./toolSchemas";
 

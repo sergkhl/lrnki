@@ -11,7 +11,7 @@ import type {
   SourceBlock,
   StructuredDocument
 } from "@lrnki/domain-core";
-import { evidenceQuoteMatches, extractableBlocks } from "@lrnki/domain-core";
+import { evidenceQuoteMatches, extractableBlocks, STAGE_TAGS } from "@lrnki/domain-core";
 import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
 import type {
   AdmissionLabelJudgmentPort,
@@ -22,7 +22,6 @@ import type {
   DefinitionPassageQualityJudgmentPort
 } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
 import {
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,

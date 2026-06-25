@@ -13,6 +13,12 @@ export { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQual
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 export {
+  noopRunProgressReporter,
+  NON_LLM_STAGES,
+  isLlmStage,
+  type NonLlmStage
+} from "./runProgressReporter";
+export {
   deduplicateDerivedNodes,
   cosineSimilarity,
   candidatePairsByDomain,

@@ -602,3 +602,34 @@ export interface SourceInspectionReadPort {
   listSourceSummaries(): Promise<SourceSummary[]>;
   getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
 }
+
+// ---------------------------------------------------------------------------
+// Run-stage timeline reporting seam (KTD4, R7). The EXTERNALLY-DRIVEN seam every
+// triggered operation reports progress through, so a future durable workflow
+// engine (Temporal/Restate) can drive the substrate without changing operation
+// logic. Operations call these at stage boundaries and inside item loops; the
+// worker injects the Postgres adapter, tests inject a fake, and an absent
+// reporter (the no-op default) keeps behavior unchanged. Side-effect-only and
+// idempotent-tolerant — the reporter writes the timeline, it returns nothing.
+// ---------------------------------------------------------------------------
+
+// The four triggered operations whose timeline these tables describe (KTD1).
+// `study_items` is its own operation_type keyed by enrichmentId (ADR-0017 split
+// is preserved — these describe operations, they do not unify them).
+export type OperationType = "extraction" | "minting" | "enrichment" | "study_items";
+
+export interface RunProgressReporterPort {
+  // Insert the parent `running` row at operation entry — the fix for "no row
+  // until done": a polling client sees `running` immediately, not no row.
+  beginOperation(input: { operationType: OperationType; operationId: string }): Promise<void>;
+  // Open a stage: insert a child row, set the parent's current_stage. `total` is
+  // the item count for a stage that iterates, enabling an N-of-M heartbeat.
+  enterStage(input: { operationId: string; stage: string; total?: number }): Promise<void>;
+  // Bump the heartbeat as items complete inside a long stage (R3), so liveness is
+  // visible without waiting for a stage boundary. `done` is the cumulative count.
+  recordProgress(input: { operationId: string; stage: string; done: number }): Promise<void>;
+  // Close a stage: set its ended_at + ok. A thrown stage reports ok:false first.
+  completeStage(input: { operationId: string; stage: string; ok: boolean }): Promise<void>;
+  // Set the parent's terminal status + completed_at.
+  completeOperation(input: { operationId: string; status: "succeeded" | "failed" }): Promise<void>;
+}

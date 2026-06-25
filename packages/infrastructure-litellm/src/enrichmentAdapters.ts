@@ -6,7 +6,7 @@ import type {
 } from "@lrnki/domain-core";
 import type { MintingDurabilityJudgmentPort, PrerequisiteOrderingPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
   prerequisiteOrderingSchema,
   prerequisiteOrderingValidator,

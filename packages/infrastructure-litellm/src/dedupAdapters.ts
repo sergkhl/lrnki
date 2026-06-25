@@ -2,7 +2,7 @@ import type { NodeMergeAdjudication } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { nodeMergeAdjudicationSchema, nodeMergeAdjudicationValidator } from "./toolSchemas";
 
 // Semantic-deduplication adapters (plan U1/U2, ADR-0012/0019). Two SEPARATE mechanisms

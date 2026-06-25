@@ -1,7 +1,7 @@
 import type { DifficultyNodeContext } from "@lrnki/domain-core";
 import type { IntrinsicDifficultyJudgmentPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { intrinsicDifficultySchema, intrinsicDifficultyValidator } from "./toolSchemas";
 
 export const INTRINSIC_DIFFICULTY_JUDGE_MODEL = "kg-independent-judge";
