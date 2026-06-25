@@ -19,6 +19,11 @@ export {
   type NonLlmStage
 } from "./runProgressReporter";
 export {
+  bottleneckReport,
+  type BottleneckReport,
+  type BottleneckStageRow
+} from "./bottleneckReport";
+export {
   deduplicateDerivedNodes,
   cosineSimilarity,
   candidatePairsByDomain,

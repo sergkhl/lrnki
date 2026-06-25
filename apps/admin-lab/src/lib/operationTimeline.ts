@@ -1,3 +1,5 @@
+import { bottleneckReport } from "@lrnki/application";
+import { LiteLlmStageSpendAdapter } from "@lrnki/infrastructure-litellm";
 import { PostgresOperationTimelineRead, createDatabaseClient } from "@lrnki/infrastructure-postgres";
 
 // Server-only thin shell over the Operation Timeline read model (R4, ADR-0027).
@@ -32,4 +34,22 @@ export function listOperationsWithStages() {
     const details = await Promise.all(summaries.map((summary) => read.getOperationTimeline(summary.operationId)));
     return details.flatMap((detail) => (detail ? [detail] : []));
   });
+}
+
+// The Admin Lab renderer of the bottleneck report (R5): the SAME use-case the worker
+// CLI calls (KTD5) — no HTTP hop, no re-implemented join. Cost is read live from
+// LiteLLM at render time and never stored (R6); a LiteLLM outage degrades to wall-clock
+// only inside the use-case.
+export function getBottleneckReport(operationId: string) {
+  return withTimelineRead((read) =>
+    bottleneckReport({
+      operationId,
+      timelineRead: read,
+      stageSpendRead: new LiteLlmStageSpendAdapter({
+        baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
+        apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
+        timeoutMs: 10000
+      })
+    })
+  );
 }

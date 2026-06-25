@@ -1,4 +1,5 @@
-import { ActivityIcon, DatabaseZapIcon } from "lucide-react";
+import Link from "next/link";
+import { ActivityIcon, DatabaseZapIcon, GaugeIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -104,8 +105,14 @@ export default async function OperationsPage() {
                       ) : null}
                     </CardTitle>
                     <CardDescription className="font-mono text-xs">{summary.operationId}</CardDescription>
-                    <CardAction>
+                    <CardAction className="flex items-center gap-2">
                       <Badge variant="outline">elapsed {formatDuration(summary.elapsedMs)}</Badge>
+                      <Link
+                        className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
+                        href={`/admin/lab/operations/bottleneck?operationId=${summary.operationId}`}
+                      >
+                        <GaugeIcon className="size-4" /> bottleneck
+                      </Link>
                     </CardAction>
                   </CardHeader>
                   <CardContent>

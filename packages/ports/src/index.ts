@@ -678,3 +678,19 @@ export interface OperationTimelineReadPort {
   listOperationTimelines(): Promise<OperationTimelineSummary[]>;
   getOperationTimeline(operationId: string): Promise<OperationTimelineDetail | undefined>;
 }
+
+// Per-stage LiteLLM spend (R5, R6). Read live from LiteLLM `/spend/tags` at report
+// time; the application NEVER computes or stores a cost figure — it surfaces
+// LiteLLM's `total_spend` verbatim. The adapter projects the response onto the closed
+// STAGE_TAGS vocabulary, excluding LiteLLM's auto-emitted User-Agent pseudo-tags and
+// any stale tag, so only join-keyable LLM stages survive. Spend is GLOBAL per tag
+// (LiteLLM has no per-operation scoping) — the standing per-stage cost picture.
+export interface StageSpend {
+  tag: string;
+  logCount: number;
+  totalSpend: number;
+}
+
+export interface StageSpendReadPort {
+  readStageSpend(): Promise<StageSpend[]>;
+}

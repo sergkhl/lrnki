@@ -12,7 +12,9 @@ import {
   loadResponseLogLearnerState,
   synthesizeResponses,
   ADAPTIVE_MASTERY_THRESHOLD,
-  runGraphEnrichment
+  runGraphEnrichment,
+  bottleneckReport,
+  type BottleneckReport
 } from "@lrnki/application";
 import {
   DoclingStructuredDocumentParser,
@@ -31,6 +33,7 @@ import {
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
+  LiteLlmStageSpendAdapter,
   LiteLlmEmbeddingClient,
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
@@ -53,6 +56,7 @@ import {
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
   PostgresRunProgressReporter,
+  PostgresOperationTimelineRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
@@ -125,6 +129,11 @@ function buildContext() {
     registrationStore,
     runStore,
     runProgressReporter,
+    // Bottleneck-report read surfaces (U7): the per-operation timeline read-model and
+    // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
+    // live and never stored (R6).
+    operationTimelineRead: new PostgresOperationTimelineRead(sql),
+    stageSpend: new LiteLlmStageSpendAdapter(baseClient),
     graphStore,
     artifacts,
     parsers,
@@ -466,6 +475,46 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
 }
 
+// Bottleneck report renderer for code agents (KTD5, R5): a per-stage table of
+// wall-clock + calls + cost for one operation, or the same structured rows as `--json`.
+// Both this CLI and the Admin Lab view call the SAME bottleneckReport use-case; neither
+// re-implements the join.
+async function bottleneckReportCommand(ctx: Context, operationId: string | undefined, flags: string[]) {
+  if (!operationId) {
+    console.error("! bottleneck-report requires <operationId> (an extraction run / graph version / enrichment id).");
+    process.exitCode = 1;
+    return;
+  }
+  const report = await bottleneckReport({
+    operationId,
+    timelineRead: ctx.operationTimelineRead,
+    stageSpendRead: ctx.stageSpend
+  });
+  if (!report) {
+    console.error(`! no operation timeline found for ${operationId}.`);
+    process.exitCode = 1;
+    return;
+  }
+  if (flags.includes("--json")) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  renderBottleneckTable(report);
+}
+
+function renderBottleneckTable(report: BottleneckReport) {
+  console.log(`\n>> bottleneck report — ${report.operationType} ${report.operationId} (${report.status})`);
+  if (!report.costAvailable) console.log("   ! LiteLLM /spend/tags unavailable — cost columns omitted, wall-clock only.");
+  const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
+  const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
+  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"cost".padStart(10)}`;
+  console.log(header);
+  console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)}`);
+  for (const row of report.stages) {
+    console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${fmtUsd(row.costUsd).padStart(10)}`);
+  }
+}
+
 async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
   if (!enrichmentId) {
     console.error("! generate-study-items requires <enrichmentId>.");
@@ -533,8 +582,11 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "list-sources":
       await listSources(ctx);
       break;
+    case "bottleneck-report":
+      await bottleneckReportCommand(ctx, arg, rest);
+      break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json]>");
   }
 }
 
