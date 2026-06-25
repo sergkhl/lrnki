@@ -1,54 +1,24 @@
 # Plans
 
-## Live plans
-Only `TODO.md` and `BLOCKERS.md` are live. Stale or completed implementation plans are removed
-after their durable decisions, completed outcomes, and latest validation evidence have been folded
-into `CONTEXT.md`, ADRs, or `TODO.md`.
+Planning documents are the canonical source for implementation design only while the work is ready or
+in progress. When work completes, fold durable decisions into ADRs, current status into `TODO.md`, and
+terminology into `CONTEXT.md`, then delete the completed plan.
 
-- [TODO](./TODO.md)
-- [BLOCKERS](./BLOCKERS.md)
+## Live coordination
 
-## Progress report instructions
+- [TODO](./TODO.md) — 3–7 current tasks, 5–10 grouped completed outcomes, and latest validation.
+- [BLOCKERS](./BLOCKERS.md) — unresolved manual actions required from the user only.
 
-### ADRs
+## Active implementation plans
 
-Update @docs/adr/README.md and linked ADRs only when a durable architectural decision changed.
+- [Section-scoped parent-child CEP definition-evidence retrieval](./2026-06-25-001-feat-cep-definition-section-retrieval-plan.md)
 
-ADR rules:
-- one durable decision per ADR,
-- policy-level decisions only,
-- no implementation details,
-- no speculative or pending decisions,
-- no duplicate decisions.
+## Ownership rules
 
-### TODO
-
-Keep @docs/plans/TODO.md limited to exactly these sections:
-
-- `TODO`: Recommended next implementation tasks
-- `COMPLETED`: Tasks that are done
-- `VALIDATION`: Latest validation results
-
-For TODO:
-
-- keep 3–7 top-level tasks,
-- order by dependency and value,
-- use sub-bullets for concrete steps,
-- remove stale or completed work.
-
-For COMPLETED:
-
-- consolidate work into 5–10 durable groups,
-- group by subsystem, milestone, or outcome,
-- do not append one bullet per code edit.
-
-For VALIDATION
-- keep only latest test results here.
-
-
-### Blockers
-
-Record unresolved manual actions required from the user in @docs/plans/BLOCKERS.md.
-Do not write in manual actions something that you can complete yourself.
-
-Remove resolved blockers.
+- ADRs own durable policy; plans link to ADRs rather than restating architecture.
+- Source types and the initial migration own exact interfaces and persisted shapes.
+- Keep only ready/in-progress plans here. Delete stale or completed plans immediately after their
+  durable content has been consolidated.
+- Do not duplicate a plan's requirements, design, implementation units, or acceptance criteria in
+  `TODO.md`; link to the active plan with a short status note.
+- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections.

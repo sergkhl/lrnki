@@ -1,25 +1,30 @@
 # Use learner-neutral intrinsic difficulty before learner-calibrated difficulty
 
-Status: Accepted (2026-06-18)
+Status: Accepted
 
 ## Decision
 
-Graph Enrichment produces concept difficulty with a learner-neutral **intrinsic difficulty** method. The method scores every derived node in the Derived Graph Layer: anchors, rescued `source_mentioned` nodes, and minted `llm_grounded` nodes. It keeps the existing `ConceptDifficulty` output shape (`score`, `method`, `components`) so learner-path projection continues to treat prerequisite structure as primary and difficulty as a secondary ordering signal.
+Graph Enrichment assigns learner-neutral intrinsic difficulty to every derived node. Prerequisite
+structure remains the primary learner-path constraint; intrinsic difficulty is a secondary ordering
+signal.
 
-Intrinsic difficulty is a fused signal:
+Intrinsic difficulty combines:
 
-- a bounded neural judge, routed through LiteLLM and a forced named tool schema, estimates a per-node intrinsic subscore from domain-neutral factors such as abstraction level, technical density, implied background load, and integration burden;
-- deterministic structural components record topological depth, transitive prerequisite ancestors, fan-in, and evidence density;
-- the returned `components` expose the neural and deterministic terms rather than hiding an opaque scalar.
+- a bounded neural judgment based on domain-neutral factors such as abstraction, technical density,
+  background load, and integration burden; and
+- inspectable deterministic structural and evidence components.
 
-The neural judge reads the same per-node evidence assembled for enrichment ordering. Anchors use their published CEP evidence; rescued nodes use verified mention passages; `llm_grounded` nodes use their generated grounding bundle. This does not change the verbatim floor: source-quoted evidence still must verify verbatim, and generated grounding remains explicitly non-verbatim as recorded in ADR-0023.
+The neural judge consumes the same provenance-appropriate evidence used by enrichment ordering.
+Source evidence remains subject to the verbatim floor; generated grounding remains explicitly
+generated under ADR-0023.
 
-Learner-calibrated difficulty remains deferred. Bradley-Terry, IRT, KT, and related learner-response models require learner interaction data the product does not yet collect. They may replace or augment intrinsic difficulty only after that data surface exists and real-use inspection shows the calibrated method improves the learner path without hiding provenance.
-
-Intrinsic difficulty is carried at `EXPERIMENT_ONLY` trust for ordering until real learner data exists. Rule-14 inspection can establish source-faithful plausibility, not a hard oracle for difficulty quality.
+Intrinsic difficulty remains `EXPERIMENT_ONLY` until real learner-response data can calibrate it.
+Population difficulty models, IRT, KT, and other learner modeling must not be fitted from synthetic or
+self-assessed responses. They may be introduced only after stable per-learner calibration and graded
+response data exist and real-use evaluation demonstrates an improvement.
 
 ## Context
 
-The previous `dag-depth-mock` difficulty producer was honest but too coarse: it could not distinguish concepts at the same topological depth. At the same time, jumping directly to learner-calibrated difficulty would invent precision unsupported by available data. A learner-neutral intrinsic judge fills the current gap while keeping the calibrated method explicitly data-blocked.
-
-F3 graph densification was removed at the same milestone; that removal is owned by ADR-0019 (the enrichment layer already passed inspected prerequisite-ordering gates without it). Difficulty therefore improves the secondary ordering signal rather than adding another graph-growth pass.
+Pure graph depth cannot distinguish many concepts at the same structural level, but the project does
+not yet have data that justifies population-level learner modeling. Intrinsic difficulty provides an
+inspectable interim signal without claiming learner calibration.

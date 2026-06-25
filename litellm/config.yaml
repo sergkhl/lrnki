@@ -307,7 +307,7 @@ router_settings:
     # cross-family independent of the DeepSeek extractor, supports forced
     # tool_choice, and is cheap ($0.039/$0.18 per Mtok), so the judge is never the
     # extractor grading its own output. (The off-core oracle triangle and label
-    # aligner were retired after the admission-precision fix; see ADR-0013/0022.)
+    # aligner were retired after the admission-precision fix; see ADR-0013.)
     kg-independent-judge: openrouter/openai/gpt-oss-120b
     # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
     # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;

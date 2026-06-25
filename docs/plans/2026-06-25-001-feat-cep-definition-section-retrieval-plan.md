@@ -20,7 +20,7 @@ retrieval) applied to the existing structure-aware blocks — no new segmentatio
 The work is gated by a **disposable three-way measurement instrument** that attributes every
 existing `core_demoted_hollow_definition` demotion on the real fixture to one of three causes
 (genuine absence / window miss / in-window mis-pick) and, for window misses, records locality
-(same / adjacent / far section). Measurement runs first so the locality distribution — a
+(same / adjacent-ancestor / adjacent-sibling / far section). Measurement runs first so the locality distribution — a
 structural signal, not fixture content — selects the section-depth rule and justifies deleting
 the superseded `adjacencyRadius`/`siblingCap` heuristics (rule 18). Promotion requires a
 rule-14 PASS on real model output, not a green suite.
@@ -41,7 +41,7 @@ meaning-empty Definition Passages and demotes the Concept core→optional under
 
 Only cause (2) is fixed by a retrieval change. Applying a chunking change blindly would spend
 carrying cost on causes (1) and (3) it cannot touch. The fix must therefore be *measured into
-existence*: quantify the split first, change retrieval to convert same/adjacent-section window
+existence*: quantify the split first, change retrieval to convert same/adjacent-ancestor window
 misses into kept definitions, and confirm on real output that the hollow-demotion rate drops
 for the right reason.
 
@@ -58,7 +58,8 @@ definition, the default constant, the selector test, and one assertion in
 
 ## Requirements Traceability
 
-Carried from origin (`docs/brainstorms/2026-06-25-cep-definition-section-retrieval-requirements.md`):
+Carried from
+[origin requirements](../brainstorms/2026-06-25-cep-definition-section-retrieval-requirements.md):
 
 | Origin requirement | Where addressed |
 |---|---|
@@ -69,12 +70,12 @@ Carried from origin (`docs/brainstorms/2026-06-25-cep-definition-section-retriev
 | Decision — measurement oracle is Layer A judge over the full document; no new judge | U1 |
 | Decision — embeddings deferred unless window-miss/**far** dominates | Deferred to Follow-Up Work |
 | Decision — in-window mis-pick fix is a domain-neutral prompt clause, separable | Deferred to Follow-Up Work |
-| Hard constraint — verbatim floor untouched (ADR-0004/0007) | U2 (retrieval-grouping only), U3 verification |
+| Hard constraint — block identity and verbatim floor untouched ([ADR-0004](../adr/0004-normalize-curated-sources.md), [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)) | U2 (retrieval-grouping only), U3 verification |
 | Hard constraint — block/locator identity unchanged; no re-segmentation | U2 (operates over existing blocks via `headingPath`) |
 | Hard constraint — domain-neutral (rules 3/17) | U2 KTD (structural section rule, no fixture calibration) |
 | Hard constraint — real-use gate (rules 13/14) | U3 rule-14 note |
 | Success — three-way attribution with defining-block citation | U1 |
-| Success — same/adjacent window-miss Concepts retain definitions, no new verbatim failures | U3 |
+| Success — same/adjacent-ancestor window-miss Concepts retain definitions, no new verbatim failures | U3 |
 | Success — genuine-absence Concepts stay demoted (no false recovery) | U3 |
 | Success — radius + sibling config gone, one source of truth | U2 |
 
@@ -83,7 +84,8 @@ Carried from origin (`docs/brainstorms/2026-06-25-cep-definition-section-retriev
 ## Key Technical Decisions
 
 **KTD1 — Measure-first sequencing.** Build and run the measurement instrument (U1) before the
-retrieval change (U2). The window-miss locality distribution (same / adjacent / far) is the
+retrieval change (U2). The window-miss locality distribution
+(same / adjacent-ancestor / adjacent-sibling / far) is the
 empirical gate for whether section scoping suffices and what depth rule to use; deleting the
 heuristics (rule 18) is justified by that distribution, not assumed. Rationale: the origin's
 own decision table keys the fix on the dominant measured cause.
@@ -113,8 +115,8 @@ by the prefix-inclusive widening*; **adjacent-sibling** = `D` and `P` share all 
 segment (same parent, different leaf) — *NOT fixed by leaf-exact or prefix-inclusive; reachable
 only via the retained label-substring sweep*; **far** = otherwise — *fixed only by embeddings
 (deferred)*. Section scoping (this pass) therefore targets **same + adjacent-ancestor**; the
-diagram's "same/adjacent" branch is read with this precision, not as a claim that every adjacent
-case is recovered.
+diagram's "same/adjacent-ancestor" branch is read with this precision, not as a claim that every
+adjacent case is recovered.
 
 **KTD3 — Section bounded by `maxEvidenceBlocksPerConcept` via a mention-centered slice.** When
 an enclosing section exceeds the cap, take a mention-centered contiguous slice *within the
@@ -122,17 +124,16 @@ section* (blocks nearest the mention indices) rather than truncating from the to
 defining block stays reachable. The `maxEvidenceBlocksPerConcept` bound and the whole-document
 label-substring sweep are retained (origin Scope 2); only adjacency + sibling-cap are removed.
 
-**KTD4 — Measurement oracle reuses the Layer A judge over all body blocks; record both
-verdicts when a cross-family judge is run.** The instrument feeds **every body block** (full
+**KTD4 — Measurement oracle reuses the existing Layer A judge over all body blocks.** The
+instrument feeds **every body block** (full
 `text` as `evidenceQuote`, with its real `blockType`/`headingPath`) to the
 `DefinitionPassageQualityJudgmentPort.judgeDefinitions` rubric — the same rubric Layer A used to
-veto — to locate defining blocks document-wide. A block is "defining" iff
-`establishesMeaning === true`. Additionally run `kg-independent-judge` (gpt-oss-120b) over the
-same blocks and **record both verdicts, flagging disagreement** (origin open question, lean:
-cheap and more honest). No new judge is built. The instrument is disposable (rule 11), deleted
-once it has reported (U3).
+veto — to locate defining blocks document-wide. Layer A already uses the cross-family
+`kg-independent-judge` alias; no second alias or judge is introduced. A block is "defining" iff
+`establishesMeaning === true` from an actual returned verdict, not a fail-open adapter fallback.
+The instrument is disposable (rule 11), deleted once it has reported (U3).
 
-**KTD4a — Chunk the document-wide scan; a missing index is a scan failure, never a verdict.**
+**KTD4a — Chunk the document-wide scan; fail-open sentinels are scan failures, never verdicts.**
 The Layer A adapter fails **open** — a missing or unparseable verdict defaults to `keep`
 (`establishesMeaning = true`; see `extractionAdapters.ts`), which is correct for production
 recall but wrong for a measurement scan: a full arXiv fixture has hundreds of body blocks, and a
@@ -140,9 +141,11 @@ single forced-tool call asked for hundreds of index-aligned judgments will trunc
 indices would be silently miscounted as **defining** — inflating window-miss / in-window
 mis-pick and masking genuine absence, corrupting the exact attribution the plan gates on.
 Therefore the instrument batches the scan into bounded chunks (≤ ~20 blocks per
-`judgeDefinitions` call) and **asserts that every index in a chunk returned a verdict**; a
-missing index is treated as scan failure (re-run / surfaced), never as a definition verdict.
-Production Layer A is unchanged — this discipline lives only in the disposable instrument.
+`judgeDefinitions` call) and rejects adapter fallback rationales such as
+`[no verdict for index ...: kept]` or `[ungrounded veto kept: ...]`. A transport exception,
+missing verdict, or ungrounded veto fails that scan chunk for re-run/manual inspection; it is
+never counted as a defining block. Production Layer A is unchanged — this stricter
+measurement-only handling lives in the disposable instrument.
 
 **KTD5 — "Window used" is computed by calling `selectEvidenceNeighborhood` itself.** The
 instrument reconstructs the per-Concept window by calling the same function the pipeline uses,
@@ -204,7 +207,7 @@ flowchart TB
 
 **Goal:** Quantify, on the real fixture, why each `core_demoted_hollow_definition` Concept was
 demoted — genuine absence / window miss / in-window mis-pick — with the defining-block citation
-and, for window misses, the locality (same / adjacent / far section). Produces the "before"
+and, for window misses, the locality (same / adjacent-ancestor / adjacent-sibling / far section). Produces the "before"
 snapshot that gates the retrieval change.
 
 **Requirements:** Origin Scope 3, Scope 4 (before), success criterion 1; KTD1, KTD4, KTD5, KTD6.
@@ -227,18 +230,18 @@ snapshot that gates the retrieval change.
   blocks (`extractableBlocks(document.blocks)`), one passage per block with
   `evidenceQuote = block.text`, real `blockType`/`headingPath`, and call `judgeDefinitions`
   (Layer A adapter) **in bounded chunks (≤ ~20 blocks)**, asserting every index in each chunk
-  returns a verdict — a missing index is a scan failure, never read as a definition (KTD4a). A
-  block is "defining" for the Concept iff `establishesMeaning === true`. Run the same chunked
-  scan with the `kg-independent-judge` adapter; record both verdicts and flag per-block
-  disagreement.
+  returns a non-fallback verdict. Detect the adapter's `[no verdict ...]` and
+  `[ungrounded veto kept ...]` rationale markers and fail the chunk instead of counting them as
+  defining (KTD4a). A block is "defining" for the Concept iff a genuine returned verdict has
+  `establishesMeaning === true`.
 - **Window reconstruction (KTD5):** call `selectEvidenceNeighborhood(document.blocks, {mentionBlockIds, labels})` to get the window actually used.
 - **Classify:** genuine absence (no defining block), in-window mis-pick (≥1 defining block ∈
   window), window miss (defining block(s) exist but none ∈ window). For window miss, record
   locality per the **pinned KTD2a predicate** (same / adjacent-ancestor / adjacent-sibling / far)
   by comparing each defining block's `headingPath` to the mention's, so the histogram drives the
   leaf-vs-prefix depth choice reproducibly.
-- Emit a per-Concept table (Concept label, cause, defining-block IDs + quotes, locality, judge
-  agreement) and a cause/locality histogram to `before.md`.
+- Emit a per-Concept table (Concept label, cause, defining-block IDs + quotes, locality, scan
+  disposition) and a cause/locality histogram to `before.md`.
 
 **Patterns to follow:** `tmp/2026-06-24-definition-quality-judge/eval.ts` for harness shape;
 `applyDefinitionPassageQualityJudge.ts:44-52` for how passages are built from blocks; the
@@ -253,7 +256,8 @@ scaffolding.
 
 **Verification:** `before.md` attributes every `core_demoted_hollow_definition` Concept on the
 fixture to exactly one cause with its defining-block citation, and the window-miss rows carry a
-same/adjacent/far locality. The cause histogram is readable and the dominant cause is identified.
+same/adjacent-ancestor/adjacent-sibling/far locality. The cause histogram is readable and the
+dominant cause is identified.
 
 ---
 
@@ -290,7 +294,9 @@ and code in the same change (rule 18). Depth rule chosen from U1's measured loca
   (KTD3) so an oversized section cannot push the defining block past the cap.
 - Keep the function pure and deterministic (it remains a domain-core symbolic transform, rule
   19) — section scoping is a retrieval-time grouping only; nothing about stored-passage
-  verification changes (hard constraint, ADR-0004/0007).
+  verification changes (hard constraint,
+  [ADR-0004](../adr/0004-normalize-curated-sources.md) and
+  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 - Grep for any other reference to the removed fields before finishing (rule 18); the survey in
   Problem Frame lists the only consumers.
 
@@ -349,7 +355,7 @@ output asserted):
 
 ### U3. Before/after validation, rule-14 PASS, instrument teardown
 
-**Goal:** Re-run the U1 instrument against the post-U2 pipeline, confirm same/adjacent
+**Goal:** Re-run the U1 instrument against the post-U2 pipeline, confirm same/adjacent-ancestor
 window-miss Concepts now retain a meaning-bearing Definition Passage and are no longer demoted,
 genuine-absence Concepts remain demoted, and no new verbatim-floor failures appear — then delete
 the instrument (rule 11) and write the rule-14 note.
@@ -368,9 +374,10 @@ gate (rules 13/14); KTD6.
 - Run `measure.ts` unchanged against the post-U2 build (KTD5 — same script, the function output
   is what changed). Capture `after.md`.
 - Diff before vs. after: every Concept previously classified window-miss/same or
-  window-miss/adjacent should now be either (a) no longer in the demoted set, or (b) carrying a
-  surviving non-hollow definition. Genuine-absence Concepts must remain demoted (no false
-  recovery). Verify the run's verbatim floor is intact (no new verification failures).
+  window-miss/adjacent-ancestor should now be either (a) no longer in the demoted set, or
+  (b) carrying a surviving non-hollow definition. Adjacent-sibling and far cases are not
+  promotion criteria for this retrieval rule. Genuine-absence Concepts must remain demoted
+  (no false recovery). Verify the run's verbatim floor is intact (no new verification failures).
 - If `after.md` shows a residual dominant cause of window-miss/**far** or in-window mis-pick,
   record it as a run-scoped quality issue and route to Deferred (do not patch the prompt with
   fixture answers — rule 17).
@@ -385,9 +392,10 @@ automated test. The required evidence is the before/after report and the rule-14
 green assertion (rules 11/14: a green suite is never reported as quality evidence).
 
 **Verification:** `### Real-use quality evaluation` note records Result: PASS with concrete
-before/after numbers — the recovered same/adjacent window-miss Concepts named, genuine-absence
-Concepts confirmed still demoted, zero new verbatim failures. The instrument is deleted; no
-standing benchmark harness remains in the tree (ADR-0013).
+before/after numbers — the recovered same/adjacent-ancestor window-miss Concepts named,
+genuine-absence Concepts confirmed still demoted, zero new verbatim failures. The instrument is deleted; no
+standing benchmark harness remains in the tree
+([ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md)).
 
 ---
 
@@ -424,8 +432,10 @@ measurement instrument; before/after rule-14 validation on the AIRA-dojo fixture
 - **Leaf-exact rule misses ancestor-intro definitions.** → U1 locality measurement detects this
   (window-miss/adjacent with prefix `headingPath`); KTD2 widens to prefix-inclusive only if
   measured, never speculatively.
-- **Measurement oracle (Layer A rubric over all blocks) inherits Layer A's blind spots.** →
-  Cross-family `kg-independent-judge` recorded alongside with disagreement flagged (KTD4).
+- **Measurement oracle inherits Layer A's blind spots.** → This is intentional: the measurement
+  explains the production gate using the same rubric. Fail-open sentinel verdicts are rejected
+  from the scan (KTD4a), and residual semantic uncertainty is reported as a caveat rather than
+  introducing a second standing judge.
 - **Deleting heuristics regresses a case section scoping doesn't cover.** → U3 before/after diff
   must show no net loss of kept definitions and no new verbatim failures before promotion; the
   retained label-substring sweep is a backstop for out-of-section mentions.
@@ -471,7 +481,7 @@ measurement instrument; before/after rule-14 validation on the AIRA-dojo fixture
 
 ## Sources & Research
 
-- Origin requirements: `docs/brainstorms/2026-06-25-cep-definition-section-retrieval-requirements.md`.
+- [Origin requirements](../brainstorms/2026-06-25-cep-definition-section-retrieval-requirements.md).
 - Established method (rule 21): hierarchical / parent-child retrieval — retrieve on the precise
   child block, return the enclosing parent section. Applied to existing structure-aware blocks;
   no new external dependency.

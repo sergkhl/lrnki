@@ -348,11 +348,11 @@ export interface DifficultyPort {
   score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
-// Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock
+// Learner mastery seam (ADR-0024 defers population learner modeling). MVP impl is a mock
 // ("knows nothing"): mastery() === 0 for every derived node. Real IRT/KT later
 // implements the SAME port, so the projection upstream never changes. Pure/sync:
 // the projection is a deterministic CLI operation (ADR-0011). Mastery is keyed to the
-// Derived Graph Layer node id (the learner-recall subject identity, ADR-0025).
+// Derived Graph Layer node id (the learner-recall subject identity, ADR-0026).
 export interface LearnerStatePort {
   readonly learnerStateRef: string;
   mastery(derivedNodeId: string): number; // [0,1]; >= masteryThreshold => pruned from the path

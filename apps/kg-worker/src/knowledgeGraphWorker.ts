@@ -360,7 +360,7 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   }
   // `target` is an operator-friendly reference: an anchor concept_id (resolved to its
   // derived node) or a derived_node_id directly. The learner path subject identity is
-  // always the derived node (ADR-0025).
+  // always the derived node (ADR-0026).
   const resolvedTargetId =
     layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId ??
     targetRef;
@@ -430,7 +430,7 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
     return;
   }
   // `target` is an anchor concept_id; the projection works in derived-node space, so
-  // resolve it to the goal anchor's derived node (KTD, ADR-0025).
+  // resolve it to the goal anchor's derived node (ADR-0026).
   const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId;
   if (!targetNodeId) {
     console.error(`! target concept ${targetRef} is not an anchor in enrichment ${enrichmentId}.`);

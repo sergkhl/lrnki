@@ -48,7 +48,7 @@ export function projectLearnerPath(input: {
   }));
 }
 
-// The MVP LearnerState: a learner who knows nothing. Real IRT/KT (ADR-0014)
+// The MVP LearnerState: a learner who knows nothing. Population IRT/KT (ADR-0024)
 // implements the same port; the projection above never changes.
 export const emptyLearnerState: LearnerStatePort = {
   learnerStateRef: "mock:empty",
