@@ -11,7 +11,7 @@ import {
   type TrustTier
 } from "@lrnki/domain-core";
 import type { GraphVersionStorePort, ExtractionRunStorePort, RunProgressReporterPort } from "@lrnki/ports";
-import { NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.6.0";
@@ -43,303 +43,314 @@ export async function buildGraphVersion(input: {
   if (input.runIds.length === 0) throw new Error("buildGraphVersion requires explicit run IDs to publish.");
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.graphVersionId;
-  // The parent `running` row exists from entry (R1). A thrown phase below leaves the
-  // open stage as the failure signal (KTD3) — minting is fast, so a stuck stage is a
-  // clear failure rather than slow progress.
+
+  // Bracket each phase onto the timeline; a thrown phase closes its stage ok:false,
+  // marks the operation `failed`, and propagates (R1, KTD3) — exactly as extraction and
+  // enrichment do. Minting's validation gates (quarantine, incomplete CEP, unpublished
+  // base, the publish-time quality floors) throw on common operator errors, so a failed
+  // build must reach a terminal `failed` status rather than masquerade as a permanent
+  // `running` row. The failure semantics live once in `bracketStage`.
+  const buildStage = bracketStage(reporter, operationId);
+
+  // The parent `running` row exists from entry (R1).
   await reporter.beginOperation({ operationType: "minting", operationId });
 
-  await reporter.enterStage({ operationId, stage: NON_LLM_STAGES.load });
-  const runs = await input.runStore.runsForBuildByIds(input.runIds);
-  if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
+  // Load — resolve the selected runs and the base version, failing closed on a
+  // quarantine decision or an incomplete core CEP before any assembly.
+  const { runs, base, existingIdentities } = await buildStage(NON_LLM_STAGES.load, async () => {
+    const runs = await input.runStore.runsForBuildByIds(input.runIds);
+    if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
 
-  // Quarantine gate (CONTEXT.md Graph-Version Build): a quarantine decision in any
-  // selected run blocks publication until its identity or meaning conflict is
-  // resolved. Fail closed before any assembly and name the offenders, rather than
-  // silently publishing around them (AGENTS rule 11).
-  const quarantined = runs
-    .flatMap((run) => run.quarantinedCandidates.map((candidate) => `${run.runId}:${candidate.canonicalLabel}`));
-  if (quarantined.length) {
-    throw new Error(`Refusing to build: selected run(s) contain unresolved quarantine decisions: ${quarantined.join(", ")}`);
-  }
+    // Quarantine gate (CONTEXT.md Graph-Version Build): a quarantine decision in any
+    // selected run blocks publication until its identity or meaning conflict is
+    // resolved. Fail closed before any assembly and name the offenders, rather than
+    // silently publishing around them (AGENTS rule 11).
+    const quarantined = runs
+      .flatMap((run) => run.quarantinedCandidates.map((candidate) => `${run.runId}:${candidate.canonicalLabel}`));
+    if (quarantined.length) {
+      throw new Error(`Refusing to build: selected run(s) contain unresolved quarantine decisions: ${quarantined.join(", ")}`);
+    }
 
-  // Every selected run's admitted-core Concept must carry a complete CEP (R1). A
-  // core candidate with a missing or incomplete profile fails the build before any
-  // publication so a Concept with no source-grounded meaning never enters the graph
-  // (test scenario U4.3).
-  for (const run of runs) {
-    const profilesByKey = new Map(run.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
-    for (const candidate of run.coreCandidates) {
-      const profile = profilesByKey.get(candidate.candidateKey);
-      if (!profile || !profile.complete || profile.definitions.length === 0) {
-        throw new Error(`Refusing to build: run ${run.runId} core concept ${candidate.candidateKey} (${candidate.canonicalLabel}) has no complete Concept Evidence Profile.`);
+    // Every selected run's admitted-core Concept must carry a complete CEP (R1). A
+    // core candidate with a missing or incomplete profile fails the build before any
+    // publication so a Concept with no source-grounded meaning never enters the graph
+    // (test scenario U4.3).
+    for (const run of runs) {
+      const profilesByKey = new Map(run.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
+      for (const candidate of run.coreCandidates) {
+        const profile = profilesByKey.get(candidate.candidateKey);
+        if (!profile || !profile.complete || profile.definitions.length === 0) {
+          throw new Error(`Refusing to build: run ${run.runId} core concept ${candidate.candidateKey} (${candidate.canonicalLabel}) has no complete Concept Evidence Profile.`);
+        }
       }
     }
-  }
 
-  // The base version this build extends (ADR-0007 reset R3). Its published CEP
-  // evidence is carried forward and unioned with the new runs; `null` only for the
-  // initial build.
-  const base = input.baseGraphVersionId
-    ? await input.graphStore.getPublishedSnapshot(input.baseGraphVersionId)
-    : undefined;
-  if (input.baseGraphVersionId && !base) {
-    throw new Error(`Base graph version ${input.baseGraphVersionId} is not published; cannot extend it.`);
-  }
+    // The base version this build extends (ADR-0007 reset R3). Its published CEP
+    // evidence is carried forward and unioned with the new runs; `null` only for the
+    // initial build.
+    const base = input.baseGraphVersionId
+      ? await input.graphStore.getPublishedSnapshot(input.baseGraphVersionId)
+      : undefined;
+    if (input.baseGraphVersionId && !base) {
+      throw new Error(`Base graph version ${input.baseGraphVersionId} is not published; cannot extend it.`);
+    }
 
-  const existingIdentities = await input.graphStore.existingConceptIdentities();
-  await reporter.completeStage({ operationId, stage: NON_LLM_STAGES.load, ok: true });
+    const existingIdentities = await input.graphStore.existingConceptIdentities();
+    return { runs, base, existingIdentities };
+  });
 
   // Refine — deterministic identity resolution, IRI minting, and CEP evidence union.
-  await reporter.enterStage({ operationId, stage: NON_LLM_STAGES.refine });
-  const refinementDecisions: RefinementDecisionRecord[] = [];
+  const { snapshot, refinementDecisions, artifact } = await buildStage(NON_LLM_STAGES.refine, async () => {
+    const refinementDecisions: RefinementDecisionRecord[] = [];
 
-  // --- Identity resolution (ADR-0015) --------------------------------------
-  // Concept identity is (declaredDomain, normalizedLabel). Base concepts are
-  // carried forward; new core candidates merge into the same identity across runs
-  // and into the base. The same normalizedLabel across different domains is a
-  // cross-domain homograph: identities stay separate and are flagged, not merged.
-  type Cluster = {
-    declaredDomain: string;
-    normalizedLabel: string;
-    canonicalLabel: string;
-    aliases: Set<string>;
-    fromBase: boolean;
-    baseConceptId?: string;
-    baseIri?: string;
-  };
-  const clusters = new Map<IdentityKey, Cluster>();
+    // --- Identity resolution (ADR-0015) --------------------------------------
+    // Concept identity is (declaredDomain, normalizedLabel). Base concepts are
+    // carried forward; new core candidates merge into the same identity across runs
+    // and into the base. The same normalizedLabel across different domains is a
+    // cross-domain homograph: identities stay separate and are flagged, not merged.
+    type Cluster = {
+      declaredDomain: string;
+      normalizedLabel: string;
+      canonicalLabel: string;
+      aliases: Set<string>;
+      fromBase: boolean;
+      baseConceptId?: string;
+      baseIri?: string;
+    };
+    const clusters = new Map<IdentityKey, Cluster>();
 
-  // Seed clusters from the base version so its Concepts are carried forward.
-  for (const concept of base?.concepts ?? []) {
-    const key = identityKey(concept.declaredDomain, concept.normalizedLabel);
-    clusters.set(key, {
-      declaredDomain: concept.declaredDomain,
-      normalizedLabel: concept.normalizedLabel,
-      canonicalLabel: concept.canonicalLabel,
-      aliases: new Set([concept.canonicalLabel, ...concept.aliases]),
-      fromBase: true,
-      baseConceptId: concept.conceptId,
-      baseIri: concept.iri
-    });
-  }
-
-  // Map (runId, candidateKey) -> identity key, to resolve CEP profiles and
-  // prerequisite-hint targets to published Concepts later.
-  const candidateIdentity = new Map<string, IdentityKey>();
-  const runCandidateKey = (runId: string, candidateKey: string) => `${runId}::${candidateKey}`;
-
-  for (const run of runs) {
-    for (const candidate of run.coreCandidates) {
-      const key = identityKey(run.declaredDomain, candidate.normalizedLabel);
-      candidateIdentity.set(runCandidateKey(run.runId, candidate.candidateKey), key);
-      const existing = clusters.get(key);
-      if (existing) {
-        existing.aliases.add(candidate.canonicalLabel);
-        candidate.aliases.forEach((alias) => existing.aliases.add(alias));
-        refinementDecisions.push({
-          decisionType: "domain_scoped_merge",
-          subject: { declaredDomain: run.declaredDomain, normalizedLabel: candidate.normalizedLabel, label: candidate.canonicalLabel },
-          outcome: existing.fromBase ? "merged_into_base" : "merged",
-          rationale: "Same normalized label within the same Declared Domain (ADR-0015).",
-          provenance: { runId: run.runId, candidateKey: candidate.candidateKey }
-        });
-      } else {
-        clusters.set(key, {
-          declaredDomain: run.declaredDomain,
-          normalizedLabel: candidate.normalizedLabel,
-          canonicalLabel: candidate.canonicalLabel,
-          aliases: new Set([candidate.canonicalLabel, ...candidate.aliases]),
-          fromBase: false
-        });
-      }
-    }
-  }
-
-  // Homograph detection over the full concept set: same normalized label across
-  // distinct Declared Domains. Declared Domain keeps these identities separate, so
-  // this is an inspection flag rather than a quarantine or publication blocker.
-  const domainsByLabel = new Map<string, Set<string>>();
-  for (const cluster of clusters.values()) {
-    const set = domainsByLabel.get(cluster.normalizedLabel) ?? new Set<string>();
-    set.add(cluster.declaredDomain);
-    domainsByLabel.set(cluster.normalizedLabel, set);
-  }
-  const homographLabels = new Set([...domainsByLabel.entries()].filter(([, domains]) => domains.size > 1).map(([label]) => label));
-
-  // --- IRI minting (ADR-0015): reuse existing IRI, else mint a fresh slug ---
-  const existingByIdentity = new Map(existingIdentities.map((identity) => [identityKey(identity.declaredDomain, identity.normalizedLabel), identity] as const));
-  const usedSlugs = new Set(existingIdentities.map((identity) => iriSlug(identity.iri)));
-  const conceptByIdentity = new Map<IdentityKey, Concept>();
-  const concepts: Concept[] = [];
-
-  for (const [key, cluster] of clusters) {
-    const isHomograph = homographLabels.has(cluster.normalizedLabel);
-    if (isHomograph && !cluster.fromBase) {
-      refinementDecisions.push({
-        decisionType: "cross_domain_homograph_flag",
-        subject: { normalizedLabel: cluster.normalizedLabel, declaredDomain: cluster.declaredDomain },
-        outcome: "flagged",
-        rationale: "Same normalized label appears in more than one Declared Domain; identities remain separate (ADR-0015).",
-        provenance: { domains: [...(domainsByLabel.get(cluster.normalizedLabel) ?? [])] }
+    // Seed clusters from the base version so its Concepts are carried forward.
+    for (const concept of base?.concepts ?? []) {
+      const key = identityKey(concept.declaredDomain, concept.normalizedLabel);
+      clusters.set(key, {
+        declaredDomain: concept.declaredDomain,
+        normalizedLabel: concept.normalizedLabel,
+        canonicalLabel: concept.canonicalLabel,
+        aliases: new Set([concept.canonicalLabel, ...concept.aliases]),
+        fromBase: true,
+        baseConceptId: concept.conceptId,
+        baseIri: concept.iri
       });
     }
-    const existing = existingByIdentity.get(key);
-    const iri = cluster.baseIri ?? existing?.iri ?? mintIri(cluster.normalizedLabel, usedSlugs);
-    const conceptId = cluster.baseConceptId ?? existing?.conceptId ?? crypto.randomUUID();
-    const concept: Concept = {
-      conceptId,
-      iri,
-      canonicalLabel: cluster.canonicalLabel,
-      normalizedLabel: cluster.normalizedLabel,
-      declaredDomain: cluster.declaredDomain,
-      aliases: [...cluster.aliases].filter((alias) => alias !== cluster.canonicalLabel),
-      // Set provisionally; finalized after the CEP union reveals the true source span.
-      trustTier: "curated_source_grounded",
-      homograph: isHomograph,
-      groundingOrigin: "document_anchored",
-      role: "anchor",
-      layer: "asserted"
+
+    // Map (runId, candidateKey) -> identity key, to resolve CEP profiles and
+    // prerequisite-hint targets to published Concepts later.
+    const candidateIdentity = new Map<string, IdentityKey>();
+    const runCandidateKey = (runId: string, candidateKey: string) => `${runId}::${candidateKey}`;
+
+    for (const run of runs) {
+      for (const candidate of run.coreCandidates) {
+        const key = identityKey(run.declaredDomain, candidate.normalizedLabel);
+        candidateIdentity.set(runCandidateKey(run.runId, candidate.candidateKey), key);
+        const existing = clusters.get(key);
+        if (existing) {
+          existing.aliases.add(candidate.canonicalLabel);
+          candidate.aliases.forEach((alias) => existing.aliases.add(alias));
+          refinementDecisions.push({
+            decisionType: "domain_scoped_merge",
+            subject: { declaredDomain: run.declaredDomain, normalizedLabel: candidate.normalizedLabel, label: candidate.canonicalLabel },
+            outcome: existing.fromBase ? "merged_into_base" : "merged",
+            rationale: "Same normalized label within the same Declared Domain (ADR-0015).",
+            provenance: { runId: run.runId, candidateKey: candidate.candidateKey }
+          });
+        } else {
+          clusters.set(key, {
+            declaredDomain: run.declaredDomain,
+            normalizedLabel: candidate.normalizedLabel,
+            canonicalLabel: candidate.canonicalLabel,
+            aliases: new Set([candidate.canonicalLabel, ...candidate.aliases]),
+            fromBase: false
+          });
+        }
+      }
+    }
+
+    // Homograph detection over the full concept set: same normalized label across
+    // distinct Declared Domains. Declared Domain keeps these identities separate, so
+    // this is an inspection flag rather than a quarantine or publication blocker.
+    const domainsByLabel = new Map<string, Set<string>>();
+    for (const cluster of clusters.values()) {
+      const set = domainsByLabel.get(cluster.normalizedLabel) ?? new Set<string>();
+      set.add(cluster.declaredDomain);
+      domainsByLabel.set(cluster.normalizedLabel, set);
+    }
+    const homographLabels = new Set([...domainsByLabel.entries()].filter(([, domains]) => domains.size > 1).map(([label]) => label));
+
+    // --- IRI minting (ADR-0015): reuse existing IRI, else mint a fresh slug ---
+    const existingByIdentity = new Map(existingIdentities.map((identity) => [identityKey(identity.declaredDomain, identity.normalizedLabel), identity] as const));
+    const usedSlugs = new Set(existingIdentities.map((identity) => iriSlug(identity.iri)));
+    const conceptByIdentity = new Map<IdentityKey, Concept>();
+    const concepts: Concept[] = [];
+
+    for (const [key, cluster] of clusters) {
+      const isHomograph = homographLabels.has(cluster.normalizedLabel);
+      if (isHomograph && !cluster.fromBase) {
+        refinementDecisions.push({
+          decisionType: "cross_domain_homograph_flag",
+          subject: { normalizedLabel: cluster.normalizedLabel, declaredDomain: cluster.declaredDomain },
+          outcome: "flagged",
+          rationale: "Same normalized label appears in more than one Declared Domain; identities remain separate (ADR-0015).",
+          provenance: { domains: [...(domainsByLabel.get(cluster.normalizedLabel) ?? [])] }
+        });
+      }
+      const existing = existingByIdentity.get(key);
+      const iri = cluster.baseIri ?? existing?.iri ?? mintIri(cluster.normalizedLabel, usedSlugs);
+      const conceptId = cluster.baseConceptId ?? existing?.conceptId ?? crypto.randomUUID();
+      const concept: Concept = {
+        conceptId,
+        iri,
+        canonicalLabel: cluster.canonicalLabel,
+        normalizedLabel: cluster.normalizedLabel,
+        declaredDomain: cluster.declaredDomain,
+        aliases: [...cluster.aliases].filter((alias) => alias !== cluster.canonicalLabel),
+        // Set provisionally; finalized after the CEP union reveals the true source span.
+        trustTier: "curated_source_grounded",
+        homograph: isHomograph,
+        groundingOrigin: "document_anchored",
+        role: "anchor",
+        layer: "asserted"
+      };
+      conceptByIdentity.set(key, concept);
+      concepts.push(concept);
+    }
+
+    // --- CEP evidence union (R3, AE2): base evidence + new runs, deduped ------
+    // Accumulator per published Concept. Definition and mention passages are
+    // deduplicated by (source, block, quote); `defines` assertions are keyed by
+    // literal value and their evidence merged.
+    type AssertionAcc = {
+      type: PublishedTypedAssertion["type"];
+      literalValue?: string;
+      evidence: Map<string, PublishedEvidencePassage>;
     };
-    conceptByIdentity.set(key, concept);
-    concepts.push(concept);
-  }
+    type ProfileAcc = {
+      definitions: Map<string, PublishedEvidencePassage>;
+      mentions: Map<string, PublishedEvidencePassage>;
+      assertions: Map<string, AssertionAcc>;
+      sources: Set<string>;
+    };
+    const passageKey = (passage: PublishedEvidencePassage) => `${passage.sourceResourceId}|${passage.sourceBlockId}|${passage.evidenceQuote}`;
+    const accByConcept = new Map<string, ProfileAcc>();
+    const accFor = (conceptId: string): ProfileAcc => {
+      let acc = accByConcept.get(conceptId);
+      if (!acc) {
+        acc = { definitions: new Map(), mentions: new Map(), assertions: new Map(), sources: new Set() };
+        accByConcept.set(conceptId, acc);
+      }
+      return acc;
+    };
+    const addPassage = (target: Map<string, PublishedEvidencePassage>, sources: Set<string>, passage: PublishedEvidencePassage) => {
+      target.set(passageKey(passage), passage);
+      sources.add(passage.sourceResourceId);
+    };
+    const addAssertionEvidence = (acc: AssertionAcc, sources: Set<string>, passage: PublishedEvidencePassage) => {
+      acc.evidence.set(passageKey(passage), passage);
+      sources.add(passage.sourceResourceId);
+    };
 
-  // --- CEP evidence union (R3, AE2): base evidence + new runs, deduped ------
-  // Accumulator per published Concept. Definition and mention passages are
-  // deduplicated by (source, block, quote); `defines` assertions are keyed by
-  // literal value and their evidence merged.
-  type AssertionAcc = {
-    type: PublishedTypedAssertion["type"];
-    literalValue?: string;
-    evidence: Map<string, PublishedEvidencePassage>;
-  };
-  type ProfileAcc = {
-    definitions: Map<string, PublishedEvidencePassage>;
-    mentions: Map<string, PublishedEvidencePassage>;
-    assertions: Map<string, AssertionAcc>;
-    sources: Set<string>;
-  };
-  const passageKey = (passage: PublishedEvidencePassage) => `${passage.sourceResourceId}|${passage.sourceBlockId}|${passage.evidenceQuote}`;
-  const accByConcept = new Map<string, ProfileAcc>();
-  const accFor = (conceptId: string): ProfileAcc => {
-    let acc = accByConcept.get(conceptId);
-    if (!acc) {
-      acc = { definitions: new Map(), mentions: new Map(), assertions: new Map(), sources: new Set() };
-      accByConcept.set(conceptId, acc);
-    }
-    return acc;
-  };
-  const addPassage = (target: Map<string, PublishedEvidencePassage>, sources: Set<string>, passage: PublishedEvidencePassage) => {
-    target.set(passageKey(passage), passage);
-    sources.add(passage.sourceResourceId);
-  };
-  const addAssertionEvidence = (acc: AssertionAcc, sources: Set<string>, passage: PublishedEvidencePassage) => {
-    acc.evidence.set(passageKey(passage), passage);
-    sources.add(passage.sourceResourceId);
-  };
-
-  // 1) Carry forward the base version's published evidence verbatim.
-  for (const profile of base?.evidenceProfiles ?? []) {
-    if (!conceptByIdentity.size) break;
-    const acc = accFor(profile.conceptId);
-    for (const definition of profile.definitions) addPassage(acc.definitions, acc.sources, definition);
-    for (const mention of profile.mentions) addPassage(acc.mentions, acc.sources, mention);
-    for (const assertion of profile.assertions) {
-      const assertionKey = `defines|${assertion.literalValue}`;
-      const existing = acc.assertions.get(assertionKey) ?? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() };
-      for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, passage);
-      acc.assertions.set(assertionKey, existing);
-    }
-  }
-
-  // 2) Union the newly selected runs' CEP evidence onto the published identities.
-  const toPublishedPassage = (sourceResourceId: string, passage: BuildEvidencePassage): PublishedEvidencePassage => ({
-    sourceResourceId,
-    sourceBlockId: passage.sourceBlockId,
-    evidenceQuote: passage.evidenceQuote,
-    headingPath: passage.headingPath,
-    locator: passage.locator
-  });
-  for (const run of runs) {
-    for (const profile of run.evidenceProfiles) {
-      const identity = candidateIdentity.get(runCandidateKey(run.runId, profile.candidateKey));
-      const concept = identity ? conceptByIdentity.get(identity) : undefined;
-      if (!concept) continue; // profile for a non-core candidate: not published
-      const acc = accFor(concept.conceptId);
-      for (const definition of profile.definitions) addPassage(acc.definitions, acc.sources, toPublishedPassage(run.sourceResourceId, definition));
-      for (const mention of profile.mentions) addPassage(acc.mentions, acc.sources, toPublishedPassage(run.sourceResourceId, mention));
+    // 1) Carry forward the base version's published evidence verbatim.
+    for (const profile of base?.evidenceProfiles ?? []) {
+      if (!conceptByIdentity.size) break;
+      const acc = accFor(profile.conceptId);
+      for (const definition of profile.definitions) addPassage(acc.definitions, acc.sources, definition);
+      for (const mention of profile.mentions) addPassage(acc.mentions, acc.sources, mention);
       for (const assertion of profile.assertions) {
         const assertionKey = `defines|${assertion.literalValue}`;
         const existing = acc.assertions.get(assertionKey) ?? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() };
-        for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, toPublishedPassage(run.sourceResourceId, passage));
+        for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, passage);
         acc.assertions.set(assertionKey, existing);
       }
     }
-  }
 
-  // Finalize trust tier from the unioned evidence span (cross-source when a
-  // Concept's CEP draws on more than one curated source).
-  for (const concept of concepts) {
-    const sources = accByConcept.get(concept.conceptId)?.sources ?? new Set<string>();
-    const tier: TrustTier = sources.size > 1 ? "cross_source_synthesized" : "curated_source_grounded";
-    concept.trustTier = tier;
-  }
-
-  const evidenceProfiles: PublishedConceptEvidenceProfile[] = concepts.map((concept) => {
-    const acc = accByConcept.get(concept.conceptId);
-    const assertions: PublishedTypedAssertion[] = [...(acc?.assertions.values() ?? [])].map((assertion) => ({
-      type: "defines",
-      literalValue: assertion.literalValue!,
-      evidence: [...assertion.evidence.values()]
-    }));
-    return {
-      conceptId: concept.conceptId,
-      definitions: [...(acc?.definitions.values() ?? [])],
-      mentions: [...(acc?.mentions.values() ?? [])],
-      assertions
-    };
-  });
-
-  // --- Quality gates (ADR-0010): fail closed before publishing -------------
-  for (const concept of concepts) {
-    if (!concept.iri) throw new Error(`Concept ${concept.conceptId} has no IRI.`);
-  }
-  for (const profile of evidenceProfiles) {
-    if (profile.definitions.length === 0) {
-      throw new Error(`Published concept ${profile.conceptId} has no definition passage; refusing to publish an edge-free Concept with no meaning.`);
+    // 2) Union the newly selected runs' CEP evidence onto the published identities.
+    const toPublishedPassage = (sourceResourceId: string, passage: BuildEvidencePassage): PublishedEvidencePassage => ({
+      sourceResourceId,
+      sourceBlockId: passage.sourceBlockId,
+      evidenceQuote: passage.evidenceQuote,
+      headingPath: passage.headingPath,
+      locator: passage.locator
+    });
+    for (const run of runs) {
+      for (const profile of run.evidenceProfiles) {
+        const identity = candidateIdentity.get(runCandidateKey(run.runId, profile.candidateKey));
+        const concept = identity ? conceptByIdentity.get(identity) : undefined;
+        if (!concept) continue; // profile for a non-core candidate: not published
+        const acc = accFor(concept.conceptId);
+        for (const definition of profile.definitions) addPassage(acc.definitions, acc.sources, toPublishedPassage(run.sourceResourceId, definition));
+        for (const mention of profile.mentions) addPassage(acc.mentions, acc.sources, toPublishedPassage(run.sourceResourceId, mention));
+        for (const assertion of profile.assertions) {
+          const assertionKey = `defines|${assertion.literalValue}`;
+          const existing = acc.assertions.get(assertionKey) ?? { type: "defines" as const, literalValue: assertion.literalValue, evidence: new Map() };
+          for (const passage of assertion.evidence) addAssertionEvidence(existing, acc.sources, toPublishedPassage(run.sourceResourceId, passage));
+          acc.assertions.set(assertionKey, existing);
+        }
+      }
     }
-  }
 
-  const snapshot: GraphSnapshot = {
-    graphVersionId: input.graphVersionId,
-    baseGraphVersionId: input.baseGraphVersionId,
-    concepts,
-    evidenceProfiles
-  };
-  const artifact: ArtifactEnvelope<GraphSnapshot> = {
-    artifactId: `${input.graphVersionId}:snapshot`,
-    artifactType: GRAPH_SNAPSHOT_ARTIFACT_TYPE,
-    graphVersionId: input.graphVersionId,
-    producer: PRODUCER,
-    producerVersion: PRODUCER_VERSION,
-    configHash: REFINEMENT_CONFIG_HASH,
-    createdAt: new Date().toISOString(),
-    payload: snapshot
-  };
-  await reporter.completeStage({ operationId, stage: NON_LLM_STAGES.refine, ok: true });
+    // Finalize trust tier from the unioned evidence span (cross-source when a
+    // Concept's CEP draws on more than one curated source).
+    for (const concept of concepts) {
+      const sources = accByConcept.get(concept.conceptId)?.sources ?? new Set<string>();
+      const tier: TrustTier = sources.size > 1 ? "cross_source_synthesized" : "curated_source_grounded";
+      concept.trustTier = tier;
+    }
+
+    const evidenceProfiles: PublishedConceptEvidenceProfile[] = concepts.map((concept) => {
+      const acc = accByConcept.get(concept.conceptId);
+      const assertions: PublishedTypedAssertion[] = [...(acc?.assertions.values() ?? [])].map((assertion) => ({
+        type: "defines",
+        literalValue: assertion.literalValue!,
+        evidence: [...assertion.evidence.values()]
+      }));
+      return {
+        conceptId: concept.conceptId,
+        definitions: [...(acc?.definitions.values() ?? [])],
+        mentions: [...(acc?.mentions.values() ?? [])],
+        assertions
+      };
+    });
+
+    // --- Quality gates (ADR-0010): fail closed before publishing -------------
+    for (const concept of concepts) {
+      if (!concept.iri) throw new Error(`Concept ${concept.conceptId} has no IRI.`);
+    }
+    for (const profile of evidenceProfiles) {
+      if (profile.definitions.length === 0) {
+        throw new Error(`Published concept ${profile.conceptId} has no definition passage; refusing to publish an edge-free Concept with no meaning.`);
+      }
+    }
+
+    const snapshot: GraphSnapshot = {
+      graphVersionId: input.graphVersionId,
+      baseGraphVersionId: input.baseGraphVersionId,
+      concepts,
+      evidenceProfiles
+    };
+    const artifact: ArtifactEnvelope<GraphSnapshot> = {
+      artifactId: `${input.graphVersionId}:snapshot`,
+      artifactType: GRAPH_SNAPSHOT_ARTIFACT_TYPE,
+      graphVersionId: input.graphVersionId,
+      producer: PRODUCER,
+      producerVersion: PRODUCER_VERSION,
+      configHash: REFINEMENT_CONFIG_HASH,
+      createdAt: new Date().toISOString(),
+      payload: snapshot
+    };
+    return { snapshot, refinementDecisions, artifact };
+  });
 
   // Atomic publication: graph-version rows, unioned CEP evidence, and the immutable
   // artifact envelope are written in one transaction (R: no authoritative
   // relational state without its artifact).
-  await reporter.enterStage({ operationId, stage: NON_LLM_STAGES.persist });
-  await input.graphStore.publish({
-    snapshot,
-    refinementConfigHash: REFINEMENT_CONFIG_HASH,
-    runMemberships: runs.map((run) => ({ runId: run.runId, sourceResourceId: run.sourceResourceId })),
-    refinementDecisions,
-    artifact
-  });
-  await reporter.completeStage({ operationId, stage: NON_LLM_STAGES.persist, ok: true });
+  await buildStage(NON_LLM_STAGES.persist, () =>
+    input.graphStore.publish({
+      snapshot,
+      refinementConfigHash: REFINEMENT_CONFIG_HASH,
+      runMemberships: runs.map((run) => ({ runId: run.runId, sourceResourceId: run.sourceResourceId })),
+      refinementDecisions,
+      artifact
+    })
+  );
   await reporter.completeOperation({ operationId, status: "succeeded" });
   return snapshot;
 }

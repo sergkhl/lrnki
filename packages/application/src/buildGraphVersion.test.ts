@@ -1,8 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ArtifactEnvelope, BuildEvidenceProfile, GraphSnapshot, PublishedConceptIdentity, RunForBuild } from "@lrnki/domain-core";
-import type { ExtractionRunStorePort, GraphVersionStorePort } from "@lrnki/ports";
+import type { ExtractionRunStorePort, GraphVersionStorePort, RunProgressReporterPort } from "@lrnki/ports";
 import { buildGraphVersion } from "./buildGraphVersion";
+
+type ReporterCall =
+  | { method: "beginOperation"; operationType: string; operationId: string }
+  | { method: "enterStage"; stage: string }
+  | { method: "completeStage"; stage: string; ok: boolean }
+  | { method: "completeOperation"; status: string };
+
+function recordingReporter() {
+  const calls: ReporterCall[] = [];
+  const reporter: RunProgressReporterPort = {
+    async beginOperation(i) { calls.push({ method: "beginOperation", operationType: i.operationType, operationId: i.operationId }); },
+    async enterStage(i) { calls.push({ method: "enterStage", stage: i.stage }); },
+    async recordProgress() {},
+    async completeStage(i) { calls.push({ method: "completeStage", stage: i.stage, ok: i.ok }); },
+    async completeOperation(i) { calls.push({ method: "completeOperation", status: i.status }); }
+  };
+  return { reporter, calls };
+}
 
 function profile(candidateKey: string, overrides: Partial<BuildEvidenceProfile> = {}): BuildEvidenceProfile {
   return {
@@ -176,6 +194,36 @@ test("buildGraphVersion fails when the named base version is not published", asy
     () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: "missing", runIds: ["run-1"], runStore, graphStore }),
     /Base graph version missing is not published/
   );
+});
+
+test("a thrown build gate closes the open stage ok:false and reports completeOperation failed", async () => {
+  // A quarantine gate throws inside the `load` stage. The build must reach a terminal
+  // `failed` status (consistent with extraction/enrichment), not strand a `running` row.
+  const runs = [runForBuild({ quarantinedCandidates: [{ candidateKey: "mercury", canonicalLabel: "Mercury" }] })];
+  const { runStore, graphStore } = fakes(runs);
+  const { reporter, calls } = recordingReporter();
+
+  await assert.rejects(
+    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter }),
+    /unresolved quarantine decisions/
+  );
+
+  assert.deepEqual(calls[0], { method: "beginOperation", operationType: "minting", operationId: "gv-1" });
+  assert.ok(calls.some((c) => c.method === "completeStage" && (c as { stage: string; ok: boolean }).stage === "load" && (c as { ok: boolean }).ok === false));
+  assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "failed" });
+  assert.ok(!calls.some((c) => c.method === "completeOperation" && (c as { status: string }).status === "succeeded"));
+});
+
+test("a clean build reports the three non-LLM stages and completeOperation succeeded", async () => {
+  const { runStore, graphStore } = fakes([runForBuild()]);
+  const { reporter, calls } = recordingReporter();
+
+  await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter });
+
+  const stages = calls.filter((c) => c.method === "completeStage") as { stage: string; ok: boolean }[];
+  assert.deepEqual(stages.map((c) => c.stage), ["load", "refine", "persist"]);
+  assert.ok(stages.every((c) => c.ok));
+  assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "succeeded" });
 });
 
 test("the published snapshot is written with its immutable artifact envelope", async () => {
