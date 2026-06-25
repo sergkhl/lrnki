@@ -13,3 +13,4 @@ export {
 export { PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
 export { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
+export { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";

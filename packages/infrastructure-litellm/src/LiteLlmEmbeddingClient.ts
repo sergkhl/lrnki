@@ -1,3 +1,4 @@
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { LiteLlmHttpError } from "./LiteLlmForcedToolClient";
 
 // Embedding transport (plan U1, ADR-0012). The first embedding client since the CEP
@@ -43,6 +44,8 @@ export class LiteLlmEmbeddingClient {
   }
 
   private async embedOnce(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
+    const operationTag = currentOperationTag();
+    const tags = [...(input.tags ?? []), ...(operationTag ? [operationTag] : [])];
     const response = await fetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/embeddings`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },
@@ -50,9 +53,8 @@ export class LiteLlmEmbeddingClient {
       body: JSON.stringify({
         model: input.model,
         input: input.texts,
-        // Same proxy-side spend tag mechanism as the forced-tool client (`metadata.tags`).
-        // Omitted entirely when no tag travels, so no empty `metadata` key is ever sent.
-        ...(input.tags && input.tags.length ? { metadata: { tags: input.tags } } : {})
+        // Same stage + ambient-operation spend labels as the forced-tool client.
+        ...(tags.length ? { metadata: { tags } } : {})
       })
     });
     if (!response.ok) throw new LiteLlmHttpError(response.status);

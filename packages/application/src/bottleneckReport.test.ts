@@ -2,103 +2,156 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
+  JourneyLineage,
+  JourneyLineageReadPort,
+  OperationStageSpend,
+  OperationStageSpendReadPort,
   OperationTimelineDetail,
   OperationTimelineReadPort,
-  StageSpend,
-  StageSpendReadPort
+  OperationType
 } from "@lrnki/ports";
 import { bottleneckReport } from "./bottleneckReport";
 
-// Deterministic tests over fake ports and a canned spend payload (rule 11): the join
-// is a deterministic transform; no model judgment is asserted.
-
-function timelineRead(detail: OperationTimelineDetail | undefined): OperationTimelineReadPort {
-  return {
-    async listOperationTimelines() { return detail ? [detail.summary] : []; },
-    async getOperationTimeline() { return detail; }
-  };
-}
-
-function spendRead(spend: StageSpend[] | (() => never)): StageSpendReadPort {
-  return {
-    async readStageSpend() {
-      if (typeof spend === "function") return spend();
-      return spend;
-    }
-  };
-}
-
-function detailWith(stages: OperationTimelineDetail["stages"]): OperationTimelineDetail {
+function detail(operationId: string, operationType: OperationType, stages: Array<[string, number | null]>): OperationTimelineDetail {
   return {
     summary: {
-      operationRunId: "or-1",
-      operationType: "extraction",
-      operationId: "op-1",
+      operationRunId: `${operationType}-${operationId}`,
+      operationType,
+      operationId,
       status: "succeeded",
       currentStage: null,
       progressDone: null,
       progressTotal: null,
       lastProgressAt: null,
       startedAt: "2026-06-25T00:00:00.000Z",
-      completedAt: "2026-06-25T00:05:00.000Z",
-      elapsedMs: 300000,
+      completedAt: "2026-06-25T00:01:00.000Z",
+      elapsedMs: 60000,
       stageCount: stages.length
     },
-    stages
+    stages: stages.map(([stage, durationMs]) => ({
+      stage,
+      startedAt: "2026-06-25T00:00:00.000Z",
+      endedAt: durationMs === null ? null : "2026-06-25T00:01:00.000Z",
+      durationMs,
+      ok: durationMs === null ? null : true,
+      progressDone: null,
+      progressTotal: null
+    }))
   };
 }
 
-function stage(name: string, durationMs: number | null): OperationTimelineDetail["stages"][number] {
-  return { stage: name, startedAt: "2026-06-25T00:00:00.000Z", endedAt: durationMs === null ? null : "2026-06-25T00:01:00.000Z", durationMs, ok: durationMs === null ? null : true, progressDone: null, progressTotal: null };
+function ports(options: {
+  details: OperationTimelineDetail[];
+  spend?: OperationStageSpend[] | Error;
+  lineage?: JourneyLineage;
+}) {
+  const timelineRead: OperationTimelineReadPort = {
+    async listOperationTimelines() { return options.details.map((row) => row.summary); },
+    async getOperationTimeline(operationId, operationType) {
+      return options.details.find((row) =>
+        row.summary.operationId === operationId &&
+        (!operationType || row.summary.operationType === operationType)
+      );
+    }
+  };
+  const operationStageSpendRead: OperationStageSpendReadPort = {
+    async readOperationStageSpend() {
+      if (options.spend instanceof Error) throw options.spend;
+      return options.spend ?? [];
+    }
+  };
+  const journeyLineageRead: JourneyLineageReadPort = {
+    async resolveJourney() { return options.lineage; }
+  };
+  return { timelineRead, operationStageSpendRead, journeyLineageRead };
 }
 
-test("joins per-stage wall-clock from the timeline with cost from spend on the stage key", async () => {
-  const detail = detailWith([stage(STAGE_TAGS.conceptDiscovery, 1000), stage(STAGE_TAGS.cepExtraction, 5000)]);
-  const spend: StageSpend[] = [
-    { tag: STAGE_TAGS.conceptDiscovery, logCount: 1, totalSpend: 0.01 },
-    { tag: STAGE_TAGS.cepExtraction, logCount: 20, totalSpend: 0.5 }
-  ];
-  const report = await bottleneckReport({ operationId: "op-1", timelineRead: timelineRead(detail), stageSpendRead: spendRead(spend) });
-  assert.ok(report);
-  assert.equal(report.costAvailable, true);
-  const cep = report.stages.find((s) => s.stage === STAGE_TAGS.cepExtraction);
-  assert.deepEqual(cep, { stage: STAGE_TAGS.cepExtraction, isLlmStage: true, wallClockMs: 5000, calls: 20, costUsd: 0.5 });
-});
-
-test("a non-LLM stage appears with its wall-clock and absent cost", async () => {
-  const detail = detailWith([stage("persist", 800)]);
-  const report = await bottleneckReport({ operationId: "op-1", timelineRead: timelineRead(detail), stageSpendRead: spendRead([]) });
-  const persist = report?.stages.find((s) => s.stage === "persist");
-  assert.deepEqual(persist, { stage: "persist", isLlmStage: false, wallClockMs: 800, calls: null, costUsd: null });
-});
-
-test("a spend STAGE_TAG with no timeline stage still appears (folded sub-stage cost, e.g. label judge)", async () => {
-  const detail = detailWith([stage(STAGE_TAGS.admission, 3000)]);
-  const spend: StageSpend[] = [
-    { tag: STAGE_TAGS.admission, logCount: 2, totalSpend: 0.2 },
-    { tag: STAGE_TAGS.admissionLabelJudge, logCount: 2, totalSpend: 0.05 }
-  ];
-  const report = await bottleneckReport({ operationId: "op-1", timelineRead: timelineRead(detail), stageSpendRead: spendRead(spend) });
-  const judge = report?.stages.find((s) => s.stage === STAGE_TAGS.admissionLabelJudge);
-  assert.deepEqual(judge, { stage: STAGE_TAGS.admissionLabelJudge, isLlmStage: true, wallClockMs: null, calls: 2, costUsd: 0.05 });
-});
-
-test("when LiteLLM /spend/tags is unavailable the report still renders wall-clock and marks cost unavailable", async () => {
-  const detail = detailWith([stage(STAGE_TAGS.cepExtraction, 5000)]);
-  const report = await bottleneckReport({
-    operationId: "op-1",
-    timelineRead: timelineRead(detail),
-    stageSpendRead: spendRead(() => { throw new Error("LiteLLM down"); })
+test("operation scope joins operation-scoped spend and includes tokens", async () => {
+  const dependencies = ports({
+    details: [detail("run-1", "extraction", [[STAGE_TAGS.admission, 3000]])],
+    spend: [{ operationId: "run-1", stage: STAGE_TAGS.admission, logCount: 2, totalSpend: 0.2, totalTokens: 1200 }]
   });
-  assert.ok(report);
-  assert.equal(report.costAvailable, false);
-  const cep = report.stages.find((s) => s.stage === STAGE_TAGS.cepExtraction);
-  assert.equal(cep?.wallClockMs, 5000);
-  assert.equal(cep?.calls, null);
-  assert.equal(cep?.costUsd, null);
+  const report = await bottleneckReport({ scope: { operationId: "run-1" }, ...dependencies });
+  assert.equal(report?.scope, "operation");
+  assert.deepEqual(report?.operations[0].stages[0], {
+    stage: STAGE_TAGS.admission,
+    isLlmStage: true,
+    wallClockMs: 3000,
+    calls: 2,
+    costUsd: 0.2,
+    tokens: 1200
+  });
+  assert.deepEqual(report?.total, { wallClockMs: 3000, calls: 2, costUsd: 0.2, tokens: 1200 });
 });
 
-test("returns undefined for an unknown operation id", async () => {
-  const report = await bottleneckReport({ operationId: "missing", timelineRead: timelineRead(undefined), stageSpendRead: spendRead([]) });
-  assert.equal(report, undefined);
+test("operation scope can disambiguate operation types that share one id", async () => {
+  const dependencies = ports({
+    details: [
+      detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
+      detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
+    ],
+    spend: [
+      { operationId: "enr-1", stage: STAGE_TAGS.prerequisiteOrdering, logCount: 3, totalSpend: 0.3, totalTokens: 300 },
+      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 }
+    ]
+  });
+  const report = await bottleneckReport({
+    scope: { operationId: "enr-1", operationType: "study_items" },
+    ...dependencies
+  });
+  assert.equal(report?.operations[0].operationType, "study_items");
+  assert.equal(report?.operations[0].subtotal.costUsd, 0.4);
+});
+
+test("journey scope rolls up two extraction runs, minting, enrichment, and study items", async () => {
+  const dependencies = ports({
+    lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", extractionRunIds: ["run-a", "run-b"] },
+    details: [
+      detail("run-a", "extraction", [[STAGE_TAGS.admission, 1000]]),
+      detail("run-b", "extraction", [[STAGE_TAGS.admission, 2000]]),
+      detail("gv-1", "minting", [["persist", 300]]),
+      detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
+      detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
+    ],
+    spend: [
+      { operationId: "run-a", stage: STAGE_TAGS.admission, logCount: 1, totalSpend: 0.1, totalTokens: 100 },
+      { operationId: "run-b", stage: STAGE_TAGS.admission, logCount: 2, totalSpend: 0.2, totalTokens: 200 },
+      { operationId: "enr-1", stage: STAGE_TAGS.prerequisiteOrdering, logCount: 3, totalSpend: 0.3, totalTokens: 300 },
+      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 }
+    ]
+  });
+  const report = await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
+  assert.equal(report?.operations.length, 5);
+  assert.deepEqual(report?.total, { wallClockMs: 12300, calls: 10, costUsd: 1, tokens: 1000 });
+  assert.deepEqual(report?.operations.find((row) => row.operationType === "minting")?.subtotal, {
+    wallClockMs: 300,
+    calls: 0,
+    costUsd: 0,
+    tokens: 0
+  });
+  assert.equal(report?.operations.find((row) => row.operationType === "enrichment")?.subtotal.costUsd, 0.3);
+  assert.equal(report?.operations.find((row) => row.operationType === "study_items")?.subtotal.costUsd, 0.4);
+});
+
+test("cost-source failure preserves wall-clock and marks cost totals unavailable", async () => {
+  const dependencies = ports({
+    lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", extractionRunIds: [] },
+    details: [
+      detail("gv-1", "minting", [["persist", 300]]),
+      detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
+      detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
+    ],
+    spend: new Error("LiteLLM down")
+  });
+  const report = await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
+  assert.equal(report?.costAvailable, false);
+  assert.equal(report?.total.wallClockMs, 9300);
+  assert.equal(report?.total.costUsd, null);
+  assert.ok(report?.operations.every((row) => row.subtotal.calls === null && row.subtotal.tokens === null));
+});
+
+test("returns undefined for unknown operation and journey anchors", async () => {
+  const dependencies = ports({ details: [] });
+  assert.equal(await bottleneckReport({ scope: { operationId: "missing" }, ...dependencies }), undefined);
+  assert.equal(await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "missing" }, ...dependencies }), undefined);
 });

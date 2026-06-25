@@ -12,6 +12,7 @@
   "dependencies": {
     "@lrnki/domain-core": "workspace:*",
     "@lrnki/ports": "workspace:*",
+    "postgres": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -9,8 +9,12 @@ import type {
   SelfAssessmentItemDraft,
   StudyItem
 } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { EnrichmentRunStorePort, GraphVersionStorePort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
 import { generateStudyItemBank } from "./generateStudyItemBank";
+
+installNodeOperationTagContext();
 
 function passage(sourceBlockId: string, evidenceQuote: string): PublishedEvidencePassage {
   return { sourceResourceId: "res-1", sourceBlockId, evidenceQuote, headingPath: [], locator: {} };
@@ -106,16 +110,19 @@ function osDraft(correctQuote: string, distractors: [string, string, string] = [
 function generationReturning(opts: {
   selfAssessment?: Record<string, SelfAssessmentItemDraft | "throw">;
   optionSelect?: Record<string, OptionSelectItemDraft | "throw">;
+  onGenerate?: () => void;
 }): StudyItemGenerationPort {
   return {
     model: "mock-gen",
     async generate(input) {
+      opts.onGenerate?.();
       const draft = opts.selfAssessment?.[input.node.derivedNodeId];
       if (draft === undefined) throw new Error(`no canned self-assessment draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("self-assessment generation failed");
       return draft;
     },
     async generateOptionSelect(input) {
+      opts.onGenerate?.();
       const draft = opts.optionSelect?.[input.node.derivedNodeId];
       if (draft === undefined) throw new Error(`no canned option-select draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("option-select generation failed");
@@ -163,6 +170,23 @@ test("a node whose self-assessment verifies and whose option-select passes the g
   assert.equal(result.rejected.length, 0);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select", "self_assessment"]);
   assert.deepEqual(persistedRejected, []);
+});
+
+test("the study-item operation context reaches generation calls", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-c1": saDraft("rules that govern memory") },
+      optionSelect: { "node-c1": osDraft("rules that govern memory") },
+      onGenerate: () => assert.equal(currentOperationTag(), "enr-1")
+    }),
+    studyItemBankStore: store
+  });
 });
 
 test("Covers AE5/R13: self-assessment verifies but the option-select guard rejects → only self_assessment; node NOT rejected", async () => {

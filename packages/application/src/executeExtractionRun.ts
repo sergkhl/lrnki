@@ -9,6 +9,7 @@ import {
   type RunEvidenceProfile,
   type StructuredDocument
 } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
@@ -61,6 +62,7 @@ export async function executeExtractionRun(input: {
   const startedAt = Date.now();
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.runId;
+  return runWithOperationTag(operationId, async () => {
   const { document, declaredDomain } = input.source;
 
   // Bracket each stage onto the timeline; a thrown stage marks the operation failed and
@@ -236,6 +238,7 @@ export async function executeExtractionRun(input: {
 
   await reporter.completeOperation({ operationId, status: "succeeded" });
   return runResult;
+  });
 }
 
 function exactAliases(candidate: RunCandidate): string[] {

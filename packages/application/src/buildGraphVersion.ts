@@ -10,6 +10,7 @@ import {
   type RefinementDecisionRecord,
   type TrustTier
 } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type { GraphVersionStorePort, ExtractionRunStorePort, RunProgressReporterPort } from "@lrnki/ports";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 
@@ -43,6 +44,7 @@ export async function buildGraphVersion(input: {
   if (input.runIds.length === 0) throw new Error("buildGraphVersion requires explicit run IDs to publish.");
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.graphVersionId;
+  return runWithOperationTag(operationId, async () => {
 
   // Bracket each phase onto the timeline; a thrown phase closes its stage ok:false,
   // marks the operation `failed`, and propagates — exactly as extraction and
@@ -353,6 +355,7 @@ export async function buildGraphVersion(input: {
   );
   await reporter.completeOperation({ operationId, status: "succeeded" });
   return snapshot;
+  });
 }
 
 function iriSlug(iri: string): string {

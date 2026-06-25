@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { z } from "zod";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
 // Deterministic-envelope tests for the transport (U1, R2/AE3). They assert the SHAPE
@@ -45,6 +46,12 @@ test("call with tags includes metadata.tags in the request body", async () => {
   assert.deepEqual(result, { ok: true });
   const body = capture.read();
   assert.deepEqual(body.metadata, { tags: ["enrichment-judge"] });
+});
+
+test("call appends the ambient operation tag after the stage tag", async () => {
+  const capture = captureBody();
+  await runWithOperationTag("op-1", () => client().call({ ...baseInput, tags: ["enrichment-judge"] }));
+  assert.deepEqual(capture.read().metadata, { tags: ["enrichment-judge", "op-1"] });
 });
 
 test("call with no tags omits metadata entirely (no empty key)", async () => {

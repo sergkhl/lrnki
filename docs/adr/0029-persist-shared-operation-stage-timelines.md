@@ -13,11 +13,21 @@ heartbeat and item counts. The operation split defined by ADR-0017 remains uncha
 observes those operations and does not create a unified pipeline identity.
 
 Inspection uses finished read models under ADR-0027. Per-stage wall-clock comes from the persisted
-timeline. Per-stage cost remains owned by LiteLLM and is read on demand by stage tag; the application
-does not compute or persist cost.
+timeline. Every LLM request carries its operation id as request-scoped telemetry alongside its stage
+tag. Per-operation calls, tokens, and cost remain owned by LiteLLM and are read on demand from
+LiteLLM's request log; the application does not compute or persist cost.
+
+The bottleneck report supports one operation or one **Processing Journey** anchored on an Enrichment
+Run. Journey resolution walks existing graph-version and Extraction Run lineage; it does not create a
+pipeline identity or orchestration boundary. Enrichment and study-item operations share an operation
+id, so timeline reads retain operation type and stage ownership keeps their spend separate.
 
 ## Context
 
 Terminal artifact rows previously appeared only when an operation completed, while stage timing was
 process-local output. A shared incremental timeline gives operators one durable liveness and
 bottleneck surface without moving orchestration or cost ownership into Admin Lab.
+
+The earlier global per-stage LiteLLM aggregate could not answer which operation incurred a cost.
+Request-scoped operation tags and request-log aggregation provide the operation-stage intersection
+without adding application-side cost persistence.

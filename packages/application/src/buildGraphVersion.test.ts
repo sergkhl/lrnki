@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ArtifactEnvelope, BuildEvidenceProfile, GraphSnapshot, PublishedConceptIdentity, RunForBuild } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ExtractionRunStorePort, GraphVersionStorePort, RunProgressReporterPort } from "@lrnki/ports";
 import { buildGraphVersion } from "./buildGraphVersion";
+
+installNodeOperationTagContext();
 
 type ReporterCall =
   | { method: "beginOperation"; operationType: string; operationId: string }
@@ -224,6 +228,24 @@ test("a clean build reports the three non-LLM stages and completeOperation succe
   assert.deepEqual(stages.map((c) => c.stage), ["load", "refine", "persist"]);
   assert.ok(stages.every((c) => c.ok));
   assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "succeeded" });
+});
+
+test("the minting operation establishes its ambient operation tag", async () => {
+  const { runStore, graphStore } = fakes([runForBuild()]);
+  const checkingRunStore: ExtractionRunStorePort = {
+    ...runStore,
+    async runsForBuildByIds(runIds) {
+      assert.equal(currentOperationTag(), "gv-context");
+      return runStore.runsForBuildByIds(runIds);
+    }
+  };
+  await buildGraphVersion({
+    graphVersionId: "gv-context",
+    baseGraphVersionId: null,
+    runIds: ["run-1"],
+    runStore: checkingRunStore,
+    graphStore
+  });
 });
 
 test("the published snapshot is written with its immutable artifact envelope", async () => {

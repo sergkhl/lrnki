@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 
 // Deterministic-envelope tests for the embedding transport (U1, R2/R13). They assert
@@ -81,6 +82,12 @@ test("tag: the node-embedding tag travels in metadata.tags", async () => {
   const capture = stubResponse({ data: [{ index: 0, embedding: [0.1] }] });
   await client().embed({ model: "m", texts: ["x"], tags: ["node-embedding"] });
   assert.deepEqual(capture.read().body.metadata, { tags: ["node-embedding"] });
+});
+
+test("tag: the ambient operation tag follows the stage tag", async () => {
+  const capture = stubResponse({ data: [{ index: 0, embedding: [0.1] }] });
+  await runWithOperationTag("op-1", () => client().embed({ model: "m", texts: ["x"], tags: ["node-embedding"] }));
+  assert.deepEqual(capture.read().body.metadata, { tags: ["node-embedding", "op-1"] });
 });
 
 test("tag: no tags omits metadata entirely", async () => {

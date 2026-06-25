@@ -9,6 +9,8 @@ import {
   type ExtractionRunResult,
   type StructuredDocument
 } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
@@ -18,6 +20,8 @@ import type {
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
+
+installNodeOperationTagContext();
 
 // A recording reporter fake: captures the ordered reporter calls so tests assert the
 // timeline lifecycle (begin → stages → complete) without a database (rule 11).
@@ -151,7 +155,7 @@ function harness(
   extract: ConceptConditionedEvidenceProfileExtractionPort["extract"],
   selectedCandidates = candidates,
   admit: (candidate: DiscoveredCandidate) => AdmissionProposal = admission,
-  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort; reporter?: RunProgressReporterPort } = {}
+  options: { document?: StructuredDocument; evidenceNeighborhoodConfig?: { maxEvidenceBlocksPerConcept: number; siblingCap: number; adjacencyRadius: number }; definitionPassageQualityJudge?: DefinitionPassageQualityJudgmentPort; reporter?: RunProgressReporterPort; onDiscovery?: () => void } = {}
 ) {
   let persisted: ExtractionRunResult | undefined;
   let persistedArtifact: ArtifactEnvelope<ExtractionRunResult> | undefined;
@@ -170,7 +174,7 @@ function harness(
       },
       pipelineConfigHash: "test-v1",
       evidenceNeighborhoodConfig: options.evidenceNeighborhoodConfig,
-      discovery: { discover: async () => selectedCandidates },
+      discovery: { discover: async () => { options.onDiscovery?.(); return selectedCandidates; } },
       admission: { admit: async () => selectedCandidates.map(admit) },
       evidenceProfileExtraction: { extract },
       assertionEntailmentJudge: entailEverything,
@@ -613,6 +617,15 @@ test("a successful run reports beginOperation → stages in pipeline order → c
   assert.ok(calls.filter((c) => c.method === "completeStage").every((c) => (c as { ok: boolean }).ok === true));
   // No failed status is ever emitted on a clean run.
   assert.ok(!calls.some((c) => c.method === "completeOperation" && (c as { status: string }).status === "failed"));
+});
+
+test("the extraction operation context reaches its async stage fan-out", async () => {
+  await harness(
+    async (input) => definitionFor[input.subject.candidateKey],
+    candidates,
+    admission,
+    { onDiscovery: () => assert.equal(currentOperationTag(), "run-1") }
+  ).run();
 });
 
 test("the cep-extraction stage emits recordProgress once per admitted concept, final done = admitted count", async () => {

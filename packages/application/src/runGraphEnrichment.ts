@@ -18,6 +18,7 @@ import type {
   WholeSetOrdering
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -174,6 +175,7 @@ export async function runGraphEnrichment(input: {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
+  return runWithOperationTag(operationId, async () => {
   // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
   // the operation failed before propagating, so a failed enrichment leaves a readable
   // timeline — no partial layer is ever persisted.
@@ -544,6 +546,7 @@ export async function runGraphEnrichment(input: {
   );
   await reporter.completeOperation({ operationId, status: "succeeded" });
   return layer;
+  });
 }
 
 function disposition(

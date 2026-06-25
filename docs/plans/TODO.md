@@ -2,14 +2,11 @@
 
 ## TODO
 
-1. **Per-journey whole-pipeline cost measurement (chosen next direction, 2026-06-25).** Follow-up to
-   the merged run-observability work ([ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md)):
-   roll up tokens/calls/cost/wall-clock per stage and operation across one document's journey. The
-   load-bearing piece is run-scoped cost attribution — tag every LLM call with its `operation_id` so a
-   single journey's spend can be isolated (today's `bottleneckReport` cost half is a global per-stage
-   aggregate). Measure-first; the suspected admission-payload optimization is a rule-21 follow-up gated
-   on the rollup. Requirements (ready for `/ce-plan`):
-   [per-journey pipeline cost](../brainstorms/2026-06-25-per-journey-pipeline-cost-requirements.md).
+1. **Stabilize whole-set ordering label fidelity before another end-to-end journey run.** Two real
+   Rust enrichment attempts on June 25 failed closed because ordering returned labels outside the
+   judged node set (`LIFO`; `Heap memory allocation` / `String Type`). Classify and research this
+   constrained-generation/entity-linking defect under rule 21 before changing prompts or validation;
+   preserve the fail-closed boundary and avoid fixture-specific aliases.
 
 2. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
    measurement on the AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to
@@ -104,11 +101,24 @@
   progress, while the CLI and Admin Lab share one on-demand wall-clock/LiteLLM-cost report. Decision:
   [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
+- **Per-journey whole-pipeline cost measurement.** LLM requests carry request-scoped operation tags;
+  the shared report now joins operation-stage calls, tokens, and live LiteLLM cost with timeline
+  wall-clock for one operation or one Processing Journey. Worker CLI and Admin Lab render the same
+  report; the former global cost path was removed. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
 ## VALIDATION
 
-- **Latest consolidated suite:** stale. The last recorded full workspace typecheck and suite run was
-  June 21, 2026; later milestones reported their focused deterministic-envelope suites green, but a
-  fresh consolidated run has not yet replaced that record.
+- **Latest consolidated suite, 2026-06-25:** full workspace typecheck and tests, ESLint (zero errors;
+  four pre-existing warnings), live PostgreSQL integration tests, and the Admin Lab production build
+  are green. Server-render checks passed for the operation and journey report routes.
+- **Per-journey cost evidence, 2026-06-25:** a real Rust extraction
+  (`c911bbd0-719b-4929-9a95-4240f18168c1`) produced 99 tagged calls, 302,157 tokens, and
+  $0.03522072. Every per-stage calls/tokens/cost cell exactly reconciled with a manual
+  `LiteLLM_SpendLogs` query. With `LITELLM_DATABASE_URL` absent, the same report retained 330,744 ms
+  of stage wall-clock and marked all cost fields unavailable. Whole-journey AE1/AE2 remains
+  unverified because two subsequent enrichment attempts failed on the ordering-label defect in TODO
+  #1; no cost-report defect was observed.
 - **Latest real-use quality evidence:** the June 24 Definition-Passage quality run passed with the
   caveat recorded above; the June 24 K-sampled prerequisite-ordering run passed on real Rust and
   economics sources, surfacing unstable directions as `uncertain` while retaining robust edges.

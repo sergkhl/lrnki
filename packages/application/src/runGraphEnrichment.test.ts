@@ -10,6 +10,8 @@ import type {
   PrerequisiteConceptContext,
   WholeSetOrdering
 } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -20,6 +22,8 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { RunProgressReporterPort } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
+
+installNodeOperationTagContext();
 
 // Recording reporter fake: captures ordered reporter calls so a test asserts the
 // enrichment timeline lifecycle without a database (rule 11). Replaces the deleted
@@ -244,6 +248,16 @@ test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages
   // Every entered stage is closed ok:true on a clean run; no failed status is emitted.
   assert.equal(calls.filter((c) => c.startsWith("complete:") && c.endsWith(":true")).length, 4);
   assert.ok(!calls.includes("done:failed"));
+});
+
+test("the enrichment operation context reaches concurrent ordering calls", async () => {
+  const ports = buildPorts({
+    onOrder: async () => {
+      await Promise.resolve();
+      assert.equal(currentOperationTag(), "e1");
+    }
+  });
+  await run(ports);
 });
 
 // D1: each multi-node domain issues exactly K draws over its own nodes only.

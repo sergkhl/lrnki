@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ActivityIcon, DatabaseZapIcon, GaugeIcon } from "lucide-react";
+import { ActivityIcon, DatabaseZapIcon, GaugeIcon, RouteIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -69,7 +69,7 @@ export default async function OperationsPage() {
             </Badge>
           </CardAction>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex flex-col gap-4">
           {!operations ? (
             <Alert variant="destructive">
               <DatabaseZapIcon />
@@ -109,10 +109,21 @@ export default async function OperationsPage() {
                       <Badge variant="outline">elapsed {formatDuration(summary.elapsedMs)}</Badge>
                       <Link
                         className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-                        href={`/admin/lab/operations/bottleneck?operationId=${summary.operationId}`}
+                        href={`/admin/lab/operations/bottleneck?operationId=${summary.operationId}&operationType=${summary.operationType}`}
                       >
                         <GaugeIcon className="size-4" /> bottleneck
                       </Link>
+                      {summary.operationType === "enrichment" ? (
+                        <Link
+                          className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
+                          href={{
+                            pathname: "/admin/lab/operations/journey",
+                            query: { enrichmentId: summary.operationId }
+                          }}
+                        >
+                          <RouteIcon className="size-4" /> journey
+                        </Link>
+                      ) : null}
                     </CardAction>
                   </CardHeader>
                   <CardContent>

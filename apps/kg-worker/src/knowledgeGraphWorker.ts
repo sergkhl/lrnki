@@ -33,7 +33,7 @@ import {
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
-  LiteLlmStageSpendAdapter,
+  LiteLlmSpendLogsReadAdapter,
   LiteLlmEmbeddingClient,
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
@@ -57,6 +57,7 @@ import {
   PostgresSourceRegistrationStore,
   PostgresRunProgressReporter,
   PostgresOperationTimelineRead,
+  PostgresJourneyLineageRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
@@ -124,6 +125,9 @@ function buildContext() {
   // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
   // options as the forced-tool clients; embeddings have no sampling knobs.
   const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
+  const spendLogsRead = process.env.LITELLM_DATABASE_URL
+    ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
+    : undefined;
   return {
     sql,
     registrationStore,
@@ -133,7 +137,13 @@ function buildContext() {
     // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
     // live and never stored (ADR-0029).
     operationTimelineRead: new PostgresOperationTimelineRead(sql),
-    stageSpend: new LiteLlmStageSpendAdapter(baseClient),
+    journeyLineageRead: new PostgresJourneyLineageRead(sql),
+    operationStageSpendRead: spendLogsRead ?? {
+      async readOperationStageSpend() {
+        throw new Error("LITELLM_DATABASE_URL is required for cost reporting.");
+      }
+    },
+    spendLogsRead,
     graphStore,
     artifacts,
     parsers,
@@ -486,9 +496,10 @@ async function bottleneckReportCommand(ctx: Context, operationId: string | undef
     return;
   }
   const report = await bottleneckReport({
-    operationId,
+    scope: { operationId },
     timelineRead: ctx.operationTimelineRead,
-    stageSpendRead: ctx.stageSpend
+    operationStageSpendRead: ctx.operationStageSpendRead,
+    journeyLineageRead: ctx.journeyLineageRead
   });
   if (!report) {
     console.error(`! no operation timeline found for ${operationId}.`);
@@ -502,17 +513,46 @@ async function bottleneckReportCommand(ctx: Context, operationId: string | undef
   renderBottleneckTable(report);
 }
 
+async function journeyCostReportCommand(ctx: Context, enrichmentId: string | undefined, flags: string[]) {
+  if (!enrichmentId) {
+    console.error("! journey-cost-report requires <enrichmentId>.");
+    process.exitCode = 1;
+    return;
+  }
+  const report = await bottleneckReport({
+    scope: { journeyAnchorEnrichmentId: enrichmentId },
+    timelineRead: ctx.operationTimelineRead,
+    operationStageSpendRead: ctx.operationStageSpendRead,
+    journeyLineageRead: ctx.journeyLineageRead
+  });
+  if (!report) {
+    console.error(`! no journey timeline found for enrichment ${enrichmentId}.`);
+    process.exitCode = 1;
+    return;
+  }
+  if (flags.includes("--json")) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  renderBottleneckTable(report);
+}
+
 function renderBottleneckTable(report: BottleneckReport) {
-  console.log(`\n>> bottleneck report — ${report.operationType} ${report.operationId} (${report.status})`);
-  if (!report.costAvailable) console.log("   ! LiteLLM /spend/tags unavailable — cost columns omitted, wall-clock only.");
+  console.log(`\n>> ${report.scope} cost report — ${report.anchorId}`);
+  if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost columns omitted, wall-clock only.");
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
   const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
-  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"cost".padStart(10)}`;
-  console.log(header);
-  console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)}`);
-  for (const row of report.stages) {
-    console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${fmtUsd(row.costUsd).padStart(10)}`);
+  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"tokens".padStart(10)} ${"cost".padStart(10)}`;
+  for (const operation of report.operations) {
+    console.log(`\n   [${operation.operationType}] ${operation.operationId} (${operation.status})`);
+    console.log(header);
+    console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)} ${"-".repeat(10)}`);
+    for (const row of operation.stages) {
+      console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${(row.tokens ?? "—").toString().padStart(10)} ${fmtUsd(row.costUsd).padStart(10)}`);
+    }
+    console.log(`   ${"subtotal".padEnd(30)} ${fmtMs(operation.subtotal.wallClockMs).padStart(9)} ${(operation.subtotal.calls ?? "—").toString().padStart(6)} ${(operation.subtotal.tokens ?? "—").toString().padStart(10)} ${fmtUsd(operation.subtotal.costUsd).padStart(10)}`);
   }
+  console.log(`\n   ${report.scope} total: wall=${fmtMs(report.total.wallClockMs)} calls=${report.total.calls ?? "—"} tokens=${report.total.tokens ?? "—"} cost=${fmtUsd(report.total.costUsd)}`);
 }
 
 async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
@@ -585,8 +625,11 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "bottleneck-report":
       await bottleneckReportCommand(ctx, arg, rest);
       break;
+    case "journey-cost-report":
+      await journeyCostReportCommand(ctx, arg, rest);
+      break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] | journey-cost-report <enrichmentId> [--json]>");
   }
 }
 
@@ -599,6 +642,7 @@ async function main() {
     // whole-command stdout `stage_timing` bracket is superseded and removed.
     await dispatch(ctx, command, arg, rest);
   } finally {
+    await ctx.spendLogsRead?.end();
     await ctx.sql.end({ timeout: 5 });
   }
 }

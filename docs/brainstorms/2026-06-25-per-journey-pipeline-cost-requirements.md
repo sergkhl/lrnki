@@ -3,7 +3,7 @@ title: "Per-journey whole-pipeline cost measurement"
 date: 2026-06-25
 topic: per-journey-pipeline-cost
 type: feat
-status: ready for /ce-plan
+status: completed
 ---
 
 # Per-journey whole-pipeline cost measurement

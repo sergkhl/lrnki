@@ -12,6 +12,7 @@ import {
   type StudyItemCitation,
   type StudyItemGroundingProvenance
 } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type { EnrichmentRunStorePort, GraphVersionStorePort, RunProgressReporterPort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
@@ -63,6 +64,7 @@ export async function generateStudyItemBank(input: {
   const newOptionId = input.newOptionId ?? randomUUID;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
+  return runWithOperationTag(operationId, async () => {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
   const snapshot = await input.graphStore.getPublishedSnapshot(layer.graphVersionId);
@@ -200,6 +202,7 @@ export async function generateStudyItemBank(input: {
   );
   await reporter.completeOperation({ operationId, status: "succeeded" });
   return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected };
+  });
 }
 
 // Verify each draft citation verbatim against its cited grounding passage and resolve

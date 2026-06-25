@@ -20,8 +20,11 @@ export {
 } from "./runProgressReporter";
 export {
   bottleneckReport,
+  type BottleneckOperationReport,
   type BottleneckReport,
-  type BottleneckStageRow
+  type BottleneckReportScope,
+  type BottleneckStageRow,
+  type BottleneckTotals
 } from "./bottleneckReport";
 export {
   deduplicateDerivedNodes,

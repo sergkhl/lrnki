@@ -1,95 +1,206 @@
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
+  JourneyLineageReadPort,
+  OperationStageSpend,
+  OperationStageSpendReadPort,
+  OperationTimelineDetail,
   OperationTimelineReadPort,
-  OperationType,
-  StageSpendReadPort
+  OperationType
 } from "@lrnki/ports";
 import { isLlmStage } from "./runProgressReporter";
 
-// One per-stage row of the bottleneck report (ADR-0029). Wall-clock is per-operation (from
-// the durable timeline); cost is the STANDING per-stage aggregate from LiteLLM (global
-// — LiteLLM has no per-operation scoping). `calls`/`costUsd` are null for non-LLM
-// stages and for LLM stages with no spend yet (or when LiteLLM is unavailable).
+export type BottleneckReportScope =
+  | { operationId: string; operationType?: OperationType }
+  | { journeyAnchorEnrichmentId: string };
+
 export interface BottleneckStageRow {
   stage: string;
   isLlmStage: boolean;
   wallClockMs: number | null;
   calls: number | null;
   costUsd: number | null;
+  tokens: number | null;
 }
 
-export interface BottleneckReport {
+export interface BottleneckTotals {
+  wallClockMs: number;
+  calls: number | null;
+  costUsd: number | null;
+  tokens: number | null;
+}
+
+export interface BottleneckOperationReport {
   operationId: string;
   operationType: OperationType;
   status: string;
-  // False when LiteLLM /spend/tags was unavailable: the wall-clock half still renders
-  // The cost half is marked unavailable while the wall-clock half still renders.
-  costAvailable: boolean;
   stages: BottleneckStageRow[];
+  subtotal: BottleneckTotals;
 }
 
-// The single source of truth for the bottleneck report: it joins the
-// per-operation timeline wall-clock with per-stage LiteLLM spend, keyed on the stage
-// tag, and is recomputed on demand — never persisted, no cost figure ever stored.
-// Both renderers (the worker CLI for code agents, the Admin Lab view for the admin
-// user) call THIS; neither re-implements the join. Returns undefined for an unknown
-// operation id. The row set is the UNION of timeline stages and spend STAGE_TAGS, so a
-// per-operation wall-clock stage AND an LLM stage whose cost is tracked but whose
-// wall-clock is folded into a coarser bracket (e.g. admission-label-judge) both appear.
+export interface BottleneckReport {
+  scope: "operation" | "journey";
+  anchorId: string;
+  costAvailable: boolean;
+  operations: BottleneckOperationReport[];
+  total: BottleneckTotals;
+}
+
+type OperationRef = { operationId: string; operationType: OperationType };
+
 export async function bottleneckReport(input: {
-  operationId: string;
+  scope: BottleneckReportScope;
   timelineRead: OperationTimelineReadPort;
-  stageSpendRead: StageSpendReadPort;
+  operationStageSpendRead: OperationStageSpendReadPort;
+  journeyLineageRead: JourneyLineageReadPort;
 }): Promise<BottleneckReport | undefined> {
-  const detail = await input.timelineRead.getOperationTimeline(input.operationId);
-  if (!detail) return undefined;
+  const scope = "operationId" in input.scope ? "operation" : "journey";
+  const anchorId = "operationId" in input.scope
+    ? input.scope.operationId
+    : input.scope.journeyAnchorEnrichmentId;
 
-  // Cost half degrades gracefully: a LiteLLM outage leaves the wall-clock half intact.
-  let spendByTag: Map<string, { logCount: number; totalSpend: number }> | null = null;
-  try {
-    const spend = await input.stageSpendRead.readStageSpend();
-    spendByTag = new Map(spend.map((row) => [row.tag, { logCount: row.logCount, totalSpend: row.totalSpend }]));
-  } catch {
-    spendByTag = null;
+  let refs: OperationRef[];
+  let details: OperationTimelineDetail[];
+  if ("operationId" in input.scope) {
+    const detail = await input.timelineRead.getOperationTimeline(
+      input.scope.operationId,
+      input.scope.operationType
+    );
+    if (!detail) return undefined;
+    refs = [{ operationId: detail.summary.operationId, operationType: detail.summary.operationType }];
+    details = [detail];
+  } else {
+    const lineage = await input.journeyLineageRead.resolveJourney(input.scope.journeyAnchorEnrichmentId);
+    if (!lineage) return undefined;
+    refs = [
+      ...lineage.extractionRunIds.map((operationId): OperationRef => ({ operationId, operationType: "extraction" })),
+      { operationId: lineage.graphVersionId, operationType: "minting" },
+      { operationId: lineage.enrichmentId, operationType: "enrichment" },
+      { operationId: lineage.enrichmentId, operationType: "study_items" }
+    ];
+    const resolved = await Promise.all(
+      refs.map((ref) => input.timelineRead.getOperationTimeline(ref.operationId, ref.operationType))
+    );
+    details = resolved.filter((detail): detail is OperationTimelineDetail => detail !== undefined);
+    refs = details.map((detail) => ({
+      operationId: detail.summary.operationId,
+      operationType: detail.summary.operationType
+    }));
+    if (details.length === 0) return undefined;
   }
-  const costAvailable = spendByTag !== null;
 
-  // Aggregate per-operation wall-clock by stage name (a stage that recurs sums its
-  // closed durations; open stages contribute null and keep the stage present).
+  let spend: OperationStageSpend[] | null = null;
+  try {
+    spend = await input.operationStageSpendRead.readOperationStageSpend(
+      [...new Set(refs.map((ref) => ref.operationId))]
+    );
+  } catch {
+    spend = null;
+  }
+
+  const costAvailable = spend !== null;
+  const operations = details.map((detail) =>
+    buildOperationReport(detail, spend)
+  );
+  return {
+    scope,
+    anchorId,
+    costAvailable,
+    operations,
+    total: sumTotals(operations.map((operation) => operation.subtotal), costAvailable)
+  };
+}
+
+function buildOperationReport(
+  detail: OperationTimelineDetail,
+  spend: OperationStageSpend[] | null
+): BottleneckOperationReport {
+  const operationSpend = (spend ?? []).filter(
+    (row) =>
+      row.operationId === detail.summary.operationId &&
+      stageBelongsToOperation(row.stage, detail.summary.operationType)
+  );
+  const spendByStage = new Map(operationSpend.map((row) => [row.stage, row]));
   const wallClockByStage = new Map<string, number | null>();
   const order: string[] = [];
   for (const stage of detail.stages) {
     if (!wallClockByStage.has(stage.stage)) order.push(stage.stage);
     const prior = wallClockByStage.get(stage.stage) ?? null;
-    const next = stage.durationMs === null ? prior : (prior ?? 0) + stage.durationMs;
-    wallClockByStage.set(stage.stage, next);
+    wallClockByStage.set(stage.stage, stage.durationMs === null ? prior : (prior ?? 0) + stage.durationMs);
   }
-  // Append spend-only STAGE_TAGS not present in the timeline (cost-tracked sub-stages
-  // whose wall-clock is folded into a coarser bracket), so no cost is silently dropped.
-  if (spendByTag) {
-    for (const tag of spendByTag.keys()) {
-      if (!wallClockByStage.has(tag)) {
-        wallClockByStage.set(tag, null);
-        order.push(tag);
-      }
+  for (const row of operationSpend) {
+    if (!wallClockByStage.has(row.stage)) {
+      wallClockByStage.set(row.stage, null);
+      order.push(row.stage);
     }
   }
 
-  const stages: BottleneckStageRow[] = order.map((stage) => {
-    const spend = spendByTag?.get(stage);
+  const stages = order.map((stage): BottleneckStageRow => {
+    const row = spendByStage.get(stage);
     return {
       stage,
       isLlmStage: isLlmStage(stage),
       wallClockMs: wallClockByStage.get(stage) ?? null,
-      calls: spend ? spend.logCount : null,
-      costUsd: spend ? spend.totalSpend : null
+      calls: row?.logCount ?? null,
+      costUsd: row?.totalSpend ?? null,
+      tokens: row?.totalTokens ?? null
     };
   });
-
   return {
-    operationId: input.operationId,
+    operationId: detail.summary.operationId,
     operationType: detail.summary.operationType,
     status: detail.summary.status,
-    costAvailable,
-    stages
+    stages,
+    subtotal: sumStageRows(stages, spend !== null)
+  };
+}
+
+function stageBelongsToOperation(stage: string, operationType: OperationType): boolean {
+  if (operationType === "extraction") {
+    return EXTRACTION_STAGES.has(stage);
+  }
+  if (operationType === "enrichment") {
+    return ENRICHMENT_STAGES.has(stage);
+  }
+  if (operationType === "study_items") {
+    return stage === STAGE_TAGS.studyItemGeneration;
+  }
+  return false;
+}
+
+const EXTRACTION_STAGES = new Set<string>([
+  STAGE_TAGS.conceptDiscovery,
+  STAGE_TAGS.admission,
+  STAGE_TAGS.admissionLabelJudge,
+  STAGE_TAGS.cepExtraction,
+  STAGE_TAGS.definitionPassageQuality,
+  STAGE_TAGS.assertionEntailment
+]);
+
+const ENRICHMENT_STAGES = new Set<string>([
+  STAGE_TAGS.prerequisiteOrdering,
+  STAGE_TAGS.rescueDurability,
+  STAGE_TAGS.mintingDurability,
+  STAGE_TAGS.missingPrerequisiteProposal,
+  STAGE_TAGS.groundingGeneration,
+  STAGE_TAGS.intrinsicDifficulty,
+  STAGE_TAGS.nodeEmbedding,
+  STAGE_TAGS.nodeMergeAdjudication
+]);
+
+function sumStageRows(rows: BottleneckStageRow[], costAvailable: boolean): BottleneckTotals {
+  return {
+    wallClockMs: rows.reduce((sum, row) => sum + (row.wallClockMs ?? 0), 0),
+    calls: costAvailable ? rows.reduce((sum, row) => sum + (row.calls ?? 0), 0) : null,
+    costUsd: costAvailable ? rows.reduce((sum, row) => sum + (row.costUsd ?? 0), 0) : null,
+    tokens: costAvailable ? rows.reduce((sum, row) => sum + (row.tokens ?? 0), 0) : null
+  };
+}
+
+function sumTotals(rows: BottleneckTotals[], costAvailable: boolean): BottleneckTotals {
+  return {
+    wallClockMs: rows.reduce((sum, row) => sum + row.wallClockMs, 0),
+    calls: costAvailable ? rows.reduce((sum, row) => sum + (row.calls ?? 0), 0) : null,
+    costUsd: costAvailable ? rows.reduce((sum, row) => sum + (row.costUsd ?? 0), 0) : null,
+    tokens: costAvailable ? rows.reduce((sum, row) => sum + (row.tokens ?? 0), 0) : null
   };
 }

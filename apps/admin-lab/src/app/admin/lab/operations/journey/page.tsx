@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DatabaseZapIcon, GaugeIcon } from "lucide-react";
+import { DatabaseZapIcon, RouteIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -11,45 +11,42 @@ import {
   CardTitle
 } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { getBottleneckReport } from "@/lib/operationTimeline";
+import { getJourneyCostReport } from "@/lib/operationTimeline";
 import { BottleneckReportView } from "../_components/BottleneckReportView";
-import type { OperationType } from "@lrnki/ports";
 
 export const dynamic = "force-dynamic";
 
-export default async function BottleneckPage({ searchParams }: { searchParams: Promise<{ operationId?: string; operationType?: string }> }) {
-  const { operationId, operationType } = await searchParams;
-  const report = operationId
-    ? await getBottleneckReport(operationId, isOperationType(operationType) ? operationType : undefined)
-    : undefined;
+export default async function JourneyCostPage({ searchParams }: { searchParams: Promise<{ enrichmentId?: string }> }) {
+  const { enrichmentId } = await searchParams;
+  const report = enrichmentId ? await getJourneyCostReport(enrichmentId) : undefined;
 
   return (
     <AdminShell active="operations">
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Bottleneck report</CardTitle>
+          <CardTitle>Journey cost report</CardTitle>
           <CardDescription>
-            One operation&apos;s wall-clock joined with operation-scoped LiteLLM calls, tokens, and cost.
+            Extraction, Graph-Version Build, enrichment, and study-item totals for one enrichment lineage.
           </CardDescription>
           <CardAction>
             <Link className="text-sm underline underline-offset-4" href="/admin/lab/operations">← operations</Link>
           </CardAction>
         </CardHeader>
         <CardContent>
-          {!operationId ? (
+          {!enrichmentId ? (
             <Empty className="min-h-72 border">
               <EmptyHeader>
-                <EmptyMedia variant="icon"><GaugeIcon /></EmptyMedia>
-                <EmptyTitle>No operation selected</EmptyTitle>
-                <EmptyDescription>Open an operation to see its per-stage bottleneck breakdown.</EmptyDescription>
+                <EmptyMedia variant="icon"><RouteIcon /></EmptyMedia>
+                <EmptyTitle>No journey selected</EmptyTitle>
+                <EmptyDescription>Provide an enrichment id to inspect its whole-pipeline cost.</EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : report === undefined ? (
             <Alert variant="destructive">
               <DatabaseZapIcon />
-              <AlertTitle>Operation not found</AlertTitle>
+              <AlertTitle>Journey not found</AlertTitle>
               <AlertDescription>
-                No timeline exists for <code className="font-mono">{operationId}</code>, or the application database is unavailable.
+                No lineage and timeline data exists for <code className="font-mono">{enrichmentId}</code>, or the application database is unavailable.
               </AlertDescription>
             </Alert>
           ) : (
@@ -59,8 +56,4 @@ export default async function BottleneckPage({ searchParams }: { searchParams: P
       </Card>
     </AdminShell>
   );
-}
-
-function isOperationType(value: string | undefined): value is OperationType {
-  return value === "extraction" || value === "minting" || value === "enrichment" || value === "study_items";
 }
