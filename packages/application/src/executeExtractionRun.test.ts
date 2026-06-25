@@ -590,7 +590,7 @@ test("splits one conflated candidate into independently-tiered atomic concepts r
   assert.equal(result.evidenceProfiles.length, 2);
 });
 
-// --- U4: run-progress reporter instrumentation -----------------------------
+// --- ADR-0029: run-progress reporter instrumentation -----------------------
 
 test("a successful run reports beginOperation → stages in pipeline order → completeOperation succeeded", async () => {
   const { reporter, calls } = recordingReporter();

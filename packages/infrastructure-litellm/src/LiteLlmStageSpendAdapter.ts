@@ -1,7 +1,7 @@
 import { isStageTag } from "@lrnki/domain-core";
 import type { StageSpend, StageSpendReadPort } from "@lrnki/ports";
 
-// Raw `/spend/tags` row shape (verified against a live proxy, plan U7): one row per
+// Raw `/spend/tags` row shape: one row per
 // request tag with a call count and aggregate spend. LiteLLM also emits its own
 // `User-Agent: …` pseudo-tags and may retain stale tag names; both are excluded by
 // projecting onto the closed STAGE_TAGS vocabulary (isStageTag).
@@ -11,7 +11,7 @@ type SpendTagRow = {
   total_spend: number;
 };
 
-// Reads per-stage spend from LiteLLM `/spend/tags` (R5/R6). The application records
+// Reads per-stage spend from LiteLLM `/spend/tags` (ADR-0029). The application records
 // time + stage tags only; cost is read live here and surfaced verbatim — never
 // computed or stored. Same base-URL/auth transport as LiteLlmForcedToolClient.
 export class LiteLlmStageSpendAdapter implements StageSpendReadPort {

@@ -55,7 +55,7 @@ export async function generateStudyItemBank(input: {
   // Parallel-ready seam (R11): bounded degree over the independent per-node units.
   // Defaults to 1 (sequential, unchanged behavior).
   concurrency?: number;
-  // Run-progress reporter seam (R7). Study-item generation is its own operation_type
+  // Run-progress reporter seam (ADR-0029). Study-item generation is its own operation_type
   // keyed by enrichmentId (ADR-0017 split). Absent → no-op (unchanged behavior).
   reporter?: RunProgressReporterPort;
 }): Promise<StudyItemBankGenerationResult> {
@@ -70,7 +70,7 @@ export async function generateStudyItemBank(input: {
   await reporter.beginOperation({ operationType: "study_items", operationId });
   // A thrown stage (e.g. a failed persist) closes the stage ok:false, marks the
   // operation `failed`, and propagates — the same single-source failure semantics
-  // extraction/enrichment use, rather than stranding a permanent `running` row (R1).
+  // extraction/enrichment use, rather than stranding a permanent `running` row.
   const studyStage = bracketStage(reporter, operationId);
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
@@ -80,7 +80,7 @@ export async function generateStudyItemBank(input: {
   // Each derived node is an independent generation unit (R11). Driving them through the
   // shared bounded mapper at degree 1 is identical to the prior sequential loop; the seam
   // admits future parallelism (raise `concurrency`) without an architectural change.
-  // Study-item generation stage with a per-node heartbeat (R3): one progress write as
+  // Study-item generation stage with a per-node heartbeat: one progress write as
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;
   const generateForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {

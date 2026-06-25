@@ -4,15 +4,14 @@ Status: Accepted
 
 ## Decision
 
-The published asserted graph has no asserted edges and no general relation registry.
+There is no general asserted relation registry.
 
 The only typed CEP evidence is `defines`, whose object is a literal definition. It requires verbatim
 grounding and the assertion-entailment judgment from ADR-0007. It remains evidence inside a CEP and
 never becomes an authoritative graph relation, numeric prior, or prerequisite-direction override.
 
-All learner-neutral graph edges belong to Graph Enrichment. The Derived Graph Layer uses only
-`inferred-prerequisite-of` under ADR-0019. Source prose that states relationships remains untyped CEP
-Mention Passage evidence available to that judgment.
+ADR-0019 owns learner-neutral graph edges and their predicate. Source prose that states
+relationships remains untyped CEP Mention Passage evidence available to Graph Enrichment.
 
 ## Context
 

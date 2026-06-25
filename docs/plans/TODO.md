@@ -2,7 +2,16 @@
 
 ## TODO
 
-1. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
+1. **Per-journey whole-pipeline cost measurement (chosen next direction, 2026-06-25).** Follow-up to
+   the merged run-observability work ([ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md)):
+   roll up tokens/calls/cost/wall-clock per stage and operation across one document's journey. The
+   load-bearing piece is run-scoped cost attribution — tag every LLM call with its `operation_id` so a
+   single journey's spend can be isolated (today's `bottleneckReport` cost half is a global per-stage
+   aggregate). Measure-first; the suspected admission-payload optimization is a rule-21 follow-up gated
+   on the rollup. Requirements (ready for `/ce-plan`):
+   [per-journey pipeline cost](../brainstorms/2026-06-25-per-journey-pipeline-cost-requirements.md).
+
+2. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
    measurement on the AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to
    an *in-window mis-pick* (defining block already in the extractor's window, but it quoted a
    passing-mention / heading / title / citation instead; zero retrieval-window misses, zero genuine
@@ -14,31 +23,6 @@
    is being re-run to record the result; escalate to re-pick-on-veto or a stronger extractor only if the
    clause underperforms
    ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
-
-2. **Cut extraction latency + build durable run observability (active thread, 2026-06-25).** A
-   single small document takes >10 min to extract. A disposable LiteLLM `LiteLLM_SpendLogs`
-   diagnostic (re-runnable: `tmp/2026-06-25-run-timing-spike/stage-timing.sh`) located the
-   bottleneck: **Concept Admission re-sends the whole ~23k-token document on every 5-candidate
-   batch** (`extractionAdapters.ts`, ~10 calls × ~59 s/call ≈ the bulk of the run); concept-discovery
-   is one ~162 s whole-document call. Two levers, fully written up in
-   `tmp/2026-06-25-run-timing-spike/FINDINGS.md`:
-   - **Provider switch to DeepSeek first-party — DONE (2026-06-25), largest lever.** Routing the
-     extraction aliases off OpenRouter onto `deepseek/deepseek-v4-flash-no-thinking` cut the two
-     payload-bound stages without any prompt change: concept-discovery 162 s → 24 s/call, admission
-     59 s → 17 s/call (real AIRA-dojo run; `tmp/2026-06-25-run-timing-spike/FINDINGS.md`). The gain is
-     raw first-party throughput (no OpenRouter proxy/host-routing hop), not caching — discovery sped up
-     6.7× with zero cache. This resolves the >10-min latency motivation. DeepSeek's per-account prefix
-     cache also works (cep-extraction 21% → 53%), removing the dedicated-key blocker entirely.
-   - **Admission document-prefix caching — minor open optimization.** Even document-first, the ~23k-token
-     admission prefix warmed only to the system-message level (~1.5k tok, 5% hit) across sequential
-     batches, while an isolated identical-prefix probe caches 99.8%. Net it would take admission ~17 s →
-     ~5 s, but it is off the critical path now and a prompt reorder is a behavior-changing prompt edit
-     (rule 14) — deferred, not shipped. Caching-independent alternative if pursued: fewer/larger
-     admission batches or neighborhood-scope each batch (reuse `selectEvidenceNeighborhood`), gated by a
-     measured multi-sample admission-recall (core-set) comparison (rules 14/19), not N=1.
-   - The durable companion is a per-operation run-stage timeline serving both live client progress
-     and speed/cost measurement — chosen direction, ready for `/ce-plan`:
-     [run-observability requirements](../brainstorms/2026-06-25-run-observability-and-progress-requirements.md).
 
 3. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
    instrument found zero retrieval-window misses on the AIRA-dojo fixture, so replacing the
@@ -110,6 +94,15 @@
   ports; learner projections are application use-cases; Admin Lab graph views use Cytoscape; the demo
   seed produces one coherent mixed-domain state. Decision:
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
+
+- **Extraction provider latency fix.** Routing production extraction aliases to DeepSeek first-party
+  resolved the >10-minute extraction latency and removed the dedicated OpenRouter-key blocker.
+  Measured results remain in the latest validation below.
+
+- **Durable operation observability.** Extraction, graph-version build, enrichment, and study-item
+  operations now write shared incremental stage timelines with heartbeats. Admin Lab exposes live
+  progress, while the CLI and Admin Lab share one on-demand wall-clock/LiteLLM-cost report. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
 ## VALIDATION
 

@@ -85,9 +85,9 @@ function buildContext() {
   const sql = createDatabaseClient();
   const registrationStore = new PostgresSourceRegistrationStore(sql);
   const runStore = new PostgresExtractionRunStore(sql);
-  // Run-progress reporter (KTD3): its own autocommit writes on the shared `sql`
+  // Run-progress reporter (ADR-0029): its own autocommit writes on the shared `sql`
   // handle, never enlisted in a store's persist transaction, drive the durable
-  // timeline that the live progress view (U6) and bottleneck report (U7) read.
+  // timeline that the live progress view and bottleneck report read.
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
   const artifacts = new PostgresArtifactRepository(sql);
@@ -129,9 +129,9 @@ function buildContext() {
     registrationStore,
     runStore,
     runProgressReporter,
-    // Bottleneck-report read surfaces (U7): the per-operation timeline read-model and
+    // Bottleneck-report read surfaces: the per-operation timeline read-model and
     // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
-    // live and never stored (R6).
+    // live and never stored (ADR-0029).
     operationTimelineRead: new PostgresOperationTimelineRead(sql),
     stageSpend: new LiteLlmStageSpendAdapter(baseClient),
     graphStore,
@@ -336,7 +336,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
     // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
-    // via the reporter (KTD7) — supersedes the old onStageTiming stdout sink.
+    // via the reporter (ADR-0029) — supersedes the old onStageTiming stdout sink.
     reporter: ctx.runProgressReporter,
     // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
     // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
@@ -475,7 +475,7 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
 }
 
-// Bottleneck report renderer for code agents (KTD5, R5): a per-stage table of
+// Bottleneck report renderer for code agents (ADR-0029): a per-stage table of
 // wall-clock + calls + cost for one operation, or the same structured rows as `--json`.
 // Both this CLI and the Admin Lab view call the SAME bottleneckReport use-case; neither
 // re-implements the join.

@@ -165,7 +165,7 @@ export async function runGraphEnrichment(input: {
   // direction-contested / weak-cut / cycle-routed edge counts, for operator visibility. The
   // application stays free of console I/O; the worker formats the structured line.
   onOrderingSummary?: (summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number }) => void;
-  // Run-progress reporter seam (R7, KTD7). Supersedes the old onStageTiming stdout
+  // Run-progress reporter seam (ADR-0029). Supersedes the old onStageTiming stdout
   // callback: per-stage wall-clock now lives in the durable operation_run_stages
   // timeline. Absent → no-op (anchor-only/test runs behave unchanged).
   reporter?: RunProgressReporterPort;
@@ -176,7 +176,7 @@ export async function runGraphEnrichment(input: {
   const operationId = input.enrichmentId;
   // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
   // the operation failed before propagating, so a failed enrichment leaves a readable
-  // timeline (R1) — no partial layer is ever persisted.
+  // timeline — no partial layer is ever persisted.
   const runStage = bracketStage(reporter, operationId);
   await reporter.beginOperation({ operationType: "enrichment", operationId });
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);

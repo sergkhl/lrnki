@@ -39,7 +39,7 @@ export async function runExtractionOverSources(input: {
   definitionPassageQualityJudge: DefinitionPassageQualityJudgmentPort;
   store: ExtractionRunStorePort;
   // Threaded into each per-source run so the worker's Postgres reporter (or a test
-  // fake) drives the timeline; absent → executeExtractionRun's no-op default (R7).
+  // fake) drives the timeline; absent → executeExtractionRun's no-op default (ADR-0029).
   reporter?: RunProgressReporterPort;
   concurrency?: number;
   onRunStart?: (unit: ExtractionSourceUnit) => void;

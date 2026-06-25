@@ -22,9 +22,7 @@ passages must match their cited blocks. Generated passages cannot claim source-v
 so their exemption is recorded explicitly as `not_applicable_by_grounding`.
 
 Judgment over generated nodes must use a model family independent from the extraction and grounding
-generator. Whole-set prerequisite ordering therefore uses a cross-family alias. Directional
-instability and other judgment uncertainty are handled by the sampled aggregation policy in
-ADR-0019 and ADR-0028, not by a generated model grading its own output.
+generator. ADR-0019 owns prerequisite-ordering aggregation and ADR-0028 owns judgment uncertainty.
 
 ## Context
 

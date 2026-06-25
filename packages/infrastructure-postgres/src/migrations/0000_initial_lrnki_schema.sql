@@ -763,15 +763,15 @@ SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_ty
 FROM response_log;
 
 -- ---------------------------------------------------------------------------
--- Operation-agnostic run-stage timeline (KTD1, KTD2; R1-R3, R7). ONE shared
+-- Operation-agnostic run-stage timeline (ADR-0029). ONE shared
 -- pair of tables describes the sub-stage timeline for ALL THREE operations
--- (extraction, minting, enrichment + study-items) so progress (R4) and the
--- bottleneck report (R5) read one source of truth. This DESCRIBES operations;
+-- (extraction, minting, enrichment + study-items) so progress and the
+-- bottleneck report read one source of truth. This DESCRIBES operations;
 -- it does not unify them (ADR-0017's operation split is preserved). The
 -- reporter writes these rows incrementally on its own autocommit statements,
--- NEVER enlisted in an operation's terminal artifact transaction (KTD3), so an
+-- NEVER enlisted in an operation's terminal artifact transaction, so an
 -- in-flight or crashed run still leaves a readable timeline. The application
--- records TIME and STAGE TAGS only — never a cost figure (R6); per-stage cost
+-- records TIME and STAGE TAGS only — never a cost figure; per-stage cost
 -- is read live from LiteLLM `/spend/tags` at report time, joined on the stage
 -- tag (the closed STAGE_TAGS vocabulary).
 -- ---------------------------------------------------------------------------

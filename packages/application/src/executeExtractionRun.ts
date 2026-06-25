@@ -54,8 +54,8 @@ export async function executeExtractionRun(input: {
   admissionLabelJudge: AdmissionLabelJudgmentPort;
   definitionPassageQualityJudge: DefinitionPassageQualityJudgmentPort;
   store: ExtractionRunStorePort;
-  // Optional run-progress reporter seam (R7). Absent → no-op, so the run behaves
-  // byte-identically to its pre-instrumentation self (default-safe, KTD4).
+  // Optional run-progress reporter seam (ADR-0029). Absent → no-op, so the run behaves
+  // byte-identically to its pre-instrumentation self.
   reporter?: RunProgressReporterPort;
 }): Promise<ExtractionRunResult> {
   const startedAt = Date.now();
@@ -64,7 +64,7 @@ export async function executeExtractionRun(input: {
   const { document, declaredDomain } = input.source;
 
   // Bracket each stage onto the timeline; a thrown stage marks the operation failed and
-  // propagates, so a failed run leaves a readable timeline without a whole-body try (R1).
+  // propagates, so a failed run leaves a readable timeline without a whole-body try.
   const runStage = bracketStage(reporter, operationId);
 
   // The parent `running` row exists from entry — the fix for "no row until done".

@@ -5,7 +5,7 @@ import type {
 } from "@lrnki/ports";
 import { isLlmStage } from "./runProgressReporter";
 
-// One per-stage row of the bottleneck report (R5). Wall-clock is per-operation (from
+// One per-stage row of the bottleneck report (ADR-0029). Wall-clock is per-operation (from
 // the durable timeline); cost is the STANDING per-stage aggregate from LiteLLM (global
 // — LiteLLM has no per-operation scoping). `calls`/`costUsd` are null for non-LLM
 // stages and for LLM stages with no spend yet (or when LiteLLM is unavailable).
@@ -22,14 +22,14 @@ export interface BottleneckReport {
   operationType: OperationType;
   status: string;
   // False when LiteLLM /spend/tags was unavailable: the wall-clock half still renders
-  // (graceful degradation, R5/U7 error path), the cost half is marked unavailable.
+  // The cost half is marked unavailable while the wall-clock half still renders.
   costAvailable: boolean;
   stages: BottleneckStageRow[];
 }
 
-// THE single source of truth for the bottleneck report (KTD5, KTD6): it joins the
+// The single source of truth for the bottleneck report: it joins the
 // per-operation timeline wall-clock with per-stage LiteLLM spend, keyed on the stage
-// tag, and is recomputed on demand — never persisted, no cost figure ever stored (R6).
+// tag, and is recomputed on demand — never persisted, no cost figure ever stored.
 // Both renderers (the worker CLI for code agents, the Admin Lab view for the admin
 // user) call THIS; neither re-implements the join. Returns undefined for an unknown
 // operation id. The row set is the UNION of timeline stages and spend STAGE_TAGS, so a

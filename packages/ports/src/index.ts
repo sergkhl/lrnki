@@ -604,7 +604,7 @@ export interface SourceInspectionReadPort {
 }
 
 // ---------------------------------------------------------------------------
-// Run-stage timeline reporting seam (KTD4, R7). The EXTERNALLY-DRIVEN seam every
+// Run-stage timeline reporting seam (ADR-0029). The externally driven seam every
 // triggered operation reports progress through, so a future durable workflow
 // engine (Temporal/Restate) can drive the substrate without changing operation
 // logic. Operations call these at stage boundaries and inside item loops; the
@@ -613,7 +613,7 @@ export interface SourceInspectionReadPort {
 // idempotent-tolerant — the reporter writes the timeline, it returns nothing.
 // ---------------------------------------------------------------------------
 
-// The four triggered operations whose timeline these tables describe (KTD1).
+// The four triggered operations whose timeline these tables describe.
 // `study_items` is its own operation_type keyed by enrichmentId (ADR-0017 split
 // is preserved — these describe operations, they do not unify them).
 export type OperationType = "extraction" | "minting" | "enrichment" | "study_items";
@@ -625,7 +625,7 @@ export interface RunProgressReporterPort {
   // Open a stage: insert a child row, set the parent's current_stage. `total` is
   // the item count for a stage that iterates, enabling an N-of-M heartbeat.
   enterStage(input: { operationId: string; stage: string; total?: number }): Promise<void>;
-  // Bump the heartbeat as items complete inside a long stage (R3), so liveness is
+  // Bump the heartbeat as items complete inside a long stage, so liveness is
   // visible without waiting for a stage boundary. `done` is the cumulative count.
   recordProgress(input: { operationId: string; stage: string; done: number }): Promise<void>;
   // Close a stage: set its ended_at + ok. A thrown stage reports ok:false first.
@@ -635,7 +635,7 @@ export interface RunProgressReporterPort {
 }
 
 // ---------------------------------------------------------------------------
-// Operation timeline read model (R4, ADR-0027). The live "where is this
+// Operation timeline read model (ADR-0027, ADR-0029). The live "where is this
 // operation, is it moving" surface. Pure read over operation_runs +
 // operation_run_stages; the adapter owns the query and row-stitch, no SQL in UI.
 // Returns finished models or `undefined`-for-not-found; real DB errors propagate.
@@ -645,7 +645,7 @@ export interface OperationTimelineStage {
   stage: string;
   startedAt: string;
   endedAt: string | null;
-  // null while the stage is open; ended_at - started_at once closed (R5 wall-clock).
+  // null while the stage is open; ended_at - started_at once closed.
   durationMs: number | null;
   ok: boolean | null;
   progressDone: number | null;
@@ -664,7 +664,7 @@ export interface OperationTimelineSummary {
   startedAt: string;
   completedAt: string | null;
   // Wall-clock since start: completed_at - started_at, or now - started_at while running.
-  // A long-stale lastProgressAt on a `running` row is the "hung run" signal (KTD3 risk).
+  // A long-stale lastProgressAt on a `running` row is the "hung run" signal.
   elapsedMs: number;
   stageCount: number;
 }
@@ -679,7 +679,7 @@ export interface OperationTimelineReadPort {
   getOperationTimeline(operationId: string): Promise<OperationTimelineDetail | undefined>;
 }
 
-// Per-stage LiteLLM spend (R5, R6). Read live from LiteLLM `/spend/tags` at report
+// Per-stage LiteLLM spend (ADR-0029). Read live from LiteLLM `/spend/tags` at report
 // time; the application NEVER computes or stores a cost figure — it surfaces
 // LiteLLM's `total_spend` verbatim. The adapter projects the response onto the closed
 // STAGE_TAGS vocabulary, excluding LiteLLM's auto-emitted User-Agent pseudo-tags and
