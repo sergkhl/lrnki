@@ -16,8 +16,25 @@ import type {
   GraphVersionStorePort,
   PrerequisiteOrderingPort
 } from "@lrnki/ports";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import type { RunProgressReporterPort } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
+
+// Recording reporter fake: captures ordered reporter calls so a test asserts the
+// enrichment timeline lifecycle without a database (rule 11). Replaces the deleted
+// onStageTiming stdout sink — stage wall-clock now flows through the durable reporter.
+function recordingReporter() {
+  const calls: string[] = [];
+  const reporter: RunProgressReporterPort = {
+    async beginOperation(i) { calls.push(`begin:${i.operationType}:${i.operationId}`); },
+    async enterStage(i) { calls.push(`enter:${i.stage}`); },
+    async recordProgress(i) { calls.push(`progress:${i.stage}:${i.done}`); },
+    async completeStage(i) { calls.push(`complete:${i.stage}:${i.ok}`); },
+    async completeOperation(i) { calls.push(`done:${i.status}`); }
+  };
+  return { reporter, calls };
+}
 
 // Two Declared Domains: "x" has 3 concepts, "y" has 2. Ordering is always same-domain
 // (ADR-0015). K-sampling (D1) draws the whole-set ordering call K times per multi-node
@@ -206,6 +223,28 @@ const pairVote = (trace: EnrichmentRunTrace | undefined, domain: string, prereqI
   trace?.orderings.find((o) => o.declaredDomain === domain)?.pairVotes.find(
     (v) => (prereqId === undefined || v.prerequisiteDerivedNodeId === prereqId) && (depId === undefined || v.dependentDerivedNodeId === depId)
   );
+
+// U5: the reporter sees the enrichment timeline lifecycle. The anchor-only run (no
+// minting/dedup ports) skips rescue-mint + dedup; ordering and difficulty carry their
+// STAGE_TAGS so the R5 cost join keys hold; persist is the non-LLM tail.
+test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages → completeOperation succeeded", async () => {
+  const ports = buildPorts();
+  const { reporter, calls } = recordingReporter();
+  await run(ports, { reporter });
+
+  assert.equal(calls[0], "begin:enrichment:e1");
+  assert.equal(calls.at(-1), "done:succeeded");
+  const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
+  assert.deepEqual(entered, [
+    STAGE_TAGS.prerequisiteOrdering,
+    "symbolic-disposal",
+    STAGE_TAGS.intrinsicDifficulty,
+    "persist"
+  ]);
+  // Every entered stage is closed ok:true on a clean run; no failed status is emitted.
+  assert.equal(calls.filter((c) => c.startsWith("complete:") && c.endsWith(":true")).length, 4);
+  assert.ok(!calls.includes("done:failed"));
+});
 
 // D1: each multi-node domain issues exactly K draws over its own nodes only.
 test("D1: issues exactly K draws per multi-node domain, never cross-domain", async () => {

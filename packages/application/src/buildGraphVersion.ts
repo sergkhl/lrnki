@@ -10,7 +10,8 @@ import {
   type RefinementDecisionRecord,
   type TrustTier
 } from "@lrnki/domain-core";
-import type { GraphVersionStorePort, ExtractionRunStorePort } from "@lrnki/ports";
+import type { GraphVersionStorePort, ExtractionRunStorePort, RunProgressReporterPort } from "@lrnki/ports";
+import { NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.6.0";
@@ -35,8 +36,19 @@ export async function buildGraphVersion(input: {
   runIds: string[];
   runStore: ExtractionRunStorePort;
   graphStore: GraphVersionStorePort;
+  // Run-progress reporter seam (R7). Minting is LLM-free, so all three stages are
+  // non-LLM (wall-clock only, never in the cost half of the R5 join). Absent → no-op.
+  reporter?: RunProgressReporterPort;
 }): Promise<GraphSnapshot> {
   if (input.runIds.length === 0) throw new Error("buildGraphVersion requires explicit run IDs to publish.");
+  const reporter = input.reporter ?? noopRunProgressReporter;
+  const operationId = input.graphVersionId;
+  // The parent `running` row exists from entry (R1). A thrown phase below leaves the
+  // open stage as the failure signal (KTD3) — minting is fast, so a stuck stage is a
+  // clear failure rather than slow progress.
+  await reporter.beginOperation({ operationType: "minting", operationId });
+
+  await reporter.enterStage({ operationId, stage: NON_LLM_STAGES.load });
   const runs = await input.runStore.runsForBuildByIds(input.runIds);
   if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
 
@@ -75,6 +87,10 @@ export async function buildGraphVersion(input: {
   }
 
   const existingIdentities = await input.graphStore.existingConceptIdentities();
+  await reporter.completeStage({ operationId, stage: NON_LLM_STAGES.load, ok: true });
+
+  // Refine — deterministic identity resolution, IRI minting, and CEP evidence union.
+  await reporter.enterStage({ operationId, stage: NON_LLM_STAGES.refine });
   const refinementDecisions: RefinementDecisionRecord[] = [];
 
   // --- Identity resolution (ADR-0015) --------------------------------------
@@ -310,9 +326,12 @@ export async function buildGraphVersion(input: {
     createdAt: new Date().toISOString(),
     payload: snapshot
   };
+  await reporter.completeStage({ operationId, stage: NON_LLM_STAGES.refine, ok: true });
+
   // Atomic publication: graph-version rows, unioned CEP evidence, and the immutable
   // artifact envelope are written in one transaction (R: no authoritative
   // relational state without its artifact).
+  await reporter.enterStage({ operationId, stage: NON_LLM_STAGES.persist });
   await input.graphStore.publish({
     snapshot,
     refinementConfigHash: REFINEMENT_CONFIG_HASH,
@@ -320,6 +339,8 @@ export async function buildGraphVersion(input: {
     refinementDecisions,
     artifact
   });
+  await reporter.completeStage({ operationId, stage: NON_LLM_STAGES.persist, ok: true });
+  await reporter.completeOperation({ operationId, status: "succeeded" });
   return snapshot;
 }
 

@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { defaultStageTimingSink, withStageTiming } from "./stageTiming";
 import {
   buildGraphVersion,
   computeLearnerPath,
@@ -290,7 +289,7 @@ async function buildVersion(ctx: Context, args: string[]) {
     return;
   }
   const graphVersionId = randomUUID();
-  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore });
+  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, reporter: ctx.runProgressReporter });
   const passages = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
   const assertions = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
   console.log(`\n>> published graph version ${graphVersionId}${baseGraphVersionId ? ` (base ${baseGraphVersionId})` : ""} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
@@ -327,10 +326,9 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
-    // Surface enrichment sub-stage wall-clock through the same structured sink as the
-    // top-level commands (U2, R1). The application reports {stage, ms}; sub-stages that
-    // complete are ok:true (a thrown sub-stage fails the command, timed at top level).
-    onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true }),
+    // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
+    // via the reporter (KTD7) — supersedes the old onStageTiming stdout sink.
+    reporter: ctx.runProgressReporter,
     // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
     // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
     onDedupSummary: (summary) => console.log(`   dedup: merges=${summary.merges} unavailable=${summary.unavailable}`),
@@ -481,7 +479,8 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     studyItemGeneration: ctx.studyItemGeneration,
-    studyItemBankStore: ctx.studyItemBankStore
+    studyItemBankStore: ctx.studyItemBankStore,
+    reporter: ctx.runProgressReporter
   });
   console.log(`   items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
   for (const item of result.studyItems) {
@@ -543,11 +542,10 @@ async function main() {
   const [command, arg, ...rest] = process.argv.slice(2);
   const ctx = buildContext();
   try {
-    // Bracket the whole command (U2, R1): one structured `stage_timing` line per
-    // top-level worker invocation. Each `worker:kg` command is its own process in the
-    // serial seed chain, so these lines plus the enrichment sub-stage lines give the
-    // full-run wall-clock split. The usage/default branch is timed too (harmless).
-    await withStageTiming(command ?? "usage", () => dispatch(ctx, command, arg, rest));
+    // Per-stage wall-clock now lives in the durable operation_run_stages timeline,
+    // written incrementally by each operation through the reporter (KTD7) — the old
+    // whole-command stdout `stage_timing` bracket is superseded and removed.
+    await dispatch(ctx, command, arg, rest);
   } finally {
     await ctx.sql.end({ timeout: 5 });
   }

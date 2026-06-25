@@ -17,6 +17,7 @@ import type {
   RescueDisposition,
   WholeSetOrdering
 } from "@lrnki/domain-core";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -27,9 +28,11 @@ import type {
   NodeMergeAdjudicationPort,
   PrerequisiteOrderingPort,
   RescueDurabilityJudgmentPort,
+  RunProgressReporterPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
+import { NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { cutWeakEdges, findCycleEdges, transitiveReduction } from "./prerequisiteDag";
@@ -162,22 +165,31 @@ export async function runGraphEnrichment(input: {
   // direction-contested / weak-cut / cycle-routed edge counts, for operator visibility. The
   // application stays free of console I/O; the worker formats the structured line.
   onOrderingSummary?: (summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number }) => void;
-  // Optional per-sub-stage wall-clock hook (U2, KTD5, R1). The application stays free
-  // of console I/O: it only measures monotonic elapsed ms around each enrichment
-  // sub-stage and reports through this callback; the worker formats the structured line.
-  onStageTiming?: (timing: { stage: string; ms: number }) => void;
+  // Run-progress reporter seam (R7, KTD7). Supersedes the old onStageTiming stdout
+  // callback: per-stage wall-clock now lives in the durable operation_run_stages
+  // timeline. Absent → no-op (anchor-only/test runs behave unchanged).
+  reporter?: RunProgressReporterPort;
   newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
-  // Bracket one enrichment sub-stage and report its wall-clock through onStageTiming.
-  // Reports on success only; a thrown sub-stage fails the whole run, which the
-  // worker-level command timer records as a failed stage (U2).
-  const timeStage = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
-    const startedAt = performance.now();
-    const result = await fn();
-    input.onStageTiming?.({ stage, ms: Math.max(0, Math.round(performance.now() - startedAt)) });
-    return result;
+  const reporter = input.reporter ?? noopRunProgressReporter;
+  const operationId = input.enrichmentId;
+  // Bracket one enrichment sub-stage onto the durable timeline. A throw closes the
+  // stage ok:false and records the operation `failed` before propagating, so a failed
+  // enrichment leaves a readable timeline (R1) — no partial layer is ever persisted.
+  const runStage = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
+    await reporter.enterStage({ operationId, stage });
+    try {
+      const result = await fn();
+      await reporter.completeStage({ operationId, stage, ok: true });
+      return result;
+    } catch (error) {
+      await reporter.completeStage({ operationId, stage, ok: false });
+      await reporter.completeOperation({ operationId, status: "failed" });
+      throw error;
+    }
   };
+  await reporter.beginOperation({ operationType: "enrichment", operationId });
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
   if (!snapshot) {
     throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
@@ -208,7 +220,7 @@ export async function runGraphEnrichment(input: {
   let rescueDispositions: RescueDisposition[] = [];
   let mintingDispositions: MintingDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
-    await timeStage("enrichment:rescue-mint", async () => {
+    await runStage("rescue-mint", async () => {
       const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
       const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
         conceptId: concept.conceptId,
@@ -260,7 +272,7 @@ export async function runGraphEnrichment(input: {
   let nodeMerges: NodeMergeRecord[] = [];
   let absorbedGroundingByCanonical = new Map<string, string[]>();
   if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
-    await timeStage("enrichment:dedup", async () => {
+    await runStage("dedup", async () => {
       // Reduce each node to its dedup context from the SAME contextOf reduction the judge
       // uses (label + verbatim definition/mention quotes), without absorbed grounding yet.
       const dedupContext = new Map<string, DedupNodeContext>(
@@ -337,7 +349,7 @@ export async function runGraphEnrichment(input: {
   const certainEdges: InferredPrerequisiteEdge[] = [];
   const uncertainEdges: InferredPrerequisiteEdge[] = [];
   const weakEdges: InferredPrerequisiteEdge[] = [];
-  await timeStage("enrichment:ordering", async () => {
+  await runStage(STAGE_TAGS.prerequisiteOrdering, async () => {
     for (const [declaredDomain, members] of [...byDomain.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       const sorted = [...members].sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
       // A singleton (or empty) domain has no possible relation: no ordering draw, empty trace.
@@ -474,7 +486,7 @@ export async function runGraphEnrichment(input: {
   // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
   // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
   // acyclicity is enforced upstream by cycle-routing (KTD3).
-  const disposal = await timeStage("enrichment:symbolic-disposal", async () => {
+  const disposal = await runStage("symbolic-disposal", async () => {
     const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
     return { reducedEdges, transitiveEdges };
   });
@@ -494,7 +506,7 @@ export async function runGraphEnrichment(input: {
 
   // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
   // — anchors AND enrichment nodes (R12, handoff constraint).
-  const difficulties = await timeStage("enrichment:difficulty", () =>
+  const difficulties = await runStage(STAGE_TAGS.intrinsicDifficulty, () =>
     input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges })
   );
 
@@ -526,19 +538,22 @@ export async function runGraphEnrichment(input: {
     mintingDispositions,
     nodeMerges
   };
-  await input.enrichmentStore.persist({
-    layer,
-    artifact: {
-      artifactId: `${input.enrichmentId}:enrichment-run`,
-      artifactType: "enrichment_run",
-      graphVersionId: input.graphVersionId,
-      producer: PRODUCER,
-      producerVersion: PRODUCER_VERSION,
-      configHash: config.enrichmentConfigHash,
-      createdAt: new Date().toISOString(),
-      payload: trace
-    }
-  });
+  await runStage(NON_LLM_STAGES.persist, () =>
+    input.enrichmentStore.persist({
+      layer,
+      artifact: {
+        artifactId: `${input.enrichmentId}:enrichment-run`,
+        artifactType: "enrichment_run",
+        graphVersionId: input.graphVersionId,
+        producer: PRODUCER,
+        producerVersion: PRODUCER_VERSION,
+        configHash: config.enrichmentConfigHash,
+        createdAt: new Date().toISOString(),
+        payload: trace
+      }
+    })
+  );
+  await reporter.completeOperation({ operationId, status: "succeeded" });
   return layer;
 }
 
