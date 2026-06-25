@@ -6,8 +6,8 @@ import type {
   DifficultyNodeContext,
   EnrichmentRunTrace,
   GraphSnapshot,
+  InferredPrerequisiteEdge,
   PrerequisiteConceptContext,
-  PrerequisiteOrderingCorrection,
   WholeSetOrdering
 } from "@lrnki/domain-core";
 import type {
@@ -16,12 +16,32 @@ import type {
   GraphVersionStorePort,
   PrerequisiteOrderingPort
 } from "@lrnki/ports";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import type { RunProgressReporterPort } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
 
+// Recording reporter fake: captures ordered reporter calls so a test asserts the
+// enrichment timeline lifecycle without a database (rule 11). Replaces the deleted
+// onStageTiming stdout sink — stage wall-clock now flows through the durable reporter.
+function recordingReporter() {
+  const calls: string[] = [];
+  const reporter: RunProgressReporterPort = {
+    async beginOperation(i) { calls.push(`begin:${i.operationType}:${i.operationId}`); },
+    async enterStage(i) { calls.push(`enter:${i.stage}`); },
+    async recordProgress(i) { calls.push(`progress:${i.stage}:${i.done}`); },
+    async completeStage(i) { calls.push(`complete:${i.stage}:${i.ok}`); },
+    async completeOperation(i) { calls.push(`done:${i.status}`); }
+  };
+  return { reporter, calls };
+}
+
 // Two Declared Domains: "x" has 3 concepts, "y" has 2. Ordering is always same-domain
-// (ADR-0015), so the whole-set reshape (R1) issues exactly ONE ordering call per domain
-// over that domain's evidenced nodes and never mixes domains in one call.
+// (ADR-0015). K-sampling (D1) draws the whole-set ordering call K times per multi-node
+// domain on the SAME input; the application tallies a per-pair directional vote (D2). The
+// fake ordering port returns the i-th canned WholeSetOrdering for the i-th DRAW within a
+// domain, so a test drives the tally deterministically WITHOUT asserting any ordering is
+// "good" (rule 11 — a canned draw set is input to the deterministic aggregation only).
 function concept(id: string, label: string, domain: string, aliases: string[] = []) {
   return {
     conceptId: id,
@@ -86,11 +106,14 @@ const snapshot: GraphSnapshot = {
   ]
 };
 
-type OrderInput = { declaredDomain: string; nodes: PrerequisiteConceptContext[]; correction?: PrerequisiteOrderingCorrection };
-type Responder = (input: OrderInput) => WholeSetOrdering;
+type OrderInput = { declaredDomain: string; nodes: PrerequisiteConceptContext[] };
+// A responder maps (call input, DRAW index within that domain) → one draw's ordering.
+type Responder = (input: OrderInput, drawIndex: number) => WholeSetOrdering;
 
 // A canned edge over two canonical labels; only edges whose endpoints are in the call's
-// node set are emitted (mirrors a sane model). Confidence defaults high (survives the cut).
+// node set are emitted (mirrors a sane model). The model's self-reported `confidence` is
+// NO LONGER the edge confidence (D4 replaces it with consensus max(f,r)/K), so it is
+// cosmetic here.
 function edgeOf(prerequisiteLabel: string, dependentLabel: string, confidence = 0.9, rationale = "mock"): WholeSetOrdering["edges"][number] {
   return { prerequisiteLabel, dependentLabel, confidence, rationale };
 }
@@ -99,8 +122,21 @@ function presentEdges(input: OrderInput, edges: WholeSetOrdering["edges"]): Whol
   return { edges: edges.filter((e) => labels.has(e.prerequisiteLabel) && labels.has(e.dependentLabel)) };
 }
 
-// Default ordering: in domain "x" assert X Two -> X One and X One -> X Three (acyclic);
-// in domain "y" assert nothing. Label-driven, no positional meaning.
+// Build K draws for one domain: `segments` lists [edges, repeat] in order; remaining draws
+// up to K are empty. Lets a test express "this edge appears in 6 of 8 draws" directly.
+function drawsOf(k: number, segments: Array<[WholeSetOrdering["edges"], number]>): WholeSetOrdering["edges"][] {
+  const out: WholeSetOrdering["edges"][] = [];
+  for (const [edges, repeat] of segments) for (let i = 0; i < repeat; i++) out.push(edges);
+  while (out.length < k) out.push([]);
+  return out.slice(0, k);
+}
+// A responder driven by a per-domain script of per-draw edge lists.
+function scriptResponder(perDomain: Record<string, WholeSetOrdering["edges"][]>): Responder {
+  return (input, drawIndex) => presentEdges(input, perDomain[input.declaredDomain]?.[drawIndex] ?? []);
+}
+
+// Default ordering: every draw in domain "x" asserts X Two -> X One and X One -> X Three
+// (acyclic, stable across draws → consensus 1.0); domain "y" asserts nothing.
 const defaultResponder: Responder = (input) =>
   presentEdges(input, [edgeOf("X Two", "X One"), edgeOf("X One", "X Three")]);
 
@@ -108,6 +144,7 @@ function buildPorts(options: { responder?: Responder; snapshot?: GraphSnapshot; 
   const active = options.snapshot ?? snapshot;
   const responder = options.responder ?? defaultResponder;
   const calls: OrderInput[] = [];
+  const drawCounts = new Map<string, number>();
 
   const graphStore: Pick<GraphVersionStorePort, "getPublishedSnapshot"> = {
     async getPublishedSnapshot(graphVersionId) {
@@ -117,14 +154,20 @@ function buildPorts(options: { responder?: Responder; snapshot?: GraphSnapshot; 
   const prerequisiteOrdering: PrerequisiteOrderingPort = {
     model: "mock-ordering",
     async order(input) {
+      // The synchronous prefix (draw-index assignment) runs before any await, so even with
+      // K concurrent draws each call gets a unique sequential index in call order.
+      const drawIndex = drawCounts.get(input.declaredDomain) ?? 0;
+      drawCounts.set(input.declaredDomain, drawIndex + 1);
       calls.push(input);
       if (options.onOrder) await options.onOrder(input);
-      return responder(input);
+      return responder(input, drawIndex);
     }
   };
+  let scoredEdges: InferredPrerequisiteEdge[] | undefined;
   const difficulty: DifficultyPort = {
     method: "intrinsic-fused-v1",
-    async score({ nodes }) {
+    async score({ nodes, prerequisiteEdges }) {
+      scoredEdges = prerequisiteEdges;
       return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {}, neuralRationale: "" }));
     }
   };
@@ -146,16 +189,20 @@ function buildPorts(options: { responder?: Responder; snapshot?: GraphSnapshot; 
     prerequisiteOrdering,
     difficulty,
     enrichmentStore,
+    callsForDomain: (domain: string) => calls.filter((c) => c.declaredDomain === domain).length,
     getPersisted: () => persisted,
     getTrace: () => trace,
     getArtifactType: () => artifactType,
-    getPersistCalls: () => persistCalls
+    getPersistCalls: () => persistCalls,
+    getScoredEdges: () => scoredEdges
   };
 }
 
 function configWith(overrides: Partial<GraphEnrichmentConfig>): GraphEnrichmentConfig {
   return { ...DEFAULT_ENRICHMENT_CONFIG, dedup: DEFAULT_DEDUP_CONFIG, ...overrides };
 }
+
+const K = DEFAULT_ENRICHMENT_CONFIG.orderingSampleCount;
 
 function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters<typeof runGraphEnrichment>[0]> = {}) {
   return runGraphEnrichment({
@@ -172,22 +219,70 @@ function run(ports: ReturnType<typeof buildPorts>, overrides: Partial<Parameters
 const idByLabel = (layer: DerivedGraphLayer) =>
   new Map(layer.derivedNodes.map((node) => [node.canonicalLabel, node.derivedNodeId] as const));
 
-// R1 grouping: exactly one ordering call per domain, each over that domain's nodes only.
-test("issues exactly one ordering call per Declared Domain, never cross-domain", async () => {
+const pairVote = (trace: EnrichmentRunTrace | undefined, domain: string, prereqId?: string, depId?: string) =>
+  trace?.orderings.find((o) => o.declaredDomain === domain)?.pairVotes.find(
+    (v) => (prereqId === undefined || v.prerequisiteDerivedNodeId === prereqId) && (depId === undefined || v.dependentDerivedNodeId === depId)
+  );
+
+// U5: the reporter sees the enrichment timeline lifecycle. The anchor-only run (no
+// minting/dedup ports) skips rescue-mint + dedup; ordering and difficulty carry their
+// STAGE_TAGS so the R5 cost join keys hold; persist is the non-LLM tail.
+test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages → completeOperation succeeded", async () => {
+  const ports = buildPorts();
+  const { reporter, calls } = recordingReporter();
+  await run(ports, { reporter });
+
+  assert.equal(calls[0], "begin:enrichment:e1");
+  assert.equal(calls.at(-1), "done:succeeded");
+  const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
+  assert.deepEqual(entered, [
+    STAGE_TAGS.prerequisiteOrdering,
+    "symbolic-disposal",
+    STAGE_TAGS.intrinsicDifficulty,
+    "persist"
+  ]);
+  // Every entered stage is closed ok:true on a clean run; no failed status is emitted.
+  assert.equal(calls.filter((c) => c.startsWith("complete:") && c.endsWith(":true")).length, 4);
+  assert.ok(!calls.includes("done:failed"));
+});
+
+// D1: each multi-node domain issues exactly K draws over its own nodes only.
+test("D1: issues exactly K draws per multi-node domain, never cross-domain", async () => {
   const ports = buildPorts();
   await run(ports);
-  assert.equal(ports.calls.length, 2, "one call for domain x and one for domain y");
-  const domains = ports.calls.map((call) => call.declaredDomain).sort();
-  assert.deepEqual(domains, ["x", "y"]);
+  assert.equal(ports.calls.length, 2 * K, "K draws for domain x and K for domain y");
+  assert.equal(ports.callsForDomain("x"), K);
+  assert.equal(ports.callsForDomain("y"), K);
   for (const call of ports.calls) {
-    const callDomains = new Set(call.nodes.map((node) => node.canonicalLabel.startsWith("X") ? "x" : "y"));
-    assert.equal(callDomains.size, 1, "a single call never mixes domains");
+    const callDomains = new Set(call.nodes.map((node) => (node.canonicalLabel.startsWith("X") ? "x" : "y")));
+    assert.equal(callDomains.size, 1, "a single draw never mixes domains");
   }
 });
 
-// Each ordering call receives full CEPs (definitions, bounded mentions, labeled typed
-// assertions, aliases) — never bare labels alone.
-test("passes Concepts' CEPs to the ordering call with bounded mentions", async () => {
+// D1: a singleton domain takes zero draws and records an empty pairVotes with k = 0.
+test("D1: a singleton domain issues 0 draws and records empty pairVotes", async () => {
+  const withSingleton: GraphSnapshot = {
+    graphVersionId: "v1",
+    baseGraphVersionId: null,
+    concepts: [concept("a", "A", "x"), concept("b", "B", "x"), concept("s", "Solo", "z")],
+    evidenceProfiles: [
+      { conceptId: "a", definitions: [passage("b1", "A def")], mentions: [], assertions: [] },
+      { conceptId: "b", definitions: [passage("b2", "B def")], mentions: [], assertions: [] },
+      { conceptId: "s", definitions: [passage("b3", "Solo def")], mentions: [], assertions: [] }
+    ]
+  };
+  const ports = buildPorts({ snapshot: withSingleton, responder: () => ({ edges: [] }) });
+  await run(ports);
+  assert.equal(ports.callsForDomain("z"), 0, "the singleton domain z takes no draws");
+  assert.equal(ports.callsForDomain("x"), K);
+  const zTrace = ports.getTrace()?.orderings.find((o) => o.declaredDomain === "z");
+  assert.equal(zTrace?.k, 0);
+  assert.deepEqual(zTrace?.pairVotes, []);
+});
+
+// Each draw receives full CEPs (definitions, bounded mentions, labeled typed assertions,
+// aliases) — never bare labels alone.
+test("passes Concepts' CEPs to each ordering draw with bounded mentions", async () => {
   const ports = buildPorts();
   await run(ports);
   const xCall = ports.calls.find((call) => call.declaredDomain === "x");
@@ -209,9 +304,9 @@ test("honors a non-default mention bound without reordering", async () => {
   assert.deepEqual(cx1.mentions, ["mention one", "mention two"]);
 });
 
-// R3 + R13: the ordering's certain edges survive disposal; an unasserted pair produces no
-// edge and no disposition; no uncertain edges arise on an acyclic single-sample run.
-test("follows the ordering: certain edges survive, unasserted pairs produce nothing", async () => {
+// A pair cited the same direction in every draw commits a certain consensus edge; an
+// unasserted pair produces no edge and no disposition.
+test("follows the consensus: stable edges survive certain, unasserted pairs produce nothing", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
   const id = idByLabel(layer);
@@ -219,78 +314,150 @@ test("follows the ordering: certain edges survive, unasserted pairs produce noth
     layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get(prereq) && e.dependentDerivedNodeId === id.get(dep) && !e.uncertain);
   assert.ok(has("X Two", "X One"));
   assert.ok(has("X One", "X Three"));
-  assert.equal(layer.prerequisiteEdges.length, 2, "only the two asserted edges; the unasserted X Two/X Three pair yields nothing (R3)");
-  assert.ok(layer.prerequisiteEdges.every((e) => !e.uncertain), "an acyclic single-sample run has no uncertain edges");
+  assert.equal(layer.prerequisiteEdges.length, 2, "only the two stable edges; the unasserted X Two/X Three pair yields nothing");
+  assert.ok(layer.prerequisiteEdges.every((e) => !e.uncertain), "a stable, acyclic consensus has no uncertain edges");
 
   const dispositions = ports.getTrace()?.dispositions ?? [];
   assert.deepEqual(dispositions.map((d) => d.disposition).sort(), ["kept", "kept"]);
-  // R3: no disposition row for the pair the judge never asserted.
+  // No disposition row for the pair never voted in any draw.
   assert.ok(!dispositions.some((d) => d.prerequisiteDerivedNodeId === id.get("X Two") && d.dependentDerivedNodeId === id.get("X Three")));
+  // Non-edge: that pair has no vote either.
+  assert.equal(pairVote(ports.getTrace(), "x", id.get("X Two"), id.get("X Three")), undefined);
 });
 
-// AE1 / R9, R10: a first cyclic response triggers exactly ONE re-prompt naming the cycle;
-// the revised acyclic response persists normally.
-test("a cyclic first response triggers exactly one re-prompt naming the cycle", async () => {
-  let corrections: PrerequisiteOrderingCorrection[] = [];
-  const responder: Responder = (input) => {
-    if (input.declaredDomain !== "x") return { edges: [] };
-    if (input.correction) {
-      corrections.push(input.correction);
-      return presentEdges(input, [edgeOf("X One", "X Two"), edgeOf("X One", "X Three")]); // acyclic
-    }
-    return presentEdges(input, [edgeOf("X One", "X Two"), edgeOf("X Two", "X Three"), edgeOf("X Three", "X One")]); // cycle
-  };
-  const ports = buildPorts({ responder });
+// D4: a pair voted forward in 6 of K draws, reverse 0, commits a certain edge whose
+// confidence is the empirical agreement 6/K — NOT the model's self-reported 0.9.
+test("D4: consensus confidence is max(f,r)/K, replacing the model self-report", async () => {
+  const e = edgeOf("X Two", "X One", 0.9);
+  const ports = buildPorts({ responder: scriptResponder({ x: drawsOf(K, [[[e], 6]]) }) });
   const layer = await run(ports);
-
-  const xCalls = ports.calls.filter((call) => call.declaredDomain === "x");
-  assert.equal(xCalls.length, 2, "exactly one corrective re-prompt for domain x");
-  assert.equal(corrections.length, 1);
-  // The correction frames the violating cycle as an ordered label path looping back.
-  const path = corrections[0].cyclePath;
-  assert.equal(path[0], path[path.length - 1], "cycle path loops back to its start");
-  assert.deepEqual([...new Set(path)].sort(), ["X One", "X Three", "X Two"]);
-
-  const xTrace = ports.getTrace()?.orderings.find((o) => o.declaredDomain === "x");
-  assert.equal(xTrace?.reprompted, true);
-  assert.deepEqual(xTrace?.cycleRoutedEdges, [], "the re-prompt fixed it; nothing routed to uncertain");
-  assert.ok(layer.prerequisiteEdges.every((e) => !e.uncertain));
-  assert.equal(ports.getPersistCalls(), 1);
+  const id = idByLabel(layer);
+  const committed = layer.prerequisiteEdges.find((edge) => edge.prerequisiteDerivedNodeId === id.get("X Two") && edge.dependentDerivedNodeId === id.get("X One"));
+  assert.ok(committed, "the 6/K pair is committed certain");
+  assert.equal(committed.uncertain, false);
+  assert.equal(committed.confidence, 6 / K, "confidence is the agreement fraction, not the 0.9 self-report");
+  const vote = pairVote(ports.getTrace(), "x", id.get("X Two"), id.get("X One"));
+  assert.equal(vote?.forward, 6);
+  assert.equal(vote?.reverse, 0);
+  assert.equal(vote?.k, K);
+  assert.equal(vote?.consensusConfidence, 6 / K);
+  assert.equal(vote?.classification, "consensus");
 });
 
-// AE2 / R11: a still-cyclic response after the one re-prompt routes every edge in the
-// offending cycle to uncertain (kept + excluded from the DAG); the rest is unaffected.
-test("a still-cyclic response routes the cycle edges to uncertain and keeps the rest", async () => {
-  // Domain x with FOUR nodes: A,B,C cycle, plus D->A outside the cycle (must survive).
-  const fourNode: GraphSnapshot = {
+// D3: a pair voted in BOTH directions beyond the contest threshold is routed to uncertain
+// (kept, flagged, path-excluded), never committed certain.
+test("D3: a direction-contested pair is routed to uncertain, not committed certain", async () => {
+  const fwd = edgeOf("X Two", "X One");
+  const rev = edgeOf("X One", "X Two");
+  // forward 5, reverse 3 → min/K = 3/8 = 0.375 ≥ the 0.2 default contest fraction.
+  const ports = buildPorts({ responder: scriptResponder({ x: drawsOf(K, [[[fwd], 5], [[rev], 3]]) }) });
+  const layer = await run(ports);
+  const id = idByLabel(layer);
+  const between = layer.prerequisiteEdges.filter(
+    (e) => new Set([e.prerequisiteDerivedNodeId, e.dependentDerivedNodeId]).has(id.get("X Two")!) && new Set([e.prerequisiteDerivedNodeId, e.dependentDerivedNodeId]).has(id.get("X One")!)
+  );
+  assert.equal(between.length, 1, "exactly one uncertain edge for the contested pair");
+  assert.equal(between[0].uncertain, true);
+  // Majority direction is X Two -> X One (5 vs 3).
+  assert.equal(between[0].prerequisiteDerivedNodeId, id.get("X Two"));
+  const vote = pairVote(ports.getTrace(), "x", id.get("X Two"), id.get("X One"));
+  assert.equal(vote?.forward, 5);
+  assert.equal(vote?.reverse, 3);
+  assert.equal(vote?.classification, "direction_contested");
+  // Excluded from the DAG handed to difficulty (uncertain edges never traverse).
+  assert.ok(!(ports.getScoredEdges() ?? []).some((e) => e.uncertain), "no uncertain edge reaches the difficulty DAG input");
+  assert.ok(!(ports.getScoredEdges() ?? []).some((e) => e.prerequisiteDerivedNodeId === id.get("X Two") && e.dependentDerivedNodeId === id.get("X One")));
+  assert.ok((ports.getTrace()?.dispositions ?? []).some((d) => d.disposition === "uncertain"));
+});
+
+// D5/D6: the existing weak-edge floor IS the presence quorum — a 1/K edge is below it
+// (weak_cut, recorded not committed) while a 7/K edge survives (kept).
+test("D5/D6: presence quorum via the floor — 1/K is weak_cut, 7/K is kept", async () => {
+  const strong = edgeOf("X Two", "X One");
+  const sparse = edgeOf("X One", "X Three");
+  // draw 0 has both; draws 1-6 have only the strong edge; draw 7 empty → strong 7/8, sparse 1/8.
+  const ports = buildPorts({ responder: scriptResponder({ x: drawsOf(K, [[[strong, sparse], 1], [[strong], 6]]) }) });
+  const layer = await run(ports);
+  const id = idByLabel(layer);
+  const kept = layer.prerequisiteEdges.find((e) => e.prerequisiteDerivedNodeId === id.get("X Two") && e.dependentDerivedNodeId === id.get("X One"));
+  assert.ok(kept && !kept.uncertain, "the 7/8 edge is kept certain");
+  assert.equal(kept.confidence, 7 / K);
+  // The 1/8 edge is NOT committed (neither certain nor uncertain).
+  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("X One") && e.dependentDerivedNodeId === id.get("X Three")));
+  const dispositions = ports.getTrace()?.dispositions ?? [];
+  assert.ok(dispositions.some((d) => d.disposition === "weak_cut" && d.prerequisiteDerivedNodeId === id.get("X One") && d.dependentDerivedNodeId === id.get("X Three")));
+  // But the sparse pair WAS voted — it has a pairVote even though it was cut.
+  assert.equal(pairVote(ports.getTrace(), "x", id.get("X One"), id.get("X Three"))?.forward, 1);
+});
+
+// KTD5: weak-cut runs BEFORE cycle-routing — a sub-floor edge that would close a cycle is
+// cut first, leaving the strong, otherwise-acyclic core committed (not routed to uncertain).
+test("KTD5: a sub-floor cycle-closing edge is weak-cut first, the strong core stays certain", async () => {
+  const abc: GraphSnapshot = {
     graphVersionId: "v1",
     baseGraphVersionId: null,
-    concepts: [concept("a", "A", "x"), concept("b", "B", "x"), concept("c", "C", "x"), concept("d", "D", "x")],
-    evidenceProfiles: ["a", "b", "c", "d"].map((cid, i) => ({ conceptId: cid, definitions: [passage(`d${i}`, `${cid} def`)], mentions: [], assertions: [] }))
+    concepts: [concept("a", "A", "x"), concept("b", "B", "x"), concept("c", "C", "x")],
+    evidenceProfiles: ["a", "b", "c"].map((cid, i) => ({ conceptId: cid, definitions: [passage(`d${i}`, `${cid} def`)], mentions: [], assertions: [] }))
   };
-  const responder: Responder = (input) =>
-    presentEdges(input, [edgeOf("A", "B"), edgeOf("B", "C"), edgeOf("C", "A"), edgeOf("D", "A")]); // always cyclic
-  const ports = buildPorts({ responder, snapshot: fourNode });
+  const ab = edgeOf("A", "B");
+  const bc = edgeOf("B", "C");
+  const ca = edgeOf("C", "A");
+  // A->B and B->C in all 8 draws (1.0); C->A in only 3 draws (0.375 < 0.5 floor → weak-cut).
+  const ports = buildPorts({ snapshot: abc, responder: scriptResponder({ x: drawsOf(K, [[[ab, bc, ca], 3], [[ab, bc], 5]]) }) });
   const layer = await run(ports);
-
   const id = idByLabel(layer);
-  const xCalls = ports.calls.filter((call) => call.declaredDomain === "x");
-  assert.equal(xCalls.length, 2, "one re-prompt, then route — never an agentic loop of calls");
-
   const certain = layer.prerequisiteEdges.filter((e) => !e.uncertain);
   const uncertain = layer.prerequisiteEdges.filter((e) => e.uncertain);
-  // D -> A is outside the cycle and survives as a certain edge.
-  assert.ok(certain.some((e) => e.prerequisiteDerivedNodeId === id.get("D") && e.dependentDerivedNodeId === id.get("A")));
-  // The three cycle edges are routed to uncertain (kept, not dropped).
-  assert.equal(uncertain.length, 3);
-  assert.equal(certain.length, 1, "only D->A stays certain");
-  // Nothing dropped: all four asserted edges are present in the persisted layer.
-  assert.equal(layer.prerequisiteEdges.length, 4);
+  assert.equal(uncertain.length, 0, "the strong A->B->C core is NOT routed to uncertain");
+  assert.ok(certain.some((e) => e.prerequisiteDerivedNodeId === id.get("A") && e.dependentDerivedNodeId === id.get("B")));
+  assert.ok(certain.some((e) => e.prerequisiteDerivedNodeId === id.get("B") && e.dependentDerivedNodeId === id.get("C")));
+  assert.ok(!certain.some((e) => e.prerequisiteDerivedNodeId === id.get("C") && e.dependentDerivedNodeId === id.get("A")), "C->A is gone (weak-cut)");
+  assert.ok((ports.getTrace()?.dispositions ?? []).some((d) => d.disposition === "weak_cut"));
+});
 
+// D7: K draws whose per-pair winners form a MULTI-NODE aggregate cycle A->B->C->A (each one
+// strong and one-directional) are cycle-routed to uncertain — and there is NO K+1 correction
+// call (the re-prompt is gone, KTD4).
+test("D7: an aggregate multi-node cycle is cycle-routed to uncertain in exactly K draws", async () => {
+  const abc: GraphSnapshot = {
+    graphVersionId: "v1",
+    baseGraphVersionId: null,
+    concepts: [concept("a", "A", "x"), concept("b", "B", "x"), concept("c", "C", "x")],
+    evidenceProfiles: ["a", "b", "c"].map((cid, i) => ({ conceptId: cid, definitions: [passage(`d${i}`, `${cid} def`)], mentions: [], assertions: [] }))
+  };
+  const cyclic = [edgeOf("A", "B"), edgeOf("B", "C"), edgeOf("C", "A")];
+  // Every draw asserts the same one-directional cycle; the aggregate strong set is cyclic.
+  const ports = buildPorts({ snapshot: abc, responder: (input) => presentEdges(input, cyclic) });
+  const layer = await run(ports);
+  assert.equal(ports.callsForDomain("x"), K, "exactly K draws — no K+1 correction call");
+  const uncertain = layer.prerequisiteEdges.filter((e) => e.uncertain);
+  const certain = layer.prerequisiteEdges.filter((e) => !e.uncertain);
+  assert.equal(uncertain.length, 3, "all three aggregate-cycle edges route to uncertain");
+  assert.equal(certain.length, 0);
   const xTrace = ports.getTrace()?.orderings.find((o) => o.declaredDomain === "x");
-  assert.equal(xTrace?.reprompted, true);
   assert.equal(xTrace?.cycleRoutedEdges.length, 3);
-  assert.ok((ports.getTrace()?.dispositions ?? []).filter((d) => d.disposition === "uncertain").length === 3);
+  assert.equal((ports.getTrace()?.dispositions ?? []).filter((d) => d.disposition === "uncertain").length, 3);
+});
+
+// Replay property: the SAME multiset of K draws fed in two different orders yields identical
+// pairVotes and the identical committed/uncertain/weak split (aggregation is order-independent).
+test("replay: the same draw multiset in different orders yields identical pairVotes and split", async () => {
+  const fwd = edgeOf("X Two", "X One");
+  const rev = edgeOf("X One", "X Two");
+  const orderA = buildPorts({ responder: scriptResponder({ x: drawsOf(K, [[[fwd], 5], [[rev], 3]]) }) });
+  // Same multiset (5 forward, 3 reverse), interleaved differently.
+  const interleaved: WholeSetOrdering["edges"][] = [[rev], [fwd], [rev], [fwd], [rev], [fwd], [fwd], [fwd]];
+  const orderB = buildPorts({ responder: scriptResponder({ x: interleaved }) });
+  const layerA = await run(orderA);
+  const layerB = await run(orderB);
+  const votesA = orderA.getTrace()?.orderings.find((o) => o.declaredDomain === "x")?.pairVotes;
+  const votesB = orderB.getTrace()?.orderings.find((o) => o.declaredDomain === "x")?.pairVotes;
+  assert.deepEqual(votesA, votesB, "pairVotes are order-independent");
+  const split = (layer: DerivedGraphLayer) => ({
+    certain: layer.prerequisiteEdges.filter((e) => !e.uncertain).length,
+    uncertain: layer.prerequisiteEdges.filter((e) => e.uncertain).length
+  });
+  assert.deepEqual(split(layerA), split(layerB));
 });
 
 // AE5 / R4: an evidence-free node is excluded from the ordering input and recorded ONCE.
@@ -316,7 +483,6 @@ test("excludes an evidence-free node from ordering and records it once", async (
   assert.equal(exclusions.length, 1, "recorded exactly once, not once per pair");
   assert.equal(exclusions[0].reason, "insufficient_evidence");
   assert.equal(exclusions[0].declaredDomain, "x");
-  // The excluded node is still a derived node (anchor projection) and scored for difficulty.
   assert.ok(layer.derivedNodes.some((node) => node.canonicalLabel === "Empty"));
 });
 
@@ -345,7 +511,7 @@ test("rejects a self-edge (one concept as its own prerequisite)", async () => {
   assert.equal(ports.getPersistCalls(), 0);
 });
 
-// R13: a redundant transitive shortcut is reduced; the disposition trace records it.
+// R13: a redundant transitive shortcut among stable certain edges is reduced; the trace records it.
 test("transitive reduction drops a redundant shortcut among certain edges", async () => {
   const responder: Responder = (input) =>
     input.declaredDomain === "x"
@@ -361,17 +527,7 @@ test("transitive reduction drops a redundant shortcut among certain edges", asyn
   assert.ok(dispositions.includes("kept"));
 });
 
-// A weak edge below the confidence floor is cut and recorded.
-test("cuts an edge below the confidence floor", async () => {
-  const responder: Responder = (input) =>
-    input.declaredDomain === "x" ? presentEdges(input, [edgeOf("X Two", "X One", 0.2)]) : { edges: [] };
-  const ports = buildPorts({ responder });
-  const layer = await run(ports);
-  assert.equal(layer.prerequisiteEdges.length, 0, "the weak edge is cut");
-  assert.ok((ports.getTrace()?.dispositions ?? []).some((d) => d.disposition === "weak_cut"));
-});
-
-test("persists a layer free of embedding and candidate-group fields and bumps the artifact type", async () => {
+test("persists a layer free of embedding and candidate-group fields with the unversioned artifact type", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
   assert.equal(layer.judgeModel, "mock-ordering");
@@ -381,10 +537,11 @@ test("persists a layer free of embedding and candidate-group fields and bumps th
     assert.ok(!("evidencePacketRef" in edge.provenance));
   }
   assert.equal(ports.getPersisted()?.enrichmentId, "e1");
-  assert.equal(ports.getArtifactType(), "enrichment_run.v3");
-  // One ordering trace per domain (R1), each naming the ordering model used.
+  assert.equal(ports.getArtifactType(), "enrichment_run");
+  // One ordering trace per domain (R1), each naming the ordering model and carrying k + pairVotes.
   assert.equal(ports.getTrace()?.orderings.length, 2);
   assert.ok(ports.getTrace()?.orderings.every((o) => o.judgeModel === "mock-ordering"));
+  assert.ok(ports.getTrace()?.orderings.every((o) => o.k === K));
   assert.deepEqual(ports.getTrace()?.rescueDispositions, []);
 });
 
@@ -419,14 +576,14 @@ test("scores intrinsic difficulty with per-node evidence contexts over all deriv
   assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
 });
 
-test("default config hash reflects the whole-set ordering reshape", async () => {
+test("default config hash reflects the K-sample ordering reshape", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "whole-set-ordering-v1");
-  assert.equal(layer.enrichmentConfigHash, "whole-set-ordering-v1");
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "k-sample-ordering");
+  assert.equal(layer.enrichmentConfigHash, "k-sample-ordering");
 });
 
-// An evidence-free snapshot reaches no ordering call and persists with only exclusions.
+// An evidence-free snapshot reaches no ordering draw and persists with only exclusions.
 test("fails closed on an evidence-free snapshot without an ordering call", async () => {
   const ungrounded: GraphSnapshot = {
     graphVersionId: "v1",
@@ -436,14 +593,14 @@ test("fails closed on an evidence-free snapshot without an ordering call", async
   };
   const ports = buildPorts({ snapshot: ungrounded });
   const layer = await run(ports);
-  assert.equal(ports.calls.length, 0, "no ordering call when nothing is evidenced");
+  assert.equal(ports.calls.length, 0, "no ordering draw when nothing is evidenced");
   assert.equal(layer.prerequisiteEdges.length, 0);
   assert.equal(ports.getTrace()?.nodeExclusions.length, 2);
   assert.deepEqual(ports.getTrace()?.dispositions, []);
 });
 
-// An ordering call that exhausts its forced-tool retry budget fails the run before persistence.
-test("fails the run without persisting when an ordering call throws", async () => {
+// An ordering draw that exhausts its forced-tool retry budget fails the run before persistence.
+test("fails the run without persisting when an ordering draw throws", async () => {
   const ports = buildPorts({ onOrder: async (input) => { if (input.declaredDomain === "x") throw new Error("forced-tool retry budget exhausted"); } });
   await assert.rejects(() => run(ports), /retry budget exhausted/);
   assert.equal(ports.getPersistCalls(), 0, "no partial enrichment run may be persisted");
@@ -469,11 +626,12 @@ function buildNodePorts(options: {
   responder?: Responder;
 }) {
   const orderedLabels: string[][] = [];
+  let drawIndex = 0;
   const prerequisiteOrdering: PrerequisiteOrderingPort = {
     model: "mock-ordering",
     async order(input) {
       orderedLabels.push(input.nodes.map((node) => node.canonicalLabel));
-      return (options.responder ?? (() => ({ edges: [] })))(input);
+      return (options.responder ?? (() => ({ edges: [] })))(input, drawIndex++);
     }
   };
   let counter = 0;
@@ -538,7 +696,6 @@ test("rescues a source_mentioned node from a member-run mention and orders it as
   const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
   assert.ok(rescued, "a source_mentioned rescued node is present");
   assert.equal(rescued.role, "prerequisite");
-  // Its relationship to the anchor is judged as an edge, never a node attribute.
   assert.ok(!("prerequisiteOf" in rescued));
   const id = idByLabel(layer);
   assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("Pointer") && e.dependentDerivedNodeId === id.get("Move Semantics")));
@@ -555,12 +712,14 @@ test("mints an llm_grounded node for an anchor and never publishes it asserted",
   assert.equal(asserted[0].nodeKind, "anchor");
 });
 
-test("orders the rescued + minted + anchor node set in one whole-set call", async () => {
+test("orders the rescued + minted + anchor node set in each of the K whole-set draws", async () => {
   const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
   await runNodes(ports);
-  // One call covering all three same-domain nodes (anchor ∪ rescued ∪ minted).
-  assert.equal(ports.orderedLabels.length, 1);
-  assert.deepEqual([...ports.orderedLabels[0]].sort(), ["Move Semantics", "Pointer", "Stack allocation"]);
+  // K draws, each covering all three same-domain nodes (anchor ∪ rescued ∪ minted).
+  assert.equal(ports.orderedLabels.length, K);
+  for (const labels of ports.orderedLabels) {
+    assert.deepEqual([...labels].sort(), ["Move Semantics", "Pointer", "Stack allocation"]);
+  }
 });
 
 test("records the verbatim-floor grounding dispositions on the run", async () => {

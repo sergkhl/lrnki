@@ -5,7 +5,9 @@ import type {
   ConceptAdmissionPort,
   ConceptConditionedEvidenceProfileExtractionPort,
   ConceptDiscoveryPort,
-  ExtractionRunStorePort
+  DefinitionPassageQualityJudgmentPort,
+  ExtractionRunStorePort,
+  RunProgressReporterPort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
 import { mapWithConcurrency } from "./mapWithConcurrency";
@@ -34,7 +36,11 @@ export async function runExtractionOverSources(input: {
   evidenceProfileExtraction: ConceptConditionedEvidenceProfileExtractionPort;
   assertionEntailmentJudge: AssertionEntailmentJudgmentPort;
   admissionLabelJudge: AdmissionLabelJudgmentPort;
+  definitionPassageQualityJudge: DefinitionPassageQualityJudgmentPort;
   store: ExtractionRunStorePort;
+  // Threaded into each per-source run so the worker's Postgres reporter (or a test
+  // fake) drives the timeline; absent → executeExtractionRun's no-op default (R7).
+  reporter?: RunProgressReporterPort;
   concurrency?: number;
   onRunStart?: (unit: ExtractionSourceUnit) => void;
   onRunComplete?: (unit: ExtractionSourceUnit, result: ExtractionRunResult) => void;
@@ -53,7 +59,9 @@ export async function runExtractionOverSources(input: {
         evidenceProfileExtraction: input.evidenceProfileExtraction,
         assertionEntailmentJudge: input.assertionEntailmentJudge,
         admissionLabelJudge: input.admissionLabelJudge,
-        store: input.store
+        definitionPassageQualityJudge: input.definitionPassageQualityJudge,
+        store: input.store,
+        reporter: input.reporter
       });
       input.onRunComplete?.(unit, result);
       return result;

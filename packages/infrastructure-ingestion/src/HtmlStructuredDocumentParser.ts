@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SourceBlock, SourceBlockType, StructuredDocument } from "@lrnki/domain-core";
+import { stripNullBytes, type SourceBlock, type SourceBlockType, type StructuredDocument } from "@lrnki/domain-core";
 import type { StructuredDocumentParserPort } from "@lrnki/ports";
 
 const PARSER_NAME = "native-html";
@@ -24,7 +24,7 @@ export class HtmlStructuredDocumentParser implements StructuredDocumentParserPor
   }
 
   async parse(input: { sourceResourceId: string; bytes: Uint8Array; contentType: string }): Promise<StructuredDocument> {
-    let html = new TextDecoder().decode(input.bytes);
+    let html = stripNullBytes(new TextDecoder().decode(input.bytes));
     html = html
       .replace(/<!--[\s\S]*?-->/g, " ")
       .replace(/<script[\s\S]*?<\/script>/gi, " ")

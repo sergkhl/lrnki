@@ -55,8 +55,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
       const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }> = {
         artifactId: randomUUID(),
-        artifactType: "study_item_bank.v4",
-        schemaVersion: "4",
+        artifactType: "study_item_bank",
         graphVersionId,
         producer: STUDY_ITEM_BANK_PRODUCER,
         producerVersion: STUDY_ITEM_BANK_PRODUCER_VERSION,

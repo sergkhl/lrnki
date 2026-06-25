@@ -1,7 +1,7 @@
 import type { JudgedOutcome } from "@lrnki/domain-core";
 import type { AnswerGradingJudgePort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { STAGE_TAGS } from "./stageTags";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { answerGradingSchema, answerGradingValidator } from "./toolSchemas";
 
 // Cross-family grading judge (ADR-0023): the card answer-keys are generated

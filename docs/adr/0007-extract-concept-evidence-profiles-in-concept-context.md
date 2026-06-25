@@ -1,39 +1,47 @@
-# Extract Concept Evidence Profiles in admitted-concept context
+# Extract Concept Evidence Profiles in admitted-Concept context
 
-Status: Accepted (reset 2026-06-15 — replaces asserted-claim extraction)
+Status: Accepted
 
 ## Decision
 
-For every admitted atomic Concept, extract one **Concept Evidence Profile (CEP)** in that Concept's
-context through a single forced named tool schema. A CEP contains at least one verified
-meaning-bearing **definition passage**, up to a configured number of salience-ordered **mention
-passages** per source (default six, recorded in the extraction configuration hash), and optional
-**typed assertions**. Every CEP element carries the curated source, source block, verbatim quote,
-heading path, and locator. There is no broad claim extraction, no relation-recall retry, no
-missing-concept proposal, and no claim conflict gate; a relationship the model wants to express that
-is not the guarded assertion type survives only as an untyped mention passage.
+For every admitted atomic Concept, extract one **Concept Evidence Profile (CEP)** through the CEP
+extraction port and a forced named tool schema. A CEP contains:
 
-The only typed assertion is `defines` (object is a literal). It remains **evidence inside the CEP**
-and never becomes an authoritative graph edge or numeric prior (ADR-0016). Every passage and
-assertion quote must exist verbatim in its cited source block; an admitted Concept left without a
-verified definition passage makes the run unsuccessful.
+- verified meaning-bearing Definition Passages;
+- a bounded, salience-ordered set of Mention Passages per source; and
+- the optional typed evidence permitted by ADR-0016.
 
-Optional-assertion entailment is decided by a bounded LLM **assertion-entailment judge** using a
-forced named tool schema and the independent `kg-independent-judge` model alias, run as a composed
-application stage after deterministic verbatim verification. It may only reject a typed assertion;
-rejection drops the type label but preserves the underlying verified passage as untyped CEP evidence.
-The judge fails closed on transport failure, invalid tool arguments, or spans that do not match the
-cited evidence under the same formatting-noise normalization as the deterministic evidence floor.
+Every passage retains its curated source, source block, verbatim quote, heading path, and locator.
+Relationship prose that is not the guarded typed evidence remains an untyped Mention Passage.
 
-Quality is verified by representative real-source inspection (rule 14), the retained inline
-production judge, and deterministic verbatim-evidence verification — not by a standing oracle harness
-(ADR-0013).
+The application applies these boundaries in order:
+
+1. Verify every cited quote against its source block.
+2. Apply the measured Definition-Passage quality judge to already-verbatim core definitions.
+3. Apply the measured assertion-entailment judge to optional typed evidence.
+4. Reconcile any core profile left without a verified, meaning-bearing Definition Passage.
+
+Both neural judges use forced tool schemas through explicit ports and fail closed to preserving
+recall: transport failure, invalid arguments, or an ungrounded negative judgment does not remove
+evidence. Their rubrics are domain-neutral, and deterministic block or lexical heuristics do not
+replace their semantic judgments.
+
+A core profile left incomplete by extraction is demoted to `optional` with
+`core_demoted_ungroundable`. If the Definition-Passage quality judge removes its last definition, it
+is demoted with `core_demoted_hollow_definition`. Either demotion prevents asserted publication,
+raises an extraction quality issue, and may still make the source-mentioned Candidate available to
+Graph Enrichment's rescue path. The Extraction Run may succeed; incomplete core evidence does not
+fail the whole run.
+
+Judge dispositions are retained in the immutable Extraction Run artifact. This ADR owns evidence
+acceptance and disposition; retrieval-window construction is a separate concern.
+
+Quality is established through real-source inspection under ADR-0013, not automated assertions about
+neural judgment content.
 
 ## Context
 
-The previous architecture spent most of its complexity on broad asserted claims, a six-relation
-registry, relation-recall retries, and a missing-concept escape hatch that the learner path never
-consumed. The reset makes the product path explicit: admission decides the small Concept set, the CEP
-preserves what curated sources teach about each Concept, and Graph Enrichment owns all prerequisite
-structure. Verbatim grounding stays a provable deterministic guarantee; semantic acceptance of the
-sole optional `defines` assertion belongs to a measured neural judge (ADR-0016).
+The asserted graph needs compact, source-grounded context for each admitted Concept, not a broad
+claim graph or asserted relation registry. Verbatim verification provides a deterministic provenance
+guarantee, while meaning and entailment remain measured semantic judgments. Demotion preserves the
+successful evidence from a source without publishing a Concept whose definition is absent or hollow.

@@ -50,7 +50,6 @@ CREATE TABLE extraction_runs (
   pipeline_config_hash text NOT NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
   degraded boolean NOT NULL DEFAULT false,
-  cost_usd real,
   latency_ms integer,
   started_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz
@@ -245,7 +244,6 @@ CREATE TABLE refinement_decisions (
 CREATE TABLE artifact_versions (
   artifact_id text PRIMARY KEY,
   artifact_type text NOT NULL,
-  schema_version text NOT NULL,
   run_id uuid REFERENCES extraction_runs(run_id),
   graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   producer text NOT NULL,
@@ -293,7 +291,7 @@ JSON_TABLE(
     confidence numeric PATH '$.admission.confidence'
   )
 ) AS c
-WHERE a.artifact_type LIKE 'extraction_run.%';
+WHERE a.artifact_type = 'extraction_run';
 
 -- Flatten extraction-run artifact payloads: one row per Concept Evidence Profile
 -- with its definition/mention/assertion counts, for the Admin Lab Run Inspector.
@@ -313,7 +311,7 @@ JSON_TABLE(
     assertion_count integer PATH '$.assertions.size()'
   )
 ) AS p
-WHERE a.artifact_type LIKE 'extraction_run.%';
+WHERE a.artifact_type = 'extraction_run';
 
 -- Flatten graph-snapshot artifact payloads: one row per published Concept with its
 -- identity and trust tier, for the Admin Lab published view (ADR-0007 reset).
@@ -334,7 +332,7 @@ JSON_TABLE(
     homograph boolean PATH '$.homograph'
   )
 ) AS c
-WHERE a.artifact_type = 'graph_snapshot.v2';
+WHERE a.artifact_type = 'graph_snapshot';
 
 -- Flatten graph-snapshot CEPs: one row per Concept Evidence Profile with its
 -- definition/mention/assertion counts and zero asserted edges (R5).
@@ -352,7 +350,7 @@ JSON_TABLE(
     assertion_count integer PATH '$.assertions.size()'
   )
 ) AS p
-WHERE a.artifact_type = 'graph_snapshot.v2';
+WHERE a.artifact_type = 'graph_snapshot';
 
 -- Flatten graph-snapshot typed assertions: one row per optional `defines`
 -- assertion inside a published CEP.
@@ -371,7 +369,7 @@ JSON_TABLE(
     )
   )
 ) AS t
-WHERE a.artifact_type = 'graph_snapshot.v2' AND t.assertion_type IS NOT NULL;
+WHERE a.artifact_type = 'graph_snapshot' AND t.assertion_type IS NOT NULL;
 
 -- Flatten enrichment-run artifact payloads: one row per derived graph node with
 -- node kind, grounding origin, and role for Admin Lab inspection.
@@ -394,7 +392,7 @@ JSON_TABLE(
     declared_domain text PATH '$.declaredDomain'
   )
 ) AS n
-WHERE a.artifact_type = 'enrichment_run.v2';
+WHERE a.artifact_type = 'enrichment_run';
 
 -- Flatten study-item-bank artifact payloads: one row per typed Study Item with its
 -- item type, derived node, grounding provenance, question, self-report prompt (null for
@@ -420,7 +418,7 @@ JSON_TABLE(
     option_count integer PATH '$.options.size()'
   )
 ) AS si
-WHERE a.artifact_type = 'study_item_bank.v4';
+WHERE a.artifact_type = 'study_item_bank';
 
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
@@ -763,3 +761,44 @@ SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_ty
        judged_outcome, graded_score,
        response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
 FROM response_log;
+
+-- ---------------------------------------------------------------------------
+-- Operation-agnostic run-stage timeline (KTD1, KTD2; R1-R3, R7). ONE shared
+-- pair of tables describes the sub-stage timeline for ALL THREE operations
+-- (extraction, minting, enrichment + study-items) so progress (R4) and the
+-- bottleneck report (R5) read one source of truth. This DESCRIBES operations;
+-- it does not unify them (ADR-0017's operation split is preserved). The
+-- reporter writes these rows incrementally on its own autocommit statements,
+-- NEVER enlisted in an operation's terminal artifact transaction (KTD3), so an
+-- in-flight or crashed run still leaves a readable timeline. The application
+-- records TIME and STAGE TAGS only — never a cost figure (R6); per-stage cost
+-- is read live from LiteLLM `/spend/tags` at report time, joined on the stage
+-- tag (the closed STAGE_TAGS vocabulary).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE operation_runs (
+  operation_run_id uuid PRIMARY KEY,
+  operation_type text NOT NULL CHECK (operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
+  operation_id uuid NOT NULL,
+  status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
+  current_stage text,
+  progress_done integer,
+  progress_total integer,
+  last_progress_at timestamptz,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  UNIQUE (operation_type, operation_id)
+);
+
+CREATE TABLE operation_run_stages (
+  operation_run_stage_id uuid PRIMARY KEY,
+  operation_run_id uuid NOT NULL REFERENCES operation_runs(operation_run_id),
+  stage text NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz,
+  ok boolean,
+  progress_done integer,
+  progress_total integer
+);
+
+CREATE INDEX operation_run_stages_run_idx ON operation_run_stages(operation_run_id);

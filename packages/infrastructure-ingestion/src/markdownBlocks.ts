@@ -1,4 +1,4 @@
-import type { SourceBlock, SourceBlockType } from "@lrnki/domain-core";
+import { stripNullBytes, type SourceBlock, type SourceBlockType } from "@lrnki/domain-core";
 
 // Shared deterministic Markdown structure pass. Both the native-markdown parser
 // (datalab/marker PDF→Markdown output) and the Docling parser (PDF/DOCX/PPTX →
@@ -56,7 +56,7 @@ const HTML_COMMENT_PLACEHOLDER = /^<!--.*-->$/;
 // its section context; maintains character offsets so
 // evidence quotes resolve to a specific block, not the whole document.
 export function extractMarkdownBlocks(text: string): SourceBlock[] {
-  const lines = text.split("\n");
+  const lines = stripNullBytes(text).split("\n");
   const blocks: SourceBlock[] = [];
   const headingStack: { depth: number; title: string }[] = [];
   let blockIndex = 0;

@@ -9,8 +9,20 @@ export { detectExtractionQualityIssues } from "./detectExtractionQualityIssues";
 export { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
+export { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQualityJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
+export {
+  noopRunProgressReporter,
+  NON_LLM_STAGES,
+  isLlmStage,
+  type NonLlmStage
+} from "./runProgressReporter";
+export {
+  bottleneckReport,
+  type BottleneckReport,
+  type BottleneckStageRow
+} from "./bottleneckReport";
 export {
   deduplicateDerivedNodes,
   cosineSimilarity,

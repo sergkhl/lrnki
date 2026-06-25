@@ -39,7 +39,7 @@ export async function resubmitEditedAnswer(formData: FormData): Promise<void> {
     const client = new LiteLlmForcedToolClient({
       baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
       apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-      timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "300") * 1000,
+      timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000,
       temperature: 0,
       seed: 7
     });

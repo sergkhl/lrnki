@@ -77,7 +77,10 @@ model_list:
       # max_tokens: 8192
 
 
-  # DeepSeek platform models (out of credits)
+  # DeepSeek platform (first-party) models. Credits live (verified 2026-06-25).
+  # Preferred for extraction: native per-account automatic prefix caching (cache-read
+  # ~$0.003/Mtok) reuses the repeated document prefix across admission batches, which the
+  # per-host OpenRouter cache could not (see model_group_alias note below).
   - model_name: "deepseek/deepseek-v4-pro"
     litellm_params:
       model: deepseek/deepseek-v4-pro
@@ -150,7 +153,12 @@ model_list:
       output_cost_per_token: 0.0000012
 
   # NOTE: openrouter flash
-  # turning off thinking does no work via extra body, need to find a correct way if forced tool call won't work
+  # OpenRouter exposes its own unified `reasoning` knob; the Anthropic-style
+  # `thinking.type: disabled` passes through unrecognised and the upstream keeps
+  # reasoning (verified 2026-06-25: reasoning_tokens stayed >0). `reasoning.enabled:
+  # false` is the param that actually suppresses it (reasoning_tokens -> 0), which
+  # both honours rule 5 (production extraction = flash, thinking off) and removes the
+  # long-reasoning latency outliers. `reasoning.exclude` only hides the text — wrong knob.
   - model_name: "openrouter/deepseek/deepseek-v4-flash-no-thinking"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash"
@@ -158,8 +166,25 @@ model_list:
       input_cost_per_token: 0.00000009
       output_cost_per_token: 0.00000018
       extra_body:
-        thinking:
-          type: "disabled"
+        reasoning:
+          enabled: false
+        # Provider pinning for prefix-cache reuse was tested 2026-06-25 and PARKED: the shared
+        # OpenRouter key cannot sustain a hard single-host pin for this workload (the 23k-token
+        # discovery/admission calls 429 or time out on the pinned host). Reliable cross-call
+        # caching needs a dedicated/BYOK OpenRouter key — see docs/plans/BLOCKERS.md. When that
+        # lands, re-pin a cache-capable host (Wafer fp4 cheapest at $0.09/$0.18, cache-read $0.02;
+        # or DeepSeek first-party, cache-read $0.003) with allow_fallbacks:false and re-apply the
+        # admission prompt reorder (document-first) so the document sits in the cached prefix.
+    model_info:
+      max_input_tokens: 1048576
+      max_output_tokens: 393216
+
+  - model_name: "openrouter/deepseek/deepseek-v4-pro"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-pro"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000000435
+      output_cost_per_token: 0.00000087
     model_info:
       max_input_tokens: 1048576
       max_output_tokens: 393216
@@ -278,24 +303,35 @@ router_settings:
   #   temperature: 0.5
 
   model_group_alias:
-    default-model: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    kg-concept-discovery: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    kg-concept-admission: openrouter/deepseek/deepseek-v4-flash-no-thinking
-    kg-claim-extraction: openrouter/deepseek/deepseek-v4-flash-no-thinking
+    # Extraction routes to DeepSeek FIRST-PARTY (not OpenRouter). OpenRouter
+    # load-balances each request across upstream hosts and DeepSeek's prefix cache
+    # is per-host, so the ~23k-token document re-sent on every admission batch never
+    # warmed (measured cache ~0.7%); pinning one host needed a dedicated key the
+    # shared OpenRouter key could not sustain (429/timeout). DeepSeek first-party
+    # caches per-ACCOUNT and automatically: verified 2026-06-25 a repeated prefix hit
+    # 2432/2507 cached tokens on the second call (cache-read ~$0.003/Mtok). This
+    # resolves the prefix-cache reuse blocker without host pinning (see ADR / BLOCKERS history).
+    default-model: deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-discovery: deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-admission: deepseek/deepseek-v4-flash-no-thinking
+    kg-claim-extraction: deepseek/deepseek-v4-flash-no-thinking
     # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
-    # U2/U5): ONE non-DeepSeek ordering call per Declared Domain returns the directed
-    # prerequisite DAG over the deduplicated node set. The single alias is CROSS-FAMILY
-    # from the DeepSeek extractor + grounding generator (ADR-0023), so the generator
-    # never grades its own minted output and the per-pair anchor/generated routing split
-    # is gone. The backing model is selected by the U7 sweep behind this alias (R8);
-    # gpt-oss-120b is the validated forced-tool default.
+    # U2/U5): ONE ordering call per Declared Domain returns the directed prerequisite
+    # DAG over the deduplicated node set. Backed by gpt-oss-120b (reasoning-grade,
+    # forced-tool-ok). MEASURED 2026-06-24 (tmp/2026-06-24-deepseek-flash-ordering-rebaseline):
+    # deepseek-flash-no-thinking is forced-tool-ok + fast (10s) BUT INADEQUATE for the
+    # holistic ordering task — it returned 0 edges for an 11-node Rust domain where
+    # gpt-oss-120b produced a correct 11-edge DAG (same node set). Whole-set ordering
+    # needs a reasoning model; flash is disproven. OPEN: test deepseek-v4-pro (reasoning,
+    # forced-tool-ok @6.7s) as a faster reasoning-grade replacement for gpt-oss-120b's
+    # high latency before the TODO #2 stability/K-sampling work.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
     # cross-family independent of the DeepSeek extractor, supports forced
     # tool_choice, and is cheap ($0.039/$0.18 per Mtok), so the judge is never the
     # extractor grading its own output. (The off-core oracle triangle and label
-    # aligner were retired after the admission-precision fix; see ADR-0013/0022.)
+    # aligner were retired after the admission-precision fix; see ADR-0013.)
     kg-independent-judge: openrouter/openai/gpt-oss-120b
     # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
     # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;

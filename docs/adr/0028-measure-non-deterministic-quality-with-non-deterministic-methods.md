@@ -1,48 +1,34 @@
-# Measure non-deterministic quality with non-deterministic methods; do not chase output determinism
+# Measure non-deterministic quality with non-deterministic methods
 
-Status: Accepted (2026-06-23)
+Status: Accepted
 
 ## Decision
 
-Quality that is inherently judgment-based and non-deterministic — concept correctness, prerequisite
-direction and existence, edge coherence, concept-deduplication correctness, difficulty ordering,
-definition quality — must be measured with **non-deterministic, best-practice methods**: LLM-as-judge
-evaluation, self-consistency / judgment-distribution sampling, and calibrated agreement or uncertainty
-estimates. It must NOT be validated by a deterministic check that pretends a single right answer
-exists, nor by chasing bit-level determinism of model output.
+Judgment-based quality—including Concept correctness, identity adjudication, prerequisite existence
+and direction, difficulty, and definition quality—must be evaluated with methods that represent
+uncertainty:
 
-Concretely:
+- representative real-use LLM-as-judge evaluation;
+- repeated judgment or self-consistency sampling; and
+- calibrated agreement or uncertainty distributions.
 
-- **Do not chase serving determinism.** Mixture-of-experts inference is non-deterministic by
-  architecture (batch-dependent expert routing, non-associative float accumulation across kernels);
-  temperature 0 and per-request seeds do not fix it, and on a hosted multi-backend aggregator the
-  serving stack cannot be pinned. A flipping result on a genuinely ambiguous input is *signal*, not a
-  bug to suppress: it is epistemic uncertainty. The correct response is to **measure** that uncertainty
-  — e.g. sample a judge K times and route direction-unstable prerequisite pairs to `uncertain`
-  (already excluded from learner paths) — not to freeze one arbitrary draw.
+Do not replace those judgments with a deterministic proxy that pretends one answer is objectively
+known. Do not chase bit-level model-output determinism. Mixture-of-experts routing, hosted backends,
+and floating-point execution can vary even with temperature zero and a seed; instability on an
+ambiguous input is measurement signal.
 
-- **Remove deterministic proxies for ambiguous quality.** A deterministic test or gate that stands in
-  for a non-deterministic quality judgment (asserting one "correct" edge set, one canonical ordering,
-  one expected label) is to be removed, not maintained. Reproducibility of a *published* artifact is
-  achieved by storing it immutably with provenance and replaying it (ADR-0017/0019), never by
-  re-deriving identical model output.
+Deterministic checks remain appropriate for the deterministic envelope: schema and tool-argument
+validity, verbatim evidence verification, graph algorithms, endpoint identity, and policy transforms.
+Automated tests must not assert neural judgment content under ADR-0013.
 
-- **Keep deterministic checks for the deterministic envelope only.** Schema and tool-argument validity
-  (rule 6), verbatim-evidence verification, graph algorithms, and policy/fusion transforms stay
-  deterministically tested precisely because they may veto neural output (rules 11, 16). A canned model
-  response is allowed only as an input fixture exercising that envelope, never as the asserted output.
+Published reproducibility comes from immutable persisted artifacts with full provenance. Re-running a
+neural operation creates a fresh observation; replaying the stored artifact reproduces the published
+state.
 
-LLM/measured evaluators built for this purpose remain disposable scaffolding (rule 11 / ADR-0013)
-unless they continue to earn standing; no permanent benchmark harness enters the core.
+Measurement harnesses remain disposable unless they continue to change a live decision.
 
 ## Context
 
-The enrichment certain-edge "reproducibility" investigation (TODO #6) spent effort trying to make an
-MoE prerequisite judge reproducible, then proved by direct measurement that the variance is
-intra-backend MoE non-determinism, confined to genuinely-ambiguous pairs, and unfixable with seed or
-provider pinning. The lesson generalizes: deterministic parity gates over non-deterministic judgments
-create false alarms and waste effort, while the real quality defects (concept fragmentation,
-incoherent edge direction) go unmeasured. This ADR redirects measurement energy from
-determinism-chasing to calibrated, non-deterministic quality evaluation, consistent with rules 11 and
-16 and with current LLM-as-judge best practice (self-consistency, judgment distribution, position-bias
-mitigation, intransitivity-aware ordering).
+Attempts to force reproducible prerequisite judgments showed that variance concentrated on genuinely
+ambiguous pairs and persisted under seeded greedy inference. Measuring the judgment distribution
+exposed useful uncertainty that deterministic parity checks obscured.

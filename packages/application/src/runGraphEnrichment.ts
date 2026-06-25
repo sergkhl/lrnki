@@ -10,12 +10,14 @@ import type {
   MintingDisposition,
   NodeEvidenceExclusion,
   NodeMergeRecord,
+  PairDirectionVote,
   PrerequisiteConceptContext,
   PrerequisiteOrderingTrace,
   PublishedConceptEvidenceProfile,
   RescueDisposition,
   WholeSetOrdering
 } from "@lrnki/domain-core";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -26,12 +28,15 @@ import type {
   NodeMergeAdjudicationPort,
   PrerequisiteOrderingPort,
   RescueDurabilityJudgmentPort,
+  RunProgressReporterPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
+import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { cutWeakEdges, findCycleEdges, transitiveReduction } from "./prerequisiteDag";
+import { mapWithConcurrency } from "./mapWithConcurrency";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 
 const PRODUCER = "@lrnki/application";
@@ -40,7 +45,21 @@ const PRODUCER_VERSION = "0.8.0";
 export type GraphEnrichmentConfig = {
   // Part of enrichment identity (ADR-0019): changing a knob re-derives the layer.
   enrichmentConfigHash: string;
-  // Weak-edge cut floor applied to the certain edges before transitive reduction.
+  // K — the number of independent ordering DRAWS per Declared Domain (D1/D8). MoE
+  // inference is non-deterministic (ADR-0028), so one draw is one sample from a
+  // distribution; the boundary draws K times on the SAME input and tallies a per-pair
+  // directional vote. Calibrated in the U6 rule-14 pass, never assumed (D8).
+  orderingSampleCount: number;
+  // The minority-vote fraction at which a pair's prerequisite DIRECTION is judged
+  // genuinely contested and routed to `uncertain` (D3/D6). A pair is contested when
+  // `min(forward, reverse) / K >= directionContestMinorityFraction`. A FRACTION of K (not a
+  // binary "any reverse") so a single stray flip at large K does not route a robust pair to
+  // `uncertain` (risk note). Calibrated in U6 (D8).
+  directionContestMinorityFraction: number;
+  // Weak-edge cut floor applied to the consensus certain candidates. Because consensus
+  // confidence is `max(f,r)/K` (an agreement fraction, D4/KTD2), this floor doubles as the
+  // PRESENCE QUORUM (D5): an edge present in too few draws scores below it and becomes
+  // `weak_cut`. Recalibrated in U6 against agreement-scale confidence (KTD2).
   minEdgeConfidence: number;
   // Bound on mention passages passed per node into the ordering prompt (R11). The
   // published CEP is already mention-bounded at extraction; this is a further
@@ -61,9 +80,19 @@ export type GraphEnrichmentConfig = {
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  // Bumped from `minting-durability-v1` because whole-set ordering replaces per-pair /
-  // per-node-batched judging, re-deriving the prerequisite DAG.
-  enrichmentConfigHash: "whole-set-ordering-v1",
+  // Load-bearing enrichment identity (ADR-0019): changing the ordering BEHAVIOR
+  // re-derives the layer. Unversioned `kind` name, consistent with the abolished `.vN`
+  // convention (KTD7) — K-sampling supersedes single-draw whole-set ordering.
+  enrichmentConfigHash: "k-sample-ordering",
+  // CALIBRATED in the U6 rule-14 pass against real K=8 gpt-oss-120b draws over the Rust +
+  // economics fixtures (D8; tmp/2026-06-24-k-sample-ordering-rule14/). K=8 is the
+  // probe-validated draw count. The contest fraction 0.1 catches a genuine 7:1 directional
+  // flip at K=8 (min/K = 0.125 ≥ 0.1 → `uncertain`) while scaling with K — a single stray
+  // reverse at K≥16 (≤0.0625) stays committed, so a robust pair is not routed to `uncertain`.
+  orderingSampleCount: 8,
+  directionContestMinorityFraction: 0.1,
+  // Now gates an AGREEMENT fraction (max(f,r)/K), not a 0.85-scale self-report — so 0.5
+  // means "present in at least half the draws". Recalibrated in U6 (KTD2).
   minEdgeConfidence: 0.5,
   maxMentionsPerConceptInPair: 6,
   // ~100k tokens at a coarse 4-chars/token proxy: comfortably inside the non-DeepSeek
@@ -79,14 +108,20 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
 // anchors; enrichment additionally RESCUES `source_mentioned` nodes from the member runs'
 // non-core mentions and MINTS `llm_grounded` nodes via an explicit anchor-driven proposal
 // pass, so a sparse source still yields a usable learner path. The deduplicated derived
-// node set is grouped by Declared Domain (ADR-0015), and each domain is ordered in ONE
-// whole-set call that returns a directed prerequisite DAG over ALL its evidenced nodes —
-// globally self-consistent by construction (KTD2). The application boundary owns every
-// PROVABLE guarantee (rules 16/19): it maps edge labels → ids fail-closed (KTD3, R9),
-// verifies acyclicity, issues AT MOST ONE corrective re-prompt naming a stubborn cycle
-// (R10), and routes any still-cyclic edges WHOLESALE to `uncertain` (kept + flagged +
-// path-excluded, never dropped — R11/KTD4). The symbolic helpers then dispose over the
-// CERTAIN edges (weak-edge cut -> transitive reduction); intrinsic difficulty scores ALL
+// node set is grouped by Declared Domain (ADR-0015), and each domain is ordered by
+// K-SAMPLING the whole-set call: the boundary draws the directed-DAG ordering K times on
+// the SAME input (bounded concurrency) and tallies a per-pair DIRECTIONAL VOTE, because MoE
+// inference is non-deterministic and one draw is one sample from a distribution (ADR-0028,
+// D1/D2). The application boundary owns every PROVABLE guarantee (rules 16/19): it maps each
+// draw's edge labels → ids fail-closed (KTD3, R9), tallies forward/reverse per unordered
+// pair, routes genuinely direction-contested pairs to `uncertain` (D3), and sets each
+// committed edge's confidence to the empirical agreement `max(f,r)/K` (D4). That consensus
+// number feeds the existing weak-edge floor, which therefore becomes a presence quorum for
+// free (D5/KTD2): sub-quorum edges → `weak_cut`. Weak-cut runs BEFORE cycle-routing (KTD5);
+// any aggregate cycle in the strong set is routed WHOLESALE to `uncertain` (kept + flagged +
+// path-excluded, never dropped — R11/KTD3). There is NO corrective re-prompt — acyclicity is
+// enforced on the aggregate, not by re-prompting one draw (KTD4, rule 18). The symbolic
+// helpers then transitively reduce the CERTAIN edges; intrinsic difficulty scores ALL
 // derived nodes from the same evidence contexts. The asserted core is never touched (R5):
 // no enrichment node is ever published. Node minting + rescue are OPT-IN — when the
 // proposal/grounding ports are omitted the run is anchor-only. Fails the run WITHOUT
@@ -126,22 +161,24 @@ export async function runGraphEnrichment(input: {
   // Optional minting durability summary hook. Reports recorded decision counts for
   // operator visibility without coupling the application layer to console output.
   onMintingSummary?: (summary: { accepted: number; dropped: number; unavailable: number }) => void;
-  // Optional per-sub-stage wall-clock hook (U2, KTD5, R1). The application stays free
-  // of console I/O: it only measures monotonic elapsed ms around each enrichment
-  // sub-stage and reports through this callback; the worker formats the structured line.
-  onStageTiming?: (timing: { stage: string; ms: number }) => void;
+  // Optional K-sampling ordering summary hook (U5): the K used and the committed /
+  // direction-contested / weak-cut / cycle-routed edge counts, for operator visibility. The
+  // application stays free of console I/O; the worker formats the structured line.
+  onOrderingSummary?: (summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number }) => void;
+  // Run-progress reporter seam (R7, KTD7). Supersedes the old onStageTiming stdout
+  // callback: per-stage wall-clock now lives in the durable operation_run_stages
+  // timeline. Absent → no-op (anchor-only/test runs behave unchanged).
+  reporter?: RunProgressReporterPort;
   newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
-  // Bracket one enrichment sub-stage and report its wall-clock through onStageTiming.
-  // Reports on success only; a thrown sub-stage fails the whole run, which the
-  // worker-level command timer records as a failed stage (U2).
-  const timeStage = async <T>(stage: string, fn: () => Promise<T>): Promise<T> => {
-    const startedAt = performance.now();
-    const result = await fn();
-    input.onStageTiming?.({ stage, ms: Math.max(0, Math.round(performance.now() - startedAt)) });
-    return result;
-  };
+  const reporter = input.reporter ?? noopRunProgressReporter;
+  const operationId = input.enrichmentId;
+  // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
+  // the operation failed before propagating, so a failed enrichment leaves a readable
+  // timeline (R1) — no partial layer is ever persisted.
+  const runStage = bracketStage(reporter, operationId);
+  await reporter.beginOperation({ operationType: "enrichment", operationId });
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
   if (!snapshot) {
     throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
@@ -172,7 +209,7 @@ export async function runGraphEnrichment(input: {
   let rescueDispositions: RescueDisposition[] = [];
   let mintingDispositions: MintingDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
-    await timeStage("enrichment:rescue-mint", async () => {
+    await runStage("rescue-mint", async () => {
       const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
       const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
         conceptId: concept.conceptId,
@@ -224,7 +261,7 @@ export async function runGraphEnrichment(input: {
   let nodeMerges: NodeMergeRecord[] = [];
   let absorbedGroundingByCanonical = new Map<string, string[]>();
   if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
-    await timeStage("enrichment:dedup", async () => {
+    await runStage("dedup", async () => {
       // Reduce each node to its dedup context from the SAME contextOf reduction the judge
       // uses (label + verbatim definition/mention quotes), without absorbed grounding yet.
       const dedupContext = new Map<string, DedupNodeContext>(
@@ -286,21 +323,27 @@ export async function runGraphEnrichment(input: {
     else byDomain.set(node.declaredDomain, [node]);
   }
 
-  // Step 2 — ONE whole-set ordering call per domain (neural proposes the directed DAG),
-  // then the deterministic envelope (rules 16/19). Domains are processed in sorted order,
-  // and each domain's nodes are sorted by stable id, so the persisted trace + edge order
-  // is replay-deterministic. For each domain: token-budget guard (R16), order, map labels
-  // → ids fail-closed (R9), verify acyclicity, issue at most one corrective re-prompt
-  // (R10), route still-cyclic edges wholesale to `uncertain` (R11).
+  // Step 2 — K-SAMPLED whole-set ordering per domain, then the deterministic envelope
+  // (rules 16/19). Domains are processed in sorted order, and each domain's nodes are sorted
+  // by stable id, so the persisted trace + edge order is replay-deterministic GIVEN a fixed
+  // set of draws (the draws themselves are intentionally non-deterministic — that IS the
+  // measurement, KTD6). For each domain: token-budget guard (R16); K draws of the ordering
+  // call on the SAME input (bounded concurrency, D1); map each draw's labels → ids fail-closed
+  // (R9); tally per-pair forward/reverse votes (D2); route direction-contested pairs to
+  // `uncertain` and commit the rest at consensus confidence max(f,r)/K (D3/D4); weak-cut the
+  // consensus candidates (presence quorum, D5/KTD2) BEFORE cycle-routing any aggregate cycle
+  // to `uncertain` (KTD5/KTD3).
+  const K = Math.max(1, Math.trunc(config.orderingSampleCount));
   const orderingTraces: PrerequisiteOrderingTrace[] = [];
   const certainEdges: InferredPrerequisiteEdge[] = [];
   const uncertainEdges: InferredPrerequisiteEdge[] = [];
-  await timeStage("enrichment:ordering", async () => {
+  const weakEdges: InferredPrerequisiteEdge[] = [];
+  await runStage(STAGE_TAGS.prerequisiteOrdering, async () => {
     for (const [declaredDomain, members] of [...byDomain.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       const sorted = [...members].sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
-      // A singleton (or empty) domain has no possible relation: no ordering call, empty trace.
+      // A singleton (or empty) domain has no possible relation: no ordering draw, empty trace.
       if (sorted.length < 2) {
-        orderingTraces.push({ declaredDomain, judgeModel: input.prerequisiteOrdering.model, nodeCount: sorted.length, assertedEdges: [], reprompted: false, cycleRoutedEdges: [] });
+        orderingTraces.push({ declaredDomain, judgeModel: input.prerequisiteOrdering.model, nodeCount: sorted.length, k: 0, pairVotes: [], cycleRoutedEdges: [] });
         continue;
       }
       const contexts = sorted.map((node) => node.context);
@@ -316,7 +359,7 @@ export async function runGraphEnrichment(input: {
       // well-defined. Matching is case-insensitive + trimmed; an edge endpoint matching no
       // node, or naming one concept as its own prerequisite, is rejected fail-closed (rule 6).
       const idByLabel = new Map<string, string>(sorted.map((node) => [normalizeLabel(node.context.canonicalLabel), node.derivedNodeId]));
-      const mapOrdering = (ordering: WholeSetOrdering): InferredPrerequisiteEdge[] =>
+      const mapDraw = (ordering: WholeSetOrdering): { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string; rationale: string }[] =>
         ordering.edges.map((edge) => {
           const prerequisiteDerivedNodeId = idByLabel.get(normalizeLabel(edge.prerequisiteLabel));
           const dependentDerivedNodeId = idByLabel.get(normalizeLabel(edge.dependentLabel));
@@ -326,56 +369,133 @@ export async function runGraphEnrichment(input: {
           if (prerequisiteDerivedNodeId === dependentDerivedNodeId) {
             throw new Error(`runGraphEnrichment: ordering edge names one concept as its own prerequisite in domain "${declaredDomain}" ("${edge.prerequisiteLabel}"); failing closed (rule 6).`);
           }
-          return { prerequisiteDerivedNodeId, dependentDerivedNodeId, predicate: "inferred-prerequisite-of" as const, confidence: edge.confidence, uncertain: false, provenance: { judgmentRationale: edge.rationale } };
+          return { prerequisiteDerivedNodeId, dependentDerivedNodeId, rationale: edge.rationale };
         });
 
-      let edges = mapOrdering(await input.prerequisiteOrdering.order({ declaredDomain, nodes: contexts }));
-      let reprompted = false;
-      const cycleRoutedEdges: { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string }[] = [];
+      // K independent draws on the SAME frozen input (D1). mapWithConcurrency preserves
+      // INPUT order in the result regardless of completion order, so the tally below — fed in
+      // draw index order — is replay-deterministic for a fixed set of draws (KTD1). A draw
+      // that throws (forced-tool budget exhausted) aborts the whole run before persistence.
+      const draws = await mapWithConcurrency(
+        Array.from({ length: K }),
+        K,
+        () => input.prerequisiteOrdering.order({ declaredDomain, nodes: contexts }).then(mapDraw)
+      );
 
-      // Acyclicity envelope: at most ONE corrective re-prompt naming the first cycle (R10).
-      const firstCycle = findCycleEdges(edges);
-      if (firstCycle) {
-        reprompted = true;
-        edges = mapOrdering(await input.prerequisiteOrdering.order({ declaredDomain, nodes: contexts, correction: { cyclePath: cyclePathLabels(firstCycle, sorted) } }));
-        // Route any STILL-cyclic edges wholesale to `uncertain` (kept + flagged, never
-        // dropped — R11/KTD4). Iterate so the CERTAIN set is provably acyclic for the DAG:
-        // each surviving cycle's edges flip to uncertain until none remain.
-        for (;;) {
-          const cycle = findCycleEdges(edges.filter((edge) => !edge.uncertain));
-          if (!cycle) break;
-          const cycleKeys = new Set(cycle.map(edgeId));
-          edges = edges.map((edge) => (cycleKeys.has(edgeId(edge)) ? { ...edge, uncertain: true } : edge));
-          for (const edge of cycle) cycleRoutedEdges.push({ prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId, dependentDerivedNodeId: edge.dependentDerivedNodeId });
+      // Tally a per-pair directional vote across the K draws (D2). The pair is keyed on the
+      // sorted id pair (orientation-free); within a single draw a directed edge counts once,
+      // but BOTH directions may count if a draw is self-contradictory (signal, not error).
+      type Tally = { u: string; v: string; uToV: number; vToU: number; uToVRationale?: string; vToURationale?: string };
+      const tally = new Map<string, Tally>();
+      for (const draw of draws) {
+        const seen = new Set<string>();
+        for (const e of draw) {
+          const directed = `${e.prerequisiteDerivedNodeId}->${e.dependentDerivedNodeId}`;
+          if (seen.has(directed)) continue;
+          seen.add(directed);
+          const forwardOriented = e.prerequisiteDerivedNodeId < e.dependentDerivedNodeId;
+          const u = forwardOriented ? e.prerequisiteDerivedNodeId : e.dependentDerivedNodeId;
+          const v = forwardOriented ? e.dependentDerivedNodeId : e.prerequisiteDerivedNodeId;
+          const key = `${u}::${v}`;
+          let t = tally.get(key);
+          if (!t) { t = { u, v, uToV: 0, vToU: 0 }; tally.set(key, t); }
+          if (e.prerequisiteDerivedNodeId === u) { t.uToV += 1; t.uToVRationale ??= e.rationale; }
+          else { t.vToU += 1; t.vToURationale ??= e.rationale; }
         }
       }
 
-      for (const edge of edges) (edge.uncertain ? uncertainEdges : certainEdges).push(edge);
+      // Classify each voted pair (deterministic, sorted by key): direction-contested →
+      // `uncertain` (D3); else a consensus certain candidate at confidence max(f,r)/K (D4).
+      const pairVotes: PairDirectionVote[] = [];
+      const certainCandidates: InferredPrerequisiteEdge[] = [];
+      for (const key of [...tally.keys()].sort((a, b) => a.localeCompare(b))) {
+        const t = tally.get(key)!;
+        const majorityIsUtoV = t.uToV >= t.vToU; // tie → canonical u→v, deterministic
+        const forward = majorityIsUtoV ? t.uToV : t.vToU;
+        const reverse = majorityIsUtoV ? t.vToU : t.uToV;
+        const prerequisiteDerivedNodeId = majorityIsUtoV ? t.u : t.v;
+        const dependentDerivedNodeId = majorityIsUtoV ? t.v : t.u;
+        const consensusConfidence = forward / K;
+        const contested = reverse / K >= config.directionContestMinorityFraction;
+        const classification = contested ? "direction_contested" : "consensus";
+        pairVotes.push({ prerequisiteDerivedNodeId, dependentDerivedNodeId, forward, reverse, k: K, consensusConfidence, classification });
+        // A deterministic, human-readable representative rationale + the vote summary (the
+        // structured counts live in pairVotes); the winning-direction rationale is preferred.
+        const winningRationale = (majorityIsUtoV ? t.uToVRationale ?? t.vToURationale : t.vToURationale ?? t.uToVRationale) ?? "";
+        const judgmentRationale = `${winningRationale} [consensus ${forward}/${K} forward, ${reverse}/${K} reverse]`.trim();
+        const edge: InferredPrerequisiteEdge = {
+          prerequisiteDerivedNodeId,
+          dependentDerivedNodeId,
+          predicate: "inferred-prerequisite-of",
+          confidence: consensusConfidence,
+          uncertain: contested,
+          provenance: { judgmentRationale }
+        };
+        (contested ? uncertainEdges : certainCandidates).push(edge);
+      }
+
+      // Presence quorum (D5/KTD2): weak-cut the consensus candidates BEFORE cycle-routing
+      // (KTD5) so one sub-quorum edge cannot force a strong, otherwise-acyclic core into
+      // `uncertain`. Sub-quorum edges are recorded `weak_cut`, never committed.
+      const { kept: strong, cut: weak } = cutWeakEdges(certainCandidates, config.minEdgeConfidence);
+      weakEdges.push(...weak);
+
+      // Cycle-route any aggregate cycle in the strong set wholesale to `uncertain` (KTD3):
+      // the K-aggregate is assembled from independent pairwise winners, so a multi-node cycle
+      // (A→B→C→A) can survive even when no single pair flipped. Iterate until the certain set
+      // is provably acyclic; flipped edges are kept + flagged, never dropped (R11).
+      const cycleRoutedEdges: { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string }[] = [];
+      let strongEdges = strong;
+      for (;;) {
+        const cycle = findCycleEdges(strongEdges);
+        if (!cycle) break;
+        const cycleKeys = new Set(cycle.map(edgeId));
+        for (const e of strongEdges) {
+          if (cycleKeys.has(edgeId(e))) {
+            uncertainEdges.push({ ...e, uncertain: true });
+            cycleRoutedEdges.push({ prerequisiteDerivedNodeId: e.prerequisiteDerivedNodeId, dependentDerivedNodeId: e.dependentDerivedNodeId });
+          }
+        }
+        strongEdges = strongEdges.filter((e) => !cycleKeys.has(edgeId(e)));
+      }
+      certainEdges.push(...strongEdges);
+
       orderingTraces.push({
         declaredDomain,
         judgeModel: input.prerequisiteOrdering.model,
         nodeCount: sorted.length,
-        assertedEdges: edges.map((edge) => ({ prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId, dependentDerivedNodeId: edge.dependentDerivedNodeId, confidence: edge.confidence, rationale: edge.provenance.judgmentRationale })),
-        reprompted,
+        k: K,
+        pairVotes,
         cycleRoutedEdges
       });
     }
   });
 
-  // Step 3 — symbolic disposal over CERTAIN edges only (symbolic constrains). Pure and
-  // fast, but bracketed so its share of the run is visible in the timing split (U2). No
-  // cycle removal here — acyclicity is already enforced upstream by cycle-routing (KTD4).
-  const disposal = await timeStage("enrichment:symbolic-disposal", async () => {
-    const { kept: strongEdges, cut: weakEdges } = cutWeakEdges(certainEdges, config.minEdgeConfidence);
-    const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(strongEdges);
-    return { weakEdges, reducedEdges, transitiveEdges };
+  // Step 3 — symbolic reduction over the acyclic CERTAIN edges (symbolic constrains). Pure
+  // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
+  // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
+  // acyclicity is enforced upstream by cycle-routing (KTD3).
+  const disposal = await runStage("symbolic-disposal", async () => {
+    const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
+    return { reducedEdges, transitiveEdges };
   });
-  const { weakEdges, reducedEdges, transitiveEdges } = disposal;
+  const { reducedEdges, transitiveEdges } = disposal;
+
+  // Ordering summary (U5): committed certain edges (post-reduction DAG), direction-contested
+  // and cycle-routed counts from the per-domain traces, and the weak-cut count — for operator
+  // visibility. The application only reports; the worker formats the structured log line.
+  input.onOrderingSummary?.({
+    k: K,
+    committed: reducedEdges.length,
+    contested: orderingTraces.reduce((sum, trace) => sum + trace.pairVotes.filter((vote) => vote.classification === "direction_contested").length, 0),
+    weakCut: weakEdges.length,
+    cycleRouted: orderingTraces.reduce((sum, trace) => sum + trace.cycleRoutedEdges.length, 0)
+  });
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
   // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
   // — anchors AND enrichment nodes (R12, handoff constraint).
-  const difficulties = await timeStage("enrichment:difficulty", () =>
+  const difficulties = await runStage(STAGE_TAGS.intrinsicDifficulty, () =>
     input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges })
   );
 
@@ -407,20 +527,22 @@ export async function runGraphEnrichment(input: {
     mintingDispositions,
     nodeMerges
   };
-  await input.enrichmentStore.persist({
-    layer,
-    artifact: {
-      artifactId: `${input.enrichmentId}:enrichment-run`,
-      artifactType: "enrichment_run.v3",
-      schemaVersion: "3",
-      graphVersionId: input.graphVersionId,
-      producer: PRODUCER,
-      producerVersion: PRODUCER_VERSION,
-      configHash: config.enrichmentConfigHash,
-      createdAt: new Date().toISOString(),
-      payload: trace
-    }
-  });
+  await runStage(NON_LLM_STAGES.persist, () =>
+    input.enrichmentStore.persist({
+      layer,
+      artifact: {
+        artifactId: `${input.enrichmentId}:enrichment-run`,
+        artifactType: "enrichment_run",
+        graphVersionId: input.graphVersionId,
+        producer: PRODUCER,
+        producerVersion: PRODUCER_VERSION,
+        configHash: config.enrichmentConfigHash,
+        createdAt: new Date().toISOString(),
+        payload: trace
+      }
+    })
+  );
+  await reporter.completeOperation({ operationId, status: "succeeded" });
   return layer;
 }
 
@@ -472,19 +594,6 @@ function estimatePromptChars(declaredDomain: string, contexts: PrerequisiteConce
     for (const assertion of context.assertions) chars += assertion.type.length + assertion.detail.length;
   }
   return chars;
-}
-
-// Render one cycle (ordered edge list `a→b→…→x→a` from findCycleEdges) as a canonical-
-// label path for the corrective re-prompt (R10). Ids fall back to themselves if a label
-// is somehow missing, so the re-prompt is always framed even on a defensive edge case.
-function cyclePathLabels(
-  cycle: InferredPrerequisiteEdge[],
-  nodes: { derivedNodeId: string; context: PrerequisiteConceptContext }[]
-): string[] {
-  const labelById = new Map(nodes.map((node) => [node.derivedNodeId, node.context.canonicalLabel]));
-  const path = [labelById.get(cycle[0].prerequisiteDerivedNodeId) ?? cycle[0].prerequisiteDerivedNodeId];
-  for (const edge of cycle) path.push(labelById.get(edge.dependentDerivedNodeId) ?? edge.dependentDerivedNodeId);
-  return path;
 }
 
 // Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor

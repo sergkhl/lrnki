@@ -6,7 +6,7 @@ type Sql = ReturnType<typeof createDatabaseClient>;
 // ADR-0019). The CLI computes and persists paths and the Derived Graph Layer; the
 // UI only reads them and never computes (rule 12). The detail view renders the
 // persisted path highlighted over the inferred prerequisite DAG of its enrichment.
-// The learner-recall subject identity is `derived_node_id` throughout (ADR-0025);
+// The learner-recall subject identity is `derived_node_id` throughout (ADR-0026);
 // these loaders never re-alias it back to a Concept id.
 
 export interface LearnerPathSummary {

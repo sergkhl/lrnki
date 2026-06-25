@@ -1,3 +1,4 @@
+import { deepStripNullBytes } from "@lrnki/domain-core";
 import type { ZodType } from "zod";
 
 export type JsonSchema = Record<string, unknown>;
@@ -66,7 +67,12 @@ export class LiteLlmForcedToolClient {
     if (calls.length === 0) throw new Error(`Expected a forced tool call: ${input.toolName}.`);
     const argumentsText = calls[0]?.function?.arguments;
     if (!argumentsText) throw new Error("Forced tool call did not include arguments.");
-    return input.validator.parse(JSON.parse(argumentsText));
+    // The model can emit an escaped ` ` in its JSON arguments, which JSON.parse
+    // turns into a real NUL byte that PostgreSQL `text` columns reject downstream
+    // (e.g. an evidence quote). Strip it from every string at this single rule-6
+    // model-output boundary so no neural stage's arguments carry one. A raw
+    // (unescaped) NUL would make JSON.parse throw first and fail closed via retry.
+    return input.validator.parse(deepStripNullBytes(JSON.parse(argumentsText)));
   }
 }
 

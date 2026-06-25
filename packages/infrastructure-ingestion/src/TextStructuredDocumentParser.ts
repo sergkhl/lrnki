@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SourceBlock, SourceBlockType, StructuredDocument } from "@lrnki/domain-core";
+import { stripNullBytes, type SourceBlock, type SourceBlockType, type StructuredDocument } from "@lrnki/domain-core";
 import type { StructuredDocumentParserPort } from "@lrnki/ports";
 
 const PARSER_NAME = "native-text";
@@ -15,7 +15,7 @@ export class TextStructuredDocumentParser implements StructuredDocumentParserPor
   }
 
   async parse(input: { sourceResourceId: string; bytes: Uint8Array; contentType: string }): Promise<StructuredDocument> {
-    const text = new TextDecoder().decode(input.bytes);
+    const text = stripNullBytes(new TextDecoder().decode(input.bytes));
     const blocks: SourceBlock[] = [];
     const headingStack: string[] = [];
     let blockIndex = 0;

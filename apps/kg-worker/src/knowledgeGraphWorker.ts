@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { defaultStageTimingSink, withStageTiming } from "./stageTiming";
 import {
   buildGraphVersion,
   computeLearnerPath,
@@ -13,7 +12,9 @@ import {
   loadResponseLogLearnerState,
   synthesizeResponses,
   ADAPTIVE_MASTERY_THRESHOLD,
-  runGraphEnrichment
+  runGraphEnrichment,
+  bottleneckReport,
+  type BottleneckReport
 } from "@lrnki/application";
 import {
   DoclingStructuredDocumentParser,
@@ -25,12 +26,14 @@ import {
 import {
   LiteLlmAdmissionLabelJudgmentAdapter,
   LiteLlmAssertionEntailmentJudgmentAdapter,
+  LiteLlmDefinitionPassageQualityJudgmentAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmAnswerGradingJudgeAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
+  LiteLlmStageSpendAdapter,
   LiteLlmEmbeddingClient,
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
@@ -52,12 +55,14 @@ import {
   PostgresGraphVersionStore,
   PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
+  PostgresRunProgressReporter,
+  PostgresOperationTimelineRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
 // Pipeline configuration identity — bump when prompts/models/schemas change so
 // runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "structure-aware-neighborhood-v37";
+const PIPELINE_CONFIG_HASH = "definition-quality-judge-v38";
 
 import { existsSync } from "node:fs";
 
@@ -80,6 +85,10 @@ function buildContext() {
   const sql = createDatabaseClient();
   const registrationStore = new PostgresSourceRegistrationStore(sql);
   const runStore = new PostgresExtractionRunStore(sql);
+  // Run-progress reporter (KTD3): its own autocommit writes on the shared `sql`
+  // handle, never enlisted in a store's persist transaction, drive the durable
+  // timeline that the live progress view (U6) and bottleneck report (U7) read.
+  const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
   const artifacts = new PostgresArtifactRepository(sql);
   const parsers = new StructuredDocumentParserRegistry([
@@ -97,7 +106,7 @@ function buildContext() {
   const baseClient = {
     baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
     apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "300") * 1000
+    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
   };
   // Discovery stays at default sampling. It is the recall stage and, empirically,
   // greedy decoding (temperature 0) makes DeepSeek emit a MORE exhaustive candidate
@@ -119,6 +128,12 @@ function buildContext() {
     sql,
     registrationStore,
     runStore,
+    runProgressReporter,
+    // Bottleneck-report read surfaces (U7): the per-operation timeline read-model and
+    // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
+    // live and never stored (R6).
+    operationTimelineRead: new PostgresOperationTimelineRead(sql),
+    stageSpend: new LiteLlmStageSpendAdapter(baseClient),
     graphStore,
     artifacts,
     parsers,
@@ -134,6 +149,12 @@ function buildContext() {
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
     admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
+    // Definition-Passage quality judge (ADR-0007 extension). Same independent
+    // production judge (kg-independent-judge) and deterministic decoding; runs after
+    // the verbatim floor and drops hollow Definition Passages (bare name, heading,
+    // title, citation), routing a last-passage veto into the existing demotion with a
+    // distinct reason code.
+    definitionPassageQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient),
     // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
     // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
     // the directed prerequisite DAG over the deduplicated node set; it is cross-family
@@ -239,7 +260,9 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
     evidenceProfileExtraction: ctx.evidenceProfileExtraction,
     assertionEntailmentJudge: ctx.assertionEntailmentJudge,
     admissionLabelJudge: ctx.admissionLabelJudge,
+    definitionPassageQualityJudge: ctx.definitionPassageQualityJudge,
     store: ctx.runStore,
+    reporter: ctx.runProgressReporter,
     onRunStart: (unit) => console.log(`\n>> extraction run ${unit.runId} for ${unit.source.sourceResourceId} [${unit.source.declaredDomain}]`),
     onRunComplete: (_unit, result) => {
       const core = result.candidates.filter((candidate) => candidate.admission.tier === "core").length;
@@ -275,7 +298,7 @@ async function buildVersion(ctx: Context, args: string[]) {
     return;
   }
   const graphVersionId = randomUUID();
-  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore });
+  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, reporter: ctx.runProgressReporter });
   const passages = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
   const assertions = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
   console.log(`\n>> published graph version ${graphVersionId}${baseGraphVersionId ? ` (base ${baseGraphVersionId})` : ""} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
@@ -312,14 +335,17 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
-    // Surface enrichment sub-stage wall-clock through the same structured sink as the
-    // top-level commands (U2, R1). The application reports {stage, ms}; sub-stages that
-    // complete are ok:true (a thrown sub-stage fails the command, timed at top level).
-    onStageTiming: (timing) => defaultStageTimingSink({ ...timing, ok: true }),
+    // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
+    // via the reporter (KTD7) — supersedes the old onStageTiming stdout sink.
+    reporter: ctx.runProgressReporter,
     // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
     // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
     onDedupSummary: (summary) => console.log(`   dedup: merges=${summary.merges} unavailable=${summary.unavailable}`),
-    onMintingSummary: (summary) => console.log(`   minting: accepted=${summary.accepted} dropped=${summary.dropped} unavailable=${summary.unavailable}`)
+    onMintingSummary: (summary) => console.log(`   minting: accepted=${summary.accepted} dropped=${summary.dropped} unavailable=${summary.unavailable}`),
+    // K-sampling ordering outcome line (plan U5): K draws per domain, how many edges were
+    // committed at consensus confidence, routed to uncertain as direction-contested, cut
+    // below the presence quorum, or routed for an aggregate cycle.
+    onOrderingSummary: (summary) => console.log(`   ordering: k=${summary.k} committed=${summary.committed} contested=${summary.contested} weakCut=${summary.weakCut} cycleRouted=${summary.cycleRouted}`)
   });
   const anchorNodes = layer.derivedNodes.filter((node) => node.nodeKind === "anchor").length;
   const enrichmentNodeCount = layer.derivedNodes.length - anchorNodes;
@@ -348,7 +374,7 @@ async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, ta
   }
   // `target` is an operator-friendly reference: an anchor concept_id (resolved to its
   // derived node) or a derived_node_id directly. The learner path subject identity is
-  // always the derived node (ADR-0025).
+  // always the derived node (ADR-0026).
   const resolvedTargetId =
     layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId ??
     targetRef;
@@ -418,7 +444,7 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
     return;
   }
   // `target` is an anchor concept_id; the projection works in derived-node space, so
-  // resolve it to the goal anchor's derived node (KTD, ADR-0025).
+  // resolve it to the goal anchor's derived node (ADR-0026).
   const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId;
   if (!targetNodeId) {
     console.error(`! target concept ${targetRef} is not an anchor in enrichment ${enrichmentId}.`);
@@ -449,6 +475,46 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
 }
 
+// Bottleneck report renderer for code agents (KTD5, R5): a per-stage table of
+// wall-clock + calls + cost for one operation, or the same structured rows as `--json`.
+// Both this CLI and the Admin Lab view call the SAME bottleneckReport use-case; neither
+// re-implements the join.
+async function bottleneckReportCommand(ctx: Context, operationId: string | undefined, flags: string[]) {
+  if (!operationId) {
+    console.error("! bottleneck-report requires <operationId> (an extraction run / graph version / enrichment id).");
+    process.exitCode = 1;
+    return;
+  }
+  const report = await bottleneckReport({
+    operationId,
+    timelineRead: ctx.operationTimelineRead,
+    stageSpendRead: ctx.stageSpend
+  });
+  if (!report) {
+    console.error(`! no operation timeline found for ${operationId}.`);
+    process.exitCode = 1;
+    return;
+  }
+  if (flags.includes("--json")) {
+    console.log(JSON.stringify(report, null, 2));
+    return;
+  }
+  renderBottleneckTable(report);
+}
+
+function renderBottleneckTable(report: BottleneckReport) {
+  console.log(`\n>> bottleneck report — ${report.operationType} ${report.operationId} (${report.status})`);
+  if (!report.costAvailable) console.log("   ! LiteLLM /spend/tags unavailable — cost columns omitted, wall-clock only.");
+  const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
+  const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
+  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"cost".padStart(10)}`;
+  console.log(header);
+  console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)}`);
+  for (const row of report.stages) {
+    console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${fmtUsd(row.costUsd).padStart(10)}`);
+  }
+}
+
 async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
   if (!enrichmentId) {
     console.error("! generate-study-items requires <enrichmentId>.");
@@ -462,7 +528,8 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     studyItemGeneration: ctx.studyItemGeneration,
-    studyItemBankStore: ctx.studyItemBankStore
+    studyItemBankStore: ctx.studyItemBankStore,
+    reporter: ctx.runProgressReporter
   });
   console.log(`   items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
   for (const item of result.studyItems) {
@@ -515,8 +582,11 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "list-sources":
       await listSources(ctx);
       break;
+    case "bottleneck-report":
+      await bottleneckReportCommand(ctx, arg, rest);
+      break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json]>");
   }
 }
 
@@ -524,11 +594,10 @@ async function main() {
   const [command, arg, ...rest] = process.argv.slice(2);
   const ctx = buildContext();
   try {
-    // Bracket the whole command (U2, R1): one structured `stage_timing` line per
-    // top-level worker invocation. Each `worker:kg` command is its own process in the
-    // serial seed chain, so these lines plus the enrichment sub-stage lines give the
-    // full-run wall-clock split. The usage/default branch is timed too (harmless).
-    await withStageTiming(command ?? "usage", () => dispatch(ctx, command, arg, rest));
+    // Per-stage wall-clock now lives in the durable operation_run_stages timeline,
+    // written incrementally by each operation through the reporter (KTD7) — the old
+    // whole-command stdout `stage_timing` bracket is superseded and removed.
+    await dispatch(ctx, command, arg, rest);
   } finally {
     await ctx.sql.end({ timeout: 5 });
   }

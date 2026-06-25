@@ -9,7 +9,7 @@ full pipeline through native parsers across the manifest-backed native fixture
 batch; Gate 2 adds Docling mixed formats. Quality is judged by representative
 real-source inspection (rule-14), not a standing oracle benchmark — the off-core
 oracle triangle and label aligner were retired after the admission-precision fix
-(ADR-0013/0022).
+(ADR-0013).
 
 ### Gate 1 — first real-use quality run (native parsers)
 

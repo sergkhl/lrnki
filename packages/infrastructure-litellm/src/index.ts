@@ -1,5 +1,6 @@
 export { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 export type { JsonSchema, ToolMessage } from "./LiteLlmForcedToolClient";
+export { LiteLlmStageSpendAdapter, parseStageSpend } from "./LiteLlmStageSpendAdapter";
 export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 export {
   LiteLlmNodeEmbeddingAdapter,
@@ -58,11 +59,13 @@ export {
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmAssertionEntailmentJudgmentAdapter,
   LiteLlmAdmissionLabelJudgmentAdapter,
+  LiteLlmDefinitionPassageQualityJudgmentAdapter,
   DISCOVERY_MODEL,
   ADMISSION_MODEL,
   EVIDENCE_PROFILE_MODEL,
   ASSERTION_ENTAILMENT_JUDGE_MODEL,
-  ADMISSION_LABEL_JUDGE_MODEL
+  ADMISSION_LABEL_JUDGE_MODEL,
+  DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL
 } from "./extractionAdapters";
 export {
   LiteLlmPrerequisiteOrderingAdapter,

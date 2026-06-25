@@ -11,6 +11,7 @@ import type {
   StudyItemGroundingProvenance,
   StudyItemType,
   ConceptDifficulty,
+  DefinitionPassageQualityJudgment,
   JudgedOutcome,
   NewResponseLogRow,
   ResponseLogRow,
@@ -23,7 +24,6 @@ import type {
   ExtractionRunResult,
   GeneratedGroundingBundle,
   WholeSetOrdering,
-  PrerequisiteOrderingCorrection,
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
@@ -97,6 +97,30 @@ export interface AssertionEntailmentJudgmentPort {
     definition: string;
     evidenceQuotes: string[]; // already verbatim-verified against cited blocks
   }): Promise<AssertionEntailmentJudgment>;
+}
+
+// Definition-Passage quality judge (ADR-0007 extension). A bounded, forced-tool LLM
+// judgment that re-reads a core Concept's already-verbatim-verified Definition
+// Passages and decides, per passage, whether it ESTABLISHES the Concept's meaning or
+// is a hollow passage (bare name repetition, heading/title, citation/bibliographic).
+// Run on the independent cross-family alias (`kg-independent-judge`) so the DeepSeek
+// extractor never grades its own definitions. BATCHED per Concept (KTD4): one call
+// judges all of a Concept's definition passages, returning one judgment per passage,
+// index-aligned to the input order. Drop-only: a veto removes the hollow passage; it
+// never adds, promotes, or reorders. The adapter grounds each veto fail-closed (an
+// ungrounded `judgedSpan` is coerced to a keep), so the application stage drops only
+// on a confident, source-grounded hollow verdict and a transport blip never shrinks
+// the published core (D3, AGENTS rule 16).
+export interface DefinitionPassageQualityJudgmentPort {
+  readonly model: string;
+  judgeDefinitions(input: {
+    declaredDomain: string;
+    subject: { canonicalLabel: string; aliases: string[] };
+    // Each passage already verbatim-verified against its cited block by the floor.
+    // `blockType` / `headingPath` are passed as CONTEXT so the judge can recognize
+    // heading/title/citation structure — never as a deterministic gate (KTD7, rule 16).
+    passages: { sourceBlockId: string; evidenceQuote: string; blockType: string; headingPath: string[] }[];
+  }): Promise<DefinitionPassageQualityJudgment[]>; // one per input passage, index-aligned
 }
 
 // Concept-vs-proposition admission judge (ADR-0005). A bounded, forced-tool LLM
@@ -250,22 +274,22 @@ export interface SourceObjectStoragePort {
 // ---------------------------------------------------------------------------
 
 // Whole-set prerequisite ordering over ALL evidenced nodes in one Declared Domain
-// (ADR-0019, amended — whole-set ordering, plan U1/U2, R1/R2). ONE forced-tool call
-// returns a directed prerequisite edge list over the listed nodes; it is globally
-// self-consistent by construction, so cycles are the rare residue rather than the
-// expected residue of intransitive per-pair judging. Each node is listed with its CEP
-// evidence; each edge cites its endpoints by EXACT canonical label, which the
-// application maps → derivedNodeIds fail-closed (KTD3, R9). The optional `correction`
-// carries the violating cycle on the AT-MOST-ONE re-prompt (R10) — a parameter of the
-// same call, never a second method. The judge proposes directed edges only; the boundary
-// verifies acyclicity and routes a stubborn cycle to `uncertain` (rules 16/19), and the
-// symbolic disposal (weak-cut → transitive reduction) runs over the certain edges.
+// (ADR-0019, amended — K-sampled whole-set ordering, plan U2/U4, D1/D2). ONE forced-tool
+// call returns a directed prerequisite edge list over the listed nodes — ONE draw from a
+// non-deterministic distribution (ADR-0028). `order` is a thin single-call caller: the
+// APPLICATION invokes it K times on the SAME input and tallies a per-pair directional vote
+// (D1/D2), so this method neither knows K nor aggregates. Each node is listed with its CEP
+// evidence; each edge cites its endpoints by EXACT canonical label, which the application
+// maps → derivedNodeIds fail-closed (KTD3, R9). The judge proposes directed edges only; the
+// boundary derives consensus confidence, routes direction-contested pairs and aggregate
+// cycles to `uncertain` (D3/D6, rules 16/19), and runs the symbolic disposal (weak-cut →
+// transitive reduction) over the consensus certain edges. There is no corrective re-prompt
+// (KTD4, rule 18): acyclicity is enforced on the aggregate, not by re-prompting one draw.
 export interface PrerequisiteOrderingPort {
   readonly model: string;
   order(input: {
     declaredDomain: string;
     nodes: PrerequisiteConceptContext[];
-    correction?: PrerequisiteOrderingCorrection;
   }): Promise<WholeSetOrdering>;
 }
 
@@ -324,11 +348,11 @@ export interface DifficultyPort {
   score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
 }
 
-// Learner mastery seam (ADR-0014 deferred personalization). MVP impl is a mock
+// Learner mastery seam (ADR-0024 defers population learner modeling). MVP impl is a mock
 // ("knows nothing"): mastery() === 0 for every derived node. Real IRT/KT later
 // implements the SAME port, so the projection upstream never changes. Pure/sync:
 // the projection is a deterministic CLI operation (ADR-0011). Mastery is keyed to the
-// Derived Graph Layer node id (the learner-recall subject identity, ADR-0025).
+// Derived Graph Layer node id (the learner-recall subject identity, ADR-0026).
 export interface LearnerStatePort {
   readonly learnerStateRef: string;
   mastery(derivedNodeId: string): number; // [0,1]; >= masteryThreshold => pruned from the path
@@ -577,4 +601,96 @@ export interface RunInspectionReadPort {
 export interface SourceInspectionReadPort {
   listSourceSummaries(): Promise<SourceSummary[]>;
   getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
+}
+
+// ---------------------------------------------------------------------------
+// Run-stage timeline reporting seam (KTD4, R7). The EXTERNALLY-DRIVEN seam every
+// triggered operation reports progress through, so a future durable workflow
+// engine (Temporal/Restate) can drive the substrate without changing operation
+// logic. Operations call these at stage boundaries and inside item loops; the
+// worker injects the Postgres adapter, tests inject a fake, and an absent
+// reporter (the no-op default) keeps behavior unchanged. Side-effect-only and
+// idempotent-tolerant — the reporter writes the timeline, it returns nothing.
+// ---------------------------------------------------------------------------
+
+// The four triggered operations whose timeline these tables describe (KTD1).
+// `study_items` is its own operation_type keyed by enrichmentId (ADR-0017 split
+// is preserved — these describe operations, they do not unify them).
+export type OperationType = "extraction" | "minting" | "enrichment" | "study_items";
+
+export interface RunProgressReporterPort {
+  // Insert the parent `running` row at operation entry — the fix for "no row
+  // until done": a polling client sees `running` immediately, not no row.
+  beginOperation(input: { operationType: OperationType; operationId: string }): Promise<void>;
+  // Open a stage: insert a child row, set the parent's current_stage. `total` is
+  // the item count for a stage that iterates, enabling an N-of-M heartbeat.
+  enterStage(input: { operationId: string; stage: string; total?: number }): Promise<void>;
+  // Bump the heartbeat as items complete inside a long stage (R3), so liveness is
+  // visible without waiting for a stage boundary. `done` is the cumulative count.
+  recordProgress(input: { operationId: string; stage: string; done: number }): Promise<void>;
+  // Close a stage: set its ended_at + ok. A thrown stage reports ok:false first.
+  completeStage(input: { operationId: string; stage: string; ok: boolean }): Promise<void>;
+  // Set the parent's terminal status + completed_at.
+  completeOperation(input: { operationId: string; status: "succeeded" | "failed" }): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Operation timeline read model (R4, ADR-0027). The live "where is this
+// operation, is it moving" surface. Pure read over operation_runs +
+// operation_run_stages; the adapter owns the query and row-stitch, no SQL in UI.
+// Returns finished models or `undefined`-for-not-found; real DB errors propagate.
+// ---------------------------------------------------------------------------
+
+export interface OperationTimelineStage {
+  stage: string;
+  startedAt: string;
+  endedAt: string | null;
+  // null while the stage is open; ended_at - started_at once closed (R5 wall-clock).
+  durationMs: number | null;
+  ok: boolean | null;
+  progressDone: number | null;
+  progressTotal: number | null;
+}
+
+export interface OperationTimelineSummary {
+  operationRunId: string;
+  operationType: OperationType;
+  operationId: string;
+  status: "running" | "succeeded" | "failed";
+  currentStage: string | null;
+  progressDone: number | null;
+  progressTotal: number | null;
+  lastProgressAt: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  // Wall-clock since start: completed_at - started_at, or now - started_at while running.
+  // A long-stale lastProgressAt on a `running` row is the "hung run" signal (KTD3 risk).
+  elapsedMs: number;
+  stageCount: number;
+}
+
+export interface OperationTimelineDetail {
+  summary: OperationTimelineSummary;
+  stages: OperationTimelineStage[];
+}
+
+export interface OperationTimelineReadPort {
+  listOperationTimelines(): Promise<OperationTimelineSummary[]>;
+  getOperationTimeline(operationId: string): Promise<OperationTimelineDetail | undefined>;
+}
+
+// Per-stage LiteLLM spend (R5, R6). Read live from LiteLLM `/spend/tags` at report
+// time; the application NEVER computes or stores a cost figure — it surfaces
+// LiteLLM's `total_spend` verbatim. The adapter projects the response onto the closed
+// STAGE_TAGS vocabulary, excluding LiteLLM's auto-emitted User-Agent pseudo-tags and
+// any stale tag, so only join-keyable LLM stages survive. Spend is GLOBAL per tag
+// (LiteLLM has no per-operation scoping) — the standing per-stage cost picture.
+export interface StageSpend {
+  tag: string;
+  logCount: number;
+  totalSpend: number;
+}
+
+export interface StageSpendReadPort {
+  readStageSpend(): Promise<StageSpend[]>;
 }

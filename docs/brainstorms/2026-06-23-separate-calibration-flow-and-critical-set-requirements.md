@@ -53,7 +53,7 @@ measured) — onto one surface, and making "calibrate everything" the only model
 - **Top-down adaptive descent / binary-search probing** — deferred. v1 is a static flat set. Add
   descent only if real-use shows the flat set leaves the gap too large.
 - Soft / weighted / probabilistic pruning, evidence weights — remain removed (prior doc).
-- Real learner modeling / IRT / KT / population difficulty calibration (ADR-0014, ADR-0024).
+- Real learner modeling / IRT / KT / population difficulty calibration (ADR-0024).
 - Graph granularity / densification — separate upstream tracks.
 
 ## Requirements

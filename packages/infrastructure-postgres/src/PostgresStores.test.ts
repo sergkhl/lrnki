@@ -32,6 +32,7 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
     maxMentionsPerConceptPerSource: 6,
     status: "succeeded",
     degraded: false,
+    definitionQualityDispositions: [],
     qualityIssues: [],
     candidates: [
       candidate("ownership", "Ownership", "core"),
@@ -61,7 +62,7 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
   };
 }
 
-function candidate(candidateKey: string, label: string, tier: "core" | "optional") {
+function candidate(candidateKey: string, label: string, tier: "core" | "optional", boundaryReasonCodes: string[] = []) {
   return {
     candidateKey,
     parentCandidateKey: candidateKey,
@@ -76,7 +77,7 @@ function candidate(candidateKey: string, label: string, tier: "core" | "optional
       establishedDomainMeaning: { modelPassed: true, passed: true, rationale: "r", submittedEvidence: [], evidence: [] },
       definitionBearingTreatment: { modelPassed: true, passed: true, rationale: "r", submittedEvidence: [], evidence: [] },
       organizingPower: { modelPassed: true, passed: true, rationale: "r", submittedAspects: [], aspects: [] },
-      coreSelected: tier === "core", selectionReasonCode: "source_level_core" as const, reasonCodes: [], boundaryReasonCodes: [], confidence: 0.9
+      coreSelected: tier === "core", selectionReasonCode: "source_level_core" as const, reasonCodes: [], boundaryReasonCodes, confidence: 0.9
     }
   };
 }
@@ -84,8 +85,7 @@ function candidate(candidateKey: string, label: string, tier: "core" | "optional
 function artifactFor(result: ExtractionRunResult): ArtifactEnvelope<ExtractionRunResult> {
   return {
     artifactId: `${result.runId}:run`,
-    artifactType: "extraction_run.v6",
-    schemaVersion: "6",
+    artifactType: "extraction_run",
     runId: result.runId,
     producer: "test",
     producerVersion: "0",
@@ -206,7 +206,7 @@ maybe("publish writes a CEP snapshot with zero asserted edges and round-trips th
       }]
     };
     const artifact: ArtifactEnvelope<GraphSnapshot> = {
-      artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId,
+      artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId,
       producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot
     };
     const store = new PostgresGraphVersionStore(sql);
@@ -260,7 +260,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       runMemberships: [{ runId, sourceResourceId }],
       refinementDecisions: [],
       artifact: {
-        artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId,
+        artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId,
         producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot
       }
     });
@@ -313,7 +313,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     await store.persist({
       layer,
       artifact: {
-        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId,
+        artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run", graphVersionId,
         producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace
       }
     });
@@ -354,7 +354,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     };
     await new PostgresGraphVersionStore(sql).publish({
       snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
-      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
     });
 
     const enrichmentId = randomUUID();
@@ -386,9 +386,9 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
     const absorbedMergeId = randomUUID();
     const trace: EnrichmentRunTrace = { enrichmentId, graphVersionId, enrichmentConfigHash: "test-enrichment", derivedNodes: layer.derivedNodes,
       orderings: [
-        { declaredDomain: "software engineering", judgeModel: "mock-judge", nodeCount: 3, reprompted: false, cycleRoutedEdges: [], assertedEdges: [
-          { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, confidence: 0.8, rationale: "r" },
-          { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, confidence: 0.7, rationale: "r" }
+        { declaredDomain: "software engineering", judgeModel: "mock-judge", nodeCount: 3, k: 8, cycleRoutedEdges: [], pairVotes: [
+          { prerequisiteDerivedNodeId: mintedId, dependentDerivedNodeId: anchorId, forward: 8, reverse: 0, k: 8, consensusConfidence: 1, classification: "consensus" },
+          { prerequisiteDerivedNodeId: rescuedId, dependentDerivedNodeId: anchorId, forward: 7, reverse: 1, k: 8, consensusConfidence: 0.875, classification: "consensus" }
         ] }
       ], nodeExclusions: [], dispositions: [], groundingDispositions: [
       { derivedNodeId: mintedId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated grounding" },
@@ -409,7 +409,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
         absorbedEvidence: ["the owner frees memory"], proposingSignal: "embedding_cosine", proposingScore: 0.97, rationale: "two surface forms of one concept", canonicalSelectionReason: "anchor_over_enrichment" }
     ] };
     const store = new PostgresEnrichmentRunStore(sql);
-    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run.v3", schemaVersion: "3", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
+    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run", graphVersionId, producer: "test", producerVersion: "0", configHash: "test-enrichment", createdAt: new Date().toISOString(), payload: trace } });
 
     const hydrated = await store.getLayer(enrichmentId);
     assert.ok(hydrated);
@@ -487,7 +487,7 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
     // (Borrowing, optional, NO definition passage) — the rescue candidate.
     const result: ExtractionRunResult = {
       runId, sourceResourceId, sourceDocumentId, declaredDomain: "software engineering",
-      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false, qualityIssues: [],
+      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false, definitionQualityDispositions: [], qualityIssues: [],
       candidates: [
         candidate("ownership", "Ownership", "core"),
         candidate("borrowing", "Borrowing", "optional")
@@ -512,7 +512,7 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
     };
     await new PostgresGraphVersionStore(sql).publish({
       snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
-      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot.v2", schemaVersion: "2", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
     });
 
     const rescue = await new PostgresEnrichmentRunStore(sql).mentionedNonCoreCandidates(graphVersionId);
@@ -524,6 +524,62 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
     assert.equal(borrowing.mentions[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
     assert.ok(borrowing.mentions[0].blockText.includes("Borrowing lets you reference"), "carries the cited block text for the U6 floor");
     // The core anchor (which HAS a definition) is never a rescue candidate.
+    assert.ok(!rescue.some((candidate) => candidate.candidateKey === "ownership"));
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a core demoted-hollow Concept (optional, no definition, mentioned) reaches the rescue pool (Covers D5)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { sourceResourceId, sourceDocumentId } = await seedSource(sql);
+    const runId = randomUUID();
+    // Borrowing was admitted core, but the definition-quality judge vetoed its only
+    // Definition Passage as hollow, so it was demoted to optional with the distinct
+    // reason code and its profile recomputed to zero definitions. It keeps its
+    // discovery mention. It must still reach the rescue pool exactly like an
+    // ungroundable optional candidate.
+    const result: ExtractionRunResult = {
+      runId, sourceResourceId, sourceDocumentId, declaredDomain: "software engineering",
+      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false,
+      definitionQualityDispositions: [{ candidateKey: "borrowing", sourceBlockId: "b2", evidenceQuote: "Borrowing", disposition: "vetoed", category: "heading_or_title", rationale: "bare heading" }],
+      qualityIssues: [],
+      candidates: [
+        candidate("ownership", "Ownership", "core"),
+        candidate("borrowing", "Borrowing", "optional", ["core_demoted_hollow_definition"])
+      ],
+      evidenceProfiles: [
+        { candidateKey: "ownership", tier: "core", definitions: [{ blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." }], mentions: [], assertions: [], complete: true },
+        // Borrowing's hollow definition was dropped -> zero definitions, incomplete.
+        { candidateKey: "borrowing", tier: "optional", definitions: [], mentions: [], assertions: [], complete: false }
+      ],
+      latencyMs: 1
+    };
+    await new PostgresExtractionRunStore(sql).persist(result, artifactFor(result));
+    const blocks = await sql<{ block_id: string; source_block_id: string }[]>`SELECT block_id, source_block_id FROM source_blocks WHERE source_document_id = ${sourceDocumentId}`;
+    const blk = (id: string) => blocks.find((row) => row.block_id === id)!.source_block_id;
+
+    const anchorId = randomUUID();
+    const graphVersionId = randomUUID();
+    const anchorLabel = `Ownership ${anchorId}`;
+    const snapshot: GraphSnapshot = {
+      graphVersionId, baseGraphVersionId: null,
+      concepts: [{ conceptId: anchorId, iri: `https://lrnki.local/concept/ownership-${anchorId}`, canonicalLabel: anchorLabel, normalizedLabel: anchorLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
+      evidenceProfiles: [{ conceptId: anchorId, definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }], mentions: [], assertions: [] }]
+    };
+    await new PostgresGraphVersionStore(sql).publish({
+      snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+    });
+
+    const rescue = await new PostgresEnrichmentRunStore(sql).mentionedNonCoreCandidates(graphVersionId);
+    const borrowing = rescue.find((candidate) => candidate.candidateKey === "borrowing");
+    assert.ok(borrowing, "the demoted-hollow Concept is a rescue candidate (Covers D5)");
+    assert.equal(borrowing.tier, "optional");
+    assert.ok(borrowing.mentions.length >= 1);
+    assert.equal(borrowing.mentions[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
+    // Negative control: the still-core anchor with a definition never appears.
     assert.ok(!rescue.some((candidate) => candidate.candidateKey === "ownership"));
   } finally {
     await sql.end();

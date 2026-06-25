@@ -96,7 +96,7 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
     const artifactRows = await sql<{ quality_issues: ExtractionQualityIssue[] | null }[]>`
       SELECT payload -> 'qualityIssues' AS quality_issues
       FROM artifact_versions
-      WHERE run_id = ${runId} AND artifact_type LIKE 'extraction_run.%'
+      WHERE run_id = ${runId} AND artifact_type = 'extraction_run'
       ORDER BY created_at DESC
       LIMIT 1`;
 
