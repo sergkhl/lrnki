@@ -35,5 +35,3 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0027 — Inspection and learner-projection read boundaries](./0027-serve-inspection-through-read-model-ports.md)
 - [0028 — Non-deterministic quality measurement](./0028-measure-non-deterministic-quality-with-non-deterministic-methods.md)
 - [0029 — Shared operation-stage timelines](./0029-persist-shared-operation-stage-timelines.md)
-
-Numbers 0020–0021 were never issued.
