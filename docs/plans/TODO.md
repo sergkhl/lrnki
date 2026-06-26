@@ -2,20 +2,31 @@
 
 ## TODO
 
-1. **Resolve the CEP definition-passage mis-pick follow-up.** The prompt-side clause is implemented,
+1. **Finish the rescue-seam derived-grounding fix (U6/U7).** U1–U5 shipped on branch
+   `fix/rescue-seam-derived-grounding`: definition-bearing `optional` candidates are now rescued into
+   the Derived Graph Layer as `source_mentioned` nodes carrying their verbatim definition + mention
+   passages (the inverted `nonCoreRescueCandidates` "no definition" predicate was flipped, promoting
+   `optional` only and keeping `reject` mention-only), the verbatim floor verifies rescued definitions,
+   study items inherit `source_mentioned` provenance, and the Study surfaces expose `studyItemCount`
+   and guard against empty sessions. Remaining: hard-reset the polluted run history and drive one clean
+   full-manifest seed (U6), then real-source + end-to-end learner-loop rule-14 verification (U7) — both
+   need a live Postgres + LiteLLM and the real provider key (AGENTS rule 5/13/14). Plan:
+   [2026-06-26-001](2026-06-26-001-fix-rescue-seam-derived-grounding-plan.md).
+
+2. **Resolve the CEP definition-passage mis-pick follow-up.** The prompt-side clause is implemented,
    and the unblocked first-party A/B trail now exists at
    `tmp/2026-06-25-cep-defn-retrieval/`. Decide from that evidence whether the clause is sufficient,
    needs a repaired measurement pass, or should escalate to re-pick-on-veto / a stronger extractor
    ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 
-2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+3. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-3. **Improve operator observability.**
+4. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
@@ -86,6 +97,13 @@
 
 ## VALIDATION
 
+- **Rescue-seam fix U1–U5, 2026-06-26 (branch `fix/rescue-seam-derived-grounding`):** full workspace
+  typecheck, the recursive test suite (271 application incl. new definition-bearing rescue/floor/study
+  cases, 38 live-PostgreSQL incl. a new R1/R2 rescue-read case proving optional definitions are reused
+  while reject definitions stay excluded, 86 admin-lab), ESLint (0 errors; 5 pre-existing warnings), and
+  the admin-lab build are green. Deterministic-envelope evidence only ([ADR-0013]
+  (../adr/0013-verify-quality-by-real-source-inspection.md)); the rule-14 grounding-density and
+  end-to-end learner-loop quality claims await the U6/U7 seed + real-source inspection (TODO #1).
 - **Latest consolidated suite, 2026-06-26:** full workspace typecheck and tests (262 application,
   37 live PostgreSQL integration including a new shared-`operation_id` reporter regression), ESLint
   (zero errors; five pre-existing warnings) are green.
