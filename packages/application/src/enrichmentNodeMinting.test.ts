@@ -17,7 +17,7 @@ import type { StageBracket } from "./runProgressReporter";
 function recordingStage() {
   const opened: string[] = [];
   const closed: string[] = [];
-  let maxConcurrentByName = new Map<string, number>();
+  const maxConcurrentByName = new Map<string, number>();
   const liveByName = new Map<string, number>();
   const stage: StageBracket = async (name, fn) => {
     opened.push(name);

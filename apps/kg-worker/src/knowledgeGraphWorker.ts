@@ -14,7 +14,9 @@ import {
   ADAPTIVE_MASTERY_THRESHOLD,
   runGraphEnrichment,
   bottleneckReport,
-  type BottleneckReport
+  rankBottleneckTargets,
+  type BottleneckReport,
+  type RankedTarget
 } from "@lrnki/application";
 import {
   DoclingStructuredDocumentParser,
@@ -506,11 +508,7 @@ async function bottleneckReportCommand(ctx: Context, operationId: string | undef
     process.exitCode = 1;
     return;
   }
-  if (flags.includes("--json")) {
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
-  renderBottleneckTable(report);
+  emitReport(report, flags);
 }
 
 async function journeyCostReportCommand(ctx: Context, enrichmentId: string | undefined, flags: string[]) {
@@ -530,7 +528,21 @@ async function journeyCostReportCommand(ctx: Context, enrichmentId: string | und
     process.exitCode = 1;
     return;
   }
-  if (flags.includes("--json")) {
+  emitReport(report, flags);
+}
+
+// Shared flag dispatch for both report commands (U3). `--ranked` renders (or with `--json`,
+// emits) the ranked cost + time target lists; `--json` alone emits the raw report; absent
+// flags render the per-stage table. `--ranked --json` is the recording form for the baseline.
+function emitReport(report: BottleneckReport, flags: string[]) {
+  const ranked = flags.includes("--ranked");
+  const json = flags.includes("--json");
+  if (ranked) {
+    if (json) console.log(JSON.stringify(rankBottleneckTargets(report), null, 2));
+    else renderRankedTargets(report);
+    return;
+  }
+  if (json) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
@@ -553,6 +565,31 @@ function renderBottleneckTable(report: BottleneckReport) {
     console.log(`   ${"subtotal".padEnd(30)} ${fmtMs(operation.subtotal.wallClockMs).padStart(9)} ${(operation.subtotal.calls ?? "—").toString().padStart(6)} ${(operation.subtotal.tokens ?? "—").toString().padStart(10)} ${fmtUsd(operation.subtotal.costUsd).padStart(10)}`);
   }
   console.log(`\n   ${report.scope} total: wall=${fmtMs(report.total.wallClockMs)} calls=${report.total.calls ?? "—"} tokens=${report.total.tokens ?? "—"} cost=${fmtUsd(report.total.costUsd)}`);
+}
+
+// Ranked-target renderer (U3): a cost-ranked and a wall-ranked list of (operation, stage)
+// rows with each target's share of the journey total — the optimization-pass handoff view.
+function renderRankedTargets(report: BottleneckReport) {
+  const ranked = rankBottleneckTargets(report);
+  const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
+  const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
+  const fmtShare = (share: number | null) => (share === null ? "—" : `${(share * 100).toFixed(1)}%`);
+  const target = (t: RankedTarget) =>
+    `${t.operationType}/${t.stage}`.padEnd(46);
+  console.log(`\n>> ${report.scope} ranked targets — ${report.anchorId}`);
+  if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost ranking empty, wall-clock ranking only.");
+
+  console.log(`\n   cost targets (desc)   ${"share".padStart(7)} ${"cost".padStart(10)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"tokens".padStart(10)}`);
+  if (ranked.byCost.length === 0) console.log("   (none)");
+  for (const t of ranked.byCost) {
+    console.log(`   ${target(t)} ${fmtShare(t.costShare).padStart(7)} ${fmtUsd(t.costUsd).padStart(10)} ${fmtMs(t.wallClockMs).padStart(9)} ${(t.calls ?? "—").toString().padStart(6)} ${(t.tokens ?? "—").toString().padStart(10)}`);
+  }
+
+  console.log(`\n   time targets (desc)   ${"share".padStart(7)} ${"wall".padStart(9)} ${"cost".padStart(10)} ${"calls".padStart(6)} ${"tokens".padStart(10)}`);
+  if (ranked.byWall.length === 0) console.log("   (none)");
+  for (const t of ranked.byWall) {
+    console.log(`   ${target(t)} ${fmtShare(t.wallShare).padStart(7)} ${fmtMs(t.wallClockMs).padStart(9)} ${fmtUsd(t.costUsd).padStart(10)} ${(t.calls ?? "—").toString().padStart(6)} ${(t.tokens ?? "—").toString().padStart(10)}`);
+  }
 }
 
 async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
@@ -629,7 +666,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] | journey-cost-report <enrichmentId> [--json]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

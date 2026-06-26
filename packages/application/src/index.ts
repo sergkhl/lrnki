@@ -27,6 +27,11 @@ export {
   type BottleneckTotals
 } from "./bottleneckReport";
 export {
+  rankBottleneckTargets,
+  type RankedTarget,
+  type RankedTargets
+} from "./rankBottleneckTargets";
+export {
   deduplicateDerivedNodes,
   cosineSimilarity,
   candidatePairsByDomain,
