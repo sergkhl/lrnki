@@ -101,6 +101,18 @@
   report; the former global cost path was removed. Decision:
   [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
+- **Pipeline-cost measurement hardening + ranked targets.** Enrichment now brackets per-stage
+  wall-clock on the same fine `STAGE_TAGS` names its LLM calls tag cost with (per-call for the
+  sequential rescue/mint loop, per-phase for the concurrent dedup batch), so the cost⋈wall join meets
+  on one key — the coarse `rescue-mint`/`dedup` brackets are gone. A tested pure ranking derives the
+  ordered (operation, stage) cost and time targets with journey-total shares, exposed through an
+  additive `--ranked` report flag. Running `study_items` end-to-end in a journey for the first time
+  surfaced and fixed a latent reporter defect: the timeline reporter keyed the parent by
+  `operation_id` alone, but `study_items` reuses the enrichmentId, so the two operations collided on
+  the `operation_run_stages` primary key — every reporter method now scopes by the full
+  `(operation_type, operation_id)` natural key. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
 - **Whole-set ordering label fidelity (grounded-generation hardening).** The ordering edge contract
   switched from free-text canonical-label echo to a 1-based ordinal index — a closed-set menu pick
   over the `Concept 1..N` the prompt already shows. Per-call schema + validator are built from the
@@ -113,9 +125,18 @@
 
 ## VALIDATION
 
-- **Latest consolidated suite, 2026-06-25:** full workspace typecheck and tests, ESLint (zero errors;
-  four pre-existing warnings), live PostgreSQL integration tests, and the Admin Lab production build
-  are green. Server-render checks passed for the operation and journey report routes.
+- **Latest consolidated suite, 2026-06-26:** full workspace typecheck and tests (262 application,
+  37 live PostgreSQL integration including a new shared-`operation_id` reporter regression), ESLint
+  (zero errors; five pre-existing warnings) are green.
+- **Pipeline-cost hardening baseline, 2026-06-26 (rule 14).** A fresh end-to-end run of the Rust
+  ch.4.1 source (extraction `1a432ca6` → minting `f3191545` → enrichment `174a3a79` → study_items)
+  produced a clean complete rollup: four operations, journey total wall=990.8s, 194 calls,
+  561,500 tokens, **$0.0607**. Every enrichment LLM stage now joins (wall AND cost on one fine name);
+  no `rescue-mint`/`dedup` row remains; `study_items` is non-null (107.5s / $0.0074). Ranked targets:
+  top cost = `extraction/admission` 32.3% ($0.0196) and `enrichment/prerequisite-ordering` 25.9%
+  ($0.0157); top time = `prerequisite-ordering` 36.0% (357.1s) and `admission` 16.0% (158.2s) — the
+  two levers for the deferred rule-21 optimization pass (superseding the earlier provisional
+  "admission 43%"). Trail: `tmp/2026-06-26-pipeline-cost-baseline/`.
 - **Per-journey cost evidence, 2026-06-25:** a real Rust extraction
   (`c911bbd0-719b-4929-9a95-4240f18168c1`) produced 99 tagged calls, 302,157 tokens, and
   $0.03522072. Every per-stage calls/tokens/cost cell exactly reconciled with a manual
