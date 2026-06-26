@@ -264,6 +264,9 @@ importers:
 
   packages/infrastructure-litellm:
     dependencies:
+      '@lrnki/application':
+        specifier: workspace:*
+        version: link:../application
       '@lrnki/domain-core':
         specifier: workspace:*
         version: link:../domain-core

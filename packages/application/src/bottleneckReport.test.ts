@@ -11,6 +11,7 @@ import type {
   OperationType
 } from "@lrnki/ports";
 import { bottleneckReport } from "./bottleneckReport";
+import { NON_LLM_STAGES } from "./runProgressReporter";
 
 function detail(operationId: string, operationType: OperationType, stages: Array<[string, number | null]>): OperationTimelineDetail {
   return {
@@ -76,6 +77,7 @@ test("operation scope joins operation-scoped spend and includes tokens", async (
   assert.deepEqual(report?.operations[0].stages[0], {
     stage: STAGE_TAGS.admission,
     isLlmStage: true,
+    stageKind: "llm",
     wallClockMs: 3000,
     calls: 2,
     costUsd: 0.2,
@@ -101,6 +103,8 @@ test("operation scope can disambiguate operation types that share one id", async
   });
   assert.equal(report?.operations[0].operationType, "study_items");
   assert.equal(report?.operations[0].subtotal.costUsd, 0.4);
+  assert.deepEqual(report?.operations[0].stages.map((row) => row.stage), [STAGE_TAGS.studyItemGeneration]);
+  assert.ok(!report?.operations[0].stages.some((row) => row.stage === STAGE_TAGS.prerequisiteOrdering));
 });
 
 test("journey scope rolls up two extraction runs, minting, enrichment, and study items", async () => {
@@ -109,7 +113,7 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
     details: [
       detail("run-a", "extraction", [[STAGE_TAGS.admission, 1000]]),
       detail("run-b", "extraction", [[STAGE_TAGS.admission, 2000]]),
-      detail("gv-1", "minting", [["persist", 300]]),
+      detail("gv-1", "minting", [[NON_LLM_STAGES.persist, 300]]),
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
       detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
     ],
@@ -137,7 +141,7 @@ test("cost-source failure preserves wall-clock and marks cost totals unavailable
   const dependencies = ports({
     lineage: { enrichmentId: "enr-1", graphVersionId: "gv-1", extractionRunIds: [] },
     details: [
-      detail("gv-1", "minting", [["persist", 300]]),
+      detail("gv-1", "minting", [[NON_LLM_STAGES.persist, 300]]),
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
       detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
     ],
@@ -148,6 +152,48 @@ test("cost-source failure preserves wall-clock and marks cost totals unavailable
   assert.equal(report?.total.wallClockMs, 9300);
   assert.equal(report?.total.costUsd, null);
   assert.ok(report?.operations.every((row) => row.subtotal.calls === null && row.subtotal.tokens === null));
+});
+
+test("non-LLM wall-clock rows and duplicate timeline rows keep current aggregation semantics", async () => {
+  const dependencies = ports({
+    details: [detail("gv-1", "minting", [
+      [NON_LLM_STAGES.load, 120],
+      [NON_LLM_STAGES.refine, 200],
+      [NON_LLM_STAGES.refine, 50],
+      [NON_LLM_STAGES.persist, 30]
+    ])],
+    spend: [
+      { operationId: "gv-1", stage: NON_LLM_STAGES.persist, logCount: 9, totalSpend: 9, totalTokens: 9000 }
+    ]
+  });
+  const report = await bottleneckReport({
+    scope: { operationId: "gv-1", operationType: "minting" },
+    ...dependencies
+  });
+  assert.deepEqual(report?.operations[0].stages, [
+    { stage: NON_LLM_STAGES.load, isLlmStage: false, stageKind: "non_llm", wallClockMs: 120, calls: null, costUsd: null, tokens: null },
+    { stage: NON_LLM_STAGES.refine, isLlmStage: false, stageKind: "non_llm", wallClockMs: 250, calls: null, costUsd: null, tokens: null },
+    { stage: NON_LLM_STAGES.persist, isLlmStage: false, stageKind: "non_llm", wallClockMs: 30, calls: null, costUsd: null, tokens: null }
+  ]);
+  assert.deepEqual(report?.operations[0].subtotal, { wallClockMs: 400, calls: 0, costUsd: 0, tokens: 0 });
+});
+
+test("unknown timeline stage remains visible and does not receive unrelated spend", async () => {
+  const dependencies = ports({
+    details: [detail("enr-1", "enrichment", [["unexpected-stage", 777]])],
+    spend: [
+      { operationId: "enr-1", stage: "unexpected-stage", logCount: 99, totalSpend: 9.9, totalTokens: 9900 },
+      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 }
+    ]
+  });
+  const report = await bottleneckReport({
+    scope: { operationId: "enr-1", operationType: "enrichment" },
+    ...dependencies
+  });
+  assert.deepEqual(report?.operations[0].stages, [
+    { stage: "unexpected-stage", isLlmStage: false, stageKind: "unknown", wallClockMs: 777, calls: null, costUsd: null, tokens: null }
+  ]);
+  assert.deepEqual(report?.operations[0].subtotal, { wallClockMs: 777, calls: 0, costUsd: 0, tokens: 0 });
 });
 
 test("returns undefined for unknown operation and journey anchors", async () => {

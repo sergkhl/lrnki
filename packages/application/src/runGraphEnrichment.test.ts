@@ -22,6 +22,7 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { RunProgressReporterPort } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
+import { NON_LLM_STAGES } from "./runProgressReporter";
 
 installNodeOperationTagContext();
 
@@ -249,9 +250,9 @@ test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages
   const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
   assert.deepEqual(entered, [
     STAGE_TAGS.prerequisiteOrdering,
-    "symbolic-disposal",
+    NON_LLM_STAGES.symbolicDisposal,
     STAGE_TAGS.intrinsicDifficulty,
-    "persist"
+    NON_LLM_STAGES.persist
   ]);
   // Every entered stage is closed ok:true on a clean run; no failed status is emitted.
   assert.equal(calls.filter((c) => c.startsWith("complete:") && c.endsWith(":true")).length, 4);
@@ -781,7 +782,7 @@ test("U1 integration: a minting run's timeline uses fine names, never `rescue-mi
   assert.ok(entered.includes(STAGE_TAGS.groundingGeneration));
   // Join-alignment: every entered stage that is not a non-LLM tail (symbolic-disposal,
   // persist) is a STAGE_TAG, so its wall-clock joins the cost the LLM call self-tags.
-  const nonLlmTail = new Set(["symbolic-disposal", "persist"]);
+  const nonLlmTail = new Set<string>([NON_LLM_STAGES.symbolicDisposal, NON_LLM_STAGES.persist]);
   const llmStages = entered.filter((stage) => !nonLlmTail.has(stage));
   assert.ok(llmStages.every((stage) => isStageTag(stage)), `every LLM stage is a join key: ${llmStages.join(", ")}`);
 });

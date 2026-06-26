@@ -1,4 +1,4 @@
-import { STAGE_TAGS } from "@lrnki/domain-core";
+import { operationTimelineLlmSpendStageTags } from "@lrnki/application";
 import type { OperationStageSpend, OperationStageSpendReadPort } from "@lrnki/ports";
 import postgres, { type Sql } from "postgres";
 
@@ -20,7 +20,7 @@ export class LiteLlmSpendLogsReadAdapter implements OperationStageSpendReadPort 
   async readOperationStageSpend(operationIds: string[]): Promise<OperationStageSpend[]> {
     if (operationIds.length === 0) return [];
     const sql = this.sql;
-    const stageTags = Object.values(STAGE_TAGS);
+    const stageTags = liteLlmOperationTimelineStageTags();
     const rows = await sql<SpendLogAggregateRow[]>`
       SELECT operation_tag.value AS operation_id,
              stage_tag.value AS stage,
@@ -40,6 +40,10 @@ export class LiteLlmSpendLogsReadAdapter implements OperationStageSpendReadPort 
   async end(): Promise<void> {
     await this.sql.end({ timeout: 5 });
   }
+}
+
+export function liteLlmOperationTimelineStageTags(): readonly string[] {
+  return operationTimelineLlmSpendStageTags();
 }
 
 export function shapeOperationStageSpend(rows: SpendLogAggregateRow[]): OperationStageSpend[] {

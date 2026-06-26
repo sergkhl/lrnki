@@ -20,6 +20,7 @@ import type {
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { executeExtractionRun } from "./executeExtractionRun";
+import { NON_LLM_STAGES } from "./runProgressReporter";
 
 installNodeOperationTagContext();
 
@@ -612,7 +613,7 @@ test("a successful run reports beginOperation → stages in pipeline order → c
     STAGE_TAGS.cepExtraction,
     STAGE_TAGS.definitionPassageQuality,
     STAGE_TAGS.assertionEntailment,
-    "persist"
+    NON_LLM_STAGES.persist
   ]);
   assert.ok(calls.filter((c) => c.method === "completeStage").every((c) => (c as { ok: boolean }).ok === true));
   // No failed status is ever emitted on a clean run.

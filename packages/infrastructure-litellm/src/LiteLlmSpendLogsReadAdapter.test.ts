@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shapeOperationStageSpend } from "./LiteLlmSpendLogsReadAdapter";
+import { STAGE_TAGS } from "@lrnki/domain-core";
+import { NON_LLM_STAGES } from "@lrnki/application";
+import { liteLlmOperationTimelineStageTags, shapeOperationStageSpend } from "./LiteLlmSpendLogsReadAdapter";
 
 test("shapes per-operation stage aggregates and numeric database values", () => {
   assert.deepEqual(
@@ -15,4 +17,11 @@ test("shapes per-operation stage aggregates and numeric database values", () => 
       { operationId: "run-A", stage: "cep-extraction", logCount: 3, totalSpend: 0, totalTokens: 0 }
     ]
   );
+});
+
+test("uses the application Operation Timeline LLM stage catalog for spend reads", () => {
+  const tags = liteLlmOperationTimelineStageTags();
+  assert.deepEqual(tags, Object.values(STAGE_TAGS));
+  assert.equal(new Set<string>(tags).has(NON_LLM_STAGES.persist), false);
+  assert.equal(new Set<string>(tags).has(NON_LLM_STAGES.symbolicDisposal), false);
 });

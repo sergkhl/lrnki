@@ -483,7 +483,7 @@ export async function runGraphEnrichment(input: {
   // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
   // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
   // acyclicity is enforced upstream by cycle-routing (KTD3).
-  const disposal = await runStage("symbolic-disposal", async () => {
+  const disposal = await runStage(NON_LLM_STAGES.symbolicDisposal, async () => {
     const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
     return { reducedEdges, transitiveEdges };
   });

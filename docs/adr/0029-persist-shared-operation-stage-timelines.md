@@ -20,7 +20,9 @@ LiteLLM's request log; the application does not compute or persist cost.
 The bottleneck report supports one operation or one **Processing Journey** anchored on an Enrichment
 Run. Journey resolution walks existing graph-version and Extraction Run lineage; it does not create a
 pipeline identity or orchestration boundary. Enrichment and study-item operations share an operation
-id, so timeline reads retain operation type and stage ownership keeps their spend separate.
+id, so timeline reads retain operation type. Application-owned Operation Timeline catalog semantics
+define reportable stage ownership and stage kind, keeping shared-id spend separate without creating a
+unified workflow identity.
 
 ## Context
 

@@ -1,4 +1,3 @@
-import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   JourneyLineageReadPort,
   OperationStageSpend,
@@ -7,7 +6,12 @@ import type {
   OperationTimelineReadPort,
   OperationType
 } from "@lrnki/ports";
-import { isLlmStage } from "./runProgressReporter";
+import {
+  isLlmStage,
+  operationTimelineStageKind,
+  spendStageBelongsToOperation,
+  type OperationTimelineStageKind
+} from "./operationTimelineCatalog";
 
 export type BottleneckReportScope =
   | { operationId: string; operationType?: OperationType }
@@ -16,6 +20,7 @@ export type BottleneckReportScope =
 export interface BottleneckStageRow {
   stage: string;
   isLlmStage: boolean;
+  stageKind: OperationTimelineStageKind;
   wallClockMs: number | null;
   calls: number | null;
   costUsd: number | null;
@@ -117,7 +122,7 @@ function buildOperationReport(
   const operationSpend = (spend ?? []).filter(
     (row) =>
       row.operationId === detail.summary.operationId &&
-      stageBelongsToOperation(row.stage, detail.summary.operationType)
+      spendStageBelongsToOperation(row.stage, detail.summary.operationType)
   );
   const spendByStage = new Map(operationSpend.map((row) => [row.stage, row]));
   const wallClockByStage = new Map<string, number | null>();
@@ -139,6 +144,7 @@ function buildOperationReport(
     return {
       stage,
       isLlmStage: isLlmStage(stage),
+      stageKind: operationTimelineStageKind(stage),
       wallClockMs: wallClockByStage.get(stage) ?? null,
       calls: row?.logCount ?? null,
       costUsd: row?.totalSpend ?? null,
@@ -153,39 +159,6 @@ function buildOperationReport(
     subtotal: sumStageRows(stages, spend !== null)
   };
 }
-
-function stageBelongsToOperation(stage: string, operationType: OperationType): boolean {
-  if (operationType === "extraction") {
-    return EXTRACTION_STAGES.has(stage);
-  }
-  if (operationType === "enrichment") {
-    return ENRICHMENT_STAGES.has(stage);
-  }
-  if (operationType === "study_items") {
-    return stage === STAGE_TAGS.studyItemGeneration;
-  }
-  return false;
-}
-
-const EXTRACTION_STAGES = new Set<string>([
-  STAGE_TAGS.conceptDiscovery,
-  STAGE_TAGS.admission,
-  STAGE_TAGS.admissionLabelJudge,
-  STAGE_TAGS.cepExtraction,
-  STAGE_TAGS.definitionPassageQuality,
-  STAGE_TAGS.assertionEntailment
-]);
-
-const ENRICHMENT_STAGES = new Set<string>([
-  STAGE_TAGS.prerequisiteOrdering,
-  STAGE_TAGS.rescueDurability,
-  STAGE_TAGS.mintingDurability,
-  STAGE_TAGS.missingPrerequisiteProposal,
-  STAGE_TAGS.groundingGeneration,
-  STAGE_TAGS.intrinsicDifficulty,
-  STAGE_TAGS.nodeEmbedding,
-  STAGE_TAGS.nodeMergeAdjudication
-]);
 
 function sumStageRows(rows: BottleneckStageRow[], costAvailable: boolean): BottleneckTotals {
   return {

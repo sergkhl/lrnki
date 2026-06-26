@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { OperationType } from "@lrnki/ports";
 import type { BottleneckOperationReport, BottleneckReport, BottleneckStageRow } from "./bottleneckReport";
 import { rankBottleneckTargets } from "./rankBottleneckTargets";
+import { NON_LLM_STAGES } from "./runProgressReporter";
 
 // Deterministic-envelope tests over the pure ranking transform (U3). The reports here are
 // hand-built INPUT FIXTURES exercising flatten → filter → sort → share — never an assertion
@@ -12,6 +13,7 @@ function stageRow(stage: string, over: Partial<BottleneckStageRow> = {}): Bottle
   return {
     stage,
     isLlmStage: true,
+    stageKind: "llm",
     wallClockMs: null,
     calls: null,
     costUsd: null,
@@ -75,13 +77,13 @@ test("a stage with cost but null wall appears in byCost only; null-cost wall sta
   const r = report([
     operation("enrichment", "e1", [
       stageRow("node-merge-adjudication", { costUsd: 0.04, wallClockMs: null, calls: 5, tokens: 2000 }),
-      stageRow("persist", { costUsd: null, wallClockMs: 80, calls: null, tokens: null })
+      stageRow(NON_LLM_STAGES.persist, { costUsd: null, wallClockMs: 80, calls: null, tokens: null, isLlmStage: false, stageKind: "non_llm" })
     ])
   ]);
   const ranked = rankBottleneckTargets(r);
   assert.deepEqual(ranked.byCost.map((t) => t.stage), ["node-merge-adjudication"]);
-  assert.ok(!ranked.byCost.some((t) => t.stage === "persist"), "null-cost stage excluded from byCost");
-  assert.deepEqual(ranked.byWall.map((t) => t.stage), ["persist"]);
+  assert.ok(!ranked.byCost.some((t) => t.stage === NON_LLM_STAGES.persist), "null-cost stage excluded from byCost");
+  assert.deepEqual(ranked.byWall.map((t) => t.stage), [NON_LLM_STAGES.persist]);
   assert.ok(!ranked.byWall.some((t) => t.stage === "node-merge-adjudication"), "null-wall stage excluded from byWall");
 });
 
@@ -115,7 +117,7 @@ test("operation-scoped report ranks within the single operation; journey ranks a
 
   const journey = report([
     operation("extraction", "x1", [stageRow("admission", { costUsd: 0.1, wallClockMs: 40 })]),
-    operation("minting", "m1", [stageRow("refine", { costUsd: null, wallClockMs: 10 })]),
+    operation("minting", "m1", [stageRow(NON_LLM_STAGES.refine, { costUsd: null, wallClockMs: 10, isLlmStage: false, stageKind: "non_llm" })]),
     operation("enrichment", "e1", [stageRow("prerequisite-ordering", { costUsd: 0.05, wallClockMs: 90 })]),
     operation("study_items", "e1", [stageRow("study-item-generation", { costUsd: 0.07, wallClockMs: 200 })])
   ]);
@@ -126,7 +128,7 @@ test("operation-scoped report ranks within the single operation; journey ranks a
     "enrichment/prerequisite-ordering"
   ]);
   // The minting refine stage has null cost ⇒ byCost excludes it but byWall includes it.
-  assert.ok(journeyRanked.byWall.some((t) => t.stage === "refine"));
+  assert.ok(journeyRanked.byWall.some((t) => t.stage === NON_LLM_STAGES.refine));
 });
 
 test("empty report (no stages) yields two empty lists", () => {

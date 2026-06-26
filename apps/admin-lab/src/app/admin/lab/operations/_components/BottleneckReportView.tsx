@@ -21,6 +21,12 @@ function formatUsd(usd: number | null): string {
   return usd === null ? "—" : `$${usd.toFixed(4)}`;
 }
 
+function stageKindLabel(kind: BottleneckReport["operations"][number]["stages"][number]["stageKind"]): string {
+  if (kind === "llm") return "LLM";
+  if (kind === "non_llm") return "non-LLM";
+  return "unknown";
+}
+
 export function BottleneckReportView({ report }: { report: BottleneckReport }) {
   return (
     <div className="flex flex-col gap-6">
@@ -51,7 +57,7 @@ export function BottleneckReportView({ report }: { report: BottleneckReport }) {
               {operation.stages.map((row) => (
                 <TableRow key={row.stage}>
                   <TableCell className="font-medium">{row.stage}</TableCell>
-                  <TableCell><Badge variant="outline">{row.isLlmStage ? "LLM" : "non-LLM"}</Badge></TableCell>
+                  <TableCell><Badge variant="outline">{stageKindLabel(row.stageKind)}</Badge></TableCell>
                   <TableCell className="text-right">{formatMs(row.wallClockMs)}</TableCell>
                   <TableCell className="text-right">{row.calls ?? "—"}</TableCell>
                   <TableCell className="text-right">{row.tokens ?? "—"}</TableCell>

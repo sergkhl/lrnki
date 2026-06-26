@@ -1,6 +1,10 @@
 export { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 export type { JsonSchema, ToolMessage } from "./LiteLlmForcedToolClient";
-export { LiteLlmSpendLogsReadAdapter, shapeOperationStageSpend } from "./LiteLlmSpendLogsReadAdapter";
+export {
+  LiteLlmSpendLogsReadAdapter,
+  liteLlmOperationTimelineStageTags,
+  shapeOperationStageSpend
+} from "./LiteLlmSpendLogsReadAdapter";
 export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 export {
   LiteLlmNodeEmbeddingAdapter,

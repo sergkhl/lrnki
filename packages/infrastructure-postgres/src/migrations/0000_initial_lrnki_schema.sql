@@ -771,9 +771,9 @@ FROM response_log;
 -- reporter writes these rows incrementally on its own autocommit statements,
 -- NEVER enlisted in an operation's terminal artifact transaction, so an
 -- in-flight or crashed run still leaves a readable timeline. The application
--- records TIME and STAGE TAGS only — never a cost figure; per-stage cost
--- is read live from LiteLLM `/spend/tags` at report time, joined on the stage
--- tag (the closed STAGE_TAGS vocabulary).
+-- records TIME and stage names only — never a cost figure; per-stage cost
+-- is read live from LiteLLM request logs at report time, joined through the
+-- application Operation Timeline catalog's closed LLM stage vocabulary.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE operation_runs (

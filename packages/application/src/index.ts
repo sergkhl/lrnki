@@ -19,6 +19,16 @@ export {
   type NonLlmStage
 } from "./runProgressReporter";
 export {
+  OPERATION_TIMELINE_CATALOG,
+  operationTimelineStageKind,
+  isKnownOperationTimelineStage,
+  stageBelongsToOperation,
+  spendStageBelongsToOperation,
+  operationTimelineStagesForOperation,
+  operationTimelineLlmSpendStageTags,
+  type OperationTimelineStageKind
+} from "./operationTimelineCatalog";
+export {
   bottleneckReport,
   type BottleneckOperationReport,
   type BottleneckReport,

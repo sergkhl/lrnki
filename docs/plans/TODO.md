@@ -86,6 +86,12 @@
   and ranked targets expose the highest cost and time levers. Decision:
   [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
+- **Operation Timeline stage ownership catalog.** Operation-stage ownership, LLM/non-LLM/unknown
+  classification, and the LiteLLM spend-stage list now live behind one application-facing catalog.
+  Bottleneck reports use that catalog for operation-scoped spend joins, unknown timeline stages stay
+  visible as timeline-only rows, and Admin Lab renders the report-provided stage kind. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
 - **Whole-set ordering label fidelity (grounded-generation hardening).** The ordering edge contract
   switched from free-text canonical-label echo to a 1-based ordinal index — a closed-set menu pick
   over the `Concept 1..N` the prompt already shows. Per-call schema + validator are built from the
@@ -97,6 +103,11 @@
 
 ## VALIDATION
 
+- **Operation Timeline ownership refactor, 2026-06-26:** full workspace typecheck and recursive test
+  suite pass; focused application coverage for bottleneck reports, catalog classification, ranking,
+  reporter instrumentation, extraction, graph-version build, enrichment, study-item generation, node
+  minting, and deduplication passes (130 tests); LiteLLM spend adapter tests pass; ESLint has zero
+  errors and five pre-existing warnings; Admin Lab production build passes.
 - **Rescue-seam fix U1–U5, 2026-06-26 (branch `fix/rescue-seam-derived-grounding`):** full workspace
   typecheck, the recursive test suite (271 application incl. new definition-bearing rescue/floor/study
   cases, 38 live-PostgreSQL incl. a new R1/R2 rescue-read case proving optional definitions are reused
