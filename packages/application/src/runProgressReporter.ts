@@ -38,12 +38,20 @@ export type NonLlmStage = (typeof NON_LLM_STAGES)[keyof typeof NON_LLM_STAGES];
 // truth shared with the infrastructure spend projection (U7).
 export const isLlmStage = isStageTag;
 
+// The shared stage-bracket signature (U1/U2). A bracket opens a named stage, runs the
+// work, and closes the stage — so a helper that receives one can attribute its inner
+// LLM port calls to fine STAGE_TAGS names without knowing about the reporter or operation
+// id. Threaded into assembleEnrichmentNodes and deduplicateDerivedNodes so the per-stage
+// wall-clock bracket keys to the SAME fine names the inner calls already tag their cost
+// with, closing the bottleneck-report join.
+export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: number) => Promise<T>;
+
 // Stage-bracket factory shared by every instrumented operation (R1). Open a stage, run
 // it, close it ok:true; a throw closes it ok:false, marks the OPERATION failed, and
 // rethrows — so a thrown stage always leaves a readable failed timeline without each
 // operation re-implementing the try/catch (and the failure semantics stay one source
 // of truth). `total` seeds an N-of-M heartbeat for stages that iterate.
-export function bracketStage(reporter: RunProgressReporterPort, operationId: string) {
+export function bracketStage(reporter: RunProgressReporterPort, operationId: string): StageBracket {
   return async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
     await reporter.enterStage({ operationId, stage, total });
     try {
@@ -57,3 +65,9 @@ export function bracketStage(reporter: RunProgressReporterPort, operationId: str
     }
   };
 }
+
+// Passthrough bracket: runs the work, opens/closes nothing. The default for a helper
+// called outside an instrumented operation (a direct unit test, or a caller that does
+// not thread a reporter) so the helper behaves byte-identically to its un-instrumented
+// self (U1/U2 opt-in seam, mirroring noopRunProgressReporter).
+export const passthroughStageBracket: StageBracket = (_stage, fn) => fn();

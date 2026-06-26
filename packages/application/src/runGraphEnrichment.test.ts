@@ -632,7 +632,8 @@ test("fails the run without persisting when an ordering draw throws", async () =
 // --- Node minting + rescue (sub-stages unchanged; ordering consumes their nodes) ------
 
 import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
+import { isStageTag } from "@lrnki/domain-core";
+import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 
 // A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
 // expand it with a rescued node and a minted node, then order all three together.
@@ -752,4 +753,55 @@ test("records the verbatim-floor grounding dispositions on the run", async () =>
   const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
   assert.ok(minted && rescued, "both enrichment node kinds survive the floor");
   assert.equal(layer.difficulties.length, layer.derivedNodes.length);
+});
+
+// --- U1/U2 integration: the enrichment timeline carries fine join-aligned stage names ----
+
+// AE1: a minting run's timeline names the fine rescue/mint stages and NO coarse `rescue-mint`.
+// Every enrichment LLM stage that fires is a STAGE_TAG, so the cost half of the bottleneck
+// join meets it on one key — the join-alignment contract (R1).
+test("U1 integration: a minting run's timeline uses fine names, never `rescue-mint`", async () => {
+  const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
+  const { reporter, calls } = recordingReporter();
+  await runGraphEnrichment({
+    enrichmentId: "e1", graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
+    missingPrerequisiteProposal: ports.proposalPort,
+    groundingGeneration: ports.groundingPort,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId,
+    reporter
+  });
+  const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
+  assert.ok(!entered.includes("rescue-mint"), "the coarse composite stage is gone");
+  assert.ok(entered.includes(STAGE_TAGS.missingPrerequisiteProposal));
+  assert.ok(entered.includes(STAGE_TAGS.groundingGeneration));
+  // Join-alignment: every entered stage that is not a non-LLM tail (symbolic-disposal,
+  // persist) is a STAGE_TAG, so its wall-clock joins the cost the LLM call self-tags.
+  const nonLlmTail = new Set(["symbolic-disposal", "persist"]);
+  const llmStages = entered.filter((stage) => !nonLlmTail.has(stage));
+  assert.ok(llmStages.every((stage) => isStageTag(stage)), `every LLM stage is a join key: ${llmStages.join(", ")}`);
+});
+
+// R1: a dedup-on run's timeline names node-embedding + node-merge-adjudication and NO `dedup`.
+test("U2 integration: a dedup-on run's timeline uses fine names, never `dedup`", async () => {
+  const ports = buildPorts();
+  const { reporter, calls } = recordingReporter();
+  const nodeEmbedding: NodeEmbeddingPort = {
+    model: "stub-embedding",
+    async embed(texts) { return texts.map(() => [1, 0]); }
+  };
+  const nodeMergeAdjudicator: NodeMergeAdjudicationPort = {
+    model: "stub-adjudicator",
+    async adjudicate() { return { decision: "keep_distinct", rationale: "" }; }
+  };
+  await run(ports, { reporter, nodeEmbedding, nodeMergeAdjudicator });
+  const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
+  assert.ok(!entered.includes("dedup"), "the coarse composite stage is gone");
+  assert.ok(entered.includes(STAGE_TAGS.nodeEmbedding));
+  assert.ok(entered.includes(STAGE_TAGS.nodeMergeAdjudication));
+  assert.equal(entered.filter((s) => s === STAGE_TAGS.nodeEmbedding).length, 1, "one embedding bracket");
+  assert.equal(entered.filter((s) => s === STAGE_TAGS.nodeMergeAdjudication).length, 1, "one adjudication bracket");
 });

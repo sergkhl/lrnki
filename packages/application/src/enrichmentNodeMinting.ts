@@ -13,8 +13,10 @@ import type {
   MissingPrerequisiteProposalPort,
   RescueDurabilityJudgmentPort
 } from "@lrnki/ports";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
+import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
 
 // Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep minting
 // bounded so a thin source cannot explode into a runaway derived graph; both knobs
@@ -65,6 +67,11 @@ export async function assembleEnrichmentNodes(input: {
   mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
   bounds?: EnrichmentMintingBounds;
   newNodeId: () => string;
+  // Stage-bracket seam (U1): each inner LLM port call is wrapped with its fine STAGE_TAGS
+  // name so its wall-clock joins the cost the call already self-tags. The assembly is a
+  // sequential `await` loop, so only one bracket of a given name is ever open at once
+  // (KTD2/KTD3). Defaults to a passthrough so a direct unit test runs un-instrumented.
+  stage?: StageBracket;
 }): Promise<{
   rescuedNodes: SourceMentionedEnrichmentNode[];
   mintedNodes: LlmGroundedEnrichmentNode[];
@@ -72,6 +79,7 @@ export async function assembleEnrichmentNodes(input: {
   mintingDispositions: MintingDisposition[];
 }> {
   const bounds = input.bounds ?? DEFAULT_MINTING_BOUNDS;
+  const stage = input.stage ?? passthroughStageBracket;
 
   // A label is "taken" when an anchor, a rescued node, or an already-minted node in
   // the same Declared Domain already carries it — the single dedupe authority for the
@@ -134,11 +142,13 @@ export async function assembleEnrichmentNodes(input: {
       existing.push({ canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes });
       anchorsByDomain.set(anchor.declaredDomain, existing);
     }
-    const judged = await applyRescueDurabilityJudge({
-      rescuedNodes: aggregatedRescuedNodes,
-      anchorsByDomain,
-      judge: input.rescueDurabilityJudge
-    });
+    const judged = await stage(STAGE_TAGS.rescueDurability, () =>
+      applyRescueDurabilityJudge({
+        rescuedNodes: aggregatedRescuedNodes,
+        anchorsByDomain,
+        judge: input.rescueDurabilityJudge!
+      })
+    );
     rescuedNodes = judged.keptNodes;
     rescueDispositions = judged.dispositions;
   }
@@ -153,12 +163,14 @@ export async function assembleEnrichmentNodes(input: {
     if (runBudget <= 0) break;
     const maxProposals = Math.min(bounds.maxMintedPerAnchor, runBudget);
     const existingLabels = labelsInDomain(takenByDomain, anchor.declaredDomain, input, rescuedNodes, mintedNodes);
-    const proposals = await input.proposalPort.propose({
-      declaredDomain: anchor.declaredDomain,
-      anchor: { conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes },
-      existingNodeLabels: existingLabels,
-      maxProposals
-    });
+    const proposals = await stage(STAGE_TAGS.missingPrerequisiteProposal, () =>
+      input.proposalPort.propose({
+        declaredDomain: anchor.declaredDomain,
+        anchor: { conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes },
+        existingNodeLabels: existingLabels,
+        maxProposals
+      })
+    );
 
     const reserved: ReservedMintingProposal[] = [];
     for (const proposal of proposals) {
@@ -182,7 +194,9 @@ export async function assembleEnrichmentNodes(input: {
     }
 
     const keptProposals = input.mintingDurabilityJudge && reserved.length > 0
-      ? await applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge })
+      ? await stage(STAGE_TAGS.mintingDurability, () =>
+          applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge! })
+        )
       : { keptProposals: reserved, dispositions: [] };
     mintingDispositions.push(...keptProposals.dispositions);
     // A `dropped` verdict is scoped to THIS anchor, so release the label: a later
@@ -196,12 +210,14 @@ export async function assembleEnrichmentNodes(input: {
     let mintedForAnchor = 0;
     for (const proposal of keptProposals.keptProposals) {
       if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) break;
-      const groundingBundle = await input.groundingPort.generate({
-        derivedNodeId: proposal.derivedNodeId,
-        declaredDomain: anchor.declaredDomain,
-        nodeLabel: proposal.proposedLabel,
-        scaffoldedAnchors: [{ conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }]
-      });
+      const groundingBundle = await stage(STAGE_TAGS.groundingGeneration, () =>
+        input.groundingPort.generate({
+          derivedNodeId: proposal.derivedNodeId,
+          declaredDomain: anchor.declaredDomain,
+          nodeLabel: proposal.proposedLabel,
+          scaffoldedAnchors: [{ conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }]
+        })
+      );
       mintedNodes.push({
         nodeKind: "enrichment",
         derivedNodeId: proposal.derivedNodeId,

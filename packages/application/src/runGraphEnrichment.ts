@@ -211,43 +211,46 @@ export async function runGraphEnrichment(input: {
   let rescueDispositions: RescueDisposition[] = [];
   let mintingDispositions: MintingDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
-    await runStage("rescue-mint", async () => {
-      const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
-      const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
-        conceptId: concept.conceptId,
-        canonicalLabel: concept.canonicalLabel,
-        normalizedLabel: concept.normalizedLabel,
-        declaredDomain: concept.declaredDomain,
-        definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
-      }));
-      const assembled = await assembleEnrichmentNodes({
-        anchors: mintingAnchors,
-        rescueCandidates,
-        proposalPort: input.missingPrerequisiteProposal!,
-        groundingPort: input.groundingGeneration!,
-        rescueDurabilityJudge: input.rescueDurabilityJudge,
-        mintingDurabilityJudge: input.mintingDurabilityJudge,
-        bounds: config.mintingBounds,
-        newNodeId
-      });
-      rescueDispositions = assembled.rescueDispositions;
-      mintingDispositions = assembled.mintingDispositions;
-      input.onMintingSummary?.({
-        accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
-        dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
-        unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
-      });
-      // The floor verifies source_mentioned passages verbatim against their cited block
-      // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
-      // does not verify is dropped before it can enter the derived layer.
-      const blockTextById = new Map<string, string>();
-      for (const candidate of rescueCandidates) {
-        for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
-      }
-      const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
-      enrichmentNodes = floored.nodes;
-      groundingDispositions = floored.dispositions;
+    // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
+    // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
+    // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
+    // and LLM-free — they need no stage row (they carry no spend to join).
+    const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
+    const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
+      conceptId: concept.conceptId,
+      canonicalLabel: concept.canonicalLabel,
+      normalizedLabel: concept.normalizedLabel,
+      declaredDomain: concept.declaredDomain,
+      definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
+    }));
+    const assembled = await assembleEnrichmentNodes({
+      anchors: mintingAnchors,
+      rescueCandidates,
+      proposalPort: input.missingPrerequisiteProposal!,
+      groundingPort: input.groundingGeneration!,
+      rescueDurabilityJudge: input.rescueDurabilityJudge,
+      mintingDurabilityJudge: input.mintingDurabilityJudge,
+      bounds: config.mintingBounds,
+      newNodeId,
+      stage: runStage
     });
+    rescueDispositions = assembled.rescueDispositions;
+    mintingDispositions = assembled.mintingDispositions;
+    input.onMintingSummary?.({
+      accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
+      dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
+      unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
+    });
+    // The floor verifies source_mentioned passages verbatim against their cited block
+    // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
+    // does not verify is dropped before it can enter the derived layer.
+    const blockTextById = new Map<string, string>();
+    for (const candidate of rescueCandidates) {
+      for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
+    }
+    const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
+    enrichmentNodes = floored.nodes;
+    groundingDispositions = floored.dispositions;
   }
 
   const assembledNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
@@ -263,31 +266,32 @@ export async function runGraphEnrichment(input: {
   let nodeMerges: NodeMergeRecord[] = [];
   let absorbedGroundingByCanonical = new Map<string, string[]>();
   if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
-    await runStage("dedup", async () => {
-      // Reduce each node to its dedup context from the SAME contextOf reduction the judge
-      // uses (label + verbatim definition/mention quotes), without absorbed grounding yet.
-      const dedupContext = new Map<string, DedupNodeContext>(
-        assembledNodes.map((node) => {
-          const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
-          return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
-        })
-      );
-      let unavailable = 0;
-      const result = await deduplicateDerivedNodes({
-        nodes: assembledNodes,
-        contextByNodeId: dedupContext,
-        embedding: input.nodeEmbedding,
-        adjudicator: input.nodeMergeAdjudicator,
-        config: config.dedup,
-        onUnavailable: () => {
-          unavailable += 1;
-        }
-      });
-      allNodes = result.nodes;
-      nodeMerges = result.merges;
-      absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
-      input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
+    // No coarse `dedup` bracket: deduplicateDerivedNodes brackets its two phases onto the
+    // fine `node-embedding` / `node-merge-adjudication` names (U2), so wall-clock joins the
+    // cost the embedding + adjudication calls already self-tag. Building the dedup context
+    // is deterministic and LLM-free — no stage row.
+    const dedupContext = new Map<string, DedupNodeContext>(
+      assembledNodes.map((node) => {
+        const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
+        return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
+      })
+    );
+    let unavailable = 0;
+    const result = await deduplicateDerivedNodes({
+      nodes: assembledNodes,
+      contextByNodeId: dedupContext,
+      embedding: input.nodeEmbedding,
+      adjudicator: input.nodeMergeAdjudicator,
+      config: config.dedup,
+      onUnavailable: () => {
+        unavailable += 1;
+      },
+      stage: runStage
     });
+    allNodes = result.nodes;
+    nodeMerges = result.merges;
+    absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
+    input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
   }
 
   // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
