@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assembleProfiles, toRunSummary } from "./PostgresInspectionRead";
+import { assembleIdentityDecisions, assembleProfiles, toRunSummary } from "./PostgresInspectionRead";
 
 // U6 test scenario 3: run summaries report profile completeness and evidence
 // counts rather than verified/rejected claim counts. The summary mapper is pure.
@@ -55,4 +55,49 @@ test("assembleProfiles splits definitions/mentions and resolves assertion target
   // An admitted Concept left without a definition is surfaced as incomplete.
   assert.equal(profiles[1].complete, false);
   assert.equal(profiles[1].definitions.length, 0);
+});
+
+// U4 test scenario: the identity-decision stitch maps merge/distinct/quarantine rows
+// into the view with both labels, survivor, proposing score, rationale, and model.
+test("assembleIdentityDecisions maps merge, distinct, and quarantine rows", () => {
+  const views = assembleIdentityDecisions([
+    {
+      outcome: "merge", rationale: "owner ≈ ownership",
+      subject: { declaredDomain: "rust programming", survivorNormalizedLabel: "ownership", members: [
+        { normalizedLabel: "ownership", canonicalLabel: "Ownership" },
+        { normalizedLabel: "owner", canonicalLabel: "Owner" }
+      ] },
+      provenance: { proposingScore: 0.91, decidingModel: "gpt-oss-120b" }
+    },
+    {
+      outcome: "distinct", rationale: "demand ≠ demography",
+      subject: { declaredDomain: "economics", survivorNormalizedLabel: null, members: [
+        { normalizedLabel: "demand", canonicalLabel: "Demand" },
+        { normalizedLabel: "demography", canonicalLabel: "Demography" }
+      ] },
+      provenance: { proposingScore: 0.72, decidingModel: "gpt-oss-120b" }
+    },
+    {
+      outcome: "quarantine", rationale: "two published collide",
+      subject: { declaredDomain: "economics", survivorNormalizedLabel: null, members: [
+        { normalizedLabel: "tradeone", canonicalLabel: "Trade One" },
+        { normalizedLabel: "tradetwo", canonicalLabel: "Trade Two" }
+      ] },
+      provenance: { proposingScore: 0.95, decidingModel: "gpt-oss-120b" }
+    }
+  ]);
+
+  assert.equal(views.length, 3);
+  assert.deepEqual(views[0], {
+    outcome: "merge", declaredDomain: "rust programming", survivorLabel: "Ownership",
+    absorbedLabels: ["Owner"], proposingScore: 0.91, rationale: "owner ≈ ownership", decidingModel: "gpt-oss-120b"
+  });
+  assert.equal(views[1].survivorLabel, null, "a distinct decision has no survivor");
+  assert.deepEqual(views[1].absorbedLabels, ["Demand", "Demography"]);
+  assert.equal(views[2].outcome, "quarantine");
+  assert.deepEqual(views[2].absorbedLabels, ["Trade One", "Trade Two"]);
+});
+
+test("assembleIdentityDecisions returns an empty list for no rows (not an error)", () => {
+  assert.deepEqual(assembleIdentityDecisions([]), []);
 });
