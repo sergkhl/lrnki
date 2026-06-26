@@ -2,13 +2,7 @@
 
 ## TODO
 
-1. **Stabilize whole-set ordering label fidelity before another end-to-end journey run.** Two real
-   Rust enrichment attempts on June 25 failed closed because ordering returned labels outside the
-   judged node set (`LIFO`; `Heap memory allocation` / `String Type`). Classify and research this
-   constrained-generation/entity-linking defect under rule 21 before changing prompts or validation;
-   preserve the fail-closed boundary and avoid fixture-specific aliases.
-
-2. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
+1. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
    measurement on the AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to
    an *in-window mis-pick* (defining block already in the extractor's window, but it quoted a
    passing-mention / heading / title / citation instead; zero retrieval-window misses, zero genuine
@@ -21,25 +15,25 @@
    clause underperforms
    ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 
-3. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
+2. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
    instrument found zero retrieval-window misses on the AIRA-dojo fixture, so replacing the
    adjacency/sibling-cap heuristics recovers nothing today. Revisit only behind a fresh requirements
    document and plan — the earlier draft will drift as the in-window mis-pick fix above lands, so it
    is intentionally not linked here.
 
-4. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+3. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-5. **Improve operator observability.**
+4. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
 
-6. **Keep data-blocked and unearned methods deferred.**
+5. **Keep data-blocked and unearned methods deferred.**
    - Do not fit population difficulty, IRT, KT, or learner models from synthetic or self-assessed
      responses.
    - Do not reintroduce ungrounded graph densification or embedding-derived prerequisite structure.
@@ -107,6 +101,16 @@
   report; the former global cost path was removed. Decision:
   [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
+- **Whole-set ordering label fidelity (grounded-generation hardening).** The ordering edge contract
+  switched from free-text canonical-label echo to a 1-based ordinal index — a closed-set menu pick
+  over the `Concept 1..N` the prompt already shows. Per-call schema + validator are built from the
+  node count so the index bound `[1, N]` is enforced under strict decoding; a transient out-of-range
+  draw re-prompts once then fails closed, and the application resolves `number → derivedNodeId` by
+  position (the superseded `trim().toLowerCase()` label-matching path was deleted, rule 18). This is
+  the rule-21 root-cause fix for the grounded-generation / entity-linking defect where synonym drift
+  (`LIFO`→`Stack`) missed an exact label match and aborted whole runs. Real-use evidence in the
+  latest validation below.
+
 ## VALIDATION
 
 - **Latest consolidated suite, 2026-06-25:** full workspace typecheck and tests, ESLint (zero errors;
@@ -116,9 +120,17 @@
   (`c911bbd0-719b-4929-9a95-4240f18168c1`) produced 99 tagged calls, 302,157 tokens, and
   $0.03522072. Every per-stage calls/tokens/cost cell exactly reconciled with a manual
   `LiteLLM_SpendLogs` query. With `LITELLM_DATABASE_URL` absent, the same report retained 330,744 ms
-  of stage wall-clock and marked all cost fields unavailable. Whole-journey AE1/AE2 remains
-  unverified because two subsequent enrichment attempts failed on the ordering-label defect in TODO
-  #1; no cost-report defect was observed.
+  of stage wall-clock and marked all cost fields unavailable.
+- **Whole-set ordering label-fidelity fix + AE1/AE2 unblock, 2026-06-26.** Re-running the exact Rust
+  fixture that failed closed twice on June 25 (graph version `ce1f3b85`) now succeeds: enrichment
+  `c2e28622` committed 20 certain / 9 uncertain edges, `cycleRouted=0`, no "outside the listed"
+  abort. `Heap memory allocation` — one of the June-25 out-of-set misses — now binds by position;
+  inspected ordering is sane (`Ownership → {Borrowing, Move, Return Values}`; `The Stack and the
+  Heap → Heap memory allocation → Deep copy vs shallow copy → clone method`; `Pointers → References
+  → Borrowing`; foundations as roots, `Memory safety` a leaf). With enrichment unblocked, the
+  whole-journey `journey-cost-report` now stitches extraction → minting → enrichment end-to-end
+  (journey total wall=774.1s, 169 calls, 443,522 tokens, $0.0465; ordering stage 8 calls / $0.0071),
+  closing the previously-unverified AE1/AE2. Trail: `tmp/2026-06-26-ordering-number-fix/`.
 - **Latest real-use quality evidence:** the June 24 Definition-Passage quality run passed with the
   caveat recorded above; the June 24 K-sampled prerequisite-ordering run passed on real Rust and
   economics sources, surfacing unstable directions as `uncertain` while retaining robust edges.

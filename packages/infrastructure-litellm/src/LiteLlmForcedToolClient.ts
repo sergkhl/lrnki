@@ -20,10 +20,13 @@ export class LiteLlmForcedToolClient {
   // composition root chooses the policy, not this transport.
   constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number; temperature?: number; seed?: number }) {}
 
-  async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }): Promise<T> {
+  async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[]; maxRetries?: number }): Promise<T> {
     // Retry budget for transient model deviations (zero/multiple tool calls,
-    // malformed arguments, network blips). Fail closed once exhausted.
-    const maxRetries = this.options.maxRetries ?? 2;
+    // malformed arguments, network blips) — a Zod validation failure inside
+    // `callOnce` throws into this loop and re-prompts. A per-call `maxRetries`
+    // lets one stage tighten the budget (e.g. ordering: first call + one corrective
+    // re-prompt); otherwise fall back to the constructor value. Fail closed once exhausted.
+    const maxRetries = input.maxRetries ?? this.options.maxRetries ?? 2;
     let lastError: unknown;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {

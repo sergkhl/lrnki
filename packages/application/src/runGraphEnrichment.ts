@@ -357,21 +357,22 @@ export async function runGraphEnrichment(input: {
         throw new Error(`runGraphEnrichment: domain "${declaredDomain}" assembled ordering prompt (~${promptChars} chars) exceeds the budget (${config.maxDomainPromptChars}); failing closed without a partial layer (R16).`);
       }
 
-      // Canonical labels are unique within a domain after dedup (KTD3), so label → id is
-      // well-defined. Matching is case-insensitive + trimmed; an edge endpoint matching no
-      // node, or naming one concept as its own prerequisite, is rejected fail-closed (rule 6).
-      const idByLabel = new Map<string, string>(sorted.map((node) => [normalizeLabel(node.context.canonicalLabel), node.derivedNodeId]));
+      // The judge cites endpoints by the 1-based Concept number shown in the prompt, which
+      // is `sorted`'s position (KTD3). Resolution is a deterministic array lookup — no string
+      // matching, no synonym drift surface. The per-call validator already bounds the index to
+      // [1, N] and rejects equal endpoints, but this deterministic boundary owns the provable
+      // guarantee: an out-of-range or self-referential number is rejected fail-closed (rule 6).
       const mapDraw = (ordering: WholeSetOrdering): { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string; rationale: string }[] =>
         ordering.edges.map((edge) => {
-          const prerequisiteDerivedNodeId = idByLabel.get(normalizeLabel(edge.prerequisiteLabel));
-          const dependentDerivedNodeId = idByLabel.get(normalizeLabel(edge.dependentLabel));
-          if (!prerequisiteDerivedNodeId || !dependentDerivedNodeId) {
-            throw new Error(`runGraphEnrichment: ordering edge cites a label not in domain "${declaredDomain}" ("${edge.prerequisiteLabel}" → "${edge.dependentLabel}"); failing closed (rule 6).`);
+          const prerequisite = sorted[edge.prerequisiteNumber - 1];
+          const dependent = sorted[edge.dependentNumber - 1];
+          if (!prerequisite || !dependent) {
+            throw new Error(`runGraphEnrichment: ordering edge cites a number outside the listed concepts of domain "${declaredDomain}" (${edge.prerequisiteNumber} → ${edge.dependentNumber}, of ${sorted.length}); failing closed (rule 6).`);
           }
-          if (prerequisiteDerivedNodeId === dependentDerivedNodeId) {
-            throw new Error(`runGraphEnrichment: ordering edge names one concept as its own prerequisite in domain "${declaredDomain}" ("${edge.prerequisiteLabel}"); failing closed (rule 6).`);
+          if (prerequisite.derivedNodeId === dependent.derivedNodeId) {
+            throw new Error(`runGraphEnrichment: ordering edge names one concept as its own prerequisite in domain "${declaredDomain}" (number ${edge.prerequisiteNumber}); failing closed (rule 6).`);
           }
-          return { prerequisiteDerivedNodeId, dependentDerivedNodeId, rationale: edge.rationale };
+          return { prerequisiteDerivedNodeId: prerequisite.derivedNodeId, dependentDerivedNodeId: dependent.derivedNodeId, rationale: edge.rationale };
         });
 
       // K independent draws on the SAME frozen input (D1). mapWithConcurrency preserves
@@ -574,11 +575,6 @@ function deterministicUuid(...parts: string[]): string {
 // excluded from the ordering input and recorded once (R4).
 const hasEvidence = (context: PrerequisiteConceptContext): boolean =>
   context.definitions.length > 0 || context.mentions.length > 0;
-
-// Canonical-label matching for the edge label → id mapping (KTD3): trimmed,
-// case-insensitive. Labels are unique within a Declared Domain after dedup, so this is
-// well-defined; an unmatched edge endpoint fails closed in the boundary (rule 6).
-const normalizeLabel = (label: string): string => label.trim().toLowerCase();
 
 // Stable directed-edge key for cycle-routing set membership.
 const edgeId = (edge: Pick<InferredPrerequisiteEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">): string =>

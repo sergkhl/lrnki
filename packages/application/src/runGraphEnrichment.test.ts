@@ -114,28 +114,36 @@ type OrderInput = { declaredDomain: string; nodes: PrerequisiteConceptContext[] 
 // A responder maps (call input, DRAW index within that domain) → one draw's ordering.
 type Responder = (input: OrderInput, drawIndex: number) => WholeSetOrdering;
 
-// A canned edge over two canonical labels; only edges whose endpoints are in the call's
-// node set are emitted (mirrors a sane model). The model's self-reported `confidence` is
-// NO LONGER the edge confidence (D4 replaces it with consensus max(f,r)/K), so it is
-// cosmetic here.
-function edgeOf(prerequisiteLabel: string, dependentLabel: string, confidence = 0.9, rationale = "mock"): WholeSetOrdering["edges"][number] {
+// Tests author canned edges by LABEL for readability; `presentEdges` converts each label
+// to the 1-based Concept number the real ordering contract now uses (the model cites the
+// position shown in the prompt — see WholeSetPrerequisiteEdge). An edge whose endpoint is
+// not in the call's node set is dropped (mirrors a sane model). The model's self-reported
+// `confidence` is NO LONGER the edge confidence (D4 replaces it with consensus
+// max(f,r)/K), so it is cosmetic here.
+type LabelEdge = { prerequisiteLabel: string; dependentLabel: string; confidence: number; rationale: string };
+function edgeOf(prerequisiteLabel: string, dependentLabel: string, confidence = 0.9, rationale = "mock"): LabelEdge {
   return { prerequisiteLabel, dependentLabel, confidence, rationale };
 }
-function presentEdges(input: OrderInput, edges: WholeSetOrdering["edges"]): WholeSetOrdering {
-  const labels = new Set(input.nodes.map((n) => n.canonicalLabel));
-  return { edges: edges.filter((e) => labels.has(e.prerequisiteLabel) && labels.has(e.dependentLabel)) };
+function presentEdges(input: OrderInput, edges: LabelEdge[]): WholeSetOrdering {
+  const numberOf = (label: string): number => input.nodes.findIndex((n) => n.canonicalLabel === label) + 1;
+  return {
+    edges: edges
+      .map((e) => ({ prerequisiteNumber: numberOf(e.prerequisiteLabel), dependentNumber: numberOf(e.dependentLabel), confidence: e.confidence, rationale: e.rationale }))
+      // findIndex(...) + 1 === 0 means the label is not in the node set: drop that edge.
+      .filter((e) => e.prerequisiteNumber > 0 && e.dependentNumber > 0)
+  };
 }
 
 // Build K draws for one domain: `segments` lists [edges, repeat] in order; remaining draws
 // up to K are empty. Lets a test express "this edge appears in 6 of 8 draws" directly.
-function drawsOf(k: number, segments: Array<[WholeSetOrdering["edges"], number]>): WholeSetOrdering["edges"][] {
-  const out: WholeSetOrdering["edges"][] = [];
+function drawsOf(k: number, segments: Array<[LabelEdge[], number]>): LabelEdge[][] {
+  const out: LabelEdge[][] = [];
   for (const [edges, repeat] of segments) for (let i = 0; i < repeat; i++) out.push(edges);
   while (out.length < k) out.push([]);
   return out.slice(0, k);
 }
 // A responder driven by a per-domain script of per-draw edge lists.
-function scriptResponder(perDomain: Record<string, WholeSetOrdering["edges"][]>): Responder {
+function scriptResponder(perDomain: Record<string, LabelEdge[][]>): Responder {
   return (input, drawIndex) => presentEdges(input, perDomain[input.declaredDomain]?.[drawIndex] ?? []);
 }
 
@@ -460,7 +468,7 @@ test("replay: the same draw multiset in different orders yields identical pairVo
   const rev = edgeOf("X One", "X Two");
   const orderA = buildPorts({ responder: scriptResponder({ x: drawsOf(K, [[[fwd], 5], [[rev], 3]]) }) });
   // Same multiset (5 forward, 3 reverse), interleaved differently.
-  const interleaved: WholeSetOrdering["edges"][] = [[rev], [fwd], [rev], [fwd], [rev], [fwd], [fwd], [fwd]];
+  const interleaved: LabelEdge[][] = [[rev], [fwd], [rev], [fwd], [rev], [fwd], [fwd], [fwd]];
   const orderB = buildPorts({ responder: scriptResponder({ x: interleaved }) });
   const layerA = await run(orderA);
   const layerB = await run(orderB);
@@ -507,19 +515,20 @@ test("fails closed without persisting when a domain exceeds the token budget", a
   assert.equal(ports.getPersistCalls(), 0, "no partial layer persisted");
 });
 
-// R9: an edge citing a label not in the judged set is rejected fail-closed, never guessed.
-test("rejects an edge citing a label outside the judged set (rule 6)", async () => {
+// R9: an edge citing a number outside the judged set is rejected fail-closed, never guessed.
+// The boundary owns the provable guarantee even if a draw slipped past the per-call validator.
+test("rejects an edge citing a number outside the judged set (rule 6)", async () => {
   const responder: Responder = (input) =>
-    input.declaredDomain === "x" ? { edges: [edgeOf("X One", "Nonexistent Concept")] } : { edges: [] };
+    input.declaredDomain === "x" ? { edges: [{ prerequisiteNumber: 1, dependentNumber: 99, confidence: 0.9, rationale: "mock" }] } : { edges: [] };
   const ports = buildPorts({ responder });
-  await assert.rejects(() => run(ports), /cites a label not in domain/);
+  await assert.rejects(() => run(ports), /outside the listed/);
   assert.equal(ports.getPersistCalls(), 0);
 });
 
 // R9: an edge naming one concept as its own prerequisite is rejected fail-closed.
 test("rejects a self-edge (one concept as its own prerequisite)", async () => {
   const responder: Responder = (input) =>
-    input.declaredDomain === "x" ? { edges: [edgeOf("X One", "X One")] } : { edges: [] };
+    input.declaredDomain === "x" ? { edges: [{ prerequisiteNumber: 1, dependentNumber: 1, confidence: 0.9, rationale: "mock" }] } : { edges: [] };
   const ports = buildPorts({ responder });
   await assert.rejects(() => run(ports), /its own prerequisite/);
   assert.equal(ports.getPersistCalls(), 0);
