@@ -12,10 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [2026-06-26-001 — fix: rescue definition-bearing optional concepts into the derived layer]
-  (./2026-06-26-001-fix-rescue-seam-derived-grounding-plan.md) — U1–U5 (code) shipped on branch
-  `fix/rescue-seam-derived-grounding`; U6 (reset + clean seed) and U7 (real-source + e2e rule-14
-  verification) remain. Status in [TODO #1](./TODO.md).
+_None in progress._
 
 ## Ownership rules
 

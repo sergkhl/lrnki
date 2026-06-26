@@ -2,31 +2,20 @@
 
 ## TODO
 
-1. **Finish the rescue-seam derived-grounding fix (U6/U7).** U1–U5 shipped on branch
-   `fix/rescue-seam-derived-grounding`: definition-bearing `optional` candidates are now rescued into
-   the Derived Graph Layer as `source_mentioned` nodes carrying their verbatim definition + mention
-   passages (the inverted `nonCoreRescueCandidates` "no definition" predicate was flipped, promoting
-   `optional` only and keeping `reject` mention-only), the verbatim floor verifies rescued definitions,
-   study items inherit `source_mentioned` provenance, and the Study surfaces expose `studyItemCount`
-   and guard against empty sessions. Remaining: hard-reset the polluted run history and drive one clean
-   full-manifest seed (U6), then real-source + end-to-end learner-loop rule-14 verification (U7) — both
-   need a live Postgres + LiteLLM and the real provider key (AGENTS rule 5/13/14). Plan:
-   [2026-06-26-001](2026-06-26-001-fix-rescue-seam-derived-grounding-plan.md).
-
-2. **Resolve the CEP definition-passage mis-pick follow-up.** The prompt-side clause is implemented,
+1. **Resolve the CEP definition-passage mis-pick follow-up.** The prompt-side clause is implemented,
    and the unblocked first-party A/B trail now exists at
    `tmp/2026-06-25-cep-defn-retrieval/`. Decide from that evidence whether the clause is sufficient,
    needs a repaired measurement pass, or should escalate to re-pick-on-veto / a stronger extractor
    ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 
-3. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-4. **Improve operator observability.**
+3. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
@@ -62,6 +51,17 @@
   [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md),
   [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), and
   [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
+
+- **Rescue-seam derived grounding (reuse over re-mint).** The publication→enrichment seam no longer
+  discards source-grounded `optional` evidence: definition-bearing `optional` candidates are rescued
+  into the Derived Graph Layer as `source_mentioned` Enrichment Nodes carrying their verbatim
+  definition and mention passages (the inverted "no definition" rescue predicate was flipped,
+  `reject`-tier stays mention-only), the verbatim floor hard-gates rescued definitions, study items
+  inherit `source_mentioned` provenance, and the Study surfaces expose `studyItemCount` and guard
+  empty sessions. Minting now falls to a genuine source-absent residue instead of re-extracting
+  optional CEPs at the lowest trust tier. Decisions:
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md) and
+  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
 
 - **Learner study loop.** Typed study items cover anchors and Enrichment Nodes through
   `derived_node_id`; option-select study is auto-graded; calibration uses mutable binary verdicts;
@@ -101,9 +101,22 @@
   typecheck, the recursive test suite (271 application incl. new definition-bearing rescue/floor/study
   cases, 38 live-PostgreSQL incl. a new R1/R2 rescue-read case proving optional definitions are reused
   while reject definitions stay excluded, 86 admin-lab), ESLint (0 errors; 5 pre-existing warnings), and
-  the admin-lab build are green. Deterministic-envelope evidence only ([ADR-0013]
-  (../adr/0013-verify-quality-by-real-source-inspection.md)); the rule-14 grounding-density and
-  end-to-end learner-loop quality claims await the U6/U7 seed + real-source inspection (TODO #1).
+  the admin-lab build are green.
+- **Rescue-seam fix U6/U7 real-source inspection, 2026-06-26 (rule 13/14).** Hard reset + a clean
+  markdown-only full-manifest seed (3 domains; graph version `41543df0`, enrichment `c6c558eb`)
+  confirmed the grounding upgrade on inspected real model output. Rust domain vs the pre-fix baseline
+  `c2e28622`: `source_mentioned` rescued nodes **1 → 10**, `llm_grounded` minted nodes **12 → 4**;
+  all-domain source-grounded share 39/51 (76%). Rescued nodes carry verbatim definition + mention
+  passages (floor `disposition=verified`; manually re-confirmed verbatim across markdown blockquote,
+  emphasis, and LaTeX cases — the only non-matches were checker-side normalization artifacts). The
+  Rust minted residue (4 nodes) is disjoint from the 25-concept rescue-eligible optional pool, so
+  minting fell to a genuine source-absent residue (R3). Study-item provenance tracks node grounding
+  (`document_anchored`→`source_cep` 30 / `source_mentioned`→`source_mentioned` 38 with verbatim
+  citations / `llm_grounded`→`generated` 23; R5). The learner loop runs end-to-end: synthetic
+  responses auto-graded with a realistic objective spread, mastery folded from graded scores at
+  threshold 0.7, and a correctly-answered node crossing into mastered — the apparent "frontier did
+  not advance" is correct conservative behavior (graded 0.5 < 0.7 keeps the next target), and
+  `compute-adaptive-path` is untouched by this branch. Trail: `tmp/2026-06-26-rescue-seam/`.
 - **Latest consolidated suite, 2026-06-26:** full workspace typecheck and tests (262 application,
   37 live PostgreSQL integration including a new shared-`operation_id` reporter regression), ESLint
   (zero errors; five pre-existing warnings) are green.
