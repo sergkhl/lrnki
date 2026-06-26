@@ -12,6 +12,11 @@ set -euo pipefail
 DB_URL="${DATABASE_URL:-postgresql://lrnki:lrnki@localhost:5432/lrnki}"
 export DATABASE_URL="$DB_URL"
 
+# Optional manifest override (defaults to the full curated manifest). Lets a seed run be
+# scoped to a subset of fixtures (e.g. markdown-only, to skip CPU Docling PDF conversion)
+# without editing the curated fixtures/manifest.json.
+SEED_MANIFEST="${SEED_MANIFEST:-fixtures/manifest.json}"
+
 # Scalar query helper: one value, no headers/alignment, whitespace trimmed.
 psql_scalar() {
   psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c "$1" | tr -d '[:space:]'
@@ -35,7 +40,8 @@ step "1/8 reset database (DROP SCHEMA + migrate)"
 scripts/reset-db.sh
 
 step "2/8 register fixtures from manifest"
-pnpm worker:kg register-from-manifest
+echo "   manifest: $SEED_MANIFEST"
+pnpm worker:kg register-from-manifest "$SEED_MANIFEST"
 
 step "3/8 run extraction over all registered sources (real LLM calls)"
 pnpm worker:kg run-extraction --all

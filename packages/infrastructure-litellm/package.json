@@ -10,8 +10,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@lrnki/application": "workspace:*",
     "@lrnki/domain-core": "workspace:*",
     "@lrnki/ports": "workspace:*",
+    "postgres": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

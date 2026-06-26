@@ -1,5 +1,9 @@
 import { deepStripNullBytes } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ZodType } from "zod";
+
+installNodeOperationTagContext();
 
 export type JsonSchema = Record<string, unknown>;
 export type ToolMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -16,10 +20,13 @@ export class LiteLlmForcedToolClient {
   // composition root chooses the policy, not this transport.
   constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number; temperature?: number; seed?: number }) {}
 
-  async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }): Promise<T> {
+  async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[]; maxRetries?: number }): Promise<T> {
     // Retry budget for transient model deviations (zero/multiple tool calls,
-    // malformed arguments, network blips). Fail closed once exhausted.
-    const maxRetries = this.options.maxRetries ?? 2;
+    // malformed arguments, network blips) — a Zod validation failure inside
+    // `callOnce` throws into this loop and re-prompts. A per-call `maxRetries`
+    // lets one stage tighten the budget (e.g. ordering: first call + one corrective
+    // re-prompt); otherwise fall back to the constructor value. Fail closed once exhausted.
+    const maxRetries = input.maxRetries ?? this.options.maxRetries ?? 2;
     let lastError: unknown;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -39,6 +46,8 @@ export class LiteLlmForcedToolClient {
   }
 
   private async callOnce<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }): Promise<T> {
+    const operationTag = currentOperationTag();
+    const tags = [...(input.tags ?? []), ...(operationTag ? [operationTag] : [])];
     const response = await fetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },
@@ -50,13 +59,9 @@ export class LiteLlmForcedToolClient {
         tool_choice: { type: "function", function: { name: input.toolName } },
         ...(this.options.temperature !== undefined ? { temperature: this.options.temperature } : {}),
         ...(this.options.seed !== undefined ? { seed: this.options.seed } : {}),
-        // Per-call stage tag (KTD4): LiteLLM consumes `metadata.tags` for spend
-        // attribution via `/spend/tags` and `LiteLLM_SpendLogs`. The transport stays a
-        // neutral forwarder — it never reads, sums, or persists usage; the app only
-        // labels. Omitted entirely when no tag travels, so no empty `metadata` key is
-        // ever sent. `metadata` is a proxy field, not a provider param, so `drop_params`
-        // does not strip it.
-        ...(input.tags && input.tags.length ? { metadata: { tags: input.tags } } : {})
+        // LiteLLM persists the per-call stage tag plus the ambient operation tag in
+        // `LiteLLM_SpendLogs`. The transport only labels requests; it never owns usage.
+        ...(tags.length ? { metadata: { tags } } : {})
       })
     });
     if (!response.ok) throw new LiteLlmHttpError(response.status);

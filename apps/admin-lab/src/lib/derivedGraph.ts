@@ -6,155 +6,30 @@
 // textual node-and-edge representation (U6 test scenario 8).
 
 import { prerequisiteAncestors, type AdaptedNodeClassification, type AdaptedNodeState } from "@lrnki/application";
-
-export type DerivedNodeKind = "anchor" | "enrichment";
-export type DerivedGroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
-
-// One grounding passage of an enrichment node, as the inspector shows it: generated
-// text for `llm_grounded`, verbatim source quote for `source_mentioned`.
-export interface GroundingPassageView {
-  passageType: "definition" | "mention";
-  text: string;
-  groundingOrigin: DerivedGroundingOrigin;
-}
-
-// The grounding bundle of one enrichment node (R8, R15) plus the recorded verbatim-
-// floor disposition (R9, AE3). `verbatimDisposition` is `not_applicable_by_grounding`
-// for a minted `llm_grounded` node and `verified` for a rescued `source_mentioned`
-// node — surfaced, never silent.
-export interface NodeGroundingView {
-  generatingModel: string | null;
-  rationale: string | null;
-  passages: GroundingPassageView[];
-  verbatimDisposition: string;
-}
-
-export interface DerivedGraphNode {
-  derivedNodeId: string;
-  label: string;
-  // Alternate surface labels for this concept; the goal-first picker searches them
-  // alongside the canonical label (R1).
-  aliases: string[];
-  declaredDomain: string;
-  difficulty: number | null;
-  // The difficulty judge's generated rationale for this node's score (R6). `null` when
-  // the node has no persisted difficulty row; empty string for a structural-only score.
-  // Always labeled as a generated rationale in the UI, never as a source quote.
-  difficultyRationale: string | null;
-  // Anchor (a projection of an asserted Concept) vs enrichment (minted/rescued, R15).
-  nodeKind: DerivedNodeKind;
-  groundingOrigin: DerivedGroundingOrigin;
-  role: "anchor" | "prerequisite";
-  // Whether any study item exists for this derived node. An enrichment-level fact loaded
-  // once in `getEnrichmentDetail`, so an itemless node is rendered and flagged.
-  hasStudyItem: boolean;
-  // Present only for enrichment nodes; anchors carry their CEP in the published view.
-  grounding: NodeGroundingView | null;
-}
-
-export interface DerivedGraphEdge {
-  prerequisiteDerivedNodeId: string;
-  dependentDerivedNodeId: string;
-  confidence: number;
-  uncertain: boolean;
-  // Which judge model ordered this pair (U5): the cross-family generated-node alias
-  // for a pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
-  judgeModel: string;
-}
-
-// Per-Declared-Domain origin counts over the derived node space (U5/AE1): how many
-// anchors, rescued `source_mentioned`, and minted `llm_grounded` nodes the layer
-// holds in each domain — the provenance-pressure summary an operator reads first.
-export interface DomainOriginCounts {
-  domain: string;
-  anchor: number;
-  sourceMentioned: number;
-  llmGrounded: number;
-}
-
-// One recorded rescue-durability disposition (U3/U5). `accepted` nodes are in the
-// layer; `dropped` ones were vetoed (confident + grounded); `kept_judge_unavailable`
-// ones were kept-and-flagged on judge failure. Surfaced so an operator can audit why
-// each rescue candidate is (or is not) present.
-export interface RescueDispositionView {
-  derivedNodeId: string;
-  canonicalLabel: string;
-  declaredDomain: string;
-  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
-  rationale: string;
-  groundingSpan: string;
-}
-
-// One recorded minting-durability disposition. `accepted` proposals are minted as
-// llm_grounded nodes; `dropped` proposals never spend grounding generation and have no
-// node row; `kept_judge_unavailable` proposals are minted fail-open.
-export interface MintingDispositionView {
-  derivedNodeId: string;
-  proposedLabel: string;
-  declaredDomain: string;
-  anchorConceptId: string;
-  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
-  rationale: string;
-}
-
-// One recorded semantic merge (plan U5, R5). The embedding proposer surfaced two
-// same-domain near-duplicates and the cross-family adjudicator decided to collapse them;
-// the canonical node survived and the absorbed node (a snapshot — its derived_graph_nodes
-// row is gone) was folded in. Surfaced read-only so an operator audits every merge:
-// canonical ← absorbed, the proposing signal + score, the deciding rationale, and the
-// deterministic canonical-selection reason. Inspect, never recompute (rule 12).
-export interface NodeMergeView {
-  declaredDomain: string;
-  canonicalDerivedNodeId: string;
-  canonicalLabel: string;
-  absorbedLabel: string;
-  absorbedAliases: string[];
-  proposingSignal: string;
-  proposingScore: number;
-  rationale: string;
-  canonicalSelectionReason: string;
-}
-
-export interface EnrichmentSummary {
-  enrichmentId: string;
-  graphVersionId: string;
-  enrichmentConfigHash: string;
-  judgeModel: string;
-  difficultyMethod: string;
-  status: string;
-  edgeCount: number;
-  certainEdgeCount: number;
-  uncertainEdgeCount: number;
-  conceptCount: number;
-  startedAt: string;
-  completedAt: string | null;
-}
-
-export interface DerivedGraphDetail {
-  summary: EnrichmentSummary;
-  nodes: DerivedGraphNode[];
-  edges: DerivedGraphEdge[];
-  // Per-domain provenance summary, the rescue-durability dispositions, and the semantic
-  // merges (U5). All read from persisted artifacts; the UI never recomputes them (rule 12).
-  originCounts: DomainOriginCounts[];
-  rescueDispositions: RescueDispositionView[];
-  mintingDispositions: MintingDispositionView[];
-  merges: NodeMergeView[];
-}
-
-// Aggregate the derived node space into per-domain origin counts (U5/AE1). Pure and
-// unit-testable; the loader computes it from the persisted nodes, the UI only renders.
-export function summarizeOriginCounts(nodes: Pick<DerivedGraphNode, "declaredDomain" | "groundingOrigin">[]): DomainOriginCounts[] {
-  const byDomain = new Map<string, DomainOriginCounts>();
-  for (const node of nodes) {
-    const counts = byDomain.get(node.declaredDomain) ?? { domain: node.declaredDomain, anchor: 0, sourceMentioned: 0, llmGrounded: 0 };
-    if (node.groundingOrigin === "document_anchored") counts.anchor += 1;
-    else if (node.groundingOrigin === "source_mentioned") counts.sourceMentioned += 1;
-    else counts.llmGrounded += 1;
-    byDomain.set(node.declaredDomain, counts);
-  }
-  return [...byDomain.values()].sort((a, b) => a.domain.localeCompare(b.domain));
-}
+import type {
+  DerivedGraphDetail,
+  DerivedGraphEdge,
+  DerivedGraphNode,
+  DerivedGroundingOrigin,
+  DerivedNodeKind,
+  MintingDispositionView,
+  NodeGroundingView,
+  NodeMergeView
+} from "@lrnki/ports";
+export type {
+  DerivedGraphDetail,
+  DerivedGraphEdge,
+  DerivedGraphNode,
+  DerivedGroundingOrigin,
+  DerivedNodeKind,
+  DomainOriginCounts,
+  EnrichmentSummary,
+  GroundingPassageView,
+  MintingDispositionView,
+  NodeGroundingView,
+  NodeMergeView,
+  RescueDispositionView
+} from "@lrnki/ports";
 
 // Cytoscape element model plus the equivalent textual representation. The textual
 // form resolves both endpoints to labels so a non-visual reader (or a test) can

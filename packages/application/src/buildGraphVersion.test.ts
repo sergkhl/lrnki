@@ -1,8 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ArtifactEnvelope, BuildEvidenceProfile, GraphSnapshot, PublishedConceptIdentity, RunForBuild } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ExtractionRunStorePort, GraphVersionStorePort, RunProgressReporterPort } from "@lrnki/ports";
 import { buildGraphVersion } from "./buildGraphVersion";
+import { NON_LLM_STAGES } from "./runProgressReporter";
+
+installNodeOperationTagContext();
 
 type ReporterCall =
   | { method: "beginOperation"; operationType: string; operationId: string }
@@ -209,7 +214,7 @@ test("a thrown build gate closes the open stage ok:false and reports completeOpe
   );
 
   assert.deepEqual(calls[0], { method: "beginOperation", operationType: "minting", operationId: "gv-1" });
-  assert.ok(calls.some((c) => c.method === "completeStage" && (c as { stage: string; ok: boolean }).stage === "load" && (c as { ok: boolean }).ok === false));
+  assert.ok(calls.some((c) => c.method === "completeStage" && (c as { stage: string; ok: boolean }).stage === NON_LLM_STAGES.load && (c as { ok: boolean }).ok === false));
   assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "failed" });
   assert.ok(!calls.some((c) => c.method === "completeOperation" && (c as { status: string }).status === "succeeded"));
 });
@@ -221,9 +226,31 @@ test("a clean build reports the three non-LLM stages and completeOperation succe
   await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, reporter });
 
   const stages = calls.filter((c) => c.method === "completeStage") as { stage: string; ok: boolean }[];
-  assert.deepEqual(stages.map((c) => c.stage), ["load", "refine", "persist"]);
+  assert.deepEqual(stages.map((c) => c.stage), [
+    NON_LLM_STAGES.load,
+    NON_LLM_STAGES.refine,
+    NON_LLM_STAGES.persist
+  ]);
   assert.ok(stages.every((c) => c.ok));
   assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "succeeded" });
+});
+
+test("the minting operation establishes its ambient operation tag", async () => {
+  const { runStore, graphStore } = fakes([runForBuild()]);
+  const checkingRunStore: ExtractionRunStorePort = {
+    ...runStore,
+    async runsForBuildByIds(runIds) {
+      assert.equal(currentOperationTag(), "gv-context");
+      return runStore.runsForBuildByIds(runIds);
+    }
+  };
+  await buildGraphVersion({
+    graphVersionId: "gv-context",
+    baseGraphVersionId: null,
+    runIds: ["run-1"],
+    runStore: checkingRunStore,
+    graphStore
+  });
 });
 
 test("the published snapshot is written with its immutable artifact envelope", async () => {

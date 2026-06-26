@@ -18,7 +18,8 @@ const document: StructuredDocument = {
   parserConfigHash: "test",
   blocks: [
     { blockId: "b1", blockType: "paragraph", text: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} },
-    { blockId: "b2", blockType: "paragraph", text: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {} }
+    { blockId: "b2", blockType: "paragraph", text: "Borrowing lets you reference a value without taking ownership.", headingPath: ["Borrowing"], locator: {} },
+    { blockId: "b3", blockType: "paragraph", text: "Heap allocation means the memory must be requested from the memory allocator at runtime.", headingPath: ["The Heap"], locator: {} }
   ]
 };
 
@@ -62,7 +63,13 @@ function runResult(sourceResourceId: string, sourceDocumentId: string, runId: st
   };
 }
 
-function candidate(candidateKey: string, label: string, tier: "core" | "optional", boundaryReasonCodes: string[] = []) {
+const MENTION_BY_KEY: Record<string, { blockId: string; evidenceQuote: string }> = {
+  ownership: { blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." },
+  borrowing: { blockId: "b2", evidenceQuote: "Borrowing lets you reference a value without taking ownership." },
+  heap: { blockId: "b3", evidenceQuote: "Heap allocation means the memory must be requested from the memory allocator at runtime." }
+};
+
+function candidate(candidateKey: string, label: string, tier: "core" | "optional" | "reject" | "quarantine", boundaryReasonCodes: string[] = []) {
   return {
     candidateKey,
     parentCandidateKey: candidateKey,
@@ -70,7 +77,7 @@ function candidate(candidateKey: string, label: string, tier: "core" | "optional
     canonicalLabel: label,
     normalizedLabel: label.toLowerCase(),
     aliases: [label],
-    mentions: [{ blockId: candidateKey === "ownership" ? "b1" : "b2", evidenceQuote: candidateKey === "ownership" ? "Ownership is a set of rules that govern memory." : "Borrowing lets you reference a value without taking ownership." }],
+    mentions: [MENTION_BY_KEY[candidateKey] ?? { blockId: "b2", evidenceQuote: "Borrowing lets you reference a value without taking ownership." }],
     admission: {
       modelTier: tier, tier, sourceRole: "declared_domain_concept" as const, proposedCanonicalLabel: label,
       standaloneLearningObjective: { modelPassed: true, passed: true, rationale: "r", submittedEvidence: [], evidence: [] },
@@ -478,7 +485,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
   }
 });
 
-maybe("mentionedNonCoreCandidates returns member-run mentions with no definition, scoped by version", async () => {
+maybe("nonCoreRescueCandidates returns a no-CEP optional candidate mention-only, scoped by version", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const { sourceResourceId, sourceDocumentId } = await seedSource(sql);
@@ -515,14 +522,15 @@ maybe("mentionedNonCoreCandidates returns member-run mentions with no definition
       artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
     });
 
-    const rescue = await new PostgresEnrichmentRunStore(sql).mentionedNonCoreCandidates(graphVersionId);
+    const rescue = await new PostgresEnrichmentRunStore(sql).nonCoreRescueCandidates(graphVersionId);
     const borrowing = rescue.find((candidate) => candidate.candidateKey === "borrowing");
     assert.ok(borrowing, "the non-core mentioned candidate is a rescue candidate");
     assert.equal(borrowing.tier, "optional");
     assert.equal(borrowing.declaredDomain, "software engineering");
+    assert.equal(borrowing.definitions.length, 0, "no CEP -> no definition passages");
     assert.ok(borrowing.mentions.length >= 1);
     assert.equal(borrowing.mentions[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
-    assert.ok(borrowing.mentions[0].blockText.includes("Borrowing lets you reference"), "carries the cited block text for the U6 floor");
+    assert.ok(borrowing.mentions[0].blockText.includes("Borrowing lets you reference"), "carries the cited block text for the U3 floor");
     // The core anchor (which HAS a definition) is never a rescue candidate.
     assert.ok(!rescue.some((candidate) => candidate.candidateKey === "ownership"));
   } finally {
@@ -573,7 +581,7 @@ maybe("a core demoted-hollow Concept (optional, no definition, mentioned) reache
       artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
     });
 
-    const rescue = await new PostgresEnrichmentRunStore(sql).mentionedNonCoreCandidates(graphVersionId);
+    const rescue = await new PostgresEnrichmentRunStore(sql).nonCoreRescueCandidates(graphVersionId);
     const borrowing = rescue.find((candidate) => candidate.candidateKey === "borrowing");
     assert.ok(borrowing, "the demoted-hollow Concept is a rescue candidate (Covers D5)");
     assert.equal(borrowing.tier, "optional");
@@ -581,6 +589,68 @@ maybe("a core demoted-hollow Concept (optional, no definition, mentioned) reache
     assert.equal(borrowing.mentions[0].evidenceQuote, "Borrowing lets you reference a value without taking ownership.");
     // Negative control: the still-core anchor with a definition never appears.
     assert.ok(!rescue.some((candidate) => candidate.candidateKey === "ownership"));
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("nonCoreRescueCandidates reuses optional definitions but keeps reject candidates mention-only (R1/R2)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { sourceResourceId, sourceDocumentId } = await seedSource(sql);
+    const runId = randomUUID();
+    // One run with a core anchor plus two non-core candidates that BOTH carry a CEP
+    // Definition Passage: an `optional` (Heap allocation) the rescue read must reuse (R1),
+    // and a `reject` (Memory management) whose definition must NOT be promoted (R2 guard).
+    const result: ExtractionRunResult = {
+      runId, sourceResourceId, sourceDocumentId, declaredDomain: "software engineering",
+      pipelineConfigHash: "test-v1", maxMentionsPerConceptPerSource: 6, status: "succeeded", degraded: false, definitionQualityDispositions: [], qualityIssues: [],
+      candidates: [
+        candidate("ownership", "Ownership", "core"),
+        candidate("heap", "Heap allocation", "optional"),
+        candidate("section", "Memory management", "reject")
+      ],
+      evidenceProfiles: [
+        { candidateKey: "ownership", tier: "core", definitions: [{ blockId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." }], mentions: [], assertions: [], complete: true },
+        { candidateKey: "heap", tier: "optional", definitions: [{ blockId: "b3", evidenceQuote: "Heap allocation means the memory must be requested from the memory allocator at runtime." }], mentions: [], assertions: [], complete: true },
+        { candidateKey: "section", tier: "reject", definitions: [{ blockId: "b3", evidenceQuote: "Heap allocation means the memory must be requested from the memory allocator at runtime." }], mentions: [], assertions: [], complete: false }
+      ],
+      latencyMs: 1
+    };
+    await new PostgresExtractionRunStore(sql).persist(result, artifactFor(result));
+    const blocks = await sql<{ block_id: string; source_block_id: string }[]>`SELECT block_id, source_block_id FROM source_blocks WHERE source_document_id = ${sourceDocumentId}`;
+    const blk = (id: string) => blocks.find((row) => row.block_id === id)!.source_block_id;
+
+    const anchorId = randomUUID();
+    const graphVersionId = randomUUID();
+    const anchorLabel = `Ownership ${anchorId}`;
+    const snapshot: GraphSnapshot = {
+      graphVersionId, baseGraphVersionId: null,
+      concepts: [{ conceptId: anchorId, iri: `https://lrnki.local/concept/ownership-${anchorId}`, canonicalLabel: anchorLabel, normalizedLabel: anchorLabel.toLowerCase(), declaredDomain: "software engineering", aliases: [], trustTier: "curated_source_grounded", homograph: false, groundingOrigin: "document_anchored", role: "anchor", layer: "asserted" }],
+      evidenceProfiles: [{ conceptId: anchorId, definitions: [{ sourceResourceId, sourceBlockId: blk("b1"), evidenceQuote: "Ownership is a set of rules that govern memory.", headingPath: ["Ownership"], locator: {} }], mentions: [], assertions: [] }]
+    };
+    await new PostgresGraphVersionStore(sql).publish({
+      snapshot, refinementConfigHash: "test", runMemberships: [{ runId, sourceResourceId }], refinementDecisions: [],
+      artifact: { artifactId: `${graphVersionId}:snapshot`, artifactType: "graph_snapshot", graphVersionId, producer: "test", producerVersion: "0", configHash: "test", createdAt: new Date().toISOString(), payload: snapshot }
+    });
+
+    const rescue = await new PostgresEnrichmentRunStore(sql).nonCoreRescueCandidates(graphVersionId);
+
+    const heap = rescue.find((candidate) => candidate.candidateKey === "heap");
+    assert.ok(heap, "the optional definition-bearing candidate reaches the pool");
+    assert.equal(heap.tier, "optional");
+    assert.equal(heap.definitions.length, 1, "the optional Definition Passage is reused (R1)");
+    assert.equal(heap.definitions[0].evidenceQuote, "Heap allocation means the memory must be requested from the memory allocator at runtime.");
+    assert.ok(heap.definitions[0].blockText.includes("requested from the memory allocator"), "carries the cited block text for the floor");
+    assert.ok(heap.mentions.length >= 1, "and still carries its discovery mention");
+
+    const section = rescue.find((candidate) => candidate.candidateKey === "section");
+    assert.ok(section, "the reject candidate still reaches the pool");
+    assert.equal(section.tier, "reject");
+    assert.equal(section.definitions.length, 0, "its definition is NOT promoted (R2 precision guard)");
+    assert.ok(section.mentions.length >= 1, "but its mention is preserved");
+
+    assert.ok(!rescue.some((candidate) => candidate.candidateKey === "ownership"), "the core anchor is never rescued");
   } finally {
     await sql.end();
   }

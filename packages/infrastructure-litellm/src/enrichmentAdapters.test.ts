@@ -10,22 +10,23 @@ import {
   RESCUE_DURABILITY_JUDGE_MODEL
 } from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { prerequisiteOrderingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
+import { buildPrerequisiteOrderingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
   return { derivedNodeId, canonicalLabel, aliases: [], definitions: [`${canonicalLabel} def`], mentions: [], assertions: [] };
 }
 
-type OrderingEdge = { prerequisiteLabel: string; dependentLabel: string; confidence: number; rationale: string };
+type OrderingEdge = { prerequisiteNumber: number; dependentNumber: number; confidence: number; rationale: string };
 
 // Stub the forced-tool client so the test exercises ONLY the adapter's render + validate
 // + passthrough, not the network. The canned object stands in for the validated tool
 // args (a deterministic envelope over a canned response — rule 11). `capture` records the
-// last client call so a test can assert the prompt's forced tool name and stage tag.
-function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string } }) {
+// last client call so a test can assert the prompt's forced tool name, stage tag, and
+// per-call retry budget.
+function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCall?: { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string; maxRetries?: number } }) {
   const client = {
     async call(input: unknown) {
-      if (capture) capture.lastCall = input as { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string };
+      if (capture) capture.lastCall = input as { messages?: { role: string; content: string }[]; tags?: string[]; toolName?: string; maxRetries?: number };
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -42,17 +43,25 @@ test("ordering adapter runs on the single non-DeepSeek ordering alias", () => {
 });
 
 // Happy path: a well-formed edges array parses to a typed WholeSetOrdering in input order.
-test("returns the validated label-cited edges verbatim, in order", async () => {
+// Endpoints are cited by 1-based Concept number (Ownership=1, Move semantics=2, Borrowing=3).
+test("returns the validated number-cited edges verbatim, in order", async () => {
   const { edges } = await adapterReturning({
     edges: [
-      { prerequisiteLabel: "Ownership", dependentLabel: "Move semantics", confidence: 0.9, rationale: "r1" },
-      { prerequisiteLabel: "Ownership", dependentLabel: "Borrowing", confidence: 0.8, rationale: "r2" }
+      { prerequisiteNumber: 1, dependentNumber: 2, confidence: 0.9, rationale: "r1" },
+      { prerequisiteNumber: 1, dependentNumber: 3, confidence: 0.8, rationale: "r2" }
     ]
   }).order({ declaredDomain: "software engineering", nodes: [ownership, moveSemantics, borrowing] });
   assert.equal(edges.length, 2);
-  assert.equal(edges[0].prerequisiteLabel, "Ownership");
-  assert.equal(edges[0].dependentLabel, "Move semantics");
-  assert.equal(edges[1].dependentLabel, "Borrowing");
+  assert.equal(edges[0].prerequisiteNumber, 1);
+  assert.equal(edges[0].dependentNumber, 2);
+  assert.equal(edges[1].dependentNumber, 3);
+});
+
+// The ordering stage gets a tightened budget: first call + exactly one corrective re-prompt.
+test("ordering request passes maxRetries: 1 for a single corrective re-prompt", async () => {
+  const capture: { lastCall?: { maxRetries?: number } } = {};
+  await adapterReturning({ edges: [] }, capture).order({ declaredDomain: "x", nodes: [ownership, moveSemantics] });
+  assert.equal(capture.lastCall?.maxRetries, 1);
 });
 
 // Edge case: an empty edges array (the judge asserts no relations) is a valid empty ordering.
@@ -71,15 +80,26 @@ test("ordering request carries the stage tag and forced tool name", async () => 
 
 // Fail-closed (rule 6): the validator rejects an edge with confidence out of [0,1].
 test("validator rejects confidence out of [0,1]", () => {
-  assert.throws(() => prerequisiteOrderingValidator.parse({
-    edges: [{ prerequisiteLabel: "a", dependentLabel: "b", confidence: 1.5, rationale: "r" }]
+  assert.throws(() => buildPrerequisiteOrderingValidator(3).parse({
+    edges: [{ prerequisiteNumber: 1, dependentNumber: 2, confidence: 1.5, rationale: "r" }]
   }));
 });
 
 // Fail-closed (rule 6): the validator rejects an edge missing a required field.
-test("validator rejects an edge missing dependentLabel", () => {
-  assert.throws(() => prerequisiteOrderingValidator.parse({
-    edges: [{ prerequisiteLabel: "a", confidence: 0.5, rationale: "r" }] // missing dependentLabel
+test("validator rejects an edge missing dependentNumber", () => {
+  assert.throws(() => buildPrerequisiteOrderingValidator(3).parse({
+    edges: [{ prerequisiteNumber: 1, confidence: 0.5, rationale: "r" }] // missing dependentNumber
+  }));
+});
+
+// Defense-in-depth (rule 6): the validator bounds the index to [1, N] and rejects a
+// self-edge, so a drifting index re-prompts before the application boundary even runs.
+test("validator rejects an out-of-range or self-referential number", () => {
+  assert.throws(() => buildPrerequisiteOrderingValidator(3).parse({
+    edges: [{ prerequisiteNumber: 1, dependentNumber: 4, confidence: 0.5, rationale: "r" }] // 4 > N=3
+  }));
+  assert.throws(() => buildPrerequisiteOrderingValidator(3).parse({
+    edges: [{ prerequisiteNumber: 2, dependentNumber: 2, confidence: 0.5, rationale: "r" }] // self-edge
   }));
 });
 

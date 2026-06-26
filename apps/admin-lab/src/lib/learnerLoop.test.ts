@@ -62,6 +62,7 @@ test("summarizeLearnerStates includes a learner with verdicts but no graded rows
   const summaries = summarizeLearnerStates([], [verdict("nA", "known", "L3")]);
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0].learnerStateRef, "L3");
+  assert.equal(summaries[0].latestResponseAt, null);
   assert.equal(summaries[0].knownVerdictCount, 1);
   assert.equal(summaries[0].responseCount, 0);
 });

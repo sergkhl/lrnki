@@ -27,7 +27,7 @@ import type {
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
-  MentionedNonCoreCandidate,
+  NonCoreRescueCandidate,
   MissingPrerequisiteProposal,
   MintingDurabilityJudgment,
   NodeMergeAdjudication,
@@ -368,13 +368,15 @@ export interface EnrichmentRunStorePort {
     artifact: ArtifactEnvelope<EnrichmentRunTrace>;
   }): Promise<void>;
   getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined>;
-  // Rescue source for Graph Enrichment (KTD5, R7): the member Extraction Runs of
-  // `graphVersionId` (resolved via graph_version_run_memberships) reduced to their
-  // rejected/optional admission proposals that carry a verbatim MENTION but no
-  // Definition Passage. Each carries resolved mention provenance plus the cited
-  // block's text so the verbatim floor (U6) re-verifies at enrichment time. These
-  // become `source_mentioned`/`derived` nodes only and never touch the asserted core.
-  mentionedNonCoreCandidates(graphVersionId: string): Promise<MentionedNonCoreCandidate[]>;
+  // Rescue source for Graph Enrichment (KTD1/KTD5, R1/R7): the member Extraction Runs
+  // of `graphVersionId` (resolved via graph_version_run_memberships) reduced to their
+  // non-core admission proposals. `optional`-tier candidates carry their verbatim
+  // Definition Passages alongside mentions so rescue reuses already-extracted grounded
+  // evidence; `reject`-tier candidates carry mentions only (KTD3 precision guard). Each
+  // passage carries the cited block's text so the verbatim floor (U3) re-verifies at
+  // enrichment time. These become `source_mentioned`/`derived` nodes only and never
+  // touch the asserted core.
+  nonCoreRescueCandidates(graphVersionId: string): Promise<NonCoreRescueCandidate[]>;
 }
 
 // Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the
@@ -603,8 +605,122 @@ export interface SourceInspectionReadPort {
   getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
 }
 
+export type DerivedNodeKind = "anchor" | "enrichment";
+export type DerivedGroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
+
+export interface GroundingPassageView {
+  passageType: "definition" | "mention";
+  text: string;
+  groundingOrigin: DerivedGroundingOrigin;
+}
+
+export interface NodeGroundingView {
+  generatingModel: string | null;
+  rationale: string | null;
+  passages: GroundingPassageView[];
+  verbatimDisposition: string;
+}
+
+export interface DerivedGraphNode {
+  derivedNodeId: string;
+  label: string;
+  aliases: string[];
+  declaredDomain: string;
+  difficulty: number | null;
+  difficultyRationale: string | null;
+  nodeKind: DerivedNodeKind;
+  groundingOrigin: DerivedGroundingOrigin;
+  role: "anchor" | "prerequisite";
+  hasStudyItem: boolean;
+  grounding: NodeGroundingView | null;
+}
+
+export interface DerivedGraphEdge {
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
+  confidence: number;
+  uncertain: boolean;
+  judgeModel: string;
+}
+
+export interface DomainOriginCounts {
+  domain: string;
+  anchor: number;
+  sourceMentioned: number;
+  llmGrounded: number;
+}
+
+export interface RescueDispositionView {
+  derivedNodeId: string;
+  canonicalLabel: string;
+  declaredDomain: string;
+  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
+  rationale: string;
+  groundingSpan: string;
+}
+
+export interface MintingDispositionView {
+  derivedNodeId: string;
+  proposedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
+  rationale: string;
+}
+
+export interface NodeMergeView {
+  declaredDomain: string;
+  canonicalDerivedNodeId: string;
+  canonicalLabel: string;
+  absorbedLabel: string;
+  absorbedAliases: string[];
+  proposingSignal: string;
+  proposingScore: number;
+  rationale: string;
+  canonicalSelectionReason: string;
+}
+
+export interface EnrichmentSummary {
+  enrichmentId: string;
+  graphVersionId: string;
+  enrichmentConfigHash: string;
+  judgeModel: string;
+  difficultyMethod: string;
+  status: string;
+  edgeCount: number;
+  certainEdgeCount: number;
+  uncertainEdgeCount: number;
+  conceptCount: number;
+  // Study items generated for this enrichment's derived nodes. 0 means the study
+  // surfaces have nothing to offer yet (generate-study-items has not run), so the UI
+  // can flag a dead-end before a learner reaches an empty session (R6, U5).
+  studyItemCount: number;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface DerivedGraphDetail {
+  summary: EnrichmentSummary;
+  nodes: DerivedGraphNode[];
+  edges: DerivedGraphEdge[];
+  originCounts: DomainOriginCounts[];
+  rescueDispositions: RescueDispositionView[];
+  mintingDispositions: MintingDispositionView[];
+  merges: NodeMergeView[];
+}
+
+// Enrichment Run inspection read surface: list summaries + one finished Derived
+// Graph Layer inspection model. This is pure inspection under ADR-0027: the
+// storage adapter owns SQL, artifact row stitching, grounding dispositions, and
+// per-domain origin counts. Admin Lab renders the finished read model and does
+// not query persistence directly.
+export interface EnrichmentInspectionReadPort {
+  listEnrichmentSummaries(): Promise<EnrichmentSummary[]>;
+  getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
+}
+
 // ---------------------------------------------------------------------------
-// Run-stage timeline reporting seam (KTD4, R7). The EXTERNALLY-DRIVEN seam every
+// Run-stage timeline reporting seam (ADR-0029). The externally driven seam every
 // triggered operation reports progress through, so a future durable workflow
 // engine (Temporal/Restate) can drive the substrate without changing operation
 // logic. Operations call these at stage boundaries and inside item loops; the
@@ -613,7 +729,7 @@ export interface SourceInspectionReadPort {
 // idempotent-tolerant — the reporter writes the timeline, it returns nothing.
 // ---------------------------------------------------------------------------
 
-// The four triggered operations whose timeline these tables describe (KTD1).
+// The four triggered operations whose timeline these tables describe.
 // `study_items` is its own operation_type keyed by enrichmentId (ADR-0017 split
 // is preserved — these describe operations, they do not unify them).
 export type OperationType = "extraction" | "minting" | "enrichment" | "study_items";
@@ -624,18 +740,21 @@ export interface RunProgressReporterPort {
   beginOperation(input: { operationType: OperationType; operationId: string }): Promise<void>;
   // Open a stage: insert a child row, set the parent's current_stage. `total` is
   // the item count for a stage that iterates, enabling an N-of-M heartbeat.
-  enterStage(input: { operationId: string; stage: string; total?: number }): Promise<void>;
-  // Bump the heartbeat as items complete inside a long stage (R3), so liveness is
+  // `operationType` is REQUIRED to scope the parent: `operation_id` is not unique
+  // on its own — `study_items` reuses the enrichmentId — so the parent must be
+  // found by the full `(operation_type, operation_id)` natural key.
+  enterStage(input: { operationType: OperationType; operationId: string; stage: string; total?: number }): Promise<void>;
+  // Bump the heartbeat as items complete inside a long stage, so liveness is
   // visible without waiting for a stage boundary. `done` is the cumulative count.
-  recordProgress(input: { operationId: string; stage: string; done: number }): Promise<void>;
+  recordProgress(input: { operationType: OperationType; operationId: string; stage: string; done: number }): Promise<void>;
   // Close a stage: set its ended_at + ok. A thrown stage reports ok:false first.
-  completeStage(input: { operationId: string; stage: string; ok: boolean }): Promise<void>;
+  completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean }): Promise<void>;
   // Set the parent's terminal status + completed_at.
-  completeOperation(input: { operationId: string; status: "succeeded" | "failed" }): Promise<void>;
+  completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
-// Operation timeline read model (R4, ADR-0027). The live "where is this
+// Operation timeline read model (ADR-0027, ADR-0029). The live "where is this
 // operation, is it moving" surface. Pure read over operation_runs +
 // operation_run_stages; the adapter owns the query and row-stitch, no SQL in UI.
 // Returns finished models or `undefined`-for-not-found; real DB errors propagate.
@@ -645,7 +764,7 @@ export interface OperationTimelineStage {
   stage: string;
   startedAt: string;
   endedAt: string | null;
-  // null while the stage is open; ended_at - started_at once closed (R5 wall-clock).
+  // null while the stage is open; ended_at - started_at once closed.
   durationMs: number | null;
   ok: boolean | null;
   progressDone: number | null;
@@ -664,7 +783,7 @@ export interface OperationTimelineSummary {
   startedAt: string;
   completedAt: string | null;
   // Wall-clock since start: completed_at - started_at, or now - started_at while running.
-  // A long-stale lastProgressAt on a `running` row is the "hung run" signal (KTD3 risk).
+  // A long-stale lastProgressAt on a `running` row is the "hung run" signal.
   elapsedMs: number;
   stageCount: number;
 }
@@ -676,21 +795,29 @@ export interface OperationTimelineDetail {
 
 export interface OperationTimelineReadPort {
   listOperationTimelines(): Promise<OperationTimelineSummary[]>;
-  getOperationTimeline(operationId: string): Promise<OperationTimelineDetail | undefined>;
+  getOperationTimeline(operationId: string, operationType?: OperationType): Promise<OperationTimelineDetail | undefined>;
 }
 
-// Per-stage LiteLLM spend (R5, R6). Read live from LiteLLM `/spend/tags` at report
-// time; the application NEVER computes or stores a cost figure — it surfaces
-// LiteLLM's `total_spend` verbatim. The adapter projects the response onto the closed
-// STAGE_TAGS vocabulary, excluding LiteLLM's auto-emitted User-Agent pseudo-tags and
-// any stale tag, so only join-keyable LLM stages survive. Spend is GLOBAL per tag
-// (LiteLLM has no per-operation scoping) — the standing per-stage cost picture.
-export interface StageSpend {
-  tag: string;
+// Per-(operation, stage) spend read live from LiteLLM's request log. The application
+// never computes or stores cost; it surfaces LiteLLM's persisted spend and token totals.
+export interface OperationStageSpend {
+  operationId: string;
+  stage: string;
   logCount: number;
   totalSpend: number;
+  totalTokens: number;
 }
 
-export interface StageSpendReadPort {
-  readStageSpend(): Promise<StageSpend[]>;
+export interface OperationStageSpendReadPort {
+  readOperationStageSpend(operationIds: string[]): Promise<OperationStageSpend[]>;
+}
+
+export interface JourneyLineage {
+  enrichmentId: string;
+  graphVersionId: string;
+  extractionRunIds: string[];
+}
+
+export interface JourneyLineageReadPort {
+  resolveJourney(enrichmentId: string): Promise<JourneyLineage | undefined>;
 }

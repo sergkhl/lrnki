@@ -14,7 +14,9 @@ import {
   ADAPTIVE_MASTERY_THRESHOLD,
   runGraphEnrichment,
   bottleneckReport,
-  type BottleneckReport
+  rankBottleneckTargets,
+  type BottleneckReport,
+  type RankedTarget
 } from "@lrnki/application";
 import {
   DoclingStructuredDocumentParser,
@@ -33,7 +35,7 @@ import {
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
-  LiteLlmStageSpendAdapter,
+  LiteLlmSpendLogsReadAdapter,
   LiteLlmEmbeddingClient,
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
@@ -57,6 +59,7 @@ import {
   PostgresSourceRegistrationStore,
   PostgresRunProgressReporter,
   PostgresOperationTimelineRead,
+  PostgresJourneyLineageRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
@@ -85,9 +88,9 @@ function buildContext() {
   const sql = createDatabaseClient();
   const registrationStore = new PostgresSourceRegistrationStore(sql);
   const runStore = new PostgresExtractionRunStore(sql);
-  // Run-progress reporter (KTD3): its own autocommit writes on the shared `sql`
+  // Run-progress reporter (ADR-0029): its own autocommit writes on the shared `sql`
   // handle, never enlisted in a store's persist transaction, drive the durable
-  // timeline that the live progress view (U6) and bottleneck report (U7) read.
+  // timeline that the live progress view and bottleneck report read.
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
   const artifacts = new PostgresArtifactRepository(sql);
@@ -124,16 +127,25 @@ function buildContext() {
   // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
   // options as the forced-tool clients; embeddings have no sampling knobs.
   const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
+  const spendLogsRead = process.env.LITELLM_DATABASE_URL
+    ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
+    : undefined;
   return {
     sql,
     registrationStore,
     runStore,
     runProgressReporter,
-    // Bottleneck-report read surfaces (U7): the per-operation timeline read-model and
+    // Bottleneck-report read surfaces: the per-operation timeline read-model and
     // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
-    // live and never stored (R6).
+    // live and never stored (ADR-0029).
     operationTimelineRead: new PostgresOperationTimelineRead(sql),
-    stageSpend: new LiteLlmStageSpendAdapter(baseClient),
+    journeyLineageRead: new PostgresJourneyLineageRead(sql),
+    operationStageSpendRead: spendLogsRead ?? {
+      async readOperationStageSpend() {
+        throw new Error("LITELLM_DATABASE_URL is required for cost reporting.");
+      }
+    },
+    spendLogsRead,
     graphStore,
     artifacts,
     parsers,
@@ -336,7 +348,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
     // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
-    // via the reporter (KTD7) — supersedes the old onStageTiming stdout sink.
+    // via the reporter (ADR-0029) — supersedes the old onStageTiming stdout sink.
     reporter: ctx.runProgressReporter,
     // Dedup outcome line (plan U3, R13): how many near-duplicate nodes collapsed and how
     // many propose/decide calls failed closed (no merge), so an operator sees the pass ran.
@@ -475,7 +487,7 @@ async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, t
   }
 }
 
-// Bottleneck report renderer for code agents (KTD5, R5): a per-stage table of
+// Bottleneck report renderer for code agents (ADR-0029): a per-stage table of
 // wall-clock + calls + cost for one operation, or the same structured rows as `--json`.
 // Both this CLI and the Admin Lab view call the SAME bottleneckReport use-case; neither
 // re-implements the join.
@@ -486,16 +498,51 @@ async function bottleneckReportCommand(ctx: Context, operationId: string | undef
     return;
   }
   const report = await bottleneckReport({
-    operationId,
+    scope: { operationId },
     timelineRead: ctx.operationTimelineRead,
-    stageSpendRead: ctx.stageSpend
+    operationStageSpendRead: ctx.operationStageSpendRead,
+    journeyLineageRead: ctx.journeyLineageRead
   });
   if (!report) {
     console.error(`! no operation timeline found for ${operationId}.`);
     process.exitCode = 1;
     return;
   }
-  if (flags.includes("--json")) {
+  emitReport(report, flags);
+}
+
+async function journeyCostReportCommand(ctx: Context, enrichmentId: string | undefined, flags: string[]) {
+  if (!enrichmentId) {
+    console.error("! journey-cost-report requires <enrichmentId>.");
+    process.exitCode = 1;
+    return;
+  }
+  const report = await bottleneckReport({
+    scope: { journeyAnchorEnrichmentId: enrichmentId },
+    timelineRead: ctx.operationTimelineRead,
+    operationStageSpendRead: ctx.operationStageSpendRead,
+    journeyLineageRead: ctx.journeyLineageRead
+  });
+  if (!report) {
+    console.error(`! no journey timeline found for enrichment ${enrichmentId}.`);
+    process.exitCode = 1;
+    return;
+  }
+  emitReport(report, flags);
+}
+
+// Shared flag dispatch for both report commands (U3). `--ranked` renders (or with `--json`,
+// emits) the ranked cost + time target lists; `--json` alone emits the raw report; absent
+// flags render the per-stage table. `--ranked --json` is the recording form for the baseline.
+function emitReport(report: BottleneckReport, flags: string[]) {
+  const ranked = flags.includes("--ranked");
+  const json = flags.includes("--json");
+  if (ranked) {
+    if (json) console.log(JSON.stringify(rankBottleneckTargets(report), null, 2));
+    else renderRankedTargets(report);
+    return;
+  }
+  if (json) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
@@ -503,15 +550,45 @@ async function bottleneckReportCommand(ctx: Context, operationId: string | undef
 }
 
 function renderBottleneckTable(report: BottleneckReport) {
-  console.log(`\n>> bottleneck report — ${report.operationType} ${report.operationId} (${report.status})`);
-  if (!report.costAvailable) console.log("   ! LiteLLM /spend/tags unavailable — cost columns omitted, wall-clock only.");
+  console.log(`\n>> ${report.scope} cost report — ${report.anchorId}`);
+  if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost columns omitted, wall-clock only.");
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
   const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
-  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"cost".padStart(10)}`;
-  console.log(header);
-  console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)}`);
-  for (const row of report.stages) {
-    console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${fmtUsd(row.costUsd).padStart(10)}`);
+  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"tokens".padStart(10)} ${"cost".padStart(10)}`;
+  for (const operation of report.operations) {
+    console.log(`\n   [${operation.operationType}] ${operation.operationId} (${operation.status})`);
+    console.log(header);
+    console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)} ${"-".repeat(10)}`);
+    for (const row of operation.stages) {
+      console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${(row.tokens ?? "—").toString().padStart(10)} ${fmtUsd(row.costUsd).padStart(10)}`);
+    }
+    console.log(`   ${"subtotal".padEnd(30)} ${fmtMs(operation.subtotal.wallClockMs).padStart(9)} ${(operation.subtotal.calls ?? "—").toString().padStart(6)} ${(operation.subtotal.tokens ?? "—").toString().padStart(10)} ${fmtUsd(operation.subtotal.costUsd).padStart(10)}`);
+  }
+  console.log(`\n   ${report.scope} total: wall=${fmtMs(report.total.wallClockMs)} calls=${report.total.calls ?? "—"} tokens=${report.total.tokens ?? "—"} cost=${fmtUsd(report.total.costUsd)}`);
+}
+
+// Ranked-target renderer (U3): a cost-ranked and a wall-ranked list of (operation, stage)
+// rows with each target's share of the journey total — the optimization-pass handoff view.
+function renderRankedTargets(report: BottleneckReport) {
+  const ranked = rankBottleneckTargets(report);
+  const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
+  const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
+  const fmtShare = (share: number | null) => (share === null ? "—" : `${(share * 100).toFixed(1)}%`);
+  const target = (t: RankedTarget) =>
+    `${t.operationType}/${t.stage}`.padEnd(46);
+  console.log(`\n>> ${report.scope} ranked targets — ${report.anchorId}`);
+  if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost ranking empty, wall-clock ranking only.");
+
+  console.log(`\n   cost targets (desc)   ${"share".padStart(7)} ${"cost".padStart(10)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"tokens".padStart(10)}`);
+  if (ranked.byCost.length === 0) console.log("   (none)");
+  for (const t of ranked.byCost) {
+    console.log(`   ${target(t)} ${fmtShare(t.costShare).padStart(7)} ${fmtUsd(t.costUsd).padStart(10)} ${fmtMs(t.wallClockMs).padStart(9)} ${(t.calls ?? "—").toString().padStart(6)} ${(t.tokens ?? "—").toString().padStart(10)}`);
+  }
+
+  console.log(`\n   time targets (desc)   ${"share".padStart(7)} ${"wall".padStart(9)} ${"cost".padStart(10)} ${"calls".padStart(6)} ${"tokens".padStart(10)}`);
+  if (ranked.byWall.length === 0) console.log("   (none)");
+  for (const t of ranked.byWall) {
+    console.log(`   ${target(t)} ${fmtShare(t.wallShare).padStart(7)} ${fmtMs(t.wallClockMs).padStart(9)} ${fmtUsd(t.costUsd).padStart(10)} ${(t.calls ?? "—").toString().padStart(6)} ${(t.tokens ?? "—").toString().padStart(10)}`);
   }
 }
 
@@ -585,8 +662,11 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "bottleneck-report":
       await bottleneckReportCommand(ctx, arg, rest);
       break;
+    case "journey-cost-report":
+      await journeyCostReportCommand(ctx, arg, rest);
+      break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 
@@ -599,6 +679,7 @@ async function main() {
     // whole-command stdout `stage_timing` bracket is superseded and removed.
     await dispatch(ctx, command, arg, rest);
   } finally {
+    await ctx.spendLogsRead?.end();
     await ctx.sql.end({ timeout: 5 });
   }
 }

@@ -10,6 +10,7 @@ import {
   type RefinementDecisionRecord,
   type TrustTier
 } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type { GraphVersionStorePort, ExtractionRunStorePort, RunProgressReporterPort } from "@lrnki/ports";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 
@@ -36,23 +37,24 @@ export async function buildGraphVersion(input: {
   runIds: string[];
   runStore: ExtractionRunStorePort;
   graphStore: GraphVersionStorePort;
-  // Run-progress reporter seam (R7). Minting is LLM-free, so all three stages are
-  // non-LLM (wall-clock only, never in the cost half of the R5 join). Absent → no-op.
+  // Run-progress reporter seam (ADR-0029). Minting is LLM-free, so all three stages are
+  // non-LLM (wall-clock only, never in the cost half). Absent → no-op.
   reporter?: RunProgressReporterPort;
 }): Promise<GraphSnapshot> {
   if (input.runIds.length === 0) throw new Error("buildGraphVersion requires explicit run IDs to publish.");
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.graphVersionId;
+  return runWithOperationTag(operationId, async () => {
 
   // Bracket each phase onto the timeline; a thrown phase closes its stage ok:false,
-  // marks the operation `failed`, and propagates (R1, KTD3) — exactly as extraction and
+  // marks the operation `failed`, and propagates — exactly as extraction and
   // enrichment do. Minting's validation gates (quarantine, incomplete CEP, unpublished
   // base, the publish-time quality floors) throw on common operator errors, so a failed
   // build must reach a terminal `failed` status rather than masquerade as a permanent
   // `running` row. The failure semantics live once in `bracketStage`.
-  const buildStage = bracketStage(reporter, operationId);
+  const buildStage = bracketStage(reporter, "minting", operationId);
 
-  // The parent `running` row exists from entry (R1).
+  // The parent `running` row exists from entry.
   await reporter.beginOperation({ operationType: "minting", operationId });
 
   // Load — resolve the selected runs and the base version, failing closed on a
@@ -351,8 +353,9 @@ export async function buildGraphVersion(input: {
       artifact
     })
   );
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "minting", operationId, status: "succeeded" });
   return snapshot;
+  });
 }
 
 function iriSlug(iri: string): string {

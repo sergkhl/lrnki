@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, NonCoreRescueCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   GroundingGenerationPort,
   MintingDurabilityJudgmentPort,
@@ -8,6 +9,34 @@ import type {
   RescueDurabilityJudgmentPort
 } from "@lrnki/ports";
 import { assembleEnrichmentNodes, type MintingAnchor } from "./enrichmentNodeMinting";
+import type { StageBracket } from "./runProgressReporter";
+
+// Recording stage bracket: captures the order in which fine stages open and close, so a
+// test asserts per-call bracketing (U1) WITHOUT a reporter or database. A throw records
+// `${name}:err` so the fail path is observable.
+function recordingStage() {
+  const opened: string[] = [];
+  const closed: string[] = [];
+  const maxConcurrentByName = new Map<string, number>();
+  const liveByName = new Map<string, number>();
+  const stage: StageBracket = async (name, fn) => {
+    opened.push(name);
+    const live = (liveByName.get(name) ?? 0) + 1;
+    liveByName.set(name, live);
+    maxConcurrentByName.set(name, Math.max(maxConcurrentByName.get(name) ?? 0, live));
+    try {
+      const result = await fn();
+      closed.push(name);
+      liveByName.set(name, (liveByName.get(name) ?? 1) - 1);
+      return result;
+    } catch (error) {
+      closed.push(`${name}:err`);
+      liveByName.set(name, (liveByName.get(name) ?? 1) - 1);
+      throw error;
+    }
+  };
+  return { stage, opened, closed, maxConcurrentByName: () => maxConcurrentByName };
+}
 
 function anchor(id: string, label: string, domain = "software engineering"): MintingAnchor {
   return { conceptId: id, canonicalLabel: label, normalizedLabel: label.toLowerCase(), declaredDomain: domain, definitionQuotes: [`${label} is defined here.`] };
@@ -47,7 +76,7 @@ function recordingGrounder(calls: string[]): GroundingGenerationPort {
   };
 }
 
-function mention(label: string, runId: string): MentionedNonCoreCandidate {
+function mention(label: string, runId: string): NonCoreRescueCandidate {
   return {
     runId,
     declaredDomain: "software engineering",
@@ -56,6 +85,23 @@ function mention(label: string, runId: string): MentionedNonCoreCandidate {
     normalizedLabel: label.toLowerCase(),
     aliases: [label],
     tier: "reject",
+    definitions: [],
+    mentions: [{ sourceResourceId: "src", sourceBlockId: `blk-${runId}`, evidenceQuote: `${label} is mentioned.`, blockText: `${label} is mentioned somewhere.`, headingPath: [], locator: {} }]
+  };
+}
+
+// An `optional`-tier rescue candidate carrying a verbatim Definition Passage in addition
+// to a mention — the reuse case the seam fix rescues instead of re-minting (U2).
+function definitionBearing(label: string, runId: string): NonCoreRescueCandidate {
+  return {
+    runId,
+    declaredDomain: "software engineering",
+    candidateKey: label.toLowerCase(),
+    canonicalLabel: label,
+    normalizedLabel: label.toLowerCase(),
+    aliases: [label],
+    tier: "optional",
+    definitions: [{ sourceResourceId: "src", sourceBlockId: `def-${runId}`, evidenceQuote: `${label} is the memory requested at runtime.`, blockText: `${label} is the memory requested at runtime.`, headingPath: [], locator: {} }],
     mentions: [{ sourceResourceId: "src", sourceBlockId: `blk-${runId}`, evidenceQuote: `${label} is mentioned.`, blockText: `${label} is mentioned somewhere.`, headingPath: [], locator: {} }]
   };
 }
@@ -125,6 +171,52 @@ test("rescue dedupes a concept appearing in two member runs into one node", asyn
   });
   assert.equal(rescuedNodes.length, 1, "the duplicate concept collapses to a single node");
   assert.equal(rescuedNodes[0].groundingPassages.length, 2, "both runs' mentions are merged onto the node");
+});
+
+test("a definition-bearing optional candidate is rescued with a definition + mention passage", async () => {
+  counter = 0;
+  const { rescuedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [definitionBearing("Heap allocation", "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1);
+  assert.equal(rescuedNodes[0].groundingOrigin, "source_mentioned");
+  const types = rescuedNodes[0].groundingPassages.map((p) => p.passageType);
+  assert.deepEqual(types, ["definition", "mention"], "definition leads, mention follows");
+  assert.equal(rescuedNodes[0].groundingPassages[0].evidenceQuote, "Heap allocation is the memory requested at runtime.");
+});
+
+test("a rescued optional concept suppresses redundant minting of the same label (R3)", async () => {
+  counter = 0;
+  const minted: string[] = [];
+  const { rescuedNodes, mintedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [definitionBearing("Heap allocation", "run-1")],
+    // The minter tries to regenerate the very concept already rescued with a real definition.
+    proposalPort: proposer({ a: [{ proposedLabel: "Heap allocation", rationale: "r" }] }),
+    groundingPort: recordingGrounder(minted),
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1, "the optional concept is rescued from its source definition");
+  assert.equal(mintedNodes.length, 0, "and the minter does not regenerate it as an llm_grounded node");
+  assert.deepEqual(minted, [], "grounding generation is never invoked for the rescued label");
+});
+
+test("two member runs of a definition-bearing concept merge definitions and mentions", async () => {
+  counter = 0;
+  const { rescuedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [definitionBearing("Heap allocation", "run-1"), definitionBearing("Heap allocation", "run-2")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1, "the concept collapses to one node across runs");
+  const types = rescuedNodes[0].groundingPassages.map((p) => p.passageType).sort();
+  assert.deepEqual(types, ["definition", "definition", "mention", "mention"], "both runs' definitions and mentions merge");
 });
 
 // Always-durable judge: an opt-in judge that accepts every rescue candidate.
@@ -347,4 +439,104 @@ test("omitting minting durability judge preserves prior minting and emits no dis
   });
   assert.deepEqual(mintedNodes.map((node) => node.canonicalLabel), ["Lifetime"]);
   assert.deepEqual(mintingDispositions, []);
+});
+
+// --- U1 stage bracketing -----------------------------------------------------------
+
+// Each LLM port call is wrapped in its fine STAGE_TAGS bracket so its wall-clock joins the
+// cost the call already self-tags. Sequential `await` loop ⇒ one bracket of a name open at
+// a time (KTD2), and a name brackets once per port call.
+test("U1: each LLM port call brackets under its fine STAGE_TAGS name (one per call)", async () => {
+  counter = 0;
+  const { stage, opened, maxConcurrentByName } = recordingStage();
+  const acceptMint: MintingDurabilityJudgmentPort = {
+    model: "kg-independent-judge",
+    judge: async () => ({ verdict: "durable", rationale: "foundation" })
+  };
+  await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing")],
+    rescueCandidates: [mention("Pointer", "run-1")],
+    proposalPort: proposer({ a: [{ proposedLabel: "Lifetime", rationale: "needed first" }] }),
+    groundingPort: grounder,
+    rescueDurabilityJudge: acceptAllJudge,
+    mintingDurabilityJudge: acceptMint,
+    newNodeId,
+    stage
+  });
+  assert.ok(opened.includes(STAGE_TAGS.rescueDurability), "rescue durability judged under its fine name");
+  assert.ok(opened.includes(STAGE_TAGS.missingPrerequisiteProposal), "proposal under its fine name");
+  assert.ok(opened.includes(STAGE_TAGS.mintingDurability), "minting durability under its fine name");
+  assert.ok(opened.includes(STAGE_TAGS.groundingGeneration), "grounding under its fine name");
+  // The coarse composite name never appears — the join-alignment property.
+  assert.ok(!opened.includes("rescue-mint"));
+  // One proposal per anchor, one grounding per minted node; never overlapping (sequential).
+  assert.equal(opened.filter((s) => s === STAGE_TAGS.missingPrerequisiteProposal).length, 1);
+  assert.equal(opened.filter((s) => s === STAGE_TAGS.groundingGeneration).length, 1);
+  for (const [, max] of maxConcurrentByName()) assert.equal(max, 1, "same-name brackets never overlap");
+});
+
+// Multiple minted nodes ⇒ one grounding bracket per node, each opened and closed in turn.
+test("U1: grounding brackets once per minted node, sequentially", async () => {
+  counter = 0;
+  const { stage, opened, maxConcurrentByName } = recordingStage();
+  const { mintedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Move Semantics")],
+    rescueCandidates: [],
+    proposalPort: proposer({ a: [
+      { proposedLabel: "Stack allocation", rationale: "r" },
+      { proposedLabel: "Heap allocation", rationale: "r" }
+    ] }),
+    groundingPort: grounder,
+    bounds: { maxMintedPerAnchor: 2, maxMintedPerRun: 12 },
+    newNodeId,
+    stage
+  });
+  assert.equal(mintedNodes.length, 2);
+  assert.equal(opened.filter((s) => s === STAGE_TAGS.groundingGeneration).length, 2);
+  assert.equal(maxConcurrentByName().get(STAGE_TAGS.groundingGeneration), 1, "grounding never overlaps");
+});
+
+// A run with no judges and no minted nodes emits only the proposal bracket — the
+// rescue/minting durability and grounding brackets sit out when their ports/work are absent.
+test("U1: durability + grounding brackets are omitted when their work is absent", async () => {
+  counter = 0;
+  const { stage, opened } = recordingStage();
+  await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Borrowing")],
+    rescueCandidates: [],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    newNodeId,
+    stage
+  });
+  assert.ok(opened.includes(STAGE_TAGS.missingPrerequisiteProposal));
+  assert.ok(!opened.includes(STAGE_TAGS.rescueDurability));
+  assert.ok(!opened.includes(STAGE_TAGS.mintingDurability));
+  assert.ok(!opened.includes(STAGE_TAGS.groundingGeneration));
+});
+
+// A thrown port call closes its fine stage on the error path and propagates (the operation
+// bracket upstream then marks the run failed — bracketStage owns that, U1).
+test("U1: a thrown port call closes its fine stage on the error path", async () => {
+  counter = 0;
+  const { stage, closed } = recordingStage();
+  const throwingGrounder: GroundingGenerationPort = {
+    model: "mock-gen",
+    async generate() {
+      throw new Error("forced-tool budget exhausted");
+    }
+  };
+  await assert.rejects(
+    () =>
+      assembleEnrichmentNodes({
+        anchors: [anchor("a", "Borrowing")],
+        rescueCandidates: [],
+        proposalPort: proposer({ a: [{ proposedLabel: "Lifetime", rationale: "needed first" }] }),
+        groundingPort: throwingGrounder,
+        newNodeId,
+        stage
+      }),
+    /budget exhausted/
+  );
+  assert.ok(closed.includes(`${STAGE_TAGS.groundingGeneration}:err`), "grounding stage closed on the error path");
 });

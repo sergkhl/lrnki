@@ -57,12 +57,14 @@ export class PostgresOperationTimelineRead implements OperationTimelineReadPort 
     return rows.map(toSummary);
   }
 
-  async getOperationTimeline(operationId: string): Promise<OperationTimelineDetail | undefined> {
+  async getOperationTimeline(operationId: string, operationType?: OperationType): Promise<OperationTimelineDetail | undefined> {
     const sql = this.sql;
     const headers = await sql<SummaryRow[]>`
       SELECT ${summaryColumns(sql)}
       FROM operation_runs r
       WHERE r.operation_id = ${operationId}
+        ${operationType ? sql`AND r.operation_type = ${operationType}` : sql``}
+      ORDER BY r.started_at DESC
       LIMIT 1`;
     const header = headers[0];
     if (!header) return undefined;
@@ -75,6 +77,7 @@ export class PostgresOperationTimelineRead implements OperationTimelineReadPort 
       FROM operation_run_stages s
       JOIN operation_runs r ON r.operation_run_id = s.operation_run_id
       WHERE r.operation_id = ${operationId}
+        ${operationType ? sql`AND r.operation_type = ${operationType}` : sql``}
       ORDER BY s.started_at ASC`;
 
     return { summary: toSummary(header), stages: stages.map(toStage) };

@@ -18,6 +18,7 @@ import type {
   WholeSetOrdering
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -165,7 +166,7 @@ export async function runGraphEnrichment(input: {
   // direction-contested / weak-cut / cycle-routed edge counts, for operator visibility. The
   // application stays free of console I/O; the worker formats the structured line.
   onOrderingSummary?: (summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number }) => void;
-  // Run-progress reporter seam (R7, KTD7). Supersedes the old onStageTiming stdout
+  // Run-progress reporter seam (ADR-0029). Supersedes the old onStageTiming stdout
   // callback: per-stage wall-clock now lives in the durable operation_run_stages
   // timeline. Absent → no-op (anchor-only/test runs behave unchanged).
   reporter?: RunProgressReporterPort;
@@ -174,10 +175,11 @@ export async function runGraphEnrichment(input: {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
+  return runWithOperationTag(operationId, async () => {
   // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
   // the operation failed before propagating, so a failed enrichment leaves a readable
-  // timeline (R1) — no partial layer is ever persisted.
-  const runStage = bracketStage(reporter, operationId);
+  // timeline — no partial layer is ever persisted.
+  const runStage = bracketStage(reporter, "enrichment", operationId);
   await reporter.beginOperation({ operationType: "enrichment", operationId });
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
   if (!snapshot) {
@@ -209,43 +211,47 @@ export async function runGraphEnrichment(input: {
   let rescueDispositions: RescueDisposition[] = [];
   let mintingDispositions: MintingDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
-    await runStage("rescue-mint", async () => {
-      const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
-      const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
-        conceptId: concept.conceptId,
-        canonicalLabel: concept.canonicalLabel,
-        normalizedLabel: concept.normalizedLabel,
-        declaredDomain: concept.declaredDomain,
-        definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
-      }));
-      const assembled = await assembleEnrichmentNodes({
-        anchors: mintingAnchors,
-        rescueCandidates,
-        proposalPort: input.missingPrerequisiteProposal!,
-        groundingPort: input.groundingGeneration!,
-        rescueDurabilityJudge: input.rescueDurabilityJudge,
-        mintingDurabilityJudge: input.mintingDurabilityJudge,
-        bounds: config.mintingBounds,
-        newNodeId
-      });
-      rescueDispositions = assembled.rescueDispositions;
-      mintingDispositions = assembled.mintingDispositions;
-      input.onMintingSummary?.({
-        accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
-        dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
-        unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
-      });
-      // The floor verifies source_mentioned passages verbatim against their cited block
-      // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
-      // does not verify is dropped before it can enter the derived layer.
-      const blockTextById = new Map<string, string>();
-      for (const candidate of rescueCandidates) {
-        for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
-      }
-      const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
-      enrichmentNodes = floored.nodes;
-      groundingDispositions = floored.dispositions;
+    // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
+    // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
+    // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
+    // and LLM-free — they need no stage row (they carry no spend to join).
+    const rescueCandidates = await input.enrichmentStore.nonCoreRescueCandidates(input.graphVersionId);
+    const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
+      conceptId: concept.conceptId,
+      canonicalLabel: concept.canonicalLabel,
+      normalizedLabel: concept.normalizedLabel,
+      declaredDomain: concept.declaredDomain,
+      definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
+    }));
+    const assembled = await assembleEnrichmentNodes({
+      anchors: mintingAnchors,
+      rescueCandidates,
+      proposalPort: input.missingPrerequisiteProposal!,
+      groundingPort: input.groundingGeneration!,
+      rescueDurabilityJudge: input.rescueDurabilityJudge,
+      mintingDurabilityJudge: input.mintingDurabilityJudge,
+      bounds: config.mintingBounds,
+      newNodeId,
+      stage: runStage
     });
+    rescueDispositions = assembled.rescueDispositions;
+    mintingDispositions = assembled.mintingDispositions;
+    input.onMintingSummary?.({
+      accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
+      dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
+      unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
+    });
+    // The floor verifies source_mentioned passages verbatim against their cited block
+    // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
+    // does not verify is dropped before it can enter the derived layer.
+    const blockTextById = new Map<string, string>();
+    for (const candidate of rescueCandidates) {
+      for (const definition of candidate.definitions) blockTextById.set(definition.sourceBlockId, definition.blockText);
+      for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
+    }
+    const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
+    enrichmentNodes = floored.nodes;
+    groundingDispositions = floored.dispositions;
   }
 
   const assembledNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
@@ -261,31 +267,32 @@ export async function runGraphEnrichment(input: {
   let nodeMerges: NodeMergeRecord[] = [];
   let absorbedGroundingByCanonical = new Map<string, string[]>();
   if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
-    await runStage("dedup", async () => {
-      // Reduce each node to its dedup context from the SAME contextOf reduction the judge
-      // uses (label + verbatim definition/mention quotes), without absorbed grounding yet.
-      const dedupContext = new Map<string, DedupNodeContext>(
-        assembledNodes.map((node) => {
-          const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
-          return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
-        })
-      );
-      let unavailable = 0;
-      const result = await deduplicateDerivedNodes({
-        nodes: assembledNodes,
-        contextByNodeId: dedupContext,
-        embedding: input.nodeEmbedding,
-        adjudicator: input.nodeMergeAdjudicator,
-        config: config.dedup,
-        onUnavailable: () => {
-          unavailable += 1;
-        }
-      });
-      allNodes = result.nodes;
-      nodeMerges = result.merges;
-      absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
-      input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
+    // No coarse `dedup` bracket: deduplicateDerivedNodes brackets its two phases onto the
+    // fine `node-embedding` / `node-merge-adjudication` names (U2), so wall-clock joins the
+    // cost the embedding + adjudication calls already self-tag. Building the dedup context
+    // is deterministic and LLM-free — no stage row.
+    const dedupContext = new Map<string, DedupNodeContext>(
+      assembledNodes.map((node) => {
+        const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
+        return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
+      })
+    );
+    let unavailable = 0;
+    const result = await deduplicateDerivedNodes({
+      nodes: assembledNodes,
+      contextByNodeId: dedupContext,
+      embedding: input.nodeEmbedding,
+      adjudicator: input.nodeMergeAdjudicator,
+      config: config.dedup,
+      onUnavailable: () => {
+        unavailable += 1;
+      },
+      stage: runStage
     });
+    allNodes = result.nodes;
+    nodeMerges = result.merges;
+    absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
+    input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
   }
 
   // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
@@ -355,21 +362,22 @@ export async function runGraphEnrichment(input: {
         throw new Error(`runGraphEnrichment: domain "${declaredDomain}" assembled ordering prompt (~${promptChars} chars) exceeds the budget (${config.maxDomainPromptChars}); failing closed without a partial layer (R16).`);
       }
 
-      // Canonical labels are unique within a domain after dedup (KTD3), so label → id is
-      // well-defined. Matching is case-insensitive + trimmed; an edge endpoint matching no
-      // node, or naming one concept as its own prerequisite, is rejected fail-closed (rule 6).
-      const idByLabel = new Map<string, string>(sorted.map((node) => [normalizeLabel(node.context.canonicalLabel), node.derivedNodeId]));
+      // The judge cites endpoints by the 1-based Concept number shown in the prompt, which
+      // is `sorted`'s position (KTD3). Resolution is a deterministic array lookup — no string
+      // matching, no synonym drift surface. The per-call validator already bounds the index to
+      // [1, N] and rejects equal endpoints, but this deterministic boundary owns the provable
+      // guarantee: an out-of-range or self-referential number is rejected fail-closed (rule 6).
       const mapDraw = (ordering: WholeSetOrdering): { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string; rationale: string }[] =>
         ordering.edges.map((edge) => {
-          const prerequisiteDerivedNodeId = idByLabel.get(normalizeLabel(edge.prerequisiteLabel));
-          const dependentDerivedNodeId = idByLabel.get(normalizeLabel(edge.dependentLabel));
-          if (!prerequisiteDerivedNodeId || !dependentDerivedNodeId) {
-            throw new Error(`runGraphEnrichment: ordering edge cites a label not in domain "${declaredDomain}" ("${edge.prerequisiteLabel}" → "${edge.dependentLabel}"); failing closed (rule 6).`);
+          const prerequisite = sorted[edge.prerequisiteNumber - 1];
+          const dependent = sorted[edge.dependentNumber - 1];
+          if (!prerequisite || !dependent) {
+            throw new Error(`runGraphEnrichment: ordering edge cites a number outside the listed concepts of domain "${declaredDomain}" (${edge.prerequisiteNumber} → ${edge.dependentNumber}, of ${sorted.length}); failing closed (rule 6).`);
           }
-          if (prerequisiteDerivedNodeId === dependentDerivedNodeId) {
-            throw new Error(`runGraphEnrichment: ordering edge names one concept as its own prerequisite in domain "${declaredDomain}" ("${edge.prerequisiteLabel}"); failing closed (rule 6).`);
+          if (prerequisite.derivedNodeId === dependent.derivedNodeId) {
+            throw new Error(`runGraphEnrichment: ordering edge names one concept as its own prerequisite in domain "${declaredDomain}" (number ${edge.prerequisiteNumber}); failing closed (rule 6).`);
           }
-          return { prerequisiteDerivedNodeId, dependentDerivedNodeId, rationale: edge.rationale };
+          return { prerequisiteDerivedNodeId: prerequisite.derivedNodeId, dependentDerivedNodeId: dependent.derivedNodeId, rationale: edge.rationale };
         });
 
       // K independent draws on the SAME frozen input (D1). mapWithConcurrency preserves
@@ -475,7 +483,7 @@ export async function runGraphEnrichment(input: {
   // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
   // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
   // acyclicity is enforced upstream by cycle-routing (KTD3).
-  const disposal = await runStage("symbolic-disposal", async () => {
+  const disposal = await runStage(NON_LLM_STAGES.symbolicDisposal, async () => {
     const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
     return { reducedEdges, transitiveEdges };
   });
@@ -542,8 +550,9 @@ export async function runGraphEnrichment(input: {
       }
     })
   );
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "enrichment", operationId, status: "succeeded" });
   return layer;
+  });
 }
 
 function disposition(
@@ -571,11 +580,6 @@ function deterministicUuid(...parts: string[]): string {
 // excluded from the ordering input and recorded once (R4).
 const hasEvidence = (context: PrerequisiteConceptContext): boolean =>
   context.definitions.length > 0 || context.mentions.length > 0;
-
-// Canonical-label matching for the edge label → id mapping (KTD3): trimmed,
-// case-insensitive. Labels are unique within a Declared Domain after dedup, so this is
-// well-defined; an unmatched edge endpoint fails closed in the boundary (rule 6).
-const normalizeLabel = (label: string): string => label.trim().toLowerCase();
 
 // Stable directed-edge key for cycle-routing set membership.
 const edgeId = (edge: Pick<InferredPrerequisiteEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">): string =>

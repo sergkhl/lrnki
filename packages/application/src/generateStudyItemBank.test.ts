@@ -9,8 +9,12 @@ import type {
   SelfAssessmentItemDraft,
   StudyItem
 } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { EnrichmentRunStorePort, GraphVersionStorePort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
 import { generateStudyItemBank } from "./generateStudyItemBank";
+
+installNodeOperationTagContext();
 
 function passage(sourceBlockId: string, evidenceQuote: string): PublishedEvidencePassage {
   return { sourceResourceId: "res-1", sourceBlockId, evidenceQuote, headingPath: [], locator: {} };
@@ -78,6 +82,60 @@ function anchorNode(conceptId = "c1", label = "Ownership") {
   };
 }
 
+// A rescued source_mentioned enrichment node carrying a verified passage (definition or
+// mention) — the node shape the rescue seam now emits with real Definition Passages (U4).
+function sourceMentionedNode(opts: { id?: string; label?: string; passageType?: "definition" | "mention"; quote: string; blockId?: string }) {
+  const blockId = opts.blockId ?? "def-1";
+  return {
+    nodeKind: "enrichment" as const,
+    derivedNodeId: opts.id ?? "node-rescued",
+    groundingOrigin: "source_mentioned" as const,
+    role: "prerequisite" as const,
+    layer: "derived" as const,
+    canonicalLabel: opts.label ?? "Heap allocation",
+    normalizedLabel: (opts.label ?? "Heap allocation").toLowerCase(),
+    declaredDomain: "software engineering",
+    aliases: [],
+    groundingPassages: [{
+      passageType: opts.passageType ?? "definition",
+      text: opts.quote,
+      groundingOrigin: "source_mentioned" as const,
+      sourceResourceId: "src",
+      sourceBlockId: blockId,
+      evidenceQuote: opts.quote,
+      headingPath: [],
+      locator: {},
+      verbatimCheck: { disposition: "verified" as const, sourceResourceId: "src", sourceBlockId: blockId }
+    }]
+  };
+}
+
+// A minted llm_grounded enrichment node — its study items must stay `generated` provenance.
+function llmGroundedNode(opts: { id?: string; label?: string } = {}) {
+  const id = opts.id ?? "node-minted";
+  return {
+    nodeKind: "enrichment" as const,
+    derivedNodeId: id,
+    groundingOrigin: "llm_grounded" as const,
+    mintingReason: "assumed_prerequisite" as const,
+    role: "prerequisite" as const,
+    layer: "derived" as const,
+    canonicalLabel: opts.label ?? "Pointer arithmetic",
+    normalizedLabel: (opts.label ?? "Pointer arithmetic").toLowerCase(),
+    declaredDomain: "software engineering",
+    aliases: [],
+    groundingBundle: {
+      derivedNodeId: id,
+      groundingOrigin: "llm_grounded" as const,
+      definitions: [{ passageType: "definition" as const, text: "Pointer arithmetic computes addresses.", groundingOrigin: "llm_grounded" as const, headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding" as const, rationale: "generated" } }],
+      mentions: [],
+      scaffoldedAnchorConceptIds: [],
+      generatingModel: "mock",
+      rationale: "r"
+    }
+  };
+}
+
 function enrichmentStoreReturning(layer: DerivedGraphLayer): EnrichmentRunStorePort {
   return {
     async persist() { /* unused */ },
@@ -106,16 +164,19 @@ function osDraft(correctQuote: string, distractors: [string, string, string] = [
 function generationReturning(opts: {
   selfAssessment?: Record<string, SelfAssessmentItemDraft | "throw">;
   optionSelect?: Record<string, OptionSelectItemDraft | "throw">;
+  onGenerate?: () => void;
 }): StudyItemGenerationPort {
   return {
     model: "mock-gen",
     async generate(input) {
+      opts.onGenerate?.();
       const draft = opts.selfAssessment?.[input.node.derivedNodeId];
       if (draft === undefined) throw new Error(`no canned self-assessment draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("self-assessment generation failed");
       return draft;
     },
     async generateOptionSelect(input) {
+      opts.onGenerate?.();
       const draft = opts.optionSelect?.[input.node.derivedNodeId];
       if (draft === undefined) throw new Error(`no canned option-select draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("option-select generation failed");
@@ -163,6 +224,23 @@ test("a node whose self-assessment verifies and whose option-select passes the g
   assert.equal(result.rejected.length, 0);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select", "self_assessment"]);
   assert.deepEqual(persistedRejected, []);
+});
+
+test("the study-item operation context reaches generation calls", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-c1": saDraft("rules that govern memory") },
+      optionSelect: { "node-c1": osDraft("rules that govern memory") },
+      onGenerate: () => assert.equal(currentOperationTag(), "enr-1")
+    }),
+    studyItemBankStore: store
+  });
 });
 
 test("Covers AE5/R13: self-assessment verifies but the option-select guard rejects → only self_assessment; node NOT rejected", async () => {
@@ -272,4 +350,63 @@ test("supportedItemTypes per node equals the set of types actually persisted acr
 
   assert.deepEqual(await store.supportedItemTypes("node-c1"), ["option_select", "self_assessment"]);
   assert.deepEqual(await store.supportedItemTypes("node-c2"), ["self_assessment"]);
+});
+
+test("a rescued node with a verified DEFINITION passage yields source_mentioned study items (R5/U4)", async () => {
+  const def = "Heap allocation means the memory must be requested from the memory allocator at runtime.";
+  const cite = "the memory must be requested from the memory allocator at runtime";
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ quote: def })])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-rescued": saDraft(cite, "def-1") },
+      optionSelect: { "node-rescued": osDraft(cite, ["Stack", "Register", "Cache"], "def-1") }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1, "the rescued definition produced study items");
+  assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"), "rescued definitions ground source_mentioned items, not generated");
+});
+
+test("a rescued mention-only node still yields source_mentioned items (no regression, U4)", async () => {
+  const m = "Borrowing lets you reference a value without taking ownership.";
+  const cite = "reference a value without taking ownership";
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ id: "node-borrow", label: "Borrowing", passageType: "mention", quote: m, blockId: "m-1" })])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-borrow": saDraft(cite, "m-1") },
+      optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], "m-1") }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1);
+  assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"));
+});
+
+test("a minted llm_grounded node still yields generated provenance (U4)", async () => {
+  const cite = "computes addresses";
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([llmGroundedNode()])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-minted": saDraft(cite, "node-minted:definition:0") },
+      optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:0") }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1);
+  assert.ok(persisted.every((item) => item.groundingProvenance === "generated"), "minted nodes stay generated provenance");
 });

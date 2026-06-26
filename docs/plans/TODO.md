@@ -2,68 +2,26 @@
 
 ## TODO
 
-1. **Validate the CEP in-window mis-pick prompt fix — rule-14 A/B running (unblocked).** Real
-   measurement on the AIRA-dojo fixture attributed every `core_demoted_hollow_definition` demotion to
-   an *in-window mis-pick* (defining block already in the extractor's window, but it quoted a
-   passing-mention / heading / title / citation instead; zero retrieval-window misses, zero genuine
-   absence). The domain-neutral definition-passage clause is **implemented and committed** — broadened
-   reject list plus a positive tie-break preferring the block that states defining
-   properties/criteria/mechanism (rules 16/17). Extraction is fully unblocked: the aliases now route to
-   DeepSeek first-party and a real run on 2026-06-25 succeeded (demoted_hollow=1, 4 bare-name vetoes).
-   `tmp/2026-06-25-cep-defn-retrieval/ab.sh` (SKIP_SCAN fast variant, baseline-no-clause vs after-clause)
-   is being re-run to record the result; escalate to re-pick-on-veto or a stronger extractor only if the
-   clause underperforms
+1. **Resolve the CEP definition-passage mis-pick follow-up.** The prompt-side clause is implemented,
+   and the unblocked first-party A/B trail now exists at
+   `tmp/2026-06-25-cep-defn-retrieval/`. Decide from that evidence whether the clause is sufficient,
+   needs a repaired measurement pass, or should escalate to re-pick-on-veto / a stronger extractor
    ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
 
-2. **Cut extraction latency + build durable run observability (active thread, 2026-06-25).** A
-   single small document takes >10 min to extract. A disposable LiteLLM `LiteLLM_SpendLogs`
-   diagnostic (re-runnable: `tmp/2026-06-25-run-timing-spike/stage-timing.sh`) located the
-   bottleneck: **Concept Admission re-sends the whole ~23k-token document on every 5-candidate
-   batch** (`extractionAdapters.ts`, ~10 calls × ~59 s/call ≈ the bulk of the run); concept-discovery
-   is one ~162 s whole-document call. Two levers, fully written up in
-   `tmp/2026-06-25-run-timing-spike/FINDINGS.md`:
-   - **Provider switch to DeepSeek first-party — DONE (2026-06-25), largest lever.** Routing the
-     extraction aliases off OpenRouter onto `deepseek/deepseek-v4-flash-no-thinking` cut the two
-     payload-bound stages without any prompt change: concept-discovery 162 s → 24 s/call, admission
-     59 s → 17 s/call (real AIRA-dojo run; `tmp/2026-06-25-run-timing-spike/FINDINGS.md`). The gain is
-     raw first-party throughput (no OpenRouter proxy/host-routing hop), not caching — discovery sped up
-     6.7× with zero cache. This resolves the >10-min latency motivation. DeepSeek's per-account prefix
-     cache also works (cep-extraction 21% → 53%), removing the dedicated-key blocker entirely.
-   - **Admission document-prefix caching — minor open optimization.** Even document-first, the ~23k-token
-     admission prefix warmed only to the system-message level (~1.5k tok, 5% hit) across sequential
-     batches, while an isolated identical-prefix probe caches 99.8%. Net it would take admission ~17 s →
-     ~5 s, but it is off the critical path now and a prompt reorder is a behavior-changing prompt edit
-     (rule 14) — deferred, not shipped. Caching-independent alternative if pursued: fewer/larger
-     admission batches or neighborhood-scope each batch (reuse `selectEvidenceNeighborhood`), gated by a
-     measured multi-sample admission-recall (core-set) comparison (rules 14/19), not N=1.
-   - The durable companion is a per-operation run-stage timeline serving both live client progress
-     and speed/cost measurement — chosen direction, ready for `/ce-plan`:
-     [run-observability requirements](../brainstorms/2026-06-25-run-observability-and-progress-requirements.md).
-
-3. **Section-scoped parent-child CEP definition retrieval — deferred.** The disposable measure-first
-   instrument found zero retrieval-window misses on the AIRA-dojo fixture, so replacing the
-   adjacency/sibling-cap heuristics recovers nothing today. Revisit only behind a fresh requirements
-   document and plan — the earlier draft will drift as the in-window mis-pick fix above lands, so it
-   is intentionally not linked here.
-
-4. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-5. **Improve operator observability.**
+3. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
-
-6. **Keep data-blocked and unearned methods deferred.**
-   - Do not fit population difficulty, IRT, KT, or learner models from synthetic or self-assessed
-     responses.
-   - Do not reintroduce ungrounded graph densification or embedding-derived prerequisite structure.
-   - Introduce a formal deterministic semantic check only where a genuine domain oracle exists; it
-     may inform a judge but must not become an unearned heuristic veto.
+   Decisions: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
+   [ADR-0011](../adr/0011-retain-minimal-admin-lab.md), and
+   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 ## COMPLETED
 
@@ -84,19 +42,26 @@
   [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md).
 
 - **Derived graph enrichment.** Graph Enrichment rescues and mints derived nodes, adjudicates
-  embedding-proposed near-duplicates separately, applies durability judges, and derives prerequisite
-  structure from K-sampled whole-domain ordering. Direction-contested, weak, and cyclic aggregates
-  remain inspectable uncertainty; artifact-version suffix and redundant schema-version state were
-  removed. Decisions: [ADR-0012](../adr/0012-embeddings-permitted-except-prerequisite-derivation.md),
-  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md), and
+  embedding-proposed near-duplicates separately, applies durability judges, derives prerequisite
+  structure from K-sampled whole-domain ordering, and records grounding origin structurally.
+  Direction-contested, weak, and cyclic aggregates remain inspectable uncertainty; intrinsic
+  difficulty remains `EXPERIMENT_ONLY`. Decisions:
+  [ADR-0012](../adr/0012-embeddings-permitted-except-prerequisite-derivation.md),
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
+  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md),
+  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), and
   [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
 
-- **Grounding and intrinsic difficulty.** Grounding origin now makes asserted/derived provenance
-  structural, records the generated-grounding verbatim exemption, and keeps generated-node judgment
-  cross-family. Every derived node receives inspectable learner-neutral intrinsic difficulty; the
-  signal remains `EXPERIMENT_ONLY`. Decisions:
-  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md) and
-  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md).
+- **Rescue-seam derived grounding (reuse over re-mint).** The publication→enrichment seam no longer
+  discards source-grounded `optional` evidence: definition-bearing `optional` candidates are rescued
+  into the Derived Graph Layer as `source_mentioned` Enrichment Nodes carrying their verbatim
+  definition and mention passages (the inverted "no definition" rescue predicate was flipped,
+  `reject`-tier stays mention-only), the verbatim floor hard-gates rescued definitions, study items
+  inherit `source_mentioned` provenance, and the Study surfaces expose `studyItemCount` and guard
+  empty sessions. Minting now falls to a genuine source-absent residue instead of re-extracting
+  optional CEPs at the lowest trust tier. Decisions:
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md) and
+  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
 
 - **Learner study loop.** Typed study items cover anchors and Enrichment Nodes through
   `derived_node_id`; option-select study is auto-graded; calibration uses mutable binary verdicts;
@@ -111,26 +76,82 @@
   seed produces one coherent mixed-domain state. Decision:
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
+- **Extraction provider latency fix.** Routing production extraction aliases to DeepSeek first-party
+  resolved the >10-minute extraction latency and removed the dedicated OpenRouter-key blocker.
+
+- **Durable operation observability and cost measurement.** Extraction, graph-version build,
+  enrichment, and study-item operations now write shared incremental stage timelines with
+  heartbeats. LLM requests carry request-scoped operation tags, the shared report joins
+  operation-stage calls/tokens/cost with timeline wall-clock for one operation or Processing Journey,
+  and ranked targets expose the highest cost and time levers. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
+- **Operation Timeline stage ownership catalog.** Operation-stage ownership, LLM/non-LLM/unknown
+  classification, and the LiteLLM spend-stage list now live behind one application-facing catalog.
+  Bottleneck reports use that catalog for operation-scoped spend joins, unknown timeline stages stay
+  visible as timeline-only rows, and Admin Lab renders the report-provided stage kind. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
+- **Whole-set ordering label fidelity (grounded-generation hardening).** The ordering edge contract
+  switched from free-text canonical-label echo to a 1-based ordinal index — a closed-set menu pick
+  over the `Concept 1..N` the prompt already shows. Per-call schema + validator are built from the
+  node count so the index bound `[1, N]` is enforced under strict decoding; a transient out-of-range
+  draw re-prompts once then fails closed, and the application resolves `number → derivedNodeId` by
+  position (the superseded `trim().toLowerCase()` label-matching path was deleted, rule 18). This is
+  the rule-21 root-cause fix for the grounded-generation / entity-linking defect where synonym drift
+  (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
+
 ## VALIDATION
 
-- **Latest consolidated suite:** stale. The last recorded full workspace typecheck and suite run was
-  June 21, 2026; later milestones reported their focused deterministic-envelope suites green, but a
-  fresh consolidated run has not yet replaced that record.
+- **Operation Timeline ownership refactor, 2026-06-26:** full workspace typecheck and recursive test
+  suite pass; focused application coverage for bottleneck reports, catalog classification, ranking,
+  reporter instrumentation, extraction, graph-version build, enrichment, study-item generation, node
+  minting, and deduplication passes (130 tests); LiteLLM spend adapter tests pass; ESLint has zero
+  errors and five pre-existing warnings; Admin Lab production build passes.
+- **Rescue-seam fix U1–U5, 2026-06-26 (branch `fix/rescue-seam-derived-grounding`):** full workspace
+  typecheck, the recursive test suite (271 application incl. new definition-bearing rescue/floor/study
+  cases, 38 live-PostgreSQL incl. a new R1/R2 rescue-read case proving optional definitions are reused
+  while reject definitions stay excluded, 86 admin-lab), ESLint (0 errors; 5 pre-existing warnings), and
+  the admin-lab build are green.
+- **Rescue-seam fix U6/U7 real-source inspection, 2026-06-26 (rule 13/14).** Hard reset + a clean
+  markdown-only full-manifest seed (3 domains; graph version `41543df0`, enrichment `c6c558eb`)
+  confirmed the grounding upgrade on inspected real model output. Rust domain vs the pre-fix baseline
+  `c2e28622`: `source_mentioned` rescued nodes **1 → 10**, `llm_grounded` minted nodes **12 → 4**;
+  all-domain source-grounded share 39/51 (76%). Rescued nodes carry verbatim definition + mention
+  passages (floor `disposition=verified`; manually re-confirmed verbatim across markdown blockquote,
+  emphasis, and LaTeX cases — the only non-matches were checker-side normalization artifacts). The
+  Rust minted residue (4 nodes) is disjoint from the 25-concept rescue-eligible optional pool, so
+  minting fell to a genuine source-absent residue (R3). Study-item provenance tracks node grounding
+  (`document_anchored`→`source_cep` 30 / `source_mentioned`→`source_mentioned` 38 with verbatim
+  citations / `llm_grounded`→`generated` 23; R5). The learner loop runs end-to-end: synthetic
+  responses auto-graded with a realistic objective spread, mastery folded from graded scores at
+  threshold 0.7, and a correctly-answered node crossing into mastered — the apparent "frontier did
+  not advance" is correct conservative behavior (graded 0.5 < 0.7 keeps the next target), and
+  `compute-adaptive-path` is untouched by this branch. Trail: `tmp/2026-06-26-rescue-seam/`.
+- **Latest consolidated suite, 2026-06-26:** full workspace typecheck and tests (262 application,
+  37 live PostgreSQL integration including a new shared-`operation_id` reporter regression), ESLint
+  (zero errors; five pre-existing warnings) are green.
+- **Whole-set ordering label-fidelity fix + AE1/AE2 unblock, 2026-06-26.** Re-running the exact Rust
+  fixture that failed closed twice on June 25 (graph version `ce1f3b85`) now succeeds: enrichment
+  `c2e28622` committed 20 certain / 9 uncertain edges, `cycleRouted=0`, no "outside the listed"
+  abort. `Heap memory allocation` — one of the June-25 out-of-set misses — now binds by position;
+  inspected ordering is sane (`Ownership → {Borrowing, Move, Return Values}`; `The Stack and the
+  Heap → Heap memory allocation → Deep copy vs shallow copy → clone method`; `Pointers → References
+  → Borrowing`; foundations as roots, `Memory safety` a leaf). With enrichment unblocked, the
+  whole-journey `journey-cost-report` now stitches extraction → minting → enrichment end-to-end
+  (journey total wall=774.1s, 169 calls, 443,522 tokens, $0.0465; ordering stage 8 calls / $0.0071),
+  closing the previously-unverified AE1/AE2. Trail: `tmp/2026-06-26-ordering-number-fix/`.
+- **Pipeline-cost hardening baseline, 2026-06-26.** A fresh Rust ch.4.1 journey produced a clean
+  complete rollup with enrichment LLM stages joining wall-clock and LiteLLM cost on one fine stage
+  name. Ranked targets identify `extraction/admission` and `enrichment/prerequisite-ordering` as the
+  top cost levers, and `prerequisite-ordering` / `admission` as the top time levers. Trail:
+  `tmp/2026-06-26-pipeline-cost-baseline/`.
 - **Latest real-use quality evidence:** the June 24 Definition-Passage quality run passed with the
   caveat recorded above; the June 24 K-sampled prerequisite-ordering run passed on real Rust and
   economics sources, surfacing unstable directions as `uncertain` while retaining robust edges.
-- **Pending real-use evidence:** the rule-14 A/B for the June 25 CEP in-window mis-pick prompt fix
-  (TODO #1) is **running** on the now-unblocked first-party route. A single real run on 2026-06-25
-  succeeded (demoted_hollow=1, 4 bare-name vetoes); `tmp/2026-06-25-cep-defn-retrieval/ab.sh`
-  (baseline-no-clause vs after-clause) is being re-run to record the A/B comparison.
-- **Extraction latency spike (TODO #2), 2026-06-25 — RESOLVED by provider switch.** Real per-stage
-  timing from `LiteLLM_SpendLogs` attributed the >10-min run to admission's whole-document re-send per
-  batch on the OpenRouter route (admission ~59 s/call, per-host cache ~0.7%). Routing the extraction
-  aliases to **DeepSeek first-party** (`litellm/config.yaml`) cut concept-discovery 162 s → 24 s/call
-  and admission 59 s → 17 s/call on a real AIRA-dojo run, and lifted per-account caching
-  (cep-extraction 21% → 53%). The OpenRouter host-pin path is abandoned (it needed a dedicated key);
-  the admission document-prefix cache warming further is a deferred minor optimization. Full trail:
-  `tmp/2026-06-25-run-timing-spike/FINDINGS.md`.
+- **CEP definition-passage prompt A/B, 2026-06-25:** the first-party trail exists at
+  `tmp/2026-06-25-cep-defn-retrieval/`; TODO #1 owns the remaining decision because the evidence
+  needs interpretation before it becomes a completed outcome.
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims above come from
   inspected real model output.

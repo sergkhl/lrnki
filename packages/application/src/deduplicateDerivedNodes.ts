@@ -3,8 +3,10 @@ import type {
   DerivedGraphNode,
   NodeMergeRecord
 } from "@lrnki/domain-core";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
+import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
 
 // Semantic deduplication of the Derived Graph Layer node set (plan U3, ADR-0012/0019,
 // AGENTS rule 20). Runs AFTER the derived node set is assembled (anchors ∪ enrichment
@@ -85,52 +87,70 @@ export async function deduplicateDerivedNodes(input: {
   adjudicator?: NodeMergeAdjudicationPort;
   config?: DedupConfig;
   onUnavailable?: (event: DedupUnavailable) => void;
+  // Stage-bracket seam (U2): the whole PROPOSE phase is one `node-embedding` bracket and
+  // the whole DECIDE phase one `node-merge-adjudication` bracket — phase-level, NOT
+  // per-call, because adjudication runs concurrently and per-call same-name brackets would
+  // overlap and mis-pair (KTD2/KTD3). Each call still self-tags its cost with the same fine
+  // name, so cost joins regardless of the wall-clock envelope. Defaults to a passthrough.
+  stage?: StageBracket;
 }): Promise<DeduplicateResult> {
   const { nodes, contextByNodeId, embedding, adjudicator } = input;
-  // Opt-in: without BOTH ports the pass is a no-op (KTD7) — identical node set, no merges.
+  // Opt-in: without BOTH ports the pass is a no-op (KTD7) — identical node set, no merges,
+  // and no stage rows (a no-op dedup never appears in the timeline).
   if (!embedding || !adjudicator) {
     return { nodes, merges: [], absorbedGroundingByCanonical: new Map() };
   }
   const config = input.config ?? DEFAULT_DEDUP_CONFIG;
+  const stage = input.stage ?? passthroughStageBracket;
 
   // PROPOSE — embed per Declared Domain so a per-domain embedding failure skips only that
   // domain (R13). Cross-domain pairs are never proposed (R1): candidatePairsByDomain
   // groups by domain and a node without a vector (failed domain) forms no pair.
   const vectorByNodeId = new Map<string, number[]>();
   const byDomain = groupByDomain(nodes);
-  for (const [domain, members] of byDomain) {
-    const texts = members.map((node) => embedText(contextByNodeId.get(node.derivedNodeId)));
-    try {
-      const vectors = await embedding.embed(texts);
-      members.forEach((node, index) => {
-        if (vectors[index]) vectorByNodeId.set(node.derivedNodeId, vectors[index]);
-      });
-    } catch (error) {
-      // Fail closed: this domain produces no merges; other domains are unaffected.
-      input.onUnavailable?.({ kind: "embedding", declaredDomain: domain, reason: reasonOf(error) });
+  // One `node-embedding` bracket spans the whole per-domain embedding loop (KTD3): the
+  // phase wall-clock under the fine name, while each `embedding.embed` self-tags its cost.
+  await stage(STAGE_TAGS.nodeEmbedding, async () => {
+    for (const [domain, members] of byDomain) {
+      const texts = members.map((node) => embedText(contextByNodeId.get(node.derivedNodeId)));
+      try {
+        const vectors = await embedding.embed(texts);
+        members.forEach((node, index) => {
+          if (vectors[index]) vectorByNodeId.set(node.derivedNodeId, vectors[index]);
+        });
+      } catch (error) {
+        // Fail closed: this domain produces no merges; other domains are unaffected. The
+        // bracket still closes ok — a surfaced per-domain failure is not a stage failure.
+        input.onUnavailable?.({ kind: "embedding", declaredDomain: domain, reason: reasonOf(error) });
+      }
     }
-  }
+  });
 
   const pairs = candidatePairsByDomain(nodes, vectorByNodeId, config.similarityThreshold, config.maxPairsPerNode);
 
   // DECIDE — adjudicate each proposed pair. Bounded concurrency, results collected in
   // deterministic pair order. A throw degrades the pair to keep_distinct (fail-closed),
   // surfaced via onUnavailable; the adjudicator never auto-merges on score alone (AE3).
-  const decisions = await mapWithConcurrency(pairs, config.adjudicationConcurrency, async (pair) => {
-    const a = contextByNodeId.get(pair.aId);
-    const b = contextByNodeId.get(pair.bId);
-    try {
-      const decision = await adjudicator.adjudicate({
-        declaredDomain: pair.declaredDomain,
-        a: { label: a?.label ?? "", aliases: a?.aliases ?? [], evidence: (a?.evidence ?? []).slice(0, config.maxEvidencePerNode) },
-        b: { label: b?.label ?? "", aliases: b?.aliases ?? [], evidence: (b?.evidence ?? []).slice(0, config.maxEvidencePerNode) }
-      });
-      return { pair, merge: decision.decision === "merge", rationale: decision.rationale };
-    } catch (error) {
-      input.onUnavailable?.({ kind: "adjudication", aId: pair.aId, bId: pair.bId, reason: reasonOf(error) });
-      return { pair, merge: false, rationale: "" };
-    }
-  });
+  // One `node-merge-adjudication` bracket spans the whole concurrent batch (KTD3): a single
+  // open/close pair per dedup run, so the persisted duration is the batch's wall-clock and
+  // no two same-name brackets overlap (KTD2). Each call self-tags its own cost.
+  const decisions = await stage(STAGE_TAGS.nodeMergeAdjudication, () =>
+    mapWithConcurrency(pairs, config.adjudicationConcurrency, async (pair) => {
+      const a = contextByNodeId.get(pair.aId);
+      const b = contextByNodeId.get(pair.bId);
+      try {
+        const decision = await adjudicator.adjudicate({
+          declaredDomain: pair.declaredDomain,
+          a: { label: a?.label ?? "", aliases: a?.aliases ?? [], evidence: (a?.evidence ?? []).slice(0, config.maxEvidencePerNode) },
+          b: { label: b?.label ?? "", aliases: b?.aliases ?? [], evidence: (b?.evidence ?? []).slice(0, config.maxEvidencePerNode) }
+        });
+        return { pair, merge: decision.decision === "merge", rationale: decision.rationale };
+      } catch (error) {
+        input.onUnavailable?.({ kind: "adjudication", aId: pair.aId, bId: pair.bId, reason: reasonOf(error) });
+        return { pair, merge: false, rationale: "" };
+      }
+    })
+  );
 
   // APPLY — union the merged pairs (transitive clusters collapse to one canonical),
   // then select canonical + absorb deterministically (KTD6).

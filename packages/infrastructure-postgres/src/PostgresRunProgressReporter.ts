@@ -10,10 +10,14 @@ import type { Sql } from "postgres";
 // "no row, then a finished one" — and an in-flight or crashed run still leaves a
 // readable timeline (a stale `last_progress_at` is the "hung run" signal).
 //
-// The parent is found by `operation_id` alone after `beginOperation`: it is a
-// run/version/enrichment uuid, globally unique, so later calls need not repeat the
-// operation_type. Each multi-write method folds its writes into one CTE statement
-// so atomicity holds without a multi-statement transaction.
+// The parent is found by the full `(operation_type, operation_id)` natural key —
+// the same key `beginOperation` conflicts on. `operation_id` is NOT unique on its
+// own: `study_items` deliberately reuses the enrichmentId (ADR-0017 split), so a
+// run that scoped by `operation_id` alone would match BOTH the enrichment and the
+// study_items parent and, in `enterStage`, emit one stage row per parent under a
+// single bound id — a primary-key self-collision. Each multi-write method folds
+// its writes into one CTE statement so atomicity holds without a multi-statement
+// transaction.
 export class PostgresRunProgressReporter implements RunProgressReporterPort {
   constructor(private readonly sql: Sql) {}
 
@@ -28,7 +32,7 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
 
   // Open a stage: set the parent's current_stage and reset its per-stage progress
   // counters, then insert the child stage row — one CTE statement.
-  async enterStage(input: { operationId: string; stage: string; total?: number }): Promise<void> {
+  async enterStage(input: { operationType: OperationType; operationId: string; stage: string; total?: number }): Promise<void> {
     await this.sql`
       WITH parent AS (
         UPDATE operation_runs
@@ -36,7 +40,7 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
             progress_done = NULL,
             progress_total = ${input.total ?? null},
             last_progress_at = now()
-        WHERE operation_id = ${input.operationId}
+        WHERE operation_type = ${input.operationType} AND operation_id = ${input.operationId}
         RETURNING operation_run_id
       )
       INSERT INTO operation_run_stages (operation_run_stage_id, operation_run_id, stage, started_at, progress_total)
@@ -47,12 +51,12 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
   // Heartbeat (R3): advance the cumulative item count and last_progress_at on both
   // the parent and the currently-open child row for this stage. Monotonic by the
   // caller's contract (done only increases within a stage).
-  async recordProgress(input: { operationId: string; stage: string; done: number }): Promise<void> {
+  async recordProgress(input: { operationType: OperationType; operationId: string; stage: string; done: number }): Promise<void> {
     await this.sql`
       WITH parent AS (
         UPDATE operation_runs
         SET progress_done = ${input.done}, last_progress_at = now()
-        WHERE operation_id = ${input.operationId}
+        WHERE operation_type = ${input.operationType} AND operation_id = ${input.operationId}
         RETURNING operation_run_id
       )
       UPDATE operation_run_stages s
@@ -64,22 +68,23 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
   }
 
   // Close the open child row for this stage.
-  async completeStage(input: { operationId: string; stage: string; ok: boolean }): Promise<void> {
+  async completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean }): Promise<void> {
     await this.sql`
       UPDATE operation_run_stages s
       SET ended_at = now(), ok = ${input.ok}
       FROM operation_runs r
       WHERE s.operation_run_id = r.operation_run_id
+        AND r.operation_type = ${input.operationType}
         AND r.operation_id = ${input.operationId}
         AND s.stage = ${input.stage}
         AND s.ended_at IS NULL`;
   }
 
   // Set the parent's terminal status + completed_at.
-  async completeOperation(input: { operationId: string; status: "succeeded" | "failed" }): Promise<void> {
+  async completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void> {
     await this.sql`
       UPDATE operation_runs
       SET status = ${input.status}, completed_at = now(), last_progress_at = now()
-      WHERE operation_id = ${input.operationId}`;
+      WHERE operation_type = ${input.operationType} AND operation_id = ${input.operationId}`;
   }
 }

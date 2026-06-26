@@ -1,7 +1,7 @@
 import { normalizeConceptLabel } from "@lrnki/domain-core";
 import type {
   LlmGroundedEnrichmentNode,
-  MentionedNonCoreCandidate,
+  NonCoreRescueCandidate,
   MintingDisposition,
   RescueDisposition,
   SourceMentionedEnrichmentNode,
@@ -13,8 +13,10 @@ import type {
   MissingPrerequisiteProposalPort,
   RescueDurabilityJudgmentPort
 } from "@lrnki/ports";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
+import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
 
 // Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep minting
 // bounded so a thin source cannot explode into a runaway derived graph; both knobs
@@ -40,9 +42,11 @@ export type MintingAnchor = {
 };
 
 // Assemble the derived layer's ENRICHMENT nodes (rescue + mint) for one run (U5).
-// RESCUE (KTD5): each member-run rejected/optional candidate the source mentions but
-// never defines becomes a `source_mentioned` node carrying its real mention evidence,
-// deduped by normalized label within Declared Domain. MINT (KTD6): each anchor drives
+// RESCUE (KTD1/KTD5): each member-run non-core candidate becomes a `source_mentioned`
+// node reusing its real verbatim evidence — `optional`-tier candidates carry their
+// Definition Passages alongside mentions (the rule-21 reuse-over-regeneration fix),
+// `reject`-tier carry mentions only — deduped by normalized label within Declared
+// Domain so the minter cannot regenerate a rescued concept. MINT (KTD6): each anchor drives
 // a bounded, explicit proposal pass — the proposal port NAMES assumed-prior concepts
 // (handoff constraint: node identity is an inspectable operation, not local string
 // construction), then the grounding port fills a CEP-shaped bundle for each accepted
@@ -50,7 +54,7 @@ export type MintingAnchor = {
 // layer (R5); the verbatim floor (U6) runs over the result before pair judging.
 export async function assembleEnrichmentNodes(input: {
   anchors: MintingAnchor[];
-  rescueCandidates: MentionedNonCoreCandidate[];
+  rescueCandidates: NonCoreRescueCandidate[];
   proposalPort: MissingPrerequisiteProposalPort;
   groundingPort: GroundingGenerationPort;
   // Optional measured rescue durability judge (U3). When provided, each AGGREGATED
@@ -65,6 +69,11 @@ export async function assembleEnrichmentNodes(input: {
   mintingDurabilityJudge?: MintingDurabilityJudgmentPort;
   bounds?: EnrichmentMintingBounds;
   newNodeId: () => string;
+  // Stage-bracket seam (U1): each inner LLM port call is wrapped with its fine STAGE_TAGS
+  // name so its wall-clock joins the cost the call already self-tags. The assembly is a
+  // sequential `await` loop, so only one bracket of a given name is ever open at once
+  // (KTD2/KTD3). Defaults to a passthrough so a direct unit test runs un-instrumented.
+  stage?: StageBracket;
 }): Promise<{
   rescuedNodes: SourceMentionedEnrichmentNode[];
   mintedNodes: LlmGroundedEnrichmentNode[];
@@ -72,6 +81,7 @@ export async function assembleEnrichmentNodes(input: {
   mintingDispositions: MintingDisposition[];
 }> {
   const bounds = input.bounds ?? DEFAULT_MINTING_BOUNDS;
+  const stage = input.stage ?? passthroughStageBracket;
 
   // A label is "taken" when an anchor, a rescued node, or an already-minted node in
   // the same Declared Domain already carries it — the single dedupe authority for the
@@ -134,11 +144,13 @@ export async function assembleEnrichmentNodes(input: {
       existing.push({ canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes });
       anchorsByDomain.set(anchor.declaredDomain, existing);
     }
-    const judged = await applyRescueDurabilityJudge({
-      rescuedNodes: aggregatedRescuedNodes,
-      anchorsByDomain,
-      judge: input.rescueDurabilityJudge
-    });
+    const judged = await stage(STAGE_TAGS.rescueDurability, () =>
+      applyRescueDurabilityJudge({
+        rescuedNodes: aggregatedRescuedNodes,
+        anchorsByDomain,
+        judge: input.rescueDurabilityJudge!
+      })
+    );
     rescuedNodes = judged.keptNodes;
     rescueDispositions = judged.dispositions;
   }
@@ -153,12 +165,14 @@ export async function assembleEnrichmentNodes(input: {
     if (runBudget <= 0) break;
     const maxProposals = Math.min(bounds.maxMintedPerAnchor, runBudget);
     const existingLabels = labelsInDomain(takenByDomain, anchor.declaredDomain, input, rescuedNodes, mintedNodes);
-    const proposals = await input.proposalPort.propose({
-      declaredDomain: anchor.declaredDomain,
-      anchor: { conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes },
-      existingNodeLabels: existingLabels,
-      maxProposals
-    });
+    const proposals = await stage(STAGE_TAGS.missingPrerequisiteProposal, () =>
+      input.proposalPort.propose({
+        declaredDomain: anchor.declaredDomain,
+        anchor: { conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes },
+        existingNodeLabels: existingLabels,
+        maxProposals
+      })
+    );
 
     const reserved: ReservedMintingProposal[] = [];
     for (const proposal of proposals) {
@@ -182,7 +196,9 @@ export async function assembleEnrichmentNodes(input: {
     }
 
     const keptProposals = input.mintingDurabilityJudge && reserved.length > 0
-      ? await applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge })
+      ? await stage(STAGE_TAGS.mintingDurability, () =>
+          applyMintingDurabilityJudge({ proposals: reserved, judge: input.mintingDurabilityJudge! })
+        )
       : { keptProposals: reserved, dispositions: [] };
     mintingDispositions.push(...keptProposals.dispositions);
     // A `dropped` verdict is scoped to THIS anchor, so release the label: a later
@@ -196,12 +212,14 @@ export async function assembleEnrichmentNodes(input: {
     let mintedForAnchor = 0;
     for (const proposal of keptProposals.keptProposals) {
       if (runBudget <= 0 || mintedForAnchor >= bounds.maxMintedPerAnchor) break;
-      const groundingBundle = await input.groundingPort.generate({
-        derivedNodeId: proposal.derivedNodeId,
-        declaredDomain: anchor.declaredDomain,
-        nodeLabel: proposal.proposedLabel,
-        scaffoldedAnchors: [{ conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }]
-      });
+      const groundingBundle = await stage(STAGE_TAGS.groundingGeneration, () =>
+        input.groundingPort.generate({
+          derivedNodeId: proposal.derivedNodeId,
+          declaredDomain: anchor.declaredDomain,
+          nodeLabel: proposal.proposedLabel,
+          scaffoldedAnchors: [{ conceptId: anchor.conceptId, canonicalLabel: anchor.canonicalLabel, definitionQuotes: anchor.definitionQuotes }]
+        })
+      );
       mintedNodes.push({
         nodeKind: "enrichment",
         derivedNodeId: proposal.derivedNodeId,
@@ -223,19 +241,28 @@ export async function assembleEnrichmentNodes(input: {
   return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions };
 }
 
-function rescuePassages(candidate: MentionedNonCoreCandidate): SourceMentionGroundingPassage[] {
-  return candidate.mentions.map((mention) => ({
-    passageType: "mention",
-    text: mention.evidenceQuote,
+function rescuePassages(candidate: NonCoreRescueCandidate): SourceMentionGroundingPassage[] {
+  // Reuse both Definition and mention evidence (KTD1). Definitions lead — they are the
+  // richer grounding that downstream study items prefer (U4). Every passage is provisional
+  // `verified`; the verbatim floor (U3) re-verifies each quote against its cited block.
+  const passage = (
+    passageType: "definition" | "mention",
+    source: NonCoreRescueCandidate["mentions"][number]
+  ): SourceMentionGroundingPassage => ({
+    passageType,
+    text: source.evidenceQuote,
     groundingOrigin: "source_mentioned",
-    sourceResourceId: mention.sourceResourceId,
-    sourceBlockId: mention.sourceBlockId,
-    evidenceQuote: mention.evidenceQuote,
-    headingPath: mention.headingPath,
-    locator: mention.locator,
-    // Provisional; the verbatim floor (U6) re-verifies against the cited block.
-    verbatimCheck: { disposition: "verified", sourceResourceId: mention.sourceResourceId, sourceBlockId: mention.sourceBlockId }
-  }));
+    sourceResourceId: source.sourceResourceId,
+    sourceBlockId: source.sourceBlockId,
+    evidenceQuote: source.evidenceQuote,
+    headingPath: source.headingPath,
+    locator: source.locator,
+    verbatimCheck: { disposition: "verified", sourceResourceId: source.sourceResourceId, sourceBlockId: source.sourceBlockId }
+  });
+  return [
+    ...candidate.definitions.map((definition) => passage("definition", definition)),
+    ...candidate.mentions.map((mention) => passage("mention", mention))
+  ];
 }
 
 // The labels already present in one domain, as canonical strings, so the proposer can

@@ -1,5 +1,5 @@
-import { isStageTag } from "@lrnki/domain-core";
-import type { RunProgressReporterPort } from "@lrnki/ports";
+import type { OperationType, RunProgressReporterPort } from "@lrnki/ports";
+import { isLlmStage, NON_LLM_STAGES, type NonLlmStage } from "./operationTimelineCatalog";
 
 // The reporter seam's application-facing surface (KTD4, R7). Operations import the
 // no-op default and the shared stage vocabulary from here; the worker injects the
@@ -21,39 +21,42 @@ export const noopRunProgressReporter: RunProgressReporterPort = {
 // carry no LiteLLM spend tag, so they simply never appear in the cost half of the
 // R5 join (left-join yields zero/absent cost). LLM stages reuse STAGE_TAGS verbatim
 // (domain-core) so cost and wall-clock join on one key — `isLlmStage` guards that.
-export const NON_LLM_STAGES = {
-  documentLoad: "document-load",
-  persist: "persist",
-  // Minting (graph-version build) is LLM-free: load base + selected runs, refine,
-  // persist (ADR-0010/ADR-0017).
-  load: "load",
-  refine: "refine"
-} as const;
-
-export type NonLlmStage = (typeof NON_LLM_STAGES)[keyof typeof NON_LLM_STAGES];
-
 // The vocabulary helper (R5 join-key alignment): true exactly for the closed LLM
 // stage set (STAGE_TAGS). Re-exported from domain-core so the reporter seam is the
 // one application-facing surface, while the membership set stays a single source of
 // truth shared with the infrastructure spend projection (U7).
-export const isLlmStage = isStageTag;
+export { isLlmStage, NON_LLM_STAGES, type NonLlmStage };
+
+// The shared stage-bracket signature (U1/U2). A bracket opens a named stage, runs the
+// work, and closes the stage — so a helper that receives one can attribute its inner
+// LLM port calls to fine STAGE_TAGS names without knowing about the reporter or operation
+// id. Threaded into assembleEnrichmentNodes and deduplicateDerivedNodes so the per-stage
+// wall-clock bracket keys to the SAME fine names the inner calls already tag their cost
+// with, closing the bottleneck-report join.
+export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: number) => Promise<T>;
 
 // Stage-bracket factory shared by every instrumented operation (R1). Open a stage, run
 // it, close it ok:true; a throw closes it ok:false, marks the OPERATION failed, and
 // rethrows — so a thrown stage always leaves a readable failed timeline without each
 // operation re-implementing the try/catch (and the failure semantics stay one source
 // of truth). `total` seeds an N-of-M heartbeat for stages that iterate.
-export function bracketStage(reporter: RunProgressReporterPort, operationId: string) {
+export function bracketStage(reporter: RunProgressReporterPort, operationType: OperationType, operationId: string): StageBracket {
   return async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
-    await reporter.enterStage({ operationId, stage, total });
+    await reporter.enterStage({ operationType, operationId, stage, total });
     try {
       const result = await fn();
-      await reporter.completeStage({ operationId, stage, ok: true });
+      await reporter.completeStage({ operationType, operationId, stage, ok: true });
       return result;
     } catch (error) {
-      await reporter.completeStage({ operationId, stage, ok: false });
-      await reporter.completeOperation({ operationId, status: "failed" });
+      await reporter.completeStage({ operationType, operationId, stage, ok: false });
+      await reporter.completeOperation({ operationType, operationId, status: "failed" });
       throw error;
     }
   };
 }
+
+// Passthrough bracket: runs the work, opens/closes nothing. The default for a helper
+// called outside an instrumented operation (a direct unit test, or a caller that does
+// not thread a reporter) so the helper behaves byte-identically to its un-instrumented
+// self (U1/U2 opt-in seam, mirroring noopRunProgressReporter).
+export const passthroughStageBracket: StageBracket = (_stage, fn) => fn();

@@ -2,7 +2,29 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AnchorProjectionNode, NodeMergeDecision, SourceMentionedEnrichmentNode } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import { candidatePairsByDomain, cosineSimilarity, deduplicateDerivedNodes, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
+import type { StageBracket } from "./runProgressReporter";
+
+// Recording stage bracket tracking open/close order and peak concurrency per name, so a
+// test asserts exactly-one-bracket-per-phase and no same-name overlap (U2/KTD2).
+function recordingStage() {
+  const opened: string[] = [];
+  const peakByName = new Map<string, number>();
+  const liveByName = new Map<string, number>();
+  const stage: StageBracket = async (name, fn) => {
+    opened.push(name);
+    const live = (liveByName.get(name) ?? 0) + 1;
+    liveByName.set(name, live);
+    peakByName.set(name, Math.max(peakByName.get(name) ?? 0, live));
+    try {
+      return await fn();
+    } finally {
+      liveByName.set(name, (liveByName.get(name) ?? 1) - 1);
+    }
+  };
+  return { stage, opened, peakByName };
+}
 
 // Deterministic-envelope tests for the dedup orchestration (plan U3, R12). Canned
 // embedding vectors and canned adjudicator decisions are INPUT FIXTURES exercising the
@@ -268,6 +290,65 @@ test("two anchors in one cluster are refused (published-identity collision, R7)"
   const result = await deduplicateDerivedNodes({ nodes, contextByNodeId: ctx, embedding: embeddingStub(vectors), adjudicator: adjudicatorStub(() => "merge"), config: transitiveConfig });
   assert.equal(result.nodes.length, 3, "no node absorbed when a cluster holds two anchors");
   assert.equal(result.merges.length, 0);
+});
+
+// --- U2 stage bracketing -----------------------------------------------------------
+
+// A run with both ports records exactly one node-embedding bracket (whole PROPOSE phase)
+// and one node-merge-adjudication bracket (whole concurrent DECIDE batch), never `dedup`,
+// and the adjudication bracket never overlaps itself despite concurrency > 1 (KTD2/KTD3).
+test("U2: one node-embedding + one node-merge-adjudication bracket, no overlap, no `dedup`", async () => {
+  const nodes = [enrichment("e1", "Alpha", "d"), enrichment("e2", "Alpha2", "d"), enrichment("e3", "Alpha3", "d")];
+  const ctx = contextMap([
+    ["e1", { label: "Alpha", aliases: [], evidence: [] }],
+    ["e2", { label: "Alpha2", aliases: [], evidence: [] }],
+    ["e3", { label: "Alpha3", aliases: [], evidence: [] }]
+  ]);
+  // All three identical ⇒ three proposed pairs adjudicated concurrently (concurrency 4).
+  const vectors = new Map<string, number[]>([["Alpha", [1, 0]], ["Alpha2", [1, 0]], ["Alpha3", [1, 0]]]);
+  const { stage, opened, peakByName } = recordingStage();
+  await deduplicateDerivedNodes({
+    nodes,
+    contextByNodeId: ctx,
+    embedding: embeddingStub(vectors),
+    adjudicator: adjudicatorStub(() => "keep_distinct"),
+    config,
+    stage
+  });
+  assert.equal(opened.filter((s) => s === STAGE_TAGS.nodeEmbedding).length, 1, "exactly one embedding bracket");
+  assert.equal(opened.filter((s) => s === STAGE_TAGS.nodeMergeAdjudication).length, 1, "exactly one adjudication bracket");
+  assert.ok(!opened.includes("dedup"), "no coarse dedup stage");
+  assert.equal(peakByName.get(STAGE_TAGS.nodeMergeAdjudication), 1, "the concurrent batch is one non-overlapping bracket");
+});
+
+// The opt-in no-op path (a missing port) emits no stage brackets — a no-op dedup never
+// appears in the timeline.
+test("U2: the opt-in no-op (missing port) emits no stage brackets", async () => {
+  const nodes = [enrichment("e1", "X", "d"), enrichment("e2", "Y", "d")];
+  const { stage, opened } = recordingStage();
+  await deduplicateDerivedNodes({ nodes, contextByNodeId: new Map(), config, stage });
+  assert.deepEqual(opened, [], "no embedding or adjudication bracket when the pass is a no-op");
+});
+
+// A per-domain embedding failure still closes the single node-embedding bracket (surfaced,
+// not stranded), and the adjudication bracket still opens once over the empty pair set.
+test("U2: an embedding failure does not strand the embedding bracket", async () => {
+  const nodes = [enrichment("a1", "FAILME one", "broken"), enrichment("a2", "FAILME two", "broken")];
+  const ctx = contextMap([
+    ["a1", { label: "FAILME one", aliases: [], evidence: [] }],
+    ["a2", { label: "FAILME two", aliases: [], evidence: [] }]
+  ]);
+  const { stage, opened, peakByName } = recordingStage();
+  await deduplicateDerivedNodes({
+    nodes,
+    contextByNodeId: ctx,
+    embedding: embeddingStub(new Map(), "FAILME"),
+    adjudicator: adjudicatorStub(() => "merge"),
+    config,
+    stage
+  });
+  assert.equal(opened.filter((s) => s === STAGE_TAGS.nodeEmbedding).length, 1);
+  assert.equal(peakByName.get(STAGE_TAGS.nodeEmbedding), 1, "the embedding bracket opened and closed once");
 });
 
 test("candidatePairsByDomain: cross-domain pairs never proposed (R1)", () => {

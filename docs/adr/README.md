@@ -34,5 +34,4 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0026 — Typed Study Item Bank and learner-response identity](./0026-typed-study-item-bank.md)
 - [0027 — Inspection and learner-projection read boundaries](./0027-serve-inspection-through-read-model-ports.md)
 - [0028 — Non-deterministic quality measurement](./0028-measure-non-deterministic-quality-with-non-deterministic-methods.md)
-
-Numbers 0020–0021 were never issued.
+- [0029 — Shared operation-stage timelines](./0029-persist-shared-operation-stage-timelines.md)

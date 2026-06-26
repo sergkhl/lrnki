@@ -10,6 +10,8 @@ import type {
   PrerequisiteConceptContext,
   WholeSetOrdering
 } from "@lrnki/domain-core";
+import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -20,6 +22,9 @@ import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { RunProgressReporterPort } from "@lrnki/ports";
 import { DEFAULT_ENRICHMENT_CONFIG, runGraphEnrichment, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 import { DEFAULT_DEDUP_CONFIG } from "./deduplicateDerivedNodes";
+import { NON_LLM_STAGES } from "./runProgressReporter";
+
+installNodeOperationTagContext();
 
 // Recording reporter fake: captures ordered reporter calls so a test asserts the
 // enrichment timeline lifecycle without a database (rule 11). Replaces the deleted
@@ -110,28 +115,36 @@ type OrderInput = { declaredDomain: string; nodes: PrerequisiteConceptContext[] 
 // A responder maps (call input, DRAW index within that domain) → one draw's ordering.
 type Responder = (input: OrderInput, drawIndex: number) => WholeSetOrdering;
 
-// A canned edge over two canonical labels; only edges whose endpoints are in the call's
-// node set are emitted (mirrors a sane model). The model's self-reported `confidence` is
-// NO LONGER the edge confidence (D4 replaces it with consensus max(f,r)/K), so it is
-// cosmetic here.
-function edgeOf(prerequisiteLabel: string, dependentLabel: string, confidence = 0.9, rationale = "mock"): WholeSetOrdering["edges"][number] {
+// Tests author canned edges by LABEL for readability; `presentEdges` converts each label
+// to the 1-based Concept number the real ordering contract now uses (the model cites the
+// position shown in the prompt — see WholeSetPrerequisiteEdge). An edge whose endpoint is
+// not in the call's node set is dropped (mirrors a sane model). The model's self-reported
+// `confidence` is NO LONGER the edge confidence (D4 replaces it with consensus
+// max(f,r)/K), so it is cosmetic here.
+type LabelEdge = { prerequisiteLabel: string; dependentLabel: string; confidence: number; rationale: string };
+function edgeOf(prerequisiteLabel: string, dependentLabel: string, confidence = 0.9, rationale = "mock"): LabelEdge {
   return { prerequisiteLabel, dependentLabel, confidence, rationale };
 }
-function presentEdges(input: OrderInput, edges: WholeSetOrdering["edges"]): WholeSetOrdering {
-  const labels = new Set(input.nodes.map((n) => n.canonicalLabel));
-  return { edges: edges.filter((e) => labels.has(e.prerequisiteLabel) && labels.has(e.dependentLabel)) };
+function presentEdges(input: OrderInput, edges: LabelEdge[]): WholeSetOrdering {
+  const numberOf = (label: string): number => input.nodes.findIndex((n) => n.canonicalLabel === label) + 1;
+  return {
+    edges: edges
+      .map((e) => ({ prerequisiteNumber: numberOf(e.prerequisiteLabel), dependentNumber: numberOf(e.dependentLabel), confidence: e.confidence, rationale: e.rationale }))
+      // findIndex(...) + 1 === 0 means the label is not in the node set: drop that edge.
+      .filter((e) => e.prerequisiteNumber > 0 && e.dependentNumber > 0)
+  };
 }
 
 // Build K draws for one domain: `segments` lists [edges, repeat] in order; remaining draws
 // up to K are empty. Lets a test express "this edge appears in 6 of 8 draws" directly.
-function drawsOf(k: number, segments: Array<[WholeSetOrdering["edges"], number]>): WholeSetOrdering["edges"][] {
-  const out: WholeSetOrdering["edges"][] = [];
+function drawsOf(k: number, segments: Array<[LabelEdge[], number]>): LabelEdge[][] {
+  const out: LabelEdge[][] = [];
   for (const [edges, repeat] of segments) for (let i = 0; i < repeat; i++) out.push(edges);
   while (out.length < k) out.push([]);
   return out.slice(0, k);
 }
 // A responder driven by a per-domain script of per-draw edge lists.
-function scriptResponder(perDomain: Record<string, WholeSetOrdering["edges"][]>): Responder {
+function scriptResponder(perDomain: Record<string, LabelEdge[][]>): Responder {
   return (input, drawIndex) => presentEdges(input, perDomain[input.declaredDomain]?.[drawIndex] ?? []);
 }
 
@@ -237,13 +250,23 @@ test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages
   const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
   assert.deepEqual(entered, [
     STAGE_TAGS.prerequisiteOrdering,
-    "symbolic-disposal",
+    NON_LLM_STAGES.symbolicDisposal,
     STAGE_TAGS.intrinsicDifficulty,
-    "persist"
+    NON_LLM_STAGES.persist
   ]);
   // Every entered stage is closed ok:true on a clean run; no failed status is emitted.
   assert.equal(calls.filter((c) => c.startsWith("complete:") && c.endsWith(":true")).length, 4);
   assert.ok(!calls.includes("done:failed"));
+});
+
+test("the enrichment operation context reaches concurrent ordering calls", async () => {
+  const ports = buildPorts({
+    onOrder: async () => {
+      await Promise.resolve();
+      assert.equal(currentOperationTag(), "e1");
+    }
+  });
+  await run(ports);
 });
 
 // D1: each multi-node domain issues exactly K draws over its own nodes only.
@@ -446,7 +469,7 @@ test("replay: the same draw multiset in different orders yields identical pairVo
   const rev = edgeOf("X One", "X Two");
   const orderA = buildPorts({ responder: scriptResponder({ x: drawsOf(K, [[[fwd], 5], [[rev], 3]]) }) });
   // Same multiset (5 forward, 3 reverse), interleaved differently.
-  const interleaved: WholeSetOrdering["edges"][] = [[rev], [fwd], [rev], [fwd], [rev], [fwd], [fwd], [fwd]];
+  const interleaved: LabelEdge[][] = [[rev], [fwd], [rev], [fwd], [rev], [fwd], [fwd], [fwd]];
   const orderB = buildPorts({ responder: scriptResponder({ x: interleaved }) });
   const layerA = await run(orderA);
   const layerB = await run(orderB);
@@ -493,19 +516,20 @@ test("fails closed without persisting when a domain exceeds the token budget", a
   assert.equal(ports.getPersistCalls(), 0, "no partial layer persisted");
 });
 
-// R9: an edge citing a label not in the judged set is rejected fail-closed, never guessed.
-test("rejects an edge citing a label outside the judged set (rule 6)", async () => {
+// R9: an edge citing a number outside the judged set is rejected fail-closed, never guessed.
+// The boundary owns the provable guarantee even if a draw slipped past the per-call validator.
+test("rejects an edge citing a number outside the judged set (rule 6)", async () => {
   const responder: Responder = (input) =>
-    input.declaredDomain === "x" ? { edges: [edgeOf("X One", "Nonexistent Concept")] } : { edges: [] };
+    input.declaredDomain === "x" ? { edges: [{ prerequisiteNumber: 1, dependentNumber: 99, confidence: 0.9, rationale: "mock" }] } : { edges: [] };
   const ports = buildPorts({ responder });
-  await assert.rejects(() => run(ports), /cites a label not in domain/);
+  await assert.rejects(() => run(ports), /outside the listed/);
   assert.equal(ports.getPersistCalls(), 0);
 });
 
 // R9: an edge naming one concept as its own prerequisite is rejected fail-closed.
 test("rejects a self-edge (one concept as its own prerequisite)", async () => {
   const responder: Responder = (input) =>
-    input.declaredDomain === "x" ? { edges: [edgeOf("X One", "X One")] } : { edges: [] };
+    input.declaredDomain === "x" ? { edges: [{ prerequisiteNumber: 1, dependentNumber: 1, confidence: 0.9, rationale: "mock" }] } : { edges: [] };
   const ports = buildPorts({ responder });
   await assert.rejects(() => run(ports), /its own prerequisite/);
   assert.equal(ports.getPersistCalls(), 0);
@@ -608,8 +632,9 @@ test("fails the run without persisting when an ordering draw throws", async () =
 
 // --- Node minting + rescue (sub-stages unchanged; ordering consumes their nodes) ------
 
-import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
-import type { GroundingGenerationPort, MissingPrerequisiteProposalPort } from "@lrnki/ports";
+import type { GeneratedGroundingBundle, NonCoreRescueCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
+import { isStageTag } from "@lrnki/domain-core";
+import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 
 // A one-anchor sparse snapshot: only "Move Semantics" is defined. Enrichment must
 // expand it with a rescued node and a minted node, then order all three together.
@@ -621,7 +646,7 @@ const sparseSnapshot: GraphSnapshot = {
 };
 
 function buildNodePorts(options: {
-  rescue?: MentionedNonCoreCandidate[];
+  rescue?: NonCoreRescueCandidate[];
   proposals?: MissingPrerequisiteProposal[];
   responder?: Responder;
 }) {
@@ -660,16 +685,17 @@ function buildNodePorts(options: {
       return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {}, neuralRationale: "" }));
     }
   };
-  const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {
+  const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "nonCoreRescueCandidates"> = {
     async persist(input) { persisted = input.layer; },
-    async mentionedNonCoreCandidates() { return options.rescue ?? []; }
+    async nonCoreRescueCandidates() { return options.rescue ?? []; }
   };
   return { orderedLabels, newNodeId, proposalPort, groundingPort, prerequisiteOrdering, graphStore, difficulty, enrichmentStore, getPersisted: () => persisted };
 }
 
-function rescueCandidate(label: string): MentionedNonCoreCandidate {
+function rescueCandidate(label: string): NonCoreRescueCandidate {
   return {
     runId: "run-1", declaredDomain: "x", candidateKey: label.toLowerCase(), canonicalLabel: label, normalizedLabel: label.toLowerCase(), aliases: [], tier: "reject",
+    definitions: [],
     mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: `${label} is mentioned`, blockText: `Here ${label} is mentioned in prose`, headingPath: [], locator: {} }]
   };
 }
@@ -729,4 +755,55 @@ test("records the verbatim-floor grounding dispositions on the run", async () =>
   const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
   assert.ok(minted && rescued, "both enrichment node kinds survive the floor");
   assert.equal(layer.difficulties.length, layer.derivedNodes.length);
+});
+
+// --- U1/U2 integration: the enrichment timeline carries fine join-aligned stage names ----
+
+// AE1: a minting run's timeline names the fine rescue/mint stages and NO coarse `rescue-mint`.
+// Every enrichment LLM stage that fires is a STAGE_TAG, so the cost half of the bottleneck
+// join meets it on one key — the join-alignment contract (R1).
+test("U1 integration: a minting run's timeline uses fine names, never `rescue-mint`", async () => {
+  const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });
+  const { reporter, calls } = recordingReporter();
+  await runGraphEnrichment({
+    enrichmentId: "e1", graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
+    missingPrerequisiteProposal: ports.proposalPort,
+    groundingGeneration: ports.groundingPort,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId,
+    reporter
+  });
+  const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
+  assert.ok(!entered.includes("rescue-mint"), "the coarse composite stage is gone");
+  assert.ok(entered.includes(STAGE_TAGS.missingPrerequisiteProposal));
+  assert.ok(entered.includes(STAGE_TAGS.groundingGeneration));
+  // Join-alignment: every entered stage that is not a non-LLM tail (symbolic-disposal,
+  // persist) is a STAGE_TAG, so its wall-clock joins the cost the LLM call self-tags.
+  const nonLlmTail = new Set<string>([NON_LLM_STAGES.symbolicDisposal, NON_LLM_STAGES.persist]);
+  const llmStages = entered.filter((stage) => !nonLlmTail.has(stage));
+  assert.ok(llmStages.every((stage) => isStageTag(stage)), `every LLM stage is a join key: ${llmStages.join(", ")}`);
+});
+
+// R1: a dedup-on run's timeline names node-embedding + node-merge-adjudication and NO `dedup`.
+test("U2 integration: a dedup-on run's timeline uses fine names, never `dedup`", async () => {
+  const ports = buildPorts();
+  const { reporter, calls } = recordingReporter();
+  const nodeEmbedding: NodeEmbeddingPort = {
+    model: "stub-embedding",
+    async embed(texts) { return texts.map(() => [1, 0]); }
+  };
+  const nodeMergeAdjudicator: NodeMergeAdjudicationPort = {
+    model: "stub-adjudicator",
+    async adjudicate() { return { decision: "keep_distinct", rationale: "" }; }
+  };
+  await run(ports, { reporter, nodeEmbedding, nodeMergeAdjudicator });
+  const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
+  assert.ok(!entered.includes("dedup"), "the coarse composite stage is gone");
+  assert.ok(entered.includes(STAGE_TAGS.nodeEmbedding));
+  assert.ok(entered.includes(STAGE_TAGS.nodeMergeAdjudication));
+  assert.equal(entered.filter((s) => s === STAGE_TAGS.nodeEmbedding).length, 1, "one embedding bracket");
+  assert.equal(entered.filter((s) => s === STAGE_TAGS.nodeMergeAdjudication).length, 1, "one adjudication bracket");
 });

@@ -12,11 +12,8 @@ input, that setting reduced avoidable drift in the precision-oriented stages. Sa
 part of pipeline-configuration identity and are chosen by the composition root; the forced-tool
 transport remains policy-neutral.
 
-These settings are operating levers, not reproducibility guarantees. Model inference can remain
-non-deterministic even with temperature zero and a seed. Extraction Runs therefore remain immutable
-observations, while reproducible publication comes from rebuilding a graph version from explicitly
-selected persisted runs under ADR-0017. Judgment uncertainty is measured under ADR-0028 rather than
-suppressed by stronger determinism claims.
+These settings are operating levers, not reproducibility guarantees. ADR-0028 owns judgment
+uncertainty and ADR-0017 owns reproducible publication from selected persisted runs.
 
 ## Context
 

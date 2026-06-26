@@ -12,6 +12,7 @@ import {
   type StudyItemCitation,
   type StudyItemGroundingProvenance
 } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type { EnrichmentRunStorePort, GraphVersionStorePort, RunProgressReporterPort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
@@ -55,7 +56,7 @@ export async function generateStudyItemBank(input: {
   // Parallel-ready seam (R11): bounded degree over the independent per-node units.
   // Defaults to 1 (sequential, unchanged behavior).
   concurrency?: number;
-  // Run-progress reporter seam (R7). Study-item generation is its own operation_type
+  // Run-progress reporter seam (ADR-0029). Study-item generation is its own operation_type
   // keyed by enrichmentId (ADR-0017 split). Absent → no-op (unchanged behavior).
   reporter?: RunProgressReporterPort;
 }): Promise<StudyItemBankGenerationResult> {
@@ -63,6 +64,7 @@ export async function generateStudyItemBank(input: {
   const newOptionId = input.newOptionId ?? randomUUID;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
+  return runWithOperationTag(operationId, async () => {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
   const snapshot = await input.graphStore.getPublishedSnapshot(layer.graphVersionId);
@@ -70,8 +72,8 @@ export async function generateStudyItemBank(input: {
   await reporter.beginOperation({ operationType: "study_items", operationId });
   // A thrown stage (e.g. a failed persist) closes the stage ok:false, marks the
   // operation `failed`, and propagates — the same single-source failure semantics
-  // extraction/enrichment use, rather than stranding a permanent `running` row (R1).
-  const studyStage = bracketStage(reporter, operationId);
+  // extraction/enrichment use, rather than stranding a permanent `running` row.
+  const studyStage = bracketStage(reporter, "study_items", operationId);
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
   const studyItems: StudyItem[] = [];
@@ -80,7 +82,7 @@ export async function generateStudyItemBank(input: {
   // Each derived node is an independent generation unit (R11). Driving them through the
   // shared bounded mapper at degree 1 is identical to the prior sequential loop; the seam
   // admits future parallelism (raise `concurrency`) without an architectural change.
-  // Study-item generation stage with a per-node heartbeat (R3): one progress write as
+  // Study-item generation stage with a per-node heartbeat: one progress write as
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;
   const generateForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
@@ -176,7 +178,7 @@ export async function generateStudyItemBank(input: {
       mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
         const result = await generateForNode(node);
         studyDone += 1;
-        await reporter.recordProgress({ operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
+        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
         return result;
       }),
     layer.derivedNodes.length
@@ -198,8 +200,9 @@ export async function generateStudyItemBank(input: {
       rejected
     })
   );
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
   return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected };
+  });
 }
 
 // Verify each draft citation verbatim against its cited grounding passage and resolve

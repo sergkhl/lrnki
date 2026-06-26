@@ -1,6 +1,10 @@
 export { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 export type { JsonSchema, ToolMessage } from "./LiteLlmForcedToolClient";
-export { LiteLlmStageSpendAdapter, parseStageSpend } from "./LiteLlmStageSpendAdapter";
+export {
+  LiteLlmSpendLogsReadAdapter,
+  liteLlmOperationTimelineStageTags,
+  shapeOperationStageSpend
+} from "./LiteLlmSpendLogsReadAdapter";
 export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 export {
   LiteLlmNodeEmbeddingAdapter,
@@ -18,8 +22,8 @@ export {
   conceptCoreSelectionValidator,
   conceptEvidenceProfileSchema,
   conceptEvidenceProfileValidator,
-  prerequisiteOrderingSchema,
-  prerequisiteOrderingValidator,
+  buildPrerequisiteOrderingSchema,
+  buildPrerequisiteOrderingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalSchema,

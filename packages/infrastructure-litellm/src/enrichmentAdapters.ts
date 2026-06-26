@@ -8,8 +8,8 @@ import type { MintingDurabilityJudgmentPort, PrerequisiteOrderingPort, RescueDur
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
-  prerequisiteOrderingSchema,
-  prerequisiteOrderingValidator,
+  buildPrerequisiteOrderingSchema,
+  buildPrerequisiteOrderingValidator,
   mintingDurabilityJudgmentSchema,
   mintingDurabilityJudgmentValidator,
   rescueDurabilityJudgmentSchema,
@@ -58,12 +58,14 @@ function renderConcept(role: string, context: PrerequisiteConceptContext): strin
 
 // Whole-set prerequisite-ordering adapter (ADR-0019 amended — whole-set ordering, plan
 // U2/KTD2). Forced named tool schema; in ONE call the model orders ALL evidenced nodes
-// in a Declared Domain into a directed acyclic prerequisite edge list, each edge naming
-// its two endpoints by verbatim canonical label. This adapter is a THIN LLM caller: it
-// renders the node set + evidence, supports the at-most-one corrective re-prompt (R10),
-// validates the tool arguments fail-closed, and returns the typed label-cited ordering.
-// Label → derivedNodeId mapping, acyclicity verification, and cycle-routing all live in
-// the application boundary (KTD3, rules 16/19), never here.
+// in a Declared Domain into a directed acyclic prerequisite edge list, each edge citing
+// its two endpoints by the 1-based Concept NUMBER shown in the prompt. Schema + validator
+// are built per call from the node count so the index bounds are concrete; a drifting
+// index re-prompts ONCE (maxRetries: 1) then fails closed (R10). This adapter is a THIN
+// LLM caller: it renders the node set + evidence, validates the tool arguments fail-
+// closed, and returns the typed number-cited ordering. Number → derivedNodeId mapping by
+// position, acyclicity verification, and cycle-routing all live in the application
+// boundary (KTD3, rules 16/19), never here.
 export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingPort {
   readonly model: string;
   constructor(private readonly client: LiteLlmForcedToolClient, model: string = PREREQUISITE_ORDERING_MODEL) {
@@ -83,7 +85,7 @@ export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingP
       "- Emit an edge ONLY when one concept must clearly be understood before another. Omit a pair entirely when neither must precede the other (siblings, alternatives, or merely related).",
       "- General foundational concepts a learner needs first should be prerequisites OF the domain-specific concepts that build on them, not the other way around.",
       "- The whole edge set must be acyclic: never emit edges that form a cycle. If you cannot decide a direction, omit that pair rather than guessing.",
-      "Each edge copies the EXACT canonical label of the prerequisite concept into prerequisiteLabel and of the dependent concept into dependentLabel; both must equal listed concept labels and must differ.",
+      "Each concept is shown with a 1-based number (\"Concept 1\", \"Concept 2\", ...). Each edge sets prerequisiteNumber to the number of the concept that must be understood FIRST and dependentNumber to the number of the concept that needs it; both must be listed numbers and must differ.",
       "Prerequisite is about conceptual dependency for learning, not temporal order in a process and not part-whole membership alone.",
       "Set confidence honestly in [0,1]; reserve high confidence for clearly-established directions."
     ].join("\n");
@@ -93,21 +95,26 @@ export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingP
       "Concepts to order:",
       ...input.nodes.map((node, index) => ["", renderConcept(`Concept ${index + 1}`, node)].join("\n")),
       "",
-      "Call submit_prerequisite_ordering with the directed acyclic edge list. Each edge sets prerequisiteLabel to the concept that must be understood first and dependentLabel to the concept that needs it; copy both labels exactly."
+      "Call submit_prerequisite_ordering with the directed acyclic edge list. Each edge sets prerequisiteNumber to the number of the concept that must be understood first and dependentNumber to the number of the concept that needs it; cite both by their listed numbers."
     ].join("\n");
 
+    // Bounds the index range to the actual node count: a drifting index re-prompts once
+    // (maxRetries: 1) under strict decoding, then the application fails closed (R10, KTD3).
+    const n = input.nodes.length;
     const result = await this.client.call({
       model: this.model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
       toolName: "submit_prerequisite_ordering",
       toolDescription: "Submit the directed acyclic learning-prerequisite ordering over the listed domain concepts.",
-      parameters: prerequisiteOrderingSchema,
-      validator: prerequisiteOrderingValidator,
-      tags: [STAGE_TAGS.prerequisiteOrdering]
+      parameters: buildPrerequisiteOrderingSchema(n),
+      validator: buildPrerequisiteOrderingValidator(n),
+      tags: [STAGE_TAGS.prerequisiteOrdering],
+      maxRetries: 1
     });
 
-    // Thin: return the validated, label-cited ordering verbatim. The application maps
-    // labels → ids and rejects any unlisted/ambiguous endpoint fail-closed (KTD3, R9).
+    // Thin: return the validated, number-cited ordering verbatim. The application maps
+    // number → id by position and rejects any out-of-range/equal endpoint fail-closed
+    // (KTD3, R9). Note: 429s on this stage also get the single corrective retry.
     return { edges: result.edges };
   }
 }

@@ -8,10 +8,10 @@ import { noopRunProgressReporter, NON_LLM_STAGES, isLlmStage } from "./runProgre
 
 test("noopRunProgressReporter resolves every method with no value and no throw", async () => {
   await assert.doesNotReject(noopRunProgressReporter.beginOperation({ operationType: "extraction", operationId: "op-1" }));
-  assert.equal(await noopRunProgressReporter.enterStage({ operationId: "op-1", stage: STAGE_TAGS.cepExtraction, total: 5 }), undefined);
-  assert.equal(await noopRunProgressReporter.recordProgress({ operationId: "op-1", stage: STAGE_TAGS.cepExtraction, done: 3 }), undefined);
-  assert.equal(await noopRunProgressReporter.completeStage({ operationId: "op-1", stage: STAGE_TAGS.cepExtraction, ok: true }), undefined);
-  assert.equal(await noopRunProgressReporter.completeOperation({ operationId: "op-1", status: "succeeded" }), undefined);
+  assert.equal(await noopRunProgressReporter.enterStage({ operationType: "extraction", operationId: "op-1", stage: STAGE_TAGS.cepExtraction, total: 5 }), undefined);
+  assert.equal(await noopRunProgressReporter.recordProgress({ operationType: "extraction", operationId: "op-1", stage: STAGE_TAGS.cepExtraction, done: 3 }), undefined);
+  assert.equal(await noopRunProgressReporter.completeStage({ operationType: "extraction", operationId: "op-1", stage: STAGE_TAGS.cepExtraction, ok: true }), undefined);
+  assert.equal(await noopRunProgressReporter.completeOperation({ operationType: "extraction", operationId: "op-1", status: "succeeded" }), undefined);
 });
 
 test("isLlmStage is true for the full LLM stage set (extraction + enrichment + study items)", () => {

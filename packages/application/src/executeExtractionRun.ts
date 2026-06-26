@@ -9,6 +9,7 @@ import {
   type RunEvidenceProfile,
   type StructuredDocument
 } from "@lrnki/domain-core";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
@@ -54,18 +55,19 @@ export async function executeExtractionRun(input: {
   admissionLabelJudge: AdmissionLabelJudgmentPort;
   definitionPassageQualityJudge: DefinitionPassageQualityJudgmentPort;
   store: ExtractionRunStorePort;
-  // Optional run-progress reporter seam (R7). Absent → no-op, so the run behaves
-  // byte-identically to its pre-instrumentation self (default-safe, KTD4).
+  // Optional run-progress reporter seam (ADR-0029). Absent → no-op, so the run behaves
+  // byte-identically to its pre-instrumentation self.
   reporter?: RunProgressReporterPort;
 }): Promise<ExtractionRunResult> {
   const startedAt = Date.now();
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.runId;
+  return runWithOperationTag(operationId, async () => {
   const { document, declaredDomain } = input.source;
 
   // Bracket each stage onto the timeline; a thrown stage marks the operation failed and
-  // propagates, so a failed run leaves a readable timeline without a whole-body try (R1).
-  const runStage = bracketStage(reporter, operationId);
+  // propagates, so a failed run leaves a readable timeline without a whole-body try.
+  const runStage = bracketStage(reporter, "extraction", operationId);
 
   // The parent `running` row exists from entry — the fix for "no row until done".
   await reporter.beginOperation({ operationType: "extraction", operationId });
@@ -155,7 +157,7 @@ export async function executeExtractionRun(input: {
           maxMentionsPerConceptPerSource
         });
         cepCompleted += 1;
-        await reporter.recordProgress({ operationId, stage: STAGE_TAGS.cepExtraction, done: cepCompleted });
+        await reporter.recordProgress({ operationType: "extraction", operationId, stage: STAGE_TAGS.cepExtraction, done: cepCompleted });
         return profile;
       }),
     admittedCandidates.length
@@ -234,8 +236,9 @@ export async function executeExtractionRun(input: {
   // a non-LLM stage (wall-clock only, never appears in the cost half of the R5 join).
   await runStage(NON_LLM_STAGES.persist, () => input.store.persist(runResult, artifact));
 
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "extraction", operationId, status: "succeeded" });
   return runResult;
+  });
 }
 
 function exactAliases(candidate: RunCandidate): string[] {

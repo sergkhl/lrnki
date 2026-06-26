@@ -1,13 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { formatLocalDateTime, formatUtcFallback, LocalDateTime } from "./LocalDateTime";
+import { formatLocalDateTime, formatUtcFallback, LocalDateTime, normalizeDateTimeValue } from "./LocalDateTime";
 
 test("LocalDateTime renders a UTC ISO fallback before client hydration", () => {
   const html = renderToStaticMarkup(<LocalDateTime iso="2026-06-20T14:05:30.000Z" />);
 
   assert.equal(html, '<time dateTime="2026-06-20T14:05:30.000Z">2026-06-20 14:05:30 UTC</time>');
   assert.equal(formatUtcFallback("2026-06-20T14:05:30.000Z"), "2026-06-20 14:05:30 UTC");
+});
+
+test("LocalDateTime accepts Date values from SQL-backed server loaders", () => {
+  const createdAt = new Date("2026-06-20T14:05:30.000Z");
+  const html = renderToStaticMarkup(<LocalDateTime iso={createdAt} />);
+
+  assert.equal(normalizeDateTimeValue(createdAt), "2026-06-20T14:05:30.000Z");
+  assert.equal(html, '<time dateTime="2026-06-20T14:05:30.000Z">2026-06-20 14:05:30 UTC</time>');
+  assert.equal(formatUtcFallback(createdAt), "2026-06-20 14:05:30 UTC");
 });
 
 test("formatLocalDateTime uses the browser locale formatter with medium date and short time", () => {

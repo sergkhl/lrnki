@@ -315,47 +315,59 @@ export const conceptEvidenceProfileValidator = z.object({
 // amended — whole-set ordering, plan U2/KTD2). The model returns a directed acyclic
 // edge list over the listed concepts; it is globally self-consistent by construction,
 // so a non-edge is simply absent — there is no per-edge 'none'/'uncertain' token. Each
-// edge NAMES its two endpoints by verbatim canonical label (unique within a same-domain
-// set under ADR-0015 dedup); the application maps labels → ids fail-closed (R9, KTD3)
-// and an endpoint matching no listed node is rejected, never guessed.
-export const prerequisiteOrderingSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["edges"],
-  properties: {
-    edges: {
-      type: "array",
-      description:
-        "The directed prerequisite edges over the listed concepts, forming one acyclic ordering. Omit a pair entirely when neither concept must be understood before the other. Do not emit a cycle: if you cannot decide a direction, leave the pair out.",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["prerequisiteLabel", "dependentLabel", "confidence", "rationale"],
-        properties: {
-          prerequisiteLabel: {
-            type: "string",
-            description: "The EXACT canonical label (copied verbatim) of the concept that must be understood FIRST. Must equal one of the listed concept labels."
-          },
-          dependentLabel: {
-            type: "string",
-            description: "The EXACT canonical label (copied verbatim) of the concept that depends on the prerequisite. Must equal a DIFFERENT listed concept label."
-          },
-          confidence: { type: "number", minimum: 0, maximum: 1 },
-          rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+// edge cites its two endpoints by the 1-based concept NUMBER shown before it in the
+// prompt — a closed-set menu pick, not free text — so synonyms/paraphrases cannot drift
+// past an exact label match. Schema + validator are built per call from the node count
+// `N`, so the index bounds [1, N] are concrete: a bad index re-prompts once (defense-in-
+// depth under strict decoding), then the application fails closed (R9, KTD3, rule 6).
+export function buildPrerequisiteOrderingSchema(n: number): JsonSchema {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["edges"],
+    properties: {
+      edges: {
+        type: "array",
+        description:
+          "The directed prerequisite edges over the listed concepts, forming one acyclic ordering. Omit a pair entirely when neither concept must be understood before the other. Do not emit a cycle: if you cannot decide a direction, leave the pair out.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["prerequisiteNumber", "dependentNumber", "confidence", "rationale"],
+          properties: {
+            prerequisiteNumber: {
+              type: "integer",
+              minimum: 1,
+              maximum: n,
+              description: "The 1-based Concept number (as shown before each concept) of the concept that must be understood FIRST."
+            },
+            dependentNumber: {
+              type: "integer",
+              minimum: 1,
+              maximum: n,
+              description: "The 1-based Concept number of the concept that depends on the prerequisite. Must be a DIFFERENT listed number."
+            },
+            confidence: { type: "number", minimum: 0, maximum: 1 },
+            rationale: { type: "string", description: "One terse sentence grounded in the concept meanings and evidence." }
+          }
         }
       }
     }
-  }
-};
+  };
+}
 
-export const prerequisiteOrderingValidator = z.object({
-  edges: z.array(z.object({
-    prerequisiteLabel: z.string().min(1),
-    dependentLabel: z.string().min(1),
-    confidence: z.number().min(0).max(1),
-    rationale: z.string().min(1)
-  }).strict())
-}).strict();
+export function buildPrerequisiteOrderingValidator(n: number) {
+  return z.object({
+    edges: z.array(z.object({
+      prerequisiteNumber: z.number().int().min(1).max(n),
+      dependentNumber: z.number().int().min(1).max(n),
+      confidence: z.number().min(0).max(1),
+      rationale: z.string().min(1)
+    }).strict().refine((e) => e.prerequisiteNumber !== e.dependentNumber, {
+      message: "An edge must cite two DIFFERENT concept numbers."
+    }))
+  }).strict();
+}
 
 // --- Generated grounding: submit_generated_grounding_bundle ---------------
 

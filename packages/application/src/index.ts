@@ -19,10 +19,28 @@ export {
   type NonLlmStage
 } from "./runProgressReporter";
 export {
+  OPERATION_TIMELINE_CATALOG,
+  operationTimelineStageKind,
+  isKnownOperationTimelineStage,
+  stageBelongsToOperation,
+  spendStageBelongsToOperation,
+  operationTimelineStagesForOperation,
+  operationTimelineLlmSpendStageTags,
+  type OperationTimelineStageKind
+} from "./operationTimelineCatalog";
+export {
   bottleneckReport,
+  type BottleneckOperationReport,
   type BottleneckReport,
-  type BottleneckStageRow
+  type BottleneckReportScope,
+  type BottleneckStageRow,
+  type BottleneckTotals
 } from "./bottleneckReport";
+export {
+  rankBottleneckTargets,
+  type RankedTarget,
+  type RankedTargets
+} from "./rankBottleneckTargets";
 export {
   deduplicateDerivedNodes,
   cosineSimilarity,

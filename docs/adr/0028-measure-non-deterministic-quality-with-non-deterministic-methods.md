@@ -17,15 +17,13 @@ known. Do not chase bit-level model-output determinism. Mixture-of-experts routi
 and floating-point execution can vary even with temperature zero and a seed; instability on an
 ambiguous input is measurement signal.
 
-Deterministic checks remain appropriate for the deterministic envelope: schema and tool-argument
-validity, verbatim evidence verification, graph algorithms, endpoint identity, and policy transforms.
-Automated tests must not assert neural judgment content under ADR-0013.
+ADR-0013 owns the deterministic-test boundary and real-source inspection policy.
 
 Published reproducibility comes from immutable persisted artifacts with full provenance. Re-running a
 neural operation creates a fresh observation; replaying the stored artifact reproduces the published
 state.
 
-Measurement harnesses remain disposable unless they continue to change a live decision.
+ADR-0013 owns measurement-harness retention.
 
 ## Context
 
