@@ -19,6 +19,19 @@
 
 ## COMPLETED
 
+- **Published-Concept semantic identity resolution.** A standalone propose-decide operation runs
+  before the deterministic Graph-Version Build: embeddings propose within-domain near-duplicate
+  published Concepts by cosine, a cross-family adjudicator decides each pair, and union-find clusters
+  are classified by their already-published count into recorded `merge` / `distinct` / `quarantine`
+  decisions. The build consumes only those decisions and makes no model call — case A/C merges
+  canonicalize automatically (the survivor keeps or mints one IRI and absorbs the other surface label
+  as an alias while its CEP evidence unions on), and a two-already-published collision is quarantined,
+  refusing the build rather than retiring a minted IRI. Decisions persist into `refinement_decisions`
+  and surface in a minimal Admin Lab table; `BUILD_DISABLE_IDENTITY_RESOLUTION` reproduces the
+  exact-label baseline. Decisions: [ADR-0015](../adr/0015-deterministic-cross-source-identity.md),
+  [ADR-0012](../adr/0012-embeddings-permitted-except-prerequisite-derivation.md), and
+  [ADR-0017](../adr/0017-split-extraction-runs-from-graph-version-builds.md).
+
 - **CEP definition-passage mis-pick, learner-facing close-out.** Measure-first resolution of the
   definition mis-pick follow-up. A disposable self-consistency instrument over the population that
   actually reaches learners — surviving `core` CEP definitions plus rescued `source_mentioned`
@@ -112,6 +125,19 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Published-Concept identity resolution U1–U5, 2026-06-26 (branch
+  `fix/cep-definition-mispick-learner-surface`).** Full workspace typecheck and recursive suite green
+  (new: 11 `resolveConceptIdentity` cases, 7 build-consumption cases incl. AE1/AE2/AE3, 4 worker
+  mapping cases, 2 inspection-read-stitch cases). Real-model calibration (rule 13/14,
+  `tmp/2026-06-26-identity-calibration/`): on real `qwen3-embedding-8b` the 0a7ed566-class
+  fragmentation pairs score 0.77–0.87 while distinct same-domain pairs score 0.45–0.52, so the
+  inherited 0.70 floor sits in a 0.25 gap (no code change). Driven through the production embedding +
+  `gpt-oss-120b` adjudicator, `Barter`/`Bartering` merged (cos 0.870) while `Owner`/`Ownership` was
+  proposed (cos 0.767) but kept **distinct** by the precision-first adjudicator (no wrong merge); a
+  real worker build over the Rust source ran resolution end-to-end with zero merges over
+  genuinely-distinct concepts, and `BUILD_DISABLE_IDENTITY_RESOLUTION` reproduced the exact-label
+  baseline. Case-B build refusal is unit-guarded (AE3).
 
 - **Operation Timeline ownership refactor, 2026-06-26:** full workspace typecheck and recursive test
   suite pass; focused application coverage for bottleneck reports, catalog classification, ranking,
