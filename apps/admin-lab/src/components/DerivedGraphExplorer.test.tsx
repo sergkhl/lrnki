@@ -19,6 +19,7 @@ const detail: DerivedGraphDetail = {
     certainEdgeCount: 1,
     uncertainEdgeCount: 1,
     conceptCount: 3,
+    studyItemCount: 5,
     startedAt: "2026-06-15T10:00:00.000Z",
     completedAt: "2026-06-15T10:05:00.000Z"
   },

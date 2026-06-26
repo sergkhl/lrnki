@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeftIcon } from "lucide-react";
+import { ArrowLeftIcon, BookOpenIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { StudySession } from "@/components/study/StudySession";
 import { buttonVariants } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { getStudySession } from "@/lib/studySession";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,24 @@ export default async function StudySessionPage({
           New session
         </Link>
       </div>
-      <StudySession session={session} />
+      {session.studyItemCount === 0 ? (
+        // A valid enrichment with no study items is a dead-end, not a 404 (R6, U5): explain
+        // the remedy (generate items / pick another enrichment) instead of a cardless graph.
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon"><BookOpenIcon /></EmptyMedia>
+            <EmptyTitle>No study items for this enrichment yet</EmptyTitle>
+            <EmptyDescription>
+              This Derived Graph Layer has no study items, so there is nothing to study here. Run
+              <code className="mx-1">generate-study-items</code> for enrichment
+              <code className="mx-1">{session.enrichmentId}</code> in the worker, or start a new session
+              on an enrichment that already has items.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <StudySession session={session} />
+      )}
     </AdminShell>
   );
 }

@@ -691,6 +691,10 @@ export interface EnrichmentSummary {
   certainEdgeCount: number;
   uncertainEdgeCount: number;
   conceptCount: number;
+  // Study items generated for this enrichment's derived nodes. 0 means the study
+  // surfaces have nothing to offer yet (generate-study-items has not run), so the UI
+  // can flag a dead-end before a learner reaches an empty session (R6, U5).
+  studyItemCount: number;
   startedAt: string;
   completedAt: string | null;
 }

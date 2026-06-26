@@ -176,7 +176,8 @@ const enrichmentSummaryColumns = (sql: Sql) => sql`
   g.status, g.started_at, g.completed_at,
   (SELECT count(*) FROM inferred_prerequisite_edges e WHERE e.enrichment_id = g.enrichment_id) AS edge_count,
   (SELECT count(*) FROM inferred_prerequisite_edges e WHERE e.enrichment_id = g.enrichment_id AND NOT e.uncertain) AS certain_edge_count,
-  (SELECT count(*) FROM concept_difficulties d WHERE d.enrichment_id = g.enrichment_id) AS concept_count`;
+  (SELECT count(*) FROM concept_difficulties d WHERE d.enrichment_id = g.enrichment_id) AS concept_count,
+  (SELECT count(*) FROM study_items si WHERE si.enrichment_id = g.enrichment_id) AS study_item_count`;
 
 function toEnrichmentSummary(row: EnrichmentSummaryRow): EnrichmentSummary {
   const edgeCount = Number(row.edge_count);
@@ -192,6 +193,7 @@ function toEnrichmentSummary(row: EnrichmentSummaryRow): EnrichmentSummary {
     certainEdgeCount,
     uncertainEdgeCount: edgeCount - certainEdgeCount,
     conceptCount: Number(row.concept_count),
+    studyItemCount: Number(row.study_item_count),
     startedAt: new Date(row.started_at).toISOString(),
     completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null
   };
@@ -221,6 +223,7 @@ type EnrichmentSummaryRow = {
   edge_count: number;
   certain_edge_count: number;
   concept_count: number;
+  study_item_count: number;
 };
 
 type NodeRow = {

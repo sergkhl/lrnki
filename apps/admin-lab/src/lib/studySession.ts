@@ -122,6 +122,9 @@ export type StudySession = {
   enrichmentId: string;
   learnerStateRef: string;
   target: { derivedNodeId: string; label: string };
+  // How many study items this enrichment carries. 0 means a dead-end session — the surface
+  // renders a remedy rather than dropping the learner into a cardless graph (R6, U5).
+  studyItemCount: number;
   detail: DerivedGraphDetail;
   // The whole-layer classification, with `selectedFrontierTarget` scoped to the goal cone
   // so the adapted-graph ring marks the node the learner advances to next toward Z.
@@ -259,6 +262,7 @@ export async function getStudySession(
     enrichmentId,
     learnerStateRef,
     target: { derivedNodeId: targetDerivedNodeId, label: labelFor(detail, targetDerivedNodeId) },
+    studyItemCount: loaded.studyItems.length,
     detail,
     classification,
     responseSourceSummary: summarizeResponseSources(loaded.rows),

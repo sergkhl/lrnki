@@ -82,12 +82,17 @@ export default async function StudyStartPage({
                     <li key={enrichment.enrichmentId}>
                       <Link
                         href={`/admin/lab/study?enrichmentId=${encodeURIComponent(enrichment.enrichmentId)}`}
-                        className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50 ${enrichment.enrichmentId === selectedEnrichmentId ? "border-primary" : ""}`}
+                        className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50 ${enrichment.enrichmentId === selectedEnrichmentId ? "border-primary" : ""} ${enrichment.studyItemCount === 0 ? "opacity-60" : ""}`}
                       >
                         <span className="min-w-0 truncate font-medium">{enrichment.enrichmentId}</span>
                         <span className="flex shrink-0 items-center gap-1">
                           <Badge variant="outline">{enrichment.conceptCount} concepts</Badge>
                           <Badge variant="secondary">{enrichment.certainEdgeCount} edges</Badge>
+                          {enrichment.studyItemCount === 0 ? (
+                            <Badge variant="destructive">no study items</Badge>
+                          ) : (
+                            <Badge variant="default">{enrichment.studyItemCount} study items</Badge>
+                          )}
                         </span>
                       </Link>
                     </li>
