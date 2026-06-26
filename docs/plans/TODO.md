@@ -2,20 +2,14 @@
 
 ## TODO
 
-1. **Resolve the CEP definition-passage mis-pick follow-up.** The prompt-side clause is implemented,
-   and the unblocked first-party A/B trail now exists at
-   `tmp/2026-06-25-cep-defn-retrieval/`. Decide from that evidence whether the clause is sufficient,
-   needs a repaired measurement pass, or should escalate to re-pick-on-veto / a stronger extractor
-   ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)).
-
-2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-3. **Improve operator observability.**
+2. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
@@ -24,6 +18,22 @@
    [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 ## COMPLETED
+
+- **CEP definition-passage mis-pick, learner-facing close-out.** Measure-first resolution of the
+  definition mis-pick follow-up. A disposable self-consistency instrument over the population that
+  actually reaches learners — surviving `core` CEP definitions plus rescued `source_mentioned`
+  definition passages — measured a 7% definitional false-negative rate (4/57), dominated by
+  in-window mis-picks (3 recoverable in-window, 1 non-adjacent window-miss, 0 genuine-absence). The
+  shipped rescue-seam coverage judge (`applyRescuedDefinitionQualityJudge`) already neutralizes the
+  learner-facing harm: every hollow rescued definition is dropped and the concept falls back to a
+  safe, grounded mention-only state, fail-closed = preserve. Bounded re-pick-on-veto was evaluated
+  and **deferred** as an upside-only recall lever: its faithful locus is extraction-time over the
+  full optional population (the declined in-window block is absent from the rescue seam's data), too
+  heavy for the 3-concept recovery, and the stronger-extractor branch is not triggered (zero
+  genuine-absence keeps DeepSeek V4 Flash the default per rule 5). The deferred section-scoped
+  retrieval lever is retired: the single window-miss has non-adjacent defining blocks, so even
+  parent-child retrieval would not recover it. Decision:
+  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md).
 
 - **Source-grounded asserted graph baseline.** Curated mixed-format sources normalize into structured
   blocks; atomic Concept Admission produces a small core; CEPs preserve verified definitions and
@@ -149,9 +159,16 @@
 - **Latest real-use quality evidence:** the June 24 Definition-Passage quality run passed with the
   caveat recorded above; the June 24 K-sampled prerequisite-ordering run passed on real Rust and
   economics sources, surfacing unstable directions as `uncertain` while retaining robust edges.
-- **CEP definition-passage prompt A/B, 2026-06-25:** the first-party trail exists at
-  `tmp/2026-06-25-cep-defn-retrieval/`; TODO #1 owns the remaining decision because the evidence
-  needs interpretation before it becomes a completed outcome.
+- **CEP definition-passage learner-facing false-negative measurement, 2026-06-26 (rule 13/14).** A
+  disposable self-consistency instrument (`tmp/2026-06-26-cep-defn-falseneg/`) re-judged the union
+  of learner-facing definitions — surviving `core` CEP definitions plus rescued `source_mentioned`
+  passages — on the clean seed (enrichment `c6c558eb`, graph version `41543df0`) with K=7
+  self-consistency. Result: 4/57 false negatives (7.0%; core 1/21, rescued optional 3/36), with 3
+  in-window mis-picks, 1 non-adjacent window-miss, and 0 genuine-absence; a K=1 pass agreed on the
+  aggregate. The shipped rescue-seam coverage judge already drops all four to mention-only, so no
+  hollow definition reaches a learner. This resolved the prior A/B trail
+  (`tmp/2026-06-25-cep-defn-retrieval/`, within base-rate noise) and closed the mis-pick follow-up
+  above; bounded re-pick was deferred on cost/benefit.
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims above come from
   inspected real model output.
