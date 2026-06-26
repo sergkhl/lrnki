@@ -6,6 +6,7 @@ export {
 } from "./PostgresStores";
 export { PostgresArtifactRepository } from "./PostgresArtifactRepository";
 export { PostgresInspectionRead } from "./PostgresInspectionRead";
+export { PostgresEnrichmentInspectionRead } from "./PostgresEnrichmentInspectionRead";
 export {
   PostgresEnrichmentRunStore,
   PostgresLearnerPathStore

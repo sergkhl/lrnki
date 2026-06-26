@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDerivedGraphView, distinctDomains, nodeRenderAttrs, summarizeOriginCounts, type DerivedGraphDetail } from "../lib/derivedGraph";
+import { buildDerivedGraphView, distinctDomains, nodeRenderAttrs, type DerivedGraphDetail } from "../lib/derivedGraph";
 
 // The DerivedGraphExplorer renders a Derived Graph Layer (ADR-0019) independently
 // of learner paths (U6 scenario 5) and must carry an equivalent textual
@@ -31,11 +31,7 @@ const detail: DerivedGraphDetail = {
     { prerequisiteDerivedNodeId: "scope", dependentDerivedNodeId: "ownership", confidence: 0.9, uncertain: false, judgeModel: "kg-prerequisite-judgment" },
     { prerequisiteDerivedNodeId: "ownership", dependentDerivedNodeId: "move", confidence: 0.5, uncertain: true, judgeModel: "kg-generated-prerequisite-judgment" }
   ],
-  originCounts: summarizeOriginCounts([
-    { declaredDomain: "rust", groundingOrigin: "source_mentioned" },
-    { declaredDomain: "rust", groundingOrigin: "document_anchored" },
-    { declaredDomain: "rust", groundingOrigin: "llm_grounded" }
-  ]),
+  originCounts: [{ domain: "rust", anchor: 1, sourceMentioned: 1, llmGrounded: 1 }],
   rescueDispositions: [
     { derivedNodeId: "scope", canonicalLabel: "Variable scope", declaredDomain: "rust", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
     { derivedNodeId: "ablation", canonicalLabel: "Table 3 Ablation", declaredDomain: "rust", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }

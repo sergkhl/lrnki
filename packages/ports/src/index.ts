@@ -603,6 +603,116 @@ export interface SourceInspectionReadPort {
   getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
 }
 
+export type DerivedNodeKind = "anchor" | "enrichment";
+export type DerivedGroundingOrigin = "document_anchored" | "source_mentioned" | "llm_grounded";
+
+export interface GroundingPassageView {
+  passageType: "definition" | "mention";
+  text: string;
+  groundingOrigin: DerivedGroundingOrigin;
+}
+
+export interface NodeGroundingView {
+  generatingModel: string | null;
+  rationale: string | null;
+  passages: GroundingPassageView[];
+  verbatimDisposition: string;
+}
+
+export interface DerivedGraphNode {
+  derivedNodeId: string;
+  label: string;
+  aliases: string[];
+  declaredDomain: string;
+  difficulty: number | null;
+  difficultyRationale: string | null;
+  nodeKind: DerivedNodeKind;
+  groundingOrigin: DerivedGroundingOrigin;
+  role: "anchor" | "prerequisite";
+  hasStudyItem: boolean;
+  grounding: NodeGroundingView | null;
+}
+
+export interface DerivedGraphEdge {
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
+  confidence: number;
+  uncertain: boolean;
+  judgeModel: string;
+}
+
+export interface DomainOriginCounts {
+  domain: string;
+  anchor: number;
+  sourceMentioned: number;
+  llmGrounded: number;
+}
+
+export interface RescueDispositionView {
+  derivedNodeId: string;
+  canonicalLabel: string;
+  declaredDomain: string;
+  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
+  rationale: string;
+  groundingSpan: string;
+}
+
+export interface MintingDispositionView {
+  derivedNodeId: string;
+  proposedLabel: string;
+  declaredDomain: string;
+  anchorConceptId: string;
+  disposition: "accepted" | "dropped" | "kept_judge_unavailable";
+  rationale: string;
+}
+
+export interface NodeMergeView {
+  declaredDomain: string;
+  canonicalDerivedNodeId: string;
+  canonicalLabel: string;
+  absorbedLabel: string;
+  absorbedAliases: string[];
+  proposingSignal: string;
+  proposingScore: number;
+  rationale: string;
+  canonicalSelectionReason: string;
+}
+
+export interface EnrichmentSummary {
+  enrichmentId: string;
+  graphVersionId: string;
+  enrichmentConfigHash: string;
+  judgeModel: string;
+  difficultyMethod: string;
+  status: string;
+  edgeCount: number;
+  certainEdgeCount: number;
+  uncertainEdgeCount: number;
+  conceptCount: number;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface DerivedGraphDetail {
+  summary: EnrichmentSummary;
+  nodes: DerivedGraphNode[];
+  edges: DerivedGraphEdge[];
+  originCounts: DomainOriginCounts[];
+  rescueDispositions: RescueDispositionView[];
+  mintingDispositions: MintingDispositionView[];
+  merges: NodeMergeView[];
+}
+
+// Enrichment Run inspection read surface: list summaries + one finished Derived
+// Graph Layer inspection model. This is pure inspection under ADR-0027: the
+// storage adapter owns SQL, artifact row stitching, grounding dispositions, and
+// per-domain origin counts. Admin Lab renders the finished read model and does
+// not query persistence directly.
+export interface EnrichmentInspectionReadPort {
+  listEnrichmentSummaries(): Promise<EnrichmentSummary[]>;
+  getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
+}
+
 // ---------------------------------------------------------------------------
 // Run-stage timeline reporting seam (ADR-0029). The externally driven seam every
 // triggered operation reports progress through, so a future durable workflow
