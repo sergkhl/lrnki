@@ -82,6 +82,60 @@ function anchorNode(conceptId = "c1", label = "Ownership") {
   };
 }
 
+// A rescued source_mentioned enrichment node carrying a verified passage (definition or
+// mention) — the node shape the rescue seam now emits with real Definition Passages (U4).
+function sourceMentionedNode(opts: { id?: string; label?: string; passageType?: "definition" | "mention"; quote: string; blockId?: string }) {
+  const blockId = opts.blockId ?? "def-1";
+  return {
+    nodeKind: "enrichment" as const,
+    derivedNodeId: opts.id ?? "node-rescued",
+    groundingOrigin: "source_mentioned" as const,
+    role: "prerequisite" as const,
+    layer: "derived" as const,
+    canonicalLabel: opts.label ?? "Heap allocation",
+    normalizedLabel: (opts.label ?? "Heap allocation").toLowerCase(),
+    declaredDomain: "software engineering",
+    aliases: [],
+    groundingPassages: [{
+      passageType: opts.passageType ?? "definition",
+      text: opts.quote,
+      groundingOrigin: "source_mentioned" as const,
+      sourceResourceId: "src",
+      sourceBlockId: blockId,
+      evidenceQuote: opts.quote,
+      headingPath: [],
+      locator: {},
+      verbatimCheck: { disposition: "verified" as const, sourceResourceId: "src", sourceBlockId: blockId }
+    }]
+  };
+}
+
+// A minted llm_grounded enrichment node — its study items must stay `generated` provenance.
+function llmGroundedNode(opts: { id?: string; label?: string } = {}) {
+  const id = opts.id ?? "node-minted";
+  return {
+    nodeKind: "enrichment" as const,
+    derivedNodeId: id,
+    groundingOrigin: "llm_grounded" as const,
+    mintingReason: "assumed_prerequisite" as const,
+    role: "prerequisite" as const,
+    layer: "derived" as const,
+    canonicalLabel: opts.label ?? "Pointer arithmetic",
+    normalizedLabel: (opts.label ?? "Pointer arithmetic").toLowerCase(),
+    declaredDomain: "software engineering",
+    aliases: [],
+    groundingBundle: {
+      derivedNodeId: id,
+      groundingOrigin: "llm_grounded" as const,
+      definitions: [{ passageType: "definition" as const, text: "Pointer arithmetic computes addresses.", groundingOrigin: "llm_grounded" as const, headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding" as const, rationale: "generated" } }],
+      mentions: [],
+      scaffoldedAnchorConceptIds: [],
+      generatingModel: "mock",
+      rationale: "r"
+    }
+  };
+}
+
 function enrichmentStoreReturning(layer: DerivedGraphLayer): EnrichmentRunStorePort {
   return {
     async persist() { /* unused */ },
@@ -296,4 +350,63 @@ test("supportedItemTypes per node equals the set of types actually persisted acr
 
   assert.deepEqual(await store.supportedItemTypes("node-c1"), ["option_select", "self_assessment"]);
   assert.deepEqual(await store.supportedItemTypes("node-c2"), ["self_assessment"]);
+});
+
+test("a rescued node with a verified DEFINITION passage yields source_mentioned study items (R5/U4)", async () => {
+  const def = "Heap allocation means the memory must be requested from the memory allocator at runtime.";
+  const cite = "the memory must be requested from the memory allocator at runtime";
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ quote: def })])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-rescued": saDraft(cite, "def-1") },
+      optionSelect: { "node-rescued": osDraft(cite, ["Stack", "Register", "Cache"], "def-1") }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1, "the rescued definition produced study items");
+  assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"), "rescued definitions ground source_mentioned items, not generated");
+});
+
+test("a rescued mention-only node still yields source_mentioned items (no regression, U4)", async () => {
+  const m = "Borrowing lets you reference a value without taking ownership.";
+  const cite = "reference a value without taking ownership";
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ id: "node-borrow", label: "Borrowing", passageType: "mention", quote: m, blockId: "m-1" })])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-borrow": saDraft(cite, "m-1") },
+      optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], "m-1") }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1);
+  assert.ok(persisted.every((item) => item.groundingProvenance === "source_mentioned"));
+});
+
+test("a minted llm_grounded node still yields generated provenance (U4)", async () => {
+  const cite = "computes addresses";
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([llmGroundedNode()])),
+    studyItemGeneration: generationReturning({
+      selfAssessment: { "node-minted": saDraft(cite, "node-minted:definition:0") },
+      optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:0") }
+    }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1);
+  assert.ok(persisted.every((item) => item.groundingProvenance === "generated"), "minted nodes stay generated provenance");
 });
