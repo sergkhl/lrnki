@@ -734,14 +734,17 @@ export interface RunProgressReporterPort {
   beginOperation(input: { operationType: OperationType; operationId: string }): Promise<void>;
   // Open a stage: insert a child row, set the parent's current_stage. `total` is
   // the item count for a stage that iterates, enabling an N-of-M heartbeat.
-  enterStage(input: { operationId: string; stage: string; total?: number }): Promise<void>;
+  // `operationType` is REQUIRED to scope the parent: `operation_id` is not unique
+  // on its own — `study_items` reuses the enrichmentId — so the parent must be
+  // found by the full `(operation_type, operation_id)` natural key.
+  enterStage(input: { operationType: OperationType; operationId: string; stage: string; total?: number }): Promise<void>;
   // Bump the heartbeat as items complete inside a long stage, so liveness is
   // visible without waiting for a stage boundary. `done` is the cumulative count.
-  recordProgress(input: { operationId: string; stage: string; done: number }): Promise<void>;
+  recordProgress(input: { operationType: OperationType; operationId: string; stage: string; done: number }): Promise<void>;
   // Close a stage: set its ended_at + ok. A thrown stage reports ok:false first.
-  completeStage(input: { operationId: string; stage: string; ok: boolean }): Promise<void>;
+  completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean }): Promise<void>;
   // Set the parent's terminal status + completed_at.
-  completeOperation(input: { operationId: string; status: "succeeded" | "failed" }): Promise<void>;
+  completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

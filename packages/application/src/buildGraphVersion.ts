@@ -52,7 +52,7 @@ export async function buildGraphVersion(input: {
   // base, the publish-time quality floors) throw on common operator errors, so a failed
   // build must reach a terminal `failed` status rather than masquerade as a permanent
   // `running` row. The failure semantics live once in `bracketStage`.
-  const buildStage = bracketStage(reporter, operationId);
+  const buildStage = bracketStage(reporter, "minting", operationId);
 
   // The parent `running` row exists from entry.
   await reporter.beginOperation({ operationType: "minting", operationId });
@@ -353,7 +353,7 @@ export async function buildGraphVersion(input: {
       artifact
     })
   );
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "minting", operationId, status: "succeeded" });
   return snapshot;
   });
 }

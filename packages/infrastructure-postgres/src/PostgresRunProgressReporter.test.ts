@@ -51,11 +51,11 @@ maybe("enterStage → recordProgress×N → completeStage(ok:true) yields a clos
     const reporter = new PostgresRunProgressReporter(sql);
     const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
-    await reporter.enterStage({ operationId, stage: "cep-extraction", total: 3 });
-    await reporter.recordProgress({ operationId, stage: "cep-extraction", done: 1 });
-    await reporter.recordProgress({ operationId, stage: "cep-extraction", done: 2 });
-    await reporter.recordProgress({ operationId, stage: "cep-extraction", done: 3 });
-    await reporter.completeStage({ operationId, stage: "cep-extraction", ok: true });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "cep-extraction", total: 3 });
+    await reporter.recordProgress({ operationType: "extraction", operationId, stage: "cep-extraction", done: 1 });
+    await reporter.recordProgress({ operationType: "extraction", operationId, stage: "cep-extraction", done: 2 });
+    await reporter.recordProgress({ operationType: "extraction", operationId, stage: "cep-extraction", done: 3 });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "cep-extraction", ok: true });
 
     const stages = await sql<{ started_at: string; ended_at: string | null; ok: boolean | null; progress_done: number | null; progress_total: number | null }[]>`
       SELECT s.started_at, s.ended_at, s.ok, s.progress_done, s.progress_total
@@ -83,11 +83,11 @@ maybe("recordProgress advances last_progress_at monotonically across calls", asy
     const reporter = new PostgresRunProgressReporter(sql);
     const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
-    await reporter.enterStage({ operationId, stage: "admission", total: 2 });
-    await reporter.recordProgress({ operationId, stage: "admission", done: 1 });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "admission", total: 2 });
+    await reporter.recordProgress({ operationType: "extraction", operationId, stage: "admission", done: 1 });
     const [{ last_progress_at: t1 }] = await sql<{ last_progress_at: string }[]>`SELECT last_progress_at FROM operation_runs WHERE operation_id = ${operationId}`;
     await sleep(5);
-    await reporter.recordProgress({ operationId, stage: "admission", done: 2 });
+    await reporter.recordProgress({ operationType: "extraction", operationId, stage: "admission", done: 2 });
     const [{ last_progress_at: t2 }] = await sql<{ last_progress_at: string }[]>`SELECT last_progress_at FROM operation_runs WHERE operation_id = ${operationId}`;
     assert.ok(new Date(t2) > new Date(t1), `expected ${t2} > ${t1}`);
   } finally {
@@ -101,9 +101,9 @@ maybe("completeStage(ok:false) then completeOperation('failed') leaves a readabl
     const reporter = new PostgresRunProgressReporter(sql);
     const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
-    await reporter.enterStage({ operationId, stage: "cep-extraction" });
-    await reporter.completeStage({ operationId, stage: "cep-extraction", ok: false });
-    await reporter.completeOperation({ operationId, status: "failed" });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "cep-extraction" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "cep-extraction", ok: false });
+    await reporter.completeOperation({ operationType: "extraction", operationId, status: "failed" });
 
     const [{ status, completed_at }] = await sql<{ status: string; completed_at: string | null }[]>`
       SELECT status, completed_at FROM operation_runs WHERE operation_id = ${operationId}`;
@@ -118,19 +118,63 @@ maybe("completeStage(ok:false) then completeOperation('failed') leaves a readabl
   }
 });
 
+// Regression: `study_items` reuses the enrichmentId as its operationId, so two
+// operation_runs share one operation_id. Every reporter method must scope by the full
+// (operation_type, operation_id) natural key — a method that matched operation_id alone
+// would, in enterStage, emit one stage row per parent under a single bound id and self-
+// collide on the primary key, and in completeStage/completeOperation would cross-write the
+// other operation. This drives both operations through their full lifecycle on one id.
+maybe("two operations sharing one operation_id (enrichment + study_items) never collide or cross-write", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const reporter = new PostgresRunProgressReporter(sql);
+    const operationId = randomUUID();
+    // Enrichment runs first and completes.
+    await reporter.beginOperation({ operationType: "enrichment", operationId });
+    await reporter.enterStage({ operationType: "enrichment", operationId, stage: "prerequisite-ordering" });
+    await reporter.completeStage({ operationType: "enrichment", operationId, stage: "prerequisite-ordering", ok: true });
+    await reporter.completeOperation({ operationType: "enrichment", operationId, status: "succeeded" });
+    // study_items then runs under the SAME operation_id — the collision case.
+    await reporter.beginOperation({ operationType: "study_items", operationId });
+    await reporter.enterStage({ operationType: "study_items", operationId, stage: "study-item-generation" });
+    await reporter.completeStage({ operationType: "study_items", operationId, stage: "study-item-generation", ok: true });
+    await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
+
+    // Each operation has exactly one parent and exactly its own one stage row.
+    const parents = await sql<{ operation_type: string; status: string; current_stage: string | null }[]>`
+      SELECT operation_type, status, current_stage FROM operation_runs WHERE operation_id = ${operationId} ORDER BY operation_type`;
+    assert.equal(parents.length, 2);
+    assert.deepEqual(parents.map((p) => p.operation_type), ["enrichment", "study_items"]);
+    assert.ok(parents.every((p) => p.status === "succeeded"), "neither operation cross-wrote the other's status");
+
+    const stages = await sql<{ operation_type: string; stage: string; ok: boolean | null }[]>`
+      SELECT r.operation_type, s.stage, s.ok
+      FROM operation_run_stages s JOIN operation_runs r ON r.operation_run_id = s.operation_run_id
+      WHERE r.operation_id = ${operationId} ORDER BY r.operation_type, s.stage`;
+    assert.equal(stages.length, 2, "exactly one stage row per operation — no PK self-collision, no duplicate");
+    assert.deepEqual(
+      stages.map((row) => `${row.operation_type}/${row.stage}`),
+      ["enrichment/prerequisite-ordering", "study_items/study-item-generation"]
+    );
+    assert.ok(stages.every((row) => row.ok === true));
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+});
+
 maybe("two stages in sequence produce two child rows with independently recoverable durations (R5 join shape)", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const reporter = new PostgresRunProgressReporter(sql);
     const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
-    await reporter.enterStage({ operationId, stage: "concept-discovery" });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "concept-discovery" });
     await sleep(3);
-    await reporter.completeStage({ operationId, stage: "concept-discovery", ok: true });
-    await reporter.enterStage({ operationId, stage: "admission" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "concept-discovery", ok: true });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "admission" });
     await sleep(3);
-    await reporter.completeStage({ operationId, stage: "admission", ok: true });
-    await reporter.completeOperation({ operationId, status: "succeeded" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "admission", ok: true });
+    await reporter.completeOperation({ operationType: "extraction", operationId, status: "succeeded" });
 
     const rows = await sql<{ stage: string; duration_ms: number }[]>`
       SELECT s.stage, (EXTRACT(EPOCH FROM (s.ended_at - s.started_at)) * 1000)::int AS duration_ms

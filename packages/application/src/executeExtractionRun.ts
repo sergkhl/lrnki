@@ -67,7 +67,7 @@ export async function executeExtractionRun(input: {
 
   // Bracket each stage onto the timeline; a thrown stage marks the operation failed and
   // propagates, so a failed run leaves a readable timeline without a whole-body try.
-  const runStage = bracketStage(reporter, operationId);
+  const runStage = bracketStage(reporter, "extraction", operationId);
 
   // The parent `running` row exists from entry — the fix for "no row until done".
   await reporter.beginOperation({ operationType: "extraction", operationId });
@@ -157,7 +157,7 @@ export async function executeExtractionRun(input: {
           maxMentionsPerConceptPerSource
         });
         cepCompleted += 1;
-        await reporter.recordProgress({ operationId, stage: STAGE_TAGS.cepExtraction, done: cepCompleted });
+        await reporter.recordProgress({ operationType: "extraction", operationId, stage: STAGE_TAGS.cepExtraction, done: cepCompleted });
         return profile;
       }),
     admittedCandidates.length
@@ -236,7 +236,7 @@ export async function executeExtractionRun(input: {
   // a non-LLM stage (wall-clock only, never appears in the cost half of the R5 join).
   await runStage(NON_LLM_STAGES.persist, () => input.store.persist(runResult, artifact));
 
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "extraction", operationId, status: "succeeded" });
   return runResult;
   });
 }

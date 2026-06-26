@@ -73,7 +73,7 @@ export async function generateStudyItemBank(input: {
   // A thrown stage (e.g. a failed persist) closes the stage ok:false, marks the
   // operation `failed`, and propagates — the same single-source failure semantics
   // extraction/enrichment use, rather than stranding a permanent `running` row.
-  const studyStage = bracketStage(reporter, operationId);
+  const studyStage = bracketStage(reporter, "study_items", operationId);
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
   const studyItems: StudyItem[] = [];
@@ -178,7 +178,7 @@ export async function generateStudyItemBank(input: {
       mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
         const result = await generateForNode(node);
         studyDone += 1;
-        await reporter.recordProgress({ operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
+        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
         return result;
       }),
     layer.derivedNodes.length
@@ -200,7 +200,7 @@ export async function generateStudyItemBank(input: {
       rejected
     })
   );
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
   return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected };
   });
 }

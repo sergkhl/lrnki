@@ -1,5 +1,5 @@
 import { isStageTag } from "@lrnki/domain-core";
-import type { RunProgressReporterPort } from "@lrnki/ports";
+import type { OperationType, RunProgressReporterPort } from "@lrnki/ports";
 
 // The reporter seam's application-facing surface (KTD4, R7). Operations import the
 // no-op default and the shared stage vocabulary from here; the worker injects the
@@ -51,16 +51,16 @@ export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: numb
 // rethrows — so a thrown stage always leaves a readable failed timeline without each
 // operation re-implementing the try/catch (and the failure semantics stay one source
 // of truth). `total` seeds an N-of-M heartbeat for stages that iterate.
-export function bracketStage(reporter: RunProgressReporterPort, operationId: string): StageBracket {
+export function bracketStage(reporter: RunProgressReporterPort, operationType: OperationType, operationId: string): StageBracket {
   return async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
-    await reporter.enterStage({ operationId, stage, total });
+    await reporter.enterStage({ operationType, operationId, stage, total });
     try {
       const result = await fn();
-      await reporter.completeStage({ operationId, stage, ok: true });
+      await reporter.completeStage({ operationType, operationId, stage, ok: true });
       return result;
     } catch (error) {
-      await reporter.completeStage({ operationId, stage, ok: false });
-      await reporter.completeOperation({ operationId, status: "failed" });
+      await reporter.completeStage({ operationType, operationId, stage, ok: false });
+      await reporter.completeOperation({ operationType, operationId, status: "failed" });
       throw error;
     }
   };

@@ -179,7 +179,7 @@ export async function runGraphEnrichment(input: {
   // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
   // the operation failed before propagating, so a failed enrichment leaves a readable
   // timeline — no partial layer is ever persisted.
-  const runStage = bracketStage(reporter, operationId);
+  const runStage = bracketStage(reporter, "enrichment", operationId);
   await reporter.beginOperation({ operationType: "enrichment", operationId });
   const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
   if (!snapshot) {
@@ -549,7 +549,7 @@ export async function runGraphEnrichment(input: {
       }
     })
   );
-  await reporter.completeOperation({ operationId, status: "succeeded" });
+  await reporter.completeOperation({ operationType: "enrichment", operationId, status: "succeeded" });
   return layer;
   });
 }

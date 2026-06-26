@@ -17,11 +17,11 @@ maybe("stitches a parent + its ordered stage rows into one detail with per-stage
     const read = new PostgresOperationTimelineRead(sql);
     const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
-    await reporter.enterStage({ operationId, stage: "concept-discovery" });
-    await reporter.completeStage({ operationId, stage: "concept-discovery", ok: true });
-    await reporter.enterStage({ operationId, stage: "admission" });
-    await reporter.completeStage({ operationId, stage: "admission", ok: true });
-    await reporter.completeOperation({ operationId, status: "succeeded" });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "concept-discovery" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "concept-discovery", ok: true });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "admission" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "admission", ok: true });
+    await reporter.completeOperation({ operationType: "extraction", operationId, status: "succeeded" });
 
     const detail = await read.getOperationTimeline(operationId);
     assert.ok(detail);
@@ -47,8 +47,8 @@ maybe("an in-flight operation renders the open stage as current with null durati
     const read = new PostgresOperationTimelineRead(sql);
     const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "enrichment", operationId });
-    await reporter.enterStage({ operationId, stage: "prerequisite-ordering", total: 10 });
-    await reporter.recordProgress({ operationId, stage: "prerequisite-ordering", done: 4 });
+    await reporter.enterStage({ operationType: "enrichment", operationId, stage: "prerequisite-ordering", total: 10 });
+    await reporter.recordProgress({ operationType: "enrichment", operationId, stage: "prerequisite-ordering", done: 4 });
 
     const detail = await read.getOperationTimeline(operationId);
     assert.ok(detail);
