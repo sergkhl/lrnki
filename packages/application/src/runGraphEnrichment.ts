@@ -1,5 +1,6 @@
 import type {
   AnchorProjectionNode,
+  DefinitionPassageDisposition,
   DerivedGraphLayer,
   DerivedGraphNode,
   DifficultyNodeContext,
@@ -29,6 +30,7 @@ import type {
   NodeMergeAdjudicationPort,
   PrerequisiteOrderingPort,
   RescueDurabilityJudgmentPort,
+  DefinitionPassageQualityJudgmentPort,
   RunProgressReporterPort,
   GraphVersionStorePort
 } from "@lrnki/ports";
@@ -39,6 +41,7 @@ import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMinting
 import { cutWeakEdges, findCycleEdges, transitiveReduction } from "./prerequisiteDag";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
+import { applyRescuedDefinitionQualityJudge } from "./applyRescuedDefinitionQualityJudge";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.8.0";
@@ -146,6 +149,14 @@ export async function runGraphEnrichment(input: {
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
   // unjudged (prior behavior).
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). When
+  // provided, the `definition`-typed grounding passages of verbatim-floored
+  // `source_mentioned` nodes are meaning-judged before they become learner-facing study
+  // items; hollow definition passages are dropped (the node stays mention-only), failing
+  // CLOSED = preserve on judge-unavailable. Omit it to leave rescued definitions unjudged
+  // (prior behavior). Same `kg-independent-judge` meaning judge as the extraction-time core
+  // gate — no new alias.
+  rescuedDefinitionQualityJudge?: DefinitionPassageQualityJudgmentPort;
   // Optional measured minting durability judge. When provided, each reserved
   // assumed-prerequisite proposal is judged before generated grounding is created;
   // omit it to preserve prior minting behavior.
@@ -209,6 +220,7 @@ export async function runGraphEnrichment(input: {
   let enrichmentNodes: EnrichmentNode[] = [];
   let groundingDispositions: GroundingVerbatimDisposition[] = [];
   let rescueDispositions: RescueDisposition[] = [];
+  let rescuedDefinitionDispositions: DefinitionPassageDisposition[] = [];
   let mintingDispositions: MintingDisposition[] = [];
   if (input.missingPrerequisiteProposal && input.groundingGeneration) {
     // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
@@ -250,8 +262,22 @@ export async function runGraphEnrichment(input: {
       for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
     }
     const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
-    enrichmentNodes = floored.nodes;
     groundingDispositions = floored.dispositions;
+    // Rescue-seam Definition-Passage quality gate (plan 2026-06-26-001 U3). Runs over the
+    // VERIFIED floored nodes — exactly the rescued `definition`-typed passages that reach
+    // study items — and drops hollow ones so a mis-picked optional definition never
+    // surfaces as a learner-facing definition. Its own fine stage tag so the added judging
+    // cost joins the enrichment operation (ADR-0029). Opt-in: only when the judge is wired.
+    if (input.rescuedDefinitionQualityJudge) {
+      const judge = input.rescuedDefinitionQualityJudge;
+      const rescuedJudged = await runStage(STAGE_TAGS.rescueDefinitionQuality, () =>
+        applyRescuedDefinitionQualityJudge({ nodes: floored.nodes, judge })
+      );
+      enrichmentNodes = rescuedJudged.nodes;
+      rescuedDefinitionDispositions = rescuedJudged.dispositions;
+    } else {
+      enrichmentNodes = floored.nodes;
+    }
   }
 
   const assembledNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
@@ -532,6 +558,7 @@ export async function runGraphEnrichment(input: {
     ],
     groundingDispositions,
     rescueDispositions,
+    rescuedDefinitionDispositions,
     mintingDispositions,
     nodeMerges
   };

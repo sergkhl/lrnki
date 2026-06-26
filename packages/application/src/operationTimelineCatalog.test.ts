@@ -44,6 +44,7 @@ test("declares reportable stages by operation type", () => {
   assert.deepEqual(operationTimelineStagesForOperation("enrichment").map((row) => row.stage), [
     STAGE_TAGS.prerequisiteOrdering,
     STAGE_TAGS.rescueDurability,
+    STAGE_TAGS.rescueDefinitionQuality,
     STAGE_TAGS.mintingDurability,
     STAGE_TAGS.missingPrerequisiteProposal,
     STAGE_TAGS.groundingGeneration,

@@ -313,6 +313,7 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
       dispositions: [],
       groundingDispositions: [],
       rescueDispositions: [],
+      rescuedDefinitionDispositions: [],
       mintingDispositions: [],
       nodeMerges: []
     };
@@ -404,6 +405,7 @@ maybe("round-trips enrichment nodes (llm_grounded + source_mentioned) with their
       { derivedNodeId: rescuedId, canonicalLabel: "Borrowing", normalizedLabel: "borrowing", declaredDomain: "software engineering", disposition: "accepted", rationale: "durable prerequisite", groundingSpan: "" },
       { derivedNodeId: droppedId, canonicalLabel: "Table 3 Ablation", normalizedLabel: "table 3 ablation", declaredDomain: "software engineering", disposition: "dropped", rationale: "incidental artifact", groundingSpan: "Table 3" }
     ],
+    rescuedDefinitionDispositions: [],
     mintingDispositions: [
       { derivedNodeId: mintedId, proposedLabel: "Stack allocation", normalizedLabel: "stack allocation", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "accepted", rationale: "durable prerequisite" },
       { derivedNodeId: droppedMintingId, proposedLabel: "Incidental Label", normalizedLabel: "incidental label", declaredDomain: "software engineering", anchorConceptId: anchorId, disposition: "dropped", rationale: "tangential to the anchor" }

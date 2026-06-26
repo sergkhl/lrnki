@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
   computeLearnerPath,
@@ -184,6 +185,12 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    // Rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). The SAME
+    // independent meaning judge (kg-independent-judge) and deterministic decoding as the
+    // extraction-time core gate — no new alias — but tagged `rescue-definition-quality` so
+    // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
+    // definitions before they reach study items; fails closed = preserve.
+    rescuedDefinitionQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient, undefined, STAGE_TAGS.rescueDefinitionQuality),
     // Measured minting durability judge: cross-family independent judge gates
     // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
     // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
@@ -340,6 +347,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
+    rescuedDefinitionQualityJudge: ctx.rescuedDefinitionQualityJudge,
     mintingDurabilityJudge: process.env.ENRICH_DISABLE_MINTING_DURABILITY ? undefined : ctx.mintingDurabilityJudge,
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
     // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).
