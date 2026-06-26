@@ -84,7 +84,7 @@ export function detectConflicts(verdicts: CalibrationVerdict[], gradedRows: Resp
 
 export type LearnerStateSummary = {
   learnerStateRef: string;
-  latestResponseAt: string;
+  latestResponseAt: string | null;
   responseCount: number;
   // Replaces the retired self-report count: how many nodes the learner marked `known`.
   knownVerdictCount: number;
@@ -231,7 +231,7 @@ export function summarizeLearnerStates(rows: TimestampedResponseLogRow[], verdic
       const learnerVerdicts = verdictsByLearner.get(learnerStateRef) ?? [];
       const latestResponseAt = learnerRows.length > 0
         ? learnerRows.reduce((latest, row) => (row.createdAt > latest ? row.createdAt : latest), learnerRows[0].createdAt)
-        : "";
+        : null;
       return {
         learnerStateRef,
         latestResponseAt,
@@ -241,7 +241,7 @@ export function summarizeLearnerStates(rows: TimestampedResponseLogRow[], verdic
         conflictCount: detectConflicts(learnerVerdicts, learnerRows).length
       };
     })
-    .sort((a, b) => b.latestResponseAt.localeCompare(a.latestResponseAt) || a.learnerStateRef.localeCompare(b.learnerStateRef));
+    .sort((a, b) => (b.latestResponseAt ?? "").localeCompare(a.latestResponseAt ?? "") || a.learnerStateRef.localeCompare(b.learnerStateRef));
 }
 
 export async function listLearnerStates(): Promise<LearnerStateSummary[] | undefined> {

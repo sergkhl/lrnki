@@ -4,18 +4,21 @@ import test from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
 import { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
+import { purgeOperationRun } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration
 // applied. Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
+// Each test purges the operation_runs it commits (see purgeOperationRun) so the
+// shared dev DB the Admin Lab reads is left exactly as it was found.
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 maybe("stitches a parent + its ordered stage rows into one detail with per-stage durations", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
     const read = new PostgresOperationTimelineRead(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
     await reporter.enterStage({ operationType: "extraction", operationId, stage: "concept-discovery" });
     await reporter.completeStage({ operationType: "extraction", operationId, stage: "concept-discovery", ok: true });
@@ -36,16 +39,17 @@ maybe("stitches a parent + its ordered stage rows into one detail with per-stage
       assert.ok(stage.durationMs !== null && stage.durationMs >= 0);
     }
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
 
 maybe("an in-flight operation renders the open stage as current with null duration, not complete", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
     const read = new PostgresOperationTimelineRead(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "enrichment", operationId });
     await reporter.enterStage({ operationType: "enrichment", operationId, stage: "prerequisite-ordering", total: 10 });
     await reporter.recordProgress({ operationType: "enrichment", operationId, stage: "prerequisite-ordering", done: 4 });
@@ -63,6 +67,7 @@ maybe("an in-flight operation renders the open stage as current with null durati
     assert.equal(open?.ok, null);
     assert.equal(open?.progressDone, 4);
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
@@ -70,6 +75,7 @@ maybe("an in-flight operation renders the open stage as current with null durati
 maybe("a not-found operation id returns undefined (not an error)", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
+    // Reads a fresh random id and writes nothing, so there is no row to purge.
     const read = new PostgresOperationTimelineRead(sql);
     assert.equal(await read.getOperationTimeline(randomUUID()), undefined);
   } finally {
@@ -79,10 +85,10 @@ maybe("a not-found operation id returns undefined (not an error)", async () => {
 
 maybe("a running row written by the reporter appears in the list before any stage completes", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
     const read = new PostgresOperationTimelineRead(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
 
     const list = await read.listOperationTimelines();
@@ -91,6 +97,7 @@ maybe("a running row written by the reporter appears in the list before any stag
     assert.equal(mine.status, "running");
     assert.equal(mine.stageCount, 0);
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });

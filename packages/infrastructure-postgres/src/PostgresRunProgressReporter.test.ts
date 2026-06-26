@@ -4,17 +4,20 @@ import { setTimeout as sleep } from "node:timers/promises";
 import test from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
+import { purgeOperationRun } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration
 // applied. Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
+// Each test purges the operation_runs it commits (see purgeOperationRun) so the
+// shared dev DB the Admin Lab reads is left exactly as it was found.
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 maybe("beginOperation commits a running parent row visible to a SEPARATE connection (KTD3 autocommit)", async () => {
   const sql = createDatabaseClient(databaseUrl);
   const other = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
-    const operationId = randomUUID();
     await new PostgresRunProgressReporter(sql).beginOperation({ operationType: "extraction", operationId });
 
     // A different connection sees `running` before any stage completes — the
@@ -26,6 +29,7 @@ maybe("beginOperation commits a running parent row visible to a SEPARATE connect
     assert.equal(rows[0].current_stage, null);
     assert.equal(rows[0].completed_at, null);
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
     await other.end({ timeout: 5 });
   }
@@ -33,23 +37,24 @@ maybe("beginOperation commits a running parent row visible to a SEPARATE connect
 
 maybe("beginOperation is idempotent-tolerant: a re-begin leaves one running row", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "enrichment", operationId });
     await reporter.beginOperation({ operationType: "enrichment", operationId });
     const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM operation_runs WHERE operation_id = ${operationId}`;
     assert.equal(count, 1);
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
 
 maybe("enterStage → recordProgress×N → completeStage(ok:true) yields a closed child row with progress_done = N", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
     await reporter.enterStage({ operationType: "extraction", operationId, stage: "cep-extraction", total: 3 });
     await reporter.recordProgress({ operationType: "extraction", operationId, stage: "cep-extraction", done: 1 });
@@ -73,15 +78,16 @@ maybe("enterStage → recordProgress×N → completeStage(ok:true) yields a clos
     assert.equal(progress_done, 3);
     assert.equal(current_stage, "cep-extraction");
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
 
 maybe("recordProgress advances last_progress_at monotonically across calls", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
     await reporter.enterStage({ operationType: "extraction", operationId, stage: "admission", total: 2 });
     await reporter.recordProgress({ operationType: "extraction", operationId, stage: "admission", done: 1 });
@@ -91,15 +97,16 @@ maybe("recordProgress advances last_progress_at monotonically across calls", asy
     const [{ last_progress_at: t2 }] = await sql<{ last_progress_at: string }[]>`SELECT last_progress_at FROM operation_runs WHERE operation_id = ${operationId}`;
     assert.ok(new Date(t2) > new Date(t1), `expected ${t2} > ${t1}`);
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
 
 maybe("completeStage(ok:false) then completeOperation('failed') leaves a readable failed parent with the failed stage row intact", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
     await reporter.enterStage({ operationType: "extraction", operationId, stage: "cep-extraction" });
     await reporter.completeStage({ operationType: "extraction", operationId, stage: "cep-extraction", ok: false });
@@ -114,6 +121,7 @@ maybe("completeStage(ok:false) then completeOperation('failed') leaves a readabl
       WHERE r.operation_id = ${operationId} AND s.stage = 'cep-extraction'`;
     assert.equal(ok, false);
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
@@ -126,9 +134,9 @@ maybe("completeStage(ok:false) then completeOperation('failed') leaves a readabl
 // other operation. This drives both operations through their full lifecycle on one id.
 maybe("two operations sharing one operation_id (enrichment + study_items) never collide or cross-write", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
-    const operationId = randomUUID();
     // Enrichment runs first and completes.
     await reporter.beginOperation({ operationType: "enrichment", operationId });
     await reporter.enterStage({ operationType: "enrichment", operationId, stage: "prerequisite-ordering" });
@@ -158,15 +166,17 @@ maybe("two operations sharing one operation_id (enrichment + study_items) never 
     );
     assert.ok(stages.every((row) => row.ok === true));
   } finally {
+    // One purge by operation_id removes both shared-id parents and their stages.
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });
 
 maybe("two stages in sequence produce two child rows with independently recoverable durations (R5 join shape)", async () => {
   const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
   try {
     const reporter = new PostgresRunProgressReporter(sql);
-    const operationId = randomUUID();
     await reporter.beginOperation({ operationType: "extraction", operationId });
     await reporter.enterStage({ operationType: "extraction", operationId, stage: "concept-discovery" });
     await sleep(3);
@@ -185,6 +195,7 @@ maybe("two stages in sequence produce two child rows with independently recovera
     assert.deepEqual(rows.map((r) => r.stage), ["concept-discovery", "admission"]);
     for (const row of rows) assert.ok(row.duration_ms >= 0, "each stage has a recoverable non-negative duration");
   } finally {
+    await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });
   }
 });

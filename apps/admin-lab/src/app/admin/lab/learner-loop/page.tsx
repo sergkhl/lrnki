@@ -61,7 +61,7 @@ export default async function LearnerLoopListPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      <LocalDateTime iso={learner.latestResponseAt} />
+                      {learner.latestResponseAt ? <LocalDateTime iso={learner.latestResponseAt} /> : "—"}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{learner.knownVerdictCount}</TableCell>
                     <TableCell className="text-right tabular-nums">{learner.gradedCount}</TableCell>
