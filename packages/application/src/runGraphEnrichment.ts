@@ -215,7 +215,7 @@ export async function runGraphEnrichment(input: {
     // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
     // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
     // and LLM-free — they need no stage row (they carry no spend to join).
-    const rescueCandidates = await input.enrichmentStore.mentionedNonCoreCandidates(input.graphVersionId);
+    const rescueCandidates = await input.enrichmentStore.nonCoreRescueCandidates(input.graphVersionId);
     const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
       conceptId: concept.conceptId,
       canonicalLabel: concept.canonicalLabel,

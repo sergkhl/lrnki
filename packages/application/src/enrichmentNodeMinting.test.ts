@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, NonCoreRescueCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   GroundingGenerationPort,
@@ -76,7 +76,7 @@ function recordingGrounder(calls: string[]): GroundingGenerationPort {
   };
 }
 
-function mention(label: string, runId: string): MentionedNonCoreCandidate {
+function mention(label: string, runId: string): NonCoreRescueCandidate {
   return {
     runId,
     declaredDomain: "software engineering",
@@ -85,6 +85,23 @@ function mention(label: string, runId: string): MentionedNonCoreCandidate {
     normalizedLabel: label.toLowerCase(),
     aliases: [label],
     tier: "reject",
+    definitions: [],
+    mentions: [{ sourceResourceId: "src", sourceBlockId: `blk-${runId}`, evidenceQuote: `${label} is mentioned.`, blockText: `${label} is mentioned somewhere.`, headingPath: [], locator: {} }]
+  };
+}
+
+// An `optional`-tier rescue candidate carrying a verbatim Definition Passage in addition
+// to a mention — the reuse case the seam fix rescues instead of re-minting (U2).
+function definitionBearing(label: string, runId: string): NonCoreRescueCandidate {
+  return {
+    runId,
+    declaredDomain: "software engineering",
+    candidateKey: label.toLowerCase(),
+    canonicalLabel: label,
+    normalizedLabel: label.toLowerCase(),
+    aliases: [label],
+    tier: "optional",
+    definitions: [{ sourceResourceId: "src", sourceBlockId: `def-${runId}`, evidenceQuote: `${label} is the memory requested at runtime.`, blockText: `${label} is the memory requested at runtime.`, headingPath: [], locator: {} }],
     mentions: [{ sourceResourceId: "src", sourceBlockId: `blk-${runId}`, evidenceQuote: `${label} is mentioned.`, blockText: `${label} is mentioned somewhere.`, headingPath: [], locator: {} }]
   };
 }
@@ -154,6 +171,52 @@ test("rescue dedupes a concept appearing in two member runs into one node", asyn
   });
   assert.equal(rescuedNodes.length, 1, "the duplicate concept collapses to a single node");
   assert.equal(rescuedNodes[0].groundingPassages.length, 2, "both runs' mentions are merged onto the node");
+});
+
+test("a definition-bearing optional candidate is rescued with a definition + mention passage", async () => {
+  counter = 0;
+  const { rescuedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [definitionBearing("Heap allocation", "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1);
+  assert.equal(rescuedNodes[0].groundingOrigin, "source_mentioned");
+  const types = rescuedNodes[0].groundingPassages.map((p) => p.passageType);
+  assert.deepEqual(types, ["definition", "mention"], "definition leads, mention follows");
+  assert.equal(rescuedNodes[0].groundingPassages[0].evidenceQuote, "Heap allocation is the memory requested at runtime.");
+});
+
+test("a rescued optional concept suppresses redundant minting of the same label (R3)", async () => {
+  counter = 0;
+  const minted: string[] = [];
+  const { rescuedNodes, mintedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [definitionBearing("Heap allocation", "run-1")],
+    // The minter tries to regenerate the very concept already rescued with a real definition.
+    proposalPort: proposer({ a: [{ proposedLabel: "Heap allocation", rationale: "r" }] }),
+    groundingPort: recordingGrounder(minted),
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1, "the optional concept is rescued from its source definition");
+  assert.equal(mintedNodes.length, 0, "and the minter does not regenerate it as an llm_grounded node");
+  assert.deepEqual(minted, [], "grounding generation is never invoked for the rescued label");
+});
+
+test("two member runs of a definition-bearing concept merge definitions and mentions", async () => {
+  counter = 0;
+  const { rescuedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [definitionBearing("Heap allocation", "run-1"), definitionBearing("Heap allocation", "run-2")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    newNodeId
+  });
+  assert.equal(rescuedNodes.length, 1, "the concept collapses to one node across runs");
+  const types = rescuedNodes[0].groundingPassages.map((p) => p.passageType).sort();
+  assert.deepEqual(types, ["definition", "definition", "mention", "mention"], "both runs' definitions and mentions merge");
 });
 
 // Always-durable judge: an opt-in judge that accepts every rescue candidate.

@@ -27,7 +27,7 @@ import type {
   GraphSnapshot,
   InferredPrerequisiteEdge,
   LearnerPath,
-  MentionedNonCoreCandidate,
+  NonCoreRescueCandidate,
   MissingPrerequisiteProposal,
   MintingDurabilityJudgment,
   NodeMergeAdjudication,
@@ -368,13 +368,15 @@ export interface EnrichmentRunStorePort {
     artifact: ArtifactEnvelope<EnrichmentRunTrace>;
   }): Promise<void>;
   getLayer(enrichmentId: string): Promise<DerivedGraphLayer | undefined>;
-  // Rescue source for Graph Enrichment (KTD5, R7): the member Extraction Runs of
-  // `graphVersionId` (resolved via graph_version_run_memberships) reduced to their
-  // rejected/optional admission proposals that carry a verbatim MENTION but no
-  // Definition Passage. Each carries resolved mention provenance plus the cited
-  // block's text so the verbatim floor (U6) re-verifies at enrichment time. These
-  // become `source_mentioned`/`derived` nodes only and never touch the asserted core.
-  mentionedNonCoreCandidates(graphVersionId: string): Promise<MentionedNonCoreCandidate[]>;
+  // Rescue source for Graph Enrichment (KTD1/KTD5, R1/R7): the member Extraction Runs
+  // of `graphVersionId` (resolved via graph_version_run_memberships) reduced to their
+  // non-core admission proposals. `optional`-tier candidates carry their verbatim
+  // Definition Passages alongside mentions so rescue reuses already-extracted grounded
+  // evidence; `reject`-tier candidates carry mentions only (KTD3 precision guard). Each
+  // passage carries the cited block's text so the verbatim floor (U3) re-verifies at
+  // enrichment time. These become `source_mentioned`/`derived` nodes only and never
+  // touch the asserted core.
+  nonCoreRescueCandidates(graphVersionId: string): Promise<NonCoreRescueCandidate[]>;
 }
 
 // Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the

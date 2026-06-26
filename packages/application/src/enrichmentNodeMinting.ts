@@ -1,7 +1,7 @@
 import { normalizeConceptLabel } from "@lrnki/domain-core";
 import type {
   LlmGroundedEnrichmentNode,
-  MentionedNonCoreCandidate,
+  NonCoreRescueCandidate,
   MintingDisposition,
   RescueDisposition,
   SourceMentionedEnrichmentNode,
@@ -42,9 +42,11 @@ export type MintingAnchor = {
 };
 
 // Assemble the derived layer's ENRICHMENT nodes (rescue + mint) for one run (U5).
-// RESCUE (KTD5): each member-run rejected/optional candidate the source mentions but
-// never defines becomes a `source_mentioned` node carrying its real mention evidence,
-// deduped by normalized label within Declared Domain. MINT (KTD6): each anchor drives
+// RESCUE (KTD1/KTD5): each member-run non-core candidate becomes a `source_mentioned`
+// node reusing its real verbatim evidence — `optional`-tier candidates carry their
+// Definition Passages alongside mentions (the rule-21 reuse-over-regeneration fix),
+// `reject`-tier carry mentions only — deduped by normalized label within Declared
+// Domain so the minter cannot regenerate a rescued concept. MINT (KTD6): each anchor drives
 // a bounded, explicit proposal pass — the proposal port NAMES assumed-prior concepts
 // (handoff constraint: node identity is an inspectable operation, not local string
 // construction), then the grounding port fills a CEP-shaped bundle for each accepted
@@ -52,7 +54,7 @@ export type MintingAnchor = {
 // layer (R5); the verbatim floor (U6) runs over the result before pair judging.
 export async function assembleEnrichmentNodes(input: {
   anchors: MintingAnchor[];
-  rescueCandidates: MentionedNonCoreCandidate[];
+  rescueCandidates: NonCoreRescueCandidate[];
   proposalPort: MissingPrerequisiteProposalPort;
   groundingPort: GroundingGenerationPort;
   // Optional measured rescue durability judge (U3). When provided, each AGGREGATED
@@ -239,19 +241,28 @@ export async function assembleEnrichmentNodes(input: {
   return { rescuedNodes, mintedNodes, rescueDispositions, mintingDispositions };
 }
 
-function rescuePassages(candidate: MentionedNonCoreCandidate): SourceMentionGroundingPassage[] {
-  return candidate.mentions.map((mention) => ({
-    passageType: "mention",
-    text: mention.evidenceQuote,
+function rescuePassages(candidate: NonCoreRescueCandidate): SourceMentionGroundingPassage[] {
+  // Reuse both Definition and mention evidence (KTD1). Definitions lead — they are the
+  // richer grounding that downstream study items prefer (U4). Every passage is provisional
+  // `verified`; the verbatim floor (U3) re-verifies each quote against its cited block.
+  const passage = (
+    passageType: "definition" | "mention",
+    source: NonCoreRescueCandidate["mentions"][number]
+  ): SourceMentionGroundingPassage => ({
+    passageType,
+    text: source.evidenceQuote,
     groundingOrigin: "source_mentioned",
-    sourceResourceId: mention.sourceResourceId,
-    sourceBlockId: mention.sourceBlockId,
-    evidenceQuote: mention.evidenceQuote,
-    headingPath: mention.headingPath,
-    locator: mention.locator,
-    // Provisional; the verbatim floor (U6) re-verifies against the cited block.
-    verbatimCheck: { disposition: "verified", sourceResourceId: mention.sourceResourceId, sourceBlockId: mention.sourceBlockId }
-  }));
+    sourceResourceId: source.sourceResourceId,
+    sourceBlockId: source.sourceBlockId,
+    evidenceQuote: source.evidenceQuote,
+    headingPath: source.headingPath,
+    locator: source.locator,
+    verbatimCheck: { disposition: "verified", sourceResourceId: source.sourceResourceId, sourceBlockId: source.sourceBlockId }
+  });
+  return [
+    ...candidate.definitions.map((definition) => passage("definition", definition)),
+    ...candidate.mentions.map((mention) => passage("mention", mention))
+  ];
 }
 
 // The labels already present in one domain, as canonical strings, so the proposer can

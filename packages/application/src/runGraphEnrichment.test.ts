@@ -631,7 +631,7 @@ test("fails the run without persisting when an ordering draw throws", async () =
 
 // --- Node minting + rescue (sub-stages unchanged; ordering consumes their nodes) ------
 
-import type { GeneratedGroundingBundle, MentionedNonCoreCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
+import type { GeneratedGroundingBundle, NonCoreRescueCandidate, MissingPrerequisiteProposal } from "@lrnki/domain-core";
 import { isStageTag } from "@lrnki/domain-core";
 import type { GroundingGenerationPort, MissingPrerequisiteProposalPort, NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 
@@ -645,7 +645,7 @@ const sparseSnapshot: GraphSnapshot = {
 };
 
 function buildNodePorts(options: {
-  rescue?: MentionedNonCoreCandidate[];
+  rescue?: NonCoreRescueCandidate[];
   proposals?: MissingPrerequisiteProposal[];
   responder?: Responder;
 }) {
@@ -684,16 +684,17 @@ function buildNodePorts(options: {
       return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0, method: "intrinsic-fused-v1", components: {}, neuralRationale: "" }));
     }
   };
-  const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "mentionedNonCoreCandidates"> = {
+  const enrichmentStore: Pick<EnrichmentRunStorePort, "persist" | "nonCoreRescueCandidates"> = {
     async persist(input) { persisted = input.layer; },
-    async mentionedNonCoreCandidates() { return options.rescue ?? []; }
+    async nonCoreRescueCandidates() { return options.rescue ?? []; }
   };
   return { orderedLabels, newNodeId, proposalPort, groundingPort, prerequisiteOrdering, graphStore, difficulty, enrichmentStore, getPersisted: () => persisted };
 }
 
-function rescueCandidate(label: string): MentionedNonCoreCandidate {
+function rescueCandidate(label: string): NonCoreRescueCandidate {
   return {
     runId: "run-1", declaredDomain: "x", candidateKey: label.toLowerCase(), canonicalLabel: label, normalizedLabel: label.toLowerCase(), aliases: [], tier: "reject",
+    definitions: [],
     mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: `${label} is mentioned`, blockText: `Here ${label} is mentioned in prose`, headingPath: [], locator: {} }]
   };
 }

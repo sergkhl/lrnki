@@ -10,7 +10,8 @@ import type {
   InferredPrerequisiteEdge,
   LearnerPath,
   LearnerPathStep,
-  MentionedNonCoreCandidate,
+  NonCoreRescueCandidate,
+  NonCoreRescuePassage,
   SourceLocator,
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
@@ -152,19 +153,25 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
     });
   }
 
-  // Rescue source for Graph Enrichment (KTD5, R7). The member Extraction Runs of
-  // `graphVersionId` reduced to their rejected/optional admission proposals that have
-  // a verbatim MENTION but no Definition Passage — concepts the source mentions but
-  // never defines. Each mention carries resolved provenance plus the cited block's
-  // text so the verbatim floor (U6) re-verifies at enrichment time. Never touches the
-  // asserted core; these become `source_mentioned`/`derived` nodes only.
-  async mentionedNonCoreCandidates(graphVersionId: string): Promise<MentionedNonCoreCandidate[]> {
-    const rows = await this.sql<{
+  // Rescue source for Graph Enrichment (KTD1/KTD5, R1/R7). The member Extraction Runs
+  // of `graphVersionId` reduced to their non-core admission proposals, reused as the
+  // fully-provenanced source for `source_mentioned`/`derived` rescue nodes. `optional`-tier
+  // candidates carry their verbatim Definition Passages alongside mentions so rescue reuses
+  // already-extracted grounded evidence instead of re-minting it at a lower trust tier (the
+  // rule-21 reuse-over-regeneration fix); `reject`-tier candidates carry mentions only (KTD3
+  // precision guard — admission already judged them non-atomic). Each passage carries the
+  // cited block's text so the verbatim floor (U3) re-verifies at enrichment time. Never
+  // touches the asserted core.
+  async nonCoreRescueCandidates(graphVersionId: string): Promise<NonCoreRescueCandidate[]> {
+    type CandidateRow = {
       run_id: string; declared_domain: string; candidate_key: string; canonical_label: string;
       normalized_label: string; aliases: string[]; tier: string;
       source_block_id: string; evidence_quote: string; block_text: string;
       heading_path: string[]; locator: unknown; block_source_resource_id: string;
-    }[]>`
+    };
+
+    // Mentions: both `optional` and `reject` tiers (the inverted definition exclusion is gone).
+    const mentionRows = await this.sql<CandidateRow[]>`
       SELECT er.run_id, sr.declared_domain, cc.candidate_key, cc.canonical_label,
              cc.normalized_label, cc.aliases, ad.tier,
              sb.source_block_id, ccm.evidence_quote, sb.text AS block_text,
@@ -179,15 +186,30 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
       JOIN source_documents sd ON sd.source_document_id = sb.source_document_id
       WHERE gm.graph_version_id = ${graphVersionId}
         AND ad.tier IN ('optional', 'reject')
-        AND NOT EXISTS (
-          SELECT 1 FROM run_concept_evidence_profiles p
-          JOIN run_evidence_passages rep ON rep.run_concept_evidence_profile_id = p.run_concept_evidence_profile_id
-          WHERE p.concept_candidate_id = cc.concept_candidate_id AND rep.kind = 'definition'
-        )
       ORDER BY er.run_id, cc.candidate_key, sb.source_block_id`;
 
-    const byCandidate = new Map<string, MentionedNonCoreCandidate>();
-    for (const row of rows) {
+    // Definitions: `optional` tier only (KTD3). Reuses the run-level CEP Definition Passages.
+    const definitionRows = await this.sql<CandidateRow[]>`
+      SELECT er.run_id, sr.declared_domain, cc.candidate_key, cc.canonical_label,
+             cc.normalized_label, cc.aliases, ad.tier,
+             sb.source_block_id, rep.evidence_quote, sb.text AS block_text,
+             sb.heading_path, sb.locator, sd.source_resource_id AS block_source_resource_id
+      FROM graph_version_run_memberships gm
+      JOIN extraction_runs er ON er.run_id = gm.run_id
+      JOIN source_resources sr ON sr.source_resource_id = er.source_resource_id
+      JOIN concept_candidates cc ON cc.run_id = er.run_id
+      JOIN concept_admission_decisions ad ON ad.concept_candidate_id = cc.concept_candidate_id
+      JOIN run_concept_evidence_profiles p ON p.concept_candidate_id = cc.concept_candidate_id
+      JOIN run_evidence_passages rep ON rep.run_concept_evidence_profile_id = p.run_concept_evidence_profile_id
+        AND rep.kind = 'definition'
+      JOIN source_blocks sb ON sb.source_block_id = rep.source_block_id
+      JOIN source_documents sd ON sd.source_document_id = sb.source_document_id
+      WHERE gm.graph_version_id = ${graphVersionId}
+        AND ad.tier = 'optional'
+      ORDER BY er.run_id, cc.candidate_key, rep.salience_rank`;
+
+    const byCandidate = new Map<string, NonCoreRescueCandidate>();
+    const getOrCreate = (row: CandidateRow): NonCoreRescueCandidate => {
       const key = `${row.run_id}|${row.candidate_key}`;
       let candidate = byCandidate.get(key);
       if (!candidate) {
@@ -199,19 +221,24 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
           normalizedLabel: row.normalized_label,
           aliases: row.aliases,
           tier: row.tier as CandidateTier,
+          definitions: [],
           mentions: []
         };
         byCandidate.set(key, candidate);
       }
-      candidate.mentions.push({
-        sourceResourceId: row.block_source_resource_id,
-        sourceBlockId: row.source_block_id,
-        evidenceQuote: row.evidence_quote,
-        blockText: row.block_text,
-        headingPath: row.heading_path,
-        locator: row.locator as SourceLocator
-      });
-    }
+      return candidate;
+    };
+    const toPassage = (row: CandidateRow): NonCoreRescuePassage => ({
+      sourceResourceId: row.block_source_resource_id,
+      sourceBlockId: row.source_block_id,
+      evidenceQuote: row.evidence_quote,
+      blockText: row.block_text,
+      headingPath: row.heading_path,
+      locator: row.locator as SourceLocator
+    });
+
+    for (const row of mentionRows) getOrCreate(row).mentions.push(toPassage(row));
+    for (const row of definitionRows) getOrCreate(row).definitions.push(toPassage(row));
     return [...byCandidate.values()];
   }
 
