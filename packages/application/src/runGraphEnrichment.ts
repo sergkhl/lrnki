@@ -246,6 +246,7 @@ export async function runGraphEnrichment(input: {
     // does not verify is dropped before it can enter the derived layer.
     const blockTextById = new Map<string, string>();
     for (const candidate of rescueCandidates) {
+      for (const definition of candidate.definitions) blockTextById.set(definition.sourceBlockId, definition.blockText);
       for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
     }
     const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
