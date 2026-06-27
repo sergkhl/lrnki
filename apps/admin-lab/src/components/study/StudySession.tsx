@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { GraduationCapIcon, RotateCcwIcon, TriangleAlertIcon, TrophyIcon } from "lucide-react";
 import { submitOptionSelect, setVerdict, clearVerdict, resetLearner } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
@@ -8,7 +10,7 @@ import { StudySideSheet } from "@/components/study/StudySideSheet";
 import { nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Admin-Lab client driver for one study session. Calibration now happens before study or
@@ -33,6 +35,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   // mastered. A foundational root always shows its single-node study screen instead (R3/AE1).
   const goalReached = !session.isFoundationalRoot && session.classification.selectedFrontierTarget === null;
   const sourceSummary = session.responseSourceSummary;
+  const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
 
@@ -144,6 +147,12 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
               <RotateCcwIcon data-icon="inline-start" />
               Reset learner
             </Button>
+            <Link
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+              href={`/admin/lab/study/${encodeURIComponent(session.learnerStateRef)}/calibrate?${calibrationQuery.toString()}` as Route}
+            >
+              Re-calibrate
+            </Link>
           </div>
         </CardHeader>
       </Card>
