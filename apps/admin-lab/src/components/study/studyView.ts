@@ -6,15 +6,6 @@ import type { Verdict, StudyItemGroundingProvenance } from "@lrnki/domain-core";
 // contract) share ONE definition (AGENTS rule 18). A later Learner app extracts this
 // folder and writes its own loader against the SAME contract.
 
-export type StudyCardView = {
-  studyItemId: string;
-  derivedNodeId: string;
-  question: string;
-  answerKey: string;
-  selfReportPrompt: string;
-  groundingProvenance: StudyItemGroundingProvenance;
-};
-
 export type StudyOptionSelectView = {
   studyItemId: string;
   derivedNodeId: string;
@@ -28,28 +19,15 @@ export type StudyOptionSelectView = {
   }[];
 };
 
-// Side-sheet content gated by the node's learner state (R5/R9/R13). A non-mastered cone
-// node with a self-assessment opens the CALIBRATION card — reveal the answer, then "I knew
-// it" / "I forgot" — and carries its current verdict plus, when present, the option-select
-// item so the learner can study it after keeping it in the gap. A frontier node WITHOUT a
-// self-assessment falls back to its option-select study, else is flagged cardless. A locked
-// node names its unmet prerequisites; a mastered node opens a read-only review that can
-// CLEAR a `known` verdict (R7 reversal).
+// Side-sheet content gated by the node's learner state. Frontier nodes either render an
+// option-select study item or a cardless "skip as known" affordance. A locked node names
+// its unmet prerequisites; a mastered node opens a cardless review that can CLEAR a
+// `known` verdict.
 export type SheetContent =
-  | { kind: "calibration"; card: StudyCardView; verdict: Verdict | null; optionItem: StudyOptionSelectView | null }
   | { kind: "option_select"; item: StudyOptionSelectView }
   | { kind: "cardless" }
   | { kind: "locked"; unmetPrerequisiteLabels: string[] }
-  | { kind: "mastered_review"; card: StudyCardView | null; verdict: Verdict | null };
-
-// The learner's binary self-assessment (R5). "I knew it" claims prior mastery → a `known`
-// verdict (prunes the trusted prerequisite down-closure); "I forgot" → a `learn` verdict
-// (the node stays in the study gap). Pure — the action upserts the returned verdict.
-export type CalibrationChoice = "knew_it" | "forgot";
-
-export function verdictForChoice(choice: CalibrationChoice): Verdict {
-  return choice === "knew_it" ? "known" : "learn";
-}
+  | { kind: "mastered_review"; verdict: Verdict | null };
 
 // Radix/Base sheet primitives can emit `open=false` while focus/animation state is
 // settling. During answer-triggered retargeting that dismiss signal is stale: the user's

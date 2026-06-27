@@ -1,29 +1,24 @@
 "use client";
 
-import { LockIcon } from "lucide-react";
-import type { Verdict } from "@lrnki/domain-core";
+import { CheckIcon, LockIcon, RotateCcwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { OptionSelectCard } from "@/components/study/OptionSelectCard";
-import { RecallCard } from "@/components/study/RecallCard";
 import type { SheetContent as SheetContentPayload } from "@/components/study/studyView";
 
-// Transfer-ready, state-gated study side sheet (U5, R5/R6/R7/R9/R13/R15). It keeps the
-// graph visible (a right-side sheet) and renders content gated by the clicked node's
-// learner state: a cone node opens the reveal/verdict CALIBRATION card and, when it also
-// has an option-select item, the study card beneath it; a frontier node without a
-// self-assessment opens its option-select study; a cardless frontier node is flagged, never
-// dropped (R13); a locked node names its unmet prerequisites with NO card; a mastered node
-// opens a read-only review that can clear a `known` verdict (R7). All data and the
-// callbacks are injected props — no loader or server action is imported (R15).
+// Transfer-ready, state-gated study side sheet. It keeps the graph visible and renders
+// content gated by the clicked node's learner state: a ready node opens an option-select
+// item or a cardless skip affordance; a locked node names unmet prerequisites; a mastered
+// node can clear a `known` verdict. All callbacks are injected props — no loader or server
+// action is imported.
 export function StudySideSheet({
   open,
   onOpenChange,
   nodeLabel,
   content,
   onSelect,
-  onVerdict,
+  onSkipAsKnown,
   onClear,
   pending = false
 }: Readonly<{
@@ -32,7 +27,7 @@ export function StudySideSheet({
   nodeLabel: string | null;
   content: SheetContentPayload | null;
   onSelect: (optionId: string) => void;
-  onVerdict: (verdict: Verdict) => void;
+  onSkipAsKnown: () => void;
   onClear: () => void;
   pending?: boolean;
 }>) {
@@ -47,41 +42,35 @@ export function StudySideSheet({
           <SheetDescription>{content ? descriptionFor(content) : null}</SheetDescription>
         </SheetHeader>
 
-        {content?.kind === "calibration" ? (
+        {content?.kind === "option_select" ? (
           <div className="flex flex-col gap-4">
-            <RecallCard
-              key={content.card.studyItemId}
-              card={content.card}
-              verdict={content.verdict}
-              onVerdict={onVerdict}
-              onClear={onClear}
-              pending={pending}
-            />
-            {content.optionItem ? (
-              <>
-                <Separator />
-                <p className="text-sm font-medium">Or study it now:</p>
-                <OptionSelectCard key={content.optionItem.studyItemId} item={content.optionItem} onSelect={onSelect} pending={pending} />
-              </>
+            <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={onSelect} pending={pending} />
+            <Button type="button" variant="outline" className="self-start" disabled={pending} onClick={onSkipAsKnown}>
+              <CheckIcon data-icon="inline-start" />
+              Skip as known
+            </Button>
+          </div>
+        ) : null}
+
+        {content?.kind === "mastered_review" ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">Mastered for this learner.</p>
+            {content.verdict === "known" ? (
+              <Button type="button" size="sm" variant="outline" className="self-start" disabled={pending} onClick={onClear}>
+                <RotateCcwIcon data-icon="inline-start" />
+                Clear known mark
+              </Button>
             ) : null}
           </div>
         ) : null}
 
-        {content?.kind === "option_select" ? (
-          <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={onSelect} pending={pending} />
-        ) : null}
-
-        {content?.kind === "mastered_review" && content.card ? (
-          <RecallCard key={content.card.studyItemId} card={content.card} verdict={content.verdict} onClear={onClear} pending={pending} readOnly />
-        ) : null}
-
-        {content?.kind === "mastered_review" && !content.card ? (
-          <p className="text-sm text-muted-foreground">Mastered — no study item exists for this node.</p>
-        ) : null}
-
         {content?.kind === "cardless" ? (
-          <div className="rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
-            No study item exists for this node — nothing to reveal or auto-grade. This frontier is flagged and kept visible.
+          <div className="flex flex-col items-start gap-3 rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+            <span>No study item exists for this ready node.</span>
+            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onSkipAsKnown}>
+              <CheckIcon data-icon="inline-start" />
+              Skip as known
+            </Button>
           </div>
         ) : null}
 
@@ -108,7 +97,6 @@ export function StudySideSheet({
 
 function StateBadge({ content }: Readonly<{ content: SheetContentPayload }>) {
   switch (content.kind) {
-    case "calibration":
     case "option_select":
     case "cardless":
       return <Badge variant="secondary">frontier</Badge>;
@@ -121,14 +109,12 @@ function StateBadge({ content }: Readonly<{ content: SheetContentPayload }>) {
 
 function descriptionFor(content: SheetContentPayload): string {
   switch (content.kind) {
-    case "calibration":
-      return "Reveal the answer, then say whether you knew it.";
     case "option_select":
-      return "Ready to study — choose one option.";
+      return "Ready to study, or mark as already known.";
     case "cardless":
-      return "On the frontier, but no study item exists.";
+      return "Ready, but no study item exists.";
     case "mastered_review":
-      return "Already mastered — review only.";
+      return "Already mastered.";
     case "locked":
       return "Not ready yet — a prerequisite is still unmet.";
   }
