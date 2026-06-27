@@ -20,6 +20,15 @@ function sessionPath(learnerStateRef: string): string {
   return `/admin/lab/study/${encodeURIComponent(learnerStateRef)}`;
 }
 
+function calibrationPath(learnerStateRef: string): string {
+  return `/admin/lab/study/${encodeURIComponent(learnerStateRef)}/calibrate`;
+}
+
+function revalidateLearnerStudyRoutes(learnerStateRef: string): void {
+  revalidatePath(sessionPath(learnerStateRef));
+  revalidatePath(calibrationPath(learnerStateRef));
+}
+
 export async function submitOptionSelect(input: {
   learnerStateRef: string;
   studyItemId: string;
@@ -48,7 +57,7 @@ export async function submitOptionSelect(input: {
   } finally {
     await sql.end({ timeout: 5 });
   }
-  revalidatePath(sessionPath(learnerStateRef));
+  revalidateLearnerStudyRoutes(learnerStateRef);
 }
 
 // Calibration verdict write (R5/R7). Upserts the learner's `known`/`learn` intent for one
@@ -63,7 +72,7 @@ export async function setVerdict(input: { learnerStateRef: string; derivedNodeId
   } finally {
     await sql.end({ timeout: 5 });
   }
-  revalidatePath(sessionPath(learnerStateRef));
+  revalidateLearnerStudyRoutes(learnerStateRef);
 }
 
 // Clear a verdict (R7 reversal; also the U7 restoration restore). Deletes the single
@@ -77,7 +86,7 @@ export async function clearVerdict(input: { learnerStateRef: string; derivedNode
   } finally {
     await sql.end({ timeout: 5 });
   }
-  revalidatePath(sessionPath(learnerStateRef));
+  revalidateLearnerStudyRoutes(learnerStateRef);
 }
 
 // Per-learner reset (R16, AE5): an explicit operator nuke of ALL the learner's verdicts AND
@@ -94,5 +103,5 @@ export async function resetLearner(input: { learnerStateRef: string }): Promise<
   } finally {
     await sql.end({ timeout: 5 });
   }
-  revalidatePath(sessionPath(learnerStateRef));
+  revalidateLearnerStudyRoutes(learnerStateRef);
 }
