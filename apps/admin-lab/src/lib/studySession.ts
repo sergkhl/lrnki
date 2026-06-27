@@ -14,7 +14,7 @@ import type { LearnerStatePort } from "@lrnki/ports";
 import { createDatabaseClient, PostgresStudyItemBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "@lrnki/infrastructure-postgres";
 import { getEnrichmentDetail } from "./enrichments";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoop";
-import { labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
+import { hideKnownClosureFromDetail, labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
 // The transfer-ready study modules own the presentation contract (R15); the loader
 // produces data matching it (AGENTS rule 18 — one definition).
 import type { SheetContent, StudyOptionSelectView } from "@/components/study/studyView";
@@ -176,6 +176,7 @@ export async function getStudySession(
   // coexistence of the two is surfaced, never resolved by a hidden precedence rule.
   const knownNodes = loaded.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
   const knownClosure = pruneClosure(knownNodes, detail.edges);
+  const visibleDetail = hideKnownClosureFromDetail({ detail, knownClosure, targetDerivedNodeId });
   const gradedByNode = new Map(Object.entries(buildMasteryMap(loaded.rows)));
   const composed = composeMastery({ knownClosure, gradedByNode });
   const learnerState: LearnerStatePort = {
@@ -244,7 +245,7 @@ export async function getStudySession(
     learnerStateRef,
     target: { derivedNodeId: targetDerivedNodeId, label: labelFor(detail, targetDerivedNodeId) },
     studyItemCount: loaded.studyItems.length,
-    detail,
+    detail: visibleDetail,
     classification,
     responseSourceSummary: summarizeResponseSources(loaded.rows),
     isFoundationalRoot,

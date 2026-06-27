@@ -97,6 +97,50 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
+export function hideKnownClosureFromDetail(input: {
+  detail: DerivedGraphDetail;
+  knownClosure: Set<string>;
+  targetDerivedNodeId: string;
+}): DerivedGraphDetail {
+  const visibleNodeIds = new Set(
+    input.detail.nodes
+      .filter((node) => node.derivedNodeId === input.targetDerivedNodeId || !input.knownClosure.has(node.derivedNodeId))
+      .map((node) => node.derivedNodeId)
+  );
+  const nodes = input.detail.nodes.filter((node) => visibleNodeIds.has(node.derivedNodeId));
+  const edges = input.detail.edges.filter(
+    (edge) => visibleNodeIds.has(edge.prerequisiteDerivedNodeId) && visibleNodeIds.has(edge.dependentDerivedNodeId)
+  );
+
+  return {
+    ...input.detail,
+    summary: {
+      ...input.detail.summary,
+      conceptCount: nodes.length,
+      edgeCount: edges.length,
+      certainEdgeCount: edges.filter((edge) => !edge.uncertain).length,
+      uncertainEdgeCount: edges.filter((edge) => edge.uncertain).length
+    },
+    nodes,
+    edges,
+    originCounts: summarizeDomainOrigins(nodes)
+  };
+}
+
+function summarizeDomainOrigins(nodes: DerivedGraphNode[]) {
+  const byDomain = new Map<string, { anchor: number; sourceMentioned: number; llmGrounded: number }>();
+  for (const node of nodes) {
+    const counts = byDomain.get(node.declaredDomain) ?? { anchor: 0, sourceMentioned: 0, llmGrounded: 0 };
+    if (node.nodeKind === "anchor") counts.anchor += 1;
+    else if (node.groundingOrigin === "source_mentioned") counts.sourceMentioned += 1;
+    else if (node.groundingOrigin === "llm_grounded") counts.llmGrounded += 1;
+    byDomain.set(node.declaredDomain, counts);
+  }
+  return [...byDomain.entries()]
+    .map(([domain, counts]) => ({ domain, ...counts }))
+    .sort((a, b) => a.domain.localeCompare(b.domain));
+}
+
 // --- Goal-first picker helpers (U4, R1/R2/R3) ------------------------------
 
 // One goal candidate for the goal-first study start. `journeySize` is how many concepts

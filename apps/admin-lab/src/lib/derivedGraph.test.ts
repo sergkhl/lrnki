@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frontierNeighborhood, filterAndOrderGoals, isFoundationalGoal, journeySize, type GoalCandidate } from "./derivedGraph";
+import { frontierNeighborhood, filterAndOrderGoals, hideKnownClosureFromDetail, isFoundationalGoal, journeySize, type DerivedGraphDetail, type GoalCandidate } from "./derivedGraph";
 
 // `frontierNeighborhood` (KTD2) is the pure helper that frames the study graph on the
 // learner's working region: the frontier target plus its direct prerequisites and direct
@@ -84,4 +84,59 @@ test("filterAndOrderGoals matches label AND alias substrings, case-insensitively
 test("isFoundationalGoal is true only for a zero-journey goal (Covers R3)", () => {
   assert.equal(isFoundationalGoal({ journeySize: 0 }), true);
   assert.equal(isFoundationalGoal({ journeySize: 1 }), false);
+});
+
+function detailForHide(): DerivedGraphDetail {
+  const nodes = [
+    { derivedNodeId: "A", label: "A", aliases: [], declaredDomain: "d", difficulty: 0.1, difficultyRationale: null, nodeKind: "anchor" as const, groundingOrigin: "document_anchored" as const, role: "prerequisite" as const, hasStudyItem: true, grounding: null },
+    { derivedNodeId: "B", label: "B", aliases: [], declaredDomain: "d", difficulty: 0.5, difficultyRationale: null, nodeKind: "anchor" as const, groundingOrigin: "document_anchored" as const, role: "prerequisite" as const, hasStudyItem: true, grounding: null },
+    { derivedNodeId: "Z", label: "Z", aliases: [], declaredDomain: "d", difficulty: 0.9, difficultyRationale: null, nodeKind: "anchor" as const, groundingOrigin: "document_anchored" as const, role: "anchor" as const, hasStudyItem: true, grounding: null }
+  ];
+  const edges = [
+    { prerequisiteDerivedNodeId: "A", dependentDerivedNodeId: "B", confidence: 0.9, uncertain: false, judgeModel: "j" },
+    { prerequisiteDerivedNodeId: "B", dependentDerivedNodeId: "Z", confidence: 0.9, uncertain: false, judgeModel: "j" }
+  ];
+  return {
+    summary: {
+      enrichmentId: "e",
+      graphVersionId: "g",
+      enrichmentConfigHash: "cfg",
+      judgeModel: "j",
+      difficultyMethod: "m",
+      status: "succeeded",
+      edgeCount: edges.length,
+      certainEdgeCount: edges.length,
+      uncertainEdgeCount: 0,
+      conceptCount: nodes.length,
+      studyItemCount: nodes.length,
+      startedAt: "t",
+      completedAt: "t"
+    },
+    nodes,
+    edges,
+    originCounts: [{ domain: "d", anchor: 3, sourceMentioned: 0, llmGrounded: 0 }],
+    rescueDispositions: [],
+    mintingDispositions: [],
+    merges: []
+  };
+}
+
+test("hideKnownClosureFromDetail removes closure nodes and incident edges from the rendered detail", () => {
+  const visible = hideKnownClosureFromDetail({ detail: detailForHide(), knownClosure: new Set(["A", "B"]), targetDerivedNodeId: "Z" });
+  assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), ["Z"]);
+  assert.deepEqual(visible.edges, []);
+  assert.equal(visible.summary.conceptCount, 1);
+  assert.equal(visible.summary.edgeCount, 0);
+});
+
+test("hideKnownClosureFromDetail never hides the goal target even when it is in the known closure", () => {
+  const visible = hideKnownClosureFromDetail({ detail: detailForHide(), knownClosure: new Set(["A", "B", "Z"]), targetDerivedNodeId: "Z" });
+  assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), ["Z"]);
+});
+
+test("hideKnownClosureFromDetail with zero verdict closure is a no-op shape", () => {
+  const detail = detailForHide();
+  const visible = hideKnownClosureFromDetail({ detail, knownClosure: new Set(), targetDerivedNodeId: "Z" });
+  assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), detail.nodes.map((node) => node.derivedNodeId));
+  assert.deepEqual(visible.edges, detail.edges);
 });
