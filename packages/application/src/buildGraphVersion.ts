@@ -1,8 +1,10 @@
 import {
+  CONCEPT_IDENTITY_DECISION_TYPE,
   slugifyConceptLabel,
   type ArtifactEnvelope,
   type BuildEvidencePassage,
   type Concept,
+  type ConceptIdentityDecision,
   type GraphSnapshot,
   type PublishedConceptEvidenceProfile,
   type PublishedEvidencePassage,
@@ -37,6 +39,11 @@ export async function buildGraphVersion(input: {
   runIds: string[];
   runStore: ExtractionRunStorePort;
   graphStore: GraphVersionStorePort;
+  // Recorded semantic identity-resolution decisions (plan 2026-06-26-002, KTD1/KTD3).
+  // The build CONSUMES these — it makes no model call (R8). `merge` decisions remap an
+  // absorbed identity key onto its survivor; a `quarantine` decision (case B) refuses
+  // the build (R7). Absent/empty → exact-label-only identity, exactly as before.
+  identityDecisions?: ConceptIdentityDecision[];
   // Run-progress reporter seam (ADR-0029). Minting is LLM-free, so all three stages are
   // non-LLM (wall-clock only, never in the cost half). Absent → no-op.
   reporter?: RunProgressReporterPort;
@@ -73,6 +80,20 @@ export async function buildGraphVersion(input: {
       throw new Error(`Refusing to build: selected run(s) contain unresolved quarantine decisions: ${quarantined.join(", ")}`);
     }
 
+    // Identity-resolution case B (plan R7, KTD4): a cluster of two-or-more already-
+    // published Concepts is a published-identity collision the build must refuse rather
+    // than re-key — resolving it would retire a minted IRI (ADR-0010/ADR-0015). Fail
+    // closed before any assembly and name the colliding published Concepts; quarantine
+    // plus re-run is the v1 escape hatch (R10).
+    const identityQuarantines = (input.identityDecisions ?? []).filter((decision) => decision.outcome === "quarantine");
+    if (identityQuarantines.length) {
+      const collisions = identityQuarantines.map((decision) => {
+        const published = decision.members.filter((member) => member.published).map((member) => member.canonicalLabel);
+        return `${decision.declaredDomain}: ${published.join(" ⇄ ")}`;
+      });
+      throw new Error(`Refusing to build: identity resolution quarantined ${identityQuarantines.length} two-already-published collision(s): ${collisions.join("; ")}`);
+    }
+
     // Every selected run's admitted-core Concept must carry a complete CEP (R1). A
     // core candidate with a missing or incomplete profile fails the build before any
     // publication so a Concept with no source-grounded meaning never enters the graph
@@ -105,6 +126,30 @@ export async function buildGraphVersion(input: {
   const { snapshot, refinementDecisions, artifact } = await buildStage(NON_LLM_STAGES.refine, async () => {
     const refinementDecisions: RefinementDecisionRecord[] = [];
 
+    // --- Semantic identity remap (plan 2026-06-26-002, R6) -------------------
+    // Apply the supplied `merge` decisions deterministically: an absorbed identity key
+    // folds onto its survivor's key, so the absorbed surface label becomes an alias and
+    // its CEP evidence unions onto the survivor (KTD3, KTD8). `quarantine` decisions
+    // already failed the build in the load stage; `distinct` decisions change no identity
+    // and are persisted for audit only (R4). No model call happens here (R8).
+    const identityMerges = (input.identityDecisions ?? []).filter((decision) => decision.outcome === "merge");
+    const keyRemap = new Map<IdentityKey, IdentityKey>(); // absorbed key -> survivor key
+    const survivorIdentity = new Map<IdentityKey, { normalizedLabel: string; canonicalLabel: string }>();
+    for (const decision of identityMerges) {
+      const survivor = decision.members.find((member) => member.normalizedLabel === decision.survivorNormalizedLabel);
+      if (!survivor) continue;
+      const survivorKey = identityKey(survivor.declaredDomain, survivor.normalizedLabel);
+      survivorIdentity.set(survivorKey, { normalizedLabel: survivor.normalizedLabel, canonicalLabel: survivor.canonicalLabel });
+      for (const member of decision.members) {
+        if (member.normalizedLabel === survivor.normalizedLabel) continue;
+        keyRemap.set(identityKey(member.declaredDomain, member.normalizedLabel), survivorKey);
+      }
+    }
+    // The survivor's authoritative key (and presentation when it first seeds a cluster):
+    // an absorbed key resolves to its survivor; everything else is its own exact-label key.
+    const effectiveKey = (declaredDomain: string, normalizedLabel: string): IdentityKey =>
+      keyRemap.get(identityKey(declaredDomain, normalizedLabel)) ?? identityKey(declaredDomain, normalizedLabel);
+
     // --- Identity resolution (ADR-0015) --------------------------------------
     // Concept identity is (declaredDomain, normalizedLabel). Base concepts are
     // carried forward; new core candidates merge into the same identity across runs
@@ -121,9 +166,12 @@ export async function buildGraphVersion(input: {
     };
     const clusters = new Map<IdentityKey, Cluster>();
 
-    // Seed clusters from the base version so its Concepts are carried forward.
+    // Seed clusters from the base version so its Concepts are carried forward. A base
+    // Concept is only ever a merge SURVIVOR (a case-B collision of two published
+    // Concepts already failed the build), so its effective key is its own key; routing
+    // through effectiveKey keeps the seam uniform.
     for (const concept of base?.concepts ?? []) {
-      const key = identityKey(concept.declaredDomain, concept.normalizedLabel);
+      const key = effectiveKey(concept.declaredDomain, concept.normalizedLabel);
       clusters.set(key, {
         declaredDomain: concept.declaredDomain,
         normalizedLabel: concept.normalizedLabel,
@@ -142,25 +190,38 @@ export async function buildGraphVersion(input: {
 
     for (const run of runs) {
       for (const candidate of run.coreCandidates) {
-        const key = identityKey(run.declaredDomain, candidate.normalizedLabel);
+        // A semantic-merge absorbed candidate routes onto its survivor's key (R6); its
+        // CEP evidence then unions onto the survivor below via candidateIdentity.
+        const ownKey = identityKey(run.declaredDomain, candidate.normalizedLabel);
+        const key = effectiveKey(run.declaredDomain, candidate.normalizedLabel);
+        const absorbed = key !== ownKey;
         candidateIdentity.set(runCandidateKey(run.runId, candidate.candidateKey), key);
         const existing = clusters.get(key);
         if (existing) {
           existing.aliases.add(candidate.canonicalLabel);
           candidate.aliases.forEach((alias) => existing.aliases.add(alias));
-          refinementDecisions.push({
-            decisionType: "domain_scoped_merge",
-            subject: { declaredDomain: run.declaredDomain, normalizedLabel: candidate.normalizedLabel, label: candidate.canonicalLabel },
-            outcome: existing.fromBase ? "merged_into_base" : "merged",
-            rationale: "Same normalized label within the same Declared Domain (ADR-0015).",
-            provenance: { runId: run.runId, candidateKey: candidate.candidateKey }
-          });
+          // An exact-label union within a domain is a `domain_scoped_merge`; a semantic
+          // absorption is already recorded by its identity decision (R4), so don't
+          // double-record it here with the (now false) "same normalized label" rationale.
+          if (!absorbed) {
+            refinementDecisions.push({
+              decisionType: "domain_scoped_merge",
+              subject: { declaredDomain: run.declaredDomain, normalizedLabel: candidate.normalizedLabel, label: candidate.canonicalLabel },
+              outcome: existing.fromBase ? "merged_into_base" : "merged",
+              rationale: "Same normalized label within the same Declared Domain (ADR-0015).",
+              provenance: { runId: run.runId, candidateKey: candidate.candidateKey }
+            });
+          }
         } else {
+          // First entry under this key seeds the cluster. For a case-C survivor the key is
+          // the survivor's own; the cluster's presentation is the survivor's label, not an
+          // absorbed member's, even if the absorbed member is processed first.
+          const survivor = survivorIdentity.get(key);
           clusters.set(key, {
             declaredDomain: run.declaredDomain,
-            normalizedLabel: candidate.normalizedLabel,
-            canonicalLabel: candidate.canonicalLabel,
-            aliases: new Set([candidate.canonicalLabel, ...candidate.aliases]),
+            normalizedLabel: survivor?.normalizedLabel ?? candidate.normalizedLabel,
+            canonicalLabel: survivor?.canonicalLabel ?? candidate.canonicalLabel,
+            aliases: new Set([survivor?.canonicalLabel ?? candidate.canonicalLabel, candidate.canonicalLabel, ...candidate.aliases]),
             fromBase: false
           });
         }
@@ -320,6 +381,24 @@ export async function buildGraphVersion(input: {
       if (profile.definitions.length === 0) {
         throw new Error(`Published concept ${profile.conceptId} has no definition passage; refusing to publish an edge-free Concept with no meaning.`);
       }
+    }
+
+    // Persist the applied identity decisions alongside the exact-label decisions (KTD3,
+    // R5). Quarantine decisions already failed the build, so only `merge`/`distinct`
+    // reach publication; the absorbed surface labels they carry are inspectable (R10).
+    for (const decision of (input.identityDecisions ?? []).filter((d) => d.outcome !== "quarantine")) {
+      refinementDecisions.push({
+        decisionType: CONCEPT_IDENTITY_DECISION_TYPE,
+        subject: { declaredDomain: decision.declaredDomain, survivorNormalizedLabel: decision.survivorNormalizedLabel, members: decision.members },
+        outcome: decision.outcome,
+        rationale: decision.rationale,
+        provenance: {
+          proposingSignal: decision.proposingSignal,
+          proposingScore: decision.proposingScore,
+          decidingModel: decision.decidingModel,
+          configHash: decision.configHash
+        }
+      });
     }
 
     const snapshot: GraphSnapshot = {

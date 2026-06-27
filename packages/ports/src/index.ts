@@ -5,6 +5,7 @@ import type {
   AssertionEntailmentJudgment,
   BlockEvidence,
   CalibrationVerdict,
+  ConceptIdentityResolutionOutcome,
   StudyItem,
   SelfAssessmentItemDraft,
   OptionSelectItemDraft,
@@ -603,6 +604,29 @@ export interface RunInspectionReadPort {
 export interface SourceInspectionReadPort {
   listSourceSummaries(): Promise<SourceSummary[]>;
   getSourceInspection(sourceResourceId: string): Promise<SourceInspection | undefined>;
+}
+
+// One recorded published-Concept identity decision, flattened for the Admin Lab (plan
+// 2026-06-26-002 U4, R10). Mirrors the derived-layer NodeMergeView shape. `survivorLabel`
+// is the surviving Concept's canonical label for a `merge` (null for `distinct` /
+// `quarantine`, which change no identity); `absorbedLabels` are the other members'
+// labels — the folded-in surface forms for a `merge`, both sides for a `distinct`, the
+// colliding published Concepts for a `quarantine`.
+export interface ConceptIdentityDecisionView {
+  outcome: ConceptIdentityResolutionOutcome;
+  declaredDomain: string;
+  survivorLabel: string | null;
+  absorbedLabels: string[];
+  proposingScore: number;
+  rationale: string;
+  decidingModel: string;
+}
+
+// Graph-version inspection read surface (ADR-0027): the identity decisions persisted with
+// a published version. Pure read over refinement_decisions filtered to the identity
+// decision type; the storage adapter owns the query and row-stitch, no SQL in the UI.
+export interface GraphVersionInspectionReadPort {
+  getConceptIdentityDecisions(graphVersionId: string): Promise<ConceptIdentityDecisionView[]>;
 }
 
 export type DerivedNodeKind = "anchor" | "enrichment";

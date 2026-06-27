@@ -12,7 +12,7 @@ import type {
   StructuredDocument
 } from "@lrnki/domain-core";
 import { evidenceQuoteMatches, extractableBlocks, STAGE_TAGS } from "@lrnki/domain-core";
-import type { CoreSelectionReasonCode } from "@lrnki/domain-core";
+import type { CoreSelectionReasonCode, StageTag } from "@lrnki/domain-core";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
@@ -447,7 +447,15 @@ export class LiteLlmAssertionEntailmentJudgmentAdapter implements AssertionEntai
 // drop a passage on text absent from it and a transport blip never shrinks the core.
 export class LiteLlmDefinitionPassageQualityJudgmentAdapter implements DefinitionPassageQualityJudgmentPort {
   readonly model: string;
-  constructor(private readonly client: LiteLlmForcedToolClient, model: string = DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL) {
+  // `stageTag` lets the same judge attribute its spend to the calling operation's stage.
+  // Default `definition-passage-quality` for the extraction-time core gate; the
+  // enrichment rescue seam (plan 2026-06-26-001 U3) passes `rescue-definition-quality` so
+  // the rescued-definition judging cost joins the enrichment operation, not extraction.
+  constructor(
+    private readonly client: LiteLlmForcedToolClient,
+    model: string = DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL,
+    private readonly stageTag: StageTag = STAGE_TAGS.definitionPassageQuality
+  ) {
     this.model = model;
   }
 
@@ -492,7 +500,7 @@ export class LiteLlmDefinitionPassageQualityJudgmentAdapter implements Definitio
       toolDescription: "Submit, per Definition Passage index, whether the quote establishes the concept's meaning or is a hollow passage.",
       parameters: definitionPassageQualityJudgmentSchema,
       validator: definitionPassageQualityJudgmentValidator,
-      tags: [STAGE_TAGS.definitionPassageQuality]
+      tags: [this.stageTag]
     });
 
     const byIndex = new Map(result.judgments.map((judgment) => [judgment.index, judgment] as const));

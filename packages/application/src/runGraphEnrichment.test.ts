@@ -16,7 +16,8 @@ import type {
   DifficultyPort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
-  PrerequisiteOrderingPort
+  PrerequisiteOrderingPort,
+  DefinitionPassageQualityJudgmentPort
 } from "@lrnki/ports";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { RunProgressReporterPort } from "@lrnki/ports";
@@ -725,6 +726,71 @@ test("rescues a source_mentioned node from a member-run mention and orders it as
   assert.ok(!("prerequisiteOf" in rescued));
   const id = idByLabel(layer);
   assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("Pointer") && e.dependentDerivedNodeId === id.get("Move Semantics")));
+});
+
+test("U3: a hollow rescued definition passage is dropped before it becomes learner-facing; the node stays mention-only", async () => {
+  // An `optional`-tier candidate carries a bare-name (hollow) Definition Passage whose
+  // quote verifies verbatim against its block, so the floor admits it as a
+  // `source_mentioned` definition — exactly the learner-facing surface generateStudyItemBank
+  // turns into a `definition` study item. The U3 judge vetoes the bare name.
+  const hollow: NonCoreRescueCandidate = {
+    runId: "run-1", declaredDomain: "x", candidateKey: "pointer", canonicalLabel: "Pointer", normalizedLabel: "pointer", aliases: [], tier: "optional",
+    definitions: [{ sourceResourceId: "s1", sourceBlockId: "blk-d", evidenceQuote: "Pointer", blockText: "Pointer", headingPath: [], locator: {} }],
+    mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: "Pointer is mentioned", blockText: "Here Pointer is mentioned in prose", headingPath: [], locator: {} }]
+  };
+  const judge: DefinitionPassageQualityJudgmentPort = {
+    model: "kg-independent-judge",
+    judgeDefinitions: async (input) =>
+      input.passages.map((passage) =>
+        passage.evidenceQuote === "Pointer"
+          ? { establishesMeaning: false, category: "bare_name_repetition", judgedSpan: "Pointer", rationale: "bare name repetition" }
+          : { establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "defines" }
+      )
+  };
+  const ports = buildNodePorts({ rescue: [hollow], responder: (input) => presentEdges(input, []) });
+  const layer = await runGraphEnrichment({
+    enrichmentId: "e1", graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
+    missingPrerequisiteProposal: ports.proposalPort,
+    groundingGeneration: ports.groundingPort,
+    rescuedDefinitionQualityJudge: judge,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId
+  });
+  const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
+  assert.ok(rescued && rescued.nodeKind === "enrichment" && rescued.groundingOrigin === "source_mentioned");
+  // The hollow definition passage is gone; only the verbatim mention remains learner-facing.
+  assert.equal(rescued.groundingPassages.filter((passage) => passage.passageType === "definition").length, 0);
+  assert.ok(rescued.groundingPassages.some((passage) => passage.passageType === "mention"));
+});
+
+test("U3: a genuinely defining rescued passage is kept when the judge is wired", async () => {
+  const defining: NonCoreRescueCandidate = {
+    runId: "run-1", declaredDomain: "x", candidateKey: "pointer", canonicalLabel: "Pointer", normalizedLabel: "pointer", aliases: [], tier: "optional",
+    definitions: [{ sourceResourceId: "s1", sourceBlockId: "blk-d", evidenceQuote: "A pointer is a variable that stores a memory address", blockText: "A pointer is a variable that stores a memory address.", headingPath: [], locator: {} }],
+    mentions: [{ sourceResourceId: "s1", sourceBlockId: "blk-r", evidenceQuote: "Pointer is mentioned", blockText: "Here Pointer is mentioned in prose", headingPath: [], locator: {} }]
+  };
+  const keepAll: DefinitionPassageQualityJudgmentPort = {
+    model: "kg-independent-judge",
+    judgeDefinitions: async (input) => input.passages.map(() => ({ establishesMeaning: true, category: "establishes_meaning", judgedSpan: "", rationale: "defines" }))
+  };
+  const ports = buildNodePorts({ rescue: [defining], responder: (input) => presentEdges(input, []) });
+  const layer = await runGraphEnrichment({
+    enrichmentId: "e1", graphVersionId: "v1",
+    graphStore: ports.graphStore as GraphVersionStorePort,
+    prerequisiteOrdering: ports.prerequisiteOrdering,
+    missingPrerequisiteProposal: ports.proposalPort,
+    groundingGeneration: ports.groundingPort,
+    rescuedDefinitionQualityJudge: keepAll,
+    difficulty: ports.difficulty,
+    enrichmentStore: ports.enrichmentStore as EnrichmentRunStorePort,
+    newNodeId: ports.newNodeId
+  });
+  const rescued = layer.derivedNodes.find((node) => node.nodeKind === "enrichment" && node.groundingOrigin === "source_mentioned");
+  assert.ok(rescued && rescued.nodeKind === "enrichment" && rescued.groundingOrigin === "source_mentioned");
+  assert.equal(rescued.groundingPassages.filter((passage) => passage.passageType === "definition").length, 1);
 });
 
 test("mints an llm_grounded node for an anchor and never publishes it asserted", async () => {

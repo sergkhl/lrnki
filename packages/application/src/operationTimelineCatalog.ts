@@ -39,6 +39,7 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
   enrichment: [
     llm(STAGE_TAGS.prerequisiteOrdering),
     llm(STAGE_TAGS.rescueDurability),
+    llm(STAGE_TAGS.rescueDefinitionQuality),
     llm(STAGE_TAGS.mintingDurability),
     llm(STAGE_TAGS.missingPrerequisiteProposal),
     llm(STAGE_TAGS.groundingGeneration),

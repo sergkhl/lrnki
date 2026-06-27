@@ -1,5 +1,8 @@
-import type { ExtractionQualityIssue, RunCandidate } from "@lrnki/domain-core";
+import type { ConceptIdentityResolutionOutcome, ExtractionQualityIssue, RunCandidate } from "@lrnki/domain-core";
+import { CONCEPT_IDENTITY_DECISION_TYPE } from "@lrnki/domain-core";
 import type {
+  ConceptIdentityDecisionView,
+  GraphVersionInspectionReadPort,
   ProfileAssertion,
   ProfilePassage,
   RunInspection,
@@ -42,8 +45,22 @@ type RunSummaryRow = {
   definition_count: number; mention_count: number; assertion_count: number;
 };
 
-export class PostgresInspectionRead implements RunInspectionReadPort, SourceInspectionReadPort {
+export class PostgresInspectionRead implements RunInspectionReadPort, SourceInspectionReadPort, GraphVersionInspectionReadPort {
   constructor(private readonly sql: Sql) {}
+
+  // Identity-resolution decisions persisted with a published version (plan U4, R10).
+  // Filters refinement_decisions to the identity decision type, so the unrelated
+  // exact-label decisions (domain_scoped_merge, cross_domain_homograph_flag) never leak
+  // into this view. Quarantine decisions never reach a published version (they fail the
+  // build), but the mapper handles all three outcomes uniformly.
+  async getConceptIdentityDecisions(graphVersionId: string): Promise<ConceptIdentityDecisionView[]> {
+    const rows = await this.sql<IdentityDecisionRow[]>`
+      SELECT outcome, rationale, subject, provenance
+      FROM refinement_decisions
+      WHERE graph_version_id = ${graphVersionId} AND decision_type = ${CONCEPT_IDENTITY_DECISION_TYPE}
+      ORDER BY subject->>'declaredDomain', outcome`;
+    return assembleIdentityDecisions(rows);
+  }
 
   async listRunSummaries(): Promise<RunSummary[]> {
     const sql = this.sql;
@@ -249,6 +266,41 @@ export function assembleProfiles(
       definitions: passages.filter((passage) => passage.kind === "definition"),
       mentions: passages.filter((passage) => passage.kind === "mention"),
       assertions: assertionsByProfile.get(row.profile_id) ?? []
+    };
+  });
+}
+
+// The refinement_decisions row shape for an identity decision (KTD3): `subject`/
+// `provenance` come back as parsed jsonb objects from the `postgres` driver.
+type IdentityDecisionRow = {
+  outcome: string;
+  rationale: string;
+  subject: {
+    declaredDomain?: string;
+    survivorNormalizedLabel?: string | null;
+    members?: { normalizedLabel: string; canonicalLabel: string }[];
+  } | null;
+  provenance: { proposingScore?: number; decidingModel?: string } | null;
+};
+
+// Pure stitch of identity-decision rows into the inspection view (plan U4). Exported so
+// the mapping is unit-testable without a live database, mirroring assembleProfiles. A
+// `merge` names its survivor; `distinct`/`quarantine` carry a null survivor and list all
+// members as the involved (absorbed/colliding) labels.
+export function assembleIdentityDecisions(rows: IdentityDecisionRow[]): ConceptIdentityDecisionView[] {
+  return rows.map((row) => {
+    const subject = row.subject ?? {};
+    const members = subject.members ?? [];
+    const survivorNormalizedLabel = subject.survivorNormalizedLabel ?? null;
+    const survivor = members.find((member) => member.normalizedLabel === survivorNormalizedLabel);
+    return {
+      outcome: row.outcome as ConceptIdentityResolutionOutcome,
+      declaredDomain: subject.declaredDomain ?? "",
+      survivorLabel: row.outcome === "merge" ? survivor?.canonicalLabel ?? null : null,
+      absorbedLabels: members.filter((member) => member.normalizedLabel !== survivorNormalizedLabel).map((member) => member.canonicalLabel),
+      proposingScore: Number(row.provenance?.proposingScore ?? 0),
+      rationale: row.rationale,
+      decidingModel: row.provenance?.decidingModel ?? ""
     };
   });
 }

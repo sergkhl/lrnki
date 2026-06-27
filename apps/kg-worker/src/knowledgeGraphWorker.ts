@@ -1,11 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
   computeLearnerPath,
   createIntrinsicDifficultyPort,
   emptyLearnerState,
+  resolveConceptIdentity,
   runExtractionOverSources,
   type ExtractionSourceUnit,
   generateStudyItemBank,
@@ -18,6 +20,7 @@ import {
   type BottleneckReport,
   type RankedTarget
 } from "@lrnki/application";
+import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
 import {
   DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
@@ -184,6 +187,12 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    // Rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). The SAME
+    // independent meaning judge (kg-independent-judge) and deterministic decoding as the
+    // extraction-time core gate — no new alias — but tagged `rescue-definition-quality` so
+    // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
+    // definitions before they reach study items; fails closed = preserve.
+    rescuedDefinitionQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient, undefined, STAGE_TAGS.rescueDefinitionQuality),
     // Measured minting durability judge: cross-family independent judge gates
     // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
     // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
@@ -310,7 +319,35 @@ async function buildVersion(ctx: Context, args: string[]) {
     return;
   }
   const graphVersionId = randomUUID();
-  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, reporter: ctx.runProgressReporter });
+
+  // Semantic identity resolution before the build (plan 2026-06-26-002). The model calls
+  // live here; the build consumes the decisions and stays LLM-free (KTD1, R8). Opt out
+  // with BUILD_DISABLE_IDENTITY_RESOLUTION to reproduce the exact-label baseline for the
+  // U5 calibration comparison (KTD7), mirroring ENRICH_DISABLE_DEDUP. The base snapshot
+  // and runs are read again here; the build re-reads them internally — both are
+  // deterministic reads that keep the build a self-contained pure function (KTD1).
+  let identityDecisions: ConceptIdentityDecision[] = [];
+  if (!process.env.BUILD_DISABLE_IDENTITY_RESOLUTION) {
+    const runs = await ctx.runStore.runsForBuildByIds(runIds);
+    const base = baseGraphVersionId ? await ctx.graphStore.getPublishedSnapshot(baseGraphVersionId) : undefined;
+    const existingIdentities = await ctx.graphStore.existingConceptIdentities();
+    const candidates = identityCandidatesFromBuildInputs({ runs, base, existingIdentities });
+    let unavailable = 0;
+    const result = await resolveConceptIdentity({
+      candidates,
+      embedding: ctx.nodeEmbedding,
+      adjudicator: ctx.nodeMergeAdjudicator,
+      onUnavailable: () => { unavailable++; }
+    });
+    identityDecisions = result.decisions;
+    const count = (outcome: ConceptIdentityDecision["outcome"]) => identityDecisions.filter((decision) => decision.outcome === outcome).length;
+    // One-line resolution summary mirroring the dedup/ordering lines. A case-B
+    // quarantine surfaces here as quarantine>0 and the build below then refuses with a
+    // named-collision error (R7).
+    console.log(`   identity: merges=${count("merge")} distinct=${count("distinct")} quarantine=${count("quarantine")} unavailable=${unavailable}`);
+  }
+
+  const snapshot = await buildGraphVersion({ graphVersionId, baseGraphVersionId, runIds, runStore: ctx.runStore, graphStore: ctx.graphStore, reporter: ctx.runProgressReporter, identityDecisions });
   const passages = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.definitions.length + profile.mentions.length, 0);
   const assertions = snapshot.evidenceProfiles.reduce((sum, profile) => sum + profile.assertions.length, 0);
   console.log(`\n>> published graph version ${graphVersionId}${baseGraphVersionId ? ` (base ${baseGraphVersionId})` : ""} from ${runIds.length} run(s): concepts=${snapshot.concepts.length} CEP-passages=${passages} assertions=${assertions} edges=0`);
@@ -340,6 +377,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
+    rescuedDefinitionQualityJudge: ctx.rescuedDefinitionQualityJudge,
     mintingDurabilityJudge: process.env.ENRICH_DISABLE_MINTING_DURABILITY ? undefined : ctx.mintingDurabilityJudge,
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the
     // exact-label baseline run for the U7 rule-14 comparison (same command, ports unset).

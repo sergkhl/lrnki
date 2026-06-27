@@ -30,3 +30,8 @@ export function listSourcesWithStats() {
 export function getSourceInspection(sourceResourceId: string) {
   return withInspectionRead((read) => read.getSourceInspection(sourceResourceId));
 }
+
+// Identity-resolution decisions persisted with a published graph version (plan U4, R10).
+export function getConceptIdentityDecisions(graphVersionId: string) {
+  return withInspectionRead((read) => read.getConceptIdentityDecisions(graphVersionId));
+}

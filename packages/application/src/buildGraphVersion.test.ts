@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ArtifactEnvelope, BuildEvidenceProfile, GraphSnapshot, PublishedConceptIdentity, RunForBuild } from "@lrnki/domain-core";
+import type { ArtifactEnvelope, BuildEvidenceProfile, ConceptIdentityDecision, ConceptIdentityRef, GraphSnapshot, PublishedConceptIdentity, RefinementDecisionRecord, RunForBuild } from "@lrnki/domain-core";
+import { CONCEPT_IDENTITY_DECISION_TYPE } from "@lrnki/domain-core";
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ExtractionRunStorePort, GraphVersionStorePort, RunProgressReporterPort } from "@lrnki/ports";
@@ -55,6 +56,7 @@ function runForBuild(overrides: Partial<RunForBuild> = {}): RunForBuild {
 function fakes(runs: RunForBuild[], existing: PublishedConceptIdentity[] = []) {
   const published = new Map<string, GraphSnapshot>();
   let last: GraphSnapshot | undefined;
+  let lastDecisions: RefinementDecisionRecord[] = [];
   const artifacts: ArtifactEnvelope<GraphSnapshot>[] = [];
   const runStore: ExtractionRunStorePort = {
     persist: async () => {},
@@ -62,11 +64,30 @@ function fakes(runs: RunForBuild[], existing: PublishedConceptIdentity[] = []) {
   };
   const graphStore: GraphVersionStorePort = {
     existingConceptIdentities: async (): Promise<PublishedConceptIdentity[]> => existing,
-    publish: async (input) => { published.set(input.snapshot.graphVersionId, input.snapshot); last = input.snapshot; artifacts.push(input.artifact); },
+    publish: async (input) => { published.set(input.snapshot.graphVersionId, input.snapshot); last = input.snapshot; lastDecisions = input.refinementDecisions; artifacts.push(input.artifact); },
     getPublishedSnapshot: async (graphVersionId) => published.get(graphVersionId),
     getLatestPublishedSnapshot: async () => last
   };
-  return { runStore, graphStore, artifacts, getPublished: () => last, published };
+  return { runStore, graphStore, artifacts, getPublished: () => last, getDecisions: () => lastDecisions, published };
+}
+
+// A merge/quarantine identity decision builder for the build-consumption tests.
+function identityRef(declaredDomain: string, normalizedLabel: string, canonicalLabel: string, published: boolean, definitions: string[] = []): ConceptIdentityRef {
+  return { declaredDomain, normalizedLabel, canonicalLabel, aliases: [], definitions, published };
+}
+
+function mergeDecision(declaredDomain: string, survivor: ConceptIdentityRef, absorbed: ConceptIdentityRef[]): ConceptIdentityDecision {
+  return {
+    outcome: "merge",
+    declaredDomain,
+    members: [survivor, ...absorbed],
+    survivorNormalizedLabel: survivor.normalizedLabel,
+    proposingSignal: "embedding_cosine",
+    proposingScore: 0.9,
+    rationale: "near-duplicate same-domain identity",
+    decidingModel: "fake-judge",
+    configHash: "identity-res-v1"
+  };
 }
 
 test("buildGraphVersion refuses to publish when a selected run carries a quarantine decision", async () => {
@@ -259,4 +280,134 @@ test("the published snapshot is written with its immutable artifact envelope", a
   assert.equal(artifacts.length, 1);
   assert.equal(artifacts[0].artifactType, "graph_snapshot");
   assert.equal(artifacts[0].graphVersionId, "gv-1");
+});
+
+// --- U2: identity-decision consumption ---------------------------------------------
+
+test("AE1: a merge decision folds a new candidate into a published Concept, keeping its IRI", async () => {
+  // Version A publishes Ownership.
+  const runA = runForBuild({
+    runId: "run-a", sourceResourceId: "src-a",
+    coreCandidates: [{ candidateKey: "ownership", canonicalLabel: "Ownership", normalizedLabel: "ownership", aliases: [] }],
+    evidenceProfiles: [profile("ownership", { definitions: [{ sourceBlockId: "a-def", evidenceQuote: "Ownership governs memory.", headingPath: ["A"], locator: { page: 1 } }] })]
+  });
+  const a = fakes([runA]);
+  const versionA = await buildGraphVersion({ graphVersionId: "gv-a", baseGraphVersionId: null, runIds: ["run-a"], runStore: a.runStore, graphStore: a.graphStore });
+  const baseConceptId = versionA.concepts[0].conceptId;
+  const baseIri = versionA.concepts[0].iri;
+
+  // Version B selects a new source teaching "Owner"; resolution merged it into Ownership.
+  const runB = runForBuild({
+    runId: "run-b", sourceResourceId: "src-b",
+    coreCandidates: [{ candidateKey: "owner", canonicalLabel: "Owner", normalizedLabel: "owner", aliases: [] }],
+    evidenceProfiles: [profile("owner", { definitions: [{ sourceBlockId: "b-def", evidenceQuote: "An owner holds a resource.", headingPath: ["B"], locator: { page: 2 } }] })]
+  });
+  const existing: PublishedConceptIdentity[] = versionA.concepts.map((c) => ({ conceptId: c.conceptId, iri: c.iri, normalizedLabel: c.normalizedLabel, declaredDomain: c.declaredDomain }));
+  const b = fakes([runB], existing);
+  b.published.set("gv-a", versionA);
+  const graphStoreB: GraphVersionStorePort = { ...b.graphStore, getPublishedSnapshot: async (id) => (id === "gv-a" ? versionA : b.published.get(id)) };
+  const decision = mergeDecision("rust programming",
+    identityRef("rust programming", "ownership", "Ownership", true),
+    [identityRef("rust programming", "owner", "Owner", false)]);
+
+  const versionB = await buildGraphVersion({
+    graphVersionId: "gv-b", baseGraphVersionId: "gv-a", runIds: ["run-b"],
+    runStore: b.runStore, graphStore: graphStoreB, identityDecisions: [decision]
+  });
+
+  assert.equal(versionB.concepts.length, 1, "the new candidate folded into the published Concept");
+  assert.equal(versionB.concepts[0].conceptId, baseConceptId, "stable identity reused (case A)");
+  assert.equal(versionB.concepts[0].iri, baseIri, "the minted IRI is kept, never retired (ADR-0010)");
+  assert.ok(versionB.concepts[0].aliases.includes("Owner"), "the absorbed surface label becomes an alias (R6)");
+  const defQuotes = versionB.evidenceProfiles[0].definitions.map((d) => d.evidenceQuote).sort();
+  assert.deepEqual(defQuotes, ["An owner holds a resource.", "Ownership governs memory."], "absorbed CEP evidence unions onto the survivor");
+});
+
+test("AE2: a merge decision over two new candidates mints one Concept carrying both labels", async () => {
+  const run = runForBuild({
+    declaredDomain: "economics",
+    coreCandidates: [
+      { candidateKey: "barter", canonicalLabel: "Barter", normalizedLabel: "barter", aliases: [] },
+      { candidateKey: "bartering", canonicalLabel: "Bartering", normalizedLabel: "bartering", aliases: [] }
+    ],
+    evidenceProfiles: [profile("barter"), profile("bartering")]
+  });
+  const { runStore, graphStore } = fakes([run]);
+  const decision = mergeDecision("economics",
+    identityRef("economics", "barter", "Barter", false),
+    [identityRef("economics", "bartering", "Bartering", false)]);
+
+  const snapshot = await buildGraphVersion({
+    graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"],
+    runStore, graphStore, identityDecisions: [decision]
+  });
+
+  assert.equal(snapshot.concepts.length, 1, "two candidates collapse to one minted Concept");
+  assert.equal(snapshot.concepts[0].canonicalLabel, "Barter", "survivor presentation wins");
+  assert.ok(snapshot.concepts[0].aliases.includes("Bartering"), "absorbed label is an alias");
+  assert.equal(snapshot.evidenceProfiles[0].definitions.length, 2, "both candidates' definitions union under the survivor");
+});
+
+test("AE3: a case-B quarantine decision refuses the build and publishes nothing", async () => {
+  const { runStore, graphStore, getPublished } = fakes([runForBuild()]);
+  const quarantine: ConceptIdentityDecision = {
+    outcome: "quarantine",
+    declaredDomain: "economics",
+    members: [
+      identityRef("economics", "tradeone", "Trade One", true),
+      identityRef("economics", "tradetwo", "Trade Two", true)
+    ],
+    survivorNormalizedLabel: null,
+    proposingSignal: "embedding_cosine", proposingScore: 0.95, rationale: "collision",
+    decidingModel: "fake-judge", configHash: "identity-res-v1"
+  };
+
+  await assert.rejects(
+    () => buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, identityDecisions: [quarantine] }),
+    /two-already-published collision.*Trade One ⇄ Trade Two/s
+  );
+  assert.equal(getPublished(), undefined, "nothing is published; no IRI minted or retired");
+});
+
+test("an empty identityDecisions array builds exactly as exact-label-only", async () => {
+  const withEmpty = fakes([runForBuild()]);
+  const baseline = fakes([runForBuild()]);
+  const a = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: withEmpty.runStore, graphStore: withEmpty.graphStore, identityDecisions: [] });
+  const b = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore: baseline.runStore, graphStore: baseline.graphStore });
+  assert.deepEqual(a.concepts.map((c) => c.canonicalLabel), b.concepts.map((c) => c.canonicalLabel));
+  assert.equal(a.concepts.length, 1);
+});
+
+test("the build consumes a merge decision with no ports supplied (no model call, R8)", async () => {
+  // The build takes no embedding/adjudicator ports at all, yet applies the merge — proof
+  // the model calls live entirely on resolution's side of the seam.
+  const run = runForBuild({
+    declaredDomain: "economics",
+    coreCandidates: [
+      { candidateKey: "barter", canonicalLabel: "Barter", normalizedLabel: "barter", aliases: [] },
+      { candidateKey: "bartering", canonicalLabel: "Bartering", normalizedLabel: "bartering", aliases: [] }
+    ],
+    evidenceProfiles: [profile("barter"), profile("bartering")]
+  });
+  const { runStore, graphStore } = fakes([run]);
+  const decision = mergeDecision("economics", identityRef("economics", "barter", "Barter", false), [identityRef("economics", "bartering", "Bartering", false)]);
+  const snapshot = await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, identityDecisions: [decision] });
+  assert.equal(snapshot.concepts.length, 1);
+});
+
+test("applied identity decisions are written to refinement_decisions (KTD3)", async () => {
+  const run = runForBuild({
+    declaredDomain: "economics",
+    coreCandidates: [
+      { candidateKey: "barter", canonicalLabel: "Barter", normalizedLabel: "barter", aliases: [] },
+      { candidateKey: "bartering", canonicalLabel: "Bartering", normalizedLabel: "bartering", aliases: [] }
+    ],
+    evidenceProfiles: [profile("barter"), profile("bartering")]
+  });
+  const { runStore, graphStore, getDecisions } = fakes([run]);
+  const decision = mergeDecision("economics", identityRef("economics", "barter", "Barter", false), [identityRef("economics", "bartering", "Bartering", false)]);
+  await buildGraphVersion({ graphVersionId: "gv-1", baseGraphVersionId: null, runIds: ["run-1"], runStore, graphStore, identityDecisions: [decision] });
+  const identityRows = getDecisions().filter((d) => d.decisionType === CONCEPT_IDENTITY_DECISION_TYPE);
+  assert.equal(identityRows.length, 1, "the merge decision is persisted");
+  assert.equal(identityRows[0].outcome, "merge");
 });

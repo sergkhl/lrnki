@@ -10,6 +10,7 @@ export { applyAdmissionLabelJudge } from "./applyAdmissionLabelJudge";
 export { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
 export { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 export { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQualityJudge";
+export { applyRescuedDefinitionQualityJudge } from "./applyRescuedDefinitionQualityJudge";
 export { verifyEvidenceQuote } from "./verifyEvidenceQuote";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG, type GraphEnrichmentConfig } from "./runGraphEnrichment";
 export {
@@ -51,6 +52,17 @@ export {
   type DeduplicateResult,
   type DedupUnavailable
 } from "./deduplicateDerivedNodes";
+export {
+  resolveConceptIdentity,
+  collapseToRepresentatives,
+  classifyDecisions,
+  candidatePairsByDomain as candidateIdentityPairsByDomain,
+  DEFAULT_IDENTITY_RESOLUTION_CONFIG,
+  type ConceptIdentityCandidate,
+  type ConceptIdentityResolutionConfig,
+  type ConceptIdentityResolutionResult,
+  type ConceptIdentityUnavailable
+} from "./resolveConceptIdentity";
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
