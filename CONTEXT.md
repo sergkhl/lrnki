@@ -139,16 +139,18 @@ _Avoid_: course, personalized graph, concept-keyed learner state
 
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
-in the learner-neutral graph.
+in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
+come from option-select study responses.
 
 **Study Item Bank**:
-A learner-neutral recall asset generated alongside one Derived Graph Layer. Study items are keyed to
-`derived_node_id` and form a typed union keyed by `itemType`.
-_Avoid_: Card, Card Bank, concept-only items, asserted graph mutation
+A learner-neutral option-select asset generated alongside one Derived Graph Layer. Study items are
+keyed to `derived_node_id`; `option_select` is the only implemented `itemType`, with other
+discriminants reserved in source types for future mechanics.
+_Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 
 **Grounding Provenance**:
-The Study Item Bank citation contract. Source-grounded items cite source evidence; generated items
-cite generated grounding and are labeled as generated.
+The Study Item Bank citation contract. Source-grounded correct options cite source evidence;
+generated correct options cite generated grounding and are labeled as generated.
 _Avoid_: fake source citation, unlabeled generated quote
 
 **Inspection Read Model**:

@@ -394,14 +394,13 @@ JSON_TABLE(
 ) AS n
 WHERE a.artifact_type = 'enrichment_run';
 
--- Flatten study-item-bank artifact payloads: one row per typed Study Item with its
--- item type, derived node, grounding provenance, question, self-report prompt (null for
--- option_select), and a citation/option count, for Admin Lab inspection (R7, R15). Reads
+-- Flatten study-item-bank artifact payloads: one row per option-select Study Item with its
+-- derived node, grounding provenance, question, and option count, for Admin Lab inspection (R7, R15). Reads
 -- the immutable `study_item_bank` artifact the Study Item Bank store writes beside its
 -- normalized rows.
 CREATE VIEW artifact_study_items AS
 SELECT a.graph_version_id, si.study_item_id, si.item_type, si.enrichment_id, si.derived_node_id,
-       si.grounding_provenance, si.question, si.self_report_prompt, si.citation_count, si.option_count
+       si.grounding_provenance, si.question, si.option_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -413,8 +412,6 @@ JSON_TABLE(
     derived_node_id text PATH '$.derivedNodeId',
     grounding_provenance text PATH '$.groundingProvenance',
     question text PATH '$.question',
-    self_report_prompt text PATH '$.selfReportPrompt',
-    citation_count integer PATH '$.citations.size()',
     option_count integer PATH '$.options.size()'
   )
 ) AS si
@@ -624,25 +621,15 @@ CREATE TABLE learner_path_steps (
 
 CREATE TABLE study_items (
   study_item_id uuid PRIMARY KEY,
-  item_type text NOT NULL CHECK (item_type IN ('self_assessment', 'option_select')),
+  item_type text NOT NULL CHECK (item_type IN ('option_select')),
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   question text NOT NULL,
-  answer_key text,
-  self_report_prompt text,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  -- Type coherence: a self_assessment item carries an answer_key + self_report_prompt
-  -- (calibration reads them); an option_select item carries NEITHER — its content lives
-  -- in study_item_options. Fail closed at the DB so no incoherent typed row can enter.
-  CHECK (
-    (item_type = 'self_assessment' AND answer_key IS NOT NULL AND self_report_prompt IS NOT NULL)
-    OR
-    (item_type = 'option_select' AND answer_key IS NULL AND self_report_prompt IS NULL)
-  ),
   UNIQUE (derived_node_id, item_type)
 );
 
@@ -661,8 +648,8 @@ CREATE TABLE study_item_options (
   UNIQUE (study_item_id, ordinal)
 );
 
--- Grounded-answer citations are provenance-tagged. They back the self_assessment answer
--- key and the option_select correct answer alike, keyed by study_item_id. Source
+-- Grounded-answer citations are provenance-tagged. They back the option_select correct
+-- answer, keyed by study_item_id. Source
 -- citations mirror real source evidence and require source ids + a verbatim quote.
 -- Generated citations point at generated grounding text only and cannot smuggle nullable
 -- source ids through the schema. Cascade so item regeneration clears citations too.
@@ -683,9 +670,7 @@ CREATE TABLE study_item_citations (
 );
 
 -- Derived nodes that yielded NO study item at all (no usable grounding), recorded as a
--- durable fact (not a transient log line). A node that grounds a self_assessment item but
--- fails to yield an option_select item is NOT here — it simply lacks that type and the
--- frontier surfaces it as cardless-for-studying (R13). Regeneration replaces an
+-- durable fact (not a transient log line). Regeneration replaces an
 -- enrichment's rejections alongside its items. The no-item frontier fallback reads
 -- `reason` instead of guessing from grounding origin.
 CREATE TABLE rejected_study_items (

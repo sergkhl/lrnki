@@ -34,22 +34,16 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
           VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${rejection.derivedNodeId}, ${rejection.reason}, ${configHash})`;
       }
       for (const item of studyItems) {
-        const answerKey = item.itemType === "self_assessment" ? item.answerKey : null;
-        const selfReportPrompt = item.itemType === "self_assessment" ? item.selfReportPrompt : null;
         await tx`
-          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
-          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${answerKey}, ${selfReportPrompt}, ${item.generatingModel}, ${item.configHash})`;
+          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.generatingModel}, ${item.configHash})`;
 
-        if (item.itemType === "self_assessment") {
-          for (const citation of item.citations) await this.insertCitation(tx, item.studyItemId, citation);
-        } else {
-          // Sequential await keeps the option/citation inserts ordered within the tx.
-          for (const [ordinal, option] of item.options.entries()) {
-            await tx`
-              INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
-              VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
-            if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
-          }
+        // Sequential await keeps the option/citation inserts ordered within the tx.
+        for (const [ordinal, option] of item.options.entries()) {
+          await tx`
+            INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
+            VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
+          if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
         }
       }
 
@@ -81,7 +75,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
       FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
@@ -90,7 +84,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
       FROM study_items WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
@@ -134,9 +128,6 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         question: row.question
       };
       const citations = (citationsByItem.get(row.study_item_id) ?? []).map(toCitation);
-      if (row.item_type === "self_assessment") {
-        return { ...base, itemType: "self_assessment", answerKey: row.answer_key!, selfReportPrompt: row.self_report_prompt!, citations };
-      }
       const citation = citations[0];
       const options: StudyItemOption[] = (optionsByItem.get(row.study_item_id) ?? []).map((option) => ({
         optionId: option.option_id,
@@ -158,14 +149,12 @@ function toCitation(row: CitationRow): StudyItemCitation {
 
 type StudyItemRow = {
   study_item_id: string;
-  item_type: "self_assessment" | "option_select";
+  item_type: "option_select";
   graph_version_id: string;
   enrichment_id: string;
   derived_node_id: string;
   grounding_provenance: string;
   question: string;
-  answer_key: string | null;
-  self_report_prompt: string | null;
   generating_model: string;
   config_hash: string;
 };

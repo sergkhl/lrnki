@@ -1,23 +1,17 @@
-import type { SelfAssessmentItem, DerivedGraphLayer, Verdict } from "@lrnki/domain-core";
-import type { AnswerGradingJudgePort, CalibrationVerdictStorePort, LearnerAnswerSimulatorPort, ResponseLogStorePort } from "@lrnki/ports";
+import type { DerivedGraphLayer, Verdict } from "@lrnki/domain-core";
+import type { CalibrationVerdictStorePort } from "@lrnki/ports";
 import { prerequisiteAncestors } from "./prerequisiteDag";
-import { gradeAndAppend } from "./measurement";
 
 // Synthetic prefill (R14, EXPERIMENT_ONLY scaffolding that lives OUTSIDE the
 // authoritative core). Seeds BOTH halves of the graph-dissolved loop so the end-to-end
 // study surface is inspectable pre-launch (the milestone's rule-14 artifact):
-//   1. Calibration VERDICTS over the goal's trusted prerequisite cone, seeded
-//      deterministically from each node's difficulty (mutable store, not the log).
-//   2. GRADED answers for a hardest-first sample, routed through the REAL judge via
-//      gradeAndAppend — one code path, not a parallel writer.
-// The retired weighted self-report sweep (buildCalibrationSet/appendSelfReportBatch) is
-// gone (R18); this writes the new verdict store directly.
+// Calibration VERDICTS over the goal's trusted prerequisite cone, seeded deterministically
+// from each node's difficulty (mutable store, not the log). The old answer-graded sample
+// depended on self-assessment cards and is intentionally gone.
 
 export type SyntheticLearnerProfile = {
   // A learner who already knows concepts below `difficultyCutoff` and must study at/above it.
   difficultyCutoff: number;
-  // How many studyItems to actually answer-and-grade (bounds LLM calls). Hardest-first.
-  gradedSampleSize: number;
 };
 
 // Deterministic verdict from a concept's difficulty (pure, testable). Below the cutoff
@@ -31,15 +25,9 @@ export async function synthesizeResponses(input: {
   learnerStateRef: string;
   layer: DerivedGraphLayer;
   targetDerivedNodeId: string;
-  declaredDomain: string;
-  studyItems: SelfAssessmentItem[];
   profile: SyntheticLearnerProfile;
-  simulator: LearnerAnswerSimulatorPort;
-  judge: AnswerGradingJudgePort;
-  responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
-}): Promise<{ knownCount: number; learnCount: number; gradedCount: number }> {
-  const studyItemByNode = new Map(input.studyItems.map((studyItem) => [studyItem.derivedNodeId, studyItem] as const));
+}): Promise<{ knownCount: number; learnCount: number }> {
   const difficultyByNode = new Map(input.layer.difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty.score] as const));
 
   // 1. Calibration: seed a verdict for every node in the goal's TRUSTED prerequisite cone
@@ -56,33 +44,5 @@ export async function synthesizeResponses(input: {
     else learnCount += 1;
   }
 
-  // 2. Measurement: answer-and-grade a hardest-first sample, including the target's own
-  //    studyItem. Each answer is simulated then graded by the REAL judge through
-  //    gradeAndAppend — exercising the true measurement path, not a stub.
-  const gradeOrder = [input.targetDerivedNodeId, ...cone]
-    .map((derivedNodeId) => ({ derivedNodeId, difficulty: difficultyByNode.get(derivedNodeId) ?? 1 }))
-    .sort((a, b) => b.difficulty - a.difficulty || a.derivedNodeId.localeCompare(b.derivedNodeId));
-  const seen = new Set<string>();
-  let gradedCount = 0;
-  for (const candidate of gradeOrder) {
-    if (gradedCount >= input.profile.gradedSampleSize) break;
-    if (seen.has(candidate.derivedNodeId)) continue;
-    seen.add(candidate.derivedNodeId);
-    const studyItem = studyItemByNode.get(candidate.derivedNodeId);
-    if (!studyItem) continue;
-    const competence: "strong" | "weak" = candidate.difficulty < input.profile.difficultyCutoff ? "strong" : "weak";
-    const { answer } = await input.simulator.simulateAnswer({ declaredDomain: input.declaredDomain, question: studyItem.question, competence });
-    await gradeAndAppend({
-      learnerStateRef: input.learnerStateRef,
-      studyItem: { studyItemId: studyItem.studyItemId, derivedNodeId: studyItem.derivedNodeId, question: studyItem.question, answerKey: studyItem.answerKey },
-      declaredDomain: input.declaredDomain,
-      submittedAnswer: answer,
-      judge: input.judge,
-      responseLog: input.responseLog,
-      responseSource: "synthetic"
-    });
-    gradedCount++;
-  }
-
-  return { knownCount, learnCount, gradedCount };
+  return { knownCount, learnCount };
 }

@@ -36,8 +36,6 @@ export {
   rescueDurabilityJudgmentValidator,
   mintingDurabilityJudgmentSchema,
   mintingDurabilityJudgmentValidator,
-  cardGenerationSchema,
-  cardGenerationValidator,
   optionSelectSchema,
   optionSelectValidator,
   answerGradingSchema,

@@ -1,7 +1,4 @@
 import {
-  computeLearnerPath,
-  loadResponseLogLearnerState,
-  gradeAndAppend,
   classifyAdaptedNodes,
   foldConceptMastery,
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -9,14 +6,7 @@ import {
 } from "@lrnki/application";
 import type { CalibrationVerdict, JudgedOutcome, ResponseLogRow, Verdict } from "@lrnki/domain-core";
 import { createDatabaseClient, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
-import type {
-  AnswerGradingJudgePort,
-  ArtifactRepositoryPort,
-  EnrichmentRunStorePort,
-  LearnerPathStorePort,
-  LearnerStatePort,
-  ResponseLogStorePort
-} from "@lrnki/ports";
+import type { LearnerStatePort, ResponseLogStorePort } from "@lrnki/ports";
 import { getEnrichmentDetail } from "./enrichments";
 import type { DerivedGraphDetail } from "./derivedGraph";
 
@@ -99,7 +89,6 @@ export type LearnerResponseView = {
   nodeLabel: string;
   studyItemId: string;
   question: string;
-  answerKey: string | null;
   signalType: string;
   judgedOutcome: string | null;
   gradedScore: number | null;
@@ -259,11 +248,11 @@ export async function listLearnerStates(): Promise<LearnerStateSummary[] | undef
 
 export async function getLearnerLoopDetail(learnerStateRef: string): Promise<LearnerLoopDetail | undefined> {
   return withClient(async (sql) => {
-    const rows = await sql<(ResponseRow & { concept_label: string; question: string; answer_key: string })[]>`
+    const rows = await sql<(ResponseRow & { concept_label: string; question: string })[]>`
       SELECT rl.response_id, rl.learner_state_ref, rl.study_item_id, rl.derived_node_id, rl.signal_type,
              rl.judged_outcome, rl.graded_score, rl.response_source, rl.grader_identity, rl.batch_id,
              rl.attempt_seq, rl.submitted_answer, rl.created_at,
-             n.canonical_label AS concept_label, cd.question, cd.answer_key
+             n.canonical_label AS concept_label, cd.question
       FROM response_log rl
       JOIN derived_graph_nodes n ON n.derived_node_id = rl.derived_node_id
       JOIN study_items cd ON cd.study_item_id = rl.study_item_id
@@ -289,7 +278,7 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
       JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
       JOIN learner_path_steps s ON s.learner_path_id = p.learner_path_id
       JOIN derived_graph_nodes n ON n.derived_node_id = s.derived_node_id
-      LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'self_assessment'
+      LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'option_select'
       LEFT JOIN rejected_study_items rc ON rc.derived_node_id = s.derived_node_id
       WHERE p.learner_state_ref = ${learnerStateRef}
       ORDER BY p.created_at DESC, s.position`;
@@ -323,7 +312,6 @@ export async function getLearnerLoopDetail(learnerStateRef: string): Promise<Lea
         nodeLabel: row.concept_label,
         studyItemId: row.study_item_id,
         question: row.question,
-        answerKey: row.answer_key,
         signalType: row.signal_type,
         judgedOutcome: row.judged_outcome,
         gradedScore: row.graded_score === null ? null : Number(row.graded_score),
@@ -402,62 +390,6 @@ function fallbackReasonFor(groundingOrigin: string): string {
   if (groundingOrigin === "llm_grounded") return "Generated prerequisite, not directly recall-tested yet.";
   if (groundingOrigin === "source_mentioned") return "Source-mentioned prerequisite, not directly recall-tested yet.";
   return "Anchor node, not directly recall-tested yet.";
-}
-
-// --- Resubmit + recompute (the first write) --------------------------------
-
-// Append a new graded row for an operator-edited answer, then recompute and
-// re-persist the learner's adaptive path(s) from the updated log. The original row
-// stays intact (the log is append-only, R5/AE5). This composes already-tested
-// application pieces (U5 gradeAndAppend + U6 estimator + projection) and touches
-// ONLY learner-loop stores — there is no graph or derived-layer write port here, so
-// it structurally cannot mutate a published graph (R15, AGENTS rule 12).
-export async function resubmitAndRecompute(deps: {
-  learnerStateRef: string;
-  studyItem: { studyItemId: string; derivedNodeId: string; question: string; answerKey: string };
-  declaredDomain: string;
-  submittedAnswer: string;
-  paths: { enrichmentId: string; targetDerivedNodeId: string }[];
-  judge: AnswerGradingJudgePort;
-  responseLog: ResponseLogStorePort;
-  enrichmentStore: EnrichmentRunStorePort;
-  pathStore: LearnerPathStorePort;
-  artifacts: ArtifactRepositoryPort;
-  newPathId: () => string;
-}): Promise<{ judgedOutcome: JudgedOutcome; recomputedPaths: number }> {
-  const { judgment } = await gradeAndAppend({
-    learnerStateRef: deps.learnerStateRef,
-    studyItem: deps.studyItem,
-    declaredDomain: deps.declaredDomain,
-    submittedAnswer: deps.submittedAnswer,
-    judge: deps.judge,
-    responseLog: deps.responseLog,
-    responseSource: "human"
-  });
-
-  let recomputed = 0;
-  for (const path of deps.paths) {
-    const layer = await deps.enrichmentStore.getLayer(path.enrichmentId);
-    if (!layer) continue;
-    const learnerState = await loadResponseLogLearnerState({
-      responseLog: deps.responseLog,
-      learnerStateRef: deps.learnerStateRef
-    });
-    // Re-project to the SAME stored target so the path keeps its identity and is
-    // replaced (not orphaned); the updated mastery changes what is pruned.
-    await computeLearnerPath({
-      learnerPathId: deps.newPathId(),
-      enrichmentId: path.enrichmentId,
-      targetDerivedNodeId: path.targetDerivedNodeId,
-      enrichmentStore: deps.enrichmentStore,
-      learnerState,
-      pathStore: deps.pathStore,
-      artifacts: deps.artifacts,
-      masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
-    });
-    recomputed++;
-  }
-  return { judgedOutcome: judgment.outcome, recomputedPaths: recomputed };
 }
 
 // Bind the real Postgres response-log store for the server action (read side reuses

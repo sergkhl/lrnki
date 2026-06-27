@@ -7,7 +7,6 @@ import type {
   CalibrationVerdict,
   ConceptIdentityResolutionOutcome,
   StudyItem,
-  SelfAssessmentItemDraft,
   OptionSelectItemDraft,
   StudyItemGroundingProvenance,
   StudyItemType,
@@ -410,23 +409,12 @@ export interface StudyItemBankStorePort {
 }
 
 // Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the
-// generator stays DeepSeek-family (AGENTS rule 5). `generate` returns a pre-verification
-// SelfAssessmentItemDraft; `generateOptionSelect` returns a pre-verification
-// OptionSelectItemDraft (a grounded correct answer + three sibling-conditioned
-// distractors). The application boundary verifies the grounded answer verbatim, then the
-// deterministic guard (U2) accepts or rejects — semantic acceptance is NOT done here.
+// generator stays DeepSeek-family (AGENTS rule 5). `generateOptionSelect` returns a
+// pre-verification OptionSelectItemDraft (a grounded correct answer + three
+// sibling-conditioned distractors). The deterministic guard accepts or rejects —
+// semantic acceptance is NOT done here.
 export interface StudyItemGenerationPort {
   readonly model: string;
-  generate(input: {
-    declaredDomain: string;
-    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-    groundingProvenance: StudyItemGroundingProvenance;
-    groundingPassages: (
-      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
-      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
-    )[];
-    definesLiteral: string | null;
-  }): Promise<SelfAssessmentItemDraft>;
   generateOptionSelect(input: {
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };

@@ -709,51 +709,6 @@ export const nodeMergeAdjudicationValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
-// --- Card generation: submit_recall_card (U2, R1/R2) ----------------------
-// One anki-style recall card per derived learning node, conditioned on its grounding.
-// The answer-key cites provided grounding passages by passage id + quote; the
-// application boundary verifies each quote under that grounding's provenance
-// contract and rejects fail-closed (AGENTS rule 6). Domain-neutral rubric language
-// only (AGENTS rule 17).
-export const cardGenerationSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["question", "answerKey", "selfReportPrompt", "citations"],
-  properties: {
-    question: {
-      type: "string",
-      description: "One self-contained recall question about the learning node that a learner could answer from understanding it. Do not reference 'the passage' or 'the source'."
-    },
-    answerKey: {
-      type: "string",
-      description: "A concise correct answer a grader can check a learner's free-form response against. Grounded in the provided grounding passages; introduce no facts absent from them."
-    },
-    selfReportPrompt: {
-      type: "string",
-      description: "A short first-person confidence prompt for calibration, e.g. 'How confident are you that you can explain this concept and its role?'."
-    },
-    citations: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["passageId", "evidenceQuote"],
-        properties: {
-          passageId: { type: "string", description: "Exact passageId of one provided grounding passage the answer derives from." },
-          evidenceQuote: { type: "string", description: "Substring copied from that grounding passage supporting the answer-key. For source-grounded passages, copy it verbatim." }
-        }
-      }
-    }
-  }
-};
-
-export const cardGenerationValidator = z.object({
-  question: z.string().min(1),
-  answerKey: z.string().min(1),
-  selfReportPrompt: z.string().min(1),
-  citations: z.array(z.object({ passageId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
-}).strict();
-
 // --- Option-select generation: submit_option_select_item (U3, R9/R10) -----
 // One four-option auto-graded item per node: a grounded correct answer (cited by
 // passage id + quote, verified verbatim by the application boundary) plus THREE
