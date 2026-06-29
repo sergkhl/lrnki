@@ -83,6 +83,12 @@ export {
   type LessonNeighbor,
   type LessonNeighborhood
 } from "./selectLessonNeighborhood";
+export { selectNodeGrounding, type GroundingPassage, type NodeGrounding } from "./selectNodeGrounding";
+export {
+  assembleConceptLesson,
+  type AssembleConceptLessonInput,
+  type AssembleConceptLessonResult
+} from "./assembleConceptLesson";
 export {
   appendOptionSelectOutcome,
   AUTO_GRADER_IDENTITY

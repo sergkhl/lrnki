@@ -35,6 +35,7 @@ import {
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmStudyItemGenerationAdapter,
+  LiteLlmConceptLessonGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
@@ -53,6 +54,7 @@ import {
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
   PostgresStudyItemBankStore,
+  PostgresConceptLessonStore,
   PostgresResponseLogStore,
   PostgresCalibrationVerdictStore,
   PostgresGraphVersionStore,
@@ -209,6 +211,10 @@ function buildContext() {
     pathStore: new PostgresLearnerPathStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays
     // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
+    // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
+    // option-select, and persisted through its own store; option-select derives FROM it.
+    conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
+    conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql),
     responseLogStore: new PostgresResponseLogStore(sql),
@@ -626,11 +632,13 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
     configHash: STUDY_ITEM_BANK_CONFIG_HASH,
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
+    conceptLessonGeneration: ctx.conceptLessonGeneration,
+    conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
     reporter: ctx.runProgressReporter
   });
-  console.log(`   items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
+  console.log(`   lessons=${result.lessons.length} lessonAbsent=${result.lessonAbsent.length} items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
   for (const item of result.studyItems) {
     const correct = item.options.find((option) => option.isCorrect);
     const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
