@@ -76,7 +76,13 @@ export {
   type OptionSelectGroundingPassage,
   type OptionSelectGuardResult
 } from "./optionSelectGuard";
-export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
+export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, nodeGroundingSnippet, type SiblingDescriptor } from "./selectSiblingContext";
+export {
+  selectLessonNeighborhood,
+  DEFAULT_MAX_LESSON_NEIGHBORS,
+  type LessonNeighbor,
+  type LessonNeighborhood
+} from "./selectLessonNeighborhood";
 export {
   appendOptionSelectOutcome,
   AUTO_GRADER_IDENTITY
