@@ -33,6 +33,17 @@
 
 ## COMPLETED
 
+- **Concept Lesson teaching substrate.** Every derived node now carries an ordered, source-grounded
+  Concept Lesson (gist → intuition → definition → examples → graph-aware applications → formulas)
+  generated in the `study_items` operation before the option-select stage and persisted as a
+  regenerable learner-neutral substrate. Sections reuse the Study Item Bank provenance/citation
+  contract; the pure assembler re-derives provenance authoritatively (source-cited only on verbatim
+  match, else generated) and records a node lesson-absent only when grounding is unusable. Option-select
+  now derives from the lesson's source-cited sections — the raw-passage feed for items is gone, so one
+  source of grounding feeds all study assets (rule 18). The Study Session rides the lesson down and
+  renders it ahead of the item (non-graded), with thin operator visibility for lesson-absent nodes.
+  Decision: [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
+
 - **Forced-tool schemas single-sourced from zod.** The hand-written JSON Schema bodies in
   `toolSchemas.ts` were deleted: each forced-tool schema is now generated from its zod validator
   through the `toForcedToolSchema` provider-dialect seam, and `blockEvidence` is one reused zod object.
@@ -174,6 +185,23 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Concept Lesson teaching substrate U1–U9, 2026-06-29 (branch
+  `feat/concept-lesson-teaching-surface`).** Full workspace typecheck green; recursive tests green
+  (domain-core 29, application 353 incl. the test-first `assembleConceptLesson` suite + lesson
+  ride-down/absent projection cases, infra-litellm 89 incl. the strict/domain-neutral lesson schema,
+  infra-postgres 47 incl. live lesson-store round-trip/regenerate/absent/view cases, admin-lab 77).
+  Real-use gate (rule 14, real DeepSeek V4 Flash calls on a re-seeded DB): the Rust ch.4.1 source ran
+  end-to-end (extraction `8d7fa85a` → graph version `d1e845d2` → enrichment `b8ded3f1`, a mixed layer
+  of 7 anchors / 9 rescued / 11 minted nodes). Study-item generation produced **27 lessons / 0
+  absent / 138 sections / 25 option-select items (2 guard-rejected)**. Inspection: the Ownership
+  anchor lesson teaches accurately (library-book intuition, verbatim source definition + examples, a
+  graph-aware applications section that names the "Owner" prerequisite neighbor); the minted "Bitwise
+  copy" lesson is fully teachable with an all-`generated` label (AE5). The honesty invariant holds
+  exactly — every section labeled `source_cep`/`source_mentioned` carries a source citation and every
+  `generated` section carries none (no synthesized content masquerades as a source quote, R8). All
+  **36/36** persisted source citations re-verified verbatim against their stored source blocks with
+  the exact `evidenceQuoteMatches` normalizer. Result: PASS.
 
 - **Forced-tool schema single-source refactor, 2026-06-29 (branch
   `refactor/single-source-forced-tool-schemas`).** Full workspace typecheck passed; the
