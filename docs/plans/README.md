@@ -12,9 +12,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [refactor: Learner study/learner-loop/path surfaces behind use-cases + inspection read ports](./2026-06-29-001-refactor-learner-study-projection-use-case-plan.md)
-  — ready; applies ADR-0027 + AGENTS rule 18 to the learner-facing reads (Candidate 2 of the
-  2026-06-27 architecture review).
+- None. (The learner study/path/loop read refactor shipped 2026-06-29; see
+  [TODO](./TODO.md) COMPLETED + VALIDATION.)
 
 ## Ownership rules
 

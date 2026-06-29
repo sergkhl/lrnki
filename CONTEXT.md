@@ -137,6 +137,12 @@ _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 A projection of one Derived Graph Layer for a target `derived_node_id` and Learner State.
 _Avoid_: course, personalized graph, concept-keyed learner state
 
+**Study Session**:
+A learner-stateful, goal-scoped projection over one Derived Graph Layer that gates each in-scope
+derived node into locked / frontier / mastered and carries its study payload. It advances the learner
+toward a target `derived_node_id` and is composed behind an application use-case, not the UI.
+_Avoid_: study screen, lesson, quiz session
+
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
 in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes

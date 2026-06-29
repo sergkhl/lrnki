@@ -23,14 +23,30 @@
    per-learner sequence assignment in the persistence boundary rather than UI-only prevention.
    Decision: [ADR-0026](../adr/0026-typed-study-item-bank.md).
 
-4. **Deepen the learner-facing reads onto the ADR-0027 split.** Move the study projection behind a
-   `getStudySession` application use-case (injected ports + compute) and the raw-SQL Learner Path /
-   Learner Loop reads behind inspection read ports, so one boundary serves the Admin Lab and the
-   forthcoming Learner Application. Ready plan:
-   [2026-06-29-001](./2026-06-29-001-refactor-learner-study-projection-use-case-plan.md).
+4. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
+   learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
+   `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
+   shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
+   both learner projections share one boundary before the Learner Application is built — worth doing
+   once that app's calibration needs are concrete. Behavior-preserving; no new ADR.
    Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 ## COMPLETED
+
+- **Learner-facing reads on the ADR-0027 read-model split.** The study projection, Learner Path
+  reads, and Learner Loop reads moved off raw SQL and out-of-place adaptation compute in the Admin
+  Lab onto the read-model-port split. Learner projections are now `application` use-cases that read
+  through injected ports and add compute over a pure core: `getStudySession` over
+  `composeStudySession`, and the learner-loop use-cases (`getLearnerLoopDetail` / `listLearnerStates`
+  / `getLearnerAdaptedGraphs`) over the relocated conflict/mastery/summary folds. The pure persisted
+  reads are inspection read ports whose Postgres adapters own every query and row-stitch
+  (`LearnerPathInspectionReadPort`, `LearnerLoopReadPort`). The re-inlined frontier ranking is gone:
+  one exported `rankFrontier` plus a goal-scoped selector serve both the projected path and the
+  adapted-graph overlay (AGENTS rule 18). The Admin Lab study/paths/learner-loop modules collapsed to
+  thin shells that inject adapters; no learner-surface UI module embeds SQL or adaptation compute, and
+  no learner projection imports a graph or Derived-Graph-Layer write port. One boundary now serves the
+  Admin Lab and the forthcoming Learner Application. `Study Session` is defined in CONTEXT.md.
+  Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 - **Published-Concept semantic identity resolution.** A standalone propose-decide operation runs
   before the deterministic Graph-Version Build: embeddings propose within-domain near-duplicate
@@ -150,6 +166,18 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Learner study/path/loop use-case refactor U1–U6, 2026-06-29 (branch
+  `refactor/learner-study-use-case`).** Full workspace typecheck green; recursive tests green
+  (application 335 incl. the new pure `composeStudySession` projection suite, the `getStudySession`
+  port-fake suite, and the relocated learner-loop fold suite; infra-postgres adds live read-adapter
+  tests for the Learner Path + Learner Loop ports, skipped without `DATABASE_URL`); admin-lab
+  production build passes; ESLint 0 errors / 2 pre-existing warnings. Grep proofs: no `sql<` in the
+  `studySession` / `learnerLoop` / `learnerPaths` shells; the `selectScopedFrontier` UI clone and the
+  re-inlined frontier sort are gone; exactly one exported `rankFrontier`. Behavior-preserving refactor
+  (AGENTS rule 14 applies lightly): the remaining manual rule-14 check is real-use parity — the study,
+  paths, and learner-loop surfaces rendering identically against a seeded enrichment/learner —
+  deferred to a DB-backed run (no `DATABASE_URL` in this environment).
 
 - **Published-Concept identity resolution U1–U5, 2026-06-26 (branch
   `fix/cep-definition-mispick-learner-surface`).** Full workspace typecheck and recursive suite green
