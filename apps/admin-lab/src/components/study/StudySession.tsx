@@ -1,23 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { GraduationCapIcon, RotateCcwIcon, TriangleAlertIcon, TrophyIcon } from "lucide-react";
-import type { Verdict } from "@lrnki/domain-core";
 import { submitOptionSelect, setVerdict, clearVerdict, resetLearner } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
 import { nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-// Admin-Lab client driver for one study session (U6). Calibration is dissolved INTO the
-// graph: tapping a cone node opens the reveal/verdict card (U5), and "I knew it" / "I forgot"
-// upsert a verdict that re-prunes the cone in place. There is no Calibrate toggle and no
-// separate sweep. Every write goes through the U6 server actions; each `revalidatePath`s the
-// session route, so the server re-derives the prune closure + classification and this
-// component re-renders with fresh props. Mastery is never held client-side.
+// Admin-Lab client driver for one study session. Calibration now happens before study or
+// through the inline "skip as known" action; this surface never reveals an answer before an
+// option-select submit. Every write goes through server actions that revalidate the session
+// route, so mastery is never held client-side.
 export function StudySession({ session }: Readonly<{ session: StudySessionData }>) {
   // A foundational root goal opens directly on its single node (R3) — never empty, never
   // a premature "Goal reached."
@@ -36,8 +35,10 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   // mastered. A foundational root always shows its single-node study screen instead (R3/AE1).
   const goalReached = !session.isFoundationalRoot && session.classification.selectedFrontierTarget === null;
   const sourceSummary = session.responseSourceSummary;
+  const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
+  const hiddenNodeIds = useMemo(() => new Set(session.adaptedHiddenNodeIds), [session.adaptedHiddenNodeIds]);
 
   const openNode = (derivedNodeId: string) => {
     setSelectedNodeId(derivedNodeId);
@@ -55,7 +56,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const onSelect = (optionId: string) => {
     const content = selectedContent;
     if (!content) return;
-    const studyItemId = content.kind === "option_select" ? content.item.studyItemId : content.kind === "calibration" ? content.optionItem?.studyItemId : undefined;
+    const studyItemId = content.kind === "option_select" ? content.item.studyItemId : undefined;
     if (!studyItemId) return;
     // Keep the sheet open and arm the advance; the effect below retargets it once the
     // re-folded session prop arrives (R4).
@@ -99,11 +100,20 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     return () => cancelAnimationFrame(frame);
   }, [session]);
 
-  const onVerdict = (verdict: Verdict) => {
+  const skipAsKnown = () => {
     if (!selectedNodeId) return;
     const derivedNodeId = selectedNodeId;
+    pendingAdvanceRef.current = true;
+    autoAdvanceDismissGuardRef.current = true;
+    sessionAtAnswerRef.current = session;
     startTransition(async () => {
-      await setVerdict({ learnerStateRef: session.learnerStateRef, derivedNodeId, verdict });
+      try {
+        await setVerdict({ learnerStateRef: session.learnerStateRef, derivedNodeId, verdict: "known" });
+      } catch (error) {
+        pendingAdvanceRef.current = false;
+        autoAdvanceDismissGuardRef.current = false;
+        throw error;
+      }
     });
   };
 
@@ -137,7 +147,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
             {session.classification.selectedFrontierTarget
               ? session.detail.nodes.find((n) => n.derivedNodeId === session.classification.selectedFrontierTarget)?.label ?? "—"
               : session.isFoundationalRoot ? "foundational — studied directly" : "goal reached"}
-            . Tap a node to reveal its answer and mark &ldquo;I knew it&rdquo; or &ldquo;I forgot&rdquo;.
+            . Tap a ready node to study it, or skip it as already known.
           </CardDescription>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Badge variant={sourceSummary.synthetic > 0 ? "secondary" : "outline"}>
@@ -147,6 +157,12 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
               <RotateCcwIcon data-icon="inline-start" />
               Reset learner
             </Button>
+            <Link
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+              href={`/admin/lab/study/${encodeURIComponent(session.learnerStateRef)}/calibrate?${calibrationQuery.toString()}` as Route}
+            >
+              Re-calibrate
+            </Link>
           </div>
         </CardHeader>
       </Card>
@@ -158,7 +174,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
             <span>
               <span className="font-medium">Foundational — studied directly.</span>{" "}
               <span className="text-muted-foreground">
-                {session.target.label} has no prerequisites. Open it to reveal the answer and calibrate, or study it.
+                {session.target.label} has no prerequisites. Open it to study it, or skip it as already known.
               </span>
             </span>
           </CardContent>
@@ -239,7 +255,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
 
       <Card>
         <CardContent className="pt-4">
-          <DerivedGraphExplorer detail={session.detail} adapted={session.classification} onNodeSelect={openNode} />
+          <DerivedGraphExplorer detail={session.detail} adapted={session.classification} hiddenNodeIds={hiddenNodeIds} onNodeSelect={openNode} />
         </CardContent>
       </Card>
 
@@ -249,7 +265,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         nodeLabel={selectedLabel}
         content={selectedContent}
         onSelect={onSelect}
-        onVerdict={onVerdict}
+        onSkipAsKnown={skipAsKnown}
         onClear={() => onClear()}
         pending={pending}
       />

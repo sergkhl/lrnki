@@ -1,15 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
-  evidenceQuoteMatches,
   STAGE_TAGS,
   type DerivedGraphNode,
   type GraphSnapshot,
-  type OptionSelectItem,
   type PublishedConceptEvidenceProfile,
   type RejectedStudyItem,
-  type SelfAssessmentItem,
   type StudyItem,
-  type StudyItemCitation,
   type StudyItemGroundingProvenance
 } from "@lrnki/domain-core";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
@@ -35,15 +31,11 @@ export type StudyItemBankGenerationResult = {
 };
 
 // Study Item Bank generation (U5, R7/R12/R13, ADR-0026). For each Derived Graph Layer
-// node, fan out over the enabled item types: (a) self-assessment — generate a recall card
-// and verify its citations verbatim (exactly the prior card path), and (b) option-select —
-// build sibling context, generate a grounded correct answer + sibling-flavored distractors,
-// and run the deterministic guard. A node persists EVERY type that survives; supported
-// types are therefore the implicit byproduct (KTD2). A node that yields NO item at all (no
-// usable grounding) is recorded as a RejectedStudyItem; a node that grounds one type but
-// not the other is NOT rejected — it simply lacks that type (R13). Generation failure on
-// one type never aborts the other type or the run. Learner-neutral and regenerable; never
-// touches the asserted graph or imports a graph/enrichment write port (R15).
+// node, generate one option-select item: build sibling context, generate a grounded
+// correct answer + sibling-flavored distractors, and run the deterministic guard.
+// A node that yields no item is recorded as a RejectedStudyItem with the exact reason.
+// Learner-neutral and regenerable; never touches the asserted graph or imports a
+// graph/enrichment write port (R15).
 export async function generateStudyItemBank(input: {
   enrichmentId: string;
   configHash: string;
@@ -86,51 +78,15 @@ export async function generateStudyItemBank(input: {
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;
   const generateForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
-    const items: StudyItem[] = [];
     const grounding = selectNodeGrounding(node, snapshot, profileByConcept);
     if (!grounding || grounding.passages.length === 0) {
-      return { items, rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" }] };
     }
 
-    let nodeHasItem = false;
-    let selfAssessmentFailure: string | null = null;
+    let failureReason: string | null = null;
 
-    // (a) self-assessment — the calibration baseline; mirrors the prior card path exactly.
-    try {
-      const draft = await input.studyItemGeneration.generate({
-        declaredDomain: node.declaredDomain,
-        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-        groundingProvenance: grounding.provenance,
-        groundingPassages: grounding.passages,
-        definesLiteral: grounding.definesLiteral
-      });
-      const verified = verifyCitations(draft.citations, grounding, node.derivedNodeId);
-      if (verified.length > 0) {
-        const item: SelfAssessmentItem = {
-          itemType: "self_assessment",
-          studyItemId: newStudyItemId(),
-          graphVersionId: layer.graphVersionId,
-          enrichmentId: layer.enrichmentId,
-          derivedNodeId: node.derivedNodeId,
-          groundingProvenance: grounding.provenance,
-          generatingModel: input.studyItemGeneration.model,
-          configHash: input.configHash,
-          question: draft.question,
-          answerKey: draft.answerKey,
-          selfReportPrompt: draft.selfReportPrompt,
-          citations: verified
-        };
-        items.push(item);
-        nodeHasItem = true;
-      } else {
-        selfAssessmentFailure = "unverifiable answer-key citation";
-      }
-    } catch (error) {
-      selfAssessmentFailure = `self-assessment generation failed: ${error instanceof Error ? error.message : String(error)}`;
-    }
-
-    // (b) option-select — auto-graded studying. Generation/guard failure drops only this
-    // type (cardless-for-studying, R13); it never rejects the node or aborts the run.
+    // Option-select — auto-graded studying. Generation/guard failure rejects this node
+    // for the bank but never aborts the run.
     try {
       const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
       const draft = await input.studyItemGeneration.generateOptionSelect({
@@ -152,25 +108,22 @@ export async function generateStudyItemBank(input: {
       };
       const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
       if (guarded.ok) {
-        const item: OptionSelectItem = guarded.item;
-        items.push(item);
-        nodeHasItem = true;
+        return { items: [guarded.item], rejected: [] };
+      } else {
+        failureReason = guarded.reason;
       }
-    } catch {
-      // option-select dropped; the node falls back to self-assessment-only / cardless.
+    } catch (error) {
+      failureReason = `option-select generation failed: ${error instanceof Error ? error.message : String(error)}`;
     }
 
-    if (!nodeHasItem) {
-      return {
-        items,
-        rejected: [{
-          derivedNodeId: node.derivedNodeId,
-          canonicalLabel: node.canonicalLabel,
-          reason: selfAssessmentFailure ?? "no study item could be grounded"
-        }]
-      };
-    }
-    return { items, rejected: [] };
+    return {
+      items: [],
+      rejected: [{
+        derivedNodeId: node.derivedNodeId,
+        canonicalLabel: node.canonicalLabel,
+        reason: failureReason ?? "no study item could be grounded"
+      }]
+    };
   };
   const perNode = await studyStage(
     STAGE_TAGS.studyItemGeneration,
@@ -203,29 +156,6 @@ export async function generateStudyItemBank(input: {
   await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
   return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected };
   });
-}
-
-// Verify each draft citation verbatim against its cited grounding passage and resolve
-// provenance from the matched passage (fail-closed, AGENTS rule 6). Returns the verified
-// citations; an empty result means none verified and the draft must be rejected.
-function verifyCitations(
-  citations: { passageId: string; evidenceQuote: string }[],
-  grounding: NodeGrounding,
-  derivedNodeId: string
-): StudyItemCitation[] {
-  const verified: StudyItemCitation[] = [];
-  for (const citation of citations) {
-    const match = grounding.passages.find(
-      (passage) => passage.passageId === citation.passageId && evidenceQuoteMatches(passage.text, citation.evidenceQuote)
-    );
-    if (!match) return [];
-    if ("sourceResourceId" in match) {
-      verified.push({ provenance: "source", sourceResourceId: match.sourceResourceId, sourceBlockId: match.sourceBlockId, evidenceQuote: citation.evidenceQuote });
-    } else {
-      verified.push({ provenance: "generated", derivedNodeId, passageText: citation.evidenceQuote });
-    }
-  }
-  return verified;
 }
 
 type GroundingPassage =

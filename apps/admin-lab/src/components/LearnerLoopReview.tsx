@@ -1,15 +1,11 @@
 import { AlertTriangleIcon } from "lucide-react";
-import { resubmitEditedAnswer } from "@/app/admin/lab/learner-loop/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
 import type { ConceptConflict, LearnerAdaptedGraphs, LearnerLoopDetail, ResponseSourceSummary } from "@/lib/learnerLoop";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 
 const CONFLICT_COPY: Record<ConceptConflict["kind"], string> = {
   claimed_known_but_failed: "Verdict known, graded incorrect",
@@ -31,8 +27,7 @@ function sourceBadgeCopy(summary: ResponseSourceSummary): string {
 }
 
 // Read + review surface for one learner's recall loop (U8). Conflicts are surfaced as
-// a deliberate calibration signal (R16); graded answers can be edited and resubmitted,
-// appending a new graded row and recomputing the path (learner state only, R15).
+// a deliberate calibration signal (R16); graded rows are option-select outcomes.
 export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: LearnerLoopDetail; adaptedGraphs: LearnerAdaptedGraphs }>) {
   const conflictByNode = new Map(detail.conflicts.map((conflict) => [conflict.derivedNodeId, conflict] as const));
   return (
@@ -42,8 +37,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
           <CardTitle>Learner {detail.learnerStateRef}</CardTitle>
           <CardDescription>
             {detail.responses.length} graded responses · {detail.conflicts.length} calibration↔graded conflicts ·{" "}
-            {detail.paths.length} projected path{detail.paths.length === 1 ? "" : "s"}. Editing an answer appends a new
-            graded row and recomputes the path — learner state only, never a published graph.
+            {detail.paths.length} projected path{detail.paths.length === 1 ? "" : "s"}. Learner state only, never a published graph.
           </CardDescription>
         </CardHeader>
         {detail.conflicts.length > 0 && (
@@ -183,30 +177,7 @@ export function LearnerLoopReview({ detail, adaptedGraphs }: Readonly<{ detail: 
               <CardDescription>{response.question}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-4">
-              <div className="text-sm">
-                <span className="font-medium">Answer key:</span> {response.answerKey ?? "Auto-graded option select"}
-              </div>
-              {response.signalType === "graded" && response.answerKey && response.submittedAnswer !== null && (
-                <>
-                  <Separator />
-                  <form action={resubmitEditedAnswer} className="flex flex-col gap-2">
-                    <input type="hidden" name="learnerStateRef" value={detail.learnerStateRef} />
-                    <input type="hidden" name="studyItemId" value={response.studyItemId} />
-                    <label className="text-sm font-medium" htmlFor={`answer-${response.responseId}`}>
-                      Edit &amp; resubmit answer (grades anew, appends a row)
-                    </label>
-                    <Textarea
-                      id={`answer-${response.responseId}`}
-                      name="editedAnswer"
-                      defaultValue={response.submittedAnswer ?? ""}
-                      rows={3}
-                    />
-                    <Button type="submit" size="sm" className="self-start">
-                      Resubmit &amp; recompute
-                    </Button>
-                  </form>
-                </>
-              )}
+              <div className="text-sm text-muted-foreground">Auto-graded option-select response.</div>
             </CardContent>
           </Card>
         );

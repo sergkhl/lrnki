@@ -17,6 +17,12 @@
    [ADR-0011](../adr/0011-retain-minimal-admin-lab.md), and
    [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
+3. **Harden Response Log attempt sequencing.** Concurrent same-learner answer submissions still
+   compute `attempt_seq` with `MAX(attempt_seq) + 1` before append, so cross-tab or multi-client
+   submissions can race the unique `(learner_state_ref, attempt_seq)` constraint. Prefer an atomic
+   per-learner sequence assignment in the persistence boundary rather than UI-only prevention.
+   Decision: [ADR-0026](../adr/0026-typed-study-item-bank.md).
+
 ## COMPLETED
 
 - **Published-Concept semantic identity resolution.** A standalone propose-decide operation runs
@@ -92,6 +98,18 @@
   the Derived Graph Layer. Admin Lab exposes the study and adapted-graph workflows without mutating
   published graph state. Decisions:
   [ADR-0026](../adr/0026-typed-study-item-bank.md) and
+  [ADR-0011](../adr/0011-retain-minimal-admin-lab.md).
+
+- **Calibration pre-study flow.** Calibration is now an optional, separate pre-study projection over
+  a goal's trusted prerequisite cone: rows are ordered hardest-first, show neutral grounded
+  descriptors rather than questions or answers, and known marks prune implied-known ancestors from
+  the list. Study no longer renders reveal/self-assessment cards; learners can skip a study item as
+  known without seeing an answer. The study graph now keeps Neutral as the full Derived Graph Layer
+  and applies known-closure hiding only as the Adapted render projection. The Study Item Bank is
+  option-select only; the retired free-form grading/simulation and `self_assessment` paths were
+  deleted. Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0011](../adr/0011-retain-minimal-admin-lab.md).
 
 - **Inspection architecture and operator tooling.** Source and run inspection use finished read-model
@@ -198,3 +216,18 @@
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims above come from
   inspected real model output.
+- **Calibration pre-study flow, 2026-06-29 (branch `feat/calibration-pre-study-flow`).** Full
+  workspace typecheck passes; full recursive tests pass; production build passes; ESLint has zero
+  errors and two pre-existing warnings. Focused coverage exercises the pure calibration list/session
+  projection, option-select-only generation, study side-sheet gating, adapted-graph known-closure
+  hiding, synthetic verdict seeding, and Postgres store type boundaries. Code review found and fixed
+  skip-as-known auto-advance, pending-write navigation races, option-vs-skip mutual exclusion, stale
+  calibration verdict wording, application-projection ownership, option-select persistence
+  invariants, calibration DB error swallowing, and non-transactional learner reset. Follow-up
+  validation on 2026-06-29 confirmed `DATABASE_URL` is available and exercised the seeded curated
+  enrichment `c6c558eb` in browser. For learner `demo-seeded-2` studying non-foundational target
+  "AI research agent", Adapted renders 38 concepts / 40 inferred edges while Neutral restores the
+  full 51 concepts / 76 inferred edges; the known concept "valid artifact" is absent from the
+  Adapted textual node list and present again in Neutral. Zero-verdict learner `demo-empty-1` renders
+  the same 51 concepts / 76 inferred edges in both modes. Screenshots:
+  `tmp/neutral-adapted-fix-adapted.png`, `tmp/neutral-adapted-fix-neutral.png`.

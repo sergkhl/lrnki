@@ -97,6 +97,48 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
+export function filterDetailToVisible(detail: DerivedGraphDetail, hiddenNodeIds: ReadonlySet<string>): DerivedGraphDetail {
+  const nodes = detail.nodes.filter((node) => !hiddenNodeIds.has(node.derivedNodeId));
+  const visibleNodeIds = new Set(nodes.map((node) => node.derivedNodeId));
+  const edges: DerivedGraphEdge[] = [];
+  let certainEdgeCount = 0;
+  let uncertainEdgeCount = 0;
+  for (const edge of detail.edges) {
+    if (!visibleNodeIds.has(edge.prerequisiteDerivedNodeId) || !visibleNodeIds.has(edge.dependentDerivedNodeId)) continue;
+    edges.push(edge);
+    if (edge.uncertain) uncertainEdgeCount += 1;
+    else certainEdgeCount += 1;
+  }
+
+  return {
+    ...detail,
+    summary: {
+      ...detail.summary,
+      conceptCount: nodes.length,
+      edgeCount: edges.length,
+      certainEdgeCount,
+      uncertainEdgeCount
+    },
+    nodes,
+    edges,
+    originCounts: summarizeDomainOrigins(nodes)
+  };
+}
+
+function summarizeDomainOrigins(nodes: DerivedGraphNode[]) {
+  const byDomain = new Map<string, { anchor: number; sourceMentioned: number; llmGrounded: number }>();
+  for (const node of nodes) {
+    const counts = byDomain.get(node.declaredDomain) ?? { anchor: 0, sourceMentioned: 0, llmGrounded: 0 };
+    if (node.nodeKind === "anchor") counts.anchor += 1;
+    else if (node.groundingOrigin === "source_mentioned") counts.sourceMentioned += 1;
+    else if (node.groundingOrigin === "llm_grounded") counts.llmGrounded += 1;
+    byDomain.set(node.declaredDomain, counts);
+  }
+  return [...byDomain.entries()]
+    .map(([domain, counts]) => ({ domain, ...counts }))
+    .sort((a, b) => a.domain.localeCompare(b.domain));
+}
+
 // --- Goal-first picker helpers (U4, R1/R2/R3) ------------------------------
 
 // One goal candidate for the goal-first study start. `journeySize` is how many concepts
@@ -173,14 +215,30 @@ export type DerivedGraphMode = "neutral" | "adapted";
 // `adaptedState` / `frontierTarget` then recolor in place. "none"/"no" is the neutral
 // baseline (matching the absent-classification render), so neutral mode is byte-identical
 // to the enrichment-page view regardless of whether a classification is available.
-export type NodeRenderAttrs = { adaptedState: AdaptedNodeState | "none"; frontierTarget: "yes" | "no" };
+export type NodeRenderAttrs = { adaptedState: AdaptedNodeState | "none"; frontierTarget: "yes" | "no"; hidden: "yes" | "no" };
 
-export function nodeRenderAttrs(mode: DerivedGraphMode, classification: AdaptedNodeClassification | undefined, derivedNodeId: string): NodeRenderAttrs {
-  if (mode === "neutral" || !classification) return { adaptedState: "none", frontierTarget: "no" };
+export function nodeRenderAttrs(
+  mode: DerivedGraphMode,
+  classification: AdaptedNodeClassification | undefined,
+  derivedNodeId: string,
+  hiddenNodeIds: ReadonlySet<string> = new Set()
+): NodeRenderAttrs {
+  if (mode === "neutral" || !classification) return { adaptedState: "none", frontierTarget: "no", hidden: "no" };
   return {
     adaptedState: classification.stateByNode[derivedNodeId] ?? "none",
-    frontierTarget: classification.selectedFrontierTarget === derivedNodeId ? "yes" : "no"
+    frontierTarget: classification.selectedFrontierTarget === derivedNodeId ? "yes" : "no",
+    hidden: hiddenNodeIds.has(derivedNodeId) ? "yes" : "no"
   };
+}
+
+export function regionHiddenAttr(
+  mode: DerivedGraphMode,
+  domain: string,
+  nodes: ReadonlyArray<{ id: string; domain: string }>,
+  hiddenNodeIds: ReadonlySet<string> = new Set()
+): "yes" | "no" {
+  const children = nodes.filter((node) => node.domain === domain);
+  return mode === "adapted" && children.length > 0 && children.every((node) => hiddenNodeIds.has(node.id)) ? "yes" : "no";
 }
 
 // Build the view-model, optionally overlaying a learner classification (U3, KTD2). With

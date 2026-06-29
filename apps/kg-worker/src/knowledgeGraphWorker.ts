@@ -34,7 +34,6 @@ import {
   LiteLlmDefinitionPassageQualityJudgmentAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
   LiteLlmConceptAdmissionAdapter,
-  LiteLlmAnswerGradingJudgeAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
@@ -44,7 +43,6 @@ import {
   LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmGroundingGenerationAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
-  LiteLlmLearnerSimulatorAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
@@ -209,21 +207,14 @@ function buildContext() {
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     learnerState: emptyLearnerState,
     pathStore: new PostgresLearnerPathStore(sql),
-    // Learner Study Loop (ADR-0026): study-item generation stays DeepSeek-family (AGENTS
-    // rule 5) for self-assessment AND option-select; a cross-family judge grades
-    // self-assessment answers. Deterministic decoding for stable re-derivation.
+    // Learner Study Loop (ADR-0026): option-select study-item generation stays
+    // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql),
-    // Measurement grading judge (U5): cross-family (kg-independent-judge) so the
-    // DeepSeek card generator never grades its own answer-key (ADR-0023).
-    answerGradingJudge: new LiteLlmAnswerGradingJudgeAdapter(deterministicClient),
     responseLogStore: new PostgresResponseLogStore(sql),
     // Mutable calibration verdict store (R10): the synthetic prefill seeds verdicts here,
     // separate from the append-only graded log.
-    verdictStore: new PostgresCalibrationVerdictStore(sql),
-    // Synthetic learner simulator (U7): DeepSeek-family generator whose answers the
-    // cross-family judge grades — EXPERIMENT_ONLY scaffolding for the rule-14 run.
-    learnerSimulator: new LiteLlmLearnerSimulatorAdapter(deterministicClient)
+    verdictStore: new PostgresCalibrationVerdictStore(sql)
   };
 }
 
@@ -457,8 +448,6 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
-  const studyItems = (await ctx.studyItemBankStore.listStudyItemsForEnrichment(enrichmentId))
-    .filter((item) => item.itemType === "self_assessment");
   const targetNode = layer.derivedNodes.find((node) => node.derivedNodeId === targetDerivedNodeId);
   if (!targetNode) {
     console.error(`! target node ${targetDerivedNodeId} is not in enrichment ${enrichmentId}.`);
@@ -470,15 +459,10 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     learnerStateRef,
     layer,
     targetDerivedNodeId,
-    declaredDomain: targetNode.declaredDomain,
-    studyItems,
-    profile: { difficultyCutoff: 0.6, gradedSampleSize: 4 },
-    simulator: ctx.learnerSimulator,
-    judge: ctx.answerGradingJudge,
-    responseLog: ctx.responseLogStore,
+    profile: { difficultyCutoff: 0.6 },
     verdictStore: ctx.verdictStore
   });
-  console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount} · graded=${result.gradedCount}`);
+  console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount}`);
 }
 
 async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetRef?: string, learnerStateRef?: string) {
@@ -648,13 +632,9 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
   });
   console.log(`   items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
   for (const item of result.studyItems) {
-    if (item.itemType === "self_assessment") {
-      console.log(`   self_assessment[${item.derivedNodeId}] provenance=${item.groundingProvenance} citations=${item.citations.length}\n     Q: ${item.question}\n     A: ${item.answerKey}`);
-    } else {
-      const correct = item.options.find((option) => option.isCorrect);
-      const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
-      console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
-    }
+    const correct = item.options.find((option) => option.isCorrect);
+    const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
+    console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
   }
   for (const rejected of result.rejected) {
     console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}): ${rejected.reason}`);

@@ -8,10 +8,10 @@ The learner loop uses `derived_node_id` as its subject identity. Mastery, calibr
 and study-item coverage key to the node in one Derived Graph Layer, whether that node is an anchor or
 an Enrichment Node. Asserted `concept_id` remains a separate identity available only for anchors.
 
-The learner-neutral **Study Item Bank** is a typed discriminated union keyed by `itemType`. Exact
-discriminants and payload shapes are owned by the domain types and initial migration. A node's
-supported item types are derived from persisted generated items, never from a separately maintained
-capability map.
+The learner-neutral **Study Item Bank** is a typed discriminated union keyed by `itemType`.
+`option_select` is the only implemented study-item payload and the only current source-level
+discriminant. A node's supported item types are derived from persisted generated items, never from a
+separately maintained capability map.
 
 Study items preserve grounding provenance:
 
@@ -22,13 +22,14 @@ Study items preserve grounding provenance:
 Source citations retain source identifiers and verbatim evidence. Generated citations identify
 generated grounding and never masquerade as source quotes.
 
-Option-select study is auto-graded from the server-side keyed answer and appends a graded Response Log
-entry. Its deterministic guard enforces only structural and provenance guarantees; distractor
-semantic quality is evaluated through real-use inspection.
+Option-select study is auto-graded from the server-side keyed correct option and appends a graded
+Response Log entry. Its deterministic guard enforces only structural and provenance guarantees;
+distractor semantic quality is evaluated through real-use inspection.
 
-Self-assessment items support explicit calibration, not graded studying. A learner records a mutable
-binary calibration verdict for a derived node. The application composes those verdicts with the
-graded Response Log and surfaces disagreement rather than hiding it behind a precedence rule.
+Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
+card. A learner records a mutable binary calibration verdict for a derived node. The application
+composes those verdicts with the graded Response Log and surfaces disagreement rather than hiding it
+behind a precedence rule.
 
 The Response Log port is append-only and graded-only. Corrections append another graded observation;
 an explicit operator reset is a separate administrative operation. Learner history remains scoped to

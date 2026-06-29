@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// Launches a study session for the chosen enrichment + target (U5, R1). Identity is mocked
-// (KTD5): the learner ref is free text — pick an existing learner or type a new one, no auth.
-// On submit it navigates to the session route with the enrichment + target as query params.
+// Launches optional calibration or direct study for the chosen enrichment + target. Identity
+// is mocked: the learner ref is free text — pick an existing learner or type a new one, no auth.
 export function StudyStartForm({
   enrichmentId,
   targetDerivedNodeId,
@@ -16,11 +16,18 @@ export function StudyStartForm({
   const router = useRouter();
   const [learnerRef, setLearnerRef] = useState("");
 
-  const start = () => {
+  const routeFor = (mode: "calibrate" | "study"): string | null => {
     const ref = learnerRef.trim();
-    if (!ref) return;
+    if (!ref) return null;
     const query = new URLSearchParams({ enrichmentId, target: targetDerivedNodeId });
-    router.push(`/admin/lab/study/${encodeURIComponent(ref)}?${query.toString()}`);
+    const base = `/admin/lab/study/${encodeURIComponent(ref)}`;
+    return mode === "calibrate" ? `${base}/calibrate?${query.toString()}` : `${base}?${query.toString()}`;
+  };
+
+  const start = (mode: "calibrate" | "study") => {
+    const route = routeFor(mode);
+    if (!route) return;
+    router.push(route as Route);
   };
 
   return (
@@ -28,7 +35,7 @@ export function StudyStartForm({
       className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
-        start();
+        start("study");
       }}
     >
       <p className="text-sm">
@@ -44,9 +51,14 @@ export function StudyStartForm({
         placeholder="e.g. demo-empty or demo-calibrated"
         className="max-w-sm"
       />
-      <Button type="submit" size="sm" className="self-start" disabled={!learnerRef.trim()}>
-        Start studying
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={!learnerRef.trim()} onClick={() => start("calibrate")}>
+          Open calibration
+        </Button>
+        <Button type="submit" size="sm" disabled={!learnerRef.trim()}>
+          Start studying
+        </Button>
+      </div>
     </form>
   );
 }

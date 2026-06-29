@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frontierNeighborhood, filterAndOrderGoals, isFoundationalGoal, journeySize, type GoalCandidate } from "./derivedGraph";
+import { frontierNeighborhood, filterAndOrderGoals, filterDetailToVisible, isFoundationalGoal, journeySize, type DerivedGraphDetail, type GoalCandidate } from "./derivedGraph";
 
 // `frontierNeighborhood` (KTD2) is the pure helper that frames the study graph on the
 // learner's working region: the frontier target plus its direct prerequisites and direct
@@ -84,4 +84,68 @@ test("filterAndOrderGoals matches label AND alias substrings, case-insensitively
 test("isFoundationalGoal is true only for a zero-journey goal (Covers R3)", () => {
   assert.equal(isFoundationalGoal({ journeySize: 0 }), true);
   assert.equal(isFoundationalGoal({ journeySize: 1 }), false);
+});
+
+function detailForHide(): DerivedGraphDetail {
+  const nodes = [
+    { derivedNodeId: "A", label: "A", aliases: [], declaredDomain: "d", difficulty: 0.1, difficultyRationale: null, nodeKind: "anchor" as const, groundingOrigin: "document_anchored" as const, role: "prerequisite" as const, hasStudyItem: true, grounding: null },
+    { derivedNodeId: "B", label: "B", aliases: [], declaredDomain: "d", difficulty: 0.5, difficultyRationale: null, nodeKind: "anchor" as const, groundingOrigin: "document_anchored" as const, role: "prerequisite" as const, hasStudyItem: true, grounding: null },
+    { derivedNodeId: "Z", label: "Z", aliases: [], declaredDomain: "d", difficulty: 0.9, difficultyRationale: null, nodeKind: "anchor" as const, groundingOrigin: "document_anchored" as const, role: "anchor" as const, hasStudyItem: true, grounding: null }
+  ];
+  const edges = [
+    { prerequisiteDerivedNodeId: "A", dependentDerivedNodeId: "B", confidence: 0.9, uncertain: false, judgeModel: "j" },
+    { prerequisiteDerivedNodeId: "B", dependentDerivedNodeId: "Z", confidence: 0.9, uncertain: false, judgeModel: "j" }
+  ];
+  return {
+    summary: {
+      enrichmentId: "e",
+      graphVersionId: "g",
+      enrichmentConfigHash: "cfg",
+      judgeModel: "j",
+      difficultyMethod: "m",
+      status: "succeeded",
+      edgeCount: edges.length,
+      certainEdgeCount: edges.length,
+      uncertainEdgeCount: 0,
+      conceptCount: nodes.length,
+      studyItemCount: nodes.length,
+      startedAt: "t",
+      completedAt: "t"
+    },
+    nodes,
+    edges,
+    originCounts: [{ domain: "d", anchor: 3, sourceMentioned: 0, llmGrounded: 0 }],
+    rescueDispositions: [],
+    mintingDispositions: [],
+    merges: []
+  };
+}
+
+test("filterDetailToVisible removes hidden nodes and incident edges from the rendered detail", () => {
+  const visible = filterDetailToVisible(detailForHide(), new Set(["A", "B"]));
+  assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), ["Z"]);
+  assert.deepEqual(visible.edges, []);
+  assert.equal(visible.summary.conceptCount, 1);
+  assert.equal(visible.summary.edgeCount, 0);
+  assert.equal(visible.summary.certainEdgeCount, 0);
+  assert.equal(visible.summary.uncertainEdgeCount, 0);
+  assert.deepEqual(visible.originCounts, [{ domain: "d", anchor: 1, sourceMentioned: 0, llmGrounded: 0 }]);
+});
+
+test("filterDetailToVisible keeps any node that is not in the hidden set, including a caller-preserved goal", () => {
+  const visible = filterDetailToVisible(detailForHide(), new Set(["A", "B"]));
+  assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), ["Z"]);
+});
+
+test("filterDetailToVisible has no goal special-case; callers own goal exclusion", () => {
+  const visible = filterDetailToVisible(detailForHide(), new Set(["A", "B", "Z"]));
+  assert.deepEqual(visible.nodes, []);
+  assert.deepEqual(visible.edges, []);
+});
+
+test("filterDetailToVisible with an empty hidden set is a no-op shape", () => {
+  const detail = detailForHide();
+  const visible = filterDetailToVisible(detail, new Set());
+  assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), detail.nodes.map((node) => node.derivedNodeId));
+  assert.deepEqual(visible.edges, detail.edges);
 });

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AdaptedNodeClassification } from "@lrnki/application";
 import type { Verdict } from "@lrnki/domain-core";
-import { sheetContentFor, unmetPrerequisites, selectScopedFrontier } from "./studySession";
-import type { StudyCardView, StudyOptionSelectView } from "@/components/study/studyView";
+import { adaptedHiddenNodeIds, sheetContentFor, unmetPrerequisites, selectScopedFrontier } from "./studySession";
+import type { StudyOptionSelectView } from "@/components/study/studyView";
 import type { DerivedGraphEdge } from "./derivedGraph";
 
 const noVerdicts = new Map<string, Verdict>();
@@ -22,10 +22,6 @@ const labelByNode = new Map([
   ["move", "Move semantics"],
   ["borrow", "Borrowing"]
 ]);
-
-function card(derivedNodeId: string): StudyCardView {
-  return { studyItemId: `sa-${derivedNodeId}`, derivedNodeId, question: `Q ${derivedNodeId}`, answerKey: `A ${derivedNodeId}`, selfReportPrompt: "Recall?", groundingProvenance: "source_cep" };
-}
 
 function optionItem(derivedNodeId: string): StudyOptionSelectView {
   return {
@@ -47,43 +43,11 @@ const classification: AdaptedNodeClassification = {
   selectedFrontierTarget: "ownership"
 };
 
-test("sheetContentFor opens a frontier node's CALIBRATION card, carrying its option item to study (Covers R5/R9)", () => {
+test("sheetContentFor returns option-select for a frontier node with a study item and never returns calibration", () => {
   const content = sheetContentFor({
     derivedNodeId: "ownership",
     classification,
     optionItemsByNode: new Map([["ownership", optionItem("ownership")]]),
-    selfAssessmentItemsByNode: new Map([["ownership", card("ownership")]]),
-    verdictByNode: noVerdicts,
-    edges,
-    labelByNode
-  });
-  assert.equal(content.kind, "calibration");
-  assert.equal(content.kind === "calibration" && content.card.studyItemId, "sa-ownership");
-  assert.equal(content.kind === "calibration" && content.optionItem?.studyItemId, "os-ownership");
-  assert.equal(content.kind === "calibration" && content.verdict, null);
-});
-
-test("sheetContentFor shows the current verdict on a frontier calibration card (Covers R7)", () => {
-  const content = sheetContentFor({
-    derivedNodeId: "ownership",
-    classification,
-    optionItemsByNode: new Map(),
-    selfAssessmentItemsByNode: new Map([["ownership", card("ownership")]]),
-    verdictByNode: new Map<string, Verdict>([["ownership", "learn"]]),
-    edges,
-    labelByNode
-  });
-  assert.equal(content.kind, "calibration");
-  assert.equal(content.kind === "calibration" && content.verdict, "learn");
-  assert.equal(content.kind === "calibration" && content.optionItem, null);
-});
-
-test("sheetContentFor falls back to option-select for a frontier node with no self-assessment to reveal (Covers R9)", () => {
-  const content = sheetContentFor({
-    derivedNodeId: "ownership",
-    classification,
-    optionItemsByNode: new Map([["ownership", optionItem("ownership")]]),
-    selfAssessmentItemsByNode: new Map(),
     verdictByNode: noVerdicts,
     edges,
     labelByNode
@@ -97,7 +61,6 @@ test("sheetContentFor flags a frontier node with neither a self-assessment nor a
     derivedNodeId: "ownership",
     classification,
     optionItemsByNode: new Map(),
-    selfAssessmentItemsByNode: new Map(),
     verdictByNode: noVerdicts,
     edges,
     labelByNode
@@ -110,7 +73,6 @@ test("sheetContentFor names a locked node's unmet prerequisites and shows no ite
     derivedNodeId: "move",
     classification,
     optionItemsByNode: new Map([["move", optionItem("move")]]),
-    selfAssessmentItemsByNode: new Map([["move", card("move")]]),
     verdictByNode: noVerdicts,
     edges,
     labelByNode
@@ -120,18 +82,16 @@ test("sheetContentFor names a locked node's unmet prerequisites and shows no ite
   assert.deepEqual(content.kind === "locked" && content.unmetPrerequisiteLabels, ["Ownership"]);
 });
 
-test("sheetContentFor opens a mastered node as a read-only review carrying its verdict (Covers R7)", () => {
+test("sheetContentFor opens a mastered node as a cardless review carrying its verdict (Covers R7)", () => {
   const content = sheetContentFor({
     derivedNodeId: "scope",
     classification,
     optionItemsByNode: new Map(),
-    selfAssessmentItemsByNode: new Map([["scope", card("scope")]]),
     verdictByNode: new Map<string, Verdict>([["scope", "known"]]),
     edges,
     labelByNode
   });
   assert.equal(content.kind, "mastered_review");
-  assert.equal(content.kind === "mastered_review" && content.card?.studyItemId, "sa-scope");
   assert.equal(content.kind === "mastered_review" && content.verdict, "known");
 });
 
@@ -161,4 +121,16 @@ test("selectScopedFrontier returns null when the goal cone has no frontier node"
   // With move mastered too, nothing in scope is frontier.
   const done: AdaptedNodeClassification = { stateByNode: { scope: "mastered", ownership: "mastered", move: "mastered" }, selectedFrontierTarget: null };
   assert.equal(selectScopedFrontier({ targetDerivedNodeId: "move", edges, classification: done, difficultyByNode: new Map() }), null);
+});
+
+test("adaptedHiddenNodeIds returns the known closure minus the goal target", () => {
+  assert.deepEqual(adaptedHiddenNodeIds(new Set(["scope", "ownership", "move"]), "move"), ["scope", "ownership"]);
+});
+
+test("adaptedHiddenNodeIds leaves a closure unchanged when it does not contain the goal", () => {
+  assert.deepEqual(adaptedHiddenNodeIds(new Set(["scope", "ownership"]), "move"), ["scope", "ownership"]);
+});
+
+test("adaptedHiddenNodeIds returns an empty list for an empty closure", () => {
+  assert.deepEqual(adaptedHiddenNodeIds(new Set(), "move"), []);
 });

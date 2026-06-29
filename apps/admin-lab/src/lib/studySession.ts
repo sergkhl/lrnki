@@ -17,7 +17,7 @@ import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary }
 import { labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
 // The transfer-ready study modules own the presentation contract (R15); the loader
 // produces data matching it (AGENTS rule 18 — one definition).
-import type { SheetContent, StudyCardView, StudyOptionSelectView } from "@/components/study/studyView";
+import type { SheetContent, StudyOptionSelectView } from "@/components/study/studyView";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -53,32 +53,26 @@ export function unmetPrerequisites(nodeId: string, edges: ReadinessEdge[], class
     .filter((prerequisiteId) => classification.stateByNode[prerequisiteId] !== "mastered");
 }
 
-// The state-gated side-sheet payload for one node (R5/R9/R13). A non-mastered cone node with
-// a self-assessment opens the CALIBRATION card (reveal → "I knew it"/"I forgot"), carrying its
-// current verdict and, when present, the option-select item so it can be studied after staying
-// in the gap. A frontier node without a self-assessment falls back to its option-select study,
-// else cardless. A mastered node opens a read-only review carrying its verdict (so a `known`
-// verdict can be cleared, R7); a locked node names its unmet prerequisites.
+// The state-gated side-sheet payload for one node. Frontier nodes study an option-select
+// item when one exists, else expose a cardless "skip as known" affordance. A mastered node
+// opens a cardless review carrying its verdict (so a `known` verdict can be cleared); a
+// locked node names its unmet prerequisites.
 export function sheetContentFor(input: {
   derivedNodeId: string;
   classification: AdaptedNodeClassification;
   optionItemsByNode: Map<string, StudyOptionSelectView>;
-  selfAssessmentItemsByNode: Map<string, StudyCardView>;
   verdictByNode: Map<string, Verdict>;
   edges: ReadinessEdge[];
   labelByNode: Map<string, string>;
 }): SheetContent {
   const state = input.classification.stateByNode[input.derivedNodeId] ?? "locked";
   const optionItem = input.optionItemsByNode.get(input.derivedNodeId) ?? null;
-  const card = input.selfAssessmentItemsByNode.get(input.derivedNodeId) ?? null;
   const verdict = input.verdictByNode.get(input.derivedNodeId) ?? null;
   if (state === "locked") {
     const unmet = unmetPrerequisites(input.derivedNodeId, input.edges, input.classification);
     return { kind: "locked", unmetPrerequisiteLabels: unmet.map((id) => input.labelByNode.get(id) ?? id) };
   }
-  if (state === "mastered") return { kind: "mastered_review", card, verdict };
-  // frontier — calibrate it when there is an answer to reveal, else study/flag it.
-  if (card) return { kind: "calibration", card, verdict, optionItem };
+  if (state === "mastered") return { kind: "mastered_review", verdict };
   return optionItem ? { kind: "option_select", item: optionItem } : { kind: "cardless" };
 }
 
@@ -102,6 +96,10 @@ export function selectScopedFrontier(input: {
   const frontier = [...scope].filter((id) => input.classification.stateByNode[id] === "frontier");
   if (frontier.length === 0) return null;
   return frontier.sort((a, b) => (input.difficultyByNode.get(b) ?? 0) - (input.difficultyByNode.get(a) ?? 0) || a.localeCompare(b))[0];
+}
+
+export function adaptedHiddenNodeIds(knownClosure: ReadonlySet<string>, targetDerivedNodeId: string): string[] {
+  return [...knownClosure].filter((id) => id !== targetDerivedNodeId);
 }
 
 // --- Study-session loader (R3, R5, R7, R9, R12) ----------------------------
@@ -129,6 +127,9 @@ export type StudySession = {
   // The whole-layer classification, with `selectedFrontierTarget` scoped to the goal cone
   // so the adapted-graph ring marks the node the learner advances to next toward Z.
   classification: AdaptedNodeClassification;
+  // Serializable known-closure hide list for the Adapted render. The full `detail` remains
+  // untouched so Neutral can render the original cone.
+  adaptedHiddenNodeIds: string[];
   responseSourceSummary: ResponseSourceSummary;
   // A DAG-root goal whose trusted prerequisite cone is just itself — studied directly as a
   // single-node screen; never an empty calibration nor a premature "Goal reached" (R3, AE1).
@@ -140,7 +141,6 @@ export type StudySession = {
   // Per-node gated side-sheet payloads (R5/R9) and the lookups the modules render from.
   sheetByNode: Record<string, SheetContent>;
   verdictByNode: Record<string, Verdict>;
-  selfAssessmentItemsByNode: Record<string, StudyCardView>;
   optionItemsByNode: Record<string, StudyOptionSelectView>;
 };
 
@@ -154,24 +154,16 @@ export async function getStudySession(
   if (!detail.nodes.some((node) => node.derivedNodeId === targetDerivedNodeId)) return undefined;
 
   const loaded = await withClient(async (sql) => {
-    const layer = await new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId);
-    const studyItems = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId);
-    const rows = await new PostgresResponseLogStore(sql).listForLearner(learnerStateRef);
-    const verdicts = await new PostgresCalibrationVerdictStore(sql).listForLearner(learnerStateRef);
+    const [layer, studyItems, rows, verdicts] = await Promise.all([
+      new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId),
+      new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId),
+      new PostgresResponseLogStore(sql).listForLearner(learnerStateRef),
+      new PostgresCalibrationVerdictStore(sql).listForLearner(learnerStateRef)
+    ]);
     return { layer, studyItems, rows, verdicts };
   });
   if (!loaded || !loaded.layer) return undefined;
 
-  const selfAssessmentViews: StudyCardView[] = loaded.studyItems
-    .filter((item) => item.itemType === "self_assessment")
-    .map((item) => ({
-      studyItemId: item.studyItemId,
-      derivedNodeId: item.derivedNodeId,
-      question: item.question,
-      answerKey: item.answerKey,
-      selfReportPrompt: item.selfReportPrompt,
-      groundingProvenance: item.groundingProvenance
-    }));
   const optionViews: StudyOptionSelectView[] = loaded.studyItems
     .filter((item) => item.itemType === "option_select")
     .map((item) => ({
@@ -186,7 +178,6 @@ export async function getStudySession(
         provenance: option.provenance
       }))
     }));
-  const selfAssessmentItemsByNode = new Map(selfAssessmentViews.map((item) => [item.derivedNodeId, item] as const));
   const optionItemsByNode = new Map(optionViews.map((item) => [item.derivedNodeId, item] as const));
 
   // Calibration ∘ graded composition (U3, R12): the trusted-edge down-closure of the `known`
@@ -194,6 +185,7 @@ export async function getStudySession(
   // coexistence of the two is surfaced, never resolved by a hidden precedence rule.
   const knownNodes = loaded.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
   const knownClosure = pruneClosure(knownNodes, detail.edges);
+  const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, targetDerivedNodeId);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(loaded.rows)));
   const composed = composeMastery({ knownClosure, gradedByNode });
   const learnerState: LearnerStatePort = {
@@ -225,7 +217,6 @@ export async function getStudySession(
       derivedNodeId: node.derivedNodeId,
       classification,
       optionItemsByNode,
-      selfAssessmentItemsByNode,
       verdictByNode,
       edges: detail.edges,
       labelByNode
@@ -265,13 +256,13 @@ export async function getStudySession(
     studyItemCount: loaded.studyItems.length,
     detail,
     classification,
+    adaptedHiddenNodeIds: hiddenNodeIds,
     responseSourceSummary: summarizeResponseSources(loaded.rows),
     isFoundationalRoot,
     coexistence,
     restorations,
     sheetByNode,
     verdictByNode: Object.fromEntries(verdictByNode),
-    selfAssessmentItemsByNode: Object.fromEntries(selfAssessmentItemsByNode),
     optionItemsByNode: Object.fromEntries(optionItemsByNode)
   };
 }

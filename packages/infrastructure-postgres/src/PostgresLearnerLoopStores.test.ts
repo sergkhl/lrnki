@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { NewResponseLogRow, OptionSelectItem, RejectedStudyItem, SelfAssessmentItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
+import type { NewResponseLogRow, OptionSelectItem, RejectedStudyItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
 import { PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
@@ -60,25 +60,6 @@ async function seedSubstrate(sql: Sql): Promise<Substrate> {
   return { graphVersionId, enrichmentId, conceptId, derivedNodeId, sourceResourceId, blockIds: blocks.map((row) => row.source_block_id) };
 }
 
-function selfAssessmentFor(s: Substrate): SelfAssessmentItem {
-  return {
-    itemType: "self_assessment",
-    studyItemId: randomUUID(),
-    graphVersionId: s.graphVersionId,
-    enrichmentId: s.enrichmentId,
-    derivedNodeId: s.derivedNodeId,
-    groundingProvenance: "source_cep",
-    question: "What does ownership govern?",
-    answerKey: "Ownership is the set of rules that govern memory.",
-    selfReportPrompt: "How confident are you that you can explain ownership?",
-    generatingModel: "test-model",
-    configHash: "cfg",
-    citations: [
-      { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." }
-    ]
-  };
-}
-
 function optionSelectFor(s: Substrate): OptionSelectItem {
   return {
     itemType: "option_select",
@@ -103,21 +84,17 @@ function bankFor(sql: Sql, s: Substrate, items: StudyItem[], rejected: RejectedS
   return new PostgresStudyItemBankStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", studyItems: items, rejected });
 }
 
-maybe("persists both a self_assessment and an option_select item for one node; both round-trip with options + citations; supportedItemTypes returns both", async () => {
+maybe("persists an option_select item; it round-trips with options + citation; supportedItemTypes returns option_select", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
-    await bankFor(sql, s, [selfAssessmentFor(s), optionSelectFor(s)]);
+    await bankFor(sql, s, [optionSelectFor(s)]);
 
     const store = new PostgresStudyItemBankStore(sql);
     const items = await store.listStudyItemsForEnrichment(s.enrichmentId);
-    assert.equal(items.length, 2);
+    assert.equal(items.length, 1);
 
-    const sa = items.find((i) => i.itemType === "self_assessment") as SelfAssessmentItem;
-    assert.equal(sa.answerKey, "Ownership is the set of rules that govern memory.");
-    assert.equal(sa.citations.length, 1);
-
-    const os = items.find((i) => i.itemType === "option_select") as OptionSelectItem;
+    const os = items[0] as OptionSelectItem;
     assert.equal(os.options.length, 4);
     const correct = os.options.filter((o) => o.isCorrect);
     assert.equal(correct.length, 1);
@@ -128,18 +105,7 @@ maybe("persists both a self_assessment and an option_select item for one node; b
       assert.equal(distractor.citation, undefined);
     }
 
-    assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["option_select", "self_assessment"]);
-  } finally {
-    await sql.end();
-  }
-});
-
-maybe("a node with only a self_assessment item supports only that type", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const s = await seedSubstrate(sql);
-    await bankFor(sql, s, [selfAssessmentFor(s)]);
-    assert.deepEqual(await new PostgresStudyItemBankStore(sql).supportedItemTypes(s.derivedNodeId), ["self_assessment"]);
+    assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["option_select"]);
   } finally {
     await sql.end();
   }
@@ -149,19 +115,18 @@ maybe("regeneration (delete-then-insert) replaces a prior bank, leaving no orpha
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
-    await bankFor(sql, s, [selfAssessmentFor(s), optionSelectFor(s)]);
-    // Re-persist with only the self_assessment item.
-    await bankFor(sql, s, [selfAssessmentFor(s)]);
+    await bankFor(sql, s, [optionSelectFor(s)]);
+    // Re-persist with no items and a rejection.
+    await bankFor(sql, s, [], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", reason: "no option-select item could be grounded" }]);
 
     const items = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
-    assert.equal(items.length, 1);
-    assert.equal(items[0].itemType, "self_assessment");
+    assert.equal(items.length, 0);
     const [{ options }] = await sql<{ options: number }[]>`
       SELECT count(*)::int AS options FROM study_item_options o JOIN study_items si ON si.study_item_id = o.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
     assert.equal(options, 0, "orphaned options are cascade-cleared");
     const [{ citations }] = await sql<{ citations: number }[]>`
       SELECT count(*)::int AS citations FROM study_item_citations c JOIN study_items si ON si.study_item_id = c.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
-    assert.equal(citations, 1, "only the surviving item's citation remains");
+    assert.equal(citations, 0, "orphaned citations are cascade-cleared");
   } finally {
     await sql.end();
   }
@@ -171,35 +136,20 @@ maybe("UNIQUE (derived_node_id, item_type) rejects a second item of the same typ
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
-    await assert.rejects(() => bankFor(sql, s, [selfAssessmentFor(s), selfAssessmentFor(s)]), /duplicate key|unique/i);
+    await assert.rejects(() => bankFor(sql, s, [optionSelectFor(s), optionSelectFor(s)]), /duplicate key|unique/i);
   } finally {
     await sql.end();
   }
 });
 
-maybe("type-coherence CHECK rejects an option_select row with a non-null answer_key", async () => {
+maybe("study_items rejects non-option-select discriminants", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
     await assert.rejects(
       () => sql`
-        INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
-        VALUES (${randomUUID()}, 'option_select', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'should not be here', NULL, 'm', 'cfg')`,
-      /violates check constraint/i
-    );
-  } finally {
-    await sql.end();
-  }
-});
-
-maybe("type-coherence CHECK rejects a self_assessment row with a null self_report_prompt", async () => {
-  const sql = createDatabaseClient(databaseUrl);
-  try {
-    const s = await seedSubstrate(sql);
-    await assert.rejects(
-      () => sql`
-        INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
-        VALUES (${randomUUID()}, 'self_assessment', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'A.', NULL, 'm', 'cfg')`,
+        INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+        VALUES (${randomUUID()}, 'unsupported_item_type', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'm', 'cfg')`,
       /violates check constraint/i
     );
   } finally {
@@ -213,8 +163,8 @@ maybe("option provenance CHECK rejects an invalid provenance value", async () =>
     const s = await seedSubstrate(sql);
     const itemId = randomUUID();
     await sql`
-      INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
-      VALUES (${itemId}, 'option_select', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', NULL, NULL, 'm', 'cfg')`;
+      INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+      VALUES (${itemId}, 'option_select', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'm', 'cfg')`;
     await assert.rejects(
       () => sql`
         INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
@@ -230,7 +180,7 @@ maybe("option provenance CHECK rejects an invalid provenance value", async () =>
 
 async function seedItem(sql: Sql): Promise<{ studyItemId: string; derivedNodeId: string }> {
   const s = await seedSubstrate(sql);
-  const item = selfAssessmentFor(s);
+  const item = optionSelectFor(s);
   await bankFor(sql, s, [item]);
   return { studyItemId: item.studyItemId, derivedNodeId: s.derivedNodeId };
 }

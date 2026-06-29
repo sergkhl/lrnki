@@ -1,15 +1,14 @@
-import type { OptionSelectItemDraft, SelfAssessmentItemDraft, StudyItemOptionDraft } from "@lrnki/domain-core";
+import type { OptionSelectItemDraft, StudyItemOptionDraft } from "@lrnki/domain-core";
 import type { StudyItemGenerationPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
-import { cardGenerationSchema, cardGenerationValidator, optionSelectSchema, optionSelectValidator } from "./toolSchemas";
+import { optionSelectSchema, optionSelectValidator } from "./toolSchemas";
 
-// Study item generation stays DeepSeek-family (AGENTS rule 5): the self-assessment
-// answer-key and the option-select correct answer are generated here; a DIFFERENT family
-// grades a learner answer against the answer-key (ADR-0023), so the generator never grades
-// its own homework. Both methods use domain-neutral rubric prompts (rule 17) and validate
-// tool arguments fail-closed (rule 6); semantic acceptance is the guard's job (U2/U5).
+// Study item generation stays DeepSeek-family (AGENTS rule 5): the option-select correct
+// answer is generated here and deterministic auto-grading handles the learner answer.
+// The prompt uses domain-neutral rubric language (rule 17) and validates tool arguments
+// fail-closed (rule 6); semantic acceptance is the guard's job (U2/U5).
 export const STUDY_ITEM_GENERATION_MODEL = EVIDENCE_PROFILE_MODEL;
 
 type GroundingPassage =
@@ -25,44 +24,6 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
 
   constructor(private readonly client: LiteLlmForcedToolClient, model: string = STUDY_ITEM_GENERATION_MODEL) {
     this.model = model;
-  }
-
-  async generate(input: {
-    declaredDomain: string;
-    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-    groundingProvenance: "source_cep" | "source_mentioned" | "generated";
-    groundingPassages: GroundingPassage[];
-    definesLiteral: string | null;
-  }): Promise<SelfAssessmentItemDraft> {
-    const system = [
-      "You write ONE anki-style recall card for a single learning node, conditioned ONLY on the provided grounding passages.",
-      "The card has a question, a concise answer-key a grader can check a free-form learner answer against, and a short first-person self-report confidence prompt.",
-      "Ground the answer-key strictly in the provided passages: introduce no facts that are not supported by them.",
-      "Cite the passages your answer-key derives from by their exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim. For generated grounding, quote only the generated grounding passage text.",
-      "Stay within the Declared Domain. Write domain-neutral, learner-facing language; never reference 'the passage' or 'the source' in the question."
-    ].join(" ");
-    const aliasText = input.node.aliases.length ? ` (aliases: ${input.node.aliases.join(", ")})` : "";
-    const user = [
-      `Declared domain: ${input.declaredDomain}.`,
-      `Learning node: "${input.node.canonicalLabel}"${aliasText}.`,
-      `Grounding provenance: ${input.groundingProvenance}.`,
-      input.definesLiteral ? `Definition literal (hint): "${input.definesLiteral}".` : "",
-      "Grounding passages (cite by passageId):",
-      renderPassages(input.groundingPassages),
-      "",
-      "Call submit_recall_card with a question, answerKey, selfReportPrompt, and at least one citation quoting a provided passage."
-    ].filter(Boolean).join("\n");
-
-    const args = await this.client.call({
-      model: this.model,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_recall_card",
-      toolDescription: "Submit one anki-style recall card grounded in the provided CEP passages.",
-      parameters: cardGenerationSchema,
-      validator: cardGenerationValidator,
-      tags: [STAGE_TAGS.studyItemGeneration]
-    });
-    return { itemType: "self_assessment", ...args };
   }
 
   async generateOptionSelect(input: {

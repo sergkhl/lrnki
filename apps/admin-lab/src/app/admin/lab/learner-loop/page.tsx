@@ -19,8 +19,7 @@ export default async function LearnerLoopListPage() {
           <CardTitle>Learner loop</CardTitle>
           <CardDescription>
             The downstream recall loop over the published graph: calibration verdicts in the mutable verdict store and
-            graded responses in the append-only Response Log. Review, edit, and resubmit answers — learner state only,
-            never a published graph.
+            option-select responses in the append-only Response Log. Learner state only, never a published graph.
           </CardDescription>
           <CardAction>
             <Badge variant={learners ? "outline" : "destructive"}>

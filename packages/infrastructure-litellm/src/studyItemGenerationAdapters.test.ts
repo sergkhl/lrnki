@@ -2,33 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { LiteLlmStudyItemGenerationAdapter } from "./studyItemGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { cardGenerationValidator, optionSelectValidator } from "./toolSchemas";
-
-test("generate passes the node and its grounding passages into the forced-tool prompt", async () => {
-  const calls: { model: string; toolName: string; messages: { content: string }[] }[] = [];
-  const client = {
-    async call(input: { model: string; toolName: string; messages: { content: string }[] }) {
-      calls.push(input);
-      return { question: "Q?", answerKey: "A.", selfReportPrompt: "Confident?", citations: [{ passageId: "b1", evidenceQuote: "rules that govern memory" }] };
-    }
-  } as unknown as LiteLlmForcedToolClient;
-  const adapter = new LiteLlmStudyItemGenerationAdapter(client, "mock-gen");
-
-  const draft = await adapter.generate({
-    declaredDomain: "software engineering",
-    node: { derivedNodeId: "n1", canonicalLabel: "Ownership", aliases: ["owner"] },
-    groundingProvenance: "source_cep",
-    groundingPassages: [{ passageId: "b1", kind: "definition", text: "Ownership is a set of rules that govern memory.", sourceResourceId: "res-1", sourceBlockId: "b1" }],
-    definesLiteral: "the rules governing memory"
-  });
-
-  assert.equal(draft.itemType, "self_assessment");
-  assert.equal(draft.citations[0].passageId, "b1");
-  assert.equal(calls[0].model, "mock-gen");
-  assert.equal(calls[0].toolName, "submit_recall_card");
-  assert.ok(calls[0].messages.some((m) => m.content.includes("Ownership")));
-  assert.ok(calls[0].messages.some((m) => m.content.includes("b1")));
-});
+import { optionSelectValidator } from "./toolSchemas";
 
 test("generateOptionSelect assembles a draft: grounded correct + three generated distractors", async () => {
   const calls: { toolName: string; messages: { content: string }[] }[] = [];
@@ -87,10 +61,6 @@ test("generateOptionSelect labels the correct answer 'generated' on a generated-
     siblings: []
   });
   assert.equal(draft.options.find((o) => o.isCorrect)!.provenance, "generated");
-});
-
-test("cardGenerationValidator rejects a tool argument missing answerKey", () => {
-  assert.throws(() => cardGenerationValidator.parse({ question: "Q?", selfReportPrompt: "C?", citations: [] }));
 });
 
 test("optionSelectValidator rejects arguments missing correctAnswer", () => {

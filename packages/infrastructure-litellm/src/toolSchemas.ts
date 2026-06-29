@@ -709,51 +709,6 @@ export const nodeMergeAdjudicationValidator = z.object({
   rationale: z.string().min(1)
 }).strict();
 
-// --- Card generation: submit_recall_card (U2, R1/R2) ----------------------
-// One anki-style recall card per derived learning node, conditioned on its grounding.
-// The answer-key cites provided grounding passages by passage id + quote; the
-// application boundary verifies each quote under that grounding's provenance
-// contract and rejects fail-closed (AGENTS rule 6). Domain-neutral rubric language
-// only (AGENTS rule 17).
-export const cardGenerationSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["question", "answerKey", "selfReportPrompt", "citations"],
-  properties: {
-    question: {
-      type: "string",
-      description: "One self-contained recall question about the learning node that a learner could answer from understanding it. Do not reference 'the passage' or 'the source'."
-    },
-    answerKey: {
-      type: "string",
-      description: "A concise correct answer a grader can check a learner's free-form response against. Grounded in the provided grounding passages; introduce no facts absent from them."
-    },
-    selfReportPrompt: {
-      type: "string",
-      description: "A short first-person confidence prompt for calibration, e.g. 'How confident are you that you can explain this concept and its role?'."
-    },
-    citations: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["passageId", "evidenceQuote"],
-        properties: {
-          passageId: { type: "string", description: "Exact passageId of one provided grounding passage the answer derives from." },
-          evidenceQuote: { type: "string", description: "Substring copied from that grounding passage supporting the answer-key. For source-grounded passages, copy it verbatim." }
-        }
-      }
-    }
-  }
-};
-
-export const cardGenerationValidator = z.object({
-  question: z.string().min(1),
-  answerKey: z.string().min(1),
-  selfReportPrompt: z.string().min(1),
-  citations: z.array(z.object({ passageId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict())
-}).strict();
-
 // --- Option-select generation: submit_option_select_item (U3, R9/R10) -----
 // One four-option auto-graded item per node: a grounded correct answer (cited by
 // passage id + quote, verified verbatim by the application boundary) plus THREE
@@ -806,46 +761,4 @@ export const optionSelectValidator = z.object({
     citation: z.object({ passageId: z.string().min(1), evidenceQuote: z.string().min(1) }).strict()
   }).strict(),
   distractors: z.array(z.string().min(1)).length(3)
-}).strict();
-
-// --- Answer grading: submit_answer_grade (U5, R9) -------------------------
-// Grades a learner's free-form written answer against a card's answer-key. Runs
-// cross-family (kg-independent-judge) so the DeepSeek card generator never grades
-// its own answer-key (ADR-0023). Domain-neutral rubric language only (rule 17).
-export const answerGradingSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["outcome", "score", "rationale"],
-  properties: {
-    outcome: {
-      type: "string",
-      enum: ["correct", "partial", "incorrect"],
-      description: "'correct' when the answer captures the answer-key's essential content; 'partial' when it is on-topic but incomplete or contains a notable error; 'incorrect' when it misses or contradicts the answer-key. Judge meaning, not wording."
-    },
-    score: { type: "number", description: "A [0,1] confidence-weighted correctness score consistent with the outcome (roughly 1.0 correct, ~0.5 partial, 0 incorrect)." },
-    rationale: { type: "string", description: "One terse sentence justifying the outcome against the answer-key." }
-  }
-};
-
-export const answerGradingValidator = z.object({
-  outcome: z.enum(["correct", "partial", "incorrect"]),
-  score: z.number().min(0).max(1),
-  rationale: z.string().min(1)
-}).strict();
-
-// --- Learner answer simulation: submit_simulated_answer (U7, R14) ---------
-// Simulates a learner of a given competence answering a recall question, to seed the
-// Response Log for a rule-14 run. EXPERIMENT_ONLY scaffolding; never asserted in
-// tests (AGENTS rule 11). Domain-neutral (rule 17).
-export const learnerAnswerSimulationSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["answer"],
-  properties: {
-    answer: { type: "string", description: "The learner's free-form written answer to the question, written in the voice and competence of the given learner persona." }
-  }
-};
-
-export const learnerAnswerSimulationValidator = z.object({
-  answer: z.string().min(1)
 }).strict();

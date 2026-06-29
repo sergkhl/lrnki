@@ -394,14 +394,13 @@ JSON_TABLE(
 ) AS n
 WHERE a.artifact_type = 'enrichment_run';
 
--- Flatten study-item-bank artifact payloads: one row per typed Study Item with its
--- item type, derived node, grounding provenance, question, self-report prompt (null for
--- option_select), and a citation/option count, for Admin Lab inspection (R7, R15). Reads
+-- Flatten study-item-bank artifact payloads: one row per option-select Study Item with its
+-- derived node, grounding provenance, question, and option count, for Admin Lab inspection (R7, R15). Reads
 -- the immutable `study_item_bank` artifact the Study Item Bank store writes beside its
 -- normalized rows.
 CREATE VIEW artifact_study_items AS
 SELECT a.graph_version_id, si.study_item_id, si.item_type, si.enrichment_id, si.derived_node_id,
-       si.grounding_provenance, si.question, si.self_report_prompt, si.citation_count, si.option_count
+       si.grounding_provenance, si.question, si.option_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -413,8 +412,6 @@ JSON_TABLE(
     derived_node_id text PATH '$.derivedNodeId',
     grounding_provenance text PATH '$.groundingProvenance',
     question text PATH '$.question',
-    self_report_prompt text PATH '$.selfReportPrompt',
-    citation_count integer PATH '$.citations.size()',
     option_count integer PATH '$.options.size()'
   )
 ) AS si
@@ -624,45 +621,40 @@ CREATE TABLE learner_path_steps (
 
 CREATE TABLE study_items (
   study_item_id uuid PRIMARY KEY,
-  item_type text NOT NULL CHECK (item_type IN ('self_assessment', 'option_select')),
+  item_type text NOT NULL CHECK (item_type IN ('option_select')),
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   question text NOT NULL,
-  answer_key text,
-  self_report_prompt text,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  -- Type coherence: a self_assessment item carries an answer_key + self_report_prompt
-  -- (calibration reads them); an option_select item carries NEITHER — its content lives
-  -- in study_item_options. Fail closed at the DB so no incoherent typed row can enter.
-  CHECK (
-    (item_type = 'self_assessment' AND answer_key IS NOT NULL AND self_report_prompt IS NOT NULL)
-    OR
-    (item_type = 'option_select' AND answer_key IS NULL AND self_report_prompt IS NULL)
-  ),
   UNIQUE (derived_node_id, item_type)
 );
 
--- Options for option_select items (R9). Exactly one is_correct per item, enforced by the
--- deterministic guard at build time (U2). `ordinal` preserves a stable render order.
+-- Options for option_select items (R9). Store writes validate the four-option shape; the
+-- schema backs that with ordinal bounds and at-most-one correct option per item.
+-- `ordinal` preserves a stable render order.
 -- The correct option's grounding lives in study_item_citations; distractors are
 -- generated and carry none. Cascade so item regeneration (delete-then-insert) clears
 -- options too.
 CREATE TABLE study_item_options (
   option_id uuid PRIMARY KEY,
   study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
-  ordinal integer NOT NULL,
+  ordinal integer NOT NULL CHECK (ordinal BETWEEN 0 AND 3),
   option_text text NOT NULL,
   is_correct boolean NOT NULL,
   provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
   UNIQUE (study_item_id, ordinal)
 );
 
--- Grounded-answer citations are provenance-tagged. They back the self_assessment answer
--- key and the option_select correct answer alike, keyed by study_item_id. Source
+CREATE UNIQUE INDEX study_item_options_one_correct_per_item
+  ON study_item_options (study_item_id)
+  WHERE is_correct;
+
+-- Grounded-answer citations are provenance-tagged. They back the option_select correct
+-- answer, keyed by study_item_id. Source
 -- citations mirror real source evidence and require source ids + a verbatim quote.
 -- Generated citations point at generated grounding text only and cannot smuggle nullable
 -- source ids through the schema. Cascade so item regeneration clears citations too.
@@ -683,9 +675,7 @@ CREATE TABLE study_item_citations (
 );
 
 -- Derived nodes that yielded NO study item at all (no usable grounding), recorded as a
--- durable fact (not a transient log line). A node that grounds a self_assessment item but
--- fails to yield an option_select item is NOT here — it simply lacks that type and the
--- frontier surfaces it as cardless-for-studying (R13). Regeneration replaces an
+-- durable fact (not a transient log line). Regeneration replaces an
 -- enrichment's rejections alongside its items. The no-item frontier fallback reads
 -- `reason` instead of guessing from grounding origin.
 CREATE TABLE rejected_study_items (
@@ -702,9 +692,9 @@ CREATE TABLE rejected_study_items (
 -- ---------------------------------------------------------------------------
 -- Calibration Verdicts — the MUTABLE calibration store (R10, KTD1). Deliberately
 -- the opposite of the response log: a calibration verdict is the learner's CURRENT
--- intent per (learner, node), so it is naturally upsert/delete. Revealing a node's
--- answer and tapping "I knew it" writes `known`; "I forgot" writes `learn`. Reversal
--- (R7) is a single-row delete/overwrite — no append-only seeded rows to reconcile.
+-- intent per (learner, node), so it is naturally upsert/delete. The calibration list
+-- and study-side "skip as known" action write `known`; synthetic prefill may seed
+-- `learn`. Reversal (R7) is a single-row delete/overwrite — no append-only seeded rows to reconcile.
 -- The trusted-edge prerequisite down-closure of the `known` set is derived at read
 -- time (not materialized), so this table holds only the direct verdicts. There are
 -- no evidence weights (rule 18): a verdict is a discrete intent, not a graded score.

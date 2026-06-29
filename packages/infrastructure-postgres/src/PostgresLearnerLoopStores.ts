@@ -21,6 +21,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
     const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
+    for (const item of studyItems) assertPersistableOptionSelectItem(item);
     // All items in one persist belong to a single enrichment layer. Regeneration is
     // replay, not mutation: delete the enrichment's prior items (options + citations
     // cascade) and prior rejections, then re-insert. Done even when 0 items survive so an
@@ -34,22 +35,16 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
           VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${rejection.derivedNodeId}, ${rejection.reason}, ${configHash})`;
       }
       for (const item of studyItems) {
-        const answerKey = item.itemType === "self_assessment" ? item.answerKey : null;
-        const selfReportPrompt = item.itemType === "self_assessment" ? item.selfReportPrompt : null;
         await tx`
-          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash)
-          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${answerKey}, ${selfReportPrompt}, ${item.generatingModel}, ${item.configHash})`;
+          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.generatingModel}, ${item.configHash})`;
 
-        if (item.itemType === "self_assessment") {
-          for (const citation of item.citations) await this.insertCitation(tx, item.studyItemId, citation);
-        } else {
-          // Sequential await keeps the option/citation inserts ordered within the tx.
-          for (const [ordinal, option] of item.options.entries()) {
-            await tx`
-              INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
-              VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
-            if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
-          }
+        // Sequential await keeps the option/citation inserts ordered within the tx.
+        for (const [ordinal, option] of item.options.entries()) {
+          await tx`
+            INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
+            VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
+          if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
         }
       }
 
@@ -81,7 +76,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
       FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
@@ -90,8 +85,8 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, answer_key, self_report_prompt, generating_model, config_hash
-      FROM study_items WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id, item_type`;
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
+      FROM study_items WHERE enrichment_id = ${enrichmentId} AND item_type = 'option_select' ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
 
@@ -134,9 +129,6 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         question: row.question
       };
       const citations = (citationsByItem.get(row.study_item_id) ?? []).map(toCitation);
-      if (row.item_type === "self_assessment") {
-        return { ...base, itemType: "self_assessment", answerKey: row.answer_key!, selfReportPrompt: row.self_report_prompt!, citations };
-      }
       const citation = citations[0];
       const options: StudyItemOption[] = (optionsByItem.get(row.study_item_id) ?? []).map((option) => ({
         optionId: option.option_id,
@@ -150,6 +142,14 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   }
 }
 
+function assertPersistableOptionSelectItem(item: StudyItem): void {
+  if (item.itemType !== "option_select") throw new Error(`unsupported study item type: ${String(item.itemType)}`);
+  if (item.options.length !== 4) throw new Error(`option_select ${item.studyItemId} must have exactly four options.`);
+  const correctOptions = item.options.filter((option) => option.isCorrect);
+  if (correctOptions.length !== 1) throw new Error(`option_select ${item.studyItemId} must have exactly one correct option.`);
+  if (!correctOptions[0].citation) throw new Error(`option_select ${item.studyItemId} correct option must carry a citation.`);
+}
+
 function toCitation(row: CitationRow): StudyItemCitation {
   return row.provenance === "source"
     ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote! }
@@ -158,14 +158,12 @@ function toCitation(row: CitationRow): StudyItemCitation {
 
 type StudyItemRow = {
   study_item_id: string;
-  item_type: "self_assessment" | "option_select";
+  item_type: "option_select";
   graph_version_id: string;
   enrichment_id: string;
   derived_node_id: string;
   grounding_provenance: string;
   question: string;
-  answer_key: string | null;
-  self_report_prompt: string | null;
   generating_model: string;
   config_hash: string;
 };

@@ -6,7 +6,6 @@ import type {
   OptionSelectItemDraft,
   PublishedEvidencePassage,
   RejectedStudyItem,
-  SelfAssessmentItemDraft,
   StudyItem
 } from "@lrnki/domain-core";
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
@@ -143,10 +142,6 @@ function enrichmentStoreReturning(layer: DerivedGraphLayer): EnrichmentRunStoreP
   } as unknown as EnrichmentRunStorePort;
 }
 
-function saDraft(quote: string, passageId = "b1"): SelfAssessmentItemDraft {
-  return { itemType: "self_assessment", question: "What governs memory?", answerKey: "A set of rules.", selfReportPrompt: "Confident?", citations: [{ passageId, evidenceQuote: quote }] };
-}
-
 function osDraft(correctQuote: string, distractors: [string, string, string] = ["Stack", "Register", "Cache"], passageId = "b1"): OptionSelectItemDraft {
   return {
     itemType: "option_select",
@@ -158,23 +153,15 @@ function osDraft(correctQuote: string, distractors: [string, string, string] = [
   };
 }
 
-// Canned generator: SA / OS drafts keyed by derivedNodeId, or the literal "throw" to
+// Canned generator: OS drafts keyed by derivedNodeId, or the literal "throw" to
 // simulate a generation failure. These are INPUT FIXTURES exercising the deterministic
 // envelope (ADR-0013) — no assertion is ever made on the model's judgment content.
 function generationReturning(opts: {
-  selfAssessment?: Record<string, SelfAssessmentItemDraft | "throw">;
   optionSelect?: Record<string, OptionSelectItemDraft | "throw">;
   onGenerate?: () => void;
 }): StudyItemGenerationPort {
   return {
     model: "mock-gen",
-    async generate(input) {
-      opts.onGenerate?.();
-      const draft = opts.selfAssessment?.[input.node.derivedNodeId];
-      if (draft === undefined) throw new Error(`no canned self-assessment draft for ${input.node.derivedNodeId}`);
-      if (draft === "throw") throw new Error("self-assessment generation failed");
-      return draft;
-    },
     async generateOptionSelect(input) {
       opts.onGenerate?.();
       const draft = opts.optionSelect?.[input.node.derivedNodeId];
@@ -205,7 +192,7 @@ function typesFor(items: StudyItem[], derivedNodeId: string): string[] {
 
 const ownershipDef = "Ownership is a set of rules that govern memory in Rust.";
 
-test("a node whose self-assessment verifies and whose option-select passes the guard persists both", async () => {
+test("a node whose option-select passes the guard persists one option-select item", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
   const result = await generateStudyItemBank({
@@ -214,15 +201,14 @@ test("a node whose self-assessment verifies and whose option-select passes the g
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-c1": saDraft("rules that govern memory") },
       optionSelect: { "node-c1": osDraft("rules that govern memory") }
     }),
     studyItemBankStore: store
   });
 
-  assert.equal(result.studyItems.length, 2);
+  assert.equal(result.studyItems.length, 1);
   assert.equal(result.rejected.length, 0);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select", "self_assessment"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
   assert.deepEqual(persistedRejected, []);
 });
 
@@ -235,7 +221,6 @@ test("the study-item operation context reaches generation calls", async () => {
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-c1": saDraft("rules that govern memory") },
       optionSelect: { "node-c1": osDraft("rules that govern memory") },
       onGenerate: () => assert.equal(currentOperationTag(), "enr-1")
     }),
@@ -243,25 +228,24 @@ test("the study-item operation context reaches generation calls", async () => {
   });
 });
 
-test("Covers AE5/R13: self-assessment verifies but the option-select guard rejects → only self_assessment; node NOT rejected", async () => {
+test("an option-select guard rejection records the node as rejected", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
   // Duplicate distractors fail the structural guard (not a grounding failure).
-  const result = await generateStudyItemBank({
+  await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-c1": saDraft("rules that govern memory") },
       optionSelect: { "node-c1": osDraft("rules that govern memory", ["Same", "Same", "Cache"]) }
     }),
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["self_assessment"]);
-  assert.equal(persistedRejected.length, 0, "a node with a self_assessment item is cardless-for-studying, not rejected");
-  assert.deepEqual(await store.supportedItemTypes("node-c1"), ["self_assessment"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), []);
+  assert.equal(persistedRejected.length, 1);
+  assert.deepEqual(await store.supportedItemTypes("node-c1"), []);
 });
 
 test("a node with no usable grounding yields no items and one rejection, without calling the generator", async () => {
@@ -270,7 +254,6 @@ test("a node with no usable grounding yields no items and one rejection, without
   let generatorCalled = false;
   const generation: StudyItemGenerationPort = {
     model: "mock",
-    async generate() { generatorCalled = true; throw new Error("should not be called"); },
     async generateOptionSelect() { generatorCalled = true; throw new Error("should not be called"); }
   };
   const result = await generateStudyItemBank({
@@ -288,30 +271,29 @@ test("a node with no usable grounding yields no items and one rejection, without
   assert.equal(generatorCalled, false);
 });
 
-test("an option-select generation that throws leaves the self-assessment item persisted and continues the run", async () => {
+test("an option-select generation that throws rejects only that node and continues the run", async () => {
   const snapshot = snapshotWith([
     { conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] },
     { conceptId: "c2", label: "Borrowing", definitions: [passage("b1", ownershipDef)] }
   ]);
-  const { store, persisted, persistedRejected } = capturingStore();
+  const { store, persisted } = capturingStore();
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1"), anchorNode("c2", "Borrowing")])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-c1": saDraft("rules that govern memory"), "node-c2": saDraft("rules that govern memory") },
       optionSelect: { "node-c1": "throw", "node-c2": osDraft("rules that govern memory") }
     }),
     studyItemBankStore: store
   });
 
-  assert.equal(result.rejected.length, 0, "an option-select throw never rejects the node");
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["self_assessment"]);
-  assert.deepEqual(typesFor(persisted, "node-c2"), ["option_select", "self_assessment"]);
+  assert.equal(result.rejected.length, 1);
+  assert.deepEqual(typesFor(persisted, "node-c1"), []);
+  assert.deepEqual(typesFor(persisted, "node-c2"), ["option_select"]);
 });
 
-test("an option-select whose correct answer cites text absent from grounding drops only that type", async () => {
+test("an option-select whose correct answer cites text absent from grounding is rejected", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted } = capturingStore();
   await generateStudyItemBank({
@@ -320,13 +302,12 @@ test("an option-select whose correct answer cites text absent from grounding dro
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-c1": saDraft("rules that govern memory") },
       optionSelect: { "node-c1": osDraft("a fact never stated in the passage") }
     }),
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["self_assessment"], "ungrounded correct answer drops option-select, self-assessment unaffected");
+  assert.deepEqual(typesFor(persisted, "node-c1"), []);
 });
 
 test("supportedItemTypes per node equals the set of types actually persisted across a small layer", async () => {
@@ -341,15 +322,14 @@ test("supportedItemTypes per node equals the set of types actually persisted acr
     graphStore: graphStoreReturning(snapshot),
     enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1"), anchorNode("c2", "Borrowing")])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-c1": saDraft("rules that govern memory"), "node-c2": saDraft("rules that govern memory") },
-      // node-c1 gets both; node-c2's option-select is guard-rejected (duplicate options).
+      // node-c1 gets an option-select; node-c2's option-select is guard-rejected.
       optionSelect: { "node-c1": osDraft("rules that govern memory"), "node-c2": osDraft("rules that govern memory", ["Same", "Same", "Cache"]) }
     }),
     studyItemBankStore: store
   });
 
-  assert.deepEqual(await store.supportedItemTypes("node-c1"), ["option_select", "self_assessment"]);
-  assert.deepEqual(await store.supportedItemTypes("node-c2"), ["self_assessment"]);
+  assert.deepEqual(await store.supportedItemTypes("node-c1"), ["option_select"]);
+  assert.deepEqual(await store.supportedItemTypes("node-c2"), []);
 });
 
 test("a rescued node with a verified DEFINITION passage yields source_mentioned study items (R5/U4)", async () => {
@@ -362,7 +342,6 @@ test("a rescued node with a verified DEFINITION passage yields source_mentioned 
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ quote: def })])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-rescued": saDraft(cite, "def-1") },
       optionSelect: { "node-rescued": osDraft(cite, ["Stack", "Register", "Cache"], "def-1") }
     }),
     studyItemBankStore: store
@@ -382,7 +361,6 @@ test("a rescued mention-only node still yields source_mentioned items (no regres
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([sourceMentionedNode({ id: "node-borrow", label: "Borrowing", passageType: "mention", quote: m, blockId: "m-1" })])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-borrow": saDraft(cite, "m-1") },
       optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], "m-1") }
     }),
     studyItemBankStore: store
@@ -401,7 +379,6 @@ test("a minted llm_grounded node still yields generated provenance (U4)", async 
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([llmGroundedNode()])),
     studyItemGeneration: generationReturning({
-      selfAssessment: { "node-minted": saDraft(cite, "node-minted:definition:0") },
       optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:0") }
     }),
     studyItemBankStore: store

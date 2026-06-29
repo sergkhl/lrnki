@@ -40,7 +40,7 @@ export default async function StudyStartPage({
             <CardDescription>
               Pick a goal concept first — search by name or alias. Each goal shows its journey size (how many
               prerequisites it builds on); larger journeys come first. A foundational goal with no prerequisites is
-              studied directly. You calibrate what you already know on the goal&apos;s graph in the next screen.
+              studied directly. Calibration is optional before study.
             </CardDescription>
           </CardHeader>
         </Card>

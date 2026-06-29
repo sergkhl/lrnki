@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { SelfAssessmentItem, CalibrationVerdict, DerivedGraphLayer, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
-import type { AnswerGradingJudgePort, CalibrationVerdictStorePort, LearnerAnswerSimulatorPort, ResponseLogStorePort } from "@lrnki/ports";
+import type { CalibrationVerdict, DerivedGraphLayer } from "@lrnki/domain-core";
+import type { CalibrationVerdictStorePort } from "@lrnki/ports";
 import { verdictByDifficulty, synthesizeResponses } from "./syntheticResponses";
 
 function anchor(id: string, conceptId: string) {
@@ -21,38 +21,6 @@ const layer: DerivedGraphLayer = {
     { derivedNodeId: "nD", score: 0.9, method: "m", components: {}, neuralRationale: "" }
   ]
 };
-function studyItem(derivedNodeId: string): SelfAssessmentItem {
-  return {
-    itemType: "self_assessment",
-    studyItemId: `studyItem-${derivedNodeId}`,
-    graphVersionId: "gv",
-    enrichmentId: "e",
-    derivedNodeId,
-    groundingProvenance: "source_cep",
-    question: `Q ${derivedNodeId}?`,
-    answerKey: `A ${derivedNodeId}`,
-    selfReportPrompt: "Confident?",
-    citations: [],
-    generatingModel: "g",
-    configHash: "c"
-  };
-}
-const studyItems = ["nA", "nB", "nC", "nD"].map(studyItem);
-
-function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
-  const rows: NewResponseLogRow[] = [];
-  const hydrate = (r: NewResponseLogRow): ResponseLogRow => ({ ...r, createdAt: new Date().toISOString() });
-  return {
-    rows,
-    store: {
-      async append(a) { rows.push(...a); },
-      async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref).map(hydrate); },
-      async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId).map(hydrate); },
-      async nextAttemptSeq(ref) { return rows.filter((r) => r.learnerStateRef === ref).length + 1; }
-    }
-  };
-}
-
 function fakeVerdictStore(): { store: CalibrationVerdictStorePort; verdicts: Map<string, CalibrationVerdict> } {
   const verdicts = new Map<string, CalibrationVerdict>();
   const key = (ref: string, node: string) => `${ref}::${node}`;
@@ -67,9 +35,6 @@ function fakeVerdictStore(): { store: CalibrationVerdictStorePort; verdicts: Map
   };
 }
 
-const simulator: LearnerAnswerSimulatorPort = { model: "sim", async simulateAnswer() { return { answer: "a simulated answer" }; } };
-const judge: AnswerGradingJudgePort = { model: "kg-independent-judge", async grade() { return { outcome: "partial", score: 0.5, rationale: "r" }; } };
-
 test("verdictByDifficulty yields 'known' below the cutoff and 'learn' at or above it", () => {
   assert.equal(verdictByDifficulty(0.2, 0.6), "known");
   assert.equal(verdictByDifficulty(0.5, 0.6), "known");
@@ -77,12 +42,11 @@ test("verdictByDifficulty yields 'known' below the cutoff and 'learn' at or abov
   assert.equal(verdictByDifficulty(0.8, 0.6), "learn");
 });
 
-test("synthesizeResponses seeds verdicts over the goal cone and routes graded answers through the real judge", async () => {
-  const log = fakeResponseLog();
+test("synthesizeResponses seeds verdicts over the goal cone and performs no self-assessment grading", async () => {
   const verdicts = fakeVerdictStore();
   const result = await synthesizeResponses({
-    learnerStateRef: "L1", layer, targetDerivedNodeId: "nD", declaredDomain: "software engineering",
-    studyItems, profile: { difficultyCutoff: 0.6, gradedSampleSize: 2 }, simulator, judge, responseLog: log.store, verdictStore: verdicts.store
+    learnerStateRef: "L1", layer, targetDerivedNodeId: "nD",
+    profile: { difficultyCutoff: 0.6 }, verdictStore: verdicts.store
   });
 
   // Calibration: nD's certain cone = {nA(0.2), nB(0.5), nC(0.8)}. Cutoff 0.6 → nA,nB known; nC learn.
@@ -92,26 +56,4 @@ test("synthesizeResponses seeds verdicts over the goal cone and routes graded an
   assert.equal(seeded.length, 3, "one verdict per cone node, in the mutable store (no log rows)");
   assert.deepEqual(new Map(seeded.map((v) => [v.derivedNodeId, v.verdict])).get("nC"), "learn");
 
-  // Measurement: gradedSampleSize=2 → 2 graded rows, tagged synthetic, judge as grader.
-  assert.equal(result.gradedCount, 2);
-  const graded = log.rows.filter((r) => r.signalType === "graded");
-  assert.equal(graded.length, 2);
-  assert.deepEqual(graded.every((r) => r.responseSource === "synthetic"), true);
-  assert.deepEqual(graded.every((r) => r.graderIdentity === "kg-independent-judge"), true);
-  // Calibration writes the verdict store, never the append-only log.
-  assert.equal(log.rows.every((r) => r.signalType === "graded"), true, "the log is graded-only");
-});
-
-test("the generator does not write graded rows directly — they carry the judge's outcome via U5", async () => {
-  const log = fakeResponseLog();
-  const verdicts = fakeVerdictStore();
-  await synthesizeResponses({
-    learnerStateRef: "L2", layer, targetDerivedNodeId: "nD", declaredDomain: "software engineering",
-    studyItems, profile: { difficultyCutoff: 0.6, gradedSampleSize: 1 }, simulator, judge, responseLog: log.store, verdictStore: verdicts.store
-  });
-  const graded = log.rows.filter((r) => r.signalType === "graded");
-  assert.equal(graded.length, 1);
-  // Deterministic transform only: the canned judge said partial → graded_score 0.5.
-  assert.equal(graded[0].judgedOutcome, "partial");
-  assert.equal(graded[0].gradedScore, 0.5);
 });

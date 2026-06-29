@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, DerivedGraphLayer, LearnerPath, NewResponseLogRow, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
-import type { AnswerGradingJudgePort, ArtifactRepositoryPort, EnrichmentRunStorePort, LearnerPathStorePort, ResponseLogStorePort } from "@lrnki/ports";
-import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, resubmitAndRecompute, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoop";
+import type { CalibrationVerdict, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
+import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoop";
 
 let seq = 0;
 function verdict(derivedNodeId: string, v: Verdict, learnerStateRef = "L1"): CalibrationVerdict {
@@ -105,62 +104,4 @@ test("buildMasteryMap: graded-only fold — latest graded wins per node", () => 
   assert.equal(mastery.nB, 1, "latest graded correct wins");
   assert.equal(mastery.nC, 0.5, "graded partial folds to 0.5");
   assert.deepEqual(buildMasteryMap([]), {}, "empty rows fold to an empty map");
-});
-
-// --- resubmit + recompute (deterministic envelope, canned judge) -----------
-
-function fakeResponseLog(initial: ResponseLogRow[]): { store: ResponseLogStorePort; rows: ResponseLogRow[] } {
-  const rows = [...initial];
-  let n = rows.length;
-  const store: ResponseLogStorePort = {
-    async append(appended: NewResponseLogRow[]) { for (const r of appended) rows.push({ ...r, createdAt: new Date().toISOString() }); },
-    async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref); },
-    async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId); },
-    async nextAttemptSeq() { return ++n; }
-  };
-  return { store, rows };
-}
-
-const layer: DerivedGraphLayer = {
-  enrichmentId: "e1", graphVersionId: "gv", enrichmentConfigHash: "c", judgeModel: "m",
-  derivedNodes: [
-    { nodeKind: "anchor", derivedNodeId: "nA", conceptId: "cA", groundingOrigin: "document_anchored", role: "anchor", layer: "asserted", canonicalLabel: "A", normalizedLabel: "a", declaredDomain: "d", aliases: [] },
-    { nodeKind: "anchor", derivedNodeId: "nB", conceptId: "cB", groundingOrigin: "document_anchored", role: "anchor", layer: "asserted", canonicalLabel: "B", normalizedLabel: "b", declaredDomain: "d", aliases: [] }
-  ],
-  prerequisiteEdges: [{ prerequisiteDerivedNodeId: "nA", dependentDerivedNodeId: "nB", predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "x" } }],
-  difficulties: [{ derivedNodeId: "nA", score: 0.2, method: "m", components: {}, neuralRationale: "" }, { derivedNodeId: "nB", score: 0.6, method: "m", components: {}, neuralRationale: "" }]
-};
-
-const enrichmentStore = { async getLayer() { return layer; } } as unknown as EnrichmentRunStorePort;
-const judge: AnswerGradingJudgePort = { model: "kg-independent-judge", async grade() { return { outcome: "correct", score: 1, rationale: "r" }; } };
-
-test("resubmit appends a new graded row, leaves the original synthetic row intact, and recomputes the path (Covers AE5, R15)", async () => {
-  const original = graded("nA", "incorrect", "synthetic"); // an earlier synthetic graded row
-  const log = fakeResponseLog([original]);
-  const persisted: LearnerPath[] = [];
-  const pathStore: LearnerPathStorePort = { async persist(p) { persisted.push(p); }, async getPath() { return undefined; } };
-  const artifacts: ArtifactRepositoryPort = { async append() {} };
-
-  const result = await resubmitAndRecompute({
-    learnerStateRef: "L1",
-    studyItem: { studyItemId: "studyItem-nA", derivedNodeId: "nA", question: "Q?", answerKey: "A" },
-    declaredDomain: "d",
-    submittedAnswer: "an improved answer",
-    paths: [{ enrichmentId: "e1", targetDerivedNodeId: "nB" }],
-    judge, responseLog: log.store, enrichmentStore, pathStore, artifacts,
-    newPathId: () => "newpath-1"
-  });
-
-  assert.equal(result.judgedOutcome, "correct");
-  assert.equal(result.recomputedPaths, 1);
-  // original synthetic incorrect row still present (append-only).
-  assert.ok(log.rows.some((r) => r.responseId === original.responseId && r.judgedOutcome === "incorrect"), "original row intact");
-  // a new human graded row was appended for nA.
-  const humanRows = log.rows.filter((r) => r.responseSource === "human" && r.derivedNodeId === "nA");
-  assert.equal(humanRows.length, 1);
-  assert.equal(humanRows[0].judgedOutcome, "correct");
-  // the path was recomputed and persisted; the new graded correct on cA masters it,
-  // so cA (0.7+) is pruned from the path to nB.
-  assert.equal(persisted.length, 1);
-  assert.equal(persisted[0].steps.some((s) => s.derivedNodeId === "nA"), false, "newly-mastered cA pruned");
 });
