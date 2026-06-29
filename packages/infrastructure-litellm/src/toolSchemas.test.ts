@@ -10,6 +10,8 @@ import {
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidatorForCandidateKeys,
   conceptEvidenceProfileSchema,
+  conceptLessonSchema,
+  conceptLessonValidator,
   toolValidators
 } from "./toolSchemas";
 
@@ -89,6 +91,46 @@ test("concept evidence profile emits nullable literalValue in forced-tool dialec
     type: ["string", "null"],
     description: "A faithful, concise definition grounded in the evidence quote."
   });
+});
+
+test("concept lesson schema folds nullable citation/diagram scalars and is registered", () => {
+  // Registration: the strict-invariant and domain-neutral suites iterate toolValidators,
+  // so membership keeps the lesson schema under the same fail-closed guarantees (U2).
+  assert.ok(toolValidators.includes(conceptLessonValidator));
+
+  const section = (conceptLessonSchema.properties as Record<string, { items: { properties: Record<string, unknown> } }>)
+    .sections.items.properties;
+  // Optional citation/diagram fields are plain nullable scalars (no min) so they fold to
+  // a type union rather than an anyOf the strict guard would reject.
+  assert.deepEqual((section.citationPassageId as Record<string, unknown>).type, ["string", "null"]);
+  assert.deepEqual((section.diagramSpec as Record<string, unknown>).type, ["string", "null"]);
+  // Section text stays a non-nullable bounded string.
+  assert.deepEqual((section.text as Record<string, unknown>).type, "string");
+});
+
+test("concept lesson validator accepts the R3 minimum and rejects empty section text", () => {
+  // gist + one application + one substantive (definition) section — the R3 minimum
+  // (membership in the array is the optionality model; absent sections are omitted).
+  assert.doesNotThrow(() => conceptLessonValidator.parse({
+    sections: [
+      { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null },
+      { kind: "definition", text: "The precise statement.", citationPassageId: "block-1", citationEvidenceQuote: "The precise statement.", diagramCaption: null, diagramSpec: null },
+      { kind: "applications", text: "How it connects to neighbors.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+    ]
+  }));
+  // An empty `text` on any present section fails closed (rule 6).
+  assert.throws(() => conceptLessonValidator.parse({
+    sections: [{ kind: "gist", text: "", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }]
+  }));
+});
+
+test("concept lesson validator accepts a section with and without a diagram descriptor", () => {
+  assert.doesNotThrow(() => conceptLessonValidator.parse({
+    sections: [
+      { kind: "examples", text: "A worked example.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: "A vs B", diagramSpec: "A relates to B" },
+      { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+    ]
+  }));
 });
 
 function assertStrictForcedToolSchema(schema: unknown): void {

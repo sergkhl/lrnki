@@ -332,6 +332,33 @@ export const optionSelectValidator = z.object({
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
 
+// --- Concept Lesson generation: submit_concept_lesson (U2, R2/R4/R6/R7/R14) -----
+// One ordered teaching artifact per learning node (ADR-0031). Every section is
+// INDEPENDENTLY OPTIONAL: a section that does not apply is simply OMITTED from the
+// array — never a placeholder (R3/R4). The schema therefore assumes no section is
+// mandatory; the minimum-validity rule is enforced at the assembly boundary (U6), not
+// here. Section descriptions name only structural ROLES (an advance organizer, a
+// concrete intuition, graph-neighbor-bridging applications) and no fixture concept or
+// domain (AGENTS rule 17). Citation + diagram are flattened to nullable scalars because
+// the forced-tool dialect folds only scalar nullables; a section's source grounding is
+// re-verified verbatim at the boundary, so a null citation simply marks a synthesized
+// section. The deterministic guard never trusts the model's claimed provenance.
+
+const conceptLessonSection = z.object({
+  kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line advance organizer; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
+  text: z.string().min(1).describe("The teaching prose for this section. Self-contained and readable on its own; do not reference 'the passage' or 'the source'."),
+  citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
+  citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
+  diagramCaption: z.string().nullable().describe("Optional one-line caption for a simple explanatory diagram for this section; null when there is none."),
+  diagramSpec: z.string().nullable().describe("Optional terse, renderer-neutral description of that diagram's structure (nodes and relationships); null when there is none.")
+}).strict();
+
+export const conceptLessonValidator = z.object({
+  sections: z.array(conceptLessonSection).describe("The ordered teaching sections for one learning node. Include only the sections the provided grounding supports — omit any section that does not apply rather than emitting a placeholder.")
+}).strict();
+
+export const conceptLessonSchema: JsonSchema = toForcedToolSchema(conceptLessonValidator);
+
 export const toolValidators = [
   conceptDiscoveryValidator,
   conceptAdmissionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
@@ -347,5 +374,6 @@ export const toolValidators = [
   rescueDurabilityJudgmentValidator,
   mintingDurabilityJudgmentValidator,
   nodeMergeAdjudicationValidator,
-  optionSelectValidator
+  optionSelectValidator,
+  conceptLessonValidator
 ] as const;
