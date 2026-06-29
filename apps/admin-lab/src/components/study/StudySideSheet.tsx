@@ -35,7 +35,7 @@ export function StudySideSheet({
   const contentKey = content?.kind === "option_select" ? `option:${content.item.studyItemId}` : `${content?.kind ?? "none"}:${nodeLabel ?? ""}`;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <StudySideSheetContent
         key={`${open}:${contentKey}`}
         nodeLabel={nodeLabel}
@@ -74,7 +74,7 @@ function StudySideSheetContent({
   };
 
   return (
-    <SheetContent side="right" className="gap-4 p-6 sm:max-w-md">
+    <SheetContent side="right" showOverlay={false} className="gap-4 p-6 sm:max-w-md">
         <SheetHeader className="p-0">
           <SheetTitle className="flex items-center gap-2">
             {nodeLabel ?? "Node"}
@@ -86,7 +86,7 @@ function StudySideSheetContent({
         {content?.kind === "option_select" ? (
           <div className="flex flex-col gap-4">
             <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={(optionId) => startAction(() => onSelect(optionId))} pending={busy} />
-            <Button type="button" variant="outline" className="self-start" disabled={busy} onClick={() => startAction(onSkipAsKnown)}>
+            <Button type="button" size="sm" variant="outline" className="self-start" disabled={busy} onClick={() => startAction(onSkipAsKnown)}>
               <CheckIcon data-icon="inline-start" />
               Skip as known
             </Button>

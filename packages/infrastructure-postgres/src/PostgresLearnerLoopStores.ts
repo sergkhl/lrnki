@@ -86,7 +86,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
-      FROM study_items WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id, item_type`;
+      FROM study_items WHERE enrichment_id = ${enrichmentId} AND item_type = 'option_select' ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
 
