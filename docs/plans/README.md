@@ -12,9 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [Single-source the forced-tool schemas](./2026-06-29-002-refactor-single-source-forced-tool-schemas-plan.md)
-  — ready. zod validator becomes the single source; the forced-tool JSON Schema is generated at one
-  provider-dialect seam (Candidate 3 of the architecture review).
+None.
 
 ## Ownership rules
 

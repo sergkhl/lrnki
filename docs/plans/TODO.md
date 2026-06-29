@@ -31,14 +31,15 @@
    once that app's calibration needs are concrete. Behavior-preserving; no new ADR.
    Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
-5. **Single-source the forced-tool schemas.** Ready — see active plan
-   [2026-06-29-002](./2026-06-29-002-refactor-single-source-forced-tool-schemas-plan.md). zod validator
-   becomes the single source; the forced-tool JSON Schema is generated at one provider-dialect seam
-   (`toForcedToolSchema`), closing the hand-synced JSON/zod duplication and the candidate-key enum
-   asymmetry (AGENTS rule 18). Origin: architecture review Candidate 3.
-   Decision: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md).
-
 ## COMPLETED
+
+- **Forced-tool schemas single-sourced from zod.** The hand-written JSON Schema bodies in
+  `toolSchemas.ts` were deleted: each forced-tool schema is now generated from its zod validator
+  through the `toForcedToolSchema` provider-dialect seam, and `blockEvidence` is one reused zod object.
+  Runtime-bounded admission/core-selection/prerequisite-ordering tools derive schema and validator
+  from the same bounded source, closing the candidate-key enum asymmetry. Permanent registry tests
+  enforce strict object shape and domain-neutral schema descriptions for every current tool.
+  Decision: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md).
 
 - **Learner-facing reads on the ADR-0027 read-model split.** The study projection, Learner Path
   reads, and Learner Loop reads moved off raw SQL and out-of-place adaptation compute in the Admin
@@ -173,6 +174,19 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Forced-tool schema single-source refactor, 2026-06-29 (branch
+  `refactor/single-source-forced-tool-schemas`).** Full workspace typecheck passed; the
+  infrastructure-litellm suite passed with new `toForcedToolSchema` golden tests, bounded enum
+  symmetry tests, and all-tool structural/domain-neutrality invariants. Real model validation used
+  the Rust curated source through the production worker path: extraction run
+  `02d72916-2ce1-46e6-873f-5bc931e2e3ef` succeeded (`candidates=20`, `core=5`, `CEPs=19`,
+  `incomplete=0`, `assertions=7`), graph version `daad805b-40a5-40d1-afa0-1d0f8c9b1deb` published,
+  and enrichment `10ee38bf-ada2-4d57-90f9-69811c309720` committed 19 prerequisite edges with
+  `contested=0`, `weakCut=0`, and `cycleRouted=0`. Production verifier inspection confirmed all 123
+  persisted CEP passages and all 7 assertion evidence quotes still verify; nullable `literalValue`,
+  tightened `minLength`, bounded candidate-key enums, and prerequisite-ordering bounds were accepted
+  by real forced-tool calls. Result: PASS. Trail: `tmp/2026-06-29-forced-tool-schema/`.
 
 - **Learner study/path/loop use-case refactor U1–U6, 2026-06-29 (branch
   `refactor/learner-study-use-case`).** Full workspace typecheck green; recursive tests green

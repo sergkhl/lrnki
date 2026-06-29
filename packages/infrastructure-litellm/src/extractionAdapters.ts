@@ -26,9 +26,9 @@ import {
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
   conceptAdmissionSchemaForCandidateKeys,
-  conceptAdmissionValidator,
+  conceptAdmissionValidatorForCandidateKeys,
   conceptCoreSelectionSchemaForCandidateKeys,
-  conceptCoreSelectionValidator,
+  conceptCoreSelectionValidatorForCandidateKeys,
   conceptEvidenceProfileSchema,
   conceptEvidenceProfileValidator,
   conceptDiscoverySchema,
@@ -178,7 +178,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
         toolName: "submit_admission_decisions",
         toolDescription: "Submit one precision-first admission decision per candidate in the requested batch.",
         parameters: conceptAdmissionSchemaForCandidateKeys(batch.map((candidate) => candidate.candidateKey)),
-        validator: conceptAdmissionValidator,
+        validator: conceptAdmissionValidatorForCandidateKeys(batch.map((candidate) => candidate.candidateKey)),
         tags: [STAGE_TAGS.admission]
       });
       const batchKeys = new Set(batch.map((candidate) => candidate.candidateKey));
@@ -254,7 +254,7 @@ export class LiteLlmConceptAdmissionAdapter implements ConceptAdmissionPort {
       toolName: "submit_core_selection",
       toolDescription: "Select or demote every individually eligible candidate at source level.",
       parameters: conceptCoreSelectionSchemaForCandidateKeys(individuallyEligible.map((decision) => decision.atomicKey)),
-      validator: conceptCoreSelectionValidator,
+      validator: conceptCoreSelectionValidatorForCandidateKeys(individuallyEligible.map((decision) => decision.atomicKey)),
       tags: [STAGE_TAGS.admission]
     });
     const selectionCounts = new Map<string, number>();
