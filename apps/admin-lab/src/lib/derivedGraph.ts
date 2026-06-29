@@ -5,7 +5,7 @@
 // `tsx --test` and feed both the Cytoscape render and its required equivalent
 // textual node-and-edge representation (U6 test scenario 8).
 
-import { prerequisiteAncestors, type AdaptedNodeClassification, type AdaptedNodeState } from "@lrnki/application";
+import { labelFor, prerequisiteAncestors, type AdaptedNodeClassification, type AdaptedNodeState } from "@lrnki/application";
 import type {
   DerivedGraphDetail,
   DerivedGraphEdge,
@@ -91,10 +91,6 @@ export function frontierNeighborhood(
     if (edge.prerequisiteDerivedNodeId === targetDerivedNodeId) ids.add(edge.dependentDerivedNodeId); // direct dependent (downstream)
   }
   return [...ids];
-}
-
-export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeId: string): string {
-  return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
 export function filterDetailToVisible(detail: DerivedGraphDetail, hiddenNodeIds: ReadonlySet<string>): DerivedGraphDetail {
