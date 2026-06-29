@@ -1,4 +1,4 @@
-import type { CalibrationVerdict, ResponseLogRow, StudyItem, StudyItemGroundingProvenance, Verdict } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, ConceptLessonSectionKind, LessonAbsentNode, ResponseLogRow, StudyItem, StudyItemGroundingProvenance, Verdict } from "@lrnki/domain-core";
 import type { DerivedGraphDetail, DerivedGraphEdge, LearnerStatePort } from "@lrnki/ports";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -36,6 +36,50 @@ export type StudyOptionSelectView = {
     provenance: "source" | "generated";
   }[];
 };
+
+// The Concept Lesson view that rides down the projection (ADR-0031, KTD5). A serializable
+// teaching artifact rendered AHEAD of the option-select for a frontier node (R12). Each section
+// carries its honest provenance badge: `source_cep`/`source_mentioned` is source-cited, otherwise
+// `generated` (R6). Reading it is non-graded — the projection has no write path (R13).
+export type ConceptLessonSectionView = {
+  kind: ConceptLessonSectionKind;
+  text: string;
+  groundingProvenance: StudyItemGroundingProvenance;
+  // True when the section verified verbatim against a source block; the card shows a distinct
+  // `source` vs `generated` badge from this.
+  isSourceCited: boolean;
+  diagram?: { caption: string; spec: string };
+};
+
+export type ConceptLessonView = {
+  derivedNodeId: string;
+  canonicalLabel: string;
+  sections: ConceptLessonSectionView[];
+};
+
+// A thin lesson-absent record for the operator quality surface (U8): which nodes produced no
+// lesson and why. Mirrors the rejected-study-item display shape.
+export type LessonAbsentView = {
+  derivedNodeId: string;
+  label: string;
+  reason: string;
+};
+
+// Map a persisted Concept Lesson to its serializable view. A section is `source`-cited only when
+// its authoritative provenance is a source kind (the assembler already re-derived this, U6).
+export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
+  return {
+    derivedNodeId: lesson.derivedNodeId,
+    canonicalLabel: lesson.canonicalLabel,
+    sections: lesson.sections.map((section) => ({
+      kind: section.kind,
+      text: section.text,
+      groundingProvenance: section.groundingProvenance,
+      isSourceCited: section.citation?.provenance === "source",
+      ...(section.diagram ? { diagram: section.diagram } : {})
+    }))
+  };
+}
 
 // A per-node study-item view, keyed by item type (KTD4). Adding a new study-item type is a
 // localized add here — a new arm of this union, one arm in `studyItemToView`, and one arm in
@@ -170,6 +214,12 @@ export type StudySession = {
   sheetByNode: Record<string, SheetContent>;
   verdictByNode: Record<string, Verdict>;
   optionItemsByNode: Record<string, StudyOptionSelectView>;
+  // The Concept Lesson substrate that rides down (ADR-0031, KTD5): one teaching view per node
+  // that has a lesson, rendered ahead of the option-select for a frontier node (R12). Reading
+  // writes nothing (R13). `lessonAbsent` gives the operator thin visibility into which nodes
+  // produced no lesson and why.
+  lessonByNode: Record<string, ConceptLessonView>;
+  lessonAbsent: LessonAbsentView[];
 };
 
 // Compose the finished Study Session from already-loaded data (KTD2). Pure: the caller is
@@ -185,6 +235,11 @@ export function composeStudySession(input: {
   studyItems: StudyItem[];
   rows: ResponseLogRow[];
   verdicts: CalibrationVerdict[];
+  // The Concept Lesson substrate for this enrichment (ADR-0031). Optional so existing callers
+  // that have not yet wired the lesson store compose a session with no lessons (unchanged
+  // behavior) rather than a type break; the real readers pass them (U8).
+  lessons?: ConceptLesson[];
+  lessonAbsent?: LessonAbsentNode[];
 }): StudySession {
   const { detail, targetDerivedNodeId } = input;
   const itemViews = input.studyItems.map(studyItemToView);
@@ -264,6 +319,13 @@ export function composeStudySession(input: {
     if (view.kind === "option_select") optionItemsByNode[view.item.derivedNodeId] = view.item;
   }
 
+  // The lesson substrate rides down keyed by node (KTD5). Absences become a thin operator view.
+  const lessonByNode: Record<string, ConceptLessonView> = {};
+  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
+  const lessonAbsent: LessonAbsentView[] = (input.lessonAbsent ?? [])
+    .map((node) => ({ derivedNodeId: node.derivedNodeId, label: labelByNode.get(node.derivedNodeId) ?? node.canonicalLabel, reason: node.reason }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   return {
     enrichmentId: input.enrichmentId,
     learnerStateRef: input.learnerStateRef,
@@ -278,6 +340,8 @@ export function composeStudySession(input: {
     restorations,
     sheetByNode,
     verdictByNode: Object.fromEntries(verdictByNode),
-    optionItemsByNode
+    optionItemsByNode,
+    lessonByNode,
+    lessonAbsent
   };
 }

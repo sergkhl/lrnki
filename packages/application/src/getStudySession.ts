@@ -1,5 +1,6 @@
 import type {
   CalibrationVerdictStorePort,
+  ConceptLessonStorePort,
   EnrichmentInspectionReadPort,
   ResponseLogStorePort,
   StudyItemBankStorePort
@@ -20,6 +21,7 @@ export async function getStudySession(input: {
   learnerStateRef: string;
   enrichmentRead: EnrichmentInspectionReadPort;
   studyItemStore: StudyItemBankStorePort;
+  conceptLessonStore: ConceptLessonStorePort;
   responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
 }): Promise<StudySession | undefined> {
@@ -27,8 +29,10 @@ export async function getStudySession(input: {
   if (!detail) return undefined;
   if (!detail.nodes.some((node) => node.derivedNodeId === input.targetDerivedNodeId)) return undefined;
 
-  const [studyItems, rows, verdicts] = await Promise.all([
+  const [studyItems, lessons, lessonAbsent, rows, verdicts] = await Promise.all([
     input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
+    input.conceptLessonStore.listLessonsForEnrichment(input.enrichmentId),
+    input.conceptLessonStore.listAbsentForEnrichment(input.enrichmentId),
     input.responseLog.listForLearner(input.learnerStateRef),
     input.verdictStore.listForLearner(input.learnerStateRef)
   ]);
@@ -39,6 +43,8 @@ export async function getStudySession(input: {
     targetDerivedNodeId: input.targetDerivedNodeId,
     detail,
     studyItems,
+    lessons,
+    lessonAbsent,
     rows,
     verdicts
   });

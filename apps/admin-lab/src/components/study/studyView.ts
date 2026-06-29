@@ -5,7 +5,7 @@
 // 18). These two helpers stay here: they are Admin-Lab sheet-interaction concerns (the
 // short-lived auto-advance guard window and the next-target read), free of any application
 // import. Components keep importing the contract types through this module.
-export type { SheetContent, StudyOptionSelectView } from "@lrnki/application";
+export type { SheetContent, StudyOptionSelectView, ConceptLessonView, ConceptLessonSectionView } from "@lrnki/application";
 
 // Radix/Base sheet primitives can emit `open=false` while focus/animation state is
 // settling. During answer-triggered retargeting that dismiss signal is stale: the user's

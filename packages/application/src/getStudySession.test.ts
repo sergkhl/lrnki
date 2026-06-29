@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
 import type {
   CalibrationVerdictStorePort,
+  ConceptLessonStorePort,
   DerivedGraphDetail,
   EnrichmentInspectionReadPort,
   ResponseLogStorePort,
@@ -69,13 +70,33 @@ function verdictStore(verdicts: CalibrationVerdict[]): CalibrationVerdictStorePo
   };
 }
 
-function callGetStudySession(args: { enrichmentId?: string; target?: string; items?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[] }) {
+function conceptLessonStore(lessons: ConceptLesson[], absent: LessonAbsentNode[] = []): ConceptLessonStorePort {
+  return {
+    async persist() { throw new Error("not used"); },
+    async getLesson() { throw new Error("not used"); },
+    async listLessonsForEnrichment() { return lessons; },
+    async listAbsentForEnrichment() { return absent; }
+  };
+}
+
+const scopeLesson: ConceptLesson = {
+  derivedNodeId: "scope", graphVersionId: "g", enrichmentId: "e", generatingModel: "deepseek", configHash: "cfg",
+  canonicalLabel: "Variable scope",
+  sections: [
+    { kind: "gist", text: "A name is valid within a region.", groundingProvenance: "generated" },
+    { kind: "definition", text: "Scope is the region where a binding is valid.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "Scope is the region where a binding is valid." } },
+    { kind: "applications", text: "Ownership builds on scope.", groundingProvenance: "generated" }
+  ]
+};
+
+function callGetStudySession(args: { enrichmentId?: string; target?: string; items?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; absent?: LessonAbsentNode[] }) {
   return getStudySession({
     enrichmentId: args.enrichmentId ?? "e",
     targetDerivedNodeId: args.target ?? "ownership",
     learnerStateRef: "L1",
     enrichmentRead: enrichmentRead({ e: detail() }),
     studyItemStore: studyItemStore(args.items ?? [optionItem]),
+    conceptLessonStore: conceptLessonStore(args.lessons ?? [], args.absent ?? []),
     responseLog: responseLog(args.rows ?? []),
     verdictStore: verdictStore(args.verdicts ?? [])
   });
@@ -102,6 +123,25 @@ test("a learner with zero rows/verdicts yields the knows-nothing session; the on
   assert.ok(session);
   assert.equal(session.classification.selectedFrontierTarget, "scope");
   assert.equal(session.adaptedHiddenNodeIds.length, 0);
+});
+
+test("Covers R12: a node's Concept Lesson rides down into lessonByNode with its honest provenance badges", async () => {
+  const session = await callGetStudySession({ lessons: [scopeLesson] });
+  assert.ok(session);
+  const lesson = session.lessonByNode["scope"];
+  assert.ok(lesson, "the lesson rides down keyed by node");
+  assert.equal(lesson.sections.length, 3);
+  // The source-cited definition is badged source; the synthesized gist is generated.
+  assert.equal(lesson.sections.find((s) => s.kind === "definition")?.isSourceCited, true);
+  assert.equal(lesson.sections.find((s) => s.kind === "gist")?.isSourceCited, false);
+});
+
+test("a lesson-absent node surfaces in the operator visibility list with its reason", async () => {
+  const session = await callGetStudySession({ absent: [{ derivedNodeId: "scope", canonicalLabel: "Variable scope", reason: "no usable grounding passages" }] });
+  assert.ok(session);
+  assert.equal(session.lessonAbsent.length, 1);
+  assert.equal(session.lessonAbsent[0].label, "Variable scope");
+  assert.match(session.lessonAbsent[0].reason, /no usable grounding/);
 });
 
 test("a calibrated learner who marked the prerequisite known yields the pruned/hidden session", async () => {

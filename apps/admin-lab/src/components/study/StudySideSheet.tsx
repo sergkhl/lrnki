@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { OptionSelectCard } from "@/components/study/OptionSelectCard";
-import type { SheetContent as SheetContentPayload } from "@/components/study/studyView";
+import { ConceptLessonCard } from "@/components/study/ConceptLessonCard";
+import type { ConceptLessonView, SheetContent as SheetContentPayload } from "@/components/study/studyView";
 
 // Transfer-ready, state-gated study side sheet. It keeps the graph visible and renders
 // content gated by the clicked node's learner state: a ready node opens an option-select
@@ -18,6 +19,7 @@ export function StudySideSheet({
   onOpenChange,
   nodeLabel,
   content,
+  lesson = null,
   onSelect,
   onSkipAsKnown,
   onClear,
@@ -27,6 +29,7 @@ export function StudySideSheet({
   onOpenChange: (open: boolean) => void;
   nodeLabel: string | null;
   content: SheetContentPayload | null;
+  lesson?: ConceptLessonView | null;
   onSelect: (optionId: string) => void;
   onSkipAsKnown: () => void;
   onClear: () => void;
@@ -40,6 +43,7 @@ export function StudySideSheet({
         key={`${open}:${contentKey}`}
         nodeLabel={nodeLabel}
         content={content}
+        lesson={lesson}
         onSelect={onSelect}
         onSkipAsKnown={onSkipAsKnown}
         onClear={onClear}
@@ -52,6 +56,7 @@ export function StudySideSheet({
 function StudySideSheetContent({
   nodeLabel,
   content,
+  lesson,
   onSelect,
   onSkipAsKnown,
   onClear,
@@ -59,6 +64,7 @@ function StudySideSheetContent({
 }: Readonly<{
   nodeLabel: string | null;
   content: SheetContentPayload | null;
+  lesson: ConceptLessonView | null;
   onSelect: (optionId: string) => void;
   onSkipAsKnown: () => void;
   onClear: () => void;
@@ -73,8 +79,13 @@ function StudySideSheetContent({
     fn();
   };
 
+  // The lesson is shown ahead of the study item for a frontier node (R12) — read first, then
+  // answer. A locked or mastered node does not surface the lesson; it is a teaching prelude to
+  // studying, not a standalone reference here.
+  const showLesson = lesson !== null && (content?.kind === "option_select" || content?.kind === "cardless");
+
   return (
-    <SheetContent side="right" showOverlay={false} className="gap-4 p-6 sm:max-w-md">
+    <SheetContent side="right" showOverlay={false} className="gap-4 overflow-y-auto p-6 sm:max-w-md">
         <SheetHeader className="p-0">
           <SheetTitle className="flex items-center gap-2">
             {nodeLabel ?? "Node"}
@@ -82,6 +93,8 @@ function StudySideSheetContent({
           </SheetTitle>
           <SheetDescription>{content ? descriptionFor(content) : null}</SheetDescription>
         </SheetHeader>
+
+        {showLesson && lesson ? <ConceptLessonCard lesson={lesson} /> : null}
 
         {content?.kind === "option_select" ? (
           <div className="flex flex-col gap-4">

@@ -2,6 +2,7 @@ import { getStudySession as loadStudySession, type StudySession } from "@lrnki/a
 import {
   createDatabaseClient,
   PostgresCalibrationVerdictStore,
+  PostgresConceptLessonStore,
   PostgresEnrichmentInspectionRead,
   PostgresResponseLogStore,
   PostgresStudyItemBankStore
@@ -33,6 +34,7 @@ export async function getStudySession(
       learnerStateRef,
       enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
       studyItemStore: new PostgresStudyItemBankStore(sql),
+      conceptLessonStore: new PostgresConceptLessonStore(sql),
       responseLog: new PostgresResponseLogStore(sql),
       verdictStore: new PostgresCalibrationVerdictStore(sql)
     });

@@ -113,6 +113,7 @@ export {
   composeStudySession,
   studyItemToView,
   studyItemViewToSheet,
+  conceptLessonToView,
   labelFor,
   unmetPrerequisites,
   adaptedHiddenNodeIds,
@@ -120,6 +121,9 @@ export {
   type SheetContent,
   type StudyItemView,
   type StudyOptionSelectView,
+  type ConceptLessonView,
+  type ConceptLessonSectionView,
+  type LessonAbsentView,
   type CoexistenceFlag,
   type RestorationSuggestion
 } from "./studySessionProjection";

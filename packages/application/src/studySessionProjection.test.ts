@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
 import type { DerivedGraphDetail } from "@lrnki/ports";
 import {
   adaptedHiddenNodeIds,
   composeStudySession,
+  conceptLessonToView,
   studyItemToView,
   studyItemViewToSheet,
   unmetPrerequisites
@@ -82,7 +83,7 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
-function compose(args: { target: string; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[] }) {
+function compose(args: { target: string; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonAbsent?: LessonAbsentNode[] }) {
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
@@ -90,8 +91,22 @@ function compose(args: { target: string; studyItems?: StudyItem[]; rows?: Respon
     detail: detail(),
     studyItems: args.studyItems ?? [],
     rows: args.rows ?? [],
-    verdicts: args.verdicts ?? []
+    verdicts: args.verdicts ?? [],
+    lessons: args.lessons,
+    lessonAbsent: args.lessonAbsent
   });
+}
+
+function lessonFor(derivedNodeId: string): ConceptLesson {
+  return {
+    derivedNodeId, graphVersionId: "g", enrichmentId: "e", generatingModel: "deepseek", configHash: "cfg",
+    canonicalLabel: labelByNode[derivedNodeId],
+    sections: [
+      { kind: "gist", text: "A short gist.", groundingProvenance: "generated" },
+      { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition." } },
+      { kind: "applications", text: "Connects to neighbors.", groundingProvenance: "generated" }
+    ]
+  };
 }
 
 test("composeStudySession gates a frontier node with an option-select item to an option_select sheet (options sorted by id)", () => {
@@ -185,4 +200,27 @@ test("the study-item mapper dispatches on item type (KTD4 extensibility seam)", 
   const view = studyItemToView(optionItem("scope"));
   assert.equal(view.kind, "option_select");
   assert.equal(studyItemViewToSheet(view).kind, "option_select");
+});
+
+test("composeStudySession rides each node's lesson down into lessonByNode with honest provenance", () => {
+  const session = compose({ target: "ownership", lessons: [lessonFor("scope")] });
+  const lesson = session.lessonByNode["scope"];
+  assert.ok(lesson);
+  assert.equal(lesson.sections.find((s) => s.kind === "definition")?.isSourceCited, true);
+  assert.equal(lesson.sections.find((s) => s.kind === "gist")?.isSourceCited, false);
+  assert.equal(session.lessonByNode["ownership"], undefined);
+});
+
+test("composeStudySession surfaces lesson-absent nodes with their label and reason, sorted", () => {
+  const session = compose({ target: "ownership", lessonAbsent: [
+    { derivedNodeId: "move", canonicalLabel: "Move semantics", reason: "no usable grounding passages" },
+    { derivedNodeId: "scope", canonicalLabel: "Variable scope", reason: "lesson did not meet the minimum" }
+  ] });
+  assert.deepEqual(session.lessonAbsent.map((a) => a.label), ["Move semantics", "Variable scope"]);
+  assert.match(session.lessonAbsent[1].reason, /minimum/);
+});
+
+test("conceptLessonToView badges source vs generated sections from authoritative provenance", () => {
+  const view = conceptLessonToView(lessonFor("scope"));
+  assert.deepEqual(view.sections.map((s) => s.isSourceCited), [false, true, false]);
 });
