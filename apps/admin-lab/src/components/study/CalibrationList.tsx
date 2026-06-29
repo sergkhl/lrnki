@@ -37,9 +37,15 @@ export function CalibrationList({ session }: Readonly<{ session: CalibrationSess
             <Badge variant="secondary">{session.knownClosure.length} known by closure</Badge>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link className={buttonVariants()} href={`/admin/lab/study/${encodeURIComponent(session.learnerStateRef)}?${studyQuery.toString()}`}>
-              Start studying
-            </Link>
+            {pending ? (
+              <Button type="button" disabled>
+                Start studying
+              </Button>
+            ) : (
+              <Link className={buttonVariants()} href={`/admin/lab/study/${encodeURIComponent(session.learnerStateRef)}?${studyQuery.toString()}`}>
+                Start studying
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

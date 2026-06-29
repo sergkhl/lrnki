@@ -1,7 +1,6 @@
-import { projectCalibrationList, type CalibrationListRow } from "@lrnki/application";
+import { composeCalibrationSession, type CalibrationSessionProjection } from "@lrnki/application";
 import { createDatabaseClient, PostgresCalibrationVerdictStore } from "@lrnki/infrastructure-postgres";
 import { getEnrichmentDetail } from "./enrichments";
-import { labelFor, type DerivedGraphDetail } from "./derivedGraph";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
 
@@ -10,43 +9,12 @@ async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefine
   const sql = createDatabaseClient();
   try {
     return await fn(sql);
-  } catch {
-    return undefined;
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
-export type CalibrationSession = {
-  enrichmentId: string;
-  learnerStateRef: string;
-  target: { derivedNodeId: string; label: string };
-  rows: CalibrationListRow[];
-  knownClosure: string[];
-};
-
-export function composeCalibrationSession(input: {
-  enrichmentId: string;
-  learnerStateRef: string;
-  targetDerivedNodeId: string;
-  detail: DerivedGraphDetail;
-  knownVerdictNodeIds: string[];
-}): CalibrationSession | undefined {
-  if (!input.detail.nodes.some((node) => node.derivedNodeId === input.targetDerivedNodeId)) return undefined;
-  const projection = projectCalibrationList({
-    targetDerivedNodeId: input.targetDerivedNodeId,
-    edges: input.detail.edges,
-    nodes: input.detail.nodes,
-    knownVerdictNodeIds: input.knownVerdictNodeIds
-  });
-  return {
-    enrichmentId: input.enrichmentId,
-    learnerStateRef: input.learnerStateRef,
-    target: { derivedNodeId: input.targetDerivedNodeId, label: labelFor(input.detail, input.targetDerivedNodeId) },
-    rows: projection.rows,
-    knownClosure: [...projection.knownClosure].sort()
-  };
-}
+export type CalibrationSession = CalibrationSessionProjection;
 
 export async function getCalibrationSession(
   enrichmentId: string,
@@ -61,7 +29,8 @@ export async function getCalibrationSession(
     enrichmentId,
     learnerStateRef,
     targetDerivedNodeId,
-    detail,
+    edges: detail.edges,
+    nodes: detail.nodes,
     knownVerdictNodeIds: verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId)
   });
 }

@@ -144,8 +144,7 @@ come from option-select study responses.
 
 **Study Item Bank**:
 A learner-neutral option-select asset generated alongside one Derived Graph Layer. Study items are
-keyed to `derived_node_id`; `option_select` is the only implemented `itemType`, with other
-discriminants reserved in source types for future mechanics.
+keyed to `derived_node_id`; `option_select` is the only implemented `itemType`.
 _Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 
 **Grounding Provenance**:

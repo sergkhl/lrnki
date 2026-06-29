@@ -76,7 +76,6 @@ export {
   type OptionSelectGuardResult
 } from "./optionSelectGuard";
 export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
-export { gradeAndAppend } from "./measurement";
 export {
   appendOptionSelectOutcome,
   AUTO_GRADER_IDENTITY
@@ -121,9 +120,11 @@ export {
 } from "./calibrationClosure";
 export {
   projectCalibrationList,
+  composeCalibrationSession,
   neutralDescriptor,
   type CalibrationDescriptor,
   type CalibrationListNode,
   type CalibrationListProjection,
-  type CalibrationListRow
+  type CalibrationListRow,
+  type CalibrationSessionProjection
 } from "./calibrationList";

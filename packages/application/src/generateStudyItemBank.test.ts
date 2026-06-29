@@ -232,7 +232,7 @@ test("an option-select guard rejection records the node as rejected", async () =
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
   // Duplicate distractors fail the structural guard (not a grounding failure).
-  const result = await generateStudyItemBank({
+  await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",
     graphStore: graphStoreReturning(snapshot),
@@ -276,7 +276,7 @@ test("an option-select generation that throws rejects only that node and continu
     { conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] },
     { conceptId: "c2", label: "Borrowing", definitions: [passage("b1", ownershipDef)] }
   ]);
-  const { store, persisted, persistedRejected } = capturingStore();
+  const { store, persisted } = capturingStore();
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
     configHash: "cfg-1",

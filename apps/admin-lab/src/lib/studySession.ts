@@ -147,10 +147,12 @@ export async function getStudySession(
   if (!detail.nodes.some((node) => node.derivedNodeId === targetDerivedNodeId)) return undefined;
 
   const loaded = await withClient(async (sql) => {
-    const layer = await new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId);
-    const studyItems = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId);
-    const rows = await new PostgresResponseLogStore(sql).listForLearner(learnerStateRef);
-    const verdicts = await new PostgresCalibrationVerdictStore(sql).listForLearner(learnerStateRef);
+    const [layer, studyItems, rows, verdicts] = await Promise.all([
+      new PostgresEnrichmentRunStore(sql).getLayer(enrichmentId),
+      new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(enrichmentId),
+      new PostgresResponseLogStore(sql).listForLearner(learnerStateRef),
+      new PostgresCalibrationVerdictStore(sql).listForLearner(learnerStateRef)
+    ]);
     return { layer, studyItems, rows, verdicts };
   });
   if (!loaded || !loaded.layer) return undefined;

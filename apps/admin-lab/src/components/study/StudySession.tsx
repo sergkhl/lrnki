@@ -102,8 +102,17 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const skipAsKnown = () => {
     if (!selectedNodeId) return;
     const derivedNodeId = selectedNodeId;
+    pendingAdvanceRef.current = true;
+    autoAdvanceDismissGuardRef.current = true;
+    sessionAtAnswerRef.current = session;
     startTransition(async () => {
-      await setVerdict({ learnerStateRef: session.learnerStateRef, derivedNodeId, verdict: "known" });
+      try {
+        await setVerdict({ learnerStateRef: session.learnerStateRef, derivedNodeId, verdict: "known" });
+      } catch (error) {
+        pendingAdvanceRef.current = false;
+        autoAdvanceDismissGuardRef.current = false;
+        throw error;
+      }
     });
   };
 

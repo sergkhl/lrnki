@@ -9,10 +9,9 @@ and study-item coverage key to the node in one Derived Graph Layer, whether that
 an Enrichment Node. Asserted `concept_id` remains a separate identity available only for anchors.
 
 The learner-neutral **Study Item Bank** is a typed discriminated union keyed by `itemType`.
-`option_select` is the only implemented study-item payload. Reserved discriminants remain in source
-types for future mechanics, but the initial migration persists option-select rows only. A node's
-supported item types are derived from persisted generated items, never from a separately maintained
-capability map.
+`option_select` is the only implemented study-item payload and the only current source-level
+discriminant. A node's supported item types are derived from persisted generated items, never from a
+separately maintained capability map.
 
 Study items preserve grounding provenance:
 

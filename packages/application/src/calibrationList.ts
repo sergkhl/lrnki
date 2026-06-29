@@ -30,6 +30,14 @@ export type CalibrationListProjection = {
   knownClosure: Set<string>;
 };
 
+export type CalibrationSessionProjection = {
+  enrichmentId: string;
+  learnerStateRef: string;
+  target: { derivedNodeId: string; label: string };
+  rows: CalibrationListRow[];
+  knownClosure: string[];
+};
+
 export function projectCalibrationList(input: {
   targetDerivedNodeId: string;
   edges: ReadinessEdge[];
@@ -42,11 +50,10 @@ export function projectCalibrationList(input: {
 
   const directlyKnown = new Set([...input.knownVerdictNodeIds].filter((derivedNodeId) => cone.has(derivedNodeId)));
   const knownClosure = pruneClosure(directlyKnown, trustedEdges);
-  const impliedHidden = new Set([...knownClosure].filter((derivedNodeId) => !directlyKnown.has(derivedNodeId)));
   const nodeById = new Map(input.nodes.map((node) => [node.derivedNodeId, node]));
 
   const rows = [...cone]
-    .filter((derivedNodeId) => !impliedHidden.has(derivedNodeId))
+    .filter((derivedNodeId) => !knownClosure.has(derivedNodeId) || directlyKnown.has(derivedNodeId))
     .map((derivedNodeId): CalibrationListRow => {
       const node = nodeById.get(derivedNodeId);
       return {
@@ -60,6 +67,33 @@ export function projectCalibrationList(input: {
     .sort((a, b) => (b.difficulty ?? 0) - (a.difficulty ?? 0) || a.derivedNodeId.localeCompare(b.derivedNodeId));
 
   return { rows, knownClosure };
+}
+
+export function composeCalibrationSession(input: {
+  enrichmentId: string;
+  learnerStateRef: string;
+  targetDerivedNodeId: string;
+  edges: ReadinessEdge[];
+  nodes: CalibrationListNode[];
+  knownVerdictNodeIds: Iterable<string>;
+}): CalibrationSessionProjection | undefined {
+  const target = input.nodes.find((node) => node.derivedNodeId === input.targetDerivedNodeId);
+  if (!target) return undefined;
+
+  const projection = projectCalibrationList({
+    targetDerivedNodeId: input.targetDerivedNodeId,
+    edges: input.edges,
+    nodes: input.nodes,
+    knownVerdictNodeIds: input.knownVerdictNodeIds
+  });
+
+  return {
+    enrichmentId: input.enrichmentId,
+    learnerStateRef: input.learnerStateRef,
+    target: { derivedNodeId: target.derivedNodeId, label: target.label },
+    rows: projection.rows,
+    knownClosure: [...projection.knownClosure].sort()
+  };
 }
 
 export function neutralDescriptor(passages: GroundingPassageView[], options?: { maxChars?: number }): CalibrationDescriptor | null {

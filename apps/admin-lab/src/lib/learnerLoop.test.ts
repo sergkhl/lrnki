@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, NewResponseLogRow, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
-import type { ResponseLogStorePort } from "@lrnki/ports";
+import type { CalibrationVerdict, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
 import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoop";
 
 let seq = 0;
@@ -106,17 +105,3 @@ test("buildMasteryMap: graded-only fold — latest graded wins per node", () => 
   assert.equal(mastery.nC, 0.5, "graded partial folds to 0.5");
   assert.deepEqual(buildMasteryMap([]), {}, "empty rows fold to an empty map");
 });
-
-// --- resubmit + recompute (deterministic envelope, canned judge) -----------
-
-function fakeResponseLog(initial: ResponseLogRow[]): { store: ResponseLogStorePort; rows: ResponseLogRow[] } {
-  const rows = [...initial];
-  let n = rows.length;
-  const store: ResponseLogStorePort = {
-    async append(appended: NewResponseLogRow[]) { for (const r of appended) rows.push({ ...r, createdAt: new Date().toISOString() }); },
-    async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref); },
-    async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId); },
-    async nextAttemptSeq() { return ++n; }
-  };
-  return { store, rows };
-}

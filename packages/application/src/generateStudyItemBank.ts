@@ -3,7 +3,6 @@ import {
   STAGE_TAGS,
   type DerivedGraphNode,
   type GraphSnapshot,
-  type OptionSelectItem,
   type PublishedConceptEvidenceProfile,
   type RejectedStudyItem,
   type StudyItem,
@@ -79,10 +78,9 @@ export async function generateStudyItemBank(input: {
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;
   const generateForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
-    const items: StudyItem[] = [];
     const grounding = selectNodeGrounding(node, snapshot, profileByConcept);
     if (!grounding || grounding.passages.length === 0) {
-      return { items, rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" }] };
     }
 
     let failureReason: string | null = null;
@@ -110,8 +108,7 @@ export async function generateStudyItemBank(input: {
       };
       const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
       if (guarded.ok) {
-        const item: OptionSelectItem = guarded.item;
-        items.push(item);
+        return { items: [guarded.item], rejected: [] };
       } else {
         failureReason = guarded.reason;
       }
@@ -119,17 +116,14 @@ export async function generateStudyItemBank(input: {
       failureReason = `option-select generation failed: ${error instanceof Error ? error.message : String(error)}`;
     }
 
-    if (items.length === 0) {
-      return {
-        items,
-        rejected: [{
-          derivedNodeId: node.derivedNodeId,
-          canonicalLabel: node.canonicalLabel,
-          reason: failureReason ?? "no study item could be grounded"
-        }]
-      };
-    }
-    return { items, rejected: [] };
+    return {
+      items: [],
+      rejected: [{
+        derivedNodeId: node.derivedNodeId,
+        canonicalLabel: node.canonicalLabel,
+        reason: failureReason ?? "no study item could be grounded"
+      }]
+    };
   };
   const perNode = await studyStage(
     STAGE_TAGS.studyItemGeneration,

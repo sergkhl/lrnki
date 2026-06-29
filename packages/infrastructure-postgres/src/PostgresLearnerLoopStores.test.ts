@@ -149,7 +149,7 @@ maybe("study_items rejects non-option-select discriminants", async () => {
     await assert.rejects(
       () => sql`
         INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
-        VALUES (${randomUUID()}, 'free_text', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'm', 'cfg')`,
+        VALUES (${randomUUID()}, 'unsupported_item_type', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'm', 'cfg')`,
       /violates check constraint/i
     );
   } finally {

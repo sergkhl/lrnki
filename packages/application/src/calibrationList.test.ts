@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { GroundingPassageView } from "@lrnki/ports";
 import type { ReadinessEdge } from "./adaptivePathProjection";
-import { neutralDescriptor, projectCalibrationList, type CalibrationListNode } from "./calibrationList";
+import { composeCalibrationSession, neutralDescriptor, projectCalibrationList, type CalibrationListNode } from "./calibrationList";
 
 function edge(prerequisite: string, dependent: string, uncertain = false): ReadinessEdge {
   return { prerequisiteDerivedNodeId: prerequisite, dependentDerivedNodeId: dependent, uncertain };
@@ -72,6 +72,24 @@ test("projectCalibrationList excludes uncertain edges from the cone and closure"
 
   assert.deepEqual(projected.rows.map((row) => row.derivedNodeId), ["Z", "B"]);
   assert.deepEqual([...projected.knownClosure].sort(), ["B"]);
+});
+
+test("composeCalibrationSession returns the application-owned calibration projection", () => {
+  const session = composeCalibrationSession({
+    enrichmentId: "e1",
+    learnerStateRef: "learner 1",
+    targetDerivedNodeId: "Z",
+    edges: chain,
+    nodes: [node("A", 0.1), node("B", 0.4), node("Z", 0.9)],
+    knownVerdictNodeIds: ["B"]
+  });
+
+  assert.ok(session);
+  assert.equal(session.enrichmentId, "e1");
+  assert.equal(session.learnerStateRef, "learner 1");
+  assert.deepEqual(session.target, { derivedNodeId: "Z", label: "Concept Z" });
+  assert.deepEqual(session.rows.map((row) => row.derivedNodeId), ["Z", "B"]);
+  assert.deepEqual(session.knownClosure, ["A", "B"]);
 });
 
 test("neutralDescriptor chooses a verbatim definition and trims to the first sentence", () => {

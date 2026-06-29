@@ -102,15 +102,17 @@ export function hideKnownClosureFromDetail(input: {
   knownClosure: Set<string>;
   targetDerivedNodeId: string;
 }): DerivedGraphDetail {
-  const visibleNodeIds = new Set(
-    input.detail.nodes
-      .filter((node) => node.derivedNodeId === input.targetDerivedNodeId || !input.knownClosure.has(node.derivedNodeId))
-      .map((node) => node.derivedNodeId)
-  );
-  const nodes = input.detail.nodes.filter((node) => visibleNodeIds.has(node.derivedNodeId));
-  const edges = input.detail.edges.filter(
-    (edge) => visibleNodeIds.has(edge.prerequisiteDerivedNodeId) && visibleNodeIds.has(edge.dependentDerivedNodeId)
-  );
+  const nodes = input.detail.nodes.filter((node) => node.derivedNodeId === input.targetDerivedNodeId || !input.knownClosure.has(node.derivedNodeId));
+  const visibleNodeIds = new Set(nodes.map((node) => node.derivedNodeId));
+  const edges: DerivedGraphEdge[] = [];
+  let certainEdgeCount = 0;
+  let uncertainEdgeCount = 0;
+  for (const edge of input.detail.edges) {
+    if (!visibleNodeIds.has(edge.prerequisiteDerivedNodeId) || !visibleNodeIds.has(edge.dependentDerivedNodeId)) continue;
+    edges.push(edge);
+    if (edge.uncertain) uncertainEdgeCount += 1;
+    else certainEdgeCount += 1;
+  }
 
   return {
     ...input.detail,
@@ -118,8 +120,8 @@ export function hideKnownClosureFromDetail(input: {
       ...input.detail.summary,
       conceptCount: nodes.length,
       edgeCount: edges.length,
-      certainEdgeCount: edges.filter((edge) => !edge.uncertain).length,
-      uncertainEdgeCount: edges.filter((edge) => edge.uncertain).length
+      certainEdgeCount,
+      uncertainEdgeCount
     },
     nodes,
     edges,

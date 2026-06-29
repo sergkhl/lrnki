@@ -21,6 +21,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
     const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
+    for (const item of studyItems) assertPersistableOptionSelectItem(item);
     // All items in one persist belong to a single enrichment layer. Regeneration is
     // replay, not mutation: delete the enrichment's prior items (options + citations
     // cascade) and prior rejections, then re-insert. Done even when 0 items survive so an
@@ -139,6 +140,14 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       return { ...base, itemType: "option_select", options };
     });
   }
+}
+
+function assertPersistableOptionSelectItem(item: StudyItem): void {
+  if (item.itemType !== "option_select") throw new Error(`unsupported study item type: ${String(item.itemType)}`);
+  if (item.options.length !== 4) throw new Error(`option_select ${item.studyItemId} must have exactly four options.`);
+  const correctOptions = item.options.filter((option) => option.isCorrect);
+  if (correctOptions.length !== 1) throw new Error(`option_select ${item.studyItemId} must have exactly one correct option.`);
+  if (!correctOptions[0].citation) throw new Error(`option_select ${item.studyItemId} correct option must carry a citation.`);
 }
 
 function toCitation(row: CitationRow): StudyItemCitation {

@@ -29,6 +29,15 @@ function revalidateLearnerStudyRoutes(learnerStateRef: string): void {
   revalidatePath(calibrationPath(learnerStateRef));
 }
 
+async function withSqlClient<T>(fn: (sql: ReturnType<typeof createDatabaseClient>) => Promise<T>): Promise<T> {
+  const sql = createDatabaseClient();
+  try {
+    return await fn(sql);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
 export async function submitOptionSelect(input: {
   learnerStateRef: string;
   studyItemId: string;
@@ -37,8 +46,7 @@ export async function submitOptionSelect(input: {
   const { learnerStateRef, studyItemId, chosenOptionId } = input;
   if (!learnerStateRef || !studyItemId || !chosenOptionId) return;
 
-  const sql = createDatabaseClient();
-  try {
+  await withSqlClient(async (sql) => {
     const rows = await sql<{ derived_node_id: string; correct_option_id: string }[]>`
       SELECT si.derived_node_id, sio.option_id AS correct_option_id
       FROM study_items si
@@ -54,24 +62,19 @@ export async function submitOptionSelect(input: {
       responseSource: "human",
       responseLog: new PostgresResponseLogStore(sql)
     });
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
-  revalidateLearnerStudyRoutes(learnerStateRef);
+  });
+  revalidatePath(sessionPath(learnerStateRef));
 }
 
 // Calibration verdict write (R5/R7). Upserts the learner's `known`/`learn` intent for one
-// node into the MUTABLE verdict store. "I knew it" (`known`) prunes the node's trusted
-// prerequisite down-closure on the next re-derive; "I forgot" (`learn`) keeps it in the gap.
+// node into the MUTABLE verdict store. Calibration toggles and "skip as known" write
+// `known`, which prunes the node's trusted prerequisite down-closure on the next re-derive.
 export async function setVerdict(input: { learnerStateRef: string; derivedNodeId: string; verdict: Verdict }): Promise<void> {
   const { learnerStateRef, derivedNodeId, verdict } = input;
   if (!learnerStateRef || !derivedNodeId) return;
-  const sql = createDatabaseClient();
-  try {
+  await withSqlClient(async (sql) => {
     await new PostgresCalibrationVerdictStore(sql).upsert({ learnerStateRef, derivedNodeId, verdict });
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
+  });
   revalidateLearnerStudyRoutes(learnerStateRef);
 }
 
@@ -80,12 +83,9 @@ export async function setVerdict(input: { learnerStateRef: string; derivedNodeId
 export async function clearVerdict(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void> {
   const { learnerStateRef, derivedNodeId } = input;
   if (!learnerStateRef || !derivedNodeId) return;
-  const sql = createDatabaseClient();
-  try {
+  await withSqlClient(async (sql) => {
     await new PostgresCalibrationVerdictStore(sql).delete({ learnerStateRef, derivedNodeId });
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
+  });
   revalidateLearnerStudyRoutes(learnerStateRef);
 }
 
@@ -96,12 +96,11 @@ export async function clearVerdict(input: { learnerStateRef: string; derivedNode
 export async function resetLearner(input: { learnerStateRef: string }): Promise<void> {
   const { learnerStateRef } = input;
   if (!learnerStateRef) return;
-  const sql = createDatabaseClient();
-  try {
-    await new PostgresCalibrationVerdictStore(sql).clearLearner(learnerStateRef);
-    await sql`DELETE FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
+  await withSqlClient(async (sql) => {
+    await sql.begin(async (tx) => {
+      await tx`DELETE FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}`;
+      await tx`DELETE FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
+    });
+  });
   revalidateLearnerStudyRoutes(learnerStateRef);
 }

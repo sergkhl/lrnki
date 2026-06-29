@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { CheckIcon, LockIcon, RotateCcwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,9 +32,49 @@ export function StudySideSheet({
   onClear: () => void;
   pending?: boolean;
 }>) {
+  const contentKey = content?.kind === "option_select" ? `option:${content.item.studyItemId}` : `${content?.kind ?? "none"}:${nodeLabel ?? ""}`;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="gap-4 p-6 sm:max-w-md">
+      <StudySideSheetContent
+        key={`${open}:${contentKey}`}
+        nodeLabel={nodeLabel}
+        content={content}
+        onSelect={onSelect}
+        onSkipAsKnown={onSkipAsKnown}
+        onClear={onClear}
+        pending={pending}
+      />
+    </Sheet>
+  );
+}
+
+function StudySideSheetContent({
+  nodeLabel,
+  content,
+  onSelect,
+  onSkipAsKnown,
+  onClear,
+  pending
+}: Readonly<{
+  nodeLabel: string | null;
+  content: SheetContentPayload | null;
+  onSelect: (optionId: string) => void;
+  onSkipAsKnown: () => void;
+  onClear: () => void;
+  pending: boolean;
+}>) {
+  const [actionStarted, setActionStarted] = useState(false);
+  const busy = pending || actionStarted;
+
+  const startAction = (fn: () => void) => {
+    if (busy) return;
+    setActionStarted(true);
+    fn();
+  };
+
+  return (
+    <SheetContent side="right" className="gap-4 p-6 sm:max-w-md">
         <SheetHeader className="p-0">
           <SheetTitle className="flex items-center gap-2">
             {nodeLabel ?? "Node"}
@@ -44,8 +85,8 @@ export function StudySideSheet({
 
         {content?.kind === "option_select" ? (
           <div className="flex flex-col gap-4">
-            <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={onSelect} pending={pending} />
-            <Button type="button" variant="outline" className="self-start" disabled={pending} onClick={onSkipAsKnown}>
+            <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={(optionId) => startAction(() => onSelect(optionId))} pending={busy} />
+            <Button type="button" variant="outline" className="self-start" disabled={busy} onClick={() => startAction(onSkipAsKnown)}>
               <CheckIcon data-icon="inline-start" />
               Skip as known
             </Button>
@@ -56,7 +97,7 @@ export function StudySideSheet({
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">Mastered for this learner.</p>
             {content.verdict === "known" ? (
-              <Button type="button" size="sm" variant="outline" className="self-start" disabled={pending} onClick={onClear}>
+              <Button type="button" size="sm" variant="outline" className="self-start" disabled={busy} onClick={() => startAction(onClear)}>
                 <RotateCcwIcon data-icon="inline-start" />
                 Clear known mark
               </Button>
@@ -67,7 +108,7 @@ export function StudySideSheet({
         {content?.kind === "cardless" ? (
           <div className="flex flex-col items-start gap-3 rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
             <span>No study item exists for this ready node.</span>
-            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onSkipAsKnown}>
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => startAction(onSkipAsKnown)}>
               <CheckIcon data-icon="inline-start" />
               Skip as known
             </Button>
@@ -90,8 +131,7 @@ export function StudySideSheet({
             )}
           </div>
         ) : null}
-      </SheetContent>
-    </Sheet>
+    </SheetContent>
   );
 }
 

@@ -17,6 +17,12 @@
    [ADR-0011](../adr/0011-retain-minimal-admin-lab.md), and
    [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
+3. **Harden Response Log attempt sequencing.** Concurrent same-learner answer submissions still
+   compute `attempt_seq` with `MAX(attempt_seq) + 1` before append, so cross-tab or multi-client
+   submissions can race the unique `(learner_state_ref, attempt_seq)` constraint. Prefer an atomic
+   per-learner sequence assignment in the persistence boundary rather than UI-only prevention.
+   Decision: [ADR-0026](../adr/0026-typed-study-item-bank.md).
+
 ## COMPLETED
 
 - **Published-Concept semantic identity resolution.** A standalone propose-decide operation runs
@@ -92,6 +98,17 @@
   the Derived Graph Layer. Admin Lab exposes the study and adapted-graph workflows without mutating
   published graph state. Decisions:
   [ADR-0026](../adr/0026-typed-study-item-bank.md) and
+  [ADR-0011](../adr/0011-retain-minimal-admin-lab.md).
+
+- **Calibration pre-study flow.** Calibration is now an optional, separate pre-study projection over
+  a goal's trusted prerequisite cone: rows are ordered hardest-first, show neutral grounded
+  descriptors rather than questions or answers, and known marks prune implied-known ancestors from
+  the list. Study no longer renders reveal/self-assessment cards; learners can skip a study item as
+  known without seeing an answer, and the adapted graph hides the full known closure as a
+  projection-only view. The Study Item Bank is option-select only; the retired free-form
+  grading/simulation and `self_assessment` paths were deleted. Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0011](../adr/0011-retain-minimal-admin-lab.md).
 
 - **Inspection architecture and operator tooling.** Source and run inspection use finished read-model
@@ -198,3 +215,15 @@
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims above come from
   inspected real model output.
+- **Calibration pre-study flow, 2026-06-29 (branch `feat/calibration-pre-study-flow`).** Full
+  workspace typecheck passes; full recursive tests pass; production build passes; ESLint has zero
+  errors and two pre-existing warnings. Focused coverage exercises the pure calibration list/session
+  projection, option-select-only generation, study side-sheet gating, adapted-graph known-closure
+  hiding, synthetic verdict seeding, and Postgres store type boundaries. Code review found and fixed
+  skip-as-known auto-advance, pending-write navigation races, option-vs-skip mutual exclusion, stale
+  calibration verdict wording, application-projection ownership, option-select persistence
+  invariants, calibration DB error swallowing, and non-transactional learner reset. Real-use quality
+  evaluation is **blocked** until a live `DATABASE_URL` is available: deterministic fixtures show B
+  known hides A from the calibration list, adapted graph hides A+B while keeping Z, no RecallCard or
+  reveal branch remains, and the calibrate route builds; no DB-backed browser pass or curated
+  enrichment inspection has been run for this milestone.

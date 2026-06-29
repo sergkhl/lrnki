@@ -633,20 +633,25 @@ CREATE TABLE study_items (
   UNIQUE (derived_node_id, item_type)
 );
 
--- Options for option_select items (R9). Exactly one is_correct per item, enforced by the
--- deterministic guard at build time (U2). `ordinal` preserves a stable render order.
+-- Options for option_select items (R9). Store writes validate the four-option shape; the
+-- schema backs that with ordinal bounds and at-most-one correct option per item.
+-- `ordinal` preserves a stable render order.
 -- The correct option's grounding lives in study_item_citations; distractors are
 -- generated and carry none. Cascade so item regeneration (delete-then-insert) clears
 -- options too.
 CREATE TABLE study_item_options (
   option_id uuid PRIMARY KEY,
   study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
-  ordinal integer NOT NULL,
+  ordinal integer NOT NULL CHECK (ordinal BETWEEN 0 AND 3),
   option_text text NOT NULL,
   is_correct boolean NOT NULL,
   provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
   UNIQUE (study_item_id, ordinal)
 );
+
+CREATE UNIQUE INDEX study_item_options_one_correct_per_item
+  ON study_item_options (study_item_id)
+  WHERE is_correct;
 
 -- Grounded-answer citations are provenance-tagged. They back the option_select correct
 -- answer, keyed by study_item_id. Source
@@ -687,9 +692,9 @@ CREATE TABLE rejected_study_items (
 -- ---------------------------------------------------------------------------
 -- Calibration Verdicts — the MUTABLE calibration store (R10, KTD1). Deliberately
 -- the opposite of the response log: a calibration verdict is the learner's CURRENT
--- intent per (learner, node), so it is naturally upsert/delete. Revealing a node's
--- answer and tapping "I knew it" writes `known`; "I forgot" writes `learn`. Reversal
--- (R7) is a single-row delete/overwrite — no append-only seeded rows to reconcile.
+-- intent per (learner, node), so it is naturally upsert/delete. The calibration list
+-- and study-side "skip as known" action write `known`; synthetic prefill may seed
+-- `learn`. Reversal (R7) is a single-row delete/overwrite — no append-only seeded rows to reconcile.
 -- The trusted-edge prerequisite down-closure of the `known` set is derived at read
 -- time (not materialized), so this table holds only the direct verdicts. There are
 -- no evidence weights (rule 18): a verdict is a discrete intent, not a graded score.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { composeCalibrationSession } from "./calibrationSession";
+import { composeCalibrationSession } from "@lrnki/application";
 import type { DerivedGraphDetail } from "./derivedGraph";
 
 function detail(): DerivedGraphDetail {
@@ -28,7 +28,8 @@ test("composeCalibrationSession projects the hardest-first list and hides implie
     enrichmentId: "e",
     learnerStateRef: "L1",
     targetDerivedNodeId: "Z",
-    detail: detail(),
+    edges: detail().edges,
+    nodes: detail().nodes,
     knownVerdictNodeIds: ["B"]
   });
   assert.ok(session);
@@ -39,5 +40,5 @@ test("composeCalibrationSession projects the hardest-first list and hides implie
 });
 
 test("composeCalibrationSession returns undefined for an unknown target", () => {
-  assert.equal(composeCalibrationSession({ enrichmentId: "e", learnerStateRef: "L1", targetDerivedNodeId: "missing", detail: detail(), knownVerdictNodeIds: [] }), undefined);
+  assert.equal(composeCalibrationSession({ enrichmentId: "e", learnerStateRef: "L1", targetDerivedNodeId: "missing", edges: detail().edges, nodes: detail().nodes, knownVerdictNodeIds: [] }), undefined);
 });
