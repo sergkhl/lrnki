@@ -12,8 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- None. (The learner study/path/loop read refactor shipped 2026-06-29; see
-  [TODO](./TODO.md) COMPLETED + VALIDATION.)
+- [Single-source the forced-tool schemas](./2026-06-29-002-refactor-single-source-forced-tool-schemas-plan.md)
+  — ready. zod validator becomes the single source; the forced-tool JSON Schema is generated at one
+  provider-dialect seam (Candidate 3 of the architecture review).
 
 ## Ownership rules
 

@@ -31,6 +31,13 @@
    once that app's calibration needs are concrete. Behavior-preserving; no new ADR.
    Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
+5. **Single-source the forced-tool schemas.** Ready — see active plan
+   [2026-06-29-002](./2026-06-29-002-refactor-single-source-forced-tool-schemas-plan.md). zod validator
+   becomes the single source; the forced-tool JSON Schema is generated at one provider-dialect seam
+   (`toForcedToolSchema`), closing the hand-synced JSON/zod duplication and the candidate-key enum
+   asymmetry (AGENTS rule 18). Origin: architecture review Candidate 3.
+   Decision: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md).
+
 ## COMPLETED
 
 - **Learner-facing reads on the ADR-0027 read-model split.** The study projection, Learner Path

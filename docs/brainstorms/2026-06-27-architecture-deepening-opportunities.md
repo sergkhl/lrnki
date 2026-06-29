@@ -257,17 +257,3 @@ flowchart TB
 > `prompt`/`map`. So this is leverage at the margins, not a large deletion — worth exploring, below
 > Candidates 1–3. The bigger duplication in this family is Candidate 3's schema twin, not the call
 > envelope.
-
----
-
-## Top recommendation
-
-**Candidate 2 — move the Learner Study projection behind a use-case + Inspection Read port.**
-
-It is the one place the review's central thesis is actively violated: a learner-facing projection
-with adaptation compute and raw SQL lives in the UI app, crossing the *Inspection Read Model* seam
-(ADR-0027) and duplicating the declared single definition of "ready" (AGENTS rule 18). It is the
-strongest combination of **locality** (readiness/mastery folds collapse into one module), **leverage**
-(one use-case feeding every study surface), and risk reduction (two definitions of "ready" can
-silently diverge between the path a learner walks and the operator's view). Candidate 1 (the trapped
-consensus engine) is a close second on pure depth.

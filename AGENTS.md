@@ -50,6 +50,10 @@ definitions and repair their references in the same change.
 
 14. After every important behavior-changing milestone, apply
     `.agents/skills/real-use-quality-evaluation/SKILL.md`. A green suite is not quality evidence.
+    `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
+    `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
+    (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer
+    a real-use gate by claiming `DATABASE_URL` is unavailable.
 
 15. Web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph visualization
     uses Cytoscape.
