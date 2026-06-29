@@ -702,6 +702,54 @@ export interface EnrichmentInspectionReadPort {
   getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
 }
 
+// Learner Path inspection read surface (ADR-0027, ADR-0011). Paths are computed and
+// persisted by the CLI; the Admin Lab only reads them and never computes (AGENTS rule 12).
+// Pure inspection: the storage adapter owns the path/step/DAG SQL and row-stitch; the UI
+// renders the finished model. The learner-recall subject identity is `derived_node_id`
+// throughout (ADR-0026).
+export interface LearnerPathSummary {
+  learnerPathId: string;
+  targetDerivedNodeId: string;
+  targetLabel: string;
+  declaredDomain: string;
+  learnerStateRef: string;
+  stepCount: number;
+  graphVersionId: string;
+  enrichmentId: string;
+  createdAt: string;
+}
+
+export interface LearnerPathNode {
+  derivedNodeId: string;
+  label: string;
+  difficulty: number | null;
+  inPath: boolean;
+  position: number | null;
+  isTarget: boolean;
+}
+
+export interface LearnerPathEdge {
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
+  confidence: number;
+  uncertain: boolean;
+  inPath: boolean;
+}
+
+export interface LearnerPathDetail {
+  summary: LearnerPathSummary;
+  steps: { position: number; derivedNodeId: string; label: string; difficulty: number; includedReason: string; groundingOrigin: string }[];
+  // The inferred prerequisite DAG of the path's enrichment, scoped to the target's
+  // Declared Domain (prerequisites are always same-domain, ADR-0015).
+  nodes: LearnerPathNode[];
+  edges: LearnerPathEdge[];
+}
+
+export interface LearnerPathInspectionReadPort {
+  listLearnerPaths(): Promise<LearnerPathSummary[]>;
+  getLearnerPathDetail(learnerPathId: string): Promise<LearnerPathDetail | undefined>;
+}
+
 // ---------------------------------------------------------------------------
 // Run-stage timeline reporting seam (ADR-0029). The externally driven seam every
 // triggered operation reports progress through, so a future durable workflow
