@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, CalibrationVerdict, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
-import type { CalibrationVerdictStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, LessonAbsentNode, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
+import type { CalibrationVerdictStorePort, ConceptLessonStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
@@ -179,6 +179,174 @@ type OptionRow = {
 
 type CitationRow = {
   study_item_id: string;
+  provenance: "source" | "generated";
+  source_resource_id: string | null;
+  source_block_id: string | null;
+  evidence_quote: string | null;
+  derived_node_id: string | null;
+  generated_passage_text: string | null;
+};
+
+const CONCEPT_LESSON_PRODUCER = "@lrnki/infrastructure-postgres";
+const CONCEPT_LESSON_PRODUCER_VERSION = "0.1.0";
+
+// Concept Lesson persistence (ADR-0031, R1/R3/R9). Normalized `concept_lessons` +
+// `concept_lesson_sections` + `concept_lesson_section_citations` are the query surface;
+// the immutable `concept_lesson_bank` artifact is the inspection trace the
+// `artifact_concept_lessons` JSON_TABLE view flattens. `persist` writes them all — plus
+// the `lesson_absent_nodes` — in ONE transaction, so there is never authoritative
+// relational state without its artifact (mirrors PostgresStudyItemBankStore). Lessons are
+// a learner-NEUTRAL derived asset: regeneration is replace-by-enrichment (delete-then-
+// insert), never a mutation of learner state and never a write to the asserted graph (R9).
+export class PostgresConceptLessonStore implements ConceptLessonStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void> {
+    const { graphVersionId, enrichmentId, configHash, lessons, absent } = input;
+    await this.sql.begin(async (tx) => {
+      // Regeneration is replay, not mutation: delete the enrichment's prior lessons
+      // (sections + citations cascade) and prior absences, then re-insert. Done even when
+      // 0 lessons survive so an all-absent regeneration still clears stale lessons.
+      await tx`DELETE FROM concept_lessons WHERE enrichment_id = ${enrichmentId}`;
+      await tx`DELETE FROM lesson_absent_nodes WHERE enrichment_id = ${enrichmentId}`;
+      for (const node of absent) {
+        await tx`
+          INSERT INTO lesson_absent_nodes (lesson_absent_node_id, graph_version_id, enrichment_id, derived_node_id, reason, config_hash)
+          VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${node.derivedNodeId}, ${node.reason}, ${configHash})`;
+      }
+      for (const lesson of lessons) {
+        const lessonId = randomUUID();
+        await tx`
+          INSERT INTO concept_lessons (concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash)
+          VALUES (${lessonId}, ${lesson.graphVersionId}, ${lesson.enrichmentId}, ${lesson.derivedNodeId}, ${lesson.canonicalLabel}, ${lesson.generatingModel}, ${lesson.configHash})`;
+        for (const [ordinal, section] of lesson.sections.entries()) {
+          const sectionId = randomUUID();
+          await tx`
+            INSERT INTO concept_lesson_sections (concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, grounding_provenance, diagram_caption, diagram_spec)
+            VALUES (${sectionId}, ${lessonId}, ${ordinal}, ${section.kind}, ${section.text}, ${section.groundingProvenance}, ${section.diagram?.caption ?? null}, ${section.diagram?.spec ?? null})`;
+          if (section.citation) await this.insertCitation(tx, sectionId, section.citation);
+        }
+      }
+
+      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }> = {
+        artifactId: randomUUID(),
+        artifactType: "concept_lesson_bank",
+        graphVersionId,
+        producer: CONCEPT_LESSON_PRODUCER,
+        producerVersion: CONCEPT_LESSON_PRODUCER_VERSION,
+        configHash,
+        createdAt: new Date().toISOString(),
+        payload: { graphVersionId, enrichmentId, lessons, absent }
+      };
+      await writeArtifactEnvelope(tx, artifact);
+    });
+  }
+
+  private async insertCitation(tx: Sql | TransactionSql, sectionId: string, citation: StudyItemCitation): Promise<void> {
+    if (citation.provenance === "source") {
+      await tx`
+        INSERT INTO concept_lesson_section_citations (concept_lesson_section_citation_id, concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote)
+        VALUES (${randomUUID()}, ${sectionId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote})`;
+    } else {
+      await tx`
+        INSERT INTO concept_lesson_section_citations (concept_lesson_section_citation_id, concept_lesson_section_id, provenance, derived_node_id, generated_passage_text)
+        VALUES (${randomUUID()}, ${sectionId}, 'generated', ${citation.derivedNodeId}, ${citation.passageText})`;
+    }
+  }
+
+  async getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined> {
+    const rows = await this.sql<LessonRow[]>`
+      SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash
+      FROM concept_lessons WHERE derived_node_id = ${derivedNodeId} LIMIT 1`;
+    if (rows.length === 0) return undefined;
+    const [lesson] = await this.hydrate(rows);
+    return lesson;
+  }
+
+  async listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]> {
+    const rows = await this.sql<LessonRow[]>`
+      SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash
+      FROM concept_lessons WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id`;
+    return this.hydrate(rows);
+  }
+
+  async listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]> {
+    const rows = await this.sql<{ derived_node_id: string; canonical_label: string; reason: string }[]>`
+      SELECT lan.derived_node_id, dgn.canonical_label, lan.reason
+      FROM lesson_absent_nodes lan
+      JOIN derived_graph_nodes dgn ON dgn.derived_node_id = lan.derived_node_id
+      WHERE lan.enrichment_id = ${enrichmentId} ORDER BY lan.derived_node_id`;
+    return rows.map((row) => ({ derivedNodeId: row.derived_node_id, canonicalLabel: row.canonical_label, reason: row.reason }));
+  }
+
+  private async hydrate(rows: LessonRow[]): Promise<ConceptLesson[]> {
+    if (rows.length === 0) return [];
+    const lessonIds = rows.map((row) => row.concept_lesson_id);
+    const sectionRows = await this.sql<LessonSectionRow[]>`
+      SELECT concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, grounding_provenance, diagram_caption, diagram_spec
+      FROM concept_lesson_sections WHERE concept_lesson_id IN ${this.sql(lessonIds)}
+      ORDER BY concept_lesson_id, ordinal`;
+    const sectionIds = sectionRows.map((row) => row.concept_lesson_section_id);
+    const citationRows = sectionIds.length
+      ? await this.sql<LessonCitationRow[]>`
+          SELECT concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote, derived_node_id, generated_passage_text
+          FROM concept_lesson_section_citations WHERE concept_lesson_section_id IN ${this.sql(sectionIds)}`
+      : [];
+
+    const citationBySection = new Map<string, LessonCitationRow>();
+    for (const citation of citationRows) citationBySection.set(citation.concept_lesson_section_id, citation);
+    const sectionsByLesson = new Map<string, LessonSectionRow[]>();
+    for (const section of sectionRows) {
+      sectionsByLesson.set(section.concept_lesson_id, [...(sectionsByLesson.get(section.concept_lesson_id) ?? []), section]);
+    }
+
+    return rows.map((row) => ({
+      derivedNodeId: row.derived_node_id,
+      graphVersionId: row.graph_version_id,
+      enrichmentId: row.enrichment_id,
+      generatingModel: row.generating_model,
+      configHash: row.config_hash,
+      canonicalLabel: row.canonical_label,
+      sections: (sectionsByLesson.get(row.concept_lesson_id) ?? []).map((section): ConceptLessonSection => {
+        const citationRow = citationBySection.get(section.concept_lesson_section_id);
+        const base: ConceptLessonSection = {
+          kind: section.kind,
+          text: section.body_text,
+          groundingProvenance: section.grounding_provenance as ConceptLessonSection["groundingProvenance"]
+        };
+        if (citationRow) base.citation = toCitation(citationRow as unknown as CitationRow);
+        if (section.diagram_caption !== null && section.diagram_spec !== null) {
+          base.diagram = { caption: section.diagram_caption, spec: section.diagram_spec };
+        }
+        return base;
+      })
+    }));
+  }
+}
+
+type LessonRow = {
+  concept_lesson_id: string;
+  graph_version_id: string;
+  enrichment_id: string;
+  derived_node_id: string;
+  canonical_label: string;
+  generating_model: string;
+  config_hash: string;
+};
+
+type LessonSectionRow = {
+  concept_lesson_section_id: string;
+  concept_lesson_id: string;
+  ordinal: number;
+  kind: ConceptLessonSection["kind"];
+  body_text: string;
+  grounding_provenance: string;
+  diagram_caption: string | null;
+  diagram_spec: string | null;
+};
+
+type LessonCitationRow = {
+  concept_lesson_section_id: string;
   provenance: "source" | "generated";
   source_resource_id: string | null;
   source_block_id: string | null;

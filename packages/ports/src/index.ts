@@ -6,7 +6,9 @@ import type {
   BlockEvidence,
   CalibrationVerdict,
   ConceptIdentityResolutionOutcome,
+  ConceptLesson,
   ConceptLessonDraft,
+  LessonAbsentNode,
   StudyItem,
   OptionSelectItemDraft,
   StudyItemGroundingProvenance,
@@ -406,6 +408,21 @@ export interface StudyItemBankStorePort {
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
   listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]>;
   supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
+}
+
+// Concept Lesson persistence (ADR-0031, R1/R3/R9). `persist` writes a whole enrichment's
+// lessons, their ordered sections + per-section grounded citations, AND its lesson-absent
+// nodes atomically, plus the immutable `concept_lesson_bank` artifact, in one transaction
+// (no authoritative relational state without its artifact, matching the Study Item Bank
+// store). Regeneration replaces an enrichment's lessons and absences (delete-then-insert).
+// `getLesson` returns a node's lesson (absences are NOT returned); `listLessonsForEnrichment`
+// powers the Study Session ride-down and the operator visibility surface. A learner-NEUTRAL
+// derived asset: this port imports no graph/enrichment write port (R9).
+export interface ConceptLessonStorePort {
+  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
+  getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined>;
+  listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]>;
+  listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
 }
 
 // Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the

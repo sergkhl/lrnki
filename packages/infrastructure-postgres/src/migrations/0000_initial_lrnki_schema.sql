@@ -417,6 +417,24 @@ JSON_TABLE(
 ) AS si
 WHERE a.artifact_type = 'study_item_bank';
 
+-- Flatten concept-lesson-bank artifact payloads: one row per persisted Concept Lesson with
+-- its derived node, label, and section count, for Admin Lab inspection (ADR-0031). Reads the
+-- immutable `concept_lesson_bank` artifact the Concept Lesson store writes beside its rows.
+CREATE VIEW artifact_concept_lessons AS
+SELECT a.graph_version_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count
+FROM artifact_versions a,
+JSON_TABLE(
+  a.payload,
+  '$.lessons[*]'
+  COLUMNS (
+    derived_node_id text PATH '$.derivedNodeId',
+    enrichment_id text PATH '$.enrichmentId',
+    canonical_label text PATH '$.canonicalLabel',
+    section_count integer PATH '$.sections.size()'
+  )
+) AS cl
+WHERE a.artifact_type = 'concept_lesson_bank';
+
 -- ---------------------------------------------------------------------------
 -- Graph Enrichment — third operation, derived layer keyed to a published
 -- version (ADR-0019). LLM-proposed, symbolically constrained; never mutates the
@@ -680,6 +698,84 @@ CREATE TABLE study_item_citations (
 -- `reason` instead of guessing from grounding origin.
 CREATE TABLE rejected_study_items (
   rejected_study_item_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  reason text NOT NULL,
+  config_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (derived_node_id)
+);
+
+-- ---------------------------------------------------------------------------
+-- Concept Lessons — the learner-neutral teaching SUBSTRATE (ADR-0031). One lesson per
+-- derived node: an ordered set of typed, independently-optional sections that TEACH a
+-- concept before it is tested. Option-select derives FROM this substrate (rule 18), so a
+-- lesson is the single source of grounding for downstream study assets. Like the Study
+-- Item Bank, lessons are a learner-NEUTRAL regenerable derived asset: regeneration is
+-- replace-by-enrichment (delete-then-insert), never mutation of learner state, and never
+-- a write to the asserted graph. The normalized rows are the query surface; the immutable
+-- `concept_lesson_bank` artifact is the inspection trace `artifact_concept_lessons` flattens.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE concept_lessons (
+  concept_lesson_id uuid PRIMARY KEY,
+  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  canonical_label text NOT NULL,
+  generating_model text NOT NULL,
+  config_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (derived_node_id)
+);
+
+-- Ordered teaching sections (R2). `ordinal` preserves the render order; a section that
+-- does not apply is simply ABSENT (no placeholder row, R3). `grounding_provenance` records
+-- the authoritative provenance the assembler re-derived (a section is `source_*` only when
+-- its quote verified verbatim). The diagram descriptor (R14) is an optional caption+spec
+-- pair, persisted but never rendered this iteration; the CHECK keeps the pair all-or-nothing.
+-- Cascade so lesson regeneration (delete-then-insert) clears sections too.
+CREATE TABLE concept_lesson_sections (
+  concept_lesson_section_id uuid PRIMARY KEY,
+  concept_lesson_id uuid NOT NULL REFERENCES concept_lessons(concept_lesson_id) ON DELETE CASCADE,
+  ordinal integer NOT NULL CHECK (ordinal >= 0),
+  kind text NOT NULL CHECK (kind IN ('gist', 'intuition', 'definition', 'examples', 'applications', 'formulas')),
+  body_text text NOT NULL,
+  grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
+  diagram_caption text,
+  diagram_spec text,
+  CHECK ((diagram_caption IS NULL AND diagram_spec IS NULL) OR (diagram_caption IS NOT NULL AND diagram_spec IS NOT NULL)),
+  UNIQUE (concept_lesson_id, ordinal)
+);
+
+-- Per-section grounding citations are provenance-tagged exactly like study-item citations
+-- (KTD2). A `source` citation mirrors real source evidence and requires source ids + a
+-- verbatim quote; a `generated` citation points at generated grounding text only and cannot
+-- smuggle nullable source ids through the schema (R8). At most one citation per section.
+-- Cascade so lesson regeneration clears citations too.
+CREATE TABLE concept_lesson_section_citations (
+  concept_lesson_section_citation_id uuid PRIMARY KEY,
+  concept_lesson_section_id uuid NOT NULL REFERENCES concept_lesson_sections(concept_lesson_section_id) ON DELETE CASCADE,
+  provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
+  source_resource_id uuid REFERENCES source_resources(source_resource_id),
+  source_block_id uuid REFERENCES source_blocks(source_block_id),
+  evidence_quote text,
+  derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  generated_passage_text text,
+  CHECK (
+    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
+    OR
+    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
+  ),
+  UNIQUE (concept_lesson_section_id)
+);
+
+-- Derived nodes whose grounding cannot meet the R3 minimum, recorded as a durable fact
+-- (not a transient log line) so the operator lesson-absent visibility surface (U8) reads
+-- the exact reason. Regeneration replaces an enrichment's absences alongside its lessons.
+CREATE TABLE lesson_absent_nodes (
+  lesson_absent_node_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
