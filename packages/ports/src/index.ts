@@ -6,6 +6,7 @@ import type {
   BlockEvidence,
   CalibrationVerdict,
   ConceptIdentityResolutionOutcome,
+  ConceptLessonDraft,
   StudyItem,
   OptionSelectItemDraft,
   StudyItemGroundingProvenance,
@@ -426,6 +427,34 @@ export interface StudyItemGenerationPort {
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];
   }): Promise<OptionSelectItemDraft>;
+}
+
+// Concept Lesson generation (ADR-0031, R2/R4/R6/R7/R11/R14). Forced named tool schema
+// routed through LiteLLM; the generator stays DeepSeek-family (AGENTS rule 5). `generate`
+// returns a pre-verification ConceptLessonDraft — an ordered set of sections each citing a
+// grounding passage by id when source-supported. Provenance honesty is re-derived
+// authoritatively by the pure assembler (U6); this port never decides what is source-cited.
+// Synthesized sections are generated unconditionally this iteration (R11; confidence-gating
+// is deferred to ADR-0030).
+export interface ConceptLessonGenerationPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    // Directional graph neighbors for the graph-aware applications section (R5). Each is a
+    // label + grounding snippet; a neighbor-poor node still produces a lesson (prompt-context
+    // only). Structurally compatible with the application's LessonNeighborhood.
+    neighbors: {
+      parents: { label: string; snippet: string }[];
+      children: { label: string; snippet: string }[];
+      siblings: { label: string; snippet: string }[];
+    };
+  }): Promise<ConceptLessonDraft>;
 }
 
 // Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ

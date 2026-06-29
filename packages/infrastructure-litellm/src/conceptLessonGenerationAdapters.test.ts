@@ -1,0 +1,104 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { LiteLlmConceptLessonGenerationAdapter } from "./conceptLessonGenerationAdapters";
+import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+
+type Captured = { toolName: string; tags: string[]; parameters: unknown; messages: { content: string }[] };
+
+function fakeClient(response: unknown, sink: Captured[]): LiteLlmForcedToolClient {
+  return {
+    async call(input: Captured) {
+      sink.push(input);
+      return response;
+    }
+  } as unknown as LiteLlmForcedToolClient;
+}
+
+const baseInput = {
+  declaredDomain: "software engineering",
+  node: { derivedNodeId: "n1", canonicalLabel: "Borrowing", aliases: ["borrow"] },
+  groundingProvenance: "source_cep" as const,
+  groundingPassages: [
+    { passageId: "b1", kind: "definition" as const, text: "Borrowing lends a reference without taking ownership.", sourceResourceId: "res-1", sourceBlockId: "b1" }
+  ],
+  neighbors: {
+    parents: [{ label: "Ownership", snippet: "each value has a single owner" }],
+    children: [{ label: "Lifetimes", snippet: "how long a reference is valid" }],
+    siblings: [{ label: "Slices", snippet: "a view into contiguous data" }]
+  }
+};
+
+test("generate issues one call with the lesson tool name, schema, and stage tag", async () => {
+  const calls: Captured[] = [];
+  const client = fakeClient({
+    sections: [
+      { kind: "gist", text: "Borrowing accesses a value without owning it.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null },
+      { kind: "definition", text: "Borrowing lends a reference without taking ownership.", citationPassageId: "b1", citationEvidenceQuote: "Borrowing lends a reference without taking ownership.", diagramCaption: null, diagramSpec: null },
+      { kind: "applications", text: "Lifetimes build on borrowing.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+    ]
+  }, calls);
+  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+
+  const draft = await adapter.generate(baseInput);
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].toolName, "submit_concept_lesson");
+  assert.deepEqual(calls[0].tags, ["concept-lesson-generation"]);
+  assert.equal(draft.sections.length, 3);
+  // A source-supported section with both citation fields carries a draft citation.
+  const definition = draft.sections.find((s) => s.kind === "definition");
+  assert.deepEqual(definition?.citation, { passageId: "b1", evidenceQuote: "Borrowing lends a reference without taking ownership." });
+  // A synthesized section carries no citation passed through.
+  assert.equal(draft.sections.find((s) => s.kind === "gist")?.citation, undefined);
+});
+
+test("the user message renders grounding passages and directional neighbor lists", async () => {
+  const calls: Captured[] = [];
+  const client = fakeClient({ sections: [] }, calls);
+  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+
+  await adapter.generate(baseInput);
+  const user = calls[0].messages.map((m) => m.content).join("\n");
+  assert.ok(user.includes("b1"));
+  assert.ok(user.includes("Ownership"));
+  assert.ok(user.includes("Lifetimes"));
+  assert.ok(user.includes("Slices"));
+});
+
+test("a partial citation (passage id without quote) is dropped rather than passed through", async () => {
+  const calls: Captured[] = [];
+  const client = fakeClient({
+    sections: [
+      { kind: "definition", text: "A definition.", citationPassageId: "b1", citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+    ]
+  }, calls);
+  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const draft = await adapter.generate(baseInput);
+  assert.equal(draft.sections[0].citation, undefined);
+});
+
+test("a diagram descriptor with both caption and spec is carried through", async () => {
+  const calls: Captured[] = [];
+  const client = fakeClient({
+    sections: [
+      { kind: "examples", text: "An example.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: "Owned vs borrowed", diagramSpec: "A relates to B" }
+    ]
+  }, calls);
+  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const draft = await adapter.generate(baseInput);
+  assert.deepEqual(draft.sections[0].diagram, { caption: "Owned vs borrowed", spec: "A relates to B" });
+});
+
+test("the system prompt names no domain and asserts no section is mandatory (R4)", async () => {
+  const calls: Captured[] = [];
+  const client = fakeClient({ sections: [] }, calls);
+  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  await adapter.generate(baseInput);
+  const system = calls[0].messages.find((m) => (m as { role?: string }).role === "system")?.content
+    ?? calls[0].messages[0].content;
+  assert.ok(/never assume a section applies/i.test(system));
+  // No fixture term leaks into the system instruction.
+  for (const term of ["ownership", "rust", "market"]) {
+    assert.equal(system.toLowerCase().includes(term), false);
+  }
+});

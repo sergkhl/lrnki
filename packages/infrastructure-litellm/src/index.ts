@@ -46,6 +46,10 @@ export {
   STUDY_ITEM_GENERATION_MODEL
 } from "./studyItemGenerationAdapters";
 export {
+  LiteLlmConceptLessonGenerationAdapter,
+  CONCEPT_LESSON_GENERATION_MODEL
+} from "./conceptLessonGenerationAdapters";
+export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,
   LiteLlmEvidenceProfileExtractionAdapter,
