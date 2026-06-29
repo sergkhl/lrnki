@@ -126,9 +126,34 @@ export function classifyAdaptedNodes(input: {
 }
 
 // Hardest-first ordering of ready+unmastered nodes: descending difficulty, ties broken
-// by id so the selection is deterministic. Shared by the selector and the classifier.
-function rankFrontier(nodeIds: string[], difficultyOf: Map<string, number>): string[] {
+// by id so the selection is deterministic. Shared by the selector, the classifier, and
+// the study projection's goal-scoped selector — exported so no surface re-inlines the
+// tie-break (KTD5, AGENTS rule 18). The path a learner walks and the ring an operator
+// sees rank the frontier the SAME way.
+export function rankFrontier(nodeIds: string[], difficultyOf: Map<string, number>): string[] {
   return [...nodeIds].sort((a, b) => (difficultyOf.get(b) ?? 0) - (difficultyOf.get(a) ?? 0) || a.localeCompare(b));
+}
+
+// The node within the goal's ancestor cone (∪ the goal itself) the learner advances to
+// NEXT — the hardest "frontier" (ready+unmastered) node in scope (KTD5). Unlike
+// `classifyAdaptedNodes`'s whole-layer `selectedFrontierTarget`, this is scoped to "teach
+// me Z", so a calibrated learner is routed only through what Z still needs. It CONSUMES the
+// whole-layer classification's already-computed states (frontier = ready+unmastered) and
+// shares `rankFrontier`, so the overlay ring and the projected path cannot drift. Returns
+// `null` when nothing in scope is frontier (the goal cone is fully mastered). Scope is taken
+// on CERTAIN edges only, matching the readiness classifier's trust model.
+export function selectScopedFrontierTarget(input: {
+  targetNodeId: string;
+  prerequisiteEdges: ReadinessEdge[];
+  classification: AdaptedNodeClassification;
+  difficulties: { derivedNodeId: string; score: number | null }[];
+}): string | null {
+  const certainEdges = input.prerequisiteEdges.filter((edge) => !edge.uncertain);
+  const scope = prerequisiteAncestors(input.targetNodeId, certainEdges);
+  scope.add(input.targetNodeId);
+  const frontier = [...scope].filter((nodeId) => input.classification.stateByNode[nodeId] === "frontier");
+  if (frontier.length === 0) return null;
+  return rankFrontier(frontier, difficultyMap(input.difficulties))[0];
 }
 
 function difficultyMap(difficulties: { derivedNodeId: string; score: number | null }[]): Map<string, number> {

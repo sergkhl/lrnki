@@ -87,6 +87,8 @@ export {
 } from "./responseLogLearnerState";
 export {
   selectFrontierTarget,
+  selectScopedFrontierTarget,
+  rankFrontier,
   projectAdaptivePath,
   classifyAdaptedNodes,
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -94,6 +96,32 @@ export {
   type AdaptedNodeClassification,
   type ReadinessEdge
 } from "./adaptivePathProjection";
+export {
+  composeStudySession,
+  studyItemToView,
+  studyItemViewToSheet,
+  labelFor,
+  unmetPrerequisites,
+  adaptedHiddenNodeIds,
+  type StudySession,
+  type SheetContent,
+  type StudyItemView,
+  type StudyOptionSelectView,
+  type CoexistenceFlag,
+  type RestorationSuggestion
+} from "./studySessionProjection";
+export {
+  detectConflicts,
+  buildMasteryMap,
+  summarizeResponseSources,
+  summarizeLearnerStates,
+  dedupeEnrichmentScopes,
+  type ConflictKind,
+  type ConceptConflict,
+  type ResponseSourceSummary,
+  type LearnerStateSummary,
+  type TimestampedResponseLogRow
+} from "./learnerLoopProjection";
 export {
   synthesizeResponses,
   verdictByDifficulty,
