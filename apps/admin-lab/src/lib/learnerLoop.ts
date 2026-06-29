@@ -1,399 +1,48 @@
 import {
-  classifyAdaptedNodes,
-  foldConceptMastery,
-  ADAPTIVE_MASTERY_THRESHOLD,
-  type AdaptedNodeClassification
+  getLearnerAdaptedGraphs as loadLearnerAdaptedGraphs,
+  getLearnerLoopDetail as loadLearnerLoopDetail,
+  listLearnerStates as loadLearnerStates
 } from "@lrnki/application";
-import type { CalibrationVerdict, JudgedOutcome, ResponseLogRow, Verdict } from "@lrnki/domain-core";
-import { createDatabaseClient, PostgresResponseLogStore } from "@lrnki/infrastructure-postgres";
-import type { LearnerStatePort, ResponseLogStorePort } from "@lrnki/ports";
-import { getEnrichmentDetail } from "./enrichments";
-import type { DerivedGraphDetail } from "./derivedGraph";
+import { createDatabaseClient, PostgresEnrichmentInspectionRead, PostgresLearnerLoopRead } from "@lrnki/infrastructure-postgres";
+
+// Server-only thin shell over the Learner Loop read port + projection use-cases (ADR-0027,
+// KTD7). The joined-history/coverage SQL lives in `PostgresLearnerLoopRead`; the
+// conflict/mastery/summary folds and the adapted-graph classify live in `@lrnki/application`
+// (`getLearnerLoopDetail` / `listLearnerStates` / `getLearnerAdaptedGraphs`), so the Admin Lab
+// and the forthcoming Learner Application share one definition (AGENTS rule 18). This module
+// only manages the sql lifecycle, injects the read adapters, and keeps the DATABASE_URL-absent
+// fallback. It opens no write port, so it structurally cannot mutate learner state (R10); real
+// DB errors propagate to the Next.js error boundary, matching the other inspection loaders.
+export type {
+  ConceptConflict,
+  LearnerStateSummary,
+  LearnerResponseView,
+  LearnerLoopDetail,
+  LearnerAdaptedGraph,
+  LearnerAdaptedGraphs,
+  ResponseSourceSummary
+} from "@lrnki/application";
 
 type Sql = ReturnType<typeof createDatabaseClient>;
-
-// Server-only loaders + pure logic for the Admin Lab learner-loop surface (U8). The
-// read loaders follow the existing read-only `withClient` pattern; the write path
-// (resubmit) is Admin Lab's FIRST mutation, and it mutates LEARNER STATE ONLY — it
-// appends to response_log and re-persists a learner_path, never a published graph or
-// the Derived Graph Layer (AGENTS rule 12, R15).
 
 async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefined> {
   if (!process.env.DATABASE_URL) return undefined;
   const sql = createDatabaseClient();
   try {
     return await fn(sql);
-  } catch {
-    return undefined;
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
-// --- Conflict detection (R12, AE3) -----------------------------------------
-
-export type ConflictKind = "claimed_known_but_failed" | "claimed_unknown_but_passed";
-
-export type ConceptConflict = {
-  derivedNodeId: string;
-  kind: ConflictKind;
-  verdict: Verdict;
-  latestGraded: JudgedOutcome;
-};
-
-// A calibration↔graded conflict (R12, AE3), re-homed off the retired self-report sweep
-// onto VERDICT-vs-graded. A node whose mutable verdict says `known` but whose LATEST graded
-// outcome is `incorrect` (claimed-known-but-failed), or whose verdict says `learn` but whose
-// latest graded is `correct` (claimed-unknown-but-passed). Requires BOTH a verdict and a
-// graded row; agreement is never flagged. Calibration/graded coexistence is SURFACED here,
-// never silently resolved by a precedence rule (KTD4). Pure over the learner's verdicts + rows.
-export function detectConflicts(verdicts: CalibrationVerdict[], gradedRows: ResponseLogRow[]): ConceptConflict[] {
-  const verdictByNode = new Map(verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
-  const latestGradedByNode = new Map<string, ResponseLogRow>();
-  for (const row of gradedRows) {
-    if (row.signalType !== "graded") continue;
-    const current = latestGradedByNode.get(row.derivedNodeId);
-    if (!current || row.attemptSeq > current.attemptSeq) latestGradedByNode.set(row.derivedNodeId, row);
-  }
-
-  const conflicts: ConceptConflict[] = [];
-  for (const [derivedNodeId, verdict] of verdictByNode) {
-    const graded = latestGradedByNode.get(derivedNodeId);
-    if (!graded) continue;
-    const latestGraded = graded.judgedOutcome as JudgedOutcome;
-    if (verdict === "known" && latestGraded === "incorrect") {
-      conflicts.push({ derivedNodeId, kind: "claimed_known_but_failed", verdict, latestGraded });
-    } else if (verdict === "learn" && latestGraded === "correct") {
-      conflicts.push({ derivedNodeId, kind: "claimed_unknown_but_passed", verdict, latestGraded });
-    }
-  }
-  return conflicts.sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
+export function listLearnerStates() {
+  return withClient((sql) => loadLearnerStates(new PostgresLearnerLoopRead(sql)));
 }
 
-// --- Read loaders ----------------------------------------------------------
-
-export type LearnerStateSummary = {
-  learnerStateRef: string;
-  latestResponseAt: string | null;
-  responseCount: number;
-  // Replaces the retired self-report count: how many nodes the learner marked `known`.
-  knownVerdictCount: number;
-  gradedCount: number;
-  conflictCount: number;
-};
-
-export type LearnerResponseView = {
-  responseId: string;
-  attemptSeq: number;
-  derivedNodeId: string;
-  nodeLabel: string;
-  studyItemId: string;
-  question: string;
-  signalType: string;
-  judgedOutcome: string | null;
-  gradedScore: number | null;
-  responseSource: string;
-  graderIdentity: string | null;
-  submittedAnswer: string | null;
-  createdAt: string;
-};
-
-export type LearnerLoopDetail = {
-  learnerStateRef: string;
-  responses: LearnerResponseView[];
-  conflicts: ConceptConflict[];
-  // Existing paths for this learner, so a resubmit knows which path(s) to recompute.
-  paths: { enrichmentId: string; targetDerivedNodeId: string; targetLabel: string }[];
-  coverage: PathStudyItemCoverage[];
-  // The learner's folded per-derived-node mastery (EXPERIMENT_ONLY trust) and a
-  // synthetic-vs-human response-source tally — both feed the adapted-graph overlay (R1, R3).
-  masteryByNode: Record<string, number>;
-  responseSourceSummary: ResponseSourceSummary;
-};
-
-// --- Pure overlay helpers (U2) ---------------------------------------------
-
-export type ResponseSourceSummary = { synthetic: number; human: number; total: number };
-
-// Tally a learner's rows by response source so the page can badge data origin, keeping
-// seeded synthetic rows distinguishable from real ones (R3). `total` includes any
-// source outside synthetic|human so the badge never silently under-counts.
-export function summarizeResponseSources(rows: { responseSource: string }[]): ResponseSourceSummary {
-  let synthetic = 0;
-  let human = 0;
-  for (const row of rows) {
-    if (row.responseSource === "synthetic") synthetic += 1;
-    else if (row.responseSource === "human") human += 1;
-  }
-  return { synthetic, human, total: rows.length };
+export function getLearnerLoopDetail(learnerStateRef: string) {
+  return withClient((sql) => loadLearnerLoopDetail(new PostgresLearnerLoopRead(sql), learnerStateRef));
 }
 
-// Fold a learner's rows to a per-derived-node mastery map, reusing `foldConceptMastery`
-// (graded outranks self-report; latest graded wins). Rows must be ordered by attempt_seq,
-// as the loader returns them — this does NOT re-query (KTD: fold what is already loaded).
-export function buildMasteryMap(rows: ResponseLogRow[]): Record<string, number> {
-  const byNode = new Map<string, ResponseLogRow[]>();
-  for (const row of rows) byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
-  const masteryByNode: Record<string, number> = {};
-  for (const [derivedNodeId, nodeRows] of byNode) masteryByNode[derivedNodeId] = foldConceptMastery(nodeRows);
-  return masteryByNode;
-}
-
-// Dedupe a learner's path scopes to distinct enrichments, keeping the first occurrence.
-// Callers pass paths latest-first (the loader returns them `created_at DESC`), so the kept
-// row is the most recent path per enrichment — resubmits append new path rows, and without
-// this the page would render duplicate panel-pairs for one enrichment (Risks).
-export function dedupeEnrichmentScopes<T extends { enrichmentId: string }>(paths: T[]): T[] {
-  const seen = new Set<string>();
-  const distinct: T[] = [];
-  for (const path of paths) {
-    if (seen.has(path.enrichmentId)) continue;
-    seen.add(path.enrichmentId);
-    distinct.push(path);
-  }
-  return distinct;
-}
-
-export type PathStudyItemCoverage = {
-  enrichmentId: string;
-  targetDerivedNodeId: string;
-  targetLabel: string;
-  steps: PathStudyItemCoverageStep[];
-};
-
-export type PathStudyItemCoverageStep = {
-  position: number;
-  derivedNodeId: string;
-  label: string;
-  groundingOrigin: string;
-  includedReason: string;
-  studyItem: { studyItemId: string; question: string; provenance: "source_cep" | "source_mentioned" | "generated" } | null;
-  fallbackReason: string | null;
-};
-
-type TimestampedResponseLogRow = ResponseLogRow & { createdAt: string };
-
-function rowToResponseLogRow(row: ResponseRow): TimestampedResponseLogRow {
-  return {
-    responseId: row.response_id,
-    learnerStateRef: row.learner_state_ref,
-    studyItemId: row.study_item_id,
-    derivedNodeId: row.derived_node_id,
-    signalType: row.signal_type as ResponseLogRow["signalType"],
-    judgedOutcome: row.judged_outcome as ResponseLogRow["judgedOutcome"],
-    gradedScore: row.graded_score === null ? null : Number(row.graded_score),
-    responseSource: row.response_source as ResponseLogRow["responseSource"],
-    graderIdentity: row.grader_identity,
-    batchId: row.batch_id,
-    attemptSeq: Number(row.attempt_seq),
-    submittedAnswer: row.submitted_answer,
-    createdAt: new Date(row.created_at).toISOString()
-  };
-}
-
-type ResponseRow = {
-  response_id: string; learner_state_ref: string; study_item_id: string; derived_node_id: string; signal_type: string;
-  judged_outcome: string | null; graded_score: number | null;
-  response_source: string; grader_identity: string | null; batch_id: string | null;
-  attempt_seq: number; submitted_answer: string | null; created_at: string;
-};
-
-// One learner's calibration verdicts, loaded for conflict detection + the known count.
-type VerdictRow = { learner_state_ref: string; derived_node_id: string; verdict: string };
-function rowToVerdict(row: VerdictRow): CalibrationVerdict {
-  return { learnerStateRef: row.learner_state_ref, derivedNodeId: row.derived_node_id, verdict: row.verdict as Verdict };
-}
-
-export function summarizeLearnerStates(rows: TimestampedResponseLogRow[], verdicts: CalibrationVerdict[]): LearnerStateSummary[] {
-  const rowsByLearner = new Map<string, TimestampedResponseLogRow[]>();
-  for (const row of rows) rowsByLearner.set(row.learnerStateRef, [...(rowsByLearner.get(row.learnerStateRef) ?? []), row]);
-  const verdictsByLearner = new Map<string, CalibrationVerdict[]>();
-  for (const verdict of verdicts) verdictsByLearner.set(verdict.learnerStateRef, [...(verdictsByLearner.get(verdict.learnerStateRef) ?? []), verdict]);
-
-  // A learner appears if it has rows OR verdicts (a freshly-calibrated learner with no
-  // graded answers yet still belongs in the list).
-  const learnerRefs = new Set<string>([...rowsByLearner.keys(), ...verdictsByLearner.keys()]);
-
-  return [...learnerRefs]
-    .map((learnerStateRef) => {
-      const learnerRows = rowsByLearner.get(learnerStateRef) ?? [];
-      const learnerVerdicts = verdictsByLearner.get(learnerStateRef) ?? [];
-      const latestResponseAt = learnerRows.length > 0
-        ? learnerRows.reduce((latest, row) => (row.createdAt > latest ? row.createdAt : latest), learnerRows[0].createdAt)
-        : null;
-      return {
-        learnerStateRef,
-        latestResponseAt,
-        responseCount: learnerRows.length,
-        knownVerdictCount: learnerVerdicts.filter((verdict) => verdict.verdict === "known").length,
-        gradedCount: learnerRows.filter((row) => row.signalType === "graded").length,
-        conflictCount: detectConflicts(learnerVerdicts, learnerRows).length
-      };
-    })
-    .sort((a, b) => (b.latestResponseAt ?? "").localeCompare(a.latestResponseAt ?? "") || a.learnerStateRef.localeCompare(b.learnerStateRef));
-}
-
-export async function listLearnerStates(): Promise<LearnerStateSummary[] | undefined> {
-  return withClient(async (sql) => {
-    const rows = await sql<ResponseRow[]>`
-      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
-             judged_outcome, graded_score, response_source, grader_identity, batch_id,
-             attempt_seq, submitted_answer, created_at
-      FROM response_log ORDER BY learner_state_ref, attempt_seq`;
-    const verdictRows = await sql<VerdictRow[]>`
-      SELECT learner_state_ref, derived_node_id, verdict FROM calibration_verdicts`;
-    return summarizeLearnerStates(rows.map(rowToResponseLogRow), verdictRows.map(rowToVerdict));
-  });
-}
-
-export async function getLearnerLoopDetail(learnerStateRef: string): Promise<LearnerLoopDetail | undefined> {
-  return withClient(async (sql) => {
-    const rows = await sql<(ResponseRow & { concept_label: string; question: string })[]>`
-      SELECT rl.response_id, rl.learner_state_ref, rl.study_item_id, rl.derived_node_id, rl.signal_type,
-             rl.judged_outcome, rl.graded_score, rl.response_source, rl.grader_identity, rl.batch_id,
-             rl.attempt_seq, rl.submitted_answer, rl.created_at,
-             n.canonical_label AS concept_label, cd.question
-      FROM response_log rl
-      JOIN derived_graph_nodes n ON n.derived_node_id = rl.derived_node_id
-      JOIN study_items cd ON cd.study_item_id = rl.study_item_id
-      WHERE rl.learner_state_ref = ${learnerStateRef}
-      ORDER BY rl.attempt_seq`;
-    const logRows = rows.map(rowToResponseLogRow);
-    const verdictRows = await sql<VerdictRow[]>`
-      SELECT learner_state_ref, derived_node_id, verdict FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}`;
-    const verdicts = verdictRows.map(rowToVerdict);
-    const pathRows = await sql<{ enrichment_id: string; target_derived_node_id: string; target_label: string }[]>`
-      SELECT p.enrichment_id, p.target_derived_node_id, n.canonical_label AS target_label
-      FROM learner_paths p JOIN derived_graph_nodes n ON n.derived_node_id = p.target_derived_node_id
-      WHERE p.learner_state_ref = ${learnerStateRef}
-      ORDER BY p.created_at DESC`;
-    const coverageRows = await sql<{
-      enrichment_id: string; target_derived_node_id: string; target_label: string; position: number; derived_node_id: string;
-      label: string; grounding_origin: string; included_reason: string; study_item_id: string | null; question: string | null; grounding_provenance: string | null; rejection_reason: string | null;
-    }[]>`
-      SELECT p.enrichment_id, p.target_derived_node_id, tn.canonical_label AS target_label,
-             s.position, s.derived_node_id, n.canonical_label AS label, n.grounding_origin,
-             s.included_reason, c.study_item_id, c.question, c.grounding_provenance, rc.reason AS rejection_reason
-      FROM learner_paths p
-      JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
-      JOIN learner_path_steps s ON s.learner_path_id = p.learner_path_id
-      JOIN derived_graph_nodes n ON n.derived_node_id = s.derived_node_id
-      LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'option_select'
-      LEFT JOIN rejected_study_items rc ON rc.derived_node_id = s.derived_node_id
-      WHERE p.learner_state_ref = ${learnerStateRef}
-      ORDER BY p.created_at DESC, s.position`;
-    const coverageByPath = new Map<string, PathStudyItemCoverage>();
-    for (const row of coverageRows) {
-      const key = `${row.enrichment_id}:${row.target_derived_node_id}`;
-      let coverage = coverageByPath.get(key);
-      if (!coverage) {
-        coverage = { enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id, targetLabel: row.target_label, steps: [] };
-        coverageByPath.set(key, coverage);
-      }
-      coverage.steps.push({
-        position: Number(row.position),
-        derivedNodeId: row.derived_node_id,
-        label: row.label,
-        groundingOrigin: row.grounding_origin,
-        includedReason: row.included_reason,
-        studyItem: row.study_item_id && row.question && row.grounding_provenance
-          ? { studyItemId: row.study_item_id, question: row.question, provenance: row.grounding_provenance as NonNullable<PathStudyItemCoverageStep["studyItem"]>["provenance"] }
-          : null,
-        fallbackReason: row.study_item_id ? null : (row.rejection_reason ?? fallbackReasonFor(row.grounding_origin))
-      });
-    }
-
-    return {
-      learnerStateRef,
-      responses: rows.map((row) => ({
-        responseId: row.response_id,
-        attemptSeq: Number(row.attempt_seq),
-        derivedNodeId: row.derived_node_id,
-        nodeLabel: row.concept_label,
-        studyItemId: row.study_item_id,
-        question: row.question,
-        signalType: row.signal_type,
-        judgedOutcome: row.judged_outcome,
-        gradedScore: row.graded_score === null ? null : Number(row.graded_score),
-        responseSource: row.response_source,
-        graderIdentity: row.grader_identity,
-        submittedAnswer: row.submitted_answer,
-        createdAt: new Date(row.created_at).toISOString()
-      })),
-      conflicts: detectConflicts(verdicts, logRows),
-      paths: pathRows.map((row) => ({ enrichmentId: row.enrichment_id, targetDerivedNodeId: row.target_derived_node_id, targetLabel: row.target_label })),
-      coverage: [...coverageByPath.values()],
-      masteryByNode: buildMasteryMap(logRows),
-      responseSourceSummary: summarizeResponseSources(logRows)
-    };
-  });
-}
-
-// --- Adapted-graph overlay loader (U2, R1/R3/R12) --------------------------
-
-export type LearnerAdaptedGraph = {
-  enrichmentId: string;
-  targetDerivedNodeId: string;
-  targetLabel: string;
-  // The enrichment's Derived Graph Layer (read-only) and the learner's mastered /
-  // frontier / locked classification over it.
-  detail: DerivedGraphDetail;
-  classification: AdaptedNodeClassification;
-};
-
-export type LearnerAdaptedGraphs = {
-  learnerStateRef: string;
-  responseSourceSummary: ResponseSourceSummary;
-  graphs: LearnerAdaptedGraph[];
-};
-
-// One adapted-graph scope per DISTINCT enrichment in the learner's paths (KTD4/KTD5).
-// Read + projection only: it composes the read-only `getLearnerLoopDetail` and
-// `getEnrichmentDetail` with the pure `classifyAdaptedNodes`. No write port is imported,
-// so it structurally cannot mutate a published graph or the Derived Graph Layer (R12).
-export async function getLearnerAdaptedGraphs(learnerStateRef: string): Promise<LearnerAdaptedGraphs | undefined> {
-  const detail = await getLearnerLoopDetail(learnerStateRef);
-  if (!detail) return undefined;
-
-  // A synchronous LearnerStatePort over the already-folded mastery map (do not re-query).
-  const learnerState: LearnerStatePort = {
-    learnerStateRef,
-    mastery: (derivedNodeId: string) => detail.masteryByNode[derivedNodeId] ?? 0
-  };
-
-  const graphs: LearnerAdaptedGraph[] = [];
-  for (const scope of dedupeEnrichmentScopes(detail.paths)) {
-    const enrichmentDetail = await getEnrichmentDetail(scope.enrichmentId);
-    if (!enrichmentDetail) continue;
-    const classification = classifyAdaptedNodes({
-      nodeIds: enrichmentDetail.nodes.map((node) => node.derivedNodeId),
-      prerequisiteEdges: enrichmentDetail.edges,
-      difficulties: enrichmentDetail.nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: node.difficulty })),
-      learnerState,
-      masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
-    });
-    graphs.push({
-      enrichmentId: scope.enrichmentId,
-      targetDerivedNodeId: scope.targetDerivedNodeId,
-      targetLabel: scope.targetLabel,
-      detail: enrichmentDetail,
-      classification
-    });
-  }
-  return { learnerStateRef, responseSourceSummary: detail.responseSourceSummary, graphs };
-}
-
-// Generic fallback used ONLY when a step's node has neither a study item nor a persisted
-// rejection row (e.g. study items were never generated for the enrichment). When a real
-// rejection exists, the coverage view shows its persisted reason instead of this guess.
-function fallbackReasonFor(groundingOrigin: string): string {
-  if (groundingOrigin === "llm_grounded") return "Generated prerequisite, not directly recall-tested yet.";
-  if (groundingOrigin === "source_mentioned") return "Source-mentioned prerequisite, not directly recall-tested yet.";
-  return "Anchor node, not directly recall-tested yet.";
-}
-
-// Bind the real Postgres response-log store for the server action (read side reuses
-// withClient; the action manages its own client lifecycle).
-export function createResponseLogStore(sql: Sql): ResponseLogStorePort {
-  return new PostgresResponseLogStore(sql);
+export function getLearnerAdaptedGraphs(learnerStateRef: string) {
+  return withClient((sql) => loadLearnerAdaptedGraphs(new PostgresLearnerLoopRead(sql), new PostgresEnrichmentInspectionRead(sql), learnerStateRef));
 }

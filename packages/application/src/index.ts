@@ -117,11 +117,18 @@ export {
   summarizeResponseSources,
   summarizeLearnerStates,
   dedupeEnrichmentScopes,
+  listLearnerStates,
+  getLearnerLoopDetail,
+  getLearnerAdaptedGraphs,
   type ConflictKind,
   type ConceptConflict,
   type ResponseSourceSummary,
   type LearnerStateSummary,
-  type TimestampedResponseLogRow
+  type TimestampedResponseLogRow,
+  type LearnerResponseView,
+  type LearnerLoopDetail,
+  type LearnerAdaptedGraph,
+  type LearnerAdaptedGraphs
 } from "./learnerLoopProjection";
 export {
   synthesizeResponses,

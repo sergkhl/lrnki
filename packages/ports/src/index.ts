@@ -750,6 +750,45 @@ export interface LearnerPathInspectionReadPort {
   getLearnerPathDetail(learnerPathId: string): Promise<LearnerPathDetail | undefined>;
 }
 
+// Learner Loop inspection read surface (ADR-0027, KTD7). The learner-loop history/coverage
+// reads are pure inspection — the storage adapter owns the joined-history SQL, the
+// learner-state list reads, the path-scope read, and the coverage stitch (including the
+// no-item fallback reason). The application's learner-loop projection use-cases add the
+// conflict/mastery/summary folds and the adapted-graph classify over these rows. Row shapes
+// are read-model types: the response rows carry the joined node label + question alongside
+// the full append-only Response Log row so a use-case can both render and re-fold from one
+// read.
+export type LearnerLoopResponseRow = ResponseLogRow & { createdAt: string };
+export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string };
+
+export type LearnerLoopPathScope = { enrichmentId: string; targetDerivedNodeId: string; targetLabel: string };
+
+export type PathStudyItemCoverageStep = {
+  position: number;
+  derivedNodeId: string;
+  label: string;
+  groundingOrigin: string;
+  includedReason: string;
+  studyItem: { studyItemId: string; question: string; provenance: "source_cep" | "source_mentioned" | "generated" } | null;
+  fallbackReason: string | null;
+};
+
+export type PathStudyItemCoverage = {
+  enrichmentId: string;
+  targetDerivedNodeId: string;
+  targetLabel: string;
+  steps: PathStudyItemCoverageStep[];
+};
+
+export interface LearnerLoopReadPort {
+  listAllResponses(): Promise<LearnerLoopResponseRow[]>;
+  listAllVerdicts(): Promise<CalibrationVerdict[]>;
+  listResponsesForLearner(learnerStateRef: string): Promise<LearnerLoopResponseDetailRow[]>;
+  listVerdictsForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]>;
+  listPathScopesForLearner(learnerStateRef: string): Promise<LearnerLoopPathScope[]>;
+  listCoverageForLearner(learnerStateRef: string): Promise<PathStudyItemCoverage[]>;
+}
+
 // ---------------------------------------------------------------------------
 // Run-stage timeline reporting seam (ADR-0029). The externally driven seam every
 // triggered operation reports progress through, so a future durable workflow

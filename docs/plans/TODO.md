@@ -23,6 +23,13 @@
    per-learner sequence assignment in the persistence boundary rather than UI-only prevention.
    Decision: [ADR-0026](../adr/0026-typed-study-item-bank.md).
 
+4. **Deepen the learner-facing reads onto the ADR-0027 split.** Move the study projection behind a
+   `getStudySession` application use-case (injected ports + compute) and the raw-SQL Learner Path /
+   Learner Loop reads behind inspection read ports, so one boundary serves the Admin Lab and the
+   forthcoming Learner Application. Ready plan:
+   [2026-06-29-001](./2026-06-29-001-refactor-learner-study-projection-use-case-plan.md).
+   Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
+
 ## COMPLETED
 
 - **Published-Concept semantic identity resolution.** A standalone propose-decide operation runs
