@@ -1,0 +1,45 @@
+import type {
+  CalibrationVerdictStorePort,
+  EnrichmentInspectionReadPort,
+  ResponseLogStorePort,
+  StudyItemBankStorePort
+} from "@lrnki/ports";
+import { composeStudySession, type StudySession } from "./studySessionProjection";
+
+// The reading use-case for the Study Session (ADR-0027, KTD1/KTD3). It loads through injected
+// ports and composes the adaptation with the pure `composeStudySession`, so the Admin Lab and
+// the forthcoming Learner Application share ONE study orchestration — each app injects its own
+// adapters (the established `computeLearnerPath` shape). It CONSUMES the finished
+// `DerivedGraphDetail` inspection read model as graph input (a projection may read a read model
+// and add compute; ADR-0027 forbids only serving a projection THROUGH a read port), which proves
+// existence in one read — no redundant `getLayer` (R4). No write port is imported, so it
+// structurally cannot mutate a published graph or the Derived Graph Layer (R10).
+export async function getStudySession(input: {
+  enrichmentId: string;
+  targetDerivedNodeId: string;
+  learnerStateRef: string;
+  enrichmentRead: EnrichmentInspectionReadPort;
+  studyItemStore: StudyItemBankStorePort;
+  responseLog: ResponseLogStorePort;
+  verdictStore: CalibrationVerdictStorePort;
+}): Promise<StudySession | undefined> {
+  const detail = await input.enrichmentRead.getDerivedGraphDetail(input.enrichmentId);
+  if (!detail) return undefined;
+  if (!detail.nodes.some((node) => node.derivedNodeId === input.targetDerivedNodeId)) return undefined;
+
+  const [studyItems, rows, verdicts] = await Promise.all([
+    input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
+    input.responseLog.listForLearner(input.learnerStateRef),
+    input.verdictStore.listForLearner(input.learnerStateRef)
+  ]);
+
+  return composeStudySession({
+    enrichmentId: input.enrichmentId,
+    learnerStateRef: input.learnerStateRef,
+    targetDerivedNodeId: input.targetDerivedNodeId,
+    detail,
+    studyItems,
+    rows,
+    verdicts
+  });
+}
