@@ -104,9 +104,10 @@
   a goal's trusted prerequisite cone: rows are ordered hardest-first, show neutral grounded
   descriptors rather than questions or answers, and known marks prune implied-known ancestors from
   the list. Study no longer renders reveal/self-assessment cards; learners can skip a study item as
-  known without seeing an answer, and the adapted graph hides the full known closure as a
-  projection-only view. The Study Item Bank is option-select only; the retired free-form
-  grading/simulation and `self_assessment` paths were deleted. Decisions:
+  known without seeing an answer. The study graph now keeps Neutral as the full Derived Graph Layer
+  and applies known-closure hiding only as the Adapted render projection. The Study Item Bank is
+  option-select only; the retired free-form grading/simulation and `self_assessment` paths were
+  deleted. Decisions:
   [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0011](../adr/0011-retain-minimal-admin-lab.md).
@@ -222,8 +223,11 @@
   hiding, synthetic verdict seeding, and Postgres store type boundaries. Code review found and fixed
   skip-as-known auto-advance, pending-write navigation races, option-vs-skip mutual exclusion, stale
   calibration verdict wording, application-projection ownership, option-select persistence
-  invariants, calibration DB error swallowing, and non-transactional learner reset. Real-use quality
-  evaluation is **blocked** until a live `DATABASE_URL` is available: deterministic fixtures show B
-  known hides A from the calibration list, adapted graph hides A+B while keeping Z, no RecallCard or
-  reveal branch remains, and the calibrate route builds; no DB-backed browser pass or curated
-  enrichment inspection has been run for this milestone.
+  invariants, calibration DB error swallowing, and non-transactional learner reset. Follow-up
+  validation on 2026-06-29 confirmed `DATABASE_URL` is available and exercised the seeded curated
+  enrichment `c6c558eb` in browser. For learner `demo-seeded-2` studying non-foundational target
+  "AI research agent", Adapted renders 38 concepts / 40 inferred edges while Neutral restores the
+  full 51 concepts / 76 inferred edges; the known concept "valid artifact" is absent from the
+  Adapted textual node list and present again in Neutral. Zero-verdict learner `demo-empty-1` renders
+  the same 51 concepts / 76 inferred edges in both modes. Screenshots:
+  `tmp/neutral-adapted-fix-adapted.png`, `tmp/neutral-adapted-fix-neutral.png`.

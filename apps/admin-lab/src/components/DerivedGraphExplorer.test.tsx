@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildDerivedGraphView, distinctDomains, nodeRenderAttrs, type DerivedGraphDetail } from "../lib/derivedGraph";
+import { buildDerivedGraphView, distinctDomains, filterDetailToVisible, nodeRenderAttrs, regionHiddenAttr, type DerivedGraphDetail } from "../lib/derivedGraph";
 
 // The DerivedGraphExplorer renders a Derived Graph Layer (ADR-0019) independently
 // of learner paths (U6 scenario 5) and must carry an equivalent textual
@@ -254,24 +254,61 @@ test("cytoscape and textual node sets stay equal and describe the same nodes in 
 // attributes the restyle effect writes. The one-time layout owns positions; these
 // attrs are the ONLY thing a mode swap changes, so the helper fully captures the swap.
 
-test("neutral mode yields the baseline 'none'/'no' for every node, ignoring any classification", () => {
+test("neutral mode yields the baseline 'none'/'no' for every node, ignoring any classification or hidden ids", () => {
   for (const id of ["scope", "ownership", "move", "absent"]) {
-    assert.deepEqual(nodeRenderAttrs("neutral", classification, id), { adaptedState: "none", frontierTarget: "no" });
+    assert.deepEqual(nodeRenderAttrs("neutral", classification, id, new Set(["scope", "ownership"])), { adaptedState: "none", frontierTarget: "no", hidden: "no" });
   }
 });
 
 test("adapted mode yields each node's mastered/frontier/locked state and marks only the frontier target", () => {
-  assert.deepEqual(nodeRenderAttrs("adapted", classification, "scope"), { adaptedState: "mastered", frontierTarget: "no" });
-  assert.deepEqual(nodeRenderAttrs("adapted", classification, "ownership"), { adaptedState: "frontier", frontierTarget: "yes" });
-  assert.deepEqual(nodeRenderAttrs("adapted", classification, "move"), { adaptedState: "locked", frontierTarget: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "scope"), { adaptedState: "mastered", frontierTarget: "no", hidden: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "ownership"), { adaptedState: "frontier", frontierTarget: "yes", hidden: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "move"), { adaptedState: "locked", frontierTarget: "no", hidden: "no" });
 });
 
 test("adapted mode with no classification falls back to the neutral baseline", () => {
-  assert.deepEqual(nodeRenderAttrs("adapted", undefined, "scope"), { adaptedState: "none", frontierTarget: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", undefined, "scope", new Set(["scope"])), { adaptedState: "none", frontierTarget: "no", hidden: "no" });
 });
 
 test("a node absent from the classification gets 'none' rather than throwing", () => {
-  assert.deepEqual(nodeRenderAttrs("adapted", classification, "absent"), { adaptedState: "none", frontierTarget: "no" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "absent"), { adaptedState: "none", frontierTarget: "no", hidden: "no" });
+});
+
+test("adapted mode marks hidden nodes while leaving visible nodes unhidden", () => {
+  const hidden = new Set(["scope"]);
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "scope", hidden), { adaptedState: "mastered", frontierTarget: "no", hidden: "yes" });
+  assert.deepEqual(nodeRenderAttrs("adapted", classification, "ownership", hidden), { adaptedState: "frontier", frontierTarget: "yes", hidden: "no" });
+});
+
+test("adapted textual view filters hidden nodes, their incident edges, and active count inputs", () => {
+  const adaptedDetail = filterDetailToVisible(detail, new Set(["scope"]));
+  const view = buildDerivedGraphView(adaptedDetail, classification);
+  assert.deepEqual(view.textual.nodes.map((node) => node.derivedNodeId), ["ownership", "move"]);
+  assert.deepEqual(view.textual.edges.map((edge) => [edge.prerequisiteDerivedNodeId, edge.dependentDerivedNodeId]), [["ownership", "move"]]);
+  assert.equal(adaptedDetail.summary.conceptCount, 2);
+  assert.equal(adaptedDetail.summary.edgeCount, 1);
+  assert.equal(adaptedDetail.summary.certainEdgeCount, 0);
+  assert.equal(adaptedDetail.summary.uncertainEdgeCount, 1);
+});
+
+test("an empty hidden set leaves adapted topology equal to neutral topology", () => {
+  const adaptedDetail = filterDetailToVisible(detail, new Set());
+  const neutral = buildDerivedGraphView(detail);
+  const adaptedView = buildDerivedGraphView(adaptedDetail, classification);
+  assert.deepEqual(adaptedView.cytoscape.nodes.map((node) => node.id), neutral.cytoscape.nodes.map((node) => node.id));
+  assert.deepEqual(adaptedView.cytoscape.edges.map((edge) => [edge.source, edge.target]), neutral.cytoscape.edges.map((edge) => [edge.source, edge.target]));
+});
+
+test("region parents hide only when every concept child in that domain is hidden in adapted mode", () => {
+  const nodes = [
+    { id: "scope", domain: "rust" },
+    { id: "ownership", domain: "rust" },
+    { id: "photosynthesis", domain: "biology" }
+  ];
+  assert.equal(regionHiddenAttr("adapted", "rust", nodes, new Set(["scope", "ownership"])), "yes");
+  assert.equal(regionHiddenAttr("adapted", "rust", nodes, new Set(["scope"])), "no");
+  assert.equal(regionHiddenAttr("adapted", "biology", nodes, new Set(["scope", "ownership"])), "no");
+  assert.equal(regionHiddenAttr("neutral", "rust", nodes, new Set(["scope", "ownership"])), "no");
 });
 
 // Covers R11/R13 regression guard: neutral-mode view-model is byte-equivalent to the

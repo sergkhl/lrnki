@@ -6,7 +6,7 @@ import { ChevronRightIcon, GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applySphereGridLayout, recenterOnFocus } from "@/lib/cytoscapeSphereGrid";
 import type { SphereGridFlaggedLoop } from "@/lib/sphereGridLayout";
-import { buildDerivedGraphView, distinctDomains, frontierNeighborhood, nodeRenderAttrs, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
+import { buildDerivedGraphView, distinctDomains, filterDetailToVisible, frontierNeighborhood, nodeRenderAttrs, regionHiddenAttr, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,10 @@ type DerivedGraphExplorerProps = Readonly<{
   // reports its derivedNodeId so the caller can open the state-gated side sheet. Absent on
   // the neutral enrichment page, so that render keeps its read-only behavior unchanged.
   onNodeSelect?: (derivedNodeId: string) => void;
+  hiddenNodeIds?: ReadonlySet<string>;
 }>;
+
+const EMPTY_HIDDEN_NODE_IDS: ReadonlySet<string> = new Set();
 
 // Difficulty maps to node diameter (R7/KTD3): a bounded range so an operator can spot
 // ordering defects at a glance. A null-difficulty node renders at the base size rather
@@ -70,7 +73,7 @@ const ADAPTED_STATE_BADGE: Record<AdaptedNodeState, "default" | "secondary" | "o
 // comparison (R11, KTD2). Without `adapted` there is no control and the render is neutral
 // — node-kind / grounding coloring exactly as before, plus the difficulty-as-size
 // encoding (R7). The textual node/edge panel re-renders for the active mode (R14).
-export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedGraphExplorerProps) {
+export function DerivedGraphExplorer({ detail, adapted, onNodeSelect, hiddenNodeIds }: DerivedGraphExplorerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cytoscapeRef = useRef<Core | null>(null);
   // Held in a ref so the tap handler is bound ONCE in the layout effect (keyed on topology)
@@ -101,6 +104,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // available; the enrichment page (no classification) is always neutral.
   const [mode, setMode] = useState<DerivedGraphMode>(hasClassification ? "adapted" : "neutral");
   const isAdaptedMode = hasClassification && mode === "adapted";
+  const activeHiddenNodeIds = hiddenNodeIds ?? EMPTY_HIDDEN_NODE_IDS;
   // Loops the sphere-grid geometry could not embed crossing-free (R10). Populated by the
   // one-time layout pass and surfaced to the operator below — fail loud, never silent-cross.
   const [flaggedLoops, setFlaggedLoops] = useState<SphereGridFlaggedLoop[]>([]);
@@ -111,7 +115,11 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
   // Topology view drives the ONE-TIME layout (stable across mode swaps); the textual
   // view re-renders for the active mode so the non-visual listing matches the canvas (R14).
   const layoutView = useMemo(() => buildDerivedGraphView(detail), [detail]);
-  const view = useMemo(() => buildDerivedGraphView(detail, isAdaptedMode ? adapted : undefined), [detail, adapted, isAdaptedMode]);
+  const activeDetail = useMemo(
+    () => (isAdaptedMode ? filterDetailToVisible(detail, activeHiddenNodeIds) : detail),
+    [detail, activeHiddenNodeIds, isAdaptedMode]
+  );
+  const view = useMemo(() => buildDerivedGraphView(activeDetail, isAdaptedMode ? adapted : undefined), [activeDetail, adapted, isAdaptedMode]);
 
   // Domain-focus selector (item 2): the distinct domain regions plus an "all" sentinel.
   // Manual, viewport-only pan — picking a domain frames its region; "all" fits the whole
@@ -168,7 +176,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
         // box + domain label come from Cytoscape core and auto-bound the packed children;
         // styled by the `node:parent` selector, excluded from every concept-node selector.
         ...distinctDomains(layoutView.cytoscape.nodes).map((domain) => ({
-          data: { id: `region:${domain}`, label: domain, regionKind: "loop" }
+          data: { id: `region:${domain}`, label: domain, regionKind: "loop", hidden: "no" }
         })),
         ...layoutView.cytoscape.nodes.map((node) => ({
           data: {
@@ -185,6 +193,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             // Neutral baseline; the restyle effect overrides these on the active mode.
             adaptedState: "none",
             frontierTarget: "no",
+            hidden: "no",
             cardless: node.cardless ? "yes" : "no"
           }
         })),
@@ -290,6 +299,10 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
           style: { "border-color": color("--foreground"), "border-width": 4 }
         },
         {
+          selector: "node[hidden = 'yes']",
+          style: { display: "none" }
+        },
+        {
           // Right-angle FFX "track" edges (R3): Cytoscape-core taxi routing, configured to
           // turn at the segment midpoint and stay monotone within each edge's bounding box,
           // so the orthogonal rendering cannot introduce a crossing the pure straight-segment
@@ -337,7 +350,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
 
   // Restyle effect — runs on every (mode, classification) change, AND once after the
   // layout effect (re)builds the instance. It is restyle-ONLY: it mutates each node's
-  // `adaptedState` / `frontierTarget` data via `cy.batch()` and never calls
+  // `adaptedState` / `frontierTarget` / `hidden` data via `cy.batch()` and never calls
   // `cy.layout().run()` or `cy.fit()`, so positions from the one-time layout pass survive
   // the swap untouched (R11). This is the structural guard the side-by-side pair lacked.
   useEffect(() => {
@@ -347,12 +360,18 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
       for (const node of layoutView.cytoscape.nodes) {
         const element = cy.getElementById(node.id);
         if (element.empty()) continue;
-        const attrs = nodeRenderAttrs(mode, adapted, node.id);
+        const attrs = nodeRenderAttrs(mode, adapted, node.id, activeHiddenNodeIds);
         element.data("adaptedState", attrs.adaptedState);
         element.data("frontierTarget", attrs.frontierTarget);
+        element.data("hidden", attrs.hidden);
+      }
+      for (const domain of domains) {
+        const element = cy.getElementById(`region:${domain}`);
+        if (element.empty()) continue;
+        element.data("hidden", regionHiddenAttr(mode, domain, layoutView.cytoscape.nodes, activeHiddenNodeIds));
       }
     });
-  }, [layoutView, mode, adapted]);
+  }, [layoutView, domains, mode, adapted, activeHiddenNodeIds]);
 
   // Advance-recenter effect (KTD3) — keyed on the classification's frontier target, so it
   // fires on a FRONTIER ADVANCE, never on the neutral↔adapted mode toggle (which is local
@@ -431,9 +450,9 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             ) : null}
             {/* Non-interactive metadata: bordered/light tag pills (KTD5). Kept off the solid
                 `default` register so nothing inert mimics the solid active segmented button. */}
-            <Badge variant="outline">{detail.summary.conceptCount} concepts</Badge>
-            <Badge variant="secondary">{detail.summary.certainEdgeCount} edges</Badge>
-            <Badge variant="outline">{detail.summary.uncertainEdgeCount} uncertain</Badge>
+            <Badge variant="outline">{activeDetail.summary.conceptCount} concepts</Badge>
+            <Badge variant="secondary">{activeDetail.summary.certainEdgeCount} edges</Badge>
+            <Badge variant="outline">{activeDetail.summary.uncertainEdgeCount} uncertain</Badge>
             {/* Summons the textual node/edge listing as a right slide-over (item 1). Kept in
                 the toolbar so it reads as a graph affordance, not a separate panel. */}
             <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => setPanelOpen(true)}>
@@ -481,7 +500,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
             <div
               ref={containerRef}
               role="img"
-              aria-label={`Derived prerequisite graph with ${detail.summary.conceptCount} concepts and ${detail.summary.edgeCount} inferred edges`}
+              aria-label={`Derived prerequisite graph with ${activeDetail.summary.conceptCount} concepts and ${activeDetail.summary.edgeCount} inferred edges`}
               className="min-h-[31rem] flex-1 rounded-lg border bg-muted/30"
             />
           ) : (
@@ -508,6 +527,11 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
           <ScrollArea className="h-full flex-1">
             <div className="flex flex-col gap-4 p-4">
               <CollapsibleSection title="Nodes (anchors + enrichment)">
+                {isAdaptedMode && activeHiddenNodeIds.size > 0 && view.textual.nodes.length === 1 ? (
+                  <p className="mb-2 rounded-md border bg-muted/30 px-2 py-1.5 text-sm text-muted-foreground">
+                    All prerequisites marked as known — only the goal is shown.
+                  </p>
+                ) : null}
                 <ul className="flex flex-col gap-1">
                   {view.textual.nodes.map((node) => (
                     <li key={node.derivedNodeId}>
@@ -602,7 +626,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect }: DerivedG
               </CollapsibleSection>
               <CollapsibleSection title="Origin counts by domain">
                 <ul className="flex flex-col gap-1">
-                  {detail.originCounts.map((counts) => (
+                  {activeDetail.originCounts.map((counts) => (
                     <li key={counts.domain} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm">
                       <span className="min-w-0 truncate font-medium">{counts.domain}</span>
                       <span className="flex shrink-0 items-center gap-1">

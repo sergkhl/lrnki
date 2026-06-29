@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frontierNeighborhood, filterAndOrderGoals, hideKnownClosureFromDetail, isFoundationalGoal, journeySize, type DerivedGraphDetail, type GoalCandidate } from "./derivedGraph";
+import { frontierNeighborhood, filterAndOrderGoals, filterDetailToVisible, isFoundationalGoal, journeySize, type DerivedGraphDetail, type GoalCandidate } from "./derivedGraph";
 
 // `frontierNeighborhood` (KTD2) is the pure helper that frames the study graph on the
 // learner's working region: the frontier target plus its direct prerequisites and direct
@@ -121,22 +121,31 @@ function detailForHide(): DerivedGraphDetail {
   };
 }
 
-test("hideKnownClosureFromDetail removes closure nodes and incident edges from the rendered detail", () => {
-  const visible = hideKnownClosureFromDetail({ detail: detailForHide(), knownClosure: new Set(["A", "B"]), targetDerivedNodeId: "Z" });
+test("filterDetailToVisible removes hidden nodes and incident edges from the rendered detail", () => {
+  const visible = filterDetailToVisible(detailForHide(), new Set(["A", "B"]));
   assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), ["Z"]);
   assert.deepEqual(visible.edges, []);
   assert.equal(visible.summary.conceptCount, 1);
   assert.equal(visible.summary.edgeCount, 0);
+  assert.equal(visible.summary.certainEdgeCount, 0);
+  assert.equal(visible.summary.uncertainEdgeCount, 0);
+  assert.deepEqual(visible.originCounts, [{ domain: "d", anchor: 1, sourceMentioned: 0, llmGrounded: 0 }]);
 });
 
-test("hideKnownClosureFromDetail never hides the goal target even when it is in the known closure", () => {
-  const visible = hideKnownClosureFromDetail({ detail: detailForHide(), knownClosure: new Set(["A", "B", "Z"]), targetDerivedNodeId: "Z" });
+test("filterDetailToVisible keeps any node that is not in the hidden set, including a caller-preserved goal", () => {
+  const visible = filterDetailToVisible(detailForHide(), new Set(["A", "B"]));
   assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), ["Z"]);
 });
 
-test("hideKnownClosureFromDetail with zero verdict closure is a no-op shape", () => {
+test("filterDetailToVisible has no goal special-case; callers own goal exclusion", () => {
+  const visible = filterDetailToVisible(detailForHide(), new Set(["A", "B", "Z"]));
+  assert.deepEqual(visible.nodes, []);
+  assert.deepEqual(visible.edges, []);
+});
+
+test("filterDetailToVisible with an empty hidden set is a no-op shape", () => {
   const detail = detailForHide();
-  const visible = hideKnownClosureFromDetail({ detail, knownClosure: new Set(), targetDerivedNodeId: "Z" });
+  const visible = filterDetailToVisible(detail, new Set());
   assert.deepEqual(visible.nodes.map((node) => node.derivedNodeId), detail.nodes.map((node) => node.derivedNodeId));
   assert.deepEqual(visible.edges, detail.edges);
 });

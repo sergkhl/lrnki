@@ -14,7 +14,7 @@ import type { LearnerStatePort } from "@lrnki/ports";
 import { createDatabaseClient, PostgresStudyItemBankStore, PostgresEnrichmentRunStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "@lrnki/infrastructure-postgres";
 import { getEnrichmentDetail } from "./enrichments";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoop";
-import { hideKnownClosureFromDetail, labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
+import { labelFor, type DerivedGraphDetail, type DerivedGraphEdge } from "./derivedGraph";
 // The transfer-ready study modules own the presentation contract (R15); the loader
 // produces data matching it (AGENTS rule 18 — one definition).
 import type { SheetContent, StudyOptionSelectView } from "@/components/study/studyView";
@@ -98,6 +98,10 @@ export function selectScopedFrontier(input: {
   return frontier.sort((a, b) => (input.difficultyByNode.get(b) ?? 0) - (input.difficultyByNode.get(a) ?? 0) || a.localeCompare(b))[0];
 }
 
+export function adaptedHiddenNodeIds(knownClosure: ReadonlySet<string>, targetDerivedNodeId: string): string[] {
+  return [...knownClosure].filter((id) => id !== targetDerivedNodeId);
+}
+
 // --- Study-session loader (R3, R5, R7, R9, R12) ----------------------------
 
 export type CoexistenceFlag = { derivedNodeId: string; label: string; gradedMastery: number };
@@ -123,6 +127,9 @@ export type StudySession = {
   // The whole-layer classification, with `selectedFrontierTarget` scoped to the goal cone
   // so the adapted-graph ring marks the node the learner advances to next toward Z.
   classification: AdaptedNodeClassification;
+  // Serializable known-closure hide list for the Adapted render. The full `detail` remains
+  // untouched so Neutral can render the original cone.
+  adaptedHiddenNodeIds: string[];
   responseSourceSummary: ResponseSourceSummary;
   // A DAG-root goal whose trusted prerequisite cone is just itself — studied directly as a
   // single-node screen; never an empty calibration nor a premature "Goal reached" (R3, AE1).
@@ -178,7 +185,7 @@ export async function getStudySession(
   // coexistence of the two is surfaced, never resolved by a hidden precedence rule.
   const knownNodes = loaded.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
   const knownClosure = pruneClosure(knownNodes, detail.edges);
-  const visibleDetail = hideKnownClosureFromDetail({ detail, knownClosure, targetDerivedNodeId });
+  const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, targetDerivedNodeId);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(loaded.rows)));
   const composed = composeMastery({ knownClosure, gradedByNode });
   const learnerState: LearnerStatePort = {
@@ -247,8 +254,9 @@ export async function getStudySession(
     learnerStateRef,
     target: { derivedNodeId: targetDerivedNodeId, label: labelFor(detail, targetDerivedNodeId) },
     studyItemCount: loaded.studyItems.length,
-    detail: visibleDetail,
+    detail,
     classification,
+    adaptedHiddenNodeIds: hiddenNodeIds,
     responseSourceSummary: summarizeResponseSources(loaded.rows),
     isFoundationalRoot,
     coexistence,

@@ -97,17 +97,13 @@ export function labelFor(detail: Pick<DerivedGraphDetail, "nodes">, derivedNodeI
   return detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
 }
 
-export function hideKnownClosureFromDetail(input: {
-  detail: DerivedGraphDetail;
-  knownClosure: Set<string>;
-  targetDerivedNodeId: string;
-}): DerivedGraphDetail {
-  const nodes = input.detail.nodes.filter((node) => node.derivedNodeId === input.targetDerivedNodeId || !input.knownClosure.has(node.derivedNodeId));
+export function filterDetailToVisible(detail: DerivedGraphDetail, hiddenNodeIds: ReadonlySet<string>): DerivedGraphDetail {
+  const nodes = detail.nodes.filter((node) => !hiddenNodeIds.has(node.derivedNodeId));
   const visibleNodeIds = new Set(nodes.map((node) => node.derivedNodeId));
   const edges: DerivedGraphEdge[] = [];
   let certainEdgeCount = 0;
   let uncertainEdgeCount = 0;
-  for (const edge of input.detail.edges) {
+  for (const edge of detail.edges) {
     if (!visibleNodeIds.has(edge.prerequisiteDerivedNodeId) || !visibleNodeIds.has(edge.dependentDerivedNodeId)) continue;
     edges.push(edge);
     if (edge.uncertain) uncertainEdgeCount += 1;
@@ -115,9 +111,9 @@ export function hideKnownClosureFromDetail(input: {
   }
 
   return {
-    ...input.detail,
+    ...detail,
     summary: {
-      ...input.detail.summary,
+      ...detail.summary,
       conceptCount: nodes.length,
       edgeCount: edges.length,
       certainEdgeCount,
@@ -219,14 +215,30 @@ export type DerivedGraphMode = "neutral" | "adapted";
 // `adaptedState` / `frontierTarget` then recolor in place. "none"/"no" is the neutral
 // baseline (matching the absent-classification render), so neutral mode is byte-identical
 // to the enrichment-page view regardless of whether a classification is available.
-export type NodeRenderAttrs = { adaptedState: AdaptedNodeState | "none"; frontierTarget: "yes" | "no" };
+export type NodeRenderAttrs = { adaptedState: AdaptedNodeState | "none"; frontierTarget: "yes" | "no"; hidden: "yes" | "no" };
 
-export function nodeRenderAttrs(mode: DerivedGraphMode, classification: AdaptedNodeClassification | undefined, derivedNodeId: string): NodeRenderAttrs {
-  if (mode === "neutral" || !classification) return { adaptedState: "none", frontierTarget: "no" };
+export function nodeRenderAttrs(
+  mode: DerivedGraphMode,
+  classification: AdaptedNodeClassification | undefined,
+  derivedNodeId: string,
+  hiddenNodeIds: ReadonlySet<string> = new Set()
+): NodeRenderAttrs {
+  if (mode === "neutral" || !classification) return { adaptedState: "none", frontierTarget: "no", hidden: "no" };
   return {
     adaptedState: classification.stateByNode[derivedNodeId] ?? "none",
-    frontierTarget: classification.selectedFrontierTarget === derivedNodeId ? "yes" : "no"
+    frontierTarget: classification.selectedFrontierTarget === derivedNodeId ? "yes" : "no",
+    hidden: hiddenNodeIds.has(derivedNodeId) ? "yes" : "no"
   };
+}
+
+export function regionHiddenAttr(
+  mode: DerivedGraphMode,
+  domain: string,
+  nodes: ReadonlyArray<{ id: string; domain: string }>,
+  hiddenNodeIds: ReadonlySet<string> = new Set()
+): "yes" | "no" {
+  const children = nodes.filter((node) => node.domain === domain);
+  return mode === "adapted" && children.length > 0 && children.every((node) => hiddenNodeIds.has(node.id)) ? "yes" : "no";
 }
 
 // Build the view-model, optionally overlaying a learner classification (U3, KTD2). With

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AdaptedNodeClassification } from "@lrnki/application";
 import type { Verdict } from "@lrnki/domain-core";
-import { sheetContentFor, unmetPrerequisites, selectScopedFrontier } from "./studySession";
+import { adaptedHiddenNodeIds, sheetContentFor, unmetPrerequisites, selectScopedFrontier } from "./studySession";
 import type { StudyOptionSelectView } from "@/components/study/studyView";
 import type { DerivedGraphEdge } from "./derivedGraph";
 
@@ -121,4 +121,16 @@ test("selectScopedFrontier returns null when the goal cone has no frontier node"
   // With move mastered too, nothing in scope is frontier.
   const done: AdaptedNodeClassification = { stateByNode: { scope: "mastered", ownership: "mastered", move: "mastered" }, selectedFrontierTarget: null };
   assert.equal(selectScopedFrontier({ targetDerivedNodeId: "move", edges, classification: done, difficultyByNode: new Map() }), null);
+});
+
+test("adaptedHiddenNodeIds returns the known closure minus the goal target", () => {
+  assert.deepEqual(adaptedHiddenNodeIds(new Set(["scope", "ownership", "move"]), "move"), ["scope", "ownership"]);
+});
+
+test("adaptedHiddenNodeIds leaves a closure unchanged when it does not contain the goal", () => {
+  assert.deepEqual(adaptedHiddenNodeIds(new Set(["scope", "ownership"]), "move"), ["scope", "ownership"]);
+});
+
+test("adaptedHiddenNodeIds returns an empty list for an empty closure", () => {
+  assert.deepEqual(adaptedHiddenNodeIds(new Set(), "move"), []);
 });

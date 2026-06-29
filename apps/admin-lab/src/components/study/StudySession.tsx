@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { GraduationCapIcon, RotateCcwIcon, TriangleAlertIcon, TrophyIcon } from "lucide-react";
@@ -38,6 +38,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
+  const hiddenNodeIds = useMemo(() => new Set(session.adaptedHiddenNodeIds), [session.adaptedHiddenNodeIds]);
 
   const openNode = (derivedNodeId: string) => {
     setSelectedNodeId(derivedNodeId);
@@ -254,7 +255,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
 
       <Card>
         <CardContent className="pt-4">
-          <DerivedGraphExplorer detail={session.detail} adapted={session.classification} onNodeSelect={openNode} />
+          <DerivedGraphExplorer detail={session.detail} adapted={session.classification} hiddenNodeIds={hiddenNodeIds} onNodeSelect={openNode} />
         </CardContent>
       </Card>
 
