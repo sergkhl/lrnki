@@ -50,6 +50,10 @@ definitions and repair their references in the same change.
 
 14. After every important behavior-changing milestone, apply
     `.agents/skills/real-use-quality-evaluation/SKILL.md`. A green suite is not quality evidence.
+    `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
+    `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
+    (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer
+    a real-use gate by claiming `DATABASE_URL` is unavailable.
 
 15. Web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph visualization
     uses Cytoscape.
@@ -74,3 +78,10 @@ definitions and repair their references in the same change.
 21. Before fixing a real-use defect, name its established problem class and research recognized best
     practices. Prefer a conventional root-cause solution. Record why a bespoke approach is necessary
     if established methods conflict with this architecture or the learner-neutral contract.
+
+22. Prioritize the future Learner App's user experience. To truly reach a learner you must speak the
+    language of their childhood — play — so game-like, delightful UX is a first-class goal of every
+    learner-facing projection, not a finishing layer added after the engine works. This priority
+    lives only in downstream projections; it never relaxes the learner-neutral core
+    ([ADR-0002](docs/adr/0002-define-learner-neutral-core-concept-graph.md)) or the projection
+    boundary in [CONTEXT.md](CONTEXT.md).

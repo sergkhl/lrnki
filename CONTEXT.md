@@ -137,6 +137,13 @@ _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 A projection of one Derived Graph Layer for a target `derived_node_id` and Learner State.
 _Avoid_: course, personalized graph, concept-keyed learner state
 
+**Study Session**:
+A learner-stateful, goal-scoped projection over one Derived Graph Layer that gates each in-scope
+derived node into locked / frontier / mastered and carries its study payload. It advances the learner
+toward a target `derived_node_id` and is composed behind an application use-case, not the UI. It
+carries each node's **Concept Lesson** for reading before the study item.
+_Avoid_: study screen, quiz session
+
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
 in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
@@ -147,9 +154,18 @@ A learner-neutral option-select asset generated alongside one Derived Graph Laye
 keyed to `derived_node_id`; `option_select` is the only implemented `itemType`.
 _Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 
+**Concept Lesson**:
+A learner-neutral teaching substrate keyed to `derived_node_id`, generated alongside the Study Item
+Bank ([ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md)). An ordered set of typed,
+independently-optional sections (gist, intuition, definition, examples, applications, formulas) that
+teach a concept before it is tested; each section is honestly labeled source-cited or generated and
+absent rather than placeholder when ungroundable. It is the single source of grounding study items
+derive from, and reading it is non-graded.
+_Avoid_: course, study screen, quiz, graded card, asserted graph mutation
+
 **Grounding Provenance**:
-The Study Item Bank citation contract. Source-grounded correct options cite source evidence;
-generated correct options cite generated grounding and are labeled as generated.
+The citation contract shared by the Study Item Bank and the Concept Lesson. Source-grounded content
+cites source evidence; generated content cites generated grounding and is labeled as generated.
 _Avoid_: fake source citation, unlabeled generated quote
 
 **Inspection Read Model**:

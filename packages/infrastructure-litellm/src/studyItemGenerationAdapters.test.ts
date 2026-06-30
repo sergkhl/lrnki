@@ -5,9 +5,9 @@ import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { optionSelectValidator } from "./toolSchemas";
 
 test("generateOptionSelect assembles a draft: grounded correct + three generated distractors", async () => {
-  const calls: { toolName: string; messages: { content: string }[] }[] = [];
+  const calls: { toolName: string; messages: { content: string }[]; maxRetries?: number }[] = [];
   const client = {
-    async call(input: { toolName: string; messages: { content: string }[] }) {
+    async call(input: { toolName: string; messages: { content: string }[]; maxRetries?: number }) {
       calls.push(input);
       return {
         question: "Where is memory allocated at runtime?",
@@ -38,8 +38,10 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
     assert.equal(distractor.citation, undefined);
   }
   assert.equal(calls[0].toolName, "submit_option_select_item");
+  assert.equal(calls[0].maxRetries, 4);
   // siblings flow into the prompt
   assert.ok(calls[0].messages.some((m) => m.content.includes("Stack")));
+  assert.ok(calls[0].messages.some((m) => m.content.includes("correctAnswer field must be an object")));
 });
 
 test("generateOptionSelect labels the correct answer 'generated' on a generated-grounding node", async () => {

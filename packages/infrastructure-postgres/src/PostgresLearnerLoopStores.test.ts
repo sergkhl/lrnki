@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { NewResponseLogRow, OptionSelectItem, RejectedStudyItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
+import type { ConceptLesson, NewResponseLogRow, OptionSelectItem, RejectedStudyItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
-import { PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
+import { PostgresConceptLessonStore, PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
 
 // Integration tests against a live PostgreSQL with the single initial migration
@@ -310,6 +310,122 @@ maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with
 
     assert.equal((await verdicts.listForLearner(learner)).length, 0);
     assert.equal((await log.listForLearner(learner)).length, 0);
+  } finally {
+    await sql.end();
+  }
+});
+
+// --- Concept Lesson store (U5, ADR-0031) ---------------------------------------
+
+function lessonFor(s: Substrate): ConceptLesson {
+  return {
+    derivedNodeId: s.derivedNodeId,
+    graphVersionId: s.graphVersionId,
+    enrichmentId: s.enrichmentId,
+    generatingModel: "test-model",
+    configHash: "cfg",
+    canonicalLabel: "Ownership",
+    sections: [
+      { kind: "gist", text: "Each value has a single owner.", groundingProvenance: "generated" },
+      {
+        kind: "definition",
+        text: "Ownership is a set of rules that govern memory.",
+        groundingProvenance: "source_cep",
+        citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." }
+      }
+    ]
+  };
+}
+
+maybe("Covers R1: persists a two-section lesson; it round-trips by derivedNodeId with sections, provenance, and citations intact", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await new PostgresConceptLessonStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lessonFor(s)], absent: [] });
+
+    const lesson = await new PostgresConceptLessonStore(sql).getLesson(s.derivedNodeId);
+    assert.ok(lesson);
+    assert.equal(lesson!.sections.length, 2);
+    assert.deepEqual(lesson!.sections.map((sec) => sec.kind), ["gist", "definition"]);
+    const definition = lesson!.sections.find((sec) => sec.kind === "definition")!;
+    assert.equal(definition.groundingProvenance, "source_cep");
+    assert.ok(definition.citation && definition.citation.provenance === "source");
+    assert.equal(lesson!.sections[0].citation, undefined);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("regenerating an enrichment replaces its prior lessons and absences rather than appending", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const store = new PostgresConceptLessonStore(sql);
+    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lessonFor(s)], absent: [] });
+    // Re-persist with no lesson and an absence.
+    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [], absent: [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", reason: "no usable grounding passages" }] });
+
+    assert.equal((await store.listLessonsForEnrichment(s.enrichmentId)).length, 0);
+    const [{ sections }] = await sql<{ sections: number }[]>`
+      SELECT count(*)::int AS sections FROM concept_lesson_sections WHERE concept_lesson_id IN (SELECT concept_lesson_id FROM concept_lessons WHERE enrichment_id = ${s.enrichmentId})`;
+    assert.equal(sections, 0, "orphaned sections are cascade-cleared");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("Covers R3: a lesson_absent_nodes row round-trips with its reason and is not returned by getLesson", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const store = new PostgresConceptLessonStore(sql);
+    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [], absent: [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", reason: "no usable grounding passages" }] });
+
+    assert.equal(await store.getLesson(s.derivedNodeId), undefined);
+    const absent = await store.listAbsentForEnrichment(s.enrichmentId);
+    assert.equal(absent.length, 1);
+    assert.equal(absent[0].reason, "no usable grounding passages");
+    assert.equal(absent[0].canonicalLabel, "Ownership");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("the artifact_concept_lessons view flattens one row per persisted lesson", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await new PostgresConceptLessonStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lessonFor(s)], absent: [] });
+
+    const rows = await sql<{ derived_node_id: string; section_count: number; canonical_label: string }[]>`
+      SELECT derived_node_id, section_count, canonical_label FROM artifact_concept_lessons WHERE enrichment_id = ${s.enrichmentId}`;
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].section_count, 2);
+    assert.equal(rows[0].canonical_label, "Ownership");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a generated-citation section persists null source ids; a source-citation section persists source ids", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const lesson: ConceptLesson = {
+      ...lessonFor(s),
+      sections: [
+        { kind: "gist", text: "Synthesized gist.", groundingProvenance: "generated", citation: { provenance: "generated", derivedNodeId: s.derivedNodeId, passageText: "a synthesized passage" } },
+        { kind: "definition", text: "Ownership is a set of rules that govern memory.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." } }
+      ]
+    };
+    await new PostgresConceptLessonStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lesson], absent: [] });
+
+    const round = await new PostgresConceptLessonStore(sql).getLesson(s.derivedNodeId);
+    const gist = round!.sections.find((sec) => sec.kind === "gist")!;
+    assert.ok(gist.citation && gist.citation.provenance === "generated");
+    if (gist.citation.provenance === "generated") assert.equal(gist.citation.passageText, "a synthesized passage");
+    const definition = round!.sections.find((sec) => sec.kind === "definition")!;
+    assert.ok(definition.citation && definition.citation.provenance === "source");
   } finally {
     await sql.end();
   }

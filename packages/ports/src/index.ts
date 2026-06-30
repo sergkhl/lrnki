@@ -6,6 +6,9 @@ import type {
   BlockEvidence,
   CalibrationVerdict,
   ConceptIdentityResolutionOutcome,
+  ConceptLesson,
+  ConceptLessonDraft,
+  LessonAbsentNode,
   StudyItem,
   OptionSelectItemDraft,
   StudyItemGroundingProvenance,
@@ -278,11 +281,11 @@ export interface SourceObjectStoragePort {
 // non-deterministic distribution (ADR-0028). `order` is a thin single-call caller: the
 // APPLICATION invokes it K times on the SAME input and tallies a per-pair directional vote
 // (D1/D2), so this method neither knows K nor aggregates. Each node is listed with its CEP
-// evidence; each edge cites its endpoints by EXACT canonical label, which the application
-// maps → derivedNodeIds fail-closed (KTD3, R9). The judge proposes directed edges only; the
-// boundary derives consensus confidence, routes direction-contested pairs and aggregate
-// cycles to `uncertain` (D3/D6, rules 16/19), and runs the symbolic disposal (weak-cut →
-// transitive reduction) over the consensus certain edges. There is no corrective re-prompt
+// evidence; each edge cites endpoints by the listed 1-based Concept number, which the
+// application maps by position to derivedNodeIds fail-closed (KTD3, R9). The judge proposes
+// directed edges only; the boundary derives consensus confidence, routes
+// direction-contested pairs and aggregate cycles to `uncertain` (D3/D6, rules 16/19), and
+// runs symbolic disposal over the consensus certain edges. There is no corrective re-prompt
 // (KTD4, rule 18): acyclicity is enforced on the aggregate, not by re-prompting one draw.
 export interface PrerequisiteOrderingPort {
   readonly model: string;
@@ -407,6 +410,21 @@ export interface StudyItemBankStorePort {
   supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
 }
 
+// Concept Lesson persistence (ADR-0031, R1/R3/R9). `persist` writes a whole enrichment's
+// lessons, their ordered sections + per-section grounded citations, AND its lesson-absent
+// nodes atomically, plus the immutable `concept_lesson_bank` artifact, in one transaction
+// (no authoritative relational state without its artifact, matching the Study Item Bank
+// store). Regeneration replaces an enrichment's lessons and absences (delete-then-insert).
+// `getLesson` returns a node's lesson (absences are NOT returned); `listLessonsForEnrichment`
+// powers the Study Session ride-down and the operator visibility surface. A learner-NEUTRAL
+// derived asset: this port imports no graph/enrichment write port (R9).
+export interface ConceptLessonStorePort {
+  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
+  getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined>;
+  listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]>;
+  listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
+}
+
 // Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the
 // generator stays DeepSeek-family (AGENTS rule 5). `generateOptionSelect` returns a
 // pre-verification OptionSelectItemDraft (a grounded correct answer + three
@@ -426,6 +444,34 @@ export interface StudyItemGenerationPort {
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];
   }): Promise<OptionSelectItemDraft>;
+}
+
+// Concept Lesson generation (ADR-0031, R2/R4/R6/R7/R11/R14). Forced named tool schema
+// routed through LiteLLM; the generator stays DeepSeek-family (AGENTS rule 5). `generate`
+// returns a pre-verification ConceptLessonDraft — an ordered set of sections each citing a
+// grounding passage by id when source-supported. Provenance honesty is re-derived
+// authoritatively by the pure assembler (U6); this port never decides what is source-cited.
+// Synthesized sections are generated unconditionally this iteration (R11; confidence-gating
+// is deferred to ADR-0030).
+export interface ConceptLessonGenerationPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    // Directional graph neighbors for the graph-aware applications section (R5). Each is a
+    // label + grounding snippet; a neighbor-poor node still produces a lesson (prompt-context
+    // only). Structurally compatible with the application's LessonNeighborhood.
+    neighbors: {
+      parents: { label: string; snippet: string }[];
+      children: { label: string; snippet: string }[];
+      siblings: { label: string; snippet: string }[];
+    };
+  }): Promise<ConceptLessonDraft>;
 }
 
 // Response Log persistence (R4–R6). The port surface is deliberately APPEND + READ
@@ -700,6 +746,93 @@ export interface DerivedGraphDetail {
 export interface EnrichmentInspectionReadPort {
   listEnrichmentSummaries(): Promise<EnrichmentSummary[]>;
   getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
+}
+
+// Learner Path inspection read surface (ADR-0027, ADR-0011). Paths are computed and
+// persisted by the CLI; the Admin Lab only reads them and never computes (AGENTS rule 12).
+// Pure inspection: the storage adapter owns the path/step/DAG SQL and row-stitch; the UI
+// renders the finished model. The learner-recall subject identity is `derived_node_id`
+// throughout (ADR-0026).
+export interface LearnerPathSummary {
+  learnerPathId: string;
+  targetDerivedNodeId: string;
+  targetLabel: string;
+  declaredDomain: string;
+  learnerStateRef: string;
+  stepCount: number;
+  graphVersionId: string;
+  enrichmentId: string;
+  createdAt: string;
+}
+
+export interface LearnerPathNode {
+  derivedNodeId: string;
+  label: string;
+  difficulty: number | null;
+  inPath: boolean;
+  position: number | null;
+  isTarget: boolean;
+}
+
+export interface LearnerPathEdge {
+  prerequisiteDerivedNodeId: string;
+  dependentDerivedNodeId: string;
+  confidence: number;
+  uncertain: boolean;
+  inPath: boolean;
+}
+
+export interface LearnerPathDetail {
+  summary: LearnerPathSummary;
+  steps: { position: number; derivedNodeId: string; label: string; difficulty: number; includedReason: string; groundingOrigin: string }[];
+  // The inferred prerequisite DAG of the path's enrichment, scoped to the target's
+  // Declared Domain (prerequisites are always same-domain, ADR-0015).
+  nodes: LearnerPathNode[];
+  edges: LearnerPathEdge[];
+}
+
+export interface LearnerPathInspectionReadPort {
+  listLearnerPaths(): Promise<LearnerPathSummary[]>;
+  getLearnerPathDetail(learnerPathId: string): Promise<LearnerPathDetail | undefined>;
+}
+
+// Learner Loop inspection read surface (ADR-0027, KTD7). The learner-loop history/coverage
+// reads are pure inspection — the storage adapter owns the joined-history SQL, the
+// learner-state list reads, the path-scope read, and the coverage stitch (including the
+// no-item fallback reason). The application's learner-loop projection use-cases add the
+// conflict/mastery/summary folds and the adapted-graph classify over these rows. Row shapes
+// are read-model types: the response rows carry the joined node label + question alongside
+// the full append-only Response Log row so a use-case can both render and re-fold from one
+// read.
+export type LearnerLoopResponseRow = ResponseLogRow & { createdAt: string };
+export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string };
+
+export type LearnerLoopPathScope = { enrichmentId: string; targetDerivedNodeId: string; targetLabel: string };
+
+export type PathStudyItemCoverageStep = {
+  position: number;
+  derivedNodeId: string;
+  label: string;
+  groundingOrigin: string;
+  includedReason: string;
+  studyItem: { studyItemId: string; question: string; provenance: "source_cep" | "source_mentioned" | "generated" } | null;
+  fallbackReason: string | null;
+};
+
+export type PathStudyItemCoverage = {
+  enrichmentId: string;
+  targetDerivedNodeId: string;
+  targetLabel: string;
+  steps: PathStudyItemCoverageStep[];
+};
+
+export interface LearnerLoopReadPort {
+  listAllResponses(): Promise<LearnerLoopResponseRow[]>;
+  listAllVerdicts(): Promise<CalibrationVerdict[]>;
+  listResponsesForLearner(learnerStateRef: string): Promise<LearnerLoopResponseDetailRow[]>;
+  listVerdictsForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]>;
+  listPathScopesForLearner(learnerStateRef: string): Promise<LearnerLoopPathScope[]>;
+  listCoverageForLearner(learnerStateRef: string): Promise<PathStudyItemCoverage[]>;
 }
 
 // ---------------------------------------------------------------------------

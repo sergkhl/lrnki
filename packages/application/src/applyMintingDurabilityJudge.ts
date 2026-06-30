@@ -1,6 +1,6 @@
 import type { MintingDisposition } from "@lrnki/domain-core";
 import type { MintingDurabilityJudgmentPort } from "@lrnki/ports";
-import { mapWithConcurrency } from "./mapWithConcurrency";
+import { gateByJudgment } from "./gateByJudgment";
 
 export type ReservedMintingProposal = {
   derivedNodeId: string;
@@ -20,22 +20,22 @@ export async function applyMintingDurabilityJudge(input: {
   judge: MintingDurabilityJudgmentPort;
   concurrency?: number;
 }): Promise<{ keptProposals: ReservedMintingProposal[]; dispositions: MintingDisposition[] }> {
-  const dispositions = new Array<MintingDisposition>(input.proposals.length);
-  await mapWithConcurrency(input.proposals, input.concurrency ?? 4, async (proposal, index) => {
-    try {
-      const judgment = await input.judge.judge({
+  // The `MintingDisposition[]` IS the gate's index-aligned outcome array (rule 16,
+  // gateByJudgment): `onVerdict` records accepted/dropped on a confident verdict;
+  // `onUnavailable` records `kept_judge_unavailable` (fail open — a transport blip
+  // never drops a proposal). No item is skipped: every proposal is judged.
+  const dispositions = await gateByJudgment(input.proposals, {
+    concurrency: input.concurrency,
+    judge: (proposal) =>
+      input.judge.judge({
         declaredDomain: proposal.declaredDomain,
         proposal: { proposedLabel: proposal.proposedLabel, rationale: proposal.rationale },
         anchor: { canonicalLabel: proposal.anchor.canonicalLabel, definitionQuotes: proposal.anchor.definitionQuotes }
-      });
-      dispositions[index] = record(
-        proposal,
-        judgment.verdict === "not_durable" ? "dropped" : "accepted",
-        judgment.rationale
-      );
-    } catch {
-      dispositions[index] = record(proposal, "kept_judge_unavailable", "minting durability judge unavailable");
-    }
+      }),
+    onVerdict: (proposal, judgment) =>
+      record(proposal, judgment.verdict === "not_durable" ? "dropped" : "accepted", judgment.rationale),
+    onUnavailable: (proposal) =>
+      record(proposal, "kept_judge_unavailable", "minting durability judge unavailable")
   });
   const dropped = new Set(
     dispositions

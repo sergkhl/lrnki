@@ -18,8 +18,10 @@ export {
   conceptAdmissionSchema,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidator,
+  conceptAdmissionValidatorForCandidateKeys,
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidator,
+  conceptCoreSelectionValidatorForCandidateKeys,
   conceptEvidenceProfileSchema,
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingSchema,
@@ -43,6 +45,10 @@ export {
   LiteLlmStudyItemGenerationAdapter,
   STUDY_ITEM_GENERATION_MODEL
 } from "./studyItemGenerationAdapters";
+export {
+  LiteLlmConceptLessonGenerationAdapter,
+  CONCEPT_LESSON_GENERATION_MODEL
+} from "./conceptLessonGenerationAdapters";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,

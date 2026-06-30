@@ -11,10 +11,12 @@ export type SiblingDescriptor = { derivedNodeId: string; label: string; snippet:
 
 export const DEFAULT_MAX_SIBLINGS = 6;
 
-// One grounding snippet per sibling, definition-preferred. Anchors carry no inline
+// One grounding snippet per node, definition-preferred. Anchors carry no inline
 // grounding on the node (their evidence lives in the CEP), so they contribute a
-// label-only descriptor — still a same-domain register cue for the generator.
-function siblingSnippet(node: DerivedGraphNode): string {
+// label-only descriptor — still a same-domain register cue for the generator. Shared
+// with the lesson neighborhood selector (U3) so both derive a neighbor snippet the same
+// way (rule 18, one source for the helper).
+export function nodeGroundingSnippet(node: DerivedGraphNode): string {
   if (node.nodeKind !== "enrichment") return "";
   if (node.groundingOrigin === "source_mentioned") {
     return node.groundingPassages[0]?.text ?? "";
@@ -44,6 +46,6 @@ export function selectSiblingContext(
   return [...adjacentSiblings, ...otherSiblings].slice(0, maxSiblings).map((candidate) => ({
     derivedNodeId: candidate.derivedNodeId,
     label: candidate.canonicalLabel,
-    snippet: siblingSnippet(candidate)
+    snippet: nodeGroundingSnippet(candidate)
   }));
 }

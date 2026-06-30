@@ -1,0 +1,219 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { z } from "zod";
+import { toForcedToolSchema } from "./forcedToolSchema";
+import {
+  buildPrerequisiteOrderingSchema,
+  buildPrerequisiteOrderingValidator,
+  conceptAdmissionSchemaForCandidateKeys,
+  conceptAdmissionValidatorForCandidateKeys,
+  conceptCoreSelectionSchemaForCandidateKeys,
+  conceptCoreSelectionValidatorForCandidateKeys,
+  conceptEvidenceProfileSchema,
+  CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
+  conceptLessonSchema,
+  conceptLessonValidator,
+  toolValidators
+} from "./toolSchemas";
+
+test("all forced-tool schemas satisfy strict object invariants", () => {
+  for (const validator of toolValidators) {
+    assertStrictForcedToolSchema(toForcedToolSchema(validator));
+  }
+});
+
+test("strict object invariant catches optional object properties", () => {
+  const schema = toForcedToolSchema(z.object({
+    requiredValue: z.string(),
+    optionalValue: z.string().optional()
+  }).strict());
+
+  assert.throws(() => assertStrictForcedToolSchema(schema), /missing required property optionalValue/);
+});
+
+test("all generated schema descriptions remain domain-neutral", () => {
+  const modelFacingText = toolValidators
+    .map((validator) => JSON.stringify(toForcedToolSchema(validator)))
+    .join("\n")
+    .toLowerCase();
+
+  for (const fixtureTerm of ["ownership", "rust", "market", "economics", "instructkg", "meselson", "aira"]) {
+    assert.equal(modelFacingText.includes(fixtureTerm), false, `fixture-derived term leaked: ${fixtureTerm}`);
+  }
+});
+
+test("candidate-key enum is symmetric for admission schemas and validators", () => {
+  const schema = conceptAdmissionSchemaForCandidateKeys(["a", "b"]);
+  const decisions = ((schema.properties as Record<string, unknown>).decisions as { items: { properties: Record<string, unknown> } }).items.properties;
+
+  assert.deepEqual(decisions.parentCandidateKey, {
+    type: "string",
+    enum: ["a", "b"],
+    description: "The discovered candidateKey this atomic concept was split from."
+  });
+  assert.throws(() => conceptAdmissionValidatorForCandidateKeys(["a", "b"]).parse({
+    decisions: [validAdmissionDecision("c")]
+  }));
+  assert.doesNotThrow(() => conceptAdmissionValidatorForCandidateKeys().parse({
+    decisions: [validAdmissionDecision("c")]
+  }));
+});
+
+test("candidate-key enum is symmetric for core-selection schemas and validators", () => {
+  const schema = conceptCoreSelectionSchemaForCandidateKeys(["a", "b"]);
+  const selections = ((schema.properties as Record<string, unknown>).selections as { maxItems: number; items: { properties: Record<string, unknown> } });
+
+  assert.equal(selections.maxItems, 2);
+  assert.deepEqual(selections.items.properties.candidateKey, { type: "string", enum: ["a", "b"] });
+  assert.throws(() => conceptCoreSelectionValidatorForCandidateKeys(["a", "b"]).parse({
+    selections: [{ candidateKey: "c", selected: true, canonicalLabel: "C", reasonCode: "source_level_core" }]
+  }));
+});
+
+test("prerequisite ordering schema keeps numeric bounds while refine remains validator-only", () => {
+  const schema = buildPrerequisiteOrderingSchema(3);
+  const edgeProperties = (((schema.properties as Record<string, unknown>).edges as { items: { properties: Record<string, unknown> } }).items.properties);
+
+  assert.deepEqual(edgeProperties.prerequisiteNumber, {
+    type: "integer",
+    minimum: 1,
+    maximum: 3,
+    description: "The 1-based Concept number (as shown before each concept) of the concept that must be understood FIRST."
+  });
+  assert.throws(() => buildPrerequisiteOrderingValidator(3).parse({
+    edges: [{ prerequisiteNumber: 2, dependentNumber: 2, confidence: 0.5, rationale: "r" }]
+  }));
+});
+
+test("concept evidence profile emits nullable literalValue in forced-tool dialect", () => {
+  const assertions = (conceptEvidenceProfileSchema.properties as Record<string, { items: { properties: Record<string, unknown> } }>).assertions;
+
+  assert.deepEqual(assertions.items.properties.literalValue, {
+    type: ["string", "null"],
+    description: "A faithful, concise definition grounded in the evidence quote."
+  });
+});
+
+test("concept lesson schema folds nullable citation/diagram scalars and is registered", () => {
+  // Registration: the strict-invariant and domain-neutral suites iterate toolValidators,
+  // so membership keeps the lesson schema under the same fail-closed guarantees (U2).
+  assert.ok(toolValidators.includes(conceptLessonValidator));
+
+  const section = (conceptLessonSchema.properties as Record<string, { items: { properties: Record<string, unknown> } }>)
+    .sections.items.properties;
+  // Optional citation/diagram fields are plain nullable scalars (no min) so they fold to
+  // a type union rather than an anyOf the strict guard would reject.
+  assert.deepEqual((section.citationPassageId as Record<string, unknown>).type, ["string", "null"]);
+  assert.deepEqual((section.diagramSpec as Record<string, unknown>).type, ["string", "null"]);
+  // Section text stays a non-nullable bounded string.
+  assert.deepEqual(section.text, {
+    type: "string",
+    minLength: 1,
+    maxLength: CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
+    description: "The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."
+  });
+});
+
+test("concept lesson validator accepts the R3 minimum and rejects empty or overlong section text", () => {
+  // gist + one application + one substantive (definition) section — the R3 minimum
+  // (membership in the array is the optionality model; absent sections are omitted).
+  assert.doesNotThrow(() => conceptLessonValidator.parse({
+    sections: [
+      { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null },
+      { kind: "definition", text: "The precise statement.", citationPassageId: "block-1", citationEvidenceQuote: "The precise statement.", diagramCaption: null, diagramSpec: null },
+      { kind: "applications", text: "How it connects to neighbors.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+    ]
+  }));
+  // An empty `text` on any present section fails closed (rule 6).
+  assert.throws(() => conceptLessonValidator.parse({
+    sections: [{ kind: "gist", text: "", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }]
+  }));
+  assert.throws(() => conceptLessonValidator.parse({
+    sections: [{
+      kind: "applications",
+      text: "x".repeat(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH + 1),
+      citationPassageId: null,
+      citationEvidenceQuote: null,
+      diagramCaption: null,
+      diagramSpec: null
+    }]
+  }));
+});
+
+test("concept lesson validator accepts a section with and without a diagram descriptor", () => {
+  assert.doesNotThrow(() => conceptLessonValidator.parse({
+    sections: [
+      { kind: "examples", text: "A worked example.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: "A vs B", diagramSpec: "A relates to B" },
+      { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+    ]
+  }));
+});
+
+function assertStrictForcedToolSchema(schema: unknown): void {
+  assert.equal(recordValue(schema).type, "object", "root must be type:object");
+  assertSchemaNode(schema, "$");
+}
+
+function assertSchemaNode(schema: unknown, path: string): void {
+  if (Array.isArray(schema)) {
+    schema.forEach((item, index) => assertSchemaNode(item, `${path}[${index}]`));
+    return;
+  }
+  if (!schema || typeof schema !== "object") return;
+
+  const node = schema as Record<string, unknown>;
+  assert.equal(node.$schema, undefined, `${path} must not include $schema`);
+  assert.notEqual(isScalarNullableAnyOf(node), true, `${path} must not use scalar nullable anyOf`);
+
+  if (node.type === "object") {
+    assert.equal(node.additionalProperties, false, `${path} must set additionalProperties:false`);
+    const properties = recordValue(node.properties);
+    const required = Array.isArray(node.required) ? node.required : [];
+    for (const key of Object.keys(properties)) {
+      assert.ok(required.includes(key), `${path} missing required property ${key}`);
+    }
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    assertSchemaNode(value, `${path}.${key}`);
+  }
+}
+
+function isScalarNullableAnyOf(node: Record<string, unknown>): boolean {
+  const anyOf = node.anyOf;
+  if (!Array.isArray(anyOf) || anyOf.length !== 2) return false;
+  return anyOf.some((option) => recordValue(option).type === "null") &&
+    anyOf.some((option) => typeof recordValue(option).type === "string" && recordValue(option).type !== "null");
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function validAdmissionDecision(parentCandidateKey: string) {
+  return {
+    parentCandidateKey,
+    atomicKey: "atom",
+    proposedCanonicalLabel: "Atomic Concept",
+    tier: "core",
+    sourceRole: "declared_domain_concept",
+    standaloneLearningObjective: criterion(),
+    establishedDomainMeaning: criterion(),
+    definitionBearingTreatment: criterion(),
+    organizingPower: {
+      passed: true,
+      rationale: "r",
+      aspects: [{ summary: "s", nature: "definition-or-property", evidence: evidence() }]
+    },
+    reasonCodes: ["r"],
+    confidence: 0.8
+  };
+}
+
+function criterion() {
+  return { passed: true, rationale: "r", evidence: [evidence()] };
+}
+
+function evidence() {
+  return { blockId: "block-1", evidenceQuote: "quote" };
+}

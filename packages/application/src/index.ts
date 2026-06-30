@@ -1,6 +1,7 @@
 export { executeExtractionRun, DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE } from "./executeExtractionRun";
 export { runExtractionOverSources, DEFAULT_EXTRACTION_OVER_SOURCES_CONCURRENCY, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { mapWithConcurrency } from "./mapWithConcurrency";
+export { gateByJudgment } from "./gateByJudgment";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { admitSource } from "./admitSource";
 export { reconcileUngroundableCores } from "./reconcileUngroundableCores";
@@ -68,6 +69,7 @@ export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 export { computeLearnerPath } from "./computeLearnerPath";
+export { getStudySession } from "./getStudySession";
 export { generateStudyItemBank, type StudyItemBankGenerationResult, type RejectedStudyItem } from "./generateStudyItemBank";
 export {
   validateOptionSelectItem,
@@ -75,7 +77,19 @@ export {
   type OptionSelectGroundingPassage,
   type OptionSelectGuardResult
 } from "./optionSelectGuard";
-export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, type SiblingDescriptor } from "./selectSiblingContext";
+export { selectSiblingContext, DEFAULT_MAX_SIBLINGS, nodeGroundingSnippet, type SiblingDescriptor } from "./selectSiblingContext";
+export {
+  selectLessonNeighborhood,
+  DEFAULT_MAX_LESSON_NEIGHBORS,
+  type LessonNeighbor,
+  type LessonNeighborhood
+} from "./selectLessonNeighborhood";
+export { selectNodeGrounding, type GroundingPassage, type NodeGrounding } from "./selectNodeGrounding";
+export {
+  assembleConceptLesson,
+  type AssembleConceptLessonInput,
+  type AssembleConceptLessonResult
+} from "./assembleConceptLesson";
 export {
   appendOptionSelectOutcome,
   AUTO_GRADER_IDENTITY
@@ -87,6 +101,8 @@ export {
 } from "./responseLogLearnerState";
 export {
   selectFrontierTarget,
+  selectScopedFrontierTarget,
+  rankFrontier,
   projectAdaptivePath,
   classifyAdaptedNodes,
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -94,6 +110,43 @@ export {
   type AdaptedNodeClassification,
   type ReadinessEdge
 } from "./adaptivePathProjection";
+export {
+  composeStudySession,
+  studyItemToView,
+  studyItemViewToSheet,
+  conceptLessonToView,
+  labelFor,
+  unmetPrerequisites,
+  adaptedHiddenNodeIds,
+  type StudySession,
+  type SheetContent,
+  type StudyItemView,
+  type StudyOptionSelectView,
+  type ConceptLessonView,
+  type ConceptLessonSectionView,
+  type LessonAbsentView,
+  type CoexistenceFlag,
+  type RestorationSuggestion
+} from "./studySessionProjection";
+export {
+  detectConflicts,
+  buildMasteryMap,
+  summarizeResponseSources,
+  summarizeLearnerStates,
+  dedupeEnrichmentScopes,
+  listLearnerStates,
+  getLearnerLoopDetail,
+  getLearnerAdaptedGraphs,
+  type ConflictKind,
+  type ConceptConflict,
+  type ResponseSourceSummary,
+  type LearnerStateSummary,
+  type TimestampedResponseLogRow,
+  type LearnerResponseView,
+  type LearnerLoopDetail,
+  type LearnerAdaptedGraph,
+  type LearnerAdaptedGraphs
+} from "./learnerLoopProjection";
 export {
   synthesizeResponses,
   verdictByDifficulty,

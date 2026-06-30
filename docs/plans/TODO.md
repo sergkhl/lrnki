@@ -23,7 +23,72 @@
    per-learner sequence assignment in the persistence boundary rather than UI-only prevention.
    Decision: [ADR-0026](../adr/0026-typed-study-item-bank.md).
 
+4. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
+   learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
+   `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
+   shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
+   both learner projections share one boundary before the Learner Application is built — worth doing
+   once that app's calibration needs are concrete. Behavior-preserving; no new ADR.
+   Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
+
 ## COMPLETED
+
+- **Measured Judge Gate — one fail-safe seam for every neural judge.** All six `apply*Judge`
+  modules now route their whole control flow through one deep module, `gateByJudgment`, which owns
+  the envelope they each re-implemented: bounded concurrency, index-aligned results, and the
+  fail-safe `try/catch` that routes a thrown or schema-invalid judge call to a pass-through outcome
+  so it can never reach the drop/demote path. AGENTS rule 16's guarantee is now structural and
+  proven once in `gateByJudgment.test.ts` instead of six hand-written `catch` blocks; item
+  pre-filtering moved into the gate's `skip`, and `assertionEntailment` flattens to per-assertion
+  gate items then regroups by profile. Each judge's public interface (input/return shape, fail
+  direction, dispositions, reason codes, object-identity-on-no-change) is unchanged. The duplicated
+  `mapWithConcurrency` collapsed to the single shared copy and its stale `KTD8` deferred note is
+  gone (rule 18). Behavior-preserving; no prompt/model/schema/threshold/ADR change. Decisions:
+  [ADR-0001](../adr/0001-adopt-greenfield-deep-module-architecture.md) and AGENTS rules 16 and 18.
+
+- **Graph Enrichment consensus-ordering module.** The K-sampled whole-set ordering envelope moved
+  behind `deriveConsensusOrdering`: stable domain/node sorting, prompt-budget fail-closed behavior,
+  ordinal endpoint resolution, per-pair tallies, direction-contest routing, weak-cut-before-cycle
+  routing, aggregate-cycle routing, and ordering trace construction now have a direct module test
+  surface. `runGraphEnrichment` keeps node preparation, symbolic transitive reduction, difficulty,
+  persistence, and Operation Timeline lifecycle; the package barrel remains unchanged. Decisions:
+  [ADR-0001](../adr/0001-adopt-greenfield-deep-module-architecture.md),
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md), and
+  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
+
+- **Concept Lesson teaching substrate.** Every derived node now carries an ordered, source-grounded
+  Concept Lesson (gist → intuition → definition → examples → graph-aware applications → formulas)
+  generated in the `study_items` operation before the option-select stage and persisted as a
+  regenerable learner-neutral substrate. Sections reuse the Study Item Bank provenance/citation
+  contract; the pure assembler re-derives provenance authoritatively (source-cited only on verbatim
+  match, else generated) and records a node lesson-absent only when grounding is unusable. Option-select
+  now derives from the lesson's source-cited sections — the raw-passage feed for items is gone, so one
+  source of grounding feeds all study assets (rule 18). The Study Session rides the lesson down and
+  renders it ahead of the item (non-graded), with thin operator visibility for lesson-absent nodes.
+  Decision: [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
+
+- **Forced-tool schemas single-sourced from zod.** The hand-written JSON Schema bodies in
+  `toolSchemas.ts` were deleted: each forced-tool schema is now generated from its zod validator
+  through the `toForcedToolSchema` provider-dialect seam, and `blockEvidence` is one reused zod object.
+  Runtime-bounded admission/core-selection/prerequisite-ordering tools derive schema and validator
+  from the same bounded source, closing the candidate-key enum asymmetry. Permanent registry tests
+  enforce strict object shape and domain-neutral schema descriptions for every current tool.
+  Decision: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md).
+
+- **Learner-facing reads on the ADR-0027 read-model split.** The study projection, Learner Path
+  reads, and Learner Loop reads moved off raw SQL and out-of-place adaptation compute in the Admin
+  Lab onto the read-model-port split. Learner projections are now `application` use-cases that read
+  through injected ports and add compute over a pure core: `getStudySession` over
+  `composeStudySession`, and the learner-loop use-cases (`getLearnerLoopDetail` / `listLearnerStates`
+  / `getLearnerAdaptedGraphs`) over the relocated conflict/mastery/summary folds. The pure persisted
+  reads are inspection read ports whose Postgres adapters own every query and row-stitch
+  (`LearnerPathInspectionReadPort`, `LearnerLoopReadPort`). The re-inlined frontier ranking is gone:
+  one exported `rankFrontier` plus a goal-scoped selector serve both the projected path and the
+  adapted-graph overlay (AGENTS rule 18). The Admin Lab study/paths/learner-loop modules collapsed to
+  thin shells that inject adapters; no learner-surface UI module embeds SQL or adaptation compute, and
+  no learner projection imports a graph or Derived-Graph-Layer write port. One boundary now serves the
+  Admin Lab and the forthcoming Learner Application. `Study Session` is defined in CONTEXT.md.
+  Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 - **Published-Concept semantic identity resolution.** A standalone propose-decide operation runs
   before the deterministic Graph-Version Build: embeddings propose within-domain near-duplicate
@@ -143,6 +208,88 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Measured Judge Gate refactor U1–U6, 2026-06-30 (branch
+  `feat/concept-lesson-teaching-surface`).** Full workspace typecheck green; full recursive suite
+  green (domain-core 29, application 362 incl. the new `gateByJudgment` guarantee suite — a thrown
+  judge routes to `onUnavailable` with `onVerdict` proven unreached, skip short-circuits with no
+  call, index alignment under out-of-order resolution, concurrency bound, empty-array — plus all six
+  judge suites passing unchanged; infra-postgres 47, infra-litellm 89, kg-worker 4, admin-lab 77);
+  ESLint 0 errors / 2 pre-existing warnings (`domain-core/src/index.ts`,
+  `infrastructure-litellm/src/extractionAdapters.ts`, both outside this diff). Sweep proofs:
+  `async function mapWithConcurrency` exists only in `mapWithConcurrency.ts` (AE3); zero `try {` in
+  any `apply*Judge.ts` (every fail path now lives in the gate, AE4); the gate's doc comment names
+  AGENTS rule 16. Real-use gate (rule 14 / KTD6, wiring confirmation — behavior-preserving, no
+  prompt/model/schema/threshold change): a clean single-Rust journey ran all six judges end to end
+  on real model calls — extraction `70092415` (`core=7 CEPs=20 incomplete=0 defs=30 assertions=9`),
+  graph version `11a37c58` (7 concepts), enrichment `1a4e7f2e` (`minting accepted=11 dropped=2
+  unavailable=0`, 7 anchors / 17 enrichment nodes, 22 certain / 8 uncertain edges, cycleRouted=0;
+  node split document_anchored=7 / llm_grounded=11 / source_mentioned=6). `unavailable=0` is the
+  load-bearing signal: `onVerdict` subtracted on confident verdicts while the gate's pass-through
+  never spuriously fired. Result: PASS. Trail: `tmp/2026-06-30-measured-judge-gate/`.
+
+- **Graph Enrichment consensus-ordering module, 2026-06-29 (branch
+  `feat/concept-lesson-teaching-surface`).** Deterministic checks passed:
+  `pnpm --filter @lrnki/application typecheck`,
+  `pnpm --filter @lrnki/application test`, direct
+  `pnpm --filter @lrnki/application exec tsx --test src/deriveConsensusOrdering.test.ts`,
+  full `pnpm run typecheck`, full `pnpm run test`, and `pnpm run lint` (0 errors; 2 pre-existing
+  warnings outside this diff). Direct module coverage exercises K draws,
+  singleton traces, stable ordering inputs, consensus confidence, direction contests, weak-cut,
+  weak-cut-before-cycle-routing, aggregate-cycle routing, replay determinism, prompt budget failure,
+  out-of-range ordinal failure, and self-edge failure. Real-use quality evaluation: fresh production
+  enrichment `16337f3e-1645-4636-a5e9-1b7fbe7884b7` over curated Rust graph version `d1e845d2` used
+  real model calls and persisted 7 anchors / 19 enrichment nodes, 28 certain / 10 uncertain edges,
+  one ordering trace for `software engineering` with `k=8`, 83 pair votes, 10 direction-contested
+  votes, 39 weak-cut dispositions, and 0 cycle-routed edges. The asserted graph stayed at 7 published
+  concepts; no weak-cut edge was committed. A learner path
+  (`4167d313-8771-4dae-9319-7199af24c009`) for target `499508fb` produced 8 prerequisite steps, all
+  reachable through certain edges only. Operation Timeline stage names remained the expected fine
+  enrichment tags through `prerequisite-ordering`, `symbolic-disposal`, `intrinsic-difficulty`, and
+  `persist`. Result: PASS. Trail:
+  `tmp/2026-06-29-consensus-ordering-real-use-enrich.log`.
+
+- **Concept Lesson teaching substrate U1–U9, 2026-06-29 (branch
+  `feat/concept-lesson-teaching-surface`).** Full workspace typecheck green; recursive tests green
+  (domain-core 29, application 353 incl. the test-first `assembleConceptLesson` suite + lesson
+  ride-down/absent projection cases, infra-litellm 89 incl. the strict/domain-neutral lesson schema,
+  infra-postgres 47 incl. live lesson-store round-trip/regenerate/absent/view cases, admin-lab 77).
+  Real-use gate (rule 14, real DeepSeek V4 Flash calls on a re-seeded DB): the Rust ch.4.1 source ran
+  end-to-end (extraction `8d7fa85a` → graph version `d1e845d2` → enrichment `b8ded3f1`, a mixed layer
+  of 7 anchors / 9 rescued / 11 minted nodes). Study-item generation produced **27 lessons / 0
+  absent / 138 sections / 25 option-select items (2 guard-rejected)**. Inspection: the Ownership
+  anchor lesson teaches accurately (library-book intuition, verbatim source definition + examples, a
+  graph-aware applications section that names the "Owner" prerequisite neighbor); the minted "Bitwise
+  copy" lesson is fully teachable with an all-`generated` label (AE5). The honesty invariant holds
+  exactly — every section labeled `source_cep`/`source_mentioned` carries a source citation and every
+  `generated` section carries none (no synthesized content masquerades as a source quote, R8). All
+  **36/36** persisted source citations re-verified verbatim against their stored source blocks with
+  the exact `evidenceQuoteMatches` normalizer. Result: PASS.
+
+- **Forced-tool schema single-source refactor, 2026-06-29 (branch
+  `refactor/single-source-forced-tool-schemas`).** Full workspace typecheck passed; the
+  infrastructure-litellm suite passed with new `toForcedToolSchema` golden tests, bounded enum
+  symmetry tests, and all-tool structural/domain-neutrality invariants. Real model validation used
+  the Rust curated source through the production worker path: extraction run
+  `02d72916-2ce1-46e6-873f-5bc931e2e3ef` succeeded (`candidates=20`, `core=5`, `CEPs=19`,
+  `incomplete=0`, `assertions=7`), graph version `daad805b-40a5-40d1-afa0-1d0f8c9b1deb` published,
+  and enrichment `10ee38bf-ada2-4d57-90f9-69811c309720` committed 19 prerequisite edges with
+  `contested=0`, `weakCut=0`, and `cycleRouted=0`. Production verifier inspection confirmed all 123
+  persisted CEP passages and all 7 assertion evidence quotes still verify; nullable `literalValue`,
+  tightened `minLength`, bounded candidate-key enums, and prerequisite-ordering bounds were accepted
+  by real forced-tool calls. Result: PASS. Trail: `tmp/2026-06-29-forced-tool-schema/`.
+
+- **Learner study/path/loop use-case refactor U1–U6, 2026-06-29 (branch
+  `refactor/learner-study-use-case`).** Full workspace typecheck green; recursive tests green
+  (application 335 incl. the new pure `composeStudySession` projection suite, the `getStudySession`
+  port-fake suite, and the relocated learner-loop fold suite; infra-postgres adds live read-adapter
+  tests for the Learner Path + Learner Loop ports, skipped without `DATABASE_URL`); admin-lab
+  production build passes; ESLint 0 errors / 2 pre-existing warnings. Grep proofs: no `sql<` in the
+  `studySession` / `learnerLoop` / `learnerPaths` shells; the `selectScopedFrontier` UI clone and the
+  re-inlined frontier sort are gone; exactly one exported `rankFrontier`. Behavior-preserving refactor
+  (AGENTS rule 14 applies lightly): the remaining manual rule-14 check is real-use parity — the study,
+  paths, and learner-loop surfaces rendering identically against a seeded enrichment/learner —
+  deferred to a DB-backed run (no `DATABASE_URL` in this environment).
 
 - **Published-Concept identity resolution U1–U5, 2026-06-26 (branch
   `fix/cep-definition-mispick-learner-surface`).** Full workspace typecheck and recursive suite green

@@ -1,11 +1,11 @@
 import type {
   DefinitionPassageDisposition,
-  DefinitionPassageQualityJudgment,
   EnrichmentNode,
   SourceMentionedEnrichmentNode,
   SourceMentionGroundingPassage
 } from "@lrnki/domain-core";
 import type { DefinitionPassageQualityJudgmentPort } from "@lrnki/ports";
+import { gateByJudgment } from "./gateByJudgment";
 
 // Rescue-seam Definition-Passage quality stage (plan 2026-06-26-001 U3, ADR-0007). Runs
 // at the rescue seam in `runGraphEnrichment` AFTER the verbatim floor (so it only judges
@@ -34,52 +34,59 @@ export async function applyRescuedDefinitionQualityJudge(input: {
 }): Promise<{ nodes: EnrichmentNode[]; dispositions: DefinitionPassageDisposition[] }> {
   const dispositions: DefinitionPassageDisposition[] = [];
 
-  const judged = await mapWithConcurrency(input.nodes, input.concurrency ?? 4, async (node) => {
-    if (node.groundingOrigin !== "source_mentioned") return { node, dispositions: [] as DefinitionPassageDisposition[] };
-    const definitionPassages = node.groundingPassages.filter((passage) => passage.passageType === "definition");
-    if (definitionPassages.length === 0) return { node, dispositions: [] as DefinitionPassageDisposition[] };
-
-    let verdicts: DefinitionPassageQualityJudgment[] | undefined;
-    try {
-      verdicts = await input.judge.judgeDefinitions({
+  // The Measured Judge Gate (rule 16, gateByJudgment) owns the control flow. `skip`
+  // is the pre-filter (R6): a non-`source_mentioned` node (`llm_grounded`: generated
+  // grounding, no source quote) or one carrying no `definition`-typed passage passes
+  // through untouched with no neural call. `onVerdict` drops only vetoed definition
+  // passages (preserving order and every mention, and object identity when nothing
+  // drops); `onUnavailable` keeps every passage flagged `kept_judge_unavailable` so a
+  // transport blip never shrinks the rescued surface (fail closed = preserve recall).
+  const judged = await gateByJudgment(input.nodes, {
+    concurrency: input.concurrency,
+    skip: (node) =>
+      definitionPassagesOf(node).length === 0 ? { node, dispositions: [] as DefinitionPassageDisposition[] } : undefined,
+    judge: (node) =>
+      input.judge.judgeDefinitions({
         declaredDomain: node.declaredDomain,
         subject: { canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-        passages: definitionPassages.map((passage) => ({
+        passages: definitionPassagesOf(node).map((passage) => ({
           sourceBlockId: passage.sourceBlockId,
           evidenceQuote: passage.evidenceQuote,
           blockType: "paragraph",
           headingPath: passage.headingPath
         }))
+      }),
+    onVerdict: (node, verdicts) => {
+      // `skip` guarantees only source_mentioned nodes reach here; this guard re-narrows
+      // the union for TypeScript (it is never the deciding branch — that is `skip`).
+      if (node.groundingOrigin !== "source_mentioned") return { node, dispositions: [] as DefinitionPassageDisposition[] };
+      const definitionPassages = node.groundingPassages.filter((passage) => passage.passageType === "definition");
+      const vetoedBlockIds = new Set<string>();
+      const nodeDispositions: DefinitionPassageDisposition[] = [];
+      definitionPassages.forEach((passage, index) => {
+        const verdict = verdicts?.[index];
+        if (!verdict || verdict.establishesMeaning) {
+          nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
+        } else {
+          vetoedBlockIds.add(passage.sourceBlockId);
+          nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "vetoed", verdict.category, verdict.rationale));
+        }
       });
-    } catch {
-      // Fail closed = preserve recall: keep every passage, flag it (rule 16).
-      return {
-        node,
-        dispositions: definitionPassages.map((passage) =>
-          dispositionFor(node.derivedNodeId, passage, "kept_judge_unavailable", "establishes_meaning", "judge transport failure: passage kept")
-        )
-      };
-    }
 
-    const vetoedBlockIds = new Set<string>();
-    const nodeDispositions: DefinitionPassageDisposition[] = [];
-    definitionPassages.forEach((passage, index) => {
-      const verdict = verdicts?.[index];
-      if (!verdict || verdict.establishesMeaning) {
-        nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
-      } else {
-        vetoedBlockIds.add(passage.sourceBlockId);
-        nodeDispositions.push(dispositionFor(node.derivedNodeId, passage, "vetoed", verdict.category, verdict.rationale));
-      }
-    });
-
-    if (vetoedBlockIds.size === 0) return { node, dispositions: nodeDispositions };
-    // Drop only the vetoed definition passages, preserving order and every mention.
-    const survivors = node.groundingPassages.filter(
-      (passage) => passage.passageType !== "definition" || !vetoedBlockIds.has(passage.sourceBlockId)
-    );
-    const next: SourceMentionedEnrichmentNode = { ...node, groundingPassages: survivors };
-    return { node: next, dispositions: nodeDispositions };
+      if (vetoedBlockIds.size === 0) return { node, dispositions: nodeDispositions };
+      // Drop only the vetoed definition passages, preserving order and every mention.
+      const survivors = node.groundingPassages.filter(
+        (passage) => passage.passageType !== "definition" || !vetoedBlockIds.has(passage.sourceBlockId)
+      );
+      const next: SourceMentionedEnrichmentNode = { ...node, groundingPassages: survivors };
+      return { node: next, dispositions: nodeDispositions };
+    },
+    onUnavailable: (node) => ({
+      node,
+      dispositions: definitionPassagesOf(node).map((passage) =>
+        dispositionFor(node.derivedNodeId, passage, "kept_judge_unavailable", "establishes_meaning", "judge transport failure: passage kept")
+      )
+    })
   });
 
   const nodes = judged.map((result) => {
@@ -88,6 +95,14 @@ export async function applyRescuedDefinitionQualityJudge(input: {
   });
 
   return { nodes, dispositions };
+}
+
+// The node's `definition`-typed grounding passages — the only passages this judge may
+// veto. A non-`source_mentioned` node (no source quote to judge) yields none, so an
+// empty result is the gate's whole pre-filter signal (R6).
+function definitionPassagesOf(node: EnrichmentNode): SourceMentionGroundingPassage[] {
+  if (node.groundingOrigin !== "source_mentioned") return [];
+  return node.groundingPassages.filter((passage) => passage.passageType === "definition");
 }
 
 function dispositionFor(
@@ -100,17 +115,4 @@ function dispositionFor(
   // `candidateKey` carries the derived node id at the rescue seam (the rescued node is the
   // subject here, not an admission candidate); the rest mirrors the extraction-time judge.
   return { candidateKey: derivedNodeId, sourceBlockId: passage.sourceBlockId, evidenceQuote: passage.evidenceQuote, disposition, category, rationale };
-}
-
-async function mapWithConcurrency<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) || 1 }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CalibrationVerdict, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
-import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoop";
+import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoopProjection";
 
 let seq = 0;
 function verdict(derivedNodeId: string, v: Verdict, learnerStateRef = "L1"): CalibrationVerdict {
@@ -66,17 +66,12 @@ test("summarizeLearnerStates includes a learner with verdicts but no graded rows
   assert.equal(summaries[0].responseCount, 0);
 });
 
-// --- U2 pure overlay helpers (R1/R3) ---------------------------------------
-// The DB-bound getLearnerLoopDetail / getLearnerAdaptedGraphs are verified by real-use
-// inspection (live Postgres, established untested-loader pattern); only these extracted
-// pure helpers carry unit scenarios.
-
 test("dedupeEnrichmentScopes: two enrichments yield two entries; duplicates collapse keeping the first (latest-first input)", () => {
   assert.deepEqual(
     dedupeEnrichmentScopes([{ enrichmentId: "e1" }, { enrichmentId: "e2" }]).map((s) => s.enrichmentId),
     ["e1", "e2"]
   );
-  // Loader returns paths created_at DESC, so the first row for an enrichment is the latest.
+  // Loaders return paths created_at DESC, so the first row for an enrichment is the latest.
   const collapsed = dedupeEnrichmentScopes([
     { enrichmentId: "e1", target: "latest" },
     { enrichmentId: "e1", target: "older" }
@@ -92,7 +87,7 @@ test("summarizeResponseSources: mixed, all-synthetic, and all-human tallies", ()
 });
 
 test("buildMasteryMap: graded-only fold — latest graded wins per node", () => {
-  // Build rows in attempt_seq order (the order the loader returns them).
+  // Build rows in attempt_seq order (the order the loaders return them).
   const rows = [
     graded("nA", "incorrect"),        // nA: only graded incorrect → 0
     graded("nB", "partial"),          // nB earlier graded partial

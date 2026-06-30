@@ -38,6 +38,8 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
+  // The Concept Lesson for the open node, shown ahead of the option-select (R12).
+  const selectedLesson = selectedNodeId ? session.lessonByNode[selectedNodeId] ?? null : null;
   const hiddenNodeIds = useMemo(() => new Set(session.adaptedHiddenNodeIds), [session.adaptedHiddenNodeIds]);
 
   const openNode = (derivedNodeId: string) => {
@@ -45,7 +47,18 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     setSheetOpen(true);
   };
 
-  const onSheetOpenChange = (nextOpen: boolean) => {
+  const onSheetOpenChange = (nextOpen: boolean, eventDetails?: { reason?: string; event?: Event }) => {
+    // Tapping a graph node is a node-open/switch gesture, never a dismiss. Because the sheet is
+    // non-modal and the canvas sits outside its popup, Base UI reports that tap as an
+    // `outside-press` close — which would instantly cancel the sheet the same tap just opened
+    // (and would close instead of switch when re-tapping another node). That is the desktop
+    // "click does nothing / opens once then closes" bug; touch took a different outside-press
+    // path, so it only reproduced with a mouse. The cytoscape `tap` → `openNode` owns this
+    // gesture, so swallow the redundant outside-press when it originates on the graph surface.
+    if (!nextOpen && eventDetails?.reason === "outside-press") {
+      const target = eventDetails.event?.target;
+      if (target instanceof Element && target.closest("[data-graph-surface]")) return;
+    }
     // Hold the sheet open across the answer → re-fold → advance window (a modal sheet emits a
     // stale open=false while the option card remounts and the server re-fold is in flight).
     if (!nextOpen && (pending || !shouldAcceptSheetOpenChange(nextOpen, autoAdvanceDismissGuardRef.current))) return;
@@ -215,6 +228,26 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         </Card>
       ) : null}
 
+      {session.lessonAbsent.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-1 py-4 text-sm">
+            <span className="flex items-center gap-2 font-medium">
+              <TriangleAlertIcon className="size-4 text-chart-5" /> Nodes with no lesson ({session.lessonAbsent.length})
+            </span>
+            <span className="text-muted-foreground">
+              These nodes produced no Concept Lesson — their grounding could not meet the minimum:
+            </span>
+            <ul className="mt-1 flex flex-col gap-1">
+              {session.lessonAbsent.map((node) => (
+                <li key={node.derivedNodeId} className="text-muted-foreground">
+                  <span className="font-medium text-foreground">{node.label}</span> — {node.reason}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {session.restorations.length > 0 ? (
         <Card>
           <CardContent className="flex flex-col gap-2 py-4 text-sm">
@@ -264,6 +297,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         onOpenChange={onSheetOpenChange}
         nodeLabel={selectedLabel}
         content={selectedContent}
+        lesson={selectedLesson}
         onSelect={onSelect}
         onSkipAsKnown={skipAsKnown}
         onClear={() => onClear()}

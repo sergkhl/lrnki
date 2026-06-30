@@ -21,6 +21,7 @@ import type {
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { admitSource } from "./admitSource";
+import { mapWithConcurrency } from "./mapWithConcurrency";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 import { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQualityJudge";
@@ -258,16 +259,3 @@ function evidenceNeighborhood(document: StructuredDocument, subject: RunCandidat
 
 // Bounded so a large source cannot fan out unbounded parallel LLM calls through the proxy.
 const CEP_EXTRACTION_CONCURRENCY = 4;
-
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}

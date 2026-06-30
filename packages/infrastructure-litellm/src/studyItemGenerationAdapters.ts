@@ -37,6 +37,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       "You write ONE four-option multiple-choice study item for a single learning node, conditioned ONLY on the provided grounding passages.",
       "Produce exactly one CORRECT answer, grounded strictly in the provided passages, plus exactly THREE distractors.",
       "Cite the passage your correct answer derives from by its exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim; for generated grounding, quote only the generated grounding passage text.",
+      "The correctAnswer field must be an object with text and citation. The citation evidenceQuote must be copied exactly from one listed grounding passage; do not paraphrase the citation quote.",
       "Write three plausible but INCORRECT distractors in the same domain register as the provided neighbor concepts, so wrong answers read like real domain answers. Each distractor must be clearly wrong for this question and never a paraphrase of the correct answer.",
       "Stay within the Declared Domain. Write domain-neutral, learner-facing language; never reference 'the passage' or 'the source' in the question."
     ].join(" ");
@@ -64,7 +65,8 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       toolDescription: "Submit one four-option study item: a grounded correct answer plus three sibling-flavored distractors.",
       parameters: optionSelectSchema,
       validator: optionSelectValidator,
-      tags: [STAGE_TAGS.studyItemGeneration]
+      tags: [STAGE_TAGS.studyItemGeneration],
+      maxRetries: 4
     });
 
     // The correct option's provenance reflects the grounding contract; distractors are
