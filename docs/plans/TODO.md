@@ -2,14 +2,7 @@
 
 ## TODO
 
-1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
-   found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
-   evidence.
-   - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
-   - Keep population calibration deferred until stable real learner-response data exists
-     ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
-
-2. **Improve operator observability.**
+1. **Improve operator observability.**
    - Preserve forced-tool fail-closed behavior while making exhausted retries and safely redacted
      malformed argument snippets inspectable.
    - Distinguish byte-exact from formatting-normalized study-item citation matches in Admin Lab.
@@ -17,13 +10,14 @@
    [ADR-0011](../adr/0011-retain-minimal-admin-lab.md), and
    [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
-3. **Harden Response Log attempt sequencing.** Concurrent same-learner answer submissions still
-   compute `attempt_seq` with `MAX(attempt_seq) + 1` before append, so cross-tab or multi-client
-   submissions can race the unique `(learner_state_ref, attempt_seq)` constraint. Prefer an atomic
-   per-learner sequence assignment in the persistence boundary rather than UI-only prevention.
-   Decision: [ADR-0026](../adr/0026-typed-study-item-bank.md).
+2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+   found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
+   evidence.
+   - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
+   - Keep population calibration deferred until stable real learner-response data exists
+     ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-4. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
+3. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
    learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
    `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
    shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
@@ -32,6 +26,18 @@
    Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 ## COMPLETED
+
+- **Atomic Response Log attempt sequencing.** The persistence boundary now owns `attempt_seq`
+  assignment. `PostgresResponseLogStore.append` groups its rows by learner and, per learner, takes a
+  transaction-scoped `pg_advisory_xact_lock(hashtextextended(learner_state_ref, 0))` before reading
+  `MAX(attempt_seq)+1` and stamping consecutive sequences — so concurrent same-learner submissions
+  serialize on the lock instead of racing the old read-compute-write `nextAttemptSeq` (a bare in-INSERT
+  `MAX+1` would not have closed the race under READ COMMITTED). Different learners hash to different
+  lock keys and never contend; the `(learner_state_ref, attempt_seq)` UNIQUE stays as a backstop. The
+  superseded `nextAttemptSeq` port method and its caller computation are deleted, and `attempt_seq`
+  left the `NewResponseLogRow` append shape (the store stamps it, exactly as it stamps `created_at`),
+  so a caller can no longer compute a value that gets ignored (rule 18). Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md) and AGENTS rules 18 and 21.
 
 - **Measured Judge Gate — one fail-safe seam for every neural judge.** All six `apply*Judge`
   modules now route their whole control flow through one deep module, `gateByJudgment`, which owns
@@ -208,6 +214,18 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Atomic Response Log attempt sequencing, 2026-06-30.** Full workspace typecheck green; full
+  recursive suite green (domain-core 29, application 362, infra-postgres 4 run / 44 DB-skipped,
+  infra-litellm 89, kg-worker 4, admin-lab 77); ESLint 0 errors / 2 pre-existing warnings
+  (`infrastructure-litellm/src/extractionAdapters.ts`, outside this diff). Real-use gate (rule 14):
+  with `DATABASE_URL` loaded from `.env`, the live `PostgresLearnerLoopStores` suite ran all 17
+  DB-backed cases green, including the new regression that fans **16 concurrent same-learner
+  `append` calls** (deliberately exceeding the `max: 10` connection pool) and asserts every append
+  committed with a **distinct, gapless `attempt_seq` 1..16 and zero `(learner_state_ref,
+  attempt_seq)` unique violations** — the direct proof the read-compute-write race is closed. The
+  prior order/FK cases still pass unchanged (the store now assigns `attempt_seq` in append order).
+  Result: PASS.
 
 - **Measured Judge Gate refactor U1–U6, 2026-06-30 (branch
   `feat/concept-lesson-teaching-surface`).** Full workspace typecheck green; full recursive suite

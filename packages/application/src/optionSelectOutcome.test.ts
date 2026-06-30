@@ -8,12 +8,15 @@ import { foldConceptMastery } from "./responseLogLearnerState";
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
   const rows: NewResponseLogRow[] = [];
-  const hydrate = (r: NewResponseLogRow): ResponseLogRow => ({ ...r, createdAt: new Date().toISOString() });
+  // Mirror the real store: it allocates `attemptSeq` itself, monotonic per learner in
+  // append order. The fake stamps the same on read so order assertions exercise the
+  // boundary's contract rather than a caller-supplied value.
+  const forLearner = (ref: string) => rows.filter((r) => r.learnerStateRef === ref);
+  const hydrate = (r: NewResponseLogRow, seq: number): ResponseLogRow => ({ ...r, attemptSeq: seq, createdAt: new Date().toISOString() });
   const store: ResponseLogStorePort = {
     async append(appended) { rows.push(...appended); },
-    async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref).map(hydrate); },
-    async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId).map(hydrate); },
-    async nextAttemptSeq(ref) { return rows.filter((r) => r.learnerStateRef === ref).length + 1; }
+    async listForLearner(ref) { return forLearner(ref).map((r, i) => hydrate(r, i + 1)); },
+    async listForLearnerNode(ref, nodeId) { return forLearner(ref).map((r, i) => hydrate(r, i + 1)).filter((r) => r.derivedNodeId === nodeId); }
   };
   return { store, rows };
 }
@@ -56,11 +59,12 @@ test("graded(auto) correct composes with the graded mastery fold to master the n
   assert.equal(foldConceptMastery(nodeRows), 1, "the latest graded(auto) correct masters the node");
 });
 
-test("attemptSeq comes from nextAttemptSeq and rows append in monotonic order", async () => {
+test("the store assigns monotonic attemptSeq across a learner's appends; the caller supplies none", async () => {
   const log = fakeResponseLog();
   await appendOptionSelectOutcome({ learnerStateRef: "L1", item, chosenOptionId: "a", correctOptionId: "a", responseSource: "human", responseLog: log.store });
   await appendOptionSelectOutcome({ learnerStateRef: "L1", item, chosenOptionId: "b", correctOptionId: "a", responseSource: "human", responseLog: log.store });
-  assert.deepEqual(log.rows.map((r) => r.attemptSeq), [1, 2]);
+  const seqs = (await log.store.listForLearner("L1")).map((r) => r.attemptSeq);
+  assert.deepEqual(seqs, [1, 2]);
 });
 
 test("responseSource is passed through verbatim for both human and synthetic", async () => {

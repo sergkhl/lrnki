@@ -402,21 +402,42 @@ export class PostgresCalibrationVerdictStore implements CalibrationVerdictStoreP
 export class PostgresResponseLogStore implements ResponseLogStorePort {
   constructor(private readonly sql: Sql) {}
 
+  // The store — not the caller — assigns each row's monotonic per-learner `attempt_seq`.
+  // Per learner we take a transaction-scoped advisory lock keyed on `learner_state_ref`
+  // BEFORE reading `MAX(attempt_seq)+1`, so concurrent same-learner appends serialize on
+  // the lock instead of racing the read-compute-write (a bare `MAX+1` in-INSERT does not
+  // help: under READ COMMITTED each snapshot hides the other's uncommitted row). Different
+  // learners hash to different lock keys and never contend; the lock auto-releases at
+  // transaction end. The `(learner_state_ref, attempt_seq)` UNIQUE stays as a backstop.
   async append(rows: NewResponseLogRow[]): Promise<void> {
     if (rows.length === 0) return;
+    const byLearner = new Map<string, NewResponseLogRow[]>();
+    for (const row of rows) {
+      const group = byLearner.get(row.learnerStateRef);
+      if (group) group.push(row);
+      else byLearner.set(row.learnerStateRef, [row]);
+    }
     await this.sql.begin(async (tx) => {
-      for (const row of rows) {
-        await tx`
-          INSERT INTO response_log (
-            response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
-            judged_outcome, graded_score,
-            response_source, grader_identity, batch_id, attempt_seq, submitted_answer
-          )
-          VALUES (
-            ${row.responseId}, ${row.learnerStateRef}, ${row.studyItemId}, ${row.derivedNodeId}, ${row.signalType},
-            ${row.judgedOutcome}, ${row.gradedScore},
-            ${row.responseSource}, ${row.graderIdentity}, ${row.batchId}, ${row.attemptSeq}, ${row.submittedAnswer}
-          )`;
+      for (const [learnerStateRef, learnerRows] of byLearner) {
+        await tx`SELECT pg_advisory_xact_lock(hashtextextended(${learnerStateRef}, 0))`;
+        const [{ next }] = await tx<{ next: number }[]>`
+          SELECT COALESCE(MAX(attempt_seq), 0) + 1 AS next
+          FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
+        let attemptSeq = Number(next);
+        for (const row of learnerRows) {
+          await tx`
+            INSERT INTO response_log (
+              response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
+              judged_outcome, graded_score,
+              response_source, grader_identity, batch_id, attempt_seq, submitted_answer
+            )
+            VALUES (
+              ${row.responseId}, ${row.learnerStateRef}, ${row.studyItemId}, ${row.derivedNodeId}, ${row.signalType},
+              ${row.judgedOutcome}, ${row.gradedScore},
+              ${row.responseSource}, ${row.graderIdentity}, ${row.batchId}, ${attemptSeq}, ${row.submittedAnswer}
+            )`;
+          attemptSeq += 1;
+        }
       }
     });
   }
@@ -437,12 +458,6 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} AND derived_node_id = ${derivedNodeId} ORDER BY attempt_seq`;
     return rows.map(hydrateResponseLogRow);
-  }
-
-  async nextAttemptSeq(learnerStateRef: string): Promise<number> {
-    const [{ next }] = await this.sql<{ next: number }[]>`
-      SELECT COALESCE(MAX(attempt_seq), 0) + 1 AS next FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
-    return Number(next);
   }
 }
 

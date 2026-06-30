@@ -27,8 +27,7 @@ test("loadResponseLogLearnerState folds graded rows directly by derived_node_id"
   const store: ResponseLogStorePort = {
     async append() {},
     async listForLearner() { return rows; },
-    async listForLearnerNode() { return rows; },
-    async nextAttemptSeq() { return 1; }
+    async listForLearnerNode() { return rows; }
   };
   const state = await loadResponseLogLearnerState({ responseLog: store, learnerStateRef: "L1" });
 

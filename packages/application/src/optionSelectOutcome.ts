@@ -19,7 +19,8 @@ export async function appendOptionSelectOutcome(input: {
   responseLog: ResponseLogStorePort;
 }): Promise<{ row: NewResponseLogRow }> {
   const { judgedOutcome, gradedScore } = outcomeFor(input);
-  const attemptSeq = await input.responseLog.nextAttemptSeq(input.learnerStateRef);
+  // `attempt_seq` is allocated by the store inside `append`, atomically per learner — the
+  // caller never computes it, so concurrent same-learner submissions cannot race it.
   const row: NewResponseLogRow = {
     responseId: randomUUID(),
     learnerStateRef: input.learnerStateRef,
@@ -31,7 +32,6 @@ export async function appendOptionSelectOutcome(input: {
     responseSource: input.responseSource,
     graderIdentity: AUTO_GRADER_IDENTITY,
     batchId: null,
-    attemptSeq,
     submittedAnswer: null
   };
   await input.responseLog.append([row]);

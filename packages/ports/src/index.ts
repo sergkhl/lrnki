@@ -478,13 +478,14 @@ export interface ConceptLessonGenerationPort {
 // only — there is no update or delete — so the append-only guarantee (R5) is
 // structural, not a convention. A per-learner reset (R16) bypasses this port with a
 // direct operator delete, so the structural guarantee is never weakened here.
-// `nextAttemptSeq` hands the caller the next monotonic sequence for a learner so
-// graded measurement stamps ordered rows.
+// `append` OWNS monotonic per-learner `attempt_seq` assignment: it allocates each
+// appended row's sequence atomically inside the persistence boundary, so concurrent
+// same-learner submissions can never collide on the `(learner_state_ref, attempt_seq)`
+// uniqueness. Callers therefore pass `NewResponseLogRow` without a sequence.
 export interface ResponseLogStorePort {
   append(rows: NewResponseLogRow[]): Promise<void>;
   listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]>;
   listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]>;
-  nextAttemptSeq(learnerStateRef: string): Promise<number>;
 }
 
 // Calibration Verdict persistence (R10, KTD1). The MUTABLE counterpart to the

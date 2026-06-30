@@ -56,8 +56,7 @@ function responseLog(rows: ResponseLogRow[]): ResponseLogStorePort {
   return {
     async append() { throw new Error("not used"); },
     async listForLearner() { return rows; },
-    async listForLearnerNode() { throw new Error("not used"); },
-    async nextAttemptSeq() { throw new Error("not used"); }
+    async listForLearnerNode() { throw new Error("not used"); }
   };
 }
 

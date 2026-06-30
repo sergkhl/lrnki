@@ -185,12 +185,12 @@ async function seedItem(sql: Sql): Promise<{ studyItemId: string; derivedNodeId:
   return { studyItemId: item.studyItemId, derivedNodeId: s.derivedNodeId };
 }
 
-function gradedRow(input: { learnerStateRef: string; studyItemId: string; derivedNodeId: string; outcome: "correct" | "partial" | "incorrect"; score: number; attemptSeq: number }): NewResponseLogRow {
+function gradedRow(input: { learnerStateRef: string; studyItemId: string; derivedNodeId: string; outcome: "correct" | "partial" | "incorrect"; score: number }): NewResponseLogRow {
   return {
     responseId: randomUUID(), learnerStateRef: input.learnerStateRef, studyItemId: input.studyItemId, derivedNodeId: input.derivedNodeId,
     signalType: "graded", judgedOutcome: input.outcome, gradedScore: input.score,
     responseSource: "human", graderIdentity: "auto", batchId: null,
-    attemptSeq: input.attemptSeq, submittedAnswer: null
+    submittedAnswer: null
   };
 }
 
@@ -200,13 +200,13 @@ maybe("a graded row referencing a real study_item_id inserts; one referencing an
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
     const learner = `learner-${randomUUID()}`;
-    await store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 })]);
+    await store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
     const rows = await store.listForLearner(learner);
     assert.equal(rows.length, 1);
     assert.equal(rows[0].studyItemId, studyItemId);
 
     await assert.rejects(
-      () => store.append([gradedRow({ learnerStateRef: learner, studyItemId: randomUUID(), derivedNodeId, outcome: "correct", score: 1, attemptSeq: 2 })]),
+      () => store.append([gradedRow({ learnerStateRef: learner, studyItemId: randomUUID(), derivedNodeId, outcome: "correct", score: 1 })]),
       /violates foreign key|foreign key/i
     );
   } finally {
@@ -221,13 +221,39 @@ maybe("graded rows preserve attempt_seq order and grader_identity 'auto'", async
     const store = new PostgresResponseLogStore(sql);
     const learner = `learner-${randomUUID()}`;
     await store.append([
-      gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 }),
-      gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "incorrect", score: 0, attemptSeq: 2 })
+      gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 }),
+      gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "incorrect", score: 0 })
     ]);
     const rows = await store.listForLearnerNode(learner, derivedNodeId);
     assert.deepEqual(rows.map((r) => r.attemptSeq), [1, 2]);
     assert.deepEqual(rows.map((r) => r.gradedScore), [1, 0]);
     assert.ok(rows.every((r) => r.graderIdentity === "auto"));
+  } finally {
+    await sql.end();
+  }
+});
+
+// The race this fix closes (TODO #1): many concurrent same-learner appends must each get a
+// distinct, gapless attempt_seq with zero `(learner_state_ref, attempt_seq)` unique
+// violations. Before the in-boundary advisory-lock assignment they would have read the same
+// MAX and collided. A 16-wide fan-out exceeds the connection pool (max 10), so this also
+// proves correctness when connection acquisition itself queues.
+maybe("concurrent same-learner appends each get a distinct, gapless attempt_seq (no unique violation)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { studyItemId, derivedNodeId } = await seedItem(sql);
+    const store = new PostgresResponseLogStore(sql);
+    const learner = `learner-${randomUUID()}`;
+    const fanOut = 16;
+    await Promise.all(
+      Array.from({ length: fanOut }, () =>
+        store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })])
+      )
+    );
+    const seqs = (await store.listForLearner(learner)).map((r) => r.attemptSeq);
+    assert.equal(seqs.length, fanOut, "every concurrent append committed");
+    assert.equal(new Set(seqs).size, fanOut, "no two appends shared an attempt_seq");
+    assert.deepEqual([...seqs].sort((a, b) => a - b), Array.from({ length: fanOut }, (_, i) => i + 1), "the sequence is gapless 1..N");
   } finally {
     await sql.end();
   }
@@ -301,7 +327,7 @@ maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with
     const log = new PostgresResponseLogStore(sql);
     const learner = `learner-${randomUUID()}`;
     await verdicts.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
-    await log.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1, attemptSeq: 1 })]);
+    await log.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
 
     // The per-learner reset: clear verdicts via the store, nuke graded rows via a direct
     // operator delete (the log has no store-port delete — the append-only guarantee stands).
