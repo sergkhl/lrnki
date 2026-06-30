@@ -19,6 +19,25 @@
 
 ## COMPLETED
 
+- **Impostor study item — a second auto-graded study-item type.** The Study Item Bank is now a
+  two-arm typed union (`option_select | impostor`). The Impostor presents four grounded statements
+  about a node — three true, one planted lie — and the learner selects the lie. The lie is
+  preferentially a true fact about a confusable graph sibling mis-attributed to this node
+  (`lieSource: "sibling"` with the named `siblingLabel`), falling back to a freshly minted
+  misconception (`lieSource: "generated"`); it is generated as Stage 3 of the `study_items` operation
+  (own `impostor-generation` spend tag) from the node's Concept Lesson via the shared
+  `studyItemGroundingFromLesson` helper, reading siblings read-only — it writes no graph node or edge.
+  A deterministic guard accepts only on structural/provenance guarantees (exactly one impostor; each
+  truth verifies verbatim against its cited lesson passage; the impostor is `generated` with no
+  citation; reveal/`lieSource` present), backed by a DB CHECK that makes a source-cited impostor
+  unrepresentable. It is auto-graded through one grading-neutral keyed-selection grader (shared with
+  option-select) into the existing 0.7 mastery fold, with a required post-answer reveal that names the
+  lie and teaches the distinction. A node's study surface is an ordered segment sequence (theory →
+  option-select → impostor); the Admin Lab stacks the cards and the projection exposes the durable
+  `studySegmentsByNode` seam for the Learner App (AGENTS rule 22). Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md), [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md),
+  and [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
 - **Operator observability — inspectable forced-tool exhaustion and citation match fidelity.**
   Two fail-closed behaviors that were previously opaque are now inspectable, with no change to any
   fail-closed decision. (1) When a forced-tool call exhausts its retries, the litellm transport
@@ -97,6 +116,30 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Impostor study item, 2026-06-30.** Full workspace typecheck green; full recursive suite green
+  (domain-core 35; application 388 incl. the new `impostorGuard` 12-case suite, the impostor
+  orchestrator-stage cases, the shared `appendGradedSelectionOutcome` regression + impostor grading,
+  and the `studySegmentsByNode`/impostor-view projection cases; infrastructure-postgres 56 incl. the
+  live impostor round-trip, both-types load, statement-cascade, per-type rejection round-trip, and the
+  negative DB-CHECK cases — source-cited impostor and second-impostor both rejected; infrastructure-
+  litellm 98 incl. the impostor adapter/schema + registry-sweep cases; admin-lab 79 incl. the
+  `allSegmentsAnswered` advance-gate; kg-worker 4). ESLint 0 errors / 2 pre-existing warnings
+  (`domain-core/src/index.ts`, `infrastructure-litellm/src/extractionAdapters.ts`, both outside this
+  diff). Admin Lab production build passes. A fresh DB reset applied the single migration cleanly with
+  the new `impostor_statements` table, its column-discipline CHECK, and the partial one-impostor index.
+  **Real-use gate (rule 14):** two domains ran end to end on a freshly reset DB with production DeepSeek
+  calls — software engineering (Rust ownership, extraction `48551d92`, enrichment `7439e6f0`) and
+  molecular biology (DNA replication, extraction `38646ea8`, enrichment `5026234f`) — producing **38
+  impostor items**. Inspected output: lies are plausible sibling mis-attributions (Reference↔Pointer↔
+  Ownership; DNA double helix↔DNA polymerase, structure-vs-enzyme; conservative↔semi-conservative↔
+  dispersive replication models) with generated-fallback misconceptions where no clean sibling lie
+  existed (e.g. "buoyant density in a vacuum"); truths are verbatim-grounded; every reveal names the lie
+  and teaches the distinction (naming the sibling for a sibling lie). Honesty invariant proven at the
+  data level: **0 of the impostor statements carry any source citation**, every item has **exactly one**
+  impostor, every truth carries a citation, and **0** impostor text leaked into graph nodes/edges
+  (zero graph mutation). Per-type absence is recorded independently (impostor 10, option-select 5
+  rejections) and never failed a run. Result: PASS.
 
 - **Operator observability (forced-tool exhaustion + citation match fidelity), 2026-06-30.** Full
   workspace typecheck green; full recursive suite green (domain-core 35 incl. the new
