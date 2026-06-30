@@ -17,7 +17,28 @@
    behavior-preserving and does not require a new ADR.
    Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
+3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+   metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
+   can reduce wall-clock without changing cost ownership. The next optimization pass should start
+   from the latest ranked report, target the measured largest contributor, and record wall-clock,
+   calls, tokens, cost, and inspected real-use output before changing prompts, models, batching, or
+   cache-token reporting. Current evidence points at enrichment/prerequisite-ordering as the next
+   wall-clock candidate after Study Item Bank concurrency.
+   Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
+   `tmp/2026-06-30-generation-metering/`.
+
 ## COMPLETED
+
+- **Generation pipeline metering and bounded Study Item Bank concurrency.** Bottleneck reports now
+  attribute every Study Item Bank LLM stage owned by the `study_items` operation:
+  `concept-lesson-generation`, `study-item-generation`, and `impostor-generation`. The operation
+  remains keyed by enrichment id, while stage-level wall-clock comes from the shared operation-stage
+  timeline and calls/tokens/cost come from LiteLLM spend logs through the existing read seam. Missing
+  spend data still renders as unavailable rather than zero. The worker now exposes an opt-in
+  `generate-study-items <enrichmentId> --concurrency <positiveInteger>` control; the default path is
+  unchanged and sequential, and application tests prove persisted item/rejection order is stable when
+  concurrent per-node generation resolves out of order. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
 - **Impostor study item — a second auto-graded study-item type.** The Study Item Bank is now a
   two-arm typed union (`option_select | impostor`). The Impostor presents four grounded statements
@@ -116,6 +137,22 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Generation pipeline metering and bounded Study Item Bank concurrency, 2026-06-30.** Application
+  test suite green (389 tests), kg-worker suite green (8 tests), and package typechecks green for
+  `@lrnki/application` and `@lrnki/kg-worker`. The corrected report over the existing Rust journey
+  (`7439e6f0`) now attributes all three `study_items` LLM stages: concept lessons 13 calls / 31,189
+  tokens / `$0.00354466`, option-select 13 / 20,046 / `$0.00195244`, and impostors 13 / 28,495 /
+  `$0.00329602`, for a corrected study-item total of 39 calls / 79,730 tokens / `$0.00879312`.
+  Direct LiteLLM aggregation matched the report rows. **Real-use gate (rule 14):** a fresh comparable
+  Rust enrichment over graph version `71006496` ran Study Item Bank generation with
+  `--concurrency 3` (`17567289`), producing 14 lessons, 12 option-select items, 11 impostor items, 2
+  option-select rejections, and 3 impostor rejections. Study-item wall-clock was 62.9s versus the
+  corrected sequential baseline's 162.1s, with 44 calls / 90,185 tokens / `$0.00942298` on the
+  slightly larger 14-node concurrent run. Inspected output stayed usable: lies are plausible sibling
+  misattributions or generated misconceptions, reveals teach the distinction, and the DB invariant
+  query found 0 source-cited impostor defects. Trail:
+  `tmp/2026-06-30-generation-metering/`.
 
 - **Impostor study item, 2026-06-30.** Full workspace typecheck green; full recursive suite green
   (domain-core 35; application 388 incl. the new `impostorGuard` 12-case suite, the impostor

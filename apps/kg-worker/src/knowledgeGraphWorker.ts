@@ -21,6 +21,7 @@ import {
   type RankedTarget
 } from "@lrnki/application";
 import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
+import { parseGenerateStudyItemsArgs } from "./workerArgs";
 import {
   DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
@@ -620,15 +621,19 @@ function renderRankedTargets(report: BottleneckReport) {
   }
 }
 
-async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
-  if (!enrichmentId) {
-    console.error("! generate-study-items requires <enrichmentId>.");
+async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | undefined, flags: string[]) {
+  let args;
+  try {
+    args = parseGenerateStudyItemsArgs(enrichmentId, flags);
+  } catch (error) {
+    console.error(`! ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
     return;
   }
-  console.log(`\n>> generating Study Item Bank for enrichment ${enrichmentId}`);
+  console.log(`\n>> generating Study Item Bank for enrichment ${args.enrichmentId}`);
+  if (args.concurrency !== undefined) console.log(`   concurrency=${args.concurrency}`);
   const result = await generateStudyItemBank({
-    enrichmentId,
+    enrichmentId: args.enrichmentId,
     configHash: STUDY_ITEM_BANK_CONFIG_HASH,
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
@@ -636,6 +641,7 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
+    concurrency: args.concurrency,
     reporter: ctx.runProgressReporter
   });
   console.log(`   lessons=${result.lessons.length} lessonAbsent=${result.lessonAbsent.length} items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
@@ -680,7 +686,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await computeLearnerPathCommand(ctx, arg, rest[0]);
       break;
     case "generate-study-items":
-      await generateStudyItemsCommand(ctx, arg);
+      await generateStudyItemsCommand(ctx, arg, rest);
       break;
     case "synthesize-responses":
       await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
@@ -698,7 +704,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

@@ -269,6 +269,10 @@ function typesFor(items: StudyItem[], derivedNodeId: string): string[] {
 
 const ownershipDef = "Ownership is a set of rules that govern memory in Rust.";
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test("a node whose lesson grounds an option-select that passes the guard persists one item and one lesson", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
@@ -312,6 +316,69 @@ test("the study-item operation context reaches generation calls", async () => {
     }),
     studyItemBankStore: store
   });
+});
+
+test("concurrent per-node generation persists items and rejections in input order", async () => {
+  const nodes = [
+    anchorNode("c1", "Ownership"),
+    anchorNode("c2", "Borrowing"),
+    anchorNode("c3", "Lifetimes")
+  ];
+  const defs = new Map([
+    ["node-c1", { blockId: "b1", text: ownershipDef, delay: 20 }],
+    ["node-c2", { blockId: "b2", text: "Borrowing lets code reference values without taking ownership.", delay: 10 }],
+    ["node-c3", { blockId: "b3", text: "Lifetimes describe how long references remain valid.", delay: 1 }]
+  ]);
+  const snapshot = snapshotWith([
+    { conceptId: "c1", label: "Ownership", definitions: [passage("b1", defs.get("node-c1")!.text)] },
+    { conceptId: "c2", label: "Borrowing", definitions: [passage("b2", defs.get("node-c2")!.text)] },
+    { conceptId: "c3", label: "Lifetimes", definitions: [passage("b3", defs.get("node-c3")!.text)] }
+  ]);
+  const { store, persisted, persistedRejected } = capturingStore();
+  const lessonStore = capturingLessonStore();
+  const conceptLessonGeneration: ConceptLessonGenerationPort = {
+    model: "mock-lesson",
+    async generate(input) {
+      const def = defs.get(input.node.derivedNodeId)!;
+      await sleep(def.delay);
+      return goodLessonDraft(def.blockId, def.text);
+    }
+  };
+  const studyItemGeneration: StudyItemGenerationPort = {
+    model: "mock-gen",
+    async generateOptionSelect(input) {
+      await sleep(defs.get(input.node.derivedNodeId)!.delay);
+      if (input.node.derivedNodeId !== "node-c1") throw new Error("option-select generation failed");
+      return osDraft("rules that govern memory");
+    },
+    async generateImpostor(input) {
+      await sleep(defs.get(input.node.derivedNodeId)!.delay);
+      return impDraftFrom(input.groundingPassages);
+    }
+  };
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith(nodes)),
+    conceptLessonGeneration,
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration,
+    studyItemBankStore: store,
+    concurrency: 3
+  });
+
+  assert.deepEqual(lessonStore.lessons.map((lesson) => lesson.derivedNodeId), ["node-c1", "node-c2", "node-c3"]);
+  assert.deepEqual(persisted.map((item) => `${item.derivedNodeId}/${item.itemType}`), [
+    "node-c1/option_select",
+    "node-c1/impostor",
+    "node-c2/impostor",
+    "node-c3/impostor"
+  ]);
+  assert.deepEqual(persistedRejected.map((item) => `${item.derivedNodeId}/${item.itemType}`), [
+    "node-c2/option_select",
+    "node-c3/option_select"
+  ]);
 });
 
 test("an option-select guard rejection records the node as rejected", async () => {
