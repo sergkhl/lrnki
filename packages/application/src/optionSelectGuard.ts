@@ -49,7 +49,8 @@ const REQUIRED_OPTION_COUNT = 4;
 // Conservative normalization: collapse internal whitespace and lowercase. Intentionally
 // minimal so "Heap" / "  heap " collapse to a duplicate while "heap" / "stack" stay
 // distinct — over-aggressive normalization would silently drop valid items (rule 16).
-function normalizeOptionText(text: string): string {
+// Shared by the impostor guard (U4) for its impostor-vs-truth distinctness check (rule 18).
+export function normalizeOptionText(text: string): string {
   return text.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
