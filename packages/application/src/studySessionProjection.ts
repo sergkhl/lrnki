@@ -123,7 +123,7 @@ export function studyItemToView(item: StudyItem): StudyItemView {
 }
 
 // Map a per-node study-item view to the frontier sheet payload it renders (KTD4). The one
-// place item type → sheet kind is decided, so the Admin Lab and the Learner Application
+// place item type → sheet kind is decided, so the Admin Lab and the Learner App
 // render each type without re-learning. Dispatches on `kind`; a new type adds one arm.
 export function studyItemViewToSheet(view: StudyItemView): SheetContent {
   switch (view.kind) {

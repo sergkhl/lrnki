@@ -144,28 +144,43 @@ toward a target `derived_node_id` and is composed behind an application use-case
 carries each node's **Concept Lesson** for reading before the study item.
 _Avoid_: study screen, quiz session
 
+**Learner App**:
+The downstream learner-facing application that turns Derived Graph Layers and Learner State into
+playable study experiences. Its game UX policy is defined by
+[ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+_Avoid_: Learner Application, Admin Lab study screen, neutral asset generator
+
+**Flow Channel**:
+A learner-specific band of clear, just-hard-enough challenges paced through tension and release.
+_Avoid_: static difficulty target, engagement score
+
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
 in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
 come from option-select study responses.
 
 **Study Item Bank**:
-A learner-neutral option-select asset generated alongside one Derived Graph Layer. Study items are
-keyed to `derived_node_id`; `option_select` is the only implemented `itemType`.
+A learner-neutral study-asset set generated alongside one Derived Graph Layer and keyed to
+`derived_node_id`. Item typing and learner-response identity are defined by
+[ADR-0026](docs/adr/0026-typed-study-item-bank.md).
 _Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 
 **Concept Lesson**:
-A learner-neutral teaching substrate keyed to `derived_node_id`, generated alongside the Study Item
-Bank ([ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md)). An ordered set of typed,
-independently-optional sections (gist, intuition, definition, examples, applications, formulas) that
-teach a concept before it is tested; each section is honestly labeled source-cited or generated and
-absent rather than placeholder when ungroundable. It is the single source of grounding study items
-derive from, and reading it is non-graded.
+A learner-neutral teaching substrate keyed to `derived_node_id` and generated alongside the Study
+Item Bank. It teaches a concept before it is tested; structure and grounding are defined by
+[ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md). Reading it is non-graded.
 _Avoid_: course, study screen, quiz, graded card, asserted graph mutation
 
+**Learner-Scoped Scaffold**:
+Learner/session-scoped generated support content that restores a Learner App's Flow Channel without
+becoming neutral graph or Study Item Bank content.
+_Avoid_: generated prerequisite, personalized Concept Lesson, Study Item Bank item
+
 **Grounding Provenance**:
-The citation contract shared by the Study Item Bank and the Concept Lesson. Source-grounded content
-cites source evidence; generated content cites generated grounding and is labeled as generated.
+The citation/provenance language shared by learner-facing study assets. Source-grounded content cites
+source evidence; generated content is labeled generated. Its study-asset contracts are owned by
+[ADR-0026](docs/adr/0026-typed-study-item-bank.md) and
+[ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md).
 _Avoid_: fake source citation, unlabeled generated quote
 
 **Inspection Read Model**:
@@ -194,3 +209,7 @@ _Avoid_: raw UI query, JSON_TABLE in the app, learner projection
 >
 > **Dev:** Two domains contain a Concept labeled “Mercury.” Must publication stop?
 > **Expert:** No. Declared Domain keeps their identities separate; flag the homograph for inspection.
+>
+> **Dev:** Can the Learner App generate a personalized hint and add it to the Study Item Bank?
+> **Expert:** No. That is a Learner-Scoped Scaffold: useful for one learner's Flow Channel, but not
+> a neutral study asset.

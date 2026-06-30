@@ -37,3 +37,4 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0029 — Shared operation-stage timelines](./0029-persist-shared-operation-stage-timelines.md)
 - [0030 — Confidence-gated synthesis with web-grounding fallback](./0030-confidence-gated-synthesis-with-web-grounding.md) (Proposed)
 - [0031 — Concept Lesson teaching substrate](./0031-concept-lesson-teaching-substrate.md)
+- [0032 — Mastery-aligned Game UX for the Learner App](./0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)

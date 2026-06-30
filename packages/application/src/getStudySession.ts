@@ -9,7 +9,7 @@ import { composeStudySession, type StudySession } from "./studySessionProjection
 
 // The reading use-case for the Study Session (ADR-0027, KTD1/KTD3). It loads through injected
 // ports and composes the adaptation with the pure `composeStudySession`, so the Admin Lab and
-// the forthcoming Learner Application share ONE study orchestration — each app injects its own
+// the forthcoming Learner App share ONE study orchestration — each app injects its own
 // adapters (the established `computeLearnerPath` shape). It CONSUMES the finished
 // `DerivedGraphDetail` inspection read model as graph input (a projection may read a read model
 // and add compute; ADR-0027 forbids only serving a projection THROUGH a read port), which proves

@@ -9,7 +9,7 @@ import { createDatabaseClient, PostgresEnrichmentInspectionRead, PostgresLearner
 // KTD7). The joined-history/coverage SQL lives in `PostgresLearnerLoopRead`; the
 // conflict/mastery/summary folds and the adapted-graph classify live in `@lrnki/application`
 // (`getLearnerLoopDetail` / `listLearnerStates` / `getLearnerAdaptedGraphs`), so the Admin Lab
-// and the forthcoming Learner Application share one definition (AGENTS rule 18). This module
+// and the forthcoming Learner App share one definition (AGENTS rule 18). This module
 // only manages the sql lifecycle, injects the read adapters, and keeps the DATABASE_URL-absent
 // fallback. It opens no write port, so it structurally cannot mutate learner state (R10); real
 // DB errors propagate to the Next.js error boundary, matching the other inspection loaders.

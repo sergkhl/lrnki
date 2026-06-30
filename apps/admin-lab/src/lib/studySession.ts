@@ -12,7 +12,7 @@ import {
 // compute (prune closure, mastery composition, node classification, goal-scoped frontier,
 // per-node sheet gating, coexistence + restorations) and the Derived Graph Layer read both
 // live in `@lrnki/application` now (`getStudySession` + `composeStudySession`), so the
-// Admin Lab and the forthcoming Learner Application share one definition (AGENTS rule 18).
+// Admin Lab and the forthcoming Learner App share one definition (AGENTS rule 18).
 // This module only manages the sql lifecycle, injects the four Postgres adapters, and keeps
 // the DATABASE_URL-absent fallback. It opens no graph write port, so it structurally cannot
 // mutate a published graph (R10); real DB errors propagate to the Next.js error boundary,

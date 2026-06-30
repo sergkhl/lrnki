@@ -13,7 +13,7 @@ import { ADAPTIVE_MASTERY_THRESHOLD, classifyAdaptedNodes, type AdaptedNodeClass
 // Pure learner-loop projection folds (ADR-0027 projection compute, KTD7). These turn a
 // learner's already-loaded verdicts + response rows into the conflict, mastery, source,
 // and learner-summary views the learner-loop surface renders. They are store-free and
-// data-in/data-out, so both the Admin Lab and the forthcoming Learner Application reuse
+// data-in/data-out, so both the Admin Lab and the forthcoming Learner App reuse
 // one definition (AGENTS rule 18); the DB-bound reading use-cases over the read port live
 // in the same package and call these. The reading use-cases (getLearnerLoopDetail /
 // listLearnerStates / getLearnerAdaptedGraphs) and the read-port row shapes are added by
@@ -238,7 +238,7 @@ export type LearnerAdaptedGraphs = {
 };
 
 // One adapted-graph scope per DISTINCT enrichment in the learner's paths (KTD7) — the piece
-// the Learner Application most directly reuses. Read + projection only: it composes the
+// the Learner App most directly reuses. Read + projection only: it composes the
 // learner-loop detail with the read-only `EnrichmentInspectionReadPort` and the pure
 // `classifyAdaptedNodes`. No write port is imported (R10).
 export async function getLearnerAdaptedGraphs(

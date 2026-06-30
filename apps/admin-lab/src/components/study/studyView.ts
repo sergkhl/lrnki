@@ -1,7 +1,7 @@
 // Pure sheet-interaction helpers for the study modules. The presentation contract — the
 // `SheetContent` discriminated union, `StudyOptionSelectView`, and the item-type → sheet
 // mapping — now lives in `@lrnki/application` with the Study Session projection (KTD6), so
-// one definition serves the Admin Lab and the forthcoming Learner Application (AGENTS rule
+// one definition serves the Admin Lab and the forthcoming Learner App (AGENTS rule
 // 18). These two helpers stay here: they are Admin-Lab sheet-interaction concerns (the
 // short-lived auto-advance guard window and the next-target read), free of any application
 // import. Components keep importing the contract types through this module.
