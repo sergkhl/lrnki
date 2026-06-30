@@ -11,6 +11,7 @@ import type {
   LessonAbsentNode,
   StudyItem,
   OptionSelectItemDraft,
+  ImpostorItemDraft,
   StudyItemGroundingProvenance,
   StudyItemType,
   ConceptDifficulty,
@@ -444,6 +445,22 @@ export interface StudyItemGenerationPort {
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];
   }): Promise<OptionSelectItemDraft>;
+  // Impostor generation (R3/R5/R6/R7). Takes the same grounding + siblings as option-select
+  // and returns a pre-verification ImpostorItemDraft: three grounded truths each citing a
+  // passage and exactly one planted lie — preferentially a true fact about one provided
+  // neighbor mis-attributed to this node, else a freshly minted misconception, labeled
+  // generated with no citation — plus a reveal and the model's `lieSource` choice. The
+  // deterministic guard (U4) re-derives provenance; this port never decides it.
+  generateImpostor(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    siblings: { label: string; snippet: string }[];
+  }): Promise<ImpostorItemDraft>;
 }
 
 // Concept Lesson generation (ADR-0031, R2/R4/R6/R7/R11/R14). Forced named tool schema

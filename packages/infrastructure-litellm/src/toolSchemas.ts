@@ -332,6 +332,35 @@ export const optionSelectValidator = z.object({
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
 
+// --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
+// One four-statement auto-graded item per node: three TRUE statements (each cited by
+// passage id + quote, verified verbatim at the guard) and exactly ONE planted lie. The lie
+// is preferentially a true fact about one provided neighbor concept, rewritten as if it were
+// about THIS node; when no clean neighbor lie exists, a freshly minted plausible
+// misconception. The lie is labeled generated and carries NO citation — never a source
+// quote. Citation fields are flattened to nullable scalars because the forced-tool dialect
+// folds only scalar nullables; the guard re-derives provenance, so a null citation marks the
+// lie. Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and
+// lists no exemplars. The deterministic guard (U4) enforces structure; this schema only
+// enforces SHAPE fail-closed (rule 6) — lie plausibility is judged by the rule-14 pass.
+
+const impostorStatement = z.object({
+  text: z.string().min(1).describe("One self-contained statement about the learning node. A true statement restates provided grounding; the single impostor reads as plausibly true of this node but is not."),
+  isImpostor: z.boolean().describe("true for the SINGLE planted lie; false for each of the three true statements. Exactly one statement has isImpostor true."),
+  citationPassageId: z.string().nullable().describe("For a TRUE statement, the exact passageId of the grounding passage it restates; null for the impostor, which is not grounded."),
+  citationEvidenceQuote: z.string().nullable().describe("For a TRUE statement, a substring copied from that grounding passage supporting it. For source-grounded passages copy it verbatim; null for the impostor.")
+}).strict();
+
+export const impostorValidator = z.object({
+  question: z.string().min(1).describe("One self-contained prompt asking the learner to pick the false statement among the four. Do not reference 'the passage' or 'the source'."),
+  statements: z.array(impostorStatement).length(4).describe("Exactly four statements about the learning node: three true and grounded, and exactly one planted lie (isImpostor true)."),
+  reveal: z.string().min(1).describe("Post-answer explanation naming which statement is the lie and why it is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
+  lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighbor concept rewritten as if about this node. 'generated' when no clean neighbor lie existed and the lie is a freshly minted plausible misconception."),
+  siblingLabel: z.string().nullable().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; null when lieSource is 'generated'.")
+}).strict();
+
+export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
+
 // --- Concept Lesson generation: submit_concept_lesson (U2, R2/R4/R6/R7/R14) -----
 // One ordered teaching artifact per learning node (ADR-0031). Every section is
 // INDEPENDENTLY OPTIONAL: a section that does not apply is simply OMITTED from the
@@ -377,5 +406,6 @@ export const toolValidators = [
   mintingDurabilityJudgmentValidator,
   nodeMergeAdjudicationValidator,
   optionSelectValidator,
+  impostorValidator,
   conceptLessonValidator
 ] as const;

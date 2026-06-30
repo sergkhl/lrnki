@@ -1,9 +1,9 @@
-import type { OptionSelectItemDraft, StudyItemOptionDraft } from "@lrnki/domain-core";
+import type { ImpostorItemDraft, ImpostorStatementDraft, OptionSelectItemDraft, StudyItemOptionDraft } from "@lrnki/domain-core";
 import type { StudyItemGenerationPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
-import { optionSelectSchema, optionSelectValidator } from "./toolSchemas";
+import { impostorSchema, impostorValidator, optionSelectSchema, optionSelectValidator } from "./toolSchemas";
 
 // Study item generation stays DeepSeek-family (AGENTS rule 5): the option-select correct
 // answer is generated here and deterministic auto-grading handles the learner answer.
@@ -78,5 +78,68 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       ...args.distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))
     ];
     return { itemType: "option_select", question: args.question, options };
+  }
+
+  async generateImpostor(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: "source_cep" | "source_mentioned" | "generated";
+    groundingPassages: GroundingPassage[];
+    siblings: { label: string; snippet: string }[];
+  }): Promise<ImpostorItemDraft> {
+    const system = [
+      "You write ONE 'spot the lie' study item for a single learning node, conditioned ONLY on the provided grounding passages and neighbor concepts.",
+      "Produce exactly four statements about the node: THREE true statements, each grounded strictly in the provided passages, and exactly ONE planted lie (the impostor).",
+      "Each TRUE statement must cite the passage it restates by its exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim; for generated grounding, quote only the generated grounding passage text. Multiple true statements may cite the same passage with different substrings.",
+      "For the impostor: PREFER a true fact about ONE of the provided neighbor concepts, rewritten as if it were about this node, so it reads as plausibly-but-falsely true here; set lieSource='sibling' and siblingLabel to that neighbor's exact label. Only when no provided neighbor yields a clean lie, mint a fresh plausible misconception about this node and set lieSource='generated' with siblingLabel null.",
+      "The impostor must carry NO citation (both citation fields null) and must be clearly false for this node, never a paraphrase of a true statement.",
+      "Write a reveal that names which statement is the lie and why it is false; for a sibling lie, state that it is actually true of the named neighbor.",
+      "Stay within the Declared Domain. Write domain-neutral, learner-facing language; never reference 'the passage' or 'the source' in any statement."
+    ].join(" ");
+    const aliasText = input.node.aliases.length ? ` (aliases: ${input.node.aliases.join(", ")})` : "";
+    const siblingText = input.siblings.length
+      ? input.siblings.map((sibling) => `- ${sibling.label}${sibling.snippet ? `: "${sibling.snippet}"` : ""}`).join("\n")
+      : "(no same-domain neighbors provided)";
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Learning node: "${input.node.canonicalLabel}"${aliasText}.`,
+      `Grounding provenance: ${input.groundingProvenance}.`,
+      "Grounding passages (cite each true statement by passageId):",
+      renderPassages(input.groundingPassages),
+      "",
+      "Same-domain neighbor concepts (prefer drawing the lie from one of these as a mis-attributed fact):",
+      siblingText,
+      "",
+      "Call submit_impostor_item with a question, exactly four statements (three true + one impostor), a reveal, lieSource, and siblingLabel."
+    ].join("\n");
+
+    const args = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_impostor_item",
+      toolDescription: "Submit one 'spot the lie' study item: three grounded true statements and one planted lie, with a reveal.",
+      parameters: impostorSchema,
+      validator: impostorValidator,
+      tags: [STAGE_TAGS.impostorGeneration],
+      maxRetries: 4
+    });
+
+    // Carry the model's citation claim onto truths; the guard (U4) re-derives provenance
+    // from whether the quote verifies. The impostor carries no citation by construction.
+    const statements: ImpostorStatementDraft[] = args.statements.map((statement) => ({
+      text: statement.text,
+      isImpostor: statement.isImpostor,
+      ...(statement.citationPassageId && statement.citationEvidenceQuote
+        ? { citation: { passageId: statement.citationPassageId, evidenceQuote: statement.citationEvidenceQuote } }
+        : {})
+    }));
+    return {
+      itemType: "impostor",
+      question: args.question,
+      statements,
+      reveal: args.reveal,
+      lieSource: args.lieSource,
+      ...(args.siblingLabel ? { siblingLabel: args.siblingLabel } : {})
+    };
   }
 }
