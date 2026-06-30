@@ -140,9 +140,11 @@ _Avoid_: course, personalized graph, concept-keyed learner state
 **Study Session**:
 A learner-stateful, goal-scoped projection over one Derived Graph Layer that gates each in-scope
 derived node into locked / frontier / mastered and carries its study payload. It advances the learner
-toward a target `derived_node_id` and is composed behind an application use-case, not the UI. It
-carries each node's **Concept Lesson** for reading before the study item.
-_Avoid_: study screen, quiz session
+toward a target `derived_node_id` and is composed behind an application use-case, not the UI. A
+node's study surface is an ordered linear segment sequence — its **Concept Lesson** (theory),
+then each study item type in canonical order (option-select, then impostor) — each segment
+independently answerable and folding into the node's single mastery number.
+_Avoid_: study screen, quiz session, item picker
 
 **Learner App**:
 The downstream learner-facing application that turns Derived Graph Layers and Learner State into

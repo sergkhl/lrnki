@@ -91,9 +91,9 @@ export {
   type AssembleConceptLessonResult
 } from "./assembleConceptLesson";
 export {
-  appendOptionSelectOutcome,
+  appendGradedSelectionOutcome,
   AUTO_GRADER_IDENTITY
-} from "./optionSelectOutcome";
+} from "./gradedSelectionOutcome";
 export {
   loadResponseLogLearnerState,
   foldConceptMastery,
@@ -122,6 +122,7 @@ export {
   type SheetContent,
   type StudyItemView,
   type StudyOptionSelectView,
+  type StudyImpostorView,
   type ConceptLessonView,
   type ConceptLessonSectionView,
   type LessonAbsentView,

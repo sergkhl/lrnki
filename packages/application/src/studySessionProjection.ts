@@ -37,6 +37,27 @@ export type StudyOptionSelectView = {
   }[];
 };
 
+// The serializable Impostor view that rides down the projection (R10/R11). Four statements
+// the learner reads; the keyed answer (which is the impostor) is resolved SERVER-SIDE at
+// grading time (U8), never read off this payload. `isImpostor` rides along for the
+// post-answer reveal the card shows regardless of correctness (R6) — the renderer must not
+// pre-mark it. Statements are sorted by id so the impostor is not positionally predictable.
+export type StudyImpostorView = {
+  studyItemId: string;
+  derivedNodeId: string;
+  question: string;
+  groundingProvenance: StudyItemGroundingProvenance;
+  statements: {
+    statementId: string;
+    text: string;
+    isImpostor: boolean;
+    provenance: "source" | "generated";
+  }[];
+  reveal: string;
+  lieSource: "sibling" | "generated";
+  siblingLabel?: string;
+};
+
 // The Concept Lesson view that rides down the projection (ADR-0031, KTD5). A serializable
 // teaching artifact rendered AHEAD of the option-select for a frontier node (R12). Each section
 // carries its honest provenance badge: `source_cep`/`source_mentioned` is source-cited, otherwise
@@ -87,9 +108,15 @@ export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
 
 // A per-node study-item view, keyed by item type (KTD4). Adding a new study-item type is a
 // localized add here — a new arm of this union, one arm in `studyItemToView`, and one arm in
-// `studyItemViewToSheet` — inherited by every surface. Option-select is the only arm today
-// (CONTEXT.md study item bank is option-select only).
-export type StudyItemView = { kind: "option_select"; item: StudyOptionSelectView };
+// `studyItemViewToSheet` — inherited by every surface. A node groups its views into an
+// ordered `studySegmentsByNode` list (option_select, then impostor).
+export type StudyItemView =
+  | { kind: "option_select"; item: StudyOptionSelectView }
+  | { kind: "impostor"; item: StudyImpostorView };
+
+// Canonical render order for a node's study segments (R10): theory (the lesson) is shown
+// first by the surface, then option-select, then impostor. A new type extends this rank.
+const STUDY_ITEM_TYPE_ORDER: Record<StudyItemView["kind"], number> = { option_select: 0, impostor: 1 };
 
 // Side-sheet content gated by the node's learner state. Frontier nodes either render a study
 // item (one arm per item type) or a cardless "skip as known" affordance. A locked node names
@@ -98,6 +125,7 @@ export type StudyItemView = { kind: "option_select"; item: StudyOptionSelectView
 // item-type → sheet-payload mapping (KTD4).
 export type SheetContent =
   | { kind: "option_select"; item: StudyOptionSelectView }
+  | { kind: "impostor"; item: StudyImpostorView }
   | { kind: "cardless" }
   | { kind: "locked"; unmetPrerequisiteLabels: string[] }
   | { kind: "mastered_review"; verdict: Verdict | null };
@@ -119,6 +147,24 @@ export function studyItemToView(item: StudyItem): StudyItemView {
             .map((option) => ({ optionId: option.optionId, text: option.text, isCorrect: option.isCorrect, provenance: option.provenance }))
         }
       };
+    case "impostor":
+      return {
+        kind: "impostor",
+        item: {
+          studyItemId: item.studyItemId,
+          derivedNodeId: item.derivedNodeId,
+          question: item.question,
+          groundingProvenance: item.groundingProvenance,
+          // Sort by id so the impostor is not always last (positional give-away), mirroring
+          // option-select's option shuffle.
+          statements: [...item.statements]
+            .sort((a, b) => a.statementId.localeCompare(b.statementId))
+            .map((statement) => ({ statementId: statement.statementId, text: statement.text, isImpostor: statement.isImpostor, provenance: statement.provenance })),
+          reveal: item.reveal,
+          lieSource: item.lieSource,
+          ...(item.siblingLabel ? { siblingLabel: item.siblingLabel } : {})
+        }
+      };
   }
 }
 
@@ -129,6 +175,8 @@ export function studyItemViewToSheet(view: StudyItemView): SheetContent {
   switch (view.kind) {
     case "option_select":
       return { kind: "option_select", item: view.item };
+    case "impostor":
+      return { kind: "impostor", item: view.item };
   }
 }
 
@@ -163,7 +211,7 @@ export function adaptedHiddenNodeIds(knownClosure: ReadonlySet<string>, targetDe
 function sheetContentFor(input: {
   derivedNodeId: string;
   classification: AdaptedNodeClassification;
-  itemViewByNode: Map<string, StudyItemView>;
+  segmentsByNode: Record<string, StudyItemView[]>;
   verdictByNode: Map<string, Verdict>;
   edges: ReadinessEdge[];
   labelByNode: Map<string, string>;
@@ -174,8 +222,12 @@ function sheetContentFor(input: {
     return { kind: "locked", unmetPrerequisiteLabels: unmet.map((id) => input.labelByNode.get(id) ?? id) };
   }
   if (state === "mastered") return { kind: "mastered_review", verdict: input.verdictByNode.get(input.derivedNodeId) ?? null };
-  const view = input.itemViewByNode.get(input.derivedNodeId);
-  return view ? studyItemViewToSheet(view) : { kind: "cardless" };
+  // A frontier node with study segments resolves to its FIRST segment as the node-level
+  // content (state-gating + badge); the surface renders the FULL ordered list from
+  // `studySegmentsByNode` and never re-renders this one (R10). A frontier node with no
+  // segment is the cardless "skip as known" affordance.
+  const segments = input.segmentsByNode[input.derivedNodeId];
+  return segments && segments.length > 0 ? studyItemViewToSheet(segments[0]) : { kind: "cardless" };
 }
 
 // --- Output shape -----------------------------------------------------------
@@ -217,7 +269,11 @@ export type StudySession = {
   // Per-node gated side-sheet payloads and the lookups the surfaces render from.
   sheetByNode: Record<string, SheetContent>;
   verdictByNode: Record<string, Verdict>;
-  optionItemsByNode: Record<string, StudyOptionSelectView>;
+  // The ordered study segments per node (R10, KTD7): each frontier node renders theory (the
+  // lesson) then this list in canonical order (option_select, then impostor), each segment
+  // independently answerable. The durable seam the Learner App consumes; supersedes the prior
+  // single-item-per-node `optionItemsByNode` (rule 18).
+  studySegmentsByNode: Record<string, StudyItemView[]>;
   // The Concept Lesson substrate that rides down (ADR-0031, KTD5): one teaching view per node
   // that has a lesson, rendered ahead of the option-select for a frontier node (R12). Reading
   // writes nothing (R13). `lessonAbsent` gives the operator thin visibility into which nodes
@@ -247,7 +303,15 @@ export function composeStudySession(input: {
 }): StudySession {
   const { detail, targetDerivedNodeId } = input;
   const itemViews = input.studyItems.map(studyItemToView);
-  const itemViewByNode = new Map(itemViews.map((view) => [view.item.derivedNodeId, view] as const));
+  // Group a node's items into its ordered segment list (R10, KTD7): option_select, then
+  // impostor. A node with one type lists one segment.
+  const studySegmentsByNode: Record<string, StudyItemView[]> = {};
+  for (const view of itemViews) {
+    (studySegmentsByNode[view.item.derivedNodeId] ??= []).push(view);
+  }
+  for (const segments of Object.values(studySegmentsByNode)) {
+    segments.sort((a, b) => STUDY_ITEM_TYPE_ORDER[a.kind] - STUDY_ITEM_TYPE_ORDER[b.kind]);
+  }
 
   // Calibration ∘ graded composition (R12): the trusted-edge down-closure of the `known`
   // verdicts is mastered via calibration; un-pruned nodes take their graded mastery; the
@@ -285,7 +349,7 @@ export function composeStudySession(input: {
     sheetByNode[node.derivedNodeId] = sheetContentFor({
       derivedNodeId: node.derivedNodeId,
       classification,
-      itemViewByNode,
+      segmentsByNode: studySegmentsByNode,
       verdictByNode,
       edges: detail.edges,
       labelByNode
@@ -318,11 +382,6 @@ export function composeStudySession(input: {
     }))
     .sort((a, b) => a.struggledLabel.localeCompare(b.struggledLabel));
 
-  const optionItemsByNode: Record<string, StudyOptionSelectView> = {};
-  for (const view of itemViews) {
-    if (view.kind === "option_select") optionItemsByNode[view.item.derivedNodeId] = view.item;
-  }
-
   // The lesson substrate rides down keyed by node (KTD5). Absences become a thin operator view.
   const lessonByNode: Record<string, ConceptLessonView> = {};
   for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
@@ -344,7 +403,7 @@ export function composeStudySession(input: {
     restorations,
     sheetByNode,
     verdictByNode: Object.fromEntries(verdictByNode),
-    optionItemsByNode,
+    studySegmentsByNode,
     lessonByNode,
     lessonAbsent
   };
