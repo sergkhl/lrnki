@@ -1,5 +1,6 @@
 import type { BlockEvidence, RunEvidenceProfile, RunTypedAssertion } from "@lrnki/domain-core";
 import type { AssertionEntailmentJudgmentPort } from "@lrnki/ports";
+import { gateByJudgment } from "./gateByJudgment";
 
 // Composed semantic-entailment stage for optional typed assertions (ADR-0007
 // reset). Runs AFTER the deterministic `applyEvidenceProfilePolicy`. Each surviving
@@ -11,6 +12,13 @@ import type { AssertionEntailmentJudgmentPort } from "@lrnki/ports";
 // passages are NOT judged — they face the deterministic floor alone. Fail closed:
 // a judge transport failure rejects the assertion (its passage still survives as a
 // mention), never silently promotes it.
+//
+// The gate's unit is one neural call, and this judge makes one call per assertion, so
+// it flattens to assertion granularity (KTD4): every assertion of every profile becomes
+// one Measured Judge Gate item (rule 16, gateByJudgment). `skip` rejects a subject-less
+// assertion with no neural call (R6); `onUnavailable` rejects on a judge failure — both
+// keep the passage. Outcomes regroup by profile index into the same accept/demote fold
+// as before, preserving object identity when a profile is unchanged.
 export async function applyAssertionEntailmentJudge(input: {
   profiles: RunEvidenceProfile[];
   declaredDomain: string;
@@ -18,19 +26,57 @@ export async function applyAssertionEntailmentJudge(input: {
   judge: AssertionEntailmentJudgmentPort;
   concurrency?: number;
 }): Promise<RunEvidenceProfile[]> {
-  return mapWithConcurrency(input.profiles, input.concurrency ?? 4, async (profile) => {
-    if (profile.assertions.length === 0) return profile;
-    const subject = input.conceptsByKey.get(profile.candidateKey);
-    const accepted: RunTypedAssertion[] = [];
-    const demotedPassages: BlockEvidence[] = [];
-    for (const assertion of profile.assertions) {
-      const entailed = subject ? await judgeAssertion(input, subject, assertion) : false;
-      if (entailed) {
-        accepted.push(assertion);
-      } else {
-        demotedPassages.push(...assertion.evidence);
-      }
+  type FlatAssertion = {
+    profileIndex: number;
+    subject: { canonicalLabel: string; aliases: string[] } | undefined;
+    assertion: RunTypedAssertion;
+  };
+  const flat: FlatAssertion[] = input.profiles.flatMap((profile, profileIndex) =>
+    profile.assertions.map((assertion) => ({
+      profileIndex,
+      subject: input.conceptsByKey.get(profile.candidateKey),
+      assertion
+    }))
+  );
+
+  const outcomes = await gateByJudgment(flat, {
+    concurrency: input.concurrency,
+    skip: (item) =>
+      item.subject ? undefined : { profileIndex: item.profileIndex, assertion: item.assertion, entailed: false },
+    judge: (item) =>
+      input.judge.judgeDefinition({
+        declaredDomain: input.declaredDomain,
+        subject: item.subject!, // skip filtered subject-less items: subject is defined here
+        definition: item.assertion.literalValue,
+        evidenceQuotes: item.assertion.evidence.map((evidence) => evidence.evidenceQuote)
+      }),
+    onVerdict: (item, judgment) => ({
+      profileIndex: item.profileIndex,
+      assertion: item.assertion,
+      entailed: judgment.entailed
+    }),
+    onUnavailable: (item) => ({ profileIndex: item.profileIndex, assertion: item.assertion, entailed: false })
+  });
+
+  // Regroup by profile, preserving assertion order within each profile (the flat list
+  // was built in profile/assertion order and the gate keeps results index-aligned).
+  const acceptedByProfile = new Map<number, RunTypedAssertion[]>();
+  const demotedByProfile = new Map<number, BlockEvidence[]>();
+  for (const outcome of outcomes) {
+    if (outcome.entailed) {
+      const accepted = acceptedByProfile.get(outcome.profileIndex) ?? [];
+      accepted.push(outcome.assertion);
+      acceptedByProfile.set(outcome.profileIndex, accepted);
+    } else {
+      const demoted = demotedByProfile.get(outcome.profileIndex) ?? [];
+      demoted.push(...outcome.assertion.evidence);
+      demotedByProfile.set(outcome.profileIndex, demoted);
     }
+  }
+
+  return input.profiles.map((profile, profileIndex) => {
+    const accepted = acceptedByProfile.get(profileIndex) ?? [];
+    const demotedPassages = demotedByProfile.get(profileIndex) ?? [];
     if (demotedPassages.length === 0 && accepted.length === profile.assertions.length) {
       return profile;
     }
@@ -44,29 +90,6 @@ export async function applyAssertionEntailmentJudge(input: {
   });
 }
 
-async function judgeAssertion(
-  input: {
-    declaredDomain: string;
-    conceptsByKey: Map<string, { canonicalLabel: string; aliases: string[] }>;
-    judge: AssertionEntailmentJudgmentPort;
-  },
-  subject: { canonicalLabel: string; aliases: string[] },
-  assertion: RunTypedAssertion
-): Promise<boolean> {
-  const evidenceQuotes = assertion.evidence.map((item) => item.evidenceQuote);
-  try {
-    const judgment = await input.judge.judgeDefinition({
-      declaredDomain: input.declaredDomain,
-      subject,
-      definition: assertion.literalValue,
-      evidenceQuotes
-    });
-    return judgment.entailed;
-  } catch {
-    return false; // judge transport failure: reject the assertion, keep the passage
-  }
-}
-
 function foldPassages(existing: BlockEvidence[], added: BlockEvidence[]): BlockEvidence[] {
   const key = (passage: BlockEvidence) => `${passage.blockId}::${passage.evidenceQuote.replace(/\s+/g, " ").trim().toLowerCase()}`;
   const seen = new Set(existing.map(key));
@@ -78,17 +101,4 @@ function foldPassages(existing: BlockEvidence[], added: BlockEvidence[]): BlockE
     result.push(passage);
   }
   return result;
-}
-
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
 }

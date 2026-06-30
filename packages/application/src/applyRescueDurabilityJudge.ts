@@ -1,6 +1,7 @@
 import { evidenceQuoteMatches } from "@lrnki/domain-core";
 import type { RescueDisposition, SourceMentionedEnrichmentNode } from "@lrnki/domain-core";
 import type { RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import { gateByJudgment } from "./gateByJudgment";
 
 // Measured rescue durability stage (U3, KTD3/KTD4). Runs AFTER mention dedupe/merge
 // so the judge sees a candidate's full aggregated evidence, and BEFORE any derived
@@ -20,41 +21,44 @@ export async function applyRescueDurabilityJudge(input: {
   judge: RescueDurabilityJudgmentPort;
   concurrency?: number;
 }): Promise<{ keptNodes: SourceMentionedEnrichmentNode[]; dispositions: RescueDisposition[] }> {
-  const dispositions = new Array<RescueDisposition>(input.rescuedNodes.length);
-  await mapWithConcurrency(input.rescuedNodes, input.concurrency ?? 4, async (node, index) => {
-    // The node's OWN verbatim mention evidence — the only text a confident drop may
-    // be grounded in (so the judge cannot veto on text absent from the candidate).
-    const mentionQuotes = node.groundingPassages
-      .map((passage) => passage.evidenceQuote)
-      .filter((quote) => quote.trim().length > 0);
-    const anchors = input.anchorsByDomain.get(node.declaredDomain) ?? [];
-    try {
-      const judgment = await input.judge.judge({
+  // The `RescueDisposition[]` IS the gate's index-aligned outcome array (rule 16,
+  // gateByJudgment). `onVerdict` carries the confident-verdict branch — including the
+  // grounding-span refinement that downgrades a `not_durable` verdict whose span is not
+  // in the candidate's own mentions back to `kept_judge_unavailable` (the judge cannot
+  // veto on text absent from the candidate). `onUnavailable` fails OPEN (KTD3): a
+  // transport failure or schema-invalid response keeps the node, inspectable, rather
+  // than turning the judge into a fragile hard veto.
+  const dispositions = await gateByJudgment(input.rescuedNodes, {
+    concurrency: input.concurrency,
+    judge: (node) =>
+      input.judge.judge({
         declaredDomain: node.declaredDomain,
-        candidate: { canonicalLabel: node.canonicalLabel, aliases: node.aliases, mentionQuotes },
-        anchors
-      });
-      if (judgment.verdict === "not_durable") {
-        const span = judgment.groundingSpan.trim();
-        const grounded = span.length > 0 && mentionQuotes.some((quote) => evidenceQuoteMatches(quote, span));
-        dispositions[index] = grounded
-          ? record(node, "dropped", judgment.rationale, span)
-          : record(node, "kept_judge_unavailable", `${judgment.rationale} [ungrounded not_durable verdict kept]`, "");
-      } else {
-        dispositions[index] = record(node, "accepted", judgment.rationale, "");
-      }
-    } catch {
-      // Fail OPEN (KTD3): a judge transport failure or schema-invalid response keeps
-      // the node and stays inspectable rather than turning the judge into a fragile
-      // hard veto.
-      dispositions[index] = record(node, "kept_judge_unavailable", "rescue durability judge unavailable", "");
-    }
+        candidate: { canonicalLabel: node.canonicalLabel, aliases: node.aliases, mentionQuotes: mentionQuotesOf(node) },
+        anchors: input.anchorsByDomain.get(node.declaredDomain) ?? []
+      }),
+    onVerdict: (node, judgment) => {
+      if (judgment.verdict !== "not_durable") return record(node, "accepted", judgment.rationale, "");
+      const span = judgment.groundingSpan.trim();
+      const grounded = span.length > 0 && mentionQuotesOf(node).some((quote) => evidenceQuoteMatches(quote, span));
+      return grounded
+        ? record(node, "dropped", judgment.rationale, span)
+        : record(node, "kept_judge_unavailable", `${judgment.rationale} [ungrounded not_durable verdict kept]`, "");
+    },
+    onUnavailable: (node) => record(node, "kept_judge_unavailable", "rescue durability judge unavailable", "")
   });
   const dropped = new Set(
     dispositions.filter((disposition) => disposition.disposition === "dropped").map((disposition) => disposition.derivedNodeId)
   );
   const keptNodes = input.rescuedNodes.filter((node) => !dropped.has(node.derivedNodeId));
   return { keptNodes, dispositions };
+}
+
+// The node's OWN verbatim mention evidence — the only text a confident drop may be
+// grounded in (so the judge cannot veto on text absent from the candidate).
+function mentionQuotesOf(node: SourceMentionedEnrichmentNode): string[] {
+  return node.groundingPassages
+    .map((passage) => passage.evidenceQuote)
+    .filter((quote) => quote.trim().length > 0);
 }
 
 function record(
@@ -72,21 +76,4 @@ function record(
     rationale: rationale.trim(),
     groundingSpan
   };
-}
-
-async function mapWithConcurrency<T>(
-  items: readonly T[],
-  limit: number,
-  fn: (item: T, index: number) => Promise<void>
-): Promise<void> {
-  let cursor = 0;
-  const workerCount = Math.max(1, Math.min(limit, items.length));
-  const worker = async (): Promise<void> => {
-    while (true) {
-      const index = cursor++;
-      if (index >= items.length) return;
-      await fn(items[index], index);
-    }
-  };
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
 }

@@ -1,6 +1,7 @@
 export { executeExtractionRun, DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE } from "./executeExtractionRun";
 export { runExtractionOverSources, DEFAULT_EXTRACTION_OVER_SOURCES_CONCURRENCY, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { mapWithConcurrency } from "./mapWithConcurrency";
+export { gateByJudgment } from "./gateByJudgment";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { admitSource } from "./admitSource";
 export { reconcileUngroundableCores } from "./reconcileUngroundableCores";

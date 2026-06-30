@@ -33,6 +33,19 @@
 
 ## COMPLETED
 
+- **Measured Judge Gate — one fail-safe seam for every neural judge.** All six `apply*Judge`
+  modules now route their whole control flow through one deep module, `gateByJudgment`, which owns
+  the envelope they each re-implemented: bounded concurrency, index-aligned results, and the
+  fail-safe `try/catch` that routes a thrown or schema-invalid judge call to a pass-through outcome
+  so it can never reach the drop/demote path. AGENTS rule 16's guarantee is now structural and
+  proven once in `gateByJudgment.test.ts` instead of six hand-written `catch` blocks; item
+  pre-filtering moved into the gate's `skip`, and `assertionEntailment` flattens to per-assertion
+  gate items then regroups by profile. Each judge's public interface (input/return shape, fail
+  direction, dispositions, reason codes, object-identity-on-no-change) is unchanged. The duplicated
+  `mapWithConcurrency` collapsed to the single shared copy and its stale `KTD8` deferred note is
+  gone (rule 18). Behavior-preserving; no prompt/model/schema/threshold/ADR change. Decisions:
+  [ADR-0001](../adr/0001-adopt-greenfield-deep-module-architecture.md) and AGENTS rules 16 and 18.
+
 - **Graph Enrichment consensus-ordering module.** The K-sampled whole-set ordering envelope moved
   behind `deriveConsensusOrdering`: stable domain/node sorting, prompt-budget fail-closed behavior,
   ordinal endpoint resolution, per-pair tallies, direction-contest routing, weak-cut-before-cycle
@@ -195,6 +208,25 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Measured Judge Gate refactor U1–U6, 2026-06-30 (branch
+  `feat/concept-lesson-teaching-surface`).** Full workspace typecheck green; full recursive suite
+  green (domain-core 29, application 362 incl. the new `gateByJudgment` guarantee suite — a thrown
+  judge routes to `onUnavailable` with `onVerdict` proven unreached, skip short-circuits with no
+  call, index alignment under out-of-order resolution, concurrency bound, empty-array — plus all six
+  judge suites passing unchanged; infra-postgres 47, infra-litellm 89, kg-worker 4, admin-lab 77);
+  ESLint 0 errors / 2 pre-existing warnings (`domain-core/src/index.ts`,
+  `infrastructure-litellm/src/extractionAdapters.ts`, both outside this diff). Sweep proofs:
+  `async function mapWithConcurrency` exists only in `mapWithConcurrency.ts` (AE3); zero `try {` in
+  any `apply*Judge.ts` (every fail path now lives in the gate, AE4); the gate's doc comment names
+  AGENTS rule 16. Real-use gate (rule 14 / KTD6, wiring confirmation — behavior-preserving, no
+  prompt/model/schema/threshold change): a clean single-Rust journey ran all six judges end to end
+  on real model calls — extraction `70092415` (`core=7 CEPs=20 incomplete=0 defs=30 assertions=9`),
+  graph version `11a37c58` (7 concepts), enrichment `1a4e7f2e` (`minting accepted=11 dropped=2
+  unavailable=0`, 7 anchors / 17 enrichment nodes, 22 certain / 8 uncertain edges, cycleRouted=0;
+  node split document_anchored=7 / llm_grounded=11 / source_mentioned=6). `unavailable=0` is the
+  load-bearing signal: `onVerdict` subtracted on confident verdicts while the gate's pass-through
+  never spuriously fired. Result: PASS. Trail: `tmp/2026-06-30-measured-judge-gate/`.
 
 - **Graph Enrichment consensus-ordering module, 2026-06-29 (branch
   `feat/concept-lesson-teaching-surface`).** Deterministic checks passed:

@@ -1,6 +1,8 @@
 // Map over items with bounded concurrency, preserving INPUT order in the result
-// regardless of completion order (plan U6, KTD8). This is the single shared copy used
-// by the per-node enrichment unit and the parallel-ready extraction / study-item seams.
+// regardless of completion order. This is the single shared copy used by every seam
+// that needs bounded parallelism: the per-node enrichment unit, the extraction /
+// study-item seams, and the `gateByJudgment` Measured Judge Gate that every neural
+// judge now rides on.
 //
 // Semantics:
 // - At most `limit` invocations of `fn` run at once (workers pull from a shared cursor).
@@ -11,11 +13,6 @@
 //   surfaces from the returned promise), so a partial result is never returned. In-flight
 //   tasks already running are not cancelled, but no NEW task is started after rejection.
 // - `limit >= items.length` degrades to "all at once"; `limit <= 0` is clamped to 1.
-//
-// KTD8: this lifts ONE shared helper for the seams that need it. The four other duplicate
-// copies (applyAdmissionLabelJudge, applyAssertionEntailmentJudge,
-// applyRescueDurabilityJudge, executeExtractionRun) are intentionally left untouched;
-// consolidating them is deferred follow-up, out of this change's scope.
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],
   limit: number,

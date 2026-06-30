@@ -1,5 +1,6 @@
 import type { RunCandidate } from "@lrnki/domain-core";
 import type { AdmissionLabelJudgmentPort } from "@lrnki/ports";
+import { gateByJudgment } from "./gateByJudgment";
 
 // Composed concept-vs-proposition admission stage (ADR-0005). Runs AFTER the pure
 // deterministic `applyAdmissionPolicy`. A candidate that the neural Core Set
@@ -22,30 +23,27 @@ export async function applyAdmissionLabelJudge(input: {
   judge: AdmissionLabelJudgmentPort;
   concurrency?: number;
 }): Promise<RunCandidate[]> {
-  const coreIndexes = input.candidates.flatMap((candidate, index) =>
-    candidate.admission.tier === "core" ? [index] : []
-  );
-  if (coreIndexes.length === 0) return input.candidates;
-
-  const result = [...input.candidates];
-  await mapWithConcurrency(coreIndexes, input.concurrency ?? 4, async (index) => {
-    const candidate = input.candidates[index];
-    try {
-      const judgment = await input.judge.judge({
+  // The whole control flow rides the Measured Judge Gate (rule 16, gateByJudgment):
+  // `skip` keeps every non-`core` candidate untouched with no neural call; `onVerdict`
+  // demotes only on a confident `proposition_or_claim`; `onUnavailable` keeps `core`
+  // (fail closed = preserve recall — a transport blip must not silently demote a
+  // candidate the prompt selected core). The result array IS the full candidate list.
+  return gateByJudgment(input.candidates, {
+    concurrency: input.concurrency,
+    skip: (candidate) => (candidate.admission.tier === "core" ? undefined : candidate),
+    judge: (candidate) =>
+      input.judge.judge({
         declaredDomain: input.declaredDomain,
         label: candidate.canonicalLabel,
         aliases: candidate.aliases,
         evidenceQuotes: candidateEvidenceQuotes(candidate)
-      });
-      if (judgment.labelKind === "proposition_or_claim") {
-        result[index] = demote(candidate, judgment.underlyingNounPhrase);
-      }
-    } catch {
-      // Fail closed = preserve recall: a judge transport failure must not silently
-      // demote a candidate the prompt selected core.
-    }
+      }),
+    onVerdict: (candidate, judgment) =>
+      judgment.labelKind === "proposition_or_claim"
+        ? demote(candidate, judgment.underlyingNounPhrase)
+        : candidate,
+    onUnavailable: (candidate) => candidate
   });
-  return result;
 }
 
 // The candidate's already-verbatim-verified evidence: discovered mentions plus the
@@ -77,15 +75,4 @@ function demote(candidate: RunCandidate, underlyingNounPhrase: string): RunCandi
       boundaryReasonCodes: reasons
     }
   };
-}
-
-async function mapWithConcurrency<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      await fn(items[index]);
-    }
-  });
-  await Promise.all(workers);
 }

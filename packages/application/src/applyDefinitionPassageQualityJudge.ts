@@ -1,10 +1,10 @@
 import type {
   BlockEvidence,
   DefinitionPassageDisposition,
-  DefinitionPassageQualityJudgment,
   RunEvidenceProfile
 } from "@lrnki/domain-core";
 import type { DefinitionPassageQualityJudgmentPort } from "@lrnki/ports";
+import { gateByJudgment } from "./gateByJudgment";
 
 // Composed Definition-Passage quality stage (ADR-0007 extension). Runs AFTER the
 // deterministic `applyEvidenceProfilePolicy` (the verbatim floor) and BEFORE
@@ -36,53 +36,59 @@ export async function applyDefinitionPassageQualityJudge(input: {
   const dispositions: DefinitionPassageDisposition[] = [];
   const hollowDefinitionKeys = new Set<string>();
 
-  const judged = await mapWithConcurrency(input.profiles, input.concurrency ?? 4, async (profile) => {
-    if (profile.tier !== "core" || profile.definitions.length === 0) {
-      return { profile, dispositions: [] as DefinitionPassageDisposition[], hollow: false };
-    }
-    const subject = input.conceptsByKey.get(profile.candidateKey) ?? { canonicalLabel: profile.candidateKey, aliases: [] };
-    const passages = profile.definitions.map((definition) => {
-      const context = input.blockContextById.get(definition.blockId) ?? { blockType: "paragraph", headingPath: [] };
-      return {
-        sourceBlockId: definition.blockId,
-        evidenceQuote: definition.evidenceQuote,
-        blockType: context.blockType,
-        headingPath: context.headingPath
-      };
-    });
+  // The Measured Judge Gate (rule 16, gateByJudgment) owns the control flow: `skip`
+  // expresses the `core`-only / non-empty pre-filter with no neural call (R6);
+  // `onVerdict` drops vetoed passages and rebuilds the profile (preserving object
+  // identity when nothing drops); `onUnavailable` keeps every passage flagged
+  // `kept_judge_unavailable` (fail closed = preserve recall, D3) so a transport blip
+  // never shrinks the published core. Each outcome carries its per-profile `hollow`
+  // flag for the post-gate fold.
+  const judged = await gateByJudgment(input.profiles, {
+    concurrency: input.concurrency,
+    skip: (profile) =>
+      profile.tier !== "core" || profile.definitions.length === 0
+        ? { profile, dispositions: [] as DefinitionPassageDisposition[], hollow: false }
+        : undefined,
+    judge: (profile) => {
+      const subject = input.conceptsByKey.get(profile.candidateKey) ?? { canonicalLabel: profile.candidateKey, aliases: [] };
+      const passages = profile.definitions.map((definition) => {
+        const context = input.blockContextById.get(definition.blockId) ?? { blockType: "paragraph", headingPath: [] };
+        return {
+          sourceBlockId: definition.blockId,
+          evidenceQuote: definition.evidenceQuote,
+          blockType: context.blockType,
+          headingPath: context.headingPath
+        };
+      });
+      return input.judge.judgeDefinitions({ declaredDomain: input.declaredDomain, subject, passages });
+    },
+    onVerdict: (profile, verdicts) => {
+      const survivors: BlockEvidence[] = [];
+      const profileDispositions: DefinitionPassageDisposition[] = [];
+      profile.definitions.forEach((definition, index) => {
+        const verdict = verdicts?.[index];
+        if (!verdict || verdict.establishesMeaning) {
+          survivors.push(definition);
+          profileDispositions.push(dispositionFor(profile.candidateKey, definition, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
+        } else {
+          profileDispositions.push(dispositionFor(profile.candidateKey, definition, "vetoed", verdict.category, verdict.rationale));
+        }
+      });
 
-    let verdicts: DefinitionPassageQualityJudgment[] | undefined;
-    try {
-      verdicts = await input.judge.judgeDefinitions({ declaredDomain: input.declaredDomain, subject, passages });
-    } catch {
-      // Fail closed = preserve recall: keep every passage, flag it (D3, rule 16).
-      return {
-        profile,
-        dispositions: profile.definitions.map((definition) =>
-          dispositionFor(profile.candidateKey, definition, "kept_judge_unavailable", "establishes_meaning", "judge transport failure: passage kept")
-        ),
-        hollow: false
-      };
-    }
-
-    const survivors: BlockEvidence[] = [];
-    const profileDispositions: DefinitionPassageDisposition[] = [];
-    profile.definitions.forEach((definition, index) => {
-      const verdict = verdicts?.[index];
-      if (!verdict || verdict.establishesMeaning) {
-        survivors.push(definition);
-        profileDispositions.push(dispositionFor(profile.candidateKey, definition, "kept", "establishes_meaning", verdict?.rationale ?? "no verdict: passage kept"));
-      } else {
-        profileDispositions.push(dispositionFor(profile.candidateKey, definition, "vetoed", verdict.category, verdict.rationale));
+      if (survivors.length === profile.definitions.length) {
+        // Nothing dropped: preserve object identity (like reconcileUngroundableCores).
+        return { profile, dispositions: profileDispositions, hollow: false };
       }
-    });
-
-    if (survivors.length === profile.definitions.length) {
-      // Nothing dropped: preserve object identity (like reconcileUngroundableCores).
-      return { profile, dispositions: profileDispositions, hollow: false };
-    }
-    const next: RunEvidenceProfile = { ...profile, definitions: survivors, complete: survivors.length >= 1 };
-    return { profile: next, dispositions: profileDispositions, hollow: survivors.length === 0 };
+      const next: RunEvidenceProfile = { ...profile, definitions: survivors, complete: survivors.length >= 1 };
+      return { profile: next, dispositions: profileDispositions, hollow: survivors.length === 0 };
+    },
+    onUnavailable: (profile) => ({
+      profile,
+      dispositions: profile.definitions.map((definition) =>
+        dispositionFor(profile.candidateKey, definition, "kept_judge_unavailable", "establishes_meaning", "judge transport failure: passage kept")
+      ),
+      hollow: false
+    })
   });
 
   const profiles = judged.map((result, index) => {
@@ -102,17 +108,4 @@ function dispositionFor(
   rationale: string
 ): DefinitionPassageDisposition {
   return { candidateKey, sourceBlockId: definition.blockId, evidenceQuote: definition.evidenceQuote, disposition, category, rationale };
-}
-
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) || 1 }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  });
-  await Promise.all(workers);
-  return results;
 }
