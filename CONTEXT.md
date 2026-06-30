@@ -157,7 +157,7 @@ _Avoid_: static difficulty target, engagement score
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
 in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
-come from option-select study responses.
+come from keyed-selection study responses (option-select and impostor).
 
 **Study Item Bank**:
 A learner-neutral study-asset set generated alongside one Derived Graph Layer and keyed to
