@@ -1,4 +1,4 @@
-export { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+export { LiteLlmForcedToolClient, LiteLlmHttpError, ForcedToolExhaustionError } from "./LiteLlmForcedToolClient";
 export type { JsonSchema, ToolMessage } from "./LiteLlmForcedToolClient";
 export {
   LiteLlmSpendLogsReadAdapter,

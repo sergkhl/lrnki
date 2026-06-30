@@ -1,4 +1,4 @@
-import type { OperationType, RunProgressReporterPort } from "@lrnki/ports";
+import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
 import { isLlmStage, NON_LLM_STAGES, type NonLlmStage } from "./operationTimelineCatalog";
 
 // The reporter seam's application-facing surface (KTD4, R7). Operations import the
@@ -48,11 +48,32 @@ export function bracketStage(reporter: RunProgressReporterPort, operationType: O
       await reporter.completeStage({ operationType, operationId, stage, ok: true });
       return result;
     } catch (error) {
-      await reporter.completeStage({ operationType, operationId, stage, ok: false });
+      // Persist the redacted reason (ADR-0006 fail-closed, inspectable) before failing the
+      // stage. We never re-throw a different error or alter the fail-closed decision.
+      await reporter.completeStage({ operationType, operationId, stage, ok: false, errorDetail: toStageErrorDetail(error) });
       await reporter.completeOperation({ operationType, operationId, status: "failed" });
       throw error;
     }
   };
+}
+
+// Cap so a fallback `other` error message stays bounded in the timeline (matches the
+// transport's snippet discipline; application never sees the raw arguments here).
+const MESSAGE_CAP = 500;
+
+// Reduce a caught stage error to its persisted, serializable detail. A carrier error
+// (the litellm forced-tool exhaustion) exposes a ports-defined `stageErrorDetail` we read
+// structurally — no infrastructure import, mirroring how `LiteLlmHttpError` is duck-typed.
+// Anything else becomes a bounded, redacted `other` message.
+export function toStageErrorDetail(error: unknown): StageErrorDetail {
+  if (isStageErrorReporting(error)) return error.stageErrorDetail;
+  const message = error instanceof Error ? error.message : String(error);
+  const redacted = message.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, MESSAGE_CAP);
+  return { kind: "other", message: redacted };
+}
+
+function isStageErrorReporting(error: unknown): error is { stageErrorDetail: StageErrorDetail } {
+  return typeof error === "object" && error !== null && "stageErrorDetail" in error;
 }
 
 // Passthrough bracket: runs the work, opens/closes nothing. The default for a helper

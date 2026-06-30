@@ -72,7 +72,7 @@ function optionSelectFor(s: Substrate): OptionSelectItem {
     generatingModel: "test-model",
     configHash: "cfg",
     options: [
-      { optionId: randomUUID(), text: "Memory", isCorrect: true, provenance: "source", citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." } },
+      { optionId: randomUUID(), text: "Memory", isCorrect: true, provenance: "source", citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory.", matchKind: "exact" } },
       { optionId: randomUUID(), text: "Network sockets", isCorrect: false, provenance: "generated" },
       { optionId: randomUUID(), text: "Thread scheduling", isCorrect: false, provenance: "generated" },
       { optionId: randomUUID(), text: "Disk layout", isCorrect: false, provenance: "generated" }
@@ -357,7 +357,7 @@ function lessonFor(s: Substrate): ConceptLesson {
         kind: "definition",
         text: "Ownership is a set of rules that govern memory.",
         groundingProvenance: "source_cep",
-        citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." }
+        citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory.", matchKind: "exact" }
       }
     ]
   };
@@ -441,7 +441,7 @@ maybe("a generated-citation section persists null source ids; a source-citation 
       ...lessonFor(s),
       sections: [
         { kind: "gist", text: "Synthesized gist.", groundingProvenance: "generated", citation: { provenance: "generated", derivedNodeId: s.derivedNodeId, passageText: "a synthesized passage" } },
-        { kind: "definition", text: "Ownership is a set of rules that govern memory.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory." } }
+        { kind: "definition", text: "Ownership is a set of rules that govern memory.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory.", matchKind: "exact" } }
       ]
     };
     await new PostgresConceptLessonStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lesson], absent: [] });

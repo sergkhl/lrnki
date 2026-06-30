@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-  evidenceQuoteMatches,
+  classifyEvidenceMatch,
   type OptionSelectItem,
   type OptionSelectItemDraft,
   type StudyItemCitation,
@@ -85,19 +85,19 @@ export function validateOptionSelectItem(
     return { ok: false, reason: "option-select correct option carries no grounding citation" };
   }
   const citationDraft = correct.citation;
-  const match = grounding.passages.find(
-    (passage) => passage.passageId === citationDraft.passageId && evidenceQuoteMatches(passage.text, citationDraft.evidenceQuote)
-  );
-  if (!match) {
+  const candidate = grounding.passages.find((passage) => passage.passageId === citationDraft.passageId);
+  const matchKind = candidate ? classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote) : "none";
+  if (!candidate || matchKind === "none") {
     return { ok: false, reason: "option-select correct option citation does not verify against grounding" };
   }
   const citation: StudyItemCitation =
-    "sourceResourceId" in match
+    "sourceResourceId" in candidate
       ? {
           provenance: "source",
-          sourceResourceId: match.sourceResourceId,
-          sourceBlockId: match.sourceBlockId,
-          evidenceQuote: citationDraft.evidenceQuote
+          sourceResourceId: candidate.sourceResourceId,
+          sourceBlockId: candidate.sourceBlockId,
+          evidenceQuote: citationDraft.evidenceQuote,
+          matchKind
         }
       : { provenance: "generated", derivedNodeId: grounding.derivedNodeId, passageText: citationDraft.evidenceQuote };
 

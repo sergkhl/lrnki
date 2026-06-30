@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { OperationType, RunProgressReporterPort } from "@lrnki/ports";
+import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
 import type { Sql } from "postgres";
 
 // Incremental, AUTOCOMMIT timeline reporter (KTD3, R1, R3). THE load-bearing
@@ -67,11 +67,13 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
         AND s.ended_at IS NULL`;
   }
 
-  // Close the open child row for this stage.
-  async completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean }): Promise<void> {
+  // Close the open child row for this stage. A failing close also persists the redacted
+  // `error_detail` so the operator timeline can show WHY (ADR-0006 fail-closed, inspectable);
+  // an ok close clears it. Still one statement on the autocommit handle.
+  async completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean; errorDetail?: StageErrorDetail }): Promise<void> {
     await this.sql`
       UPDATE operation_run_stages s
-      SET ended_at = now(), ok = ${input.ok}
+      SET ended_at = now(), ok = ${input.ok}, error_detail = ${input.errorDetail ? this.sql.json(input.errorDetail as unknown as Parameters<Sql["json"]>[0]) : null}
       FROM operation_runs r
       WHERE s.operation_run_id = r.operation_run_id
         AND r.operation_type = ${input.operationType}

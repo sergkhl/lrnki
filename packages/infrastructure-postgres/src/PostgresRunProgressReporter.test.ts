@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import test from "node:test";
+import type { StageErrorDetail } from "@lrnki/ports";
 import { createDatabaseClient } from "./db";
+import { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
 import { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
 import { purgeOperationRun } from "./testSupport";
 
@@ -120,6 +122,56 @@ maybe("completeStage(ok:false) then completeOperation('failed') leaves a readabl
       SELECT s.ok FROM operation_run_stages s JOIN operation_runs r ON r.operation_run_id = s.operation_run_id
       WHERE r.operation_id = ${operationId} AND s.stage = 'cep-extraction'`;
     assert.equal(ok, false);
+  } finally {
+    await purgeOperationRun(sql, operationId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
+maybe("a failing completeStage persists error_detail that round-trips through the timeline read", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
+  const errorDetail: StageErrorDetail = {
+    kind: "forced_tool_exhaustion",
+    message: 'Forced tool call "submit_concept_candidates" failed after 3 attempt(s): schema',
+    toolName: "submit_concept_candidates",
+    model: "kg-extraction",
+    attempts: [
+      { attempt: 0, kind: "schema_invalid", schemaIssuePaths: ["candidates.0.candidateKey"], redactedSnippet: '{"candidates":[{"candidateKey":""}]}' },
+      { attempt: 1, kind: "http", status: 429 },
+      { attempt: 2, kind: "schema_invalid", schemaIssuePaths: ["candidates.0.candidateKey"] }
+    ]
+  };
+  try {
+    const reporter = new PostgresRunProgressReporter(sql);
+    await reporter.beginOperation({ operationType: "extraction", operationId });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "concept-discovery" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "concept-discovery", ok: false, errorDetail });
+    await reporter.completeOperation({ operationType: "extraction", operationId, status: "failed" });
+
+    const detail = await new PostgresOperationTimelineRead(sql).getOperationTimeline(operationId, "extraction");
+    assert.ok(detail);
+    const stage = detail.stages.find((s) => s.stage === "concept-discovery")!;
+    assert.equal(stage.ok, false);
+    // jsonb round-trips the structured detail verbatim (paths + redacted snippet preserved).
+    assert.deepEqual(stage.errorDetail, errorDetail);
+  } finally {
+    await purgeOperationRun(sql, operationId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
+maybe("a successful completeStage stores a null error_detail", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
+  try {
+    const reporter = new PostgresRunProgressReporter(sql);
+    await reporter.beginOperation({ operationType: "extraction", operationId });
+    await reporter.enterStage({ operationType: "extraction", operationId, stage: "admission" });
+    await reporter.completeStage({ operationType: "extraction", operationId, stage: "admission", ok: true });
+
+    const detail = await new PostgresOperationTimelineRead(sql).getOperationTimeline(operationId, "extraction");
+    assert.equal(detail?.stages.find((s) => s.stage === "admission")?.errorDetail, null);
   } finally {
     await purgeOperationRun(sql, operationId);
     await sql.end({ timeout: 5 });

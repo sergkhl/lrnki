@@ -851,6 +851,55 @@ export interface LearnerLoopReadPort {
 // is preserved — these describe operations, they do not unify them).
 export type OperationType = "extraction" | "minting" | "enrichment" | "study_items";
 
+// ---------------------------------------------------------------------------
+// Forced-tool failure detail (ADR-0006 fail-closed, made INSPECTABLE). When a
+// forced-tool call exhausts its retries and fails its stage, the litellm transport
+// captures WHY — already safely redacted at the model-output boundary — so the
+// operator timeline can render the reason instead of a bare "failed". This NEVER
+// changes the fail-closed decision; it only describes a failure that already happened.
+// The shapes live in `ports` (shared contract) so the application persists them
+// without importing infrastructure: the litellm error carries `stageErrorDetail`
+// and `bracketStage` duck-types it (mirroring the structural `LiteLlmHttpError` check).
+// ---------------------------------------------------------------------------
+
+// One forced-tool attempt's redacted failure. `kind` classifies the deviation; the
+// optional fields are populated only when meaningful (`status` for HTTP failures,
+// `schemaIssuePaths` for schema-invalid arguments — PATHS only, never the offending
+// values, which can be large or source-derived). `redactedSnippet` is the offending
+// arguments text bounded, control-char-stripped, and truncated.
+export type ForcedToolFailureKind =
+  | "http"
+  | "no_tool_call"
+  | "no_arguments"
+  | "invalid_json"
+  | "schema_invalid"
+  | "other";
+
+export interface ForcedToolFailureAttempt {
+  attempt: number;
+  kind: ForcedToolFailureKind;
+  status?: number;
+  schemaIssuePaths?: string[];
+  redactedSnippet?: string;
+}
+
+// The serializable, persisted failure detail for a failed stage. `forced_tool_exhaustion`
+// carries the per-attempt trail (which deviations, how many retries); `other` is any
+// non-forced-tool throw reduced to a redacted message.
+export interface StageErrorDetail {
+  kind: "forced_tool_exhaustion" | "other";
+  message: string;
+  toolName?: string;
+  model?: string;
+  attempts?: ForcedToolFailureAttempt[];
+}
+
+// Marker an error implements so the application can persist its detail without a typed
+// import of the infrastructure error class. Duck-typed by `bracketStage`.
+export interface StageErrorReporting {
+  readonly stageErrorDetail: StageErrorDetail;
+}
+
 export interface RunProgressReporterPort {
   // Insert the parent `running` row at operation entry — the fix for "no row
   // until done": a polling client sees `running` immediately, not no row.
@@ -865,7 +914,9 @@ export interface RunProgressReporterPort {
   // visible without waiting for a stage boundary. `done` is the cumulative count.
   recordProgress(input: { operationType: OperationType; operationId: string; stage: string; done: number }): Promise<void>;
   // Close a stage: set its ended_at + ok. A thrown stage reports ok:false first.
-  completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean }): Promise<void>;
+  // `errorDetail` is the optional redacted reason a failed stage carries (ADR-0006
+  // fail-closed, made inspectable); it is persisted only on the failing close.
+  completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean; errorDetail?: StageErrorDetail }): Promise<void>;
   // Set the parent's terminal status + completed_at.
   completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void>;
 }
@@ -886,6 +937,9 @@ export interface OperationTimelineStage {
   ok: boolean | null;
   progressDone: number | null;
   progressTotal: number | null;
+  // The redacted failure reason for a failed stage (ADR-0006 fail-closed, inspectable);
+  // null for ok or still-open stages, and for failed stages predating this detail.
+  errorDetail: StageErrorDetail | null;
 }
 
 export interface OperationTimelineSummary {

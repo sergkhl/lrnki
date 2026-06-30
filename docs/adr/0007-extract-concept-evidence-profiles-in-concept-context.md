@@ -14,6 +14,11 @@ extraction port and a forced named tool schema. A CEP contains:
 Every passage retains its curated source, source block, verbatim quote, heading path, and locator.
 Relationship prose that is not the guarded typed evidence remains an untyped Mention Passage.
 
+Quote verification tolerates source formatting noise the model normalizes away. The match is
+classified `exact` (byte-exact substring) or `normalized` (matched only after that normalization),
+and downstream source citations record which — grounding fidelity an operator can inspect, not just
+pass/fail. Verification itself stays the `exact`-or-`normalized` (non-`none`) predicate.
+
 The application applies these boundaries in order:
 
 1. Verify every cited quote against its source block.

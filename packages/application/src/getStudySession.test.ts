@@ -83,7 +83,7 @@ const scopeLesson: ConceptLesson = {
   canonicalLabel: "Variable scope",
   sections: [
     { kind: "gist", text: "A name is valid within a region.", groundingProvenance: "generated" },
-    { kind: "definition", text: "Scope is the region where a binding is valid.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "Scope is the region where a binding is valid." } },
+    { kind: "definition", text: "Scope is the region where a binding is valid.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "Scope is the region where a binding is valid.", matchKind: "exact" } },
     { kind: "applications", text: "Ownership builds on scope.", groundingProvenance: "generated" }
   ]
 };

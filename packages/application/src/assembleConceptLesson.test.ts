@@ -48,10 +48,37 @@ test("a verbatim-verifying definition is source-cited; the intuition is generate
   const definition = result.lesson.sections.find((s) => s.kind === "definition")!;
   assert.equal(definition.groundingProvenance, "source_cep");
   assert.ok(definition.citation && definition.citation.provenance === "source");
-  if (definition.citation.provenance === "source") assert.equal(definition.citation.sourceBlockId, "b1");
+  if (definition.citation.provenance === "source") {
+    assert.equal(definition.citation.sourceBlockId, "b1");
+    // byte-exact quote → matchKind "exact" (grounding fidelity, inspectable)
+    assert.equal(definition.citation.matchKind, "exact");
+  }
   const intuition = result.lesson.sections.find((s) => s.kind === "intuition")!;
   assert.equal(intuition.groundingProvenance, "generated");
   assert.equal(intuition.citation, undefined);
+});
+
+test("a definition matching only after normalization records matchKind: normalized", () => {
+  const grounding: NodeGrounding = {
+    provenance: "source_cep",
+    passages: [
+      { passageId: "b1", kind: "definition", text: "Ownership is a **set of rules** that govern memory.", sourceResourceId: "res-1", sourceBlockId: "b1" }
+    ],
+    definesLiteral: "the rules governing memory"
+  };
+  const draft: ConceptLessonDraft = {
+    sections: [
+      { kind: "gist", text: "Each value has a single owner." },
+      { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." } },
+      { kind: "applications", text: "Move semantics build on ownership." }
+    ]
+  };
+  const result = assemble(draft, grounding);
+  assert.equal(result.kind, "lesson");
+  if (result.kind !== "lesson") return;
+  const definition = result.lesson.sections.find((s) => s.kind === "definition")!;
+  assert.ok(definition.citation && definition.citation.provenance === "source");
+  if (definition.citation.provenance === "source") assert.equal(definition.citation.matchKind, "normalized");
 });
 
 // A substantive section that is itself a verbatim substring of grounding is source-cited

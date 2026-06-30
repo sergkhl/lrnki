@@ -3,7 +3,8 @@ import type {
   OperationTimelineReadPort,
   OperationTimelineStage,
   OperationTimelineSummary,
-  OperationType
+  OperationType,
+  StageErrorDetail
 } from "@lrnki/ports";
 import type { Sql } from "postgres";
 
@@ -37,6 +38,7 @@ type StageRow = {
   ok: boolean | null;
   progress_done: number | null;
   progress_total: number | null;
+  error_detail: StageErrorDetail | null;
 };
 
 const summaryColumns = (sql: Sql) => sql`
@@ -73,7 +75,7 @@ export class PostgresOperationTimelineRead implements OperationTimelineReadPort 
       SELECT s.stage, s.started_at, s.ended_at,
         CASE WHEN s.ended_at IS NULL THEN NULL
              ELSE (EXTRACT(EPOCH FROM (s.ended_at - s.started_at)) * 1000)::bigint END AS duration_ms,
-        s.ok, s.progress_done, s.progress_total
+        s.ok, s.progress_done, s.progress_total, s.error_detail
       FROM operation_run_stages s
       JOIN operation_runs r ON r.operation_run_id = s.operation_run_id
       WHERE r.operation_id = ${operationId}
@@ -109,6 +111,7 @@ function toStage(row: StageRow): OperationTimelineStage {
     durationMs: row.duration_ms === null ? null : Number(row.duration_ms),
     ok: row.ok,
     progressDone: row.progress_done,
-    progressTotal: row.progress_total
+    progressTotal: row.progress_total,
+    errorDetail: row.error_detail
   };
 }

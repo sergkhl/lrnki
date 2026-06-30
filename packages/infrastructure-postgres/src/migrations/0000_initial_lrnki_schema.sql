@@ -683,12 +683,16 @@ CREATE TABLE study_item_citations (
   source_resource_id uuid REFERENCES source_resources(source_resource_id),
   source_block_id uuid REFERENCES source_blocks(source_block_id),
   evidence_quote text,
+  -- Grounding fidelity for a source citation: whether the quote traced byte-exact or only
+  -- after formatting normalization (ADR-0007 evidence matching, made inspectable). NULL on
+  -- a generated citation.
+  match_kind text CHECK (match_kind IN ('exact', 'normalized')),
   derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
   generated_passage_text text,
   CHECK (
-    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
+    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND match_kind IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
     OR
-    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
+    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND match_kind IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
   )
 );
 
@@ -761,12 +765,15 @@ CREATE TABLE concept_lesson_section_citations (
   source_resource_id uuid REFERENCES source_resources(source_resource_id),
   source_block_id uuid REFERENCES source_blocks(source_block_id),
   evidence_quote text,
+  -- Grounding fidelity for a source citation: byte-exact vs. normalized match (ADR-0007),
+  -- made inspectable. NULL on a generated citation.
+  match_kind text CHECK (match_kind IN ('exact', 'normalized')),
   derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
   generated_passage_text text,
   CHECK (
-    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
+    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND match_kind IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
     OR
-    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
+    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND match_kind IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
   ),
   UNIQUE (concept_lesson_section_id)
 );
@@ -884,7 +891,11 @@ CREATE TABLE operation_run_stages (
   ended_at timestamptz,
   ok boolean,
   progress_done integer,
-  progress_total integer
+  progress_total integer,
+  -- Redacted, structured failure reason for a failed stage (ADR-0006 fail-closed, made
+  -- inspectable): the forced-tool exhaustion attempt trail or a bounded `other` message.
+  -- NULL for ok/open stages. Captured at the model-output boundary, never the raw args.
+  error_detail jsonb
 );
 
 CREATE INDEX operation_run_stages_run_idx ON operation_run_stages(operation_run_id);

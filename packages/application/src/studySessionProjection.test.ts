@@ -103,7 +103,7 @@ function lessonFor(derivedNodeId: string): ConceptLesson {
     canonicalLabel: labelByNode[derivedNodeId],
     sections: [
       { kind: "gist", text: "A short gist.", groundingProvenance: "generated" },
-      { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition." } },
+      { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition.", matchKind: "exact" } },
       { kind: "applications", text: "Connects to neighbors.", groundingProvenance: "generated" }
     ]
   };

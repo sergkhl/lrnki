@@ -65,8 +65,8 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   private async insertCitation(tx: Sql | TransactionSql, studyItemId: string, citation: StudyItemCitation): Promise<void> {
     if (citation.provenance === "source") {
       await tx`
-        INSERT INTO study_item_citations (study_item_citation_id, study_item_id, provenance, source_resource_id, source_block_id, evidence_quote)
-        VALUES (${randomUUID()}, ${studyItemId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote})`;
+        INSERT INTO study_item_citations (study_item_citation_id, study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind)
+        VALUES (${randomUUID()}, ${studyItemId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote}, ${citation.matchKind})`;
     } else {
       await tx`
         INSERT INTO study_item_citations (study_item_citation_id, study_item_id, provenance, derived_node_id, generated_passage_text)
@@ -100,7 +100,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.study_item_id);
     const citationRows = await this.sql<CitationRow[]>`
-      SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, derived_node_id, generated_passage_text
+      SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
       FROM study_item_citations WHERE study_item_id IN ${this.sql(ids)}
       ORDER BY study_item_id, study_item_citation_id`;
     const optionRows = await this.sql<OptionRow[]>`
@@ -152,7 +152,7 @@ function assertPersistableOptionSelectItem(item: StudyItem): void {
 
 function toCitation(row: CitationRow): StudyItemCitation {
   return row.provenance === "source"
-    ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote! }
+    ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote!, matchKind: row.match_kind! }
     : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
 }
 
@@ -183,6 +183,7 @@ type CitationRow = {
   source_resource_id: string | null;
   source_block_id: string | null;
   evidence_quote: string | null;
+  match_kind: "exact" | "normalized" | null;
   derived_node_id: string | null;
   generated_passage_text: string | null;
 };
@@ -245,8 +246,8 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
   private async insertCitation(tx: Sql | TransactionSql, sectionId: string, citation: StudyItemCitation): Promise<void> {
     if (citation.provenance === "source") {
       await tx`
-        INSERT INTO concept_lesson_section_citations (concept_lesson_section_citation_id, concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote)
-        VALUES (${randomUUID()}, ${sectionId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote})`;
+        INSERT INTO concept_lesson_section_citations (concept_lesson_section_citation_id, concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind)
+        VALUES (${randomUUID()}, ${sectionId}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote}, ${citation.matchKind})`;
     } else {
       await tx`
         INSERT INTO concept_lesson_section_citations (concept_lesson_section_citation_id, concept_lesson_section_id, provenance, derived_node_id, generated_passage_text)
@@ -289,7 +290,7 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
     const sectionIds = sectionRows.map((row) => row.concept_lesson_section_id);
     const citationRows = sectionIds.length
       ? await this.sql<LessonCitationRow[]>`
-          SELECT concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote, derived_node_id, generated_passage_text
+          SELECT concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
           FROM concept_lesson_section_citations WHERE concept_lesson_section_id IN ${this.sql(sectionIds)}`
       : [];
 
@@ -351,6 +352,7 @@ type LessonCitationRow = {
   source_resource_id: string | null;
   source_block_id: string | null;
   evidence_quote: string | null;
+  match_kind: "exact" | "normalized" | null;
   derived_node_id: string | null;
   generated_passage_text: string | null;
 };

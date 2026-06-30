@@ -55,9 +55,12 @@ export function ConceptLessonCard({ lesson }: Readonly<{ lesson: ConceptLessonVi
 }
 
 // A `source` badge signals the section is grounded in source material; `generated` signals a
-// synthesized teaching aid. The badge reads off the section's authoritative provenance.
+// synthesized teaching aid. For a source section the badge also shows grounding fidelity:
+// `source · exact` (quoted byte-exact) vs `source · normalized` (matched only after formatting
+// normalization) — so an operator sees quote fidelity, not just pass/fail.
 function ProvenanceBadge({ section }: Readonly<{ section: ConceptLessonSectionView }>) {
-  return section.isSourceCited
-    ? <Badge variant="outline">source</Badge>
-    : <Badge variant="secondary">generated</Badge>;
+  if (!section.isSourceCited) return <Badge variant="secondary">generated</Badge>;
+  return section.matchKind === "normalized"
+    ? <Badge variant="secondary" title="Matched after formatting normalization">source · normalized</Badge>
+    : <Badge variant="outline" title="Byte-exact source quote">source · exact</Badge>;
 }

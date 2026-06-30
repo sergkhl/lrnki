@@ -1,5 +1,7 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { ActivityIcon, DatabaseZapIcon, GaugeIcon, RouteIcon } from "lucide-react";
+import type { StageErrorDetail } from "@lrnki/ports";
 import { AdminShell } from "@/components/AdminShell";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -51,6 +53,43 @@ function formatDuration(ms: number | null): string {
 function isStale(status: string, lastProgressAt: string | null): boolean {
   if (status !== "running" || !lastProgressAt) return false;
   return Date.now() - new Date(lastProgressAt).getTime() > STALE_HEARTBEAT_MS;
+}
+
+// The redacted reason a failed stage carries (ADR-0006 fail-closed, made inspectable): the
+// forced-tool exhaustion trail (per-attempt deviation kind, HTTP status, violated schema
+// PATHS, and a bounded redacted arguments snippet) or a bounded `other` message. Read-only —
+// the snippet was already redacted at the transport boundary; this only renders it.
+function StageErrorDetailView({ detail }: Readonly<{ detail: StageErrorDetail }>) {
+  return (
+    <div className="flex flex-col gap-1.5 text-xs">
+      <p className="font-medium text-destructive">{detail.message}</p>
+      {detail.kind === "forced_tool_exhaustion" ? (
+        <p className="text-muted-foreground">
+          tool <span className="font-mono">{detail.toolName}</span>
+          {detail.model ? <> · model <span className="font-mono">{detail.model}</span></> : null}
+          {detail.attempts ? <> · {detail.attempts.length} attempt(s)</> : null}
+        </p>
+      ) : null}
+      {detail.attempts?.map((attempt) => (
+        <div key={attempt.attempt} className="rounded border border-dashed px-2 py-1">
+          <p>
+            attempt {attempt.attempt + 1}: <span className="font-mono">{attempt.kind}</span>
+            {attempt.status !== undefined ? <> · HTTP {attempt.status}</> : null}
+          </p>
+          {attempt.schemaIssuePaths && attempt.schemaIssuePaths.length > 0 ? (
+            <p className="text-muted-foreground">
+              schema issues: <span className="font-mono">{attempt.schemaIssuePaths.join(", ")}</span>
+            </p>
+          ) : null}
+          {attempt.redactedSnippet ? (
+            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted/60 p-1.5 font-mono text-[11px]">
+              {attempt.redactedSnippet}
+            </pre>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default async function OperationsPage() {
@@ -147,19 +186,28 @@ export default async function OperationsPage() {
                         </TableHeader>
                         <TableBody>
                           {stages.map((stage, index) => (
-                            <TableRow key={`${stage.stage}-${index}`}>
-                              <TableCell className="font-medium">{stage.stage}</TableCell>
-                              <TableCell>
-                                {stage.endedAt === null ? (
-                                  <Badge variant="secondary">running</Badge>
-                                ) : (
-                                  <Badge variant={stage.ok ? "default" : "destructive"}>{stage.ok ? "ok" : "failed"}</Badge>
-                                )}
-                              </TableCell>
-                              <TableCell>{stage.progressTotal !== null ? `${stage.progressDone ?? 0} / ${stage.progressTotal}` : "—"}</TableCell>
-                              <TableCell>{formatDuration(stage.durationMs)}</TableCell>
-                              <TableCell className="font-mono text-xs"><LocalDateTime iso={stage.startedAt} /></TableCell>
-                            </TableRow>
+                            <Fragment key={`${stage.stage}-${index}`}>
+                              <TableRow>
+                                <TableCell className="font-medium">{stage.stage}</TableCell>
+                                <TableCell>
+                                  {stage.endedAt === null ? (
+                                    <Badge variant="secondary">running</Badge>
+                                  ) : (
+                                    <Badge variant={stage.ok ? "default" : "destructive"}>{stage.ok ? "ok" : "failed"}</Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>{stage.progressTotal !== null ? `${stage.progressDone ?? 0} / ${stage.progressTotal}` : "—"}</TableCell>
+                                <TableCell>{formatDuration(stage.durationMs)}</TableCell>
+                                <TableCell className="font-mono text-xs"><LocalDateTime iso={stage.startedAt} /></TableCell>
+                              </TableRow>
+                              {stage.errorDetail ? (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="bg-destructive/5">
+                                    <StageErrorDetailView detail={stage.errorDetail} />
+                                  </TableCell>
+                                </TableRow>
+                              ) : null}
+                            </Fragment>
                           ))}
                         </TableBody>
                       </Table>

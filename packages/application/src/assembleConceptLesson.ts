@@ -1,4 +1,5 @@
 import {
+  classifyEvidenceMatch,
   evidenceQuoteMatches,
   type ConceptLesson,
   type ConceptLessonDraft,
@@ -51,13 +52,16 @@ function citeVerifiedPassage(
 ): { provenance: StudyItemGroundingProvenance; citation: StudyItemCitation } {
   if (isSourcePassage(passage)) {
     // The grounding provenance (source_cep | source_mentioned) labels a verified source section.
+    // The caller only reaches here on an established match, so classify is exact|normalized.
+    const match = classifyEvidenceMatch(passage.text, evidenceQuote);
     return {
       provenance: grounding.provenance,
       citation: {
         provenance: "source",
         sourceResourceId: passage.sourceResourceId,
         sourceBlockId: passage.sourceBlockId,
-        evidenceQuote
+        evidenceQuote,
+        matchKind: match === "exact" ? "exact" : "normalized"
       }
     };
   }

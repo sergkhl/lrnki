@@ -70,11 +70,30 @@ test("happy path: four distinct options, one grounded correct, three generated â
   assert.equal(keyed.length, 1);
   assert.equal(keyed[0].provenance, "source");
   assert.ok(keyed[0].citation && keyed[0].citation.provenance === "source");
+  // a byte-exact quote records matchKind: "exact" (grounding fidelity, inspectable)
+  if (keyed[0].citation.provenance === "source") assert.equal(keyed[0].citation.matchKind, "exact");
   // distractors carry no citation and are labeled generated
   for (const opt of result.item.options.filter((o) => !o.isCorrect)) {
     assert.equal(opt.provenance, "generated");
     assert.equal(opt.citation, undefined);
   }
+});
+
+test("a quote matching only after normalization records matchKind: normalized", () => {
+  const grounding: OptionSelectGrounding = {
+    ...sourceGrounding(),
+    passages: [{ passageId: "blk-1", text: "A **heap** allocates memory at runtime.", sourceResourceId: "src-1", sourceBlockId: "blk-1" }]
+  };
+  const result = validateOptionSelectItem(
+    draftOf([correct, distractor("Stack"), distractor("Register"), distractor("Cache")]),
+    grounding,
+    sequentialIds()
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const keyed = result.item.options.find((o) => o.isCorrect)!;
+  assert.ok(keyed.citation && keyed.citation.provenance === "source");
+  if (keyed.citation.provenance === "source") assert.equal(keyed.citation.matchKind, "normalized");
 });
 
 test("AE4: duplicate normalized option text â†’ reject", () => {

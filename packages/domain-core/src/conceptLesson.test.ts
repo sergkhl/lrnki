@@ -42,7 +42,8 @@ test("a source-cited definition section reuses the source citation arm", () => {
     provenance: "source",
     sourceResourceId: "res-1",
     sourceBlockId: "block-7",
-    evidenceQuote: "Ownership is Rust's most unique feature."
+    evidenceQuote: "Ownership is Rust's most unique feature.",
+    matchKind: "exact"
   };
   const definition: ConceptLessonSection = {
     kind: "definition",
@@ -76,7 +77,8 @@ test("a minimal valid lesson carries gist + application + one substantive sectio
           provenance: "source",
           sourceResourceId: "res-1",
           sourceBlockId: "block-1",
-          evidenceQuote: "Ownership governs which binding frees a value."
+          evidenceQuote: "Ownership governs which binding frees a value.",
+          matchKind: "exact"
         }
       },
       { kind: "applications", text: "Move semantics build on ownership.", groundingProvenance: "generated" }

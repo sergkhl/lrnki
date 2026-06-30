@@ -36,7 +36,8 @@ function detail(operationId: string, operationType: OperationType, stages: Array
       durationMs,
       ok: durationMs === null ? null : true,
       progressDone: null,
-      progressTotal: null
+      progressTotal: null,
+      errorDetail: null
     }))
   };
 }

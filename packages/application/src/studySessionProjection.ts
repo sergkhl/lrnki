@@ -48,6 +48,9 @@ export type ConceptLessonSectionView = {
   // True when the section verified verbatim against a source block; the card shows a distinct
   // `source` vs `generated` badge from this.
   isSourceCited: boolean;
+  // For a source-cited section: whether the quote traced byte-exact or only after formatting
+  // normalization (grounding fidelity). Absent on a generated section.
+  matchKind?: "exact" | "normalized";
   diagram?: { caption: string; spec: string };
 };
 
@@ -76,6 +79,7 @@ export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
       text: section.text,
       groundingProvenance: section.groundingProvenance,
       isSourceCited: section.citation?.provenance === "source",
+      ...(section.citation?.provenance === "source" ? { matchKind: section.citation.matchKind } : {}),
       ...(section.diagram ? { diagram: section.diagram } : {})
     }))
   };
