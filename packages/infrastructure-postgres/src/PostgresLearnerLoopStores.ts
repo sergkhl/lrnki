@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, LessonAbsentNode, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
+import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, ImpostorItem, ImpostorStatement, LessonAbsentNode, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
 import type { CalibrationVerdictStorePort, ConceptLessonStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
@@ -21,7 +21,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
     const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
-    for (const item of studyItems) assertPersistableOptionSelectItem(item);
+    for (const item of studyItems) assertPersistableItem(item);
     // All items in one persist belong to a single enrichment layer. Regeneration is
     // replay, not mutation: delete the enrichment's prior items (options + citations
     // cascade) and prior rejections, then re-insert. Done even when 0 items survive so an
@@ -31,20 +31,26 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       await tx`DELETE FROM rejected_study_items WHERE enrichment_id = ${enrichmentId}`;
       for (const rejection of rejected) {
         await tx`
-          INSERT INTO rejected_study_items (rejected_study_item_id, graph_version_id, enrichment_id, derived_node_id, reason, config_hash)
-          VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${rejection.derivedNodeId}, ${rejection.reason}, ${configHash})`;
+          INSERT INTO rejected_study_items (rejected_study_item_id, graph_version_id, enrichment_id, derived_node_id, item_type, reason, config_hash)
+          VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${rejection.derivedNodeId}, ${rejection.itemType}, ${rejection.reason}, ${configHash})`;
       }
       for (const item of studyItems) {
         await tx`
           INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
           VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.generatingModel}, ${item.configHash})`;
 
-        // Sequential await keeps the option/citation inserts ordered within the tx.
-        for (const [ordinal, option] of item.options.entries()) {
-          await tx`
-            INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
-            VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
-          if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
+        // Sequential await keeps the per-item child inserts ordered within the tx.
+        if (item.itemType === "option_select") {
+          for (const [ordinal, option] of item.options.entries()) {
+            await tx`
+              INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
+              VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
+            if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
+          }
+        } else {
+          for (const statement of item.statements) {
+            await this.insertImpostorStatement(tx, item, statement);
+          }
         }
       }
 
@@ -74,6 +80,31 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     }
   }
 
+  // Insert one impostor statement row. A truth carries its inline citation (source or
+  // generated); the impostor carries no citation and, alone, the item's reveal / lie_source /
+  // sibling_label. The DB CHECK rejects any other column shape (the structural honesty
+  // backstop behind the guard) — a source-cited impostor is unrepresentable.
+  private async insertImpostorStatement(tx: Sql | TransactionSql, item: ImpostorItem, statement: ImpostorStatement): Promise<void> {
+    if (statement.isImpostor) {
+      const siblingLabel = item.lieSource === "sibling" ? (item.siblingLabel ?? null) : null;
+      await tx`
+        INSERT INTO impostor_statements (impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, reveal_text, lie_source, sibling_label)
+        VALUES (${statement.statementId}, ${item.studyItemId}, ${statement.ordinal}, ${statement.text}, true, 'generated', ${item.reveal}, ${item.lieSource}, ${siblingLabel})`;
+      return;
+    }
+    const citation = statement.citation;
+    if (!citation) throw new Error(`impostor truth ${statement.statementId} must carry a citation.`);
+    if (citation.provenance === "source") {
+      await tx`
+        INSERT INTO impostor_statements (impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, source_resource_id, source_block_id, evidence_quote, match_kind)
+        VALUES (${statement.statementId}, ${item.studyItemId}, ${statement.ordinal}, ${statement.text}, false, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote}, ${citation.matchKind})`;
+    } else {
+      await tx`
+        INSERT INTO impostor_statements (impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, derived_node_id, generated_passage_text)
+        VALUES (${statement.statementId}, ${item.studyItemId}, ${statement.ordinal}, ${statement.text}, false, 'generated', ${citation.derivedNodeId}, ${citation.passageText})`;
+    }
+  }
+
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
@@ -86,7 +117,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
-      FROM study_items WHERE enrichment_id = ${enrichmentId} AND item_type = 'option_select' ORDER BY derived_node_id, item_type`;
+      FROM study_items WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
 
@@ -99,14 +130,27 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   private async hydrate(rows: StudyItemRow[]): Promise<StudyItem[]> {
     if (rows.length === 0) return [];
     const ids = rows.map((row) => row.study_item_id);
-    const citationRows = await this.sql<CitationRow[]>`
-      SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
-      FROM study_item_citations WHERE study_item_id IN ${this.sql(ids)}
-      ORDER BY study_item_id, study_item_citation_id`;
-    const optionRows = await this.sql<OptionRow[]>`
-      SELECT option_id, study_item_id, ordinal, option_text, is_correct, provenance
-      FROM study_item_options WHERE study_item_id IN ${this.sql(ids)}
-      ORDER BY study_item_id, ordinal`;
+    const optionSelectIds = rows.filter((row) => row.item_type === "option_select").map((row) => row.study_item_id);
+    const impostorIds = rows.filter((row) => row.item_type === "impostor").map((row) => row.study_item_id);
+
+    const citationRows = optionSelectIds.length
+      ? await this.sql<CitationRow[]>`
+        SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
+        FROM study_item_citations WHERE study_item_id IN ${this.sql(optionSelectIds)}
+        ORDER BY study_item_id, study_item_citation_id`
+      : [];
+    const optionRows = optionSelectIds.length
+      ? await this.sql<OptionRow[]>`
+        SELECT option_id, study_item_id, ordinal, option_text, is_correct, provenance
+        FROM study_item_options WHERE study_item_id IN ${this.sql(optionSelectIds)}
+        ORDER BY study_item_id, ordinal`
+      : [];
+    const statementRows = impostorIds.length
+      ? await this.sql<ImpostorStatementRow[]>`
+        SELECT impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text, reveal_text, lie_source, sibling_label
+        FROM impostor_statements WHERE study_item_id IN ${this.sql(impostorIds)}
+        ORDER BY study_item_id, ordinal`
+      : [];
 
     const citationsByItem = new Map<string, CitationRow[]>();
     for (const citation of citationRows) {
@@ -116,8 +160,12 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     for (const option of optionRows) {
       optionsByItem.set(option.study_item_id, [...(optionsByItem.get(option.study_item_id) ?? []), option]);
     }
+    const statementsByItem = new Map<string, ImpostorStatementRow[]>();
+    for (const statement of statementRows) {
+      statementsByItem.set(statement.study_item_id, [...(statementsByItem.get(statement.study_item_id) ?? []), statement]);
+    }
 
-    return rows.map((row) => {
+    return rows.map((row): StudyItem => {
       const base = {
         studyItemId: row.study_item_id,
         graphVersionId: row.graph_version_id,
@@ -128,6 +176,19 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         configHash: row.config_hash,
         question: row.question
       };
+      if (row.item_type === "impostor") {
+        const statementRowsForItem = statementsByItem.get(row.study_item_id) ?? [];
+        const statements: ImpostorStatement[] = statementRowsForItem.map(toImpostorStatement);
+        const impostorRow = statementRowsForItem.find((statement) => statement.is_impostor);
+        return {
+          ...base,
+          itemType: "impostor",
+          statements,
+          reveal: impostorRow?.reveal_text ?? "",
+          lieSource: (impostorRow?.lie_source ?? "generated") as ImpostorItem["lieSource"],
+          ...(impostorRow?.sibling_label ? { siblingLabel: impostorRow.sibling_label } : {})
+        };
+      }
       const citations = (citationsByItem.get(row.study_item_id) ?? []).map(toCitation);
       const citation = citations[0];
       const options: StudyItemOption[] = (optionsByItem.get(row.study_item_id) ?? []).map((option) => ({
@@ -142,12 +203,25 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   }
 }
 
-function assertPersistableOptionSelectItem(item: StudyItem): void {
-  if (item.itemType !== "option_select") throw new Error(`unsupported study item type: ${String(item.itemType)}`);
-  if (item.options.length !== 4) throw new Error(`option_select ${item.studyItemId} must have exactly four options.`);
-  const correctOptions = item.options.filter((option) => option.isCorrect);
-  if (correctOptions.length !== 1) throw new Error(`option_select ${item.studyItemId} must have exactly one correct option.`);
-  if (!correctOptions[0].citation) throw new Error(`option_select ${item.studyItemId} correct option must carry a citation.`);
+// Defense-in-depth structural assert before persist (the guard already validated). Dispatches
+// on item type; the DB CHECKs are the final backstop.
+function assertPersistableItem(item: StudyItem): void {
+  if (item.itemType === "option_select") {
+    if (item.options.length !== 4) throw new Error(`option_select ${item.studyItemId} must have exactly four options.`);
+    const correctOptions = item.options.filter((option) => option.isCorrect);
+    if (correctOptions.length !== 1) throw new Error(`option_select ${item.studyItemId} must have exactly one correct option.`);
+    if (!correctOptions[0].citation) throw new Error(`option_select ${item.studyItemId} correct option must carry a citation.`);
+    return;
+  }
+  if (item.itemType === "impostor") {
+    if (item.statements.length !== 4) throw new Error(`impostor ${item.studyItemId} must have exactly four statements.`);
+    const impostors = item.statements.filter((statement) => statement.isImpostor);
+    if (impostors.length !== 1) throw new Error(`impostor ${item.studyItemId} must have exactly one impostor statement.`);
+    if (impostors[0].citation) throw new Error(`impostor ${item.studyItemId} impostor statement must carry no citation.`);
+    if (item.statements.some((statement) => !statement.isImpostor && !statement.citation)) throw new Error(`impostor ${item.studyItemId} truths must each carry a citation.`);
+    return;
+  }
+  throw new Error(`unsupported study item type: ${String((item as { itemType?: string }).itemType)}`);
 }
 
 function toCitation(row: CitationRow): StudyItemCitation {
@@ -156,9 +230,25 @@ function toCitation(row: CitationRow): StudyItemCitation {
     : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
 }
 
+function toImpostorStatement(row: ImpostorStatementRow): ImpostorStatement {
+  const citation: StudyItemCitation | undefined = row.is_impostor
+    ? undefined
+    : row.provenance === "source"
+      ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote!, matchKind: row.match_kind! }
+      : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
+  return {
+    statementId: row.impostor_statement_id,
+    ordinal: row.ordinal,
+    text: row.statement_text,
+    isImpostor: row.is_impostor,
+    provenance: row.provenance,
+    ...(citation ? { citation } : {})
+  };
+}
+
 type StudyItemRow = {
   study_item_id: string;
-  item_type: "option_select";
+  item_type: StudyItemType;
   graph_version_id: string;
   enrichment_id: string;
   derived_node_id: string;
@@ -186,6 +276,24 @@ type CitationRow = {
   match_kind: "exact" | "normalized" | null;
   derived_node_id: string | null;
   generated_passage_text: string | null;
+};
+
+type ImpostorStatementRow = {
+  impostor_statement_id: string;
+  study_item_id: string;
+  ordinal: number;
+  statement_text: string;
+  is_impostor: boolean;
+  provenance: "source" | "generated";
+  source_resource_id: string | null;
+  source_block_id: string | null;
+  evidence_quote: string | null;
+  match_kind: "exact" | "normalized" | null;
+  derived_node_id: string | null;
+  generated_passage_text: string | null;
+  reveal_text: string | null;
+  lie_source: "sibling" | "generated" | null;
+  sibling_label: string | null;
 };
 
 const CONCEPT_LESSON_PRODUCER = "@lrnki/infrastructure-postgres";
