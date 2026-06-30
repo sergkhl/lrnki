@@ -394,13 +394,14 @@ JSON_TABLE(
 ) AS n
 WHERE a.artifact_type = 'enrichment_run';
 
--- Flatten study-item-bank artifact payloads: one row per option-select Study Item with its
--- derived node, grounding provenance, question, and option count, for Admin Lab inspection (R7, R15). Reads
--- the immutable `study_item_bank` artifact the Study Item Bank store writes beside its
--- normalized rows.
+-- Flatten study-item-bank artifact payloads: one row per Study Item with its derived node,
+-- grounding provenance, question, and per-type count, for Admin Lab inspection (R7, R15).
+-- `option_count` is null for impostor rows and `statement_count` is null for option-select
+-- rows — JSON_TABLE returns null when the path is absent. Reads the immutable
+-- `study_item_bank` artifact the Study Item Bank store writes beside its normalized rows.
 CREATE VIEW artifact_study_items AS
 SELECT a.graph_version_id, si.study_item_id, si.item_type, si.enrichment_id, si.derived_node_id,
-       si.grounding_provenance, si.question, si.option_count
+       si.grounding_provenance, si.question, si.option_count, si.statement_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -412,7 +413,8 @@ JSON_TABLE(
     derived_node_id text PATH '$.derivedNodeId',
     grounding_provenance text PATH '$.groundingProvenance',
     question text PATH '$.question',
-    option_count integer PATH '$.options.size()'
+    option_count integer PATH '$.options.size()',
+    statement_count integer PATH '$.statements.size()'
   )
 ) AS si
 WHERE a.artifact_type = 'study_item_bank';
@@ -639,7 +641,7 @@ CREATE TABLE learner_path_steps (
 
 CREATE TABLE study_items (
   study_item_id uuid PRIMARY KEY,
-  item_type text NOT NULL CHECK (item_type IN ('option_select')),
+  item_type text NOT NULL CHECK (item_type IN ('option_select', 'impostor')),
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
@@ -696,19 +698,77 @@ CREATE TABLE study_item_citations (
   )
 );
 
--- Derived nodes that yielded NO study item at all (no usable grounding), recorded as a
--- durable fact (not a transient log line). Regeneration replaces an
--- enrichment's rejections alongside its items. The no-item frontier fallback reads
--- `reason` instead of guessing from grounding origin.
+-- Statements for impostor items (R1, KTD5). Four rows per item: three truths and exactly
+-- one planted lie (the impostor). A truth carries inline provenance + a verified citation
+-- mirroring study_item_citations; the impostor is `generated` and carries NO citation —
+-- never a source quote (R5/R8). The impostor row, and only it, carries the reveal /
+-- lie_source / sibling_label (denormalized onto the lie's row). One CHECK enforces the
+-- three legal column shapes, so a source-cited impostor is unrepresentable — the structural
+-- honesty backstop behind the application guard (U4). Cascade so item regeneration
+-- (delete-then-insert) clears statements too.
+CREATE TABLE impostor_statements (
+  impostor_statement_id uuid PRIMARY KEY,
+  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
+  ordinal integer NOT NULL CHECK (ordinal BETWEEN 0 AND 3),
+  statement_text text NOT NULL,
+  is_impostor boolean NOT NULL,
+  provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
+  -- Inline citation columns mirroring study_item_citations (a truth's grounding).
+  source_resource_id uuid REFERENCES source_resources(source_resource_id),
+  source_block_id uuid REFERENCES source_blocks(source_block_id),
+  evidence_quote text,
+  match_kind text CHECK (match_kind IN ('exact', 'normalized')),
+  derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  generated_passage_text text,
+  -- Impostor-row-only metadata (NULL on every truth).
+  reveal_text text,
+  lie_source text CHECK (lie_source IN ('sibling', 'generated')),
+  sibling_label text,
+  CHECK (
+    -- Source-grounded truth: a verbatim source citation, no generated/impostor columns.
+    (is_impostor = false AND provenance = 'source'
+       AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND match_kind IS NOT NULL
+       AND derived_node_id IS NULL AND generated_passage_text IS NULL
+       AND reveal_text IS NULL AND lie_source IS NULL AND sibling_label IS NULL)
+    OR
+    -- Generated-origin truth: a generated citation, no source/impostor columns.
+    (is_impostor = false AND provenance = 'generated'
+       AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND match_kind IS NULL
+       AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL
+       AND reveal_text IS NULL AND lie_source IS NULL AND sibling_label IS NULL)
+    OR
+    -- The impostor: `generated`, NO citation at all, carries the reveal + lie_source;
+    -- sibling_label present iff the lie was a mis-attributed sibling fact.
+    (is_impostor = true AND provenance = 'generated'
+       AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND match_kind IS NULL
+       AND derived_node_id IS NULL AND generated_passage_text IS NULL
+       AND reveal_text IS NOT NULL AND lie_source IS NOT NULL
+       AND (sibling_label IS NOT NULL) = (lie_source = 'sibling'))
+  ),
+  UNIQUE (study_item_id, ordinal)
+);
+
+-- Exactly one impostor per item (the keyed lie). The application guard enforces the full
+-- four-statements-one-impostor shape; this partial unique index is the structural backstop.
+CREATE UNIQUE INDEX impostor_statements_one_impostor_per_item
+  ON impostor_statements (study_item_id)
+  WHERE is_impostor;
+
+-- Derived nodes that yielded NO study item of a given type (no usable grounding), recorded
+-- as a durable fact (not a transient log line). Keyed per `item_type` (KTD8) so a node can
+-- be impostor-absent independently of having an option-select item. Regeneration replaces an
+-- enrichment's rejections alongside its items. The no-item frontier fallback reads `reason`
+-- instead of guessing from grounding origin.
 CREATE TABLE rejected_study_items (
   rejected_study_item_id uuid PRIMARY KEY,
   graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  item_type text NOT NULL CHECK (item_type IN ('option_select', 'impostor')),
   reason text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (derived_node_id)
+  UNIQUE (derived_node_id, item_type)
 );
 
 -- ---------------------------------------------------------------------------
