@@ -34,14 +34,11 @@ export function cutWeakEdges(edges: Edge[], minConfidence: number): { kept: Edge
   return { kept, cut };
 }
 
-// Acyclicity verifier (plan U3, KTD4, R9/R12). Returns one cycle's edges as an ordered
-// path (deterministic DFS back-edge detection over sorted input), or null if the graph
-// is acyclic. This is the PROVABLE structural guarantee in the deterministic envelope:
-// the application calls it to decide whether to issue the one corrective re-prompt and to
-// frame the violating cycle, and to route a still-cyclic edge set to `uncertain` (R11).
-// No edge is ever dropped here — disposal of a stubborn cycle is the application's routing
-// decision (rules 16/19). The sorted-input DFS makes the SAME edge set always yield the
-// SAME violating cycle, so a replayed enrichment re-derives an identical re-prompt.
+// Acyclicity verifier. Returns one cycle's edges as an ordered path (deterministic DFS
+// back-edge detection over sorted input), or null if the graph is acyclic. No edge is ever
+// dropped here: the consensus-ordering module routes aggregate-cycle edges to `uncertain`
+// and removes them from the certain set. The sorted-input DFS makes the SAME edge set
+// always yield the SAME violating cycle, so replayed enrichment re-derives the same route.
 export function findCycleEdges(edges: Edge[]): Edge[] | null {
   const adj = new Map<string, Edge[]>();
   const nodes = new Set<string>();

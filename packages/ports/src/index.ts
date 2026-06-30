@@ -281,11 +281,11 @@ export interface SourceObjectStoragePort {
 // non-deterministic distribution (ADR-0028). `order` is a thin single-call caller: the
 // APPLICATION invokes it K times on the SAME input and tallies a per-pair directional vote
 // (D1/D2), so this method neither knows K nor aggregates. Each node is listed with its CEP
-// evidence; each edge cites its endpoints by EXACT canonical label, which the application
-// maps → derivedNodeIds fail-closed (KTD3, R9). The judge proposes directed edges only; the
-// boundary derives consensus confidence, routes direction-contested pairs and aggregate
-// cycles to `uncertain` (D3/D6, rules 16/19), and runs the symbolic disposal (weak-cut →
-// transitive reduction) over the consensus certain edges. There is no corrective re-prompt
+// evidence; each edge cites endpoints by the listed 1-based Concept number, which the
+// application maps by position to derivedNodeIds fail-closed (KTD3, R9). The judge proposes
+// directed edges only; the boundary derives consensus confidence, routes
+// direction-contested pairs and aggregate cycles to `uncertain` (D3/D6, rules 16/19), and
+// runs symbolic disposal over the consensus certain edges. There is no corrective re-prompt
 // (KTD4, rule 18): acyclicity is enforced on the aggregate, not by re-prompting one draw.
 export interface PrerequisiteOrderingPort {
   readonly model: string;

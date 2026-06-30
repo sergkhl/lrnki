@@ -11,12 +11,9 @@ import type {
   MintingDisposition,
   NodeEvidenceExclusion,
   NodeMergeRecord,
-  PairDirectionVote,
   PrerequisiteConceptContext,
-  PrerequisiteOrderingTrace,
   PublishedConceptEvidenceProfile,
-  RescueDisposition,
-  WholeSetOrdering
+  RescueDisposition
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
@@ -38,10 +35,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
-import { cutWeakEdges, findCycleEdges, transitiveReduction } from "./prerequisiteDag";
-import { mapWithConcurrency } from "./mapWithConcurrency";
+import { transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 import { applyRescuedDefinitionQualityJudge } from "./applyRescuedDefinitionQualityJudge";
+import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.8.0";
@@ -116,21 +113,15 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
 // K-SAMPLING the whole-set call: the boundary draws the directed-DAG ordering K times on
 // the SAME input (bounded concurrency) and tallies a per-pair DIRECTIONAL VOTE, because MoE
 // inference is non-deterministic and one draw is one sample from a distribution (ADR-0028,
-// D1/D2). The application boundary owns every PROVABLE guarantee (rules 16/19): it maps each
-// draw's edge labels → ids fail-closed (KTD3, R9), tallies forward/reverse per unordered
-// pair, routes genuinely direction-contested pairs to `uncertain` (D3), and sets each
-// committed edge's confidence to the empirical agreement `max(f,r)/K` (D4). That consensus
-// number feeds the existing weak-edge floor, which therefore becomes a presence quorum for
-// free (D5/KTD2): sub-quorum edges → `weak_cut`. Weak-cut runs BEFORE cycle-routing (KTD5);
-// any aggregate cycle in the strong set is routed WHOLESALE to `uncertain` (kept + flagged +
-// path-excluded, never dropped — R11/KTD3). There is NO corrective re-prompt — acyclicity is
-// enforced on the aggregate, not by re-prompting one draw (KTD4, rule 18). The symbolic
-// helpers then transitively reduce the CERTAIN edges; intrinsic difficulty scores ALL
+// D1/D2). `deriveConsensusOrdering` owns the deterministic consensus envelope: ordinal
+// endpoint resolution, per-pair tallying, direction-contest routing, weak-cut before cycle
+// routing, and trace construction. The symbolic helpers then transitively reduce the
+// CERTAIN edges; intrinsic difficulty scores ALL
 // derived nodes from the same evidence contexts. The asserted core is never touched (R5):
 // no enrichment node is ever published. Node minting + rescue are OPT-IN — when the
 // proposal/grounding ports are omitted the run is anchor-only. Fails the run WITHOUT
 // persistence if any ordering call exhausts the forced-tool retry budget, if an edge
-// cites a label outside the judged set (rule 6), or if a domain blows the token budget
+// cites an ordinal outside the judged set (rule 6), or if a domain blows the token budget
 // (R16, KTD6) — no partial layer is ever persisted.
 export async function runGraphEnrichment(input: {
   enrichmentId: string;
@@ -356,154 +347,25 @@ export async function runGraphEnrichment(input: {
     else byDomain.set(node.declaredDomain, [node]);
   }
 
-  // Step 2 — K-SAMPLED whole-set ordering per domain, then the deterministic envelope
-  // (rules 16/19). Domains are processed in sorted order, and each domain's nodes are sorted
-  // by stable id, so the persisted trace + edge order is replay-deterministic GIVEN a fixed
-  // set of draws (the draws themselves are intentionally non-deterministic — that IS the
-  // measurement, KTD6). For each domain: token-budget guard (R16); K draws of the ordering
-  // call on the SAME input (bounded concurrency, D1); map each draw's labels → ids fail-closed
-  // (R9); tally per-pair forward/reverse votes (D2); route direction-contested pairs to
-  // `uncertain` and commit the rest at consensus confidence max(f,r)/K (D3/D4); weak-cut the
-  // consensus candidates (presence quorum, D5/KTD2) BEFORE cycle-routing any aggregate cycle
-  // to `uncertain` (KTD5/KTD3).
   const K = Math.max(1, Math.trunc(config.orderingSampleCount));
-  const orderingTraces: PrerequisiteOrderingTrace[] = [];
-  const certainEdges: InferredPrerequisiteEdge[] = [];
-  const uncertainEdges: InferredPrerequisiteEdge[] = [];
-  const weakEdges: InferredPrerequisiteEdge[] = [];
-  await runStage(STAGE_TAGS.prerequisiteOrdering, async () => {
-    for (const [declaredDomain, members] of [...byDomain.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
-      const sorted = [...members].sort((a, b) => a.derivedNodeId.localeCompare(b.derivedNodeId));
-      // A singleton (or empty) domain has no possible relation: no ordering draw, empty trace.
-      if (sorted.length < 2) {
-        orderingTraces.push({ declaredDomain, judgeModel: input.prerequisiteOrdering.model, nodeCount: sorted.length, k: 0, pairVotes: [], cycleRoutedEdges: [] });
-        continue;
-      }
-      const contexts = sorted.map((node) => node.context);
-
-      // KTD6/R16 token-budget guard: a coarse char proxy for the assembled prompt; fail
-      // closed (no partial layer) when one domain would blow the budget. No chunking.
-      const promptChars = estimatePromptChars(declaredDomain, contexts);
-      if (promptChars > config.maxDomainPromptChars) {
-        throw new Error(`runGraphEnrichment: domain "${declaredDomain}" assembled ordering prompt (~${promptChars} chars) exceeds the budget (${config.maxDomainPromptChars}); failing closed without a partial layer (R16).`);
-      }
-
-      // The judge cites endpoints by the 1-based Concept number shown in the prompt, which
-      // is `sorted`'s position (KTD3). Resolution is a deterministic array lookup — no string
-      // matching, no synonym drift surface. The per-call validator already bounds the index to
-      // [1, N] and rejects equal endpoints, but this deterministic boundary owns the provable
-      // guarantee: an out-of-range or self-referential number is rejected fail-closed (rule 6).
-      const mapDraw = (ordering: WholeSetOrdering): { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string; rationale: string }[] =>
-        ordering.edges.map((edge) => {
-          const prerequisite = sorted[edge.prerequisiteNumber - 1];
-          const dependent = sorted[edge.dependentNumber - 1];
-          if (!prerequisite || !dependent) {
-            throw new Error(`runGraphEnrichment: ordering edge cites a number outside the listed concepts of domain "${declaredDomain}" (${edge.prerequisiteNumber} → ${edge.dependentNumber}, of ${sorted.length}); failing closed (rule 6).`);
-          }
-          if (prerequisite.derivedNodeId === dependent.derivedNodeId) {
-            throw new Error(`runGraphEnrichment: ordering edge names one concept as its own prerequisite in domain "${declaredDomain}" (number ${edge.prerequisiteNumber}); failing closed (rule 6).`);
-          }
-          return { prerequisiteDerivedNodeId: prerequisite.derivedNodeId, dependentDerivedNodeId: dependent.derivedNodeId, rationale: edge.rationale };
-        });
-
-      // K independent draws on the SAME frozen input (D1). mapWithConcurrency preserves
-      // INPUT order in the result regardless of completion order, so the tally below — fed in
-      // draw index order — is replay-deterministic for a fixed set of draws (KTD1). A draw
-      // that throws (forced-tool budget exhausted) aborts the whole run before persistence.
-      const draws = await mapWithConcurrency(
-        Array.from({ length: K }),
-        K,
-        () => input.prerequisiteOrdering.order({ declaredDomain, nodes: contexts }).then(mapDraw)
-      );
-
-      // Tally a per-pair directional vote across the K draws (D2). The pair is keyed on the
-      // sorted id pair (orientation-free); within a single draw a directed edge counts once,
-      // but BOTH directions may count if a draw is self-contradictory (signal, not error).
-      type Tally = { u: string; v: string; uToV: number; vToU: number; uToVRationale?: string; vToURationale?: string };
-      const tally = new Map<string, Tally>();
-      for (const draw of draws) {
-        const seen = new Set<string>();
-        for (const e of draw) {
-          const directed = `${e.prerequisiteDerivedNodeId}->${e.dependentDerivedNodeId}`;
-          if (seen.has(directed)) continue;
-          seen.add(directed);
-          const forwardOriented = e.prerequisiteDerivedNodeId < e.dependentDerivedNodeId;
-          const u = forwardOriented ? e.prerequisiteDerivedNodeId : e.dependentDerivedNodeId;
-          const v = forwardOriented ? e.dependentDerivedNodeId : e.prerequisiteDerivedNodeId;
-          const key = `${u}::${v}`;
-          let t = tally.get(key);
-          if (!t) { t = { u, v, uToV: 0, vToU: 0 }; tally.set(key, t); }
-          if (e.prerequisiteDerivedNodeId === u) { t.uToV += 1; t.uToVRationale ??= e.rationale; }
-          else { t.vToU += 1; t.vToURationale ??= e.rationale; }
-        }
-      }
-
-      // Classify each voted pair (deterministic, sorted by key): direction-contested →
-      // `uncertain` (D3); else a consensus certain candidate at confidence max(f,r)/K (D4).
-      const pairVotes: PairDirectionVote[] = [];
-      const certainCandidates: InferredPrerequisiteEdge[] = [];
-      for (const key of [...tally.keys()].sort((a, b) => a.localeCompare(b))) {
-        const t = tally.get(key)!;
-        const majorityIsUtoV = t.uToV >= t.vToU; // tie → canonical u→v, deterministic
-        const forward = majorityIsUtoV ? t.uToV : t.vToU;
-        const reverse = majorityIsUtoV ? t.vToU : t.uToV;
-        const prerequisiteDerivedNodeId = majorityIsUtoV ? t.u : t.v;
-        const dependentDerivedNodeId = majorityIsUtoV ? t.v : t.u;
-        const consensusConfidence = forward / K;
-        const contested = reverse / K >= config.directionContestMinorityFraction;
-        const classification = contested ? "direction_contested" : "consensus";
-        pairVotes.push({ prerequisiteDerivedNodeId, dependentDerivedNodeId, forward, reverse, k: K, consensusConfidence, classification });
-        // A deterministic, human-readable representative rationale + the vote summary (the
-        // structured counts live in pairVotes); the winning-direction rationale is preferred.
-        const winningRationale = (majorityIsUtoV ? t.uToVRationale ?? t.vToURationale : t.vToURationale ?? t.uToVRationale) ?? "";
-        const judgmentRationale = `${winningRationale} [consensus ${forward}/${K} forward, ${reverse}/${K} reverse]`.trim();
-        const edge: InferredPrerequisiteEdge = {
-          prerequisiteDerivedNodeId,
-          dependentDerivedNodeId,
-          predicate: "inferred-prerequisite-of",
-          confidence: consensusConfidence,
-          uncertain: contested,
-          provenance: { judgmentRationale }
-        };
-        (contested ? uncertainEdges : certainCandidates).push(edge);
-      }
-
-      // Presence quorum (D5/KTD2): weak-cut the consensus candidates BEFORE cycle-routing
-      // (KTD5) so one sub-quorum edge cannot force a strong, otherwise-acyclic core into
-      // `uncertain`. Sub-quorum edges are recorded `weak_cut`, never committed.
-      const { kept: strong, cut: weak } = cutWeakEdges(certainCandidates, config.minEdgeConfidence);
-      weakEdges.push(...weak);
-
-      // Cycle-route any aggregate cycle in the strong set wholesale to `uncertain` (KTD3):
-      // the K-aggregate is assembled from independent pairwise winners, so a multi-node cycle
-      // (A→B→C→A) can survive even when no single pair flipped. Iterate until the certain set
-      // is provably acyclic; flipped edges are kept + flagged, never dropped (R11).
-      const cycleRoutedEdges: { prerequisiteDerivedNodeId: string; dependentDerivedNodeId: string }[] = [];
-      let strongEdges = strong;
-      for (;;) {
-        const cycle = findCycleEdges(strongEdges);
-        if (!cycle) break;
-        const cycleKeys = new Set(cycle.map(edgeId));
-        for (const e of strongEdges) {
-          if (cycleKeys.has(edgeId(e))) {
-            uncertainEdges.push({ ...e, uncertain: true });
-            cycleRoutedEdges.push({ prerequisiteDerivedNodeId: e.prerequisiteDerivedNodeId, dependentDerivedNodeId: e.dependentDerivedNodeId });
-          }
-        }
-        strongEdges = strongEdges.filter((e) => !cycleKeys.has(edgeId(e)));
-      }
-      certainEdges.push(...strongEdges);
-
-      orderingTraces.push({
+  const {
+    orderings: orderingTraces,
+    certainEdges,
+    uncertainEdges,
+    weakEdges
+  } = await runStage(STAGE_TAGS.prerequisiteOrdering, () =>
+    deriveConsensusOrdering({
+      domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({
         declaredDomain,
-        judgeModel: input.prerequisiteOrdering.model,
-        nodeCount: sorted.length,
-        k: K,
-        pairVotes,
-        cycleRoutedEdges
-      });
-    }
-  });
+        nodes: members.map((node) => node.context)
+      })),
+      prerequisiteOrdering: input.prerequisiteOrdering,
+      orderingSampleCount: config.orderingSampleCount,
+      directionContestMinorityFraction: config.directionContestMinorityFraction,
+      minEdgeConfidence: config.minEdgeConfidence,
+      maxDomainPromptChars: config.maxDomainPromptChars
+    })
+  );
 
   // Step 3 — symbolic reduction over the acyclic CERTAIN edges (symbolic constrains). Pure
   // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
@@ -607,25 +469,6 @@ function deterministicUuid(...parts: string[]): string {
 // excluded from the ordering input and recorded once (R4).
 const hasEvidence = (context: PrerequisiteConceptContext): boolean =>
   context.definitions.length > 0 || context.mentions.length > 0;
-
-// Stable directed-edge key for cycle-routing set membership.
-const edgeId = (edge: Pick<InferredPrerequisiteEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">): string =>
-  `${edge.prerequisiteDerivedNodeId}->${edge.dependentDerivedNodeId}`;
-
-// Coarse char proxy for the assembled whole-set ordering prompt of one domain (KTD6,
-// R16). Not a tokenizer — a deterministic upper-bound-ish estimate over the rendered node
-// evidence; the fail-LOUD budget guard is the contract, the exact threshold is tuned in U7.
-function estimatePromptChars(declaredDomain: string, contexts: PrerequisiteConceptContext[]): number {
-  let chars = declaredDomain.length;
-  for (const context of contexts) {
-    chars += context.canonicalLabel.length;
-    for (const alias of context.aliases) chars += alias.length;
-    for (const definition of context.definitions) chars += definition.length;
-    for (const mention of context.mentions) chars += mention.length;
-    for (const assertion of context.assertions) chars += assertion.type.length + assertion.detail.length;
-  }
-  return chars;
-}
 
 // Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor
 // uses its published CEP (verbatim definition + bounded mention quotes + LABELED

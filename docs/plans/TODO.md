@@ -33,6 +33,16 @@
 
 ## COMPLETED
 
+- **Graph Enrichment consensus-ordering module.** The K-sampled whole-set ordering envelope moved
+  behind `deriveConsensusOrdering`: stable domain/node sorting, prompt-budget fail-closed behavior,
+  ordinal endpoint resolution, per-pair tallies, direction-contest routing, weak-cut-before-cycle
+  routing, aggregate-cycle routing, and ordering trace construction now have a direct module test
+  surface. `runGraphEnrichment` keeps node preparation, symbolic transitive reduction, difficulty,
+  persistence, and Operation Timeline lifecycle; the package barrel remains unchanged. Decisions:
+  [ADR-0001](../adr/0001-adopt-greenfield-deep-module-architecture.md),
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md), and
+  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
+
 - **Concept Lesson teaching substrate.** Every derived node now carries an ordered, source-grounded
   Concept Lesson (gist → intuition → definition → examples → graph-aware applications → formulas)
   generated in the `study_items` operation before the option-select stage and persisted as a
@@ -185,6 +195,27 @@
   (`LIFO`→`Stack`) missed an exact label match and aborted whole runs.
 
 ## VALIDATION
+
+- **Graph Enrichment consensus-ordering module, 2026-06-29 (branch
+  `feat/concept-lesson-teaching-surface`).** Deterministic checks passed:
+  `pnpm --filter @lrnki/application typecheck`,
+  `pnpm --filter @lrnki/application test`, direct
+  `pnpm --filter @lrnki/application exec tsx --test src/deriveConsensusOrdering.test.ts`,
+  full `pnpm run typecheck`, full `pnpm run test`, and `pnpm run lint` (0 errors; 2 pre-existing
+  warnings outside this diff). Direct module coverage exercises K draws,
+  singleton traces, stable ordering inputs, consensus confidence, direction contests, weak-cut,
+  weak-cut-before-cycle-routing, aggregate-cycle routing, replay determinism, prompt budget failure,
+  out-of-range ordinal failure, and self-edge failure. Real-use quality evaluation: fresh production
+  enrichment `16337f3e-1645-4636-a5e9-1b7fbe7884b7` over curated Rust graph version `d1e845d2` used
+  real model calls and persisted 7 anchors / 19 enrichment nodes, 28 certain / 10 uncertain edges,
+  one ordering trace for `software engineering` with `k=8`, 83 pair votes, 10 direction-contested
+  votes, 39 weak-cut dispositions, and 0 cycle-routed edges. The asserted graph stayed at 7 published
+  concepts; no weak-cut edge was committed. A learner path
+  (`4167d313-8771-4dae-9319-7199af24c009`) for target `499508fb` produced 8 prerequisite steps, all
+  reachable through certain edges only. Operation Timeline stage names remained the expected fine
+  enrichment tags through `prerequisite-ordering`, `symbolic-disposal`, `intrinsic-difficulty`, and
+  `persist`. Result: PASS. Trail:
+  `tmp/2026-06-29-consensus-ordering-real-use-enrich.log`.
 
 - **Concept Lesson teaching substrate U1–U9, 2026-06-29 (branch
   `feat/concept-lesson-teaching-surface`).** Full workspace typecheck green; recursive tests green
