@@ -129,7 +129,6 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   private async hydrate(rows: StudyItemRow[]): Promise<StudyItem[]> {
     if (rows.length === 0) return [];
-    const ids = rows.map((row) => row.study_item_id);
     const optionSelectIds = rows.filter((row) => row.item_type === "option_select").map((row) => row.study_item_id);
     const impostorIds = rows.filter((row) => row.item_type === "impostor").map((row) => row.study_item_id);
 

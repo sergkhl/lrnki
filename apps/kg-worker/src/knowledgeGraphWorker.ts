@@ -640,12 +640,18 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
   });
   console.log(`   lessons=${result.lessons.length} lessonAbsent=${result.lessonAbsent.length} items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
   for (const item of result.studyItems) {
-    const correct = item.options.find((option) => option.isCorrect);
-    const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
-    console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
+    if (item.itemType === "option_select") {
+      const correct = item.options.find((option) => option.isCorrect);
+      const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
+      console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
+    } else {
+      const impostor = item.statements.find((statement) => statement.isImpostor);
+      const truths = item.statements.filter((statement) => !statement.isImpostor).map((statement) => statement.text);
+      console.log(`   impostor[${item.derivedNodeId}] provenance=${item.groundingProvenance} lieSource=${item.lieSource}${item.siblingLabel ? ` sibling=${item.siblingLabel}` : ""}\n     Q: ${item.question}\n     lie: ${impostor?.text}\n     truths: ${truths.join(" | ")}\n     reveal: ${item.reveal}`);
+    }
   }
   for (const rejected of result.rejected) {
-    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}): ${rejected.reason}`);
+    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}) [${rejected.itemType}]: ${rejected.reason}`);
   }
 }
 
