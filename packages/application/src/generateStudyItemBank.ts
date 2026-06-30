@@ -22,6 +22,7 @@ import { assembleConceptLesson } from "./assembleConceptLesson";
 // the seam without an architectural change. The per-node units are independent and the
 // shared helper preserves input order, so the persisted item order is unchanged.
 export const DEFAULT_STUDY_ITEM_CONCURRENCY = 1;
+export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
 
 export type { RejectedStudyItem };
 
@@ -160,7 +161,7 @@ export async function generateStudyItemBank(input: {
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no option-select item: concept lesson is absent for this node" }] };
     }
-    const grounding = optionSelectGroundingFromLesson(lesson);
+    const grounding = optionSelectGroundingFromLesson(lesson, node);
     if (!grounding) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no option-select item: the lesson has no grounded sections to anchor an item" }] };
     }
@@ -168,34 +169,37 @@ export async function generateStudyItemBank(input: {
     let failureReason: string | null = null;
 
     // Option-select — auto-graded studying. Generation/guard failure rejects this node
-    // for the bank but never aborts the run.
-    try {
-      const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
-      const draft = await input.studyItemGeneration.generateOptionSelect({
-        declaredDomain: node.declaredDomain,
-        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-        groundingProvenance: grounding.provenance,
-        groundingPassages: grounding.passages,
-        siblings
-      });
-      const guardContext: OptionSelectGrounding = {
-        studyItemId: newStudyItemId(),
-        graphVersionId: layer.graphVersionId,
-        enrichmentId: layer.enrichmentId,
-        derivedNodeId: node.derivedNodeId,
-        groundingProvenance: grounding.provenance,
-        generatingModel: input.studyItemGeneration.model,
-        configHash: input.configHash,
-        passages: grounding.passages
-      };
-      const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
-      if (guarded.ok) {
-        return { items: [guarded.item], rejected: [] };
-      } else {
-        failureReason = guarded.reason;
+    // for the bank but never aborts the run. Citation guard failures are model-output
+    // quality misses, so give the generator one fresh attempt before recording absence.
+    const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
+    for (let attempt = 0; attempt < OPTION_SELECT_GENERATION_ATTEMPTS; attempt += 1) {
+      try {
+        const draft = await input.studyItemGeneration.generateOptionSelect({
+          declaredDomain: node.declaredDomain,
+          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+          groundingProvenance: grounding.provenance,
+          groundingPassages: grounding.passages,
+          siblings
+        });
+        const guardContext: OptionSelectGrounding = {
+          studyItemId: newStudyItemId(),
+          graphVersionId: layer.graphVersionId,
+          enrichmentId: layer.enrichmentId,
+          derivedNodeId: node.derivedNodeId,
+          groundingProvenance: grounding.provenance,
+          generatingModel: input.studyItemGeneration.model,
+          configHash: input.configHash,
+          passages: grounding.passages
+        };
+        const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
+        if (guarded.ok) {
+          return { items: [guarded.item], rejected: [] };
+        } else {
+          failureReason = guarded.reason;
+        }
+      } catch (error) {
+        failureReason = `option-select generation failed: ${error instanceof Error ? error.message : String(error)}`;
       }
-    } catch (error) {
-      failureReason = `option-select generation failed: ${error instanceof Error ? error.message : String(error)}`;
     }
 
     return {
@@ -240,14 +244,17 @@ export async function generateStudyItemBank(input: {
   });
 }
 
-// Derive option-select grounding from a Concept Lesson's CITED sections (U7, R10, rule 18).
-// Only sections that carry a citation can anchor an option's verbatim trace; synthesized
-// sections (gist/intuition/applications) are teaching prose, not grounding. The lesson's
-// source citations already verified against source blocks (U6), so the guard re-anchors to
-// the same source text. Provenance reflects the lesson's source sections (source_cep /
-// source_mentioned) or `generated` for a minted node whose lesson is wholly generated.
+// Derive option-select grounding from a Concept Lesson's grounded sections (U7, R10, rule 18).
+// Source-origin nodes require citations, because only cited sections carry a source-verifiable
+// trace. Generated-origin nodes may fall back to their generated substantive lesson sections
+// when no citation survived, because the item remains honestly generated and still derives
+// from the lesson substrate rather than raw graph grounding. Synthesized gist/intuition/
+// applications never become fallback grounding.
 // Returns null when the lesson has no grounded section to anchor an item.
-function optionSelectGroundingFromLesson(lesson: ConceptLesson): { provenance: "source_cep" | "source_mentioned" | "generated"; passages: GroundingPassage[] } | null {
+function optionSelectGroundingFromLesson(
+  lesson: ConceptLesson,
+  node: DerivedGraphNode
+): { provenance: "source_cep" | "source_mentioned" | "generated"; passages: GroundingPassage[] } | null {
   const passages: GroundingPassage[] = [];
   let sourceProvenance: "source_cep" | "source_mentioned" | null = null;
   for (const section of lesson.sections) {
@@ -265,11 +272,24 @@ function optionSelectGroundingFromLesson(lesson: ConceptLesson): { provenance: "
         sourceProvenance = section.groundingProvenance;
       }
     } else {
+      const generatedPassageKind: "definition" | "mention" = section.kind === "definition" ? "definition" : "mention";
       passages.push({
-        passageId: `${lesson.derivedNodeId}:${section.kind}`,
+        passageId: `${lesson.derivedNodeId}:${generatedPassageKind}:0`,
         kind: passageKind,
         text: section.citation.passageText,
         derivedNodeId: section.citation.derivedNodeId
+      });
+    }
+  }
+  if (passages.length === 0 && node.groundingOrigin === "llm_grounded") {
+    for (const section of lesson.sections) {
+      if (section.kind !== "definition" && section.kind !== "examples" && section.kind !== "formulas") continue;
+      const passageKind: "definition" | "mention" = section.kind === "definition" ? "definition" : "mention";
+      passages.push({
+        passageId: `${lesson.derivedNodeId}:${passageKind}:lesson`,
+        kind: passageKind,
+        text: section.text,
+        derivedNodeId: lesson.derivedNodeId
       });
     }
   }

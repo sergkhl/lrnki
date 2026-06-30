@@ -500,6 +500,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect, hiddenNode
             <div
               ref={containerRef}
               role="img"
+              data-graph-surface
               aria-label={`Derived prerequisite graph with ${activeDetail.summary.conceptCount} concepts and ${activeDetail.summary.edgeCount} inferred edges`}
               className="min-h-[31rem] flex-1 rounded-lg border bg-muted/30"
             />

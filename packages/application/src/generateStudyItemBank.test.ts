@@ -14,7 +14,7 @@ import type {
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ConceptLessonGenerationPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
-import { generateStudyItemBank } from "./generateStudyItemBank";
+import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
 
 installNodeOperationTagContext();
 
@@ -373,6 +373,32 @@ test("an option-select whose correct answer cites text absent from the lesson gr
   assert.deepEqual(typesFor(persisted, "node-c1"), []);
 });
 
+test("an option-select guard miss gets one fresh generation attempt before rejection", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store, persisted } = capturingStore();
+  let calls = 0;
+  const retryingGeneration: StudyItemGenerationPort = {
+    model: "mock-gen",
+    async generateOptionSelect() {
+      calls += 1;
+      return calls === 1 ? osDraft("a fact never stated in the passage") : osDraft("rules that govern memory");
+    }
+  };
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: retryingGeneration,
+    studyItemBankStore: store
+  });
+
+  assert.equal(calls, OPTION_SELECT_GENERATION_ATTEMPTS);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
+});
+
 test("Covers R10: option-select grounds in the lesson's source-cited section; a lesson with no grounded section yields no item", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
@@ -449,14 +475,42 @@ test("Covers AE5: a minted llm_grounded node yields a generated lesson and gener
     graphStore: graphStoreReturning(snapshotWith([])),
     enrichmentStore: enrichmentStoreReturning(layerWith([llmGroundedNode()])),
     // The minted node's lesson cites its generated grounding passage; the assembler keeps it
-    // generated, and option-select grounds in the generated lesson section keyed by node:kind.
+    // generated, and option-select grounds in the generated lesson section with the selector's
+    // canonical generated passage id.
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-minted": goodLessonDraft("node-minted:definition:0", generatedDef) } }),
     conceptLessonStore: lessonStore.store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:0") } }),
     studyItemBankStore: store
   });
 
   assert.ok(lessonStore.lessons.length === 1 && lessonStore.lessons[0].sections.every((s) => s.groundingProvenance === "generated"), "the minted node's whole lesson is generated-labeled");
   assert.ok(persisted.length >= 1);
   assert.ok(persisted.every((item) => item.groundingProvenance === "generated"), "minted nodes stay generated provenance");
+});
+
+test("a minted lesson with no surviving citation can still anchor generated option-select from substantive lesson prose", async () => {
+  const generatedDef = "Pointer arithmetic calculates target memory addresses from a base address and an offset.";
+  const cite = "target memory addresses";
+  const { store, persisted } = capturingStore();
+  const lessonStore = capturingLessonStore();
+  const uncitedGeneratedLesson: ConceptLessonDraft = {
+    sections: [
+      { kind: "gist", text: "A one-line gist." },
+      { kind: "definition", text: generatedDef },
+      { kind: "applications", text: "How it connects to neighbors." }
+    ]
+  };
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshotWith([])),
+    enrichmentStore: enrichmentStoreReturning(layerWith([llmGroundedNode()])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-minted": uncitedGeneratedLesson } }),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:lesson") } }),
+    studyItemBankStore: store
+  });
+
+  assert.ok(persisted.length >= 1);
+  assert.ok(persisted.every((item) => item.groundingProvenance === "generated"));
 });

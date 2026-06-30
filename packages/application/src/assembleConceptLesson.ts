@@ -3,6 +3,7 @@ import {
   type ConceptLesson,
   type ConceptLessonDraft,
   type ConceptLessonSection,
+  type ConceptLessonSectionDraft,
   type ConceptLessonSectionKind,
   type LessonAbsentNode,
   type StudyItemCitation,
@@ -43,16 +44,11 @@ function isSourcePassage(passage: GroundingPassage): passage is Extract<Groundin
 // Re-derive a section's authoritative provenance + citation from the cited grounding passage.
 // Returns the grounding provenance label and the verified citation, or `generated`/no-citation
 // when the quote does not verify or the section is synthesized.
-function deriveSectionGrounding(
-  draftCitation: { passageId: string; evidenceQuote: string } | undefined,
+function citeVerifiedPassage(
+  passage: GroundingPassage,
+  evidenceQuote: string,
   grounding: NodeGrounding
-): { provenance: StudyItemGroundingProvenance; citation?: StudyItemCitation } {
-  if (!draftCitation) return { provenance: "generated" };
-  const passage = grounding.passages.find((candidate) => candidate.passageId === draftCitation.passageId);
-  if (!passage || !evidenceQuoteMatches(passage.text, draftCitation.evidenceQuote)) {
-    // Unverifiable or dangling citation → synthesized. Never leak it as a source quote (R8).
-    return { provenance: "generated" };
-  }
+): { provenance: StudyItemGroundingProvenance; citation: StudyItemCitation } {
   if (isSourcePassage(passage)) {
     // The grounding provenance (source_cep | source_mentioned) labels a verified source section.
     return {
@@ -61,7 +57,7 @@ function deriveSectionGrounding(
         provenance: "source",
         sourceResourceId: passage.sourceResourceId,
         sourceBlockId: passage.sourceBlockId,
-        evidenceQuote: draftCitation.evidenceQuote
+        evidenceQuote
       }
     };
   }
@@ -72,6 +68,28 @@ function deriveSectionGrounding(
   };
 }
 
+function deriveSectionGrounding(
+  section: ConceptLessonSectionDraft,
+  grounding: NodeGrounding
+): { provenance: StudyItemGroundingProvenance; citation?: StudyItemCitation } {
+  if (!section.citation) {
+    // If a substantive section is itself a verbatim substring of one grounding passage, cite it
+    // even when the model forgot the passage id. This is still a provable match; synthesized
+    // teaching aids such as gist/intuition/applications remain uncited.
+    if (SUBSTANTIVE_KINDS.includes(section.kind)) {
+      const inferred = grounding.passages.find((candidate) => evidenceQuoteMatches(candidate.text, section.text));
+      if (inferred) return citeVerifiedPassage(inferred, section.text, grounding);
+    }
+    return { provenance: "generated" };
+  }
+  const passage = grounding.passages.find((candidate) => candidate.passageId === section.citation!.passageId);
+  if (!passage || !evidenceQuoteMatches(passage.text, section.citation.evidenceQuote)) {
+    // Unverifiable or dangling citation → synthesized. Never leak it as a source quote (R8).
+    return { provenance: "generated" };
+  }
+  return citeVerifiedPassage(passage, section.citation.evidenceQuote, grounding);
+}
+
 export function assembleConceptLesson(input: AssembleConceptLessonInput): AssembleConceptLessonResult {
   const { node, grounding, draft } = input;
 
@@ -80,7 +98,7 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
   for (const section of draft.sections) {
     if (byKind.has(section.kind)) continue;
     if (section.text.trim().length === 0) continue;
-    const grounded = deriveSectionGrounding(section.citation, grounding);
+    const grounded = deriveSectionGrounding(section, grounding);
     const assembled: ConceptLessonSection = {
       kind: section.kind,
       text: section.text,

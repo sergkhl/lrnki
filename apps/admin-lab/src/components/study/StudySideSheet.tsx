@@ -26,7 +26,9 @@ export function StudySideSheet({
   pending = false
 }: Readonly<{
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  // Base UI calls this with `(open, eventDetails)`; the caller inspects `eventDetails.reason`
+  // to distinguish a real dismiss from the graph-tap outside-press it must ignore.
+  onOpenChange: (open: boolean, eventDetails?: { reason?: string; event?: Event }) => void;
   nodeLabel: string | null;
   content: SheetContentPayload | null;
   lesson?: ConceptLessonView | null;
@@ -85,7 +87,7 @@ function StudySideSheetContent({
   const showLesson = lesson !== null && (content?.kind === "option_select" || content?.kind === "cardless");
 
   return (
-    <SheetContent side="right" showOverlay={false} className="gap-4 overflow-y-auto p-6 sm:max-w-md">
+    <SheetContent side="right" showOverlay={false} className="gap-4 overflow-y-auto p-6 sm:max-w-md data-[closed]:pointer-events-none">
         <SheetHeader className="p-0">
           <SheetTitle className="flex items-center gap-2">
             {nodeLabel ?? "Node"}

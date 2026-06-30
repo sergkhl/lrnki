@@ -47,7 +47,18 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     setSheetOpen(true);
   };
 
-  const onSheetOpenChange = (nextOpen: boolean) => {
+  const onSheetOpenChange = (nextOpen: boolean, eventDetails?: { reason?: string; event?: Event }) => {
+    // Tapping a graph node is a node-open/switch gesture, never a dismiss. Because the sheet is
+    // non-modal and the canvas sits outside its popup, Base UI reports that tap as an
+    // `outside-press` close — which would instantly cancel the sheet the same tap just opened
+    // (and would close instead of switch when re-tapping another node). That is the desktop
+    // "click does nothing / opens once then closes" bug; touch took a different outside-press
+    // path, so it only reproduced with a mouse. The cytoscape `tap` → `openNode` owns this
+    // gesture, so swallow the redundant outside-press when it originates on the graph surface.
+    if (!nextOpen && eventDetails?.reason === "outside-press") {
+      const target = eventDetails.event?.target;
+      if (target instanceof Element && target.closest("[data-graph-surface]")) return;
+    }
     // Hold the sheet open across the answer → re-fold → advance window (a modal sheet emits a
     // stale open=false while the option card remounts and the server re-fold is in flight).
     if (!nextOpen && (pending || !shouldAcceptSheetOpenChange(nextOpen, autoAdvanceDismissGuardRef.current))) return;

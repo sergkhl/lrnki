@@ -54,6 +54,24 @@ test("a verbatim-verifying definition is source-cited; the intuition is generate
   assert.equal(intuition.citation, undefined);
 });
 
+// A substantive section that is itself a verbatim substring of grounding is source-cited
+// even if the model forgot the draft citation fields. This remains a provable match.
+test("an uncited substantive section is source-cited when its text verifies against grounding", () => {
+  const draft: ConceptLessonDraft = {
+    sections: [
+      { kind: "gist", text: "Each value has a single owner." },
+      { kind: "definition", text: "Ownership is a set of rules that govern memory." },
+      { kind: "applications", text: "Move semantics build on ownership." }
+    ]
+  };
+  const result = assemble(draft, sourceGrounding);
+  assert.equal(result.kind, "lesson");
+  if (result.kind !== "lesson") return;
+  const definition = result.lesson.sections.find((s) => s.kind === "definition")!;
+  assert.equal(definition.groundingProvenance, "source_cep");
+  assert.ok(definition.citation && definition.citation.provenance === "source");
+});
+
 // Covers AE1, R3, R4. A node with no notation/formula grounding produces gist, intuition,
 // definition, examples, applications and NO formulas section — no placeholder.
 test("a node with no formula grounding produces no formulas section and no placeholder", () => {

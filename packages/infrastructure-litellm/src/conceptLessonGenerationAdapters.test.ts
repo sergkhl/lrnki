@@ -44,6 +44,7 @@ test("generate issues one call with the lesson tool name, schema, and stage tag"
   assert.equal(calls.length, 1);
   assert.equal(calls[0].toolName, "submit_concept_lesson");
   assert.deepEqual(calls[0].tags, ["concept-lesson-generation"]);
+  assert.ok(JSON.stringify(calls[0].parameters).includes("maxLength"));
   assert.equal(draft.sections.length, 3);
   // A source-supported section with both citation fields carries a draft citation.
   const definition = draft.sections.find((s) => s.kind === "definition");
@@ -97,6 +98,9 @@ test("the system prompt names no domain and asserts no section is mandatory (R4)
   const system = calls[0].messages.find((m) => (m as { role?: string }).role === "system")?.content
     ?? calls[0].messages[0].content;
   assert.ok(/never assume a section applies/i.test(system));
+  assert.ok(/default compact shape/i.test(system));
+  assert.ok(/at most two short sentences/i.test(system));
+  assert.ok(/Every definition, examples, or formulas section must carry both citation fields/i.test(system));
   // No fixture term leaks into the system instruction.
   for (const term of ["ownership", "rust", "market"]) {
     assert.equal(system.toLowerCase().includes(term), false);

@@ -10,6 +10,7 @@ import {
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidatorForCandidateKeys,
   conceptEvidenceProfileSchema,
+  CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
   toolValidators
@@ -105,10 +106,15 @@ test("concept lesson schema folds nullable citation/diagram scalars and is regis
   assert.deepEqual((section.citationPassageId as Record<string, unknown>).type, ["string", "null"]);
   assert.deepEqual((section.diagramSpec as Record<string, unknown>).type, ["string", "null"]);
   // Section text stays a non-nullable bounded string.
-  assert.deepEqual((section.text as Record<string, unknown>).type, "string");
+  assert.deepEqual(section.text, {
+    type: "string",
+    minLength: 1,
+    maxLength: CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
+    description: "The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."
+  });
 });
 
-test("concept lesson validator accepts the R3 minimum and rejects empty section text", () => {
+test("concept lesson validator accepts the R3 minimum and rejects empty or overlong section text", () => {
   // gist + one application + one substantive (definition) section — the R3 minimum
   // (membership in the array is the optionality model; absent sections are omitted).
   assert.doesNotThrow(() => conceptLessonValidator.parse({
@@ -121,6 +127,16 @@ test("concept lesson validator accepts the R3 minimum and rejects empty section 
   // An empty `text` on any present section fails closed (rule 6).
   assert.throws(() => conceptLessonValidator.parse({
     sections: [{ kind: "gist", text: "", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }]
+  }));
+  assert.throws(() => conceptLessonValidator.parse({
+    sections: [{
+      kind: "applications",
+      text: "x".repeat(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH + 1),
+      citationPassageId: null,
+      citationEvidenceQuote: null,
+      diagramCaption: null,
+      diagramSpec: null
+    }]
   }));
 });
 

@@ -344,9 +344,11 @@ export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectVal
 // re-verified verbatim at the boundary, so a null citation simply marks a synthesized
 // section. The deterministic guard never trusts the model's claimed provenance.
 
+export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
+
 const conceptLessonSection = z.object({
   kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line advance organizer; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
-  text: z.string().min(1).describe("The teaching prose for this section. Self-contained and readable on its own; do not reference 'the passage' or 'the source'."),
+  text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
   diagramCaption: z.string().nullable().describe("Optional one-line caption for a simple explanatory diagram for this section; null when there is none."),

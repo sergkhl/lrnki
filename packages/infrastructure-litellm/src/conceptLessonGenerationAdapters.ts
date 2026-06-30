@@ -45,9 +45,12 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
   }): Promise<ConceptLessonDraft> {
     const system = [
       "You write ONE ordered teaching lesson for a single learning node, conditioned ONLY on the provided grounding passages and neighbor concepts.",
-      "A lesson is an ordered set of independently optional sections. The arc, when each applies, is: a one-line gist (an advance organizer), a concrete intuition before any formal statement, the precise definition or notation, worked examples, graph-aware applications that bridge to the neighbor concepts, then any formal methods or formulas.",
+      "A lesson is an ordered set of independently optional sections. The default compact shape is: a one-sentence gist, one precise substantive section (definition, examples, or formulas), and a short applications bridge to the neighbor concepts.",
+      "Emit intuition only when the grounding supports a genuinely distinct mental model that is not already covered by the gist or substantive section. Do not use repetitive analogy templates such as 'Think of...' unless the analogy is necessary and specifically grounded.",
+      "Length budgets: gist is one sentence; definition, examples, formulas, and applications are at most two short sentences each.",
       "Never assume a section applies. Emit a section ONLY when the provided grounding supports it; omit any section that does not apply rather than writing a placeholder.",
-      "For a section that restates source-supported content (typically definition, examples, or formulas), cite the grounding passage it derives from by its exact passageId and quote a substring of that passage; for source-grounded passages the quote must be verbatim. Leave gist, intuition, and applications uncited — they are synthesized.",
+      "For a section that restates source-supported or generated-grounding content (typically definition, examples, or formulas), cite the grounding passage it derives from by its exact passageId and quote a substring of that passage; for source-grounded passages the quote must be verbatim. Leave gist and intuition uncited. Cite applications only when they directly restate one provided grounding passage; otherwise leave them synthesized.",
+      "Every definition, examples, or formulas section must carry both citation fields. Use one cited grounding passage per section; do not combine multiple passages into a single cited section. If no single passage supports the section, omit that section.",
       "Stay within the Declared Domain. Write domain-neutral, learner-facing prose; never reference 'the passage' or 'the source'."
     ].join(" ");
 
