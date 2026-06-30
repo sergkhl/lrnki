@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { appendOptionSelectOutcome } from "@lrnki/application";
+import { appendGradedSelectionOutcome } from "@lrnki/application";
 import type { Verdict } from "@lrnki/domain-core";
 import {
   PostgresCalibrationVerdictStore,
@@ -54,11 +54,43 @@ export async function submitOptionSelect(input: {
       WHERE si.study_item_id = ${studyItemId} AND si.item_type = 'option_select'
       LIMIT 1`;
     if (rows.length === 0) return;
-    await appendOptionSelectOutcome({
+    await appendGradedSelectionOutcome({
       learnerStateRef,
       item: { studyItemId, derivedNodeId: rows[0].derived_node_id },
-      chosenOptionId,
-      correctOptionId: rows[0].correct_option_id,
+      chosenId: chosenOptionId,
+      keyedCorrectId: rows[0].correct_option_id,
+      responseSource: "human",
+      responseLog: new PostgresResponseLogStore(sql)
+    });
+  });
+  revalidatePath(sessionPath(learnerStateRef));
+}
+
+// Impostor grading (R12, AE4). The keyed-correct answer is the impostor statement id, looked
+// up SERVER-SIDE here and never trusted from the client — a client-sent statement id cannot
+// change the key. Reuses the shared keyed-selection grader: a chosen id equal to the impostor
+// statement scores 1, any truth scores 0. Mirrors submitOptionSelect's correct-option lookup.
+export async function submitImpostor(input: {
+  learnerStateRef: string;
+  studyItemId: string;
+  chosenStatementId: string;
+}): Promise<void> {
+  const { learnerStateRef, studyItemId, chosenStatementId } = input;
+  if (!learnerStateRef || !studyItemId || !chosenStatementId) return;
+
+  await withSqlClient(async (sql) => {
+    const rows = await sql<{ derived_node_id: string; impostor_statement_id: string }[]>`
+      SELECT si.derived_node_id, ist.impostor_statement_id
+      FROM study_items si
+      JOIN impostor_statements ist ON ist.study_item_id = si.study_item_id AND ist.is_impostor
+      WHERE si.study_item_id = ${studyItemId} AND si.item_type = 'impostor'
+      LIMIT 1`;
+    if (rows.length === 0) return;
+    await appendGradedSelectionOutcome({
+      learnerStateRef,
+      item: { studyItemId, derivedNodeId: rows[0].derived_node_id },
+      chosenId: chosenStatementId,
+      keyedCorrectId: rows[0].impostor_statement_id,
       responseSource: "human",
       responseLog: new PostgresResponseLogStore(sql)
     });
