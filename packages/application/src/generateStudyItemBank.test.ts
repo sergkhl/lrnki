@@ -5,6 +5,7 @@ import type {
   ConceptLessonDraft,
   DerivedGraphLayer,
   GraphSnapshot,
+  ImpostorItemDraft,
   LessonAbsentNode,
   OptionSelectItemDraft,
   PublishedEvidencePassage,
@@ -169,12 +170,35 @@ function goodLessonDraft(passageId: string, defQuote: string): ConceptLessonDraf
   };
 }
 
+// A guard-passing impostor draft derived from the FIRST grounding passage the orchestrator
+// hands the generator: three truths citing that passage's full text (distinct statement text,
+// same quote — the guard only requires impostor-vs-truth distinctness) plus one generated lie.
+function impDraftFrom(passages: { passageId: string; text: string }[]): ImpostorItemDraft {
+  const p = passages[0];
+  return {
+    itemType: "impostor",
+    question: "Which statement is false?",
+    statements: [
+      { text: "True statement one.", isImpostor: false, citation: { passageId: p.passageId, evidenceQuote: p.text } },
+      { text: "True statement two.", isImpostor: false, citation: { passageId: p.passageId, evidenceQuote: p.text } },
+      { text: "True statement three.", isImpostor: false, citation: { passageId: p.passageId, evidenceQuote: p.text } },
+      { text: "A planted lie about this node.", isImpostor: true }
+    ],
+    reveal: "The fourth statement is false.",
+    lieSource: "generated"
+  };
+}
+
 // Canned generators keyed by derivedNodeId, or the literal "throw" to simulate a failure.
 // INPUT FIXTURES exercising the deterministic envelope (ADR-0013) — no assertion is ever made
-// on the model's judgment content.
+// on the model's judgment content. By default `generateImpostor` derives a guard-passing
+// impostor from the grounding it is handed, so a node with a usable lesson carries both item
+// types; pass `impostor` to override per node (a draft, "throw", or "absent" to skip).
 function generationReturning(opts: {
   optionSelect?: Record<string, OptionSelectItemDraft | "throw">;
+  impostor?: Record<string, ImpostorItemDraft | "throw" | "absent">;
   onGenerate?: () => void;
+  onGenerateImpostor?: () => void;
 }): StudyItemGenerationPort {
   return {
     model: "mock-gen",
@@ -184,6 +208,17 @@ function generationReturning(opts: {
       if (draft === undefined) throw new Error(`no canned option-select draft for ${input.node.derivedNodeId}`);
       if (draft === "throw") throw new Error("option-select generation failed");
       return draft;
+    },
+    async generateImpostor(input) {
+      opts.onGenerateImpostor?.();
+      const override = opts.impostor?.[input.node.derivedNodeId];
+      if (override === "throw") throw new Error("impostor generation failed");
+      if (override === "absent") {
+        // A guard-failing draft (zero impostors) so the node is recorded impostor-absent.
+        return { ...impDraftFrom(input.groundingPassages), statements: impDraftFrom(input.groundingPassages).statements.map((s) => ({ ...s, isImpostor: false })) };
+      }
+      if (override) return override;
+      return impDraftFrom(input.groundingPassages);
     }
   };
 }
@@ -249,11 +284,12 @@ test("a node whose lesson grounds an option-select that passes the guard persist
     studyItemBankStore: store
   });
 
-  assert.equal(result.studyItems.length, 1);
+  // Both stages run: the node carries an option-select AND an impostor item (KTD7).
+  assert.equal(result.studyItems.length, 2);
   assert.equal(result.rejected.length, 0);
   assert.equal(result.lessons.length, 1);
   assert.equal(result.lessonAbsent.length, 0);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
   assert.deepEqual(persistedRejected, []);
   // The lesson is persisted through the lesson store, with a source-cited definition section.
   assert.equal(lessonStore.lessons.length, 1);
@@ -293,9 +329,11 @@ test("an option-select guard rejection records the node as rejected", async () =
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), []);
-  assert.equal(persistedRejected.length, 1);
-  assert.deepEqual(await store.supportedItemTypes("node-c1"), []);
+  // Option-select is rejected (its guard miss), but the impostor stage still grounds an item.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
+  const optionSelectRejections = persistedRejected.filter((r) => r.itemType === "option_select");
+  assert.equal(optionSelectRejections.length, 1);
+  assert.deepEqual(await store.supportedItemTypes("node-c1"), ["impostor"]);
 });
 
 test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent and yields no item, without calling either generator", async () => {
@@ -308,9 +346,11 @@ test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent a
     async generate() { lessonGeneratorCalled = true; throw new Error("should not be called"); }
   };
   let osGeneratorCalled = false;
+  let impostorGeneratorCalled = false;
   const generation: StudyItemGenerationPort = {
     model: "mock",
-    async generateOptionSelect() { osGeneratorCalled = true; throw new Error("should not be called"); }
+    async generateOptionSelect() { osGeneratorCalled = true; throw new Error("should not be called"); },
+    async generateImpostor() { impostorGeneratorCalled = true; throw new Error("should not be called"); }
   };
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
@@ -328,10 +368,14 @@ test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent a
   assert.equal(lessonStore.absent.length, 1);
   assert.match(lessonStore.absent[0].reason, /no usable grounding/);
   assert.equal(lessonGeneratorCalled, false);
-  // R10: option-select is not generated for a lesson-absent node; it is rejected referencing it.
-  assert.equal(result.rejected.length, 1);
-  assert.match(persistedRejected[0].reason, /lesson is absent/);
+  // R10/R9: neither item type is generated for a lesson-absent node; it is rejected per type,
+  // each referencing the absent lesson (keyed independently — KTD8).
+  assert.equal(result.rejected.length, 2);
+  const reasonsByType = new Map(persistedRejected.map((r) => [r.itemType, r.reason] as const));
+  assert.match(reasonsByType.get("option_select")!, /lesson is absent/);
+  assert.match(reasonsByType.get("impostor")!, /lesson is absent/);
   assert.equal(osGeneratorCalled, false);
+  assert.equal(impostorGeneratorCalled, false);
 });
 
 test("an option-select generation that throws rejects only that node and continues the run", async () => {
@@ -351,9 +395,10 @@ test("an option-select generation that throws rejects only that node and continu
     studyItemBankStore: store
   });
 
-  assert.equal(result.rejected.length, 1);
-  assert.deepEqual(typesFor(persisted, "node-c1"), []);
-  assert.deepEqual(typesFor(persisted, "node-c2"), ["option_select"]);
+  // Only node-c1's option-select is rejected; both nodes' impostors ground from their lessons.
+  assert.equal(result.rejected.filter((r) => r.itemType === "option_select").length, 1);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
+  assert.deepEqual(typesFor(persisted, "node-c2"), ["impostor", "option_select"]);
 });
 
 test("an option-select whose correct answer cites text absent from the lesson grounding is rejected", async () => {
@@ -370,7 +415,8 @@ test("an option-select whose correct answer cites text absent from the lesson gr
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), []);
+  // The ungrounded option-select is rejected; the impostor still grounds from the lesson.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
 });
 
 test("an option-select guard miss gets one fresh generation attempt before rejection", async () => {
@@ -382,6 +428,22 @@ test("an option-select guard miss gets one fresh generation attempt before rejec
     async generateOptionSelect() {
       calls += 1;
       return calls === 1 ? osDraft("a fact never stated in the passage") : osDraft("rules that govern memory");
+    },
+    async generateImpostor(input) {
+      // A guard-passing impostor from the grounding so the node also carries an impostor item.
+      const p = input.groundingPassages[0];
+      return {
+        itemType: "impostor",
+        question: "Which is false?",
+        statements: [
+          { text: "t1", isImpostor: false, citation: { passageId: p.passageId, evidenceQuote: p.text } },
+          { text: "t2", isImpostor: false, citation: { passageId: p.passageId, evidenceQuote: p.text } },
+          { text: "t3", isImpostor: false, citation: { passageId: p.passageId, evidenceQuote: p.text } },
+          { text: "a lie", isImpostor: true }
+        ],
+        reveal: "The fourth is false.",
+        lieSource: "generated"
+      };
     }
   };
   await generateStudyItemBank({
@@ -396,7 +458,7 @@ test("an option-select guard miss gets one fresh generation attempt before rejec
   });
 
   assert.equal(calls, OPTION_SELECT_GENERATION_ATTEMPTS);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
 });
 
 test("Covers R10: option-select grounds in the lesson's source-cited section; a lesson with no grounded section yields no item", async () => {
@@ -486,6 +548,128 @@ test("Covers AE5: a minted llm_grounded node yields a generated lesson and gener
   assert.ok(lessonStore.lessons.length === 1 && lessonStore.lessons[0].sections.every((s) => s.groundingProvenance === "generated"), "the minted node's whole lesson is generated-labeled");
   assert.ok(persisted.length >= 1);
   assert.ok(persisted.every((item) => item.groundingProvenance === "generated"), "minted nodes stay generated provenance");
+});
+
+function impDraftCiting(passageId: string, quote: string, opts: { lieSource?: "sibling" | "generated"; siblingLabel?: string } = {}): ImpostorItemDraft {
+  return {
+    itemType: "impostor",
+    question: "Which statement is false?",
+    statements: [
+      { text: "Truth one about the node.", isImpostor: false, citation: { passageId, evidenceQuote: quote } },
+      { text: "Truth two about the node.", isImpostor: false, citation: { passageId, evidenceQuote: quote } },
+      { text: "Truth three about the node.", isImpostor: false, citation: { passageId, evidenceQuote: quote } },
+      { text: "A plausible-but-false claim.", isImpostor: true }
+    ],
+    reveal: "The fourth is false.",
+    lieSource: opts.lieSource ?? "generated",
+    ...(opts.siblingLabel ? { siblingLabel: opts.siblingLabel } : {})
+  };
+}
+
+test("Covers AE1: a sibling-sourced impostor passes the guard and persists with its siblingLabel", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: generationReturning({
+      optionSelect: { "node-c1": osDraft("rules that govern memory") },
+      impostor: { "node-c1": impDraftCiting("b1", "rules that govern memory", { lieSource: "sibling", siblingLabel: "Borrowing" }) }
+    }),
+    studyItemBankStore: store
+  });
+
+  const impostor = persisted.find((item) => item.itemType === "impostor");
+  assert.ok(impostor && impostor.itemType === "impostor");
+  if (impostor.itemType !== "impostor") return;
+  assert.equal(impostor.lieSource, "sibling");
+  assert.equal(impostor.siblingLabel, "Borrowing");
+  assert.equal(impostor.statements.filter((s) => s.isImpostor).length, 1);
+});
+
+test("Covers AE2: a model returning lieSource 'generated' produces a generated-labeled impostor", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store, persisted } = capturingStore();
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: generationReturning({
+      optionSelect: { "node-c1": osDraft("rules that govern memory") },
+      impostor: { "node-c1": impDraftCiting("b1", "rules that govern memory", { lieSource: "generated" }) }
+    }),
+    studyItemBankStore: store
+  });
+
+  const impostor = persisted.find((item) => item.itemType === "impostor");
+  assert.ok(impostor && impostor.itemType === "impostor");
+  if (impostor.itemType !== "impostor") return;
+  assert.equal(impostor.lieSource, "generated");
+  assert.equal(impostor.siblingLabel, undefined);
+});
+
+test("Covers AE2: a node whose impostor fails the guard twice is recorded impostor-absent and the run continues", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store, persisted, persistedRejected } = capturingStore();
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: generationReturning({
+      optionSelect: { "node-c1": osDraft("rules that govern memory") },
+      impostor: { "node-c1": "absent" }
+    }),
+    studyItemBankStore: store
+  });
+
+  // Option-select still persists; the impostor is recorded absent with a guard reason.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
+  const impostorRejection = persistedRejected.find((r) => r.itemType === "impostor");
+  assert.ok(impostorRejection, "a per-type impostor rejection is recorded");
+  assert.match(impostorRejection!.reason, /exactly one impostor/i);
+  // The run does not fail.
+  assert.equal(result.studyItems.some((item) => item.itemType === "option_select"), true);
+});
+
+test("rule 18: both stages derive grounding from the same lesson passages for a node", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store } = capturingStore();
+  let optionSelectPassages: { passageId: string; text: string }[] = [];
+  let impostorPassages: { passageId: string; text: string }[] = [];
+  const recordingGeneration: StudyItemGenerationPort = {
+    model: "mock-gen",
+    async generateOptionSelect(input) {
+      optionSelectPassages = input.groundingPassages.map((p) => ({ passageId: p.passageId, text: p.text }));
+      return osDraft("rules that govern memory");
+    },
+    async generateImpostor(input) {
+      impostorPassages = input.groundingPassages.map((p) => ({ passageId: p.passageId, text: p.text }));
+      return impDraftCiting("b1", "rules that govern memory");
+    }
+  };
+  await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: recordingGeneration,
+    studyItemBankStore: store
+  });
+
+  assert.deepEqual(impostorPassages, optionSelectPassages);
+  assert.ok(impostorPassages.length > 0);
 });
 
 test("a minted lesson with no surviving citation can still anchor generated option-select from substantive lesson prose", async () => {
