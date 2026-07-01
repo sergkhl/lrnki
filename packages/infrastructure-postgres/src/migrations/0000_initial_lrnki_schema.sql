@@ -446,7 +446,9 @@ WHERE a.artifact_type = 'concept_lesson_bank';
 
 CREATE TABLE graph_enrichments (
   enrichment_id uuid PRIMARY KEY,
-  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  -- NULL for synthetic (source-less) layers, which have no published asserted version;
+  -- non-null for enrichment layers derived from a published graph version (ADR-0019).
+  graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_config_hash text NOT NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
   judge_model text NOT NULL,
@@ -461,7 +463,7 @@ CREATE TABLE derived_graph_nodes (
   node_kind text NOT NULL CHECK (node_kind IN ('anchor', 'enrichment')),
   concept_id uuid REFERENCES concepts(concept_id),
   grounding_origin text NOT NULL CHECK (grounding_origin IN ('document_anchored', 'source_mentioned', 'llm_grounded')),
-  role text NOT NULL CHECK (role IN ('anchor', 'prerequisite')),
+  role text NOT NULL CHECK (role IN ('anchor', 'prerequisite', 'synthetic_primary')),
   canonical_label text NOT NULL,
   normalized_label text NOT NULL,
   declared_domain text NOT NULL,
@@ -471,7 +473,7 @@ CREATE TABLE derived_graph_nodes (
   CHECK (
     (node_kind = 'anchor' AND concept_id IS NOT NULL AND grounding_origin = 'document_anchored' AND role = 'anchor')
     OR
-    (node_kind = 'enrichment' AND concept_id IS NULL AND grounding_origin IN ('source_mentioned', 'llm_grounded') AND role = 'prerequisite')
+    (node_kind = 'enrichment' AND concept_id IS NULL AND grounding_origin IN ('source_mentioned', 'llm_grounded') AND role IN ('prerequisite', 'synthetic_primary'))
   )
 );
 
@@ -642,7 +644,7 @@ CREATE TABLE learner_path_steps (
 CREATE TABLE study_items (
   study_item_id uuid PRIMARY KEY,
   item_type text NOT NULL CHECK (item_type IN ('option_select', 'impostor')),
-  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
@@ -761,7 +763,7 @@ CREATE UNIQUE INDEX impostor_statements_one_impostor_per_item
 -- instead of guessing from grounding origin.
 CREATE TABLE rejected_study_items (
   rejected_study_item_id uuid PRIMARY KEY,
-  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   item_type text NOT NULL CHECK (item_type IN ('option_select', 'impostor')),
@@ -784,7 +786,7 @@ CREATE TABLE rejected_study_items (
 
 CREATE TABLE concept_lessons (
   concept_lesson_id uuid PRIMARY KEY,
-  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   canonical_label text NOT NULL,
@@ -843,7 +845,7 @@ CREATE TABLE concept_lesson_section_citations (
 -- the exact reason. Regeneration replaces an enrichment's absences alongside its lessons.
 CREATE TABLE lesson_absent_nodes (
   lesson_absent_node_id uuid PRIMARY KEY,
-  graph_version_id uuid NOT NULL REFERENCES graph_versions(graph_version_id),
+  graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   reason text NOT NULL,

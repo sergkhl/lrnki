@@ -77,6 +77,14 @@ export async function generateStudyItemBank(input: {
   return runWithOperationTag(operationId, async () => {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
+  // Study-item generation grounds against the published graph snapshot (below), so it requires a
+  // non-null version. Synthetic (versionless) layers are wired in U7; reject them explicitly here.
+  if (layer.graphVersionId === null) {
+    throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} is a synthetic versionless layer; study-item generation over synthetic layers lands in U7.`);
+  }
+  // Narrowed to string by the guard above; a local const keeps the narrowing across the awaits
+  // below, which TS otherwise widens back to `string | null` on property access.
+  const graphVersionId = layer.graphVersionId;
   const snapshot = await input.graphStore.getPublishedSnapshot(layer.graphVersionId);
   if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${layer.graphVersionId} is not published.`);
   await reporter.beginOperation({ operationType: "study_items", operationId });
@@ -109,7 +117,7 @@ export async function generateStudyItemBank(input: {
         neighbors
       });
       const assembled = assembleConceptLesson({
-        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId },
+        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
         generatingModel: input.conceptLessonGeneration.model,
         configHash: input.configHash,
         grounding,
@@ -144,7 +152,7 @@ export async function generateStudyItemBank(input: {
 
   await studyStage(NON_LLM_STAGES.persist, () =>
     input.conceptLessonStore.persist({
-      graphVersionId: layer.graphVersionId,
+      graphVersionId: graphVersionId,
       enrichmentId: layer.enrichmentId,
       configHash: input.configHash,
       lessons,
@@ -190,7 +198,7 @@ export async function generateStudyItemBank(input: {
         });
         const guardContext: OptionSelectGrounding = {
           studyItemId: newStudyItemId(),
-          graphVersionId: layer.graphVersionId,
+          graphVersionId: graphVersionId,
           enrichmentId: layer.enrichmentId,
           derivedNodeId: node.derivedNodeId,
           groundingProvenance: grounding.provenance,
@@ -270,7 +278,7 @@ export async function generateStudyItemBank(input: {
         });
         const guardContext: ImpostorGrounding = {
           studyItemId: newStudyItemId(),
-          graphVersionId: layer.graphVersionId,
+          graphVersionId: graphVersionId,
           enrichmentId: layer.enrichmentId,
           derivedNodeId: node.derivedNodeId,
           groundingProvenance: grounding.provenance,
@@ -317,7 +325,7 @@ export async function generateStudyItemBank(input: {
 
   await studyStage(NON_LLM_STAGES.persist, () =>
     input.studyItemBankStore.persist({
-      graphVersionId: layer.graphVersionId,
+      graphVersionId: graphVersionId,
       enrichmentId: layer.enrichmentId,
       configHash: input.configHash,
       studyItems,
@@ -325,7 +333,7 @@ export async function generateStudyItemBank(input: {
     })
   );
   await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
-  return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected, lessons, lessonAbsent };
+  return { graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected, lessons, lessonAbsent };
   });
 }
 
