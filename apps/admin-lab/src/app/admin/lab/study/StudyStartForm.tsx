@@ -39,7 +39,7 @@ export function StudyStartForm({
       }}
     >
       <p className="text-sm">
-        Study goal: <span className="font-medium">{targetLabel}</span>
+        Quest target: <span className="font-medium">{targetLabel}</span>
       </p>
       <label className="text-sm font-medium" htmlFor="learner-ref">
         Learner identity (pick an existing ref or type a new one)
@@ -56,7 +56,7 @@ export function StudyStartForm({
           Open calibration
         </Button>
         <Button type="submit" size="sm" disabled={!learnerRef.trim()}>
-          Start studying
+          Start quest
         </Button>
       </div>
     </form>

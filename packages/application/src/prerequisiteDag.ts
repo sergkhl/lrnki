@@ -10,6 +10,9 @@ import type { ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-
 // ---------------------------------------------------------------------------
 
 type Edge = InferredPrerequisiteEdge;
+// The minimal directed-edge shape the ancestor/topology helpers read — just the two endpoint
+// ids. Both `InferredPrerequisiteEdge` and loader-facing graph edges satisfy it structurally.
+export type PrerequisiteEdgeRef = Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">;
 
 function sortEdges(edges: Edge[]): Edge[] {
   return [...edges].sort(
@@ -120,7 +123,7 @@ export function transitiveReduction(edges: Edge[]): { edges: Edge[]; removed: Ed
 
 // Longest-path depth from a source (no prerequisites) = topological depth.
 // depth = 0 for a concept with no prerequisites, else 1 + max(prerequisite depths).
-export function topologicalDepth(derivedNodeIds: string[], edges: Edge[]): Map<string, number> {
+export function topologicalDepth(derivedNodeIds: string[], edges: PrerequisiteEdgeRef[]): Map<string, number> {
   const prerequisitesOf = new Map<string, string[]>();
   for (const id of derivedNodeIds) prerequisitesOf.set(id, []);
   for (const e of edges) {
@@ -143,12 +146,6 @@ export function topologicalDepth(derivedNodeIds: string[], edges: Edge[]): Map<s
   for (const id of [...prerequisitesOf.keys()].sort((a, b) => a.localeCompare(b))) compute(id);
   return depth;
 }
-
-// The minimal directed-edge shape the ancestor walk reads — just the two endpoint ids.
-// Both `InferredPrerequisiteEdge` (domain-core) and the loader-facing `DerivedGraphEdge`
-// (admin-lab) satisfy it structurally, so the calibration closure (U3) and the study
-// loader share ONE ancestor definition without a cast (AGENTS rule 18).
-export type PrerequisiteEdgeRef = Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">;
 
 // Transitive prerequisite ancestors of a target — everything that must precede it. The
 // caller pre-filters to the edge set it trusts (e.g. `!uncertain`); this walk does not
@@ -174,7 +171,7 @@ export function prerequisiteAncestors(targetDerivedNodeId: string, edges: Readon
 // lexical), letting the projection prefer easier ready concepts first.
 export function topologicalOrder(
   derivedNodeIds: string[],
-  edges: Edge[],
+  edges: PrerequisiteEdgeRef[],
   tieBreak: (a: string, b: string) => number = (a, b) => a.localeCompare(b)
 ): string[] {
   const nodes = new Set(derivedNodeIds);

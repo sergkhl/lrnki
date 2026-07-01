@@ -1,21 +1,18 @@
 import Link from "next/link";
 import { GitForkIcon, GraduationCapIcon } from "lucide-react";
+import { buildTargetCandidates, recommendedTargets } from "@lrnki/application";
 import { AdminShell } from "@/components/AdminShell";
-import { GoalPicker } from "@/app/admin/lab/study/GoalPicker";
+import { QuestPicker } from "@/app/admin/lab/study/QuestPicker";
 import { StudyStartForm } from "@/app/admin/lab/study/StudyStartForm";
 import { getEnrichmentDetail, listEnrichments } from "@/lib/enrichments";
-import { goalCandidates, isFoundationalGoal, journeySize } from "@/lib/derivedGraph";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 export const dynamic = "force-dynamic";
 
-// Study start (U4, R1/R2/R3). GOAL-FIRST: the learner searches a goal concept (label or
-// alias) within an enrichment, sees each goal's journey size (prerequisite-cone count,
-// larger first), and a DAG-root goal is tagged "foundational — studied directly" yet stays
-// selectable. The enrichment is a SECONDARY switcher defaulting to the latest. The
-// mechanism is domain-general; the demo anchors on real curated graphs.
+// Study start. The learner picks a target concept for a path-first quest; the enrichment is
+// a secondary switcher defaulting to the latest Derived Graph Layer.
 export default async function StudyStartPage({
   searchParams
 }: Readonly<{ searchParams: Promise<{ enrichmentId?: string; target?: string }> }>) {
@@ -26,8 +23,9 @@ export default async function StudyStartPage({
   const selectedEnrichmentId = enrichmentId ?? enrichments?.[0]?.enrichmentId;
   const detail = selectedEnrichmentId ? await getEnrichmentDetail(selectedEnrichmentId) : undefined;
   const targetNode = detail && target ? detail.nodes.find((node) => node.derivedNodeId === target) : undefined;
-  const candidates = detail ? goalCandidates(detail) : [];
-  const targetJourney = targetNode && detail ? journeySize(targetNode.derivedNodeId, detail.edges) : 0;
+  const candidates = detail ? buildTargetCandidates(detail) : [];
+  const recommended = detail ? recommendedTargets(candidates, detail) : [];
+  const targetCandidate = target ? candidates.find((candidate) => candidate.derivedNodeId === target) : undefined;
 
   return (
     <AdminShell active="study">
@@ -35,12 +33,11 @@ export default async function StudyStartPage({
         <Card>
           <CardHeader className="border-b">
             <CardTitle className="flex items-center gap-2">
-              <GraduationCapIcon className="size-4" /> Study a goal
+              <GraduationCapIcon className="size-4" /> Start a quest
             </CardTitle>
             <CardDescription>
-              Pick a goal concept first — search by name or alias. Each goal shows its journey size (how many
-              prerequisites it builds on); larger journeys come first. A foundational goal with no prerequisites is
-              studied directly. Calibration is optional before study.
+              Pick a target concept. Recommended quests favor milestone targets with trusted prerequisite paths;
+              search stays available for any concept in the Derived Graph Layer.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -59,14 +56,14 @@ export default async function StudyStartPage({
           </Card>
         ) : (
           <>
-            {/* Goal — the primary choice */}
+            {/* Target concept — the primary choice */}
             <Card>
               <CardHeader className="border-b">
-                <CardTitle className="text-base">1 · Goal concept</CardTitle>
-                <CardDescription>&ldquo;Teach me Z&rdquo; — search and pick the concept to reach.</CardDescription>
+                <CardTitle className="text-base">1 · Quest target</CardTitle>
+                <CardDescription>Recommended milestones first, with search across every target concept.</CardDescription>
               </CardHeader>
               <CardContent className="pt-4">
-                <GoalPicker enrichmentId={selectedEnrichmentId!} candidates={candidates} currentTarget={target} />
+                <QuestPicker enrichmentId={selectedEnrichmentId!} recommended={recommended} candidates={candidates} currentTarget={target} />
               </CardContent>
             </Card>
 
@@ -109,7 +106,7 @@ export default async function StudyStartPage({
                   <CardDescription>Mocked identity — no auth.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3 pt-4">
-                  {isFoundationalGoal({ journeySize: targetJourney }) ? (
+                  {targetCandidate?.isFoundational ? (
                     <p className="text-sm text-muted-foreground">
                       <span className="font-medium">{targetNode.label}</span> is foundational — it has no prerequisites,
                       so you&apos;ll study it directly.

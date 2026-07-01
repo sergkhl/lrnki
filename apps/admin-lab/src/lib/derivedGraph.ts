@@ -5,7 +5,7 @@
 // `tsx --test` and feed both the Cytoscape render and its required equivalent
 // textual node-and-edge representation (U6 test scenario 8).
 
-import { labelFor, prerequisiteAncestors, type AdaptedNodeClassification, type AdaptedNodeState } from "@lrnki/application";
+import { labelFor, type AdaptedNodeClassification, type AdaptedNodeState } from "@lrnki/application";
 import type {
   DerivedGraphDetail,
   DerivedGraphEdge,
@@ -133,62 +133,6 @@ function summarizeDomainOrigins(nodes: DerivedGraphNode[]) {
   return [...byDomain.entries()]
     .map(([domain, counts]) => ({ domain, ...counts }))
     .sort((a, b) => a.domain.localeCompare(b.domain));
-}
-
-// --- Goal-first picker helpers (U4, R1/R2/R3) ------------------------------
-
-// One goal candidate for the goal-first study start. `journeySize` is how many concepts
-// must be learned before this goal — its TRUSTED (certain-edge) prerequisite-ancestor
-// count (R2). A zero-journey goal is foundational (R3).
-export interface GoalCandidate {
-  derivedNodeId: string;
-  label: string;
-  aliases: string[];
-  declaredDomain: string;
-  nodeKind: DerivedNodeKind;
-  hasStudyItem: boolean;
-  journeySize: number;
-}
-
-// Journey size = the count of trusted prerequisite ancestors (R2). Uncertain edges are
-// excluded, matching the readiness/down-closure trust model. Pure and unit-testable.
-export function journeySize(
-  targetDerivedNodeId: string,
-  edges: Pick<DerivedGraphEdge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId" | "uncertain">[]
-): number {
-  return prerequisiteAncestors(targetDerivedNodeId, edges.filter((edge) => !edge.uncertain)).size;
-}
-
-// Build goal candidates from a graph detail, each tagged with its journey size (R1/R2).
-export function goalCandidates(detail: Pick<DerivedGraphDetail, "nodes" | "edges">): GoalCandidate[] {
-  return detail.nodes.map((node) => ({
-    derivedNodeId: node.derivedNodeId,
-    label: node.label,
-    aliases: node.aliases,
-    declaredDomain: node.declaredDomain,
-    nodeKind: node.nodeKind,
-    hasStudyItem: node.hasStudyItem,
-    journeySize: journeySize(node.derivedNodeId, detail.edges)
-  }));
-}
-
-// Filter + order goal candidates for the picker (R1/R2): a case-insensitive substring
-// match on the label OR any alias; larger journeys first, ties broken by label. An empty
-// query matches everything. Pure, unit-testable; the page wiring is inspected in U8.
-export function filterAndOrderGoals(candidates: GoalCandidate[], query: string): GoalCandidate[] {
-  const q = query.trim().toLowerCase();
-  const matches = (candidate: GoalCandidate): boolean =>
-    q.length === 0 ||
-    candidate.label.toLowerCase().includes(q) ||
-    candidate.aliases.some((alias) => alias.toLowerCase().includes(q));
-  return candidates
-    .filter(matches)
-    .sort((a, b) => b.journeySize - a.journeySize || a.label.localeCompare(b.label));
-}
-
-// A zero-journey goal is foundational — studied directly, no prerequisite cone (R3).
-export function isFoundationalGoal(candidate: Pick<GoalCandidate, "journeySize">): boolean {
-  return candidate.journeySize === 0;
 }
 
 // The distinct declared domains present on the canvas, sorted deterministically. Each
