@@ -64,6 +64,13 @@ export {
   type ConceptIdentityResolutionResult,
   type ConceptIdentityUnavailable
 } from "./resolveConceptIdentity";
+export {
+  probeKnowledgeBoundary,
+  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  type KnowledgeBoundaryDisposition,
+  type KnowledgeBoundaryVerdict,
+  type KnowledgeBoundaryProbeConfig
+} from "./knowledgeBoundaryProbe";
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
