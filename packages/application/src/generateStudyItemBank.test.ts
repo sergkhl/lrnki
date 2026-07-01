@@ -765,3 +765,77 @@ test("a minted lesson with no surviving citation can still anchor generated opti
   assert.ok(persisted.length >= 1);
   assert.ok(persisted.every((item) => item.groundingProvenance === "generated"));
 });
+
+// --- U7: study assets over a synthetic (source-less) layer ---------------------
+
+function syntheticNode(opts: { id?: string; label?: string; def: string }) {
+  const id = opts.id ?? "node-syn";
+  return {
+    nodeKind: "enrichment" as const,
+    derivedNodeId: id,
+    groundingOrigin: "llm_grounded" as const,
+    // A synthetic_primary node carries NO mintingReason.
+    role: "synthetic_primary" as const,
+    layer: "derived" as const,
+    canonicalLabel: opts.label ?? "Photosynthesis",
+    normalizedLabel: (opts.label ?? "Photosynthesis").toLowerCase(),
+    declaredDomain: "biology",
+    aliases: [],
+    groundingBundle: {
+      derivedNodeId: id,
+      groundingOrigin: "llm_grounded" as const,
+      definitions: [{ passageType: "definition" as const, text: opts.def, groundingOrigin: "llm_grounded" as const, headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding" as const, rationale: "generated" } }],
+      mentions: [],
+      scaffoldedAnchorConceptIds: [],
+      generatingModel: "mock",
+      rationale: "topic concept"
+    }
+  };
+}
+
+function syntheticLayer(nodes: DerivedGraphLayer["derivedNodes"]): DerivedGraphLayer {
+  return { enrichmentId: "enr-syn", graphVersionId: null, enrichmentConfigHash: "synthetic-topic-generation", judgeModel: "mock", derivedNodes: nodes, prerequisiteEdges: [], difficulties: [] };
+}
+
+function generatedLessonDraft(nodeId: string, def: string): ConceptLessonDraft {
+  return {
+    sections: [
+      { kind: "gist", text: "A one-line gist." },
+      { kind: "definition", text: "A definition restating the concept.", citation: { passageId: `${nodeId}:definition:0`, evidenceQuote: def } },
+      { kind: "applications", text: "How it connects to neighbors." }
+    ]
+  };
+}
+
+test("Covers R9: study items + lessons generate over a synthetic (null-version) layer with generated provenance only", async () => {
+  const def = "Photosynthesis converts light energy into chemical energy.";
+  const node = syntheticNode({ def });
+  const { store, persisted } = capturingStore();
+  const lessonStore = capturingLessonStore();
+  // A graphStore that throws if consulted proves the synthetic path reads NO published snapshot.
+  const graphStore = { async getPublishedSnapshot() { throw new Error("synthetic layer must not read a published snapshot"); } } as unknown as GraphVersionStorePort;
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-syn",
+    configHash: "cfg-syn",
+    graphStore,
+    enrichmentStore: enrichmentStoreReturning(syntheticLayer([node])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-syn": generatedLessonDraft("node-syn", def) } }),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: generationReturning({ optionSelect: { "node-syn": osDraft(def, ["Respiration", "Osmosis", "Diffusion"], "node-syn:definition:0") } }),
+    studyItemBankStore: store
+  });
+
+  assert.equal(result.graphVersionId, null, "the result carries the synthetic layer's null version");
+  assert.equal(result.lessons.length, 1);
+  assert.equal(result.lessons[0].graphVersionId, null);
+  assert.ok(persisted.length >= 1, "at least one study item generated over the synthetic node");
+  // No source-citation arm: every synthetic item + lesson section is generated provenance.
+  for (const item of persisted) {
+    assert.equal(item.graphVersionId, null);
+    assert.equal(item.groundingProvenance, "generated");
+  }
+  for (const lesson of lessonStore.lessons) {
+    assert.equal(lesson.graphVersionId, null);
+    assert.ok(lesson.sections.every((section) => section.groundingProvenance === "generated"));
+  }
+});

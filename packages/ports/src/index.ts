@@ -439,7 +439,7 @@ export interface LearnerPathStorePort {
 // stored map (KTD2, rule 18). Rejected nodes are persisted so the no-item frontier
 // fallback reads the real rejection reason instead of guessing from grounding origin.
 export interface StudyItemBankStorePort {
-  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
+  persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
   listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]>;
   supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
@@ -454,7 +454,7 @@ export interface StudyItemBankStorePort {
 // powers the Study Session ride-down and the operator visibility surface. A learner-NEUTRAL
 // derived asset: this port imports no graph/enrichment write port (R9).
 export interface ConceptLessonStorePort {
-  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
+  persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
   getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined>;
   listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]>;
   listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
@@ -711,7 +711,9 @@ export interface DerivedGraphNode {
   difficultyRationale: string | null;
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
-  role: "anchor" | "prerequisite";
+  // `synthetic_primary` is a first-class topic concept from the synthetic arm (ADR-0019
+  // amended); it renders like any other derived node in the inspection surface.
+  role: "anchor" | "prerequisite" | "synthetic_primary";
   hasStudyItem: boolean;
   grounding: NodeGroundingView | null;
 }
@@ -763,7 +765,8 @@ export interface NodeMergeView {
 
 export interface EnrichmentSummary {
   enrichmentId: string;
-  graphVersionId: string;
+  // NULL for a synthetic (source-less) layer; non-null for source-derived enrichment.
+  graphVersionId: string | null;
   enrichmentConfigHash: string;
   judgeModel: string;
   difficultyMethod: string;

@@ -275,3 +275,36 @@ test("conceptLessonToView badges source vs generated sections from authoritative
   const view = conceptLessonToView(lessonFor("scope"));
   assert.deepEqual(view.sections.map((s) => s.isSourceCited), [false, true, false]);
 });
+
+// U7/R10: the Study Session projection renders over an ANCHOR-LESS synthetic layer with no
+// new primitive. A synthetic detail carries only enrichment/synthetic_primary nodes and a
+// null version; target resolution and locked/frontier gating key on derivedNodeId, so the
+// session composes identically to a source-grounded layer.
+function syntheticDetail(): DerivedGraphDetail {
+  const base = detail();
+  return {
+    ...base,
+    summary: { ...base.summary, graphVersionId: null },
+    nodes: base.nodes.map((n) => ({ ...n, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "synthetic_primary" }))
+  };
+}
+
+test("composeStudySession renders over an anchor-less synthetic layer, resolving the target and gating by derivedNodeId (R10)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "move",
+    detail: syntheticDetail(),
+    studyItems: [optionItem("scope")],
+    rows: [],
+    verdicts: []
+  });
+  // The synthetic target resolves and the DAG gates: scope is the frontier, move stays locked
+  // behind its certain prerequisite (ownership); the uncertain edge is excluded — identical to
+  // the source-grounded projection, with no anchor in the layer.
+  assert.equal(session.classification.selectedFrontierTarget, "scope");
+  assert.equal(session.sheetByNode.scope.kind, "option_select");
+  const move = session.sheetByNode.move;
+  assert.equal(move.kind, "locked");
+  assert.deepEqual(move.kind === "locked" && move.unmetPrerequisiteLabels, ["Ownership"]);
+});

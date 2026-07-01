@@ -27,7 +27,7 @@ const SECTION_ORDER: ConceptLessonSectionKind[] = ["gist", "intuition", "definit
 const SUBSTANTIVE_KINDS: ConceptLessonSectionKind[] = ["definition", "examples", "formulas"];
 
 export type AssembleConceptLessonInput = {
-  node: { derivedNodeId: string; canonicalLabel: string; graphVersionId: string; enrichmentId: string };
+  node: { derivedNodeId: string; canonicalLabel: string; graphVersionId: string | null; enrichmentId: string };
   generatingModel: string;
   configHash: string;
   grounding: NodeGrounding;

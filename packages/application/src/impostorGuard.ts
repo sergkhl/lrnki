@@ -24,7 +24,7 @@ import { normalizeOptionText, type OptionSelectGroundingPassage } from "./option
 // passage shape is shared with option-select (rule 18). Built by the fan-out (U5).
 export type ImpostorGrounding = {
   studyItemId: string;
-  graphVersionId: string;
+  graphVersionId: string | null;
   enrichmentId: string;
   derivedNodeId: string;
   groundingProvenance: StudyItemGroundingProvenance;

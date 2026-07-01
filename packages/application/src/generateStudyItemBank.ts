@@ -29,7 +29,7 @@ export const IMPOSTOR_GENERATION_ATTEMPTS = 2;
 export type { RejectedStudyItem };
 
 export type StudyItemBankGenerationResult = {
-  graphVersionId: string;
+  graphVersionId: string | null;
   enrichmentId: string;
   studyItems: StudyItem[];
   rejected: RejectedStudyItem[];
@@ -77,16 +77,16 @@ export async function generateStudyItemBank(input: {
   return runWithOperationTag(operationId, async () => {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
-  // Study-item generation grounds against the published graph snapshot (below), so it requires a
-  // non-null version. Synthetic (versionless) layers are wired in U7; reject them explicitly here.
-  if (layer.graphVersionId === null) {
-    throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} is a synthetic versionless layer; study-item generation over synthetic layers lands in U7.`);
-  }
-  // Narrowed to string by the guard above; a local const keeps the narrowing across the awaits
-  // below, which TS otherwise widens back to `string | null` on property access.
+  // A synthetic (versionless) layer reads no published snapshot: every synthetic node is
+  // `llm_grounded` and self-grounds from its Grounding Bundle (selectNodeGrounding never
+  // touches the snapshot for a non-anchor node), so an EMPTY snapshot is sufficient and the
+  // null version threads through persistence unchanged (U7, KTD6). A source-derived layer
+  // still requires its published snapshot for anchor grounding.
   const graphVersionId = layer.graphVersionId;
-  const snapshot = await input.graphStore.getPublishedSnapshot(layer.graphVersionId);
-  if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${layer.graphVersionId} is not published.`);
+  const snapshot = graphVersionId === null
+    ? { graphVersionId: "", baseGraphVersionId: null, concepts: [], evidenceProfiles: [] }
+    : await input.graphStore.getPublishedSnapshot(graphVersionId);
+  if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${graphVersionId} is not published.`);
   await reporter.beginOperation({ operationType: "study_items", operationId });
   // A thrown stage (e.g. a failed persist) closes the stage ok:false, marks the
   // operation `failed`, and propagates — the same single-source failure semantics

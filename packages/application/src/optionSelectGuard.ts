@@ -31,7 +31,7 @@ export type OptionSelectGroundingPassage =
 // to. Built by the fan-out (U5) from the node's selected grounding.
 export type OptionSelectGrounding = {
   studyItemId: string;
-  graphVersionId: string;
+  graphVersionId: string | null;
   enrichmentId: string;
   derivedNodeId: string;
   groundingProvenance: StudyItemGroundingProvenance;
