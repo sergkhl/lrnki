@@ -10,6 +10,7 @@ import {
 import { composeMastery, pruneClosure, struggledNodes, suggestRestorations } from "./calibrationClosure";
 import { prerequisiteAncestors } from "./prerequisiteDag";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoopProjection";
+import { projectStatefulLearnerPath, type StatefulLearnerPathStep } from "./statefulLearnerPath";
 
 // The PURE Study Session projection (ADR-0027 projection compute; CONTEXT.md "Study
 // Session"). A Study Session is a learner-stateful, goal-scoped projection over one Derived
@@ -262,6 +263,9 @@ export type StudySession = {
   // A DAG-root goal whose trusted prerequisite cone is just itself — studied directly as a
   // single-node screen; never an empty calibration nor a premature "Goal reached".
   isFoundationalRoot: boolean;
+  // Ordered, unpruned target-scoped Learner Path steps. The state is read from the same
+  // whole-layer classification that the map overlay uses, so the ladder cannot drift.
+  statefulPath: StatefulLearnerPathStep[];
   // Calibration `known` ∩ graded — coexistence SURFACED, not silently resolved.
   coexistence: CoexistenceFlag[];
   // Restoration nudges for nodes the learner missed while studying the gap.
@@ -341,6 +345,7 @@ export function composeStudySession(input: {
     difficulties
   });
   const classification: AdaptedNodeClassification = { stateByNode: baseClassification.stateByNode, selectedFrontierTarget };
+  const statefulPath = projectStatefulLearnerPath({ targetDerivedNodeId, detail, stateByNode: classification.stateByNode });
 
   const labelByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
   const verdictByNode = new Map(input.verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
@@ -399,6 +404,7 @@ export function composeStudySession(input: {
     adaptedHiddenNodeIds: hiddenNodeIds,
     responseSourceSummary: summarizeResponseSources(input.rows),
     isFoundationalRoot,
+    statefulPath,
     coexistence,
     restorations,
     sheetByNode,

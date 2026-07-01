@@ -166,6 +166,8 @@ export {
   type SyntheticLearnerProfile
 } from "./syntheticResponses";
 export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
+export { buildTargetCandidates, recommendedTargets, filterTargets, type TargetCandidate } from "./targetCandidates";
+export { projectStatefulLearnerPath, type StatefulLearnerPathStep } from "./statefulLearnerPath";
 export {
   cutWeakEdges,
   findCycleEdges,

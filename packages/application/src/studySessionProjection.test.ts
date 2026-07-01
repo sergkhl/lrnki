@@ -183,6 +183,14 @@ test("composeStudySession marks a DAG-root goal as a foundational root", () => {
   assert.equal(compose({ target: "move" }).isFoundationalRoot, false);
 });
 
+test("composeStudySession rides down an unpruned statefulPath scoped to the target and trusted ancestors", () => {
+  const session = compose({ target: "move", verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
+  assert.deepEqual(session.statefulPath.map((step) => step.derivedNodeId), ["scope", "ownership", "move"]);
+  assert.equal(session.statefulPath.find((step) => step.derivedNodeId === "scope")?.state, session.classification.stateByNode.scope);
+  assert.equal(session.statefulPath.find((step) => step.derivedNodeId === "move")?.isTarget, true);
+  assert.equal(session.statefulPath.some((step) => step.derivedNodeId === "borrow"), false, "uncertain ancestors are excluded from scope");
+});
+
 test("composeStudySession prunes the known closure, excludes the goal from the hide list even when known, and is ordering-independent", () => {
   const verdicts: CalibrationVerdict[] = [{ learnerStateRef: "L1", derivedNodeId: "ownership", verdict: "known" }];
   const session = compose({ target: "move", verdicts });
