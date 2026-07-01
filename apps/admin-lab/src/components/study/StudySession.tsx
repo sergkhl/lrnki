@@ -19,8 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 // option-select submit. Every write goes through server actions that revalidate the session
 // route, so mastery is never held client-side.
 export function StudySession({ session }: Readonly<{ session: StudySessionData }>) {
-  // A foundational root goal opens directly on its single node (R3) — never empty, never
-  // a premature "Goal reached."
+  // A foundational root target opens directly on its single node — never empty, never a
+  // premature completion state.
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(session.isFoundationalRoot ? session.target.derivedNodeId : null);
   const [sheetOpen, setSheetOpen] = useState(session.isFoundationalRoot);
   const [mapScope, setMapScope] = useState<"focused" | "full">("focused");
@@ -38,8 +38,8 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   // does not remount) and resets when the node changes.
   const [answeredSegmentIds, setAnsweredSegmentIds] = useState<Set<string>>(new Set());
 
-  // "Goal reached" only when the goal is NOT a foundational root and its whole cone is
-  // mastered. A foundational root always shows its single-node study screen instead (R3/AE1).
+  // Complete only when the target is NOT a foundational root and its whole cone is mastered.
+  // A foundational root always shows its single-node study screen instead.
   const questComplete = isPathComplete(session.classification, session.isFoundationalRoot);
   const sourceSummary = session.responseSourceSummary;
   const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
@@ -117,9 +117,9 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     answerSegment(studyItemId, () => submitImpostor({ learnerStateRef: session.learnerStateRef, studyItemId, chosenStatementId: statementId }));
   };
 
-  // Advance effect (R4/AE1): when a DIFFERENT session arrives after a graded answer, retarget
+  // Advance effect: when a DIFFERENT session arrives after a graded answer, retarget
   // the open sheet to the freshly-advanced frontier target; a null target with no foundational
-  // root means the goal is reached — close the sheet.
+  // root means the quest is complete — close the sheet.
   useEffect(() => {
     if (!pendingAdvanceRef.current || session === sessionAtAnswerRef.current) return;
     pendingAdvanceRef.current = false;
@@ -219,6 +219,20 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
               <span className="font-medium">Foundational — studied directly.</span>{" "}
               <span className="text-muted-foreground">
                 {session.target.label} has no prerequisites. Open it to study it, or skip it as already known.
+              </span>
+            </span>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {session.studyItemCount === 0 ? (
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4 text-sm">
+            <TriangleAlertIcon className="size-5 text-chart-5" />
+            <span>
+              <span className="font-medium">No study items yet.</span>{" "}
+              <span className="text-muted-foreground">
+                The quest ladder and map are still inspectable; frontier steps open as cardless study actions.
               </span>
             </span>
           </CardContent>

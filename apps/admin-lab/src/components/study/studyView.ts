@@ -18,8 +18,8 @@ export function shouldAcceptSheetOpenChange(nextOpen: boolean, autoAdvanceDismis
 
 // The next node to study after a frontier item is answered. The server re-folds mastery and
 // re-classifies after each answer; this reads the freshly-advanced frontier target so the
-// open sheet can retarget to it. `null` means the goal is reached (nothing ready+unmastered)
-// — the caller closes the sheet and shows a completion state. Accepts a minimal structural
+// open sheet can retarget to it. `null` means the path is complete (nothing ready+unmastered)
+// — the caller closes the sheet and shows completion. Accepts a minimal structural
 // shape so this module stays free of any Admin-Lab / application import.
 export function nextStudyTarget(classification: { selectedFrontierTarget: string | null }): string | null {
   return classification.selectedFrontierTarget;

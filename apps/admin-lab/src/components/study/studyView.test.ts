@@ -14,7 +14,7 @@ test("nextStudyTarget returns the freshly-advanced frontier target when present 
   assert.equal(nextStudyTarget({ selectedFrontierTarget: "node-2" }), "node-2");
 });
 
-test("nextStudyTarget returns null when the goal is reached (no frontier target)", () => {
+test("nextStudyTarget returns null when the path is complete (no frontier target)", () => {
   assert.equal(nextStudyTarget({ selectedFrontierTarget: null }), null);
 });
 
