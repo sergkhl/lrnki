@@ -27,6 +27,14 @@
    Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
    `tmp/2026-06-30-generation-metering/`.
 
+4. **Validate learner-facing projections for anchor-less synthetic layers.** The Learner Paths view,
+   the deferred adaptive path, and anchor-based target resolution were validated only on
+   source-grounded layers. The synthetic generation arm (plan
+   `2026-06-30-001-feat-synthetic-topic-generation-plan.md`) introduces anchor-less `llm_grounded`
+   layers those projections have never seen; the `nodeKind === "anchor"` target resolution is the
+   known assumption. Audit and adapt them beyond the Study Session that plan already covers. Depends
+   on the synthetic arm landing first.
+
 ## COMPLETED
 
 - **Generation pipeline metering and bounded Study Item Bank concurrency.** Bottleneck reports now
