@@ -1,12 +1,12 @@
 # Gate synthesized content on probed model knowledge with a web-grounding fallback
 
-Status: Proposed
+Status: Accepted for the probe half; the web-grounding fallback stays Proposed (deferred).
 
 ## Decision
 
 Before a model synthesizes world-knowledge content for a concept it cannot cite to a curated
-source, probe whether the concept is core model knowledge. A dedicated low-parameter LiteLLM alias,
-separate from the synthesizing model, runs the probe cheaply.
+source, probe whether the concept is core model knowledge. A dedicated small-parameter LiteLLM alias,
+separate from the synthesizing model and cross-family from it, runs the probe cheaply.
 
 - When the probe shows the concept is core knowledge, synthesize from parametric knowledge as today.
 - When the probe shows the concept at or beyond the model's knowledge boundary, do not synthesize
@@ -14,12 +14,22 @@ separate from the synthesizing model, runs the probe cheaply.
   reserved `web_grounded` Grounding Origin owned by
   [ADR-0023](0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
 
-The probe prefers a consistency-based signal — sample agreement at low temperature — over verbalized
-self-confidence, because verbalized confidence is weakly calibrated. It reuses the non-deterministic
-measurement stance of
-[ADR-0028](0028-measure-non-deterministic-quality-with-non-deterministic-methods.md). A low-parameter
+The probe prefers a consistency-based signal — semantic agreement across K sampled draws — over
+verbalized self-confidence, because verbalized confidence is weakly calibrated. Agreement is measured
+with the existing embedding port (ADR-0012 similarity use), not lexical overlap and not a new judge.
+Sampling is at **moderate** temperature, not low: low temperature masks confident hallucination
+behind a repeated wrong answer, whereas self-consistency needs sampling diversity to expose a
+knowledge boundary as answer dispersion. It reuses the non-deterministic measurement stance of
+[ADR-0028](0028-measure-non-deterministic-quality-with-non-deterministic-methods.md). A small-parameter
 model is a deliberate choice: factual recall tracks concept popularity, so a small model cheaply
 reveals whether a concept is popular/core or long-tail.
+
+The probe half is IMPLEMENTED (plan 2026-06-30-001): Synthetic Topic Generation probes every
+synthesized concept and routes `core_knowledge` to a `synthetic_primary` `llm_grounded` node and
+`boundary` to an `uncertain` disposition — retained, inspectable, excluded from trusted learner
+surfaces. The web-retrieval fallback is STUBBED at that exact `boundary` seam: it stays deferred, so
+`web_grounded` remains reserved in ADR-0023 and a `boundary` concept is held out rather than retrieved
+until the retrieval branch lands, which will replace the `uncertain` route without restructuring.
 
 Scope is every synthesis locus that asserts factual content with no curated-source citation:
 
@@ -50,6 +60,8 @@ through a cheap popularity-correlated probe is the conventional signal for that 
 grounding-origin model already reserved `web_grounded` for this path, so activating it extends an
 anticipated seam rather than adding a layer.
 
-This decision is Proposed and not yet implemented, so `web_grounded` stays reserved in
-[ADR-0023](0023-grounding-origin-model-and-cross-family-generated-node-judge.md) and the synthesized
-Concept Lesson sections are generated unconditionally until this work lands.
+The probe half is now implemented for Synthetic Topic Generation (plan 2026-06-30-001). The
+web-grounding fallback remains deferred, so `web_grounded` stays reserved in
+[ADR-0023](0023-grounding-origin-model-and-cross-family-generated-node-judge.md), a `boundary`
+concept is held out as an `uncertain` disposition rather than retrieved, and the synthesized Concept
+Lesson sections are still generated unconditionally until the retrieval branch lands.

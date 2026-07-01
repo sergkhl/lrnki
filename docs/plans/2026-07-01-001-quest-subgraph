@@ -1,0 +1,67 @@
+# Quest Subgraph Study Mechanic
+
+  ## Summary
+
+  Replace the current “every node is a goal” study picker with a quest-target model. A quest is learner-facing UI around a technical
+  target concept. The Study Session remains target-scoped; the visible graph becomes a limited quest subgraph instead of the whole
+  Derived Graph Layer by default.
+
+  This keeps goal-guided mastery behavior while fixing the confusing “many goals, same graph” UX. The direction is consistent with
+  cognitive-load guidance for small focused chunks, mastery-learning feedback tied to goals, and goal-oriented learning-path work.
+  (edresearch.edu.au
+  (https://www.edresearch.edu.au/summaries-explainers/explainers/managing-cognitive-load-optimises-learning?utm_source=openai))
+  (tguskey.com (https://tguskey.com/wp-content/uploads/Mastery-Learning-3-Lessons-of-Mastery-Learning.pdf?utm_source=openai))
+  (dl.acm.org (https://dl.acm.org/doi/abs/10.1145/3583780.3614897?utm_source=openai))
+
+  ## Key Changes
+
+  - Rename study UI copy from “goal” to “quest” / “target concept.”
+  - Replace goalCandidates(detail) behavior with quest-target helpers:
+      - Recommended quests = milestone nodes.
+      - Milestone node = non-foundational target with trusted prerequisite ancestors and no trusted outgoing dependent edges.
+      - If fewer than 3 milestones exist, fill from highest journeySize > 0.
+      - Cap recommended quests at 8.
+      - Search still exposes all concepts as advanced target concepts.
+
+  - Keep route/API shape unchanged: target=<derivedNodeId> remains the technical target.
+  - Add quest graph scoping:
+      - questCone = trusted prerequisite ancestors + target.
+      - If cone size is <= 9, show the full quest cone.
+      - If cone size is > 9, show the current frontier neighborhood intersected with the quest cone, always including the target.
+      - Add a “Quest / Full map” toggle; Full map preserves today’s whole-layer graph.
+
+  - Preserve existing learner-state behavior:
+      - Mastered/frontier/locked classification still comes from composeStudySession.
+      - Known-closure hiding still applies in adapted quest view.
+      - “Goal reached” becomes “Quest complete.”
+
+  ## Implementation Notes
+
+  - Keep reusable pure graph helpers near the existing derived graph helpers first, then promote to @lrnki/application only if the
+    Learner App starts consuming them.
+
+  - Update GoalPicker into a quest picker with “Recommended quests” and “Search all target concepts.”
+  - Update StudySession to compute visible quest detail before passing it to DerivedGraphExplorer.
+  - Add minimal optional copy props to DerivedGraphExplorer if needed so the card can say “Quest map” without changing the neutral
+    enrichment page.
+
+  - Update CONTEXT.md with Study Target as the technical term if implementation renames public domain language; add an Auto Quest
+    Chain TODO, not an ADR.
+
+  ## Test Plan
+
+  - Unit-test milestone selection, fallback fill, search-all behavior, and sorting.
+  - Unit-test quest cone and 9-node cap behavior.
+  - Unit-test large-cone visible set: frontier neighborhood intersected with cone plus target.
+  - Regression-test current Rust graph expectation: recommended quests should include terminal milestones like Move semantics, String
+    Type, Copy trait, Memory management, and Variable Scope, not every foundational node.
+
+  - Run admin-lab tests and typecheck.
+  - Real-use gate: inspect /admin/lab/study on the latest Rust enrichment and one non-Rust enrichment to confirm the page feels like
+    focused quests, not a full graph picker.
+
+  ## Assumptions
+
+  - Auto Quest Chain is deferred; Quest Subgraph is the simpler intermediate step.
+  - 9 is the visible full-cone cap.
+  - Whole graph remains available as context, but not as the default active learning goal.

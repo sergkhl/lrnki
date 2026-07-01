@@ -71,6 +71,11 @@ export {
   type KnowledgeBoundaryVerdict,
   type KnowledgeBoundaryProbeConfig
 } from "./knowledgeBoundaryProbe";
+export {
+  runSyntheticGeneration,
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+  type SyntheticGenerationConfig
+} from "./runSyntheticGeneration";
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
