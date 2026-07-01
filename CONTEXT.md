@@ -133,6 +133,28 @@ _Avoid_: published concept, asserted node, anchor
 The CEP-shaped, source-quoteless grounding generated for an `llm_grounded` Enrichment Node.
 _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 
+**Synthetic Topic Generation**:
+The second derived-fact-producing operation. From a `topic` plus a Declared Domain it generates a
+free-standing, **anchor-less** Derived Graph Layer of `synthetic_primary` nodes with a null
+published-version link, gated per concept by the Knowledge-Boundary Probe. It runs no Extraction Run
+and no Graph-Version Build and never writes the asserted graph. Owned by
+[ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
+_Avoid_: synthetic Grounding Origin, asserted synthetic concept, curated-source treatment of generated text
+
+**Synthetic Concept**:
+A `synthetic_primary` `llm_grounded` Enrichment Node — a first-class topic concept produced by
+Synthetic Topic Generation and grounded by a Generated Grounding Bundle that cites no source. Its
+provenance is owned by [ADR-0023](docs/adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
+_Avoid_: minted prerequisite, `source_mentioned`, published concept
+
+**Knowledge-Boundary Probe**:
+The per-concept gate for Synthetic Topic Generation: a small cross-family LiteLLM alias answers K
+times at moderate temperature, and semantic agreement measured with the existing embedding port
+yields `core_knowledge` (synthesize) or `boundary` (an `uncertain` disposition, retained and
+inspectable but held out of trusted learner surfaces). Owned by
+[ADR-0030](docs/adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+_Avoid_: verbalized confidence, lexical overlap, new judge
+
 **Learner Path**:
 A projection of one Derived Graph Layer for a target `derived_node_id` and Learner State.
 _Avoid_: course, personalized graph, concept-keyed learner state

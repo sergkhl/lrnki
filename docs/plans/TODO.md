@@ -29,13 +29,39 @@
 
 4. **Validate learner-facing projections for anchor-less synthetic layers.** The Learner Paths view,
    the deferred adaptive path, and anchor-based target resolution were validated only on
-   source-grounded layers. The synthetic generation arm (plan
-   `2026-06-30-001-feat-synthetic-topic-generation-plan.md`) introduces anchor-less `llm_grounded`
-   layers those projections have never seen; the `nodeKind === "anchor"` target resolution is the
-   known assumption. Audit and adapt them beyond the Study Session that plan already covers. Depends
-   on the synthetic arm landing first.
+   source-grounded layers. The now-landed Synthetic Topic Generation arm introduces anchor-less
+   `llm_grounded` layers those projections have never seen; the `nodeKind === "anchor"` target
+   resolution is the known assumption. Audit and adapt them beyond the Study Session already covered.
+   Decision: [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md).
+
+5. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+   synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
+   textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
+   shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
+   AE2's disposition is exercised by unit tests only. Measure-first: probe deliberately fringe or
+   contested concepts, inspect the K-draw semantic dispersion, and tune temperature/threshold (or
+   confirm the concepts are genuinely core knowledge) before the deferred `web_grounded` retrieval
+   branch is built on this seam. Decision:
+   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
 ## COMPLETED
+
+- **Synthetic Topic Generation — a second pipeline arm.** A `topic` plus a Declared Domain now
+  produces a free-standing, anchor-less Derived Graph Layer of `synthetic_primary` `llm_grounded`
+  nodes with no Extraction Run and no Graph-Version Build, gated per concept by the Knowledge-Boundary
+  Probe (a small cross-family LiteLLM alias sampled K times at moderate temperature, semantic
+  agreement measured via the existing embedding port). A `core_knowledge` concept synthesizes a
+  Generated Grounding Bundle and becomes a trusted node; a `boundary` concept routes to an `uncertain`
+  disposition held out of trusted surfaces — the seam the deferred `web_grounded` retrieval branch
+  replaces without restructuring. The layer stores a null published-version link (the relaxed nullable
+  `graph_version_id`), the asserted graph and `graph_versions` are never written, and the reused
+  downstream machinery — whole-set prerequisite ordering, intrinsic difficulty, Study Item Bank,
+  Concept Lessons, and the Study Session projection — runs over it with the single anchor-less
+  target-resolution fix (resolve by `derivedNodeId` when the layer has no anchor). Launched by the
+  worker `generate-synthetic-layer <topic> <declaredDomain>` command; the source-grounded arm is
+  untouched. Decisions: [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
+  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md), and
+  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
 - **Generation pipeline metering and bounded Study Item Bank concurrency.** Bottleneck reports now
   attribute every Study Item Bank LLM stage owned by the `study_items` operation:
@@ -145,6 +171,27 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Synthetic Topic Generation, 2026-07-01.** Deterministic envelope: `@lrnki/infrastructure-litellm`
+  typecheck green and its suite green (102 tests) for the grounding-schema cap fix; U1–U7 landed their
+  package suites green in their own commits (`452c887`…`ed7494f`). **Real-use gate (rule 14):** three
+  topics across mixed domains ran end to end on real production calls on a live DB — Photosynthesis
+  [biology] (14 concepts, 14 `core_knowledge` / 0 `boundary`, enrichment `eb6e5ac1`), Quantum error
+  correction [physics] (12 / 12 / 0, `21b8c077`), and Mechanistic interpretability of neural networks
+  [machine learning] (12 / 12 / 0, `02afc709`) — each producing an anchor-less layer with a null
+  `graph_version_id`, whole-set prerequisite ordering, and intrinsic difficulty over every node. The
+  honesty invariant is proven at the data level across every synthetic run persisted (8 null-version
+  enrichments / 48 `synthetic_primary` nodes): **0 source-block citations, 0 evidence quotes, all
+  `llm_grounded`**, and the asserted `graph_versions` registry (192 rows) was untouched — 0 asserted
+  writes. Inspected synthesized definitions are domain-accurate (photosystems PSII/PSI; fault-tolerance
+  error thresholds; transversal gates), not filler. **Defect found and fixed by the gate:** the reused
+  generated-grounding schema capped `definitions` at 2 (sized for minted prerequisites) and exhausted
+  the forced-tool call when a first-class concept warranted 3, failing the whole operation; raised to
+  `max(4)` (3 of the 14 Photosynthesis nodes then legitimately persisted 3 definitions; 11 self-limited
+  to 2). **Result: PASS** for the core arm (AE1 core→`synthetic_primary` demonstrated 38/38; AE3
+  honesty invariant proven). **Caveat:** the `boundary`→`uncertain` route (AE2) did **not** fire on any
+  real run (0 / 38 concepts); its mechanism is unit-tested only, and probe calibration is TODO item 5.
+  Trail: `tmp/2026-07-01-synthetic-topic-rule14/`.
 
 - **Generation pipeline metering and bounded Study Item Bank concurrency, 2026-06-30.** Application
   test suite green (389 tests), kg-worker suite green (8 tests), and package typechecks green for
