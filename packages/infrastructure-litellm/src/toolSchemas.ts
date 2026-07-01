@@ -172,6 +172,34 @@ export function buildPrerequisiteOrderingSchema(n: number): JsonSchema {
   return toForcedToolSchema(buildPrerequisiteOrderingValidator(n));
 }
 
+// --- Concept-set synthesis: submit_synthesized_concepts (U2, R1/R2) -------
+// The source-less analog of Candidate Discovery (plan 2026-06-30-001). ONE forced-tool
+// call generates a bounded concept set from a topic + Declared Domain alone; the set is
+// generated, not gated for coverage or grain in this build. Domain-neutral rubric
+// language only (AGENTS rule 17): the schema names no topic and lists no exemplars.
+
+export const conceptSetSynthesisValidator = z.object({
+  concepts: z.array(z.object({
+    conceptKey: z.string().min(1).describe("Short stable slug unique within this concept set, e.g. 'topic_x'."),
+    canonicalLabel: z.string().min(1).describe("Precise, domain-qualified label naming one durable, independently-teachable concept within the topic."),
+    aliases: z.array(z.string().min(1)).describe("Exact alternative surface forms for the same concept; empty when there are none.")
+  }).strict()).describe("A bounded set of durable, independently-teachable concepts a learner would study to understand the topic within the Declared Domain. Name concepts, not propositions or claims.")
+}).strict();
+
+export const conceptSetSynthesisSchema: JsonSchema = toForcedToolSchema(conceptSetSynthesisValidator);
+
+// --- Knowledge-boundary probe: submit_knowledge_boundary_answer (U2, R6/R7)
+// ONE draw of the self-consistency probe (plan 2026-06-30-001, KTD4). A pointed factual
+// answer about one concept; the application samples this K times at moderate temperature
+// and measures semantic agreement across the `answer` strings with the embedding port to
+// route the concept to core_knowledge/boundary (U3). Domain-neutral rubric (rule 17).
+
+export const knowledgeBoundaryProbeValidator = z.object({
+  answer: z.string().min(1).describe("A single self-contained factual characterization of the concept as understood in the Declared Domain: its core meaning and the one or two facts most central to it. Concise prose, no hedging or meta-commentary.")
+}).strict();
+
+export const knowledgeBoundaryProbeSchema: JsonSchema = toForcedToolSchema(knowledgeBoundaryProbeValidator);
+
 // --- Generated grounding: submit_generated_grounding_bundle ---------------
 
 const generatedGroundingPassage = z.object({
@@ -396,6 +424,8 @@ export const toolValidators = [
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingValidator(3),
+  conceptSetSynthesisValidator,
+  knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalValidator,
   intrinsicDifficultyValidator,

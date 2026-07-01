@@ -19,28 +19,48 @@ export class LiteLlmGroundingGenerationAdapter implements GroundingGenerationPor
     declaredDomain: string;
     nodeLabel: string;
     scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
+    topic?: string;
   }): Promise<GeneratedGroundingBundle> {
-    const system = [
-      "You generate a CEP-shaped grounding bundle for an LLM-grounded prerequisite node in a learner-neutral derived graph layer.",
-      "The bundle is NOT source-quoted evidence and must never pretend to be verbatim from the curated source.",
-      "Write concise generated definition and mention-like passages that explain the prerequisite concept using the vocabulary of the provided anchor concepts.",
-      "Condition the explanation on the scaffolded anchors: the generated prerequisite should be useful because it helps a learner understand those anchors.",
-      "Do not introduce unrelated curriculum breadth. Stay within the Declared Domain and the provided anchors."
-    ].join(" ");
+    // Anchor-less synthetic case (KTD3): no scaffolded anchors, so the bundle grounds on
+    // the originating topic instead. The enrichment-minting path keeps scaffolding on its
+    // anchors unchanged.
+    const anchorLess = input.scaffoldedAnchors.length === 0;
+    const system = anchorLess
+      ? [
+          "You generate a CEP-shaped grounding bundle for an LLM-grounded concept node in a learner-neutral derived graph layer.",
+          "The bundle is generated from your own knowledge; there is no curated source, so it must never pretend to be a verbatim source quote.",
+          "Write concise generated definition and mention-like passages that explain the concept as a first-class topic concept in the Declared Domain.",
+          "Explain the concept on its own terms and how it fits the stated topic; do not invent unrelated breadth. Stay within the Declared Domain."
+        ].join(" ")
+      : [
+          "You generate a CEP-shaped grounding bundle for an LLM-grounded prerequisite node in a learner-neutral derived graph layer.",
+          "The bundle is NOT source-quoted evidence and must never pretend to be verbatim from the curated source.",
+          "Write concise generated definition and mention-like passages that explain the prerequisite concept using the vocabulary of the provided anchor concepts.",
+          "Condition the explanation on the scaffolded anchors: the generated prerequisite should be useful because it helps a learner understand those anchors.",
+          "Do not introduce unrelated curriculum breadth. Stay within the Declared Domain and the provided anchors."
+        ].join(" ");
     const anchorText = input.scaffoldedAnchors
       .map((anchor) => [
         `- ${anchor.canonicalLabel} (${anchor.conceptId})`,
         ...anchor.definitionQuotes.map((quote) => `  definition quote: "${quote}"`)
       ].join("\n"))
       .join("\n");
-    const user = [
-      `Declared domain: ${input.declaredDomain}.`,
-      `Generated prerequisite node: "${input.nodeLabel}".`,
-      "Scaffolded anchors:",
-      anchorText || "(none)",
-      "",
-      "Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale."
-    ].join("\n");
+    const user = anchorLess
+      ? [
+          `Declared domain: ${input.declaredDomain}.`,
+          ...(input.topic ? [`Originating topic: "${input.topic}".`] : []),
+          `Concept node: "${input.nodeLabel}".`,
+          "",
+          "Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale."
+        ].join("\n")
+      : [
+          `Declared domain: ${input.declaredDomain}.`,
+          `Generated prerequisite node: "${input.nodeLabel}".`,
+          "Scaffolded anchors:",
+          anchorText || "(none)",
+          "",
+          "Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale."
+        ].join("\n");
 
     const result = await this.client.call({
       model: this.model,

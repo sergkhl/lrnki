@@ -315,6 +315,16 @@ router_settings:
     kg-concept-discovery: deepseek/deepseek-v4-flash-no-thinking
     kg-concept-admission: deepseek/deepseek-v4-flash-no-thinking
     kg-claim-extraction: deepseek/deepseek-v4-flash-no-thinking
+    # Synthetic topic generation, second pipeline arm (ADR-0019 amended, plan
+    # 2026-06-30-001). Concept-set synthesis is the source-less analog of Candidate
+    # Discovery, so it stays on the DeepSeek extractor family (AGENTS rule 5). The
+    # knowledge-boundary probe is a SMALL cross-family alias (llama-4-scout, Meta MoE
+    # ~17B active) independent of the DeepSeek synthesizer (KTD4): the K-sampled
+    # dispersion of a small model exposes its knowledge boundary. Forced tool_choice on
+    # the probe alias is empirically verified before locking (U2 verification); its
+    # moderate probe temperature is set on the client the worker constructs, not here.
+    kg-concept-synthesis: deepseek/deepseek-v4-flash-no-thinking
+    kg-knowledge-boundary-probe: openrouter/meta-llama/llama-4-scout
     # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
     # U2/U5): ONE ordering call per Declared Domain returns the directed prerequisite
     # DAG over the deduplicated node set. Backed by gpt-oss-120b (reasoning-grade,

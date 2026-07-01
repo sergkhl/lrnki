@@ -26,6 +26,8 @@ import type {
   ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
+  SynthesizedConcept,
+  KnowledgeBoundaryProbeAnswer,
   WholeSetOrdering,
   GraphSnapshot,
   InferredPrerequisiteEdge,
@@ -303,7 +305,39 @@ export interface GroundingGenerationPort {
     declaredDomain: string;
     nodeLabel: string;
     scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
+    // Topic context for the anchor-less synthetic case (KTD3, R3). When
+    // `scaffoldedAnchors` is empty (synthetic generation), the bundle is grounded on
+    // the originating topic instead of scaffolded anchors; absent/empty for the
+    // enrichment-minting path, which keeps scaffolding on its anchors unchanged.
+    topic?: string;
   }): Promise<GeneratedGroundingBundle>;
+}
+
+// ---------------------------------------------------------------------------
+// Synthetic topic generation ports (ADR-0019 amended, plan 2026-06-30-001). The
+// source-less front half of the second pipeline arm: concept-set synthesis is the
+// source-less analog of Candidate Discovery, and the knowledge-boundary probe is a
+// single-draw factual answer the application samples K times (U3). Both stay
+// domain-neutral and untuned with expected topics (AGENTS rule 17).
+// ---------------------------------------------------------------------------
+
+// Concept-set synthesis (R1, R2, KTD7). ONE forced-tool call generates a bounded
+// concept set from `topic + declaredDomain` alone — no source, no coverage/grain gate
+// in this build. The generator stays DeepSeek-family (AGENTS rule 5); the probe below
+// is a cross-family second opinion.
+export interface ConceptSetSynthesisPort {
+  readonly model: string;
+  synthesize(input: { topic: string; declaredDomain: string }): Promise<SynthesizedConcept[]>;
+}
+
+// Knowledge-boundary probe (R6, R7, KTD4). ONE draw: a pointed factual answer about
+// one concept, on a dedicated SMALL cross-family alias independent of the synthesizer,
+// returned via a forced named tool. The K-draw loop, moderate temperature, and
+// semantic-agreement aggregation live in the application (U3), mirroring how
+// runGraphEnrichment owns `orderingSampleCount` rather than the ordering adapter.
+export interface KnowledgeBoundaryProbePort {
+  readonly model: string;
+  probe(input: { conceptLabel: string; declaredDomain: string }): Promise<KnowledgeBoundaryProbeAnswer>;
 }
 
 // Missing-prerequisite proposal (R7, KTD6, handoff constraint). The explicit,
