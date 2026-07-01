@@ -46,6 +46,15 @@
 
 ## COMPLETED
 
+- **Quest Subgraph study mechanic.** Admin Lab study now starts from quest-oriented target
+  recommendations and search, backed by application-owned `TargetCandidate` projection over trusted
+  prerequisite cones. `StudySession` rides down an unpruned, stateful, depth-tiered Learner Path for
+  the selected target, and the study surface presents that ladder first with the existing graph
+  explorer reused as focused quest map or full-map context. The ladder and map read one
+  classification source, known-closure hiding is display-only, and graph-only enrichments remain
+  inspectable with a no-items warning. Decisions remain within the existing Study Session /
+  Learner Path vocabulary and projection boundary; `quest` is UI copy only.
+
 - **Synthetic Topic Generation — a second pipeline arm.** A `topic` plus a Declared Domain now
   produces a free-standing, anchor-less Derived Graph Layer of `synthetic_primary` `llm_grounded`
   nodes with no Extraction Run and no Graph-Version Build, gated per concept by the Knowledge-Boundary
@@ -171,6 +180,22 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Quest Subgraph study mechanic, 2026-07-01.** `pnpm run check` passed: full workspace typecheck,
+  recursive test suite, ESLint (0 errors / 2 pre-existing warnings outside this diff), and Admin Lab
+  production build. Focused suites also passed after implementation:
+  `@lrnki/application` test/typecheck and `@lrnki/admin-lab` test/typecheck. **Real-use gate
+  (rule 14):** three existing real DB enrichments were inspected through the application read model:
+  mechanistic interpretability [machine learning] (`02afc709`, 12 nodes / 16 edges), quantum error
+  correction [physics] (`21b8c077`, 12 / 19), and photosynthesis [biology] (`eb6e5ac1`, 14 / 15).
+  Recommended targets read as plausible milestones; fresh ladders preserved prerequisite waves and
+  target-last ordering; focused map scope matched the ladder scope; marking the first frontier known
+  advanced the selected frontier while keeping the mastered step visible/collapsed in the unpruned
+  ladder. **Defect found and fixed by the gate:** the session route still hid graph-only enrichments
+  behind a no-study-items empty state, blocking operator inspection; it now renders the quest
+  ladder/map with an inline no-items warning. **Result: PASS.** Caveat: the inspected enrichments
+  currently have zero study items, so graded card-completion UX was not re-exercised by this gate.
+  Trail: `tmp/2026-07-01-quest-subgraph-eval/`.
 
 - **Synthetic Topic Generation, 2026-07-01.** Deterministic envelope: `@lrnki/infrastructure-litellm`
   typecheck green and its suite green (102 tests) for the grounding-schema cap fix; U1–U7 landed their
