@@ -207,7 +207,7 @@ const generatedGroundingPassage = z.object({
 }).strict();
 
 export const generatedGroundingBundleValidator = z.object({
-  definitions: z.array(generatedGroundingPassage).min(1).max(2).describe("Generated meaning-bearing definition passages for the prerequisite concept."),
+  definitions: z.array(generatedGroundingPassage).min(1).max(4).describe("Generated meaning-bearing definition passages for the concept. A minted prerequisite stays tight (1-2); a first-class topic concept may warrant more, up to the cap."),
   mentions: z.array(generatedGroundingPassage).max(4).describe("Generated mention-like passages that connect the prerequisite concept to the scaffolded anchors."),
   rationale: z.string().min(1).describe("One terse sentence explaining why this prerequisite scaffolds the provided anchors.")
 }).strict();
