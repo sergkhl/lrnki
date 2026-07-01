@@ -75,7 +75,7 @@ export class PostgresLearnerLoopRead implements LearnerLoopReadPort {
       JOIN learner_path_steps s ON s.learner_path_id = p.learner_path_id
       JOIN derived_graph_nodes n ON n.derived_node_id = s.derived_node_id
       LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'option_select'
-      LEFT JOIN rejected_study_items rc ON rc.derived_node_id = s.derived_node_id
+      LEFT JOIN rejected_study_items rc ON rc.derived_node_id = s.derived_node_id AND rc.item_type = 'option_select'
       WHERE p.learner_state_ref = ${learnerStateRef}
       ORDER BY p.created_at DESC, s.position`;
     const coverageByPath = new Map<string, PathStudyItemCoverage>();

@@ -172,6 +172,34 @@ export function buildPrerequisiteOrderingSchema(n: number): JsonSchema {
   return toForcedToolSchema(buildPrerequisiteOrderingValidator(n));
 }
 
+// --- Concept-set synthesis: submit_synthesized_concepts (U2, R1/R2) -------
+// The source-less analog of Candidate Discovery (plan 2026-06-30-001). ONE forced-tool
+// call generates a bounded concept set from a topic + Declared Domain alone; the set is
+// generated, not gated for coverage or grain in this build. Domain-neutral rubric
+// language only (AGENTS rule 17): the schema names no topic and lists no exemplars.
+
+export const conceptSetSynthesisValidator = z.object({
+  concepts: z.array(z.object({
+    conceptKey: z.string().min(1).describe("Short stable slug unique within this concept set, e.g. 'topic_x'."),
+    canonicalLabel: z.string().min(1).describe("Precise, domain-qualified label naming one durable, independently-teachable concept within the topic."),
+    aliases: z.array(z.string().min(1)).describe("Exact alternative surface forms for the same concept; empty when there are none.")
+  }).strict()).describe("A bounded set of durable, independently-teachable concepts a learner would study to understand the topic within the Declared Domain. Name concepts, not propositions or claims.")
+}).strict();
+
+export const conceptSetSynthesisSchema: JsonSchema = toForcedToolSchema(conceptSetSynthesisValidator);
+
+// --- Knowledge-boundary probe: submit_knowledge_boundary_answer (U2, R6/R7)
+// ONE draw of the self-consistency probe (plan 2026-06-30-001, KTD4). A pointed factual
+// answer about one concept; the application samples this K times at moderate temperature
+// and measures semantic agreement across the `answer` strings with the embedding port to
+// route the concept to core_knowledge/boundary (U3). Domain-neutral rubric (rule 17).
+
+export const knowledgeBoundaryProbeValidator = z.object({
+  answer: z.string().min(1).describe("A single self-contained factual characterization of the concept as understood in the Declared Domain: its core meaning and the one or two facts most central to it. Concise prose, no hedging or meta-commentary.")
+}).strict();
+
+export const knowledgeBoundaryProbeSchema: JsonSchema = toForcedToolSchema(knowledgeBoundaryProbeValidator);
+
 // --- Generated grounding: submit_generated_grounding_bundle ---------------
 
 const generatedGroundingPassage = z.object({
@@ -179,7 +207,7 @@ const generatedGroundingPassage = z.object({
 }).strict();
 
 export const generatedGroundingBundleValidator = z.object({
-  definitions: z.array(generatedGroundingPassage).min(1).max(2).describe("Generated meaning-bearing definition passages for the prerequisite concept."),
+  definitions: z.array(generatedGroundingPassage).min(1).max(4).describe("Generated meaning-bearing definition passages for the concept. A minted prerequisite stays tight (1-2); a first-class topic concept may warrant more, up to the cap."),
   mentions: z.array(generatedGroundingPassage).max(4).describe("Generated mention-like passages that connect the prerequisite concept to the scaffolded anchors."),
   rationale: z.string().min(1).describe("One terse sentence explaining why this prerequisite scaffolds the provided anchors.")
 }).strict();
@@ -332,6 +360,35 @@ export const optionSelectValidator = z.object({
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
 
+// --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
+// One four-statement auto-graded item per node: three TRUE statements (each cited by
+// passage id + quote, verified verbatim at the guard) and exactly ONE planted lie. The lie
+// is preferentially a true fact about one provided neighbor concept, rewritten as if it were
+// about THIS node; when no clean neighbor lie exists, a freshly minted plausible
+// misconception. The lie is labeled generated and carries NO citation — never a source
+// quote. Citation fields are flattened to nullable scalars because the forced-tool dialect
+// folds only scalar nullables; the guard re-derives provenance, so a null citation marks the
+// lie. Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and
+// lists no exemplars. The deterministic guard (U4) enforces structure; this schema only
+// enforces SHAPE fail-closed (rule 6) — lie plausibility is judged by the rule-14 pass.
+
+const impostorStatement = z.object({
+  text: z.string().min(1).describe("One self-contained statement about the learning node. A true statement restates provided grounding; the single impostor reads as plausibly true of this node but is not."),
+  isImpostor: z.boolean().describe("true for the SINGLE planted lie; false for each of the three true statements. Exactly one statement has isImpostor true."),
+  citationPassageId: z.string().nullable().describe("For a TRUE statement, the exact passageId of the grounding passage it restates; null for the impostor, which is not grounded."),
+  citationEvidenceQuote: z.string().nullable().describe("For a TRUE statement, a substring copied from that grounding passage supporting it. For source-grounded passages copy it verbatim; null for the impostor.")
+}).strict();
+
+export const impostorValidator = z.object({
+  question: z.string().min(1).describe("One self-contained prompt asking the learner to pick the false statement among the four. Do not reference 'the passage' or 'the source'."),
+  statements: z.array(impostorStatement).length(4).describe("Exactly four statements about the learning node: three true and grounded, and exactly one planted lie (isImpostor true)."),
+  reveal: z.string().min(1).describe("Post-answer explanation naming which statement is the lie and why it is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
+  lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighbor concept rewritten as if about this node. 'generated' when no clean neighbor lie existed and the lie is a freshly minted plausible misconception."),
+  siblingLabel: z.string().nullable().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; null when lieSource is 'generated'.")
+}).strict();
+
+export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
+
 // --- Concept Lesson generation: submit_concept_lesson (U2, R2/R4/R6/R7/R14) -----
 // One ordered teaching artifact per learning node (ADR-0031). Every section is
 // INDEPENDENTLY OPTIONAL: a section that does not apply is simply OMITTED from the
@@ -367,6 +424,8 @@ export const toolValidators = [
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingValidator(3),
+  conceptSetSynthesisValidator,
+  knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalValidator,
   intrinsicDifficultyValidator,
@@ -377,5 +436,6 @@ export const toolValidators = [
   mintingDurabilityJudgmentValidator,
   nodeMergeAdjudicationValidator,
   optionSelectValidator,
+  impostorValidator,
   conceptLessonValidator
 ] as const;

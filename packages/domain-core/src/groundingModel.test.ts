@@ -70,6 +70,44 @@ test("llm-grounded enrichment nodes are derived prerequisites without ordering a
   assert.equal("dependentDerivedNodeId" in node, false);
 });
 
+test("synthetic-primary nodes are llm-grounded derived concepts without a minting reason", () => {
+  const node: EnrichmentNode = {
+    nodeKind: "enrichment",
+    derivedNodeId: "dn3",
+    groundingOrigin: "llm_grounded",
+    role: "synthetic_primary",
+    layer: "derived",
+    canonicalLabel: "Photosynthesis",
+    normalizedLabel: "photosynthesis",
+    declaredDomain: "Biology",
+    aliases: [],
+    groundingBundle: {
+      derivedNodeId: "dn3",
+      groundingOrigin: "llm_grounded",
+      definitions: [
+        {
+          passageType: "definition",
+          text: "Photosynthesis converts light energy into chemical energy stored in glucose.",
+          groundingOrigin: "llm_grounded",
+          headingPath: [],
+          locator: {},
+          verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated grounding has no cited source block" }
+        }
+      ],
+      mentions: [],
+      // Anchor-less: a synthetic primary concept scaffolds against no published anchor.
+      scaffoldedAnchorConceptIds: [],
+      generatingModel: "mock-generator",
+      rationale: "Primary concept synthesized for the topic."
+    }
+  };
+
+  assert.equal(node.layer, "derived");
+  assert.equal(layerOf(node.groundingOrigin), "derived");
+  assert.equal(node.role, "synthetic_primary");
+  assert.equal("mintingReason" in node, false);
+});
+
 test("source-mentioned enrichment nodes do not carry a minting reason", () => {
   const node: EnrichmentNode = {
     nodeKind: "enrichment",

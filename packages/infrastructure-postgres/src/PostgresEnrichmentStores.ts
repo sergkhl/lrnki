@@ -305,12 +305,17 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
         };
       }
       if (node.grounding_origin === "llm_grounded") {
+        // A synthetic_primary node is a first-class topic concept: honor the stored role
+        // and OMIT mintingReason (it was never minted to fill a source gap, KTD3). Only an
+        // enrichment-minted prerequisite carries `assumed_prerequisite`. Hydrating both as
+        // `prerequisite` would corrupt a synthetic node on round-trip (the U5 fix).
+        const synthetic = node.role === "synthetic_primary";
         return {
           nodeKind: "enrichment",
           derivedNodeId: node.derived_node_id,
           groundingOrigin: "llm_grounded",
-          mintingReason: "assumed_prerequisite",
-          role: "prerequisite",
+          ...(synthetic ? {} : { mintingReason: "assumed_prerequisite" as const }),
+          role: synthetic ? "synthetic_primary" : "prerequisite",
           layer: "derived",
           canonicalLabel: node.canonical_label,
           normalizedLabel: node.normalized_label,
@@ -384,7 +389,8 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
 
 type EnrichmentRow = {
   enrichment_id: string;
-  graph_version_id: string;
+  // NULL for a synthetic (source-less) layer, which reads no published version (KTD2).
+  graph_version_id: string | null;
   enrichment_config_hash: string;
   judge_model: string;
 };

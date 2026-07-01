@@ -213,7 +213,8 @@ function summarizeOriginCounts(nodes: Pick<DerivedGraphNode, "declaredDomain" | 
 
 type EnrichmentSummaryRow = {
   enrichment_id: string;
-  graph_version_id: string;
+  // NULL for a synthetic (source-less) layer.
+  graph_version_id: string | null;
   enrichment_config_hash: string;
   judge_model: string;
   difficulty_method: string;

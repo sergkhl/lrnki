@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import type { ConceptLesson, NewResponseLogRow, OptionSelectItem, RejectedStudyItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
+import type { ConceptLesson, ImpostorItem, NewResponseLogRow, OptionSelectItem, RejectedStudyItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
 import { PostgresConceptLessonStore, PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
@@ -80,6 +80,30 @@ function optionSelectFor(s: Substrate): OptionSelectItem {
   };
 }
 
+function impostorFor(s: Substrate, opts: { lieSource?: "sibling" | "generated"; siblingLabel?: string } = {}): ImpostorItem {
+  const sourceCitation = { provenance: "source" as const, sourceResourceId: s.sourceResourceId, sourceBlockId: s.blockIds[0], evidenceQuote: "Ownership is a set of rules that govern memory.", matchKind: "exact" as const };
+  return {
+    itemType: "impostor",
+    studyItemId: randomUUID(),
+    graphVersionId: s.graphVersionId,
+    enrichmentId: s.enrichmentId,
+    derivedNodeId: s.derivedNodeId,
+    groundingProvenance: "source_cep",
+    question: "Which statement about ownership is false?",
+    generatingModel: "test-model",
+    configHash: "cfg",
+    statements: [
+      { statementId: randomUUID(), ordinal: 0, text: "Ownership governs memory.", isImpostor: false, provenance: "source", citation: sourceCitation },
+      { statementId: randomUUID(), ordinal: 1, text: "Ownership is a set of rules.", isImpostor: false, provenance: "source", citation: sourceCitation },
+      { statementId: randomUUID(), ordinal: 2, text: "Ownership applies to values that govern memory.", isImpostor: false, provenance: "source", citation: sourceCitation },
+      { statementId: randomUUID(), ordinal: 3, text: "Ownership lets you reference a value without taking it.", isImpostor: true, provenance: "generated" }
+    ],
+    reveal: "The fourth is false; that describes Borrowing.",
+    lieSource: opts.lieSource ?? "sibling",
+    ...((opts.lieSource ?? "sibling") === "sibling" ? { siblingLabel: opts.siblingLabel ?? "Borrowing" } : {})
+  };
+}
+
 function bankFor(sql: Sql, s: Substrate, items: StudyItem[], rejected: RejectedStudyItem[] = []): Promise<void> {
   return new PostgresStudyItemBankStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", studyItems: items, rejected });
 }
@@ -117,7 +141,7 @@ maybe("regeneration (delete-then-insert) replaces a prior bank, leaving no orpha
     const s = await seedSubstrate(sql);
     await bankFor(sql, s, [optionSelectFor(s)]);
     // Re-persist with no items and a rejection.
-    await bankFor(sql, s, [], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", reason: "no option-select item could be grounded" }]);
+    await bankFor(sql, s, [], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", itemType: "option_select", reason: "no option-select item could be grounded" }]);
 
     const items = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
     assert.equal(items.length, 0);
@@ -171,6 +195,115 @@ maybe("option provenance CHECK rejects an invalid provenance value", async () =>
         VALUES (${randomUUID()}, ${itemId}, 0, 'x', false, 'fabricated')`,
       /violates check constraint/i
     );
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("Covers AE3: persists an impostor item; it round-trips with four statements, one generated impostor (no citation), three cited truths, reveal/lieSource/siblingLabel", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [impostorFor(s)]);
+
+    const store = new PostgresStudyItemBankStore(sql);
+    const items = await store.listStudyItemsForEnrichment(s.enrichmentId);
+    assert.equal(items.length, 1);
+    const item = items[0];
+    assert.equal(item.itemType, "impostor");
+    if (item.itemType !== "impostor") return;
+    assert.equal(item.statements.length, 4);
+    const impostors = item.statements.filter((st) => st.isImpostor);
+    assert.equal(impostors.length, 1);
+    assert.equal(impostors[0].provenance, "generated");
+    assert.equal(impostors[0].citation, undefined);
+    for (const truth of item.statements.filter((st) => !st.isImpostor)) {
+      assert.ok(truth.citation && truth.citation.provenance === "source");
+    }
+    assert.equal(item.reveal, "The fourth is false; that describes Borrowing.");
+    assert.equal(item.lieSource, "sibling");
+    assert.equal(item.siblingLabel, "Borrowing");
+    assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["impostor"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("listStudyItemsForEnrichment returns BOTH item types for a node that has both", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [optionSelectFor(s), impostorFor(s)]);
+    const store = new PostgresStudyItemBankStore(sql);
+    const items = await store.listStudyItemsForEnrichment(s.enrichmentId);
+    assert.deepEqual(items.map((i) => i.itemType).sort(), ["impostor", "option_select"]);
+    assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["impostor", "option_select"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("regenerating an enrichment replaces prior impostor statements (no orphan rows)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [impostorFor(s)]);
+    await bankFor(sql, s, [], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", itemType: "impostor", reason: "no impostor item could be grounded" }]);
+    const [{ statements }] = await sql<{ statements: number }[]>`
+      SELECT count(*)::int AS statements FROM impostor_statements st JOIN study_items si ON si.study_item_id = st.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
+    assert.equal(statements, 0, "orphaned impostor statements are cascade-cleared");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("Covers R9/KTD8: a per-type rejection round-trips — impostor-absent while option-select-present", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    await bankFor(sql, s, [optionSelectFor(s)], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", itemType: "impostor", reason: "no impostor item could be grounded" }]);
+    const rejections = await sql<{ item_type: string; reason: string }[]>`
+      SELECT item_type, reason FROM rejected_study_items WHERE enrichment_id = ${s.enrichmentId} ORDER BY item_type`;
+    assert.deepEqual(rejections.map((r) => r.item_type), ["impostor"]);
+    const store = new PostgresStudyItemBankStore(sql);
+    assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["option_select"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("the DB CHECK rejects a source-cited impostor row (honesty inversion unrepresentable)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const itemId = randomUUID();
+    await sql`
+      INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+      VALUES (${itemId}, 'impostor', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'm', 'cfg')`;
+    await assert.rejects(
+      () => sql`
+        INSERT INTO impostor_statements (impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, reveal_text, lie_source)
+        VALUES (${randomUUID()}, ${itemId}, 0, 'a lie with a citation', true, 'source', ${s.sourceResourceId}, ${s.blockIds[0]}, 'q', 'exact', 'reveal', 'generated')`,
+      /violates check constraint/i
+    );
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("the partial unique index rejects a second impostor statement for one item", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const itemId = randomUUID();
+    await sql`
+      INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+      VALUES (${itemId}, 'impostor', ${s.graphVersionId}, ${s.enrichmentId}, ${s.derivedNodeId}, 'source_cep', 'Q?', 'm', 'cfg')`;
+    const impostorRow = (ordinal: number) => sql`
+      INSERT INTO impostor_statements (impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, reveal_text, lie_source)
+      VALUES (${randomUUID()}, ${itemId}, ${ordinal}, 'a lie', true, 'generated', 'reveal', 'generated')`;
+    await impostorRow(0);
+    await assert.rejects(() => impostorRow(1), /duplicate key|unique/i);
   } finally {
     await sql.end();
   }

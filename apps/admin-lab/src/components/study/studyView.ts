@@ -5,7 +5,7 @@
 // 18). These two helpers stay here: they are Admin-Lab sheet-interaction concerns (the
 // short-lived auto-advance guard window and the next-target read), free of any application
 // import. Components keep importing the contract types through this module.
-export type { SheetContent, StudyOptionSelectView, ConceptLessonView, ConceptLessonSectionView } from "@lrnki/application";
+export type { SheetContent, StudyItemView, StudyOptionSelectView, StudyImpostorView, ConceptLessonView, ConceptLessonSectionView } from "@lrnki/application";
 
 // Radix/Base sheet primitives can emit `open=false` while focus/animation state is
 // settling. During answer-triggered retargeting that dismiss signal is stale: the user's
@@ -21,4 +21,14 @@ export function shouldAcceptSheetOpenChange(nextOpen: boolean, autoAdvanceDismis
 // shape so this module stays free of any Admin-Lab / application import.
 export function nextStudyTarget(classification: { selectedFrontierTarget: string | null }): string | null {
   return classification.selectedFrontierTarget;
+}
+
+// A frontier node stacks its ordered study segments (option-select, then impostor). The sheet
+// holds the open node until EVERY segment is answered, then advances (KTD7). True only when
+// there is at least one segment and the learner has answered all of them this open-session.
+export function allSegmentsAnswered(
+  segments: ReadonlyArray<{ item: { studyItemId: string } }>,
+  answeredIds: ReadonlySet<string>
+): boolean {
+  return segments.length > 0 && segments.every((segment) => answeredIds.has(segment.item.studyItemId));
 }

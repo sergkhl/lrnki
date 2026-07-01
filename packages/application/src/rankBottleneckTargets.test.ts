@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationType } from "@lrnki/ports";
 import type { BottleneckOperationReport, BottleneckReport, BottleneckStageRow } from "./bottleneckReport";
 import { rankBottleneckTargets } from "./rankBottleneckTargets";
@@ -119,14 +120,23 @@ test("operation-scoped report ranks within the single operation; journey ranks a
     operation("extraction", "x1", [stageRow("admission", { costUsd: 0.1, wallClockMs: 40 })]),
     operation("minting", "m1", [stageRow(NON_LLM_STAGES.refine, { costUsd: null, wallClockMs: 10, isLlmStage: false, stageKind: "non_llm" })]),
     operation("enrichment", "e1", [stageRow("prerequisite-ordering", { costUsd: 0.05, wallClockMs: 90 })]),
-    operation("study_items", "e1", [stageRow("study-item-generation", { costUsd: 0.07, wallClockMs: 200 })])
+    operation("study_items", "e1", [
+      stageRow(STAGE_TAGS.conceptLessonGeneration, { costUsd: 0.03, wallClockMs: 80, calls: 1, tokens: 100 }),
+      stageRow(STAGE_TAGS.studyItemGeneration, { costUsd: 0.07, wallClockMs: 200, calls: 4, tokens: 400 }),
+      stageRow(STAGE_TAGS.impostorGeneration, { costUsd: 0.06, wallClockMs: 120, calls: 5, tokens: 500 })
+    ])
   ]);
   const journeyRanked = rankBottleneckTargets(journey);
   assert.deepEqual(journeyRanked.byCost.map((t) => `${t.operationType}/${t.stage}`), [
     "extraction/admission",
     "study_items/study-item-generation",
-    "enrichment/prerequisite-ordering"
+    "study_items/impostor-generation",
+    "enrichment/prerequisite-ordering",
+    "study_items/concept-lesson-generation"
   ]);
+  assert.ok(journeyRanked.byCost.some((t) => t.stage === STAGE_TAGS.conceptLessonGeneration));
+  assert.ok(Math.abs(journeyRanked.byCost.find((t) => t.stage === STAGE_TAGS.impostorGeneration)!.costShare! - 0.06 / 0.31) < 1e-9);
+  assert.ok(Math.abs(journeyRanked.byWall.find((t) => t.stage === STAGE_TAGS.studyItemGeneration)!.wallShare! - 200 / 540) < 1e-9);
   // The minting refine stage has null cost ⇒ byCost excludes it but byWall includes it.
   assert.ok(journeyRanked.byWall.some((t) => t.stage === NON_LLM_STAGES.refine));
 });

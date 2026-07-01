@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { GraduationCapIcon, RotateCcwIcon, TriangleAlertIcon, TrophyIcon } from "lucide-react";
-import { submitOptionSelect, setVerdict, clearVerdict, resetLearner } from "@/app/admin/lab/study/actions";
+import { submitOptionSelect, submitImpostor, setVerdict, clearVerdict, resetLearner } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
-import { nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
+import { allSegmentsAnswered, nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -30,6 +30,11 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const pendingAdvanceRef = useRef(false);
   const autoAdvanceDismissGuardRef = useRef(false);
   const sessionAtAnswerRef = useRef(session);
+  // A frontier node now stacks multiple study segments (option-select, then impostor). The
+  // sheet holds the target until EVERY segment is answered, then advances (KTD7). We track the
+  // answered segment ids for the open node here; it survives the per-answer re-fold (the sheet
+  // does not remount) and resets when the node changes.
+  const [answeredSegmentIds, setAnsweredSegmentIds] = useState<Set<string>>(new Set());
 
   // "Goal reached" only when the goal is NOT a foundational root and its whole cone is
   // mastered. A foundational root always shows its single-node study screen instead (R3/AE1).
@@ -38,12 +43,16 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
   const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
-  // The Concept Lesson for the open node, shown ahead of the option-select (R12).
+  // The ordered study segments for the open node (option_select, then impostor), each rendered
+  // as its own card in the stacked sheet (R10).
+  const selectedSegments = selectedNodeId ? session.studySegmentsByNode[selectedNodeId] ?? [] : [];
+  // The Concept Lesson for the open node, shown ahead of the study segments (R12).
   const selectedLesson = selectedNodeId ? session.lessonByNode[selectedNodeId] ?? null : null;
   const hiddenNodeIds = useMemo(() => new Set(session.adaptedHiddenNodeIds), [session.adaptedHiddenNodeIds]);
 
   const openNode = (derivedNodeId: string) => {
     setSelectedNodeId(derivedNodeId);
+    setAnsweredSegmentIds(new Set());
     setSheetOpen(true);
   };
 
@@ -66,25 +75,38 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     if (!nextOpen) setSelectedNodeId(null);
   };
 
-  const onSelect = (optionId: string) => {
-    const content = selectedContent;
-    if (!content) return;
-    const studyItemId = content.kind === "option_select" ? content.item.studyItemId : undefined;
-    if (!studyItemId) return;
-    // Keep the sheet open and arm the advance; the effect below retargets it once the
-    // re-folded session prop arrives (R4).
-    pendingAdvanceRef.current = true;
-    autoAdvanceDismissGuardRef.current = true;
-    sessionAtAnswerRef.current = session;
+  // Answer one segment, then advance ONLY when every segment of the open node is answered.
+  // Each answer revalidates → a new session prop arrives → the advance effect runs, but it
+  // only retargets once the advance is armed (the final segment). Intermediate answers leave
+  // the sheet on the node so the learner can finish its remaining segments.
+  const answerSegment = (studyItemId: string, submit: () => Promise<void>) => {
+    const nextAnswered = new Set(answeredSegmentIds).add(studyItemId);
+    setAnsweredSegmentIds(nextAnswered);
+    const allAnswered = allSegmentsAnswered(selectedSegments, nextAnswered);
+    if (allAnswered) {
+      pendingAdvanceRef.current = true;
+      autoAdvanceDismissGuardRef.current = true;
+      sessionAtAnswerRef.current = session;
+    }
     startTransition(async () => {
       try {
-        await submitOptionSelect({ learnerStateRef: session.learnerStateRef, studyItemId, chosenOptionId: optionId });
+        await submit();
       } catch (error) {
-        pendingAdvanceRef.current = false;
-        autoAdvanceDismissGuardRef.current = false;
+        if (allAnswered) {
+          pendingAdvanceRef.current = false;
+          autoAdvanceDismissGuardRef.current = false;
+        }
         throw error;
       }
     });
+  };
+
+  const onSelectOption = (studyItemId: string, optionId: string) => {
+    answerSegment(studyItemId, () => submitOptionSelect({ learnerStateRef: session.learnerStateRef, studyItemId, chosenOptionId: optionId }));
+  };
+
+  const onSelectImpostor = (studyItemId: string, statementId: string) => {
+    answerSegment(studyItemId, () => submitImpostor({ learnerStateRef: session.learnerStateRef, studyItemId, chosenStatementId: statementId }));
   };
 
   // Advance effect (R4/AE1): when a DIFFERENT session arrives after a graded answer, retarget
@@ -106,6 +128,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     } else {
       frame = requestAnimationFrame(() => {
         setSelectedNodeId(target);
+        setAnsweredSegmentIds(new Set());
         setSheetOpen(true);
         autoAdvanceDismissGuardRef.current = false;
       });
@@ -297,8 +320,10 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         onOpenChange={onSheetOpenChange}
         nodeLabel={selectedLabel}
         content={selectedContent}
+        segments={selectedSegments}
         lesson={selectedLesson}
-        onSelect={onSelect}
+        onSelectOption={onSelectOption}
+        onSelectImpostor={onSelectImpostor}
         onSkipAsKnown={skipAsKnown}
         onClear={() => onClear()}
         pending={pending}

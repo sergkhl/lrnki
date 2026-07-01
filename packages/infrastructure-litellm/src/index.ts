@@ -28,6 +28,10 @@ export {
   buildPrerequisiteOrderingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
+  conceptSetSynthesisSchema,
+  conceptSetSynthesisValidator,
+  knowledgeBoundaryProbeSchema,
+  knowledgeBoundaryProbeValidator,
   missingPrerequisiteProposalSchema,
   missingPrerequisiteProposalValidator,
   intrinsicDifficultySchema,
@@ -75,6 +79,12 @@ export {
   LiteLlmGroundingGenerationAdapter,
   GROUNDING_GENERATION_MODEL
 } from "./groundingGenerationAdapters";
+export {
+  LiteLlmConceptSetSynthesisAdapter,
+  LiteLlmKnowledgeBoundaryProbeAdapter,
+  CONCEPT_SYNTHESIS_MODEL,
+  KNOWLEDGE_BOUNDARY_PROBE_MODEL
+} from "./syntheticGenerationAdapters";
 export {
   LiteLlmMissingPrerequisiteProposalAdapter,
   MISSING_PREREQUISITE_PROPOSAL_MODEL

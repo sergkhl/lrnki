@@ -15,12 +15,14 @@ import {
   synthesizeResponses,
   ADAPTIVE_MASTERY_THRESHOLD,
   runGraphEnrichment,
+  runSyntheticGeneration,
   bottleneckReport,
   rankBottleneckTargets,
   type BottleneckReport,
   type RankedTarget
 } from "@lrnki/application";
 import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
+import { parseGenerateStudyItemsArgs } from "./workerArgs";
 import {
   DoclingStructuredDocumentParser,
   HtmlStructuredDocumentParser,
@@ -43,6 +45,8 @@ import {
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmGroundingGenerationAdapter,
+  LiteLlmConceptSetSynthesisAdapter,
+  LiteLlmKnowledgeBoundaryProbeAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
@@ -127,6 +131,12 @@ function buildContext() {
   // the three fixtures); claims are per-subject and benefit from stable text. Not
   // bit-exact on DeepSeek's MoE, so a small residual remains.
   const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
+  // Knowledge-boundary probe client (plan 2026-06-30-001, KTD4). MODERATE temperature —
+  // NOT the deterministic 0 — so the K draws carry the sampling diversity that exposes a
+  // small model's knowledge boundary as answer dispersion; low temperature would mask
+  // confident hallucination behind a repeated wrong answer (ADR-0030 amended). No seed,
+  // so the K draws vary.
+  const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
   // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
   // options as the forced-tool clients; embeddings have no sampling knobs.
   const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
@@ -182,6 +192,13 @@ function buildContext() {
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
     groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
+    // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
+    // amended). Concept-set synthesis stays DeepSeek-family with deterministic decoding
+    // for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
+    // MODERATE-temperature cross-family client so its K draws disperse at the model's
+    // knowledge boundary (KTD4).
+    conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
+    knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
     // Measured rescue durability judge (U3): cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
@@ -407,6 +424,44 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
   }
 }
 
+async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDomain?: string) {
+  // Synthetic Topic Generation, the second pipeline arm (ADR-0019 amended): a topic +
+  // Declared Domain -> a free-standing, anchor-less Derived Graph Layer of
+  // synthetic_primary llm_grounded nodes. It reads no published version and never mutates
+  // the asserted graph (R1, R4, R11). The source-grounded commands are untouched.
+  if (!topic || !declaredDomain) {
+    console.error("! generate-synthetic-layer requires <topic> <declaredDomain>.");
+    process.exitCode = 1;
+    return;
+  }
+  const enrichmentId = randomUUID();
+  console.log(`\n>> synthetic generation ${enrichmentId} for topic "${topic}" [${declaredDomain}]`);
+  const layer = await runSyntheticGeneration({
+    enrichmentId,
+    topic,
+    declaredDomain,
+    conceptSetSynthesis: ctx.conceptSetSynthesis,
+    knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
+    // The probe's semantic-agreement signal reuses the existing embedding port (ADR-0012).
+    embedding: ctx.nodeEmbedding,
+    groundingGeneration: ctx.groundingGeneration,
+    prerequisiteOrdering: ctx.prerequisiteOrdering,
+    difficulty: ctx.difficulty,
+    enrichmentStore: ctx.enrichmentStore,
+    reporter: ctx.runProgressReporter,
+    // Concept/verdict + edge summary line for operator visibility: how many concepts were
+    // synthesized, how many the probe kept as core vs held out as boundary, and the DAG size.
+    onSummary: (summary) =>
+      console.log(`   concepts=${summary.concepts} core=${summary.core} boundary=${summary.boundary} nodes=${summary.nodes} edges(committed/uncertain)=${summary.committedEdges}/${summary.uncertainEdges}`)
+  });
+  console.log(
+    `   nodes=${layer.derivedNodes.length} difficulties=${layer.difficulties.length} judge=${layer.judgeModel} version=${layer.graphVersionId ?? "null (synthetic)"}`
+  );
+  for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
+    console.log(`   edge: ${edge.prerequisiteDerivedNodeId} -> ${edge.dependentDerivedNodeId} (conf=${edge.confidence.toFixed(2)})`);
+  }
+}
+
 async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetRef?: string) {
   if (!enrichmentId || !targetRef) {
     console.error("! compute-learner-path requires <enrichmentId> <target>.");
@@ -620,15 +675,19 @@ function renderRankedTargets(report: BottleneckReport) {
   }
 }
 
-async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
-  if (!enrichmentId) {
-    console.error("! generate-study-items requires <enrichmentId>.");
+async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | undefined, flags: string[]) {
+  let args;
+  try {
+    args = parseGenerateStudyItemsArgs(enrichmentId, flags);
+  } catch (error) {
+    console.error(`! ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
     return;
   }
-  console.log(`\n>> generating Study Item Bank for enrichment ${enrichmentId}`);
+  console.log(`\n>> generating Study Item Bank for enrichment ${args.enrichmentId}`);
+  if (args.concurrency !== undefined) console.log(`   concurrency=${args.concurrency}`);
   const result = await generateStudyItemBank({
-    enrichmentId,
+    enrichmentId: args.enrichmentId,
     configHash: STUDY_ITEM_BANK_CONFIG_HASH,
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
@@ -636,16 +695,23 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId?: string) {
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
+    concurrency: args.concurrency,
     reporter: ctx.runProgressReporter
   });
   console.log(`   lessons=${result.lessons.length} lessonAbsent=${result.lessonAbsent.length} items=${result.studyItems.length} rejected=${result.rejected.length} model=${ctx.studyItemGeneration.model}`);
   for (const item of result.studyItems) {
-    const correct = item.options.find((option) => option.isCorrect);
-    const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
-    console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
+    if (item.itemType === "option_select") {
+      const correct = item.options.find((option) => option.isCorrect);
+      const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
+      console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
+    } else {
+      const impostor = item.statements.find((statement) => statement.isImpostor);
+      const truths = item.statements.filter((statement) => !statement.isImpostor).map((statement) => statement.text);
+      console.log(`   impostor[${item.derivedNodeId}] provenance=${item.groundingProvenance} lieSource=${item.lieSource}${item.siblingLabel ? ` sibling=${item.siblingLabel}` : ""}\n     Q: ${item.question}\n     lie: ${impostor?.text}\n     truths: ${truths.join(" | ")}\n     reveal: ${item.reveal}`);
+    }
   }
   for (const rejected of result.rejected) {
-    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}): ${rejected.reason}`);
+    console.log(`   ! rejected ${rejected.canonicalLabel} (${rejected.derivedNodeId}) [${rejected.itemType}]: ${rejected.reason}`);
   }
 }
 
@@ -670,11 +736,14 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "enrich-graph-version":
       await enrichGraphVersion(ctx, arg);
       break;
+    case "generate-synthetic-layer":
+      await generateSyntheticLayer(ctx, arg, rest[0]);
+      break;
     case "compute-learner-path":
       await computeLearnerPathCommand(ctx, arg, rest[0]);
       break;
     case "generate-study-items":
-      await generateStudyItemsCommand(ctx, arg);
+      await generateStudyItemsCommand(ctx, arg, rest);
       break;
     case "synthesize-responses":
       await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
@@ -692,7 +761,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

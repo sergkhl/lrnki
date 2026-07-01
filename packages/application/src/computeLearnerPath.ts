@@ -33,6 +33,12 @@ export async function computeLearnerPath(input: {
 }): Promise<LearnerPath> {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`computeLearnerPath: enrichment ${input.enrichmentId} not found.`);
+  // Learner-path persistence writes learner_paths (version-required). Synthetic (versionless)
+  // layers are deferred to the follow-up projection work (TODO); reject them explicitly.
+  if (layer.graphVersionId === null) {
+    throw new Error(`computeLearnerPath: enrichment ${input.enrichmentId} is a synthetic versionless layer; learner-path persistence requires a published graph version (deferred).`);
+  }
+  const graphVersionId = layer.graphVersionId;
   if (!layer.difficulties.some((difficulty) => difficulty.derivedNodeId === input.targetDerivedNodeId)) {
     throw new Error(`computeLearnerPath: target ${input.targetDerivedNodeId} is not in enrichment ${input.enrichmentId}.`);
   }
@@ -60,7 +66,7 @@ export async function computeLearnerPath(input: {
 
   const path: LearnerPath = {
     learnerPathId: input.learnerPathId,
-    graphVersionId: layer.graphVersionId,
+    graphVersionId,
     enrichmentId: layer.enrichmentId,
     targetDerivedNodeId: projected.targetNodeId,
     learnerStateRef: input.learnerState.learnerStateRef,
@@ -71,7 +77,7 @@ export async function computeLearnerPath(input: {
   await input.artifacts.append({
     artifactId: `${input.learnerPathId}:learner-path`,
     artifactType: "learner_path",
-    graphVersionId: layer.graphVersionId,
+    graphVersionId,
     producer: PRODUCER,
     producerVersion: PRODUCER_VERSION,
     configHash: layer.enrichmentConfigHash,

@@ -31,7 +31,7 @@ export type OptionSelectGroundingPassage =
 // to. Built by the fan-out (U5) from the node's selected grounding.
 export type OptionSelectGrounding = {
   studyItemId: string;
-  graphVersionId: string;
+  graphVersionId: string | null;
   enrichmentId: string;
   derivedNodeId: string;
   groundingProvenance: StudyItemGroundingProvenance;
@@ -49,7 +49,8 @@ const REQUIRED_OPTION_COUNT = 4;
 // Conservative normalization: collapse internal whitespace and lowercase. Intentionally
 // minimal so "Heap" / "  heap " collapse to a duplicate while "heap" / "stack" stay
 // distinct — over-aggressive normalization would silently drop valid items (rule 16).
-function normalizeOptionText(text: string): string {
+// Shared by the impostor guard (U4) for its impostor-vs-truth distinctness check (rule 18).
+export function normalizeOptionText(text: string): string {
   return text.replace(/\s+/g, " ").trim().toLowerCase();
 }
 

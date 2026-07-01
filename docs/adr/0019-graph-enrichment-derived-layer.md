@@ -4,9 +4,18 @@ Status: Accepted
 
 ## Decision
 
-Graph Enrichment is the only operation that creates learner-neutral graph facts not asserted by a
-source. Each immutable **Enrichment Run** consumes one explicit published graph version and one
-enrichment configuration and produces a separate **Derived Graph Layer**.
+Graph Enrichment creates learner-neutral graph facts not asserted by a source. Each immutable
+**Enrichment Run** consumes one explicit published graph version and one enrichment configuration
+and produces a separate **Derived Graph Layer**.
+
+**Amendment (2026-06-30, plan 2026-06-30-001).** Graph Enrichment is no longer the *sole* creator of
+derived facts. **Synthetic Topic Generation** is a second derived-fact producer: a `topic` plus a
+Declared Domain yields a free-standing, anchor-less Derived Graph Layer of `synthetic_primary`
+`llm_grounded` nodes (ADR-0023), reading no published graph version and writing nothing asserted. Its
+layer stores a NULL `graphVersionId`; it reuses the same back half (prerequisite ordering, intrinsic
+difficulty) and the same `EnrichmentRunStorePort` persistence. Both arms coexist; a Processing
+Journey is either source-grounded or synthetic. The invariant that no derived operation ever mutates
+the asserted graph or `graph_versions` is unchanged.
 
 The Derived Graph Layer contains:
 

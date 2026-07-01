@@ -8,13 +8,16 @@ Every graph node carries one grounding origin:
 
 - `document_anchored` for a published asserted Concept;
 - `source_mentioned` for a rescued node grounded in source mentions;
-- `llm_grounded` for a minted node with generated grounding; or
+- `llm_grounded` for a minted prerequisite or a synthesized topic concept, each with generated
+  grounding; or
 - reserved `web_grounded`.
 
 Layer is derived from grounding origin, never independently assigned:
 `document_anchored` is asserted; every other origin is derived. Asserted Concepts are anchors.
 Rescued and minted nodes are Enrichment Nodes and never enter the asserted graph. A node's
-`prerequisite` role explains why it was introduced; ordering exists only in
+role explains why it was introduced — `prerequisite` for a rescued or minted gap-filler,
+`synthetic_primary` for a topic concept produced by synthetic generation over an anchor-less layer
+(all nodes `llm_grounded`, no `document_anchored` anchors); ordering exists only in
 `inferred-prerequisite-of` edges.
 
 The verbatim evidence floor applies according to provenance. Source-quoted anchor and rescued

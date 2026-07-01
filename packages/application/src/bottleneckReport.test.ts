@@ -91,11 +91,17 @@ test("operation scope can disambiguate operation types that share one id", async
   const dependencies = ports({
     details: [
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
-      detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
+      detail("enr-1", "study_items", [
+        [STAGE_TAGS.conceptLessonGeneration, 1000],
+        [STAGE_TAGS.studyItemGeneration, 5000],
+        [STAGE_TAGS.impostorGeneration, 2000]
+      ])
     ],
     spend: [
       { operationId: "enr-1", stage: STAGE_TAGS.prerequisiteOrdering, logCount: 3, totalSpend: 0.3, totalTokens: 300 },
-      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 }
+      { operationId: "enr-1", stage: STAGE_TAGS.conceptLessonGeneration, logCount: 1, totalSpend: 0.1, totalTokens: 100 },
+      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 },
+      { operationId: "enr-1", stage: STAGE_TAGS.impostorGeneration, logCount: 5, totalSpend: 0.5, totalTokens: 500 }
     ]
   });
   const report = await bottleneckReport({
@@ -103,8 +109,12 @@ test("operation scope can disambiguate operation types that share one id", async
     ...dependencies
   });
   assert.equal(report?.operations[0].operationType, "study_items");
-  assert.equal(report?.operations[0].subtotal.costUsd, 0.4);
-  assert.deepEqual(report?.operations[0].stages.map((row) => row.stage), [STAGE_TAGS.studyItemGeneration]);
+  assert.deepEqual(report?.operations[0].subtotal, { wallClockMs: 8000, calls: 10, costUsd: 1, tokens: 1000 });
+  assert.deepEqual(report?.operations[0].stages.map((row) => row.stage), [
+    STAGE_TAGS.conceptLessonGeneration,
+    STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.impostorGeneration
+  ]);
   assert.ok(!report?.operations[0].stages.some((row) => row.stage === STAGE_TAGS.prerequisiteOrdering));
 });
 
@@ -116,18 +126,24 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
       detail("run-b", "extraction", [[STAGE_TAGS.admission, 2000]]),
       detail("gv-1", "minting", [[NON_LLM_STAGES.persist, 300]]),
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
-      detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
+      detail("enr-1", "study_items", [
+        [STAGE_TAGS.conceptLessonGeneration, 1000],
+        [STAGE_TAGS.studyItemGeneration, 5000],
+        [STAGE_TAGS.impostorGeneration, 2000]
+      ])
     ],
     spend: [
       { operationId: "run-a", stage: STAGE_TAGS.admission, logCount: 1, totalSpend: 0.1, totalTokens: 100 },
       { operationId: "run-b", stage: STAGE_TAGS.admission, logCount: 2, totalSpend: 0.2, totalTokens: 200 },
       { operationId: "enr-1", stage: STAGE_TAGS.prerequisiteOrdering, logCount: 3, totalSpend: 0.3, totalTokens: 300 },
-      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 }
+      { operationId: "enr-1", stage: STAGE_TAGS.conceptLessonGeneration, logCount: 1, totalSpend: 0.1, totalTokens: 100 },
+      { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 },
+      { operationId: "enr-1", stage: STAGE_TAGS.impostorGeneration, logCount: 5, totalSpend: 0.5, totalTokens: 500 }
     ]
   });
   const report = await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
   assert.equal(report?.operations.length, 5);
-  assert.deepEqual(report?.total, { wallClockMs: 12300, calls: 10, costUsd: 1, tokens: 1000 });
+  assert.deepEqual(report?.total, { wallClockMs: 15300, calls: 16, costUsd: 1.6, tokens: 1600 });
   assert.deepEqual(report?.operations.find((row) => row.operationType === "minting")?.subtotal, {
     wallClockMs: 300,
     calls: 0,
@@ -135,7 +151,12 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
     tokens: 0
   });
   assert.equal(report?.operations.find((row) => row.operationType === "enrichment")?.subtotal.costUsd, 0.3);
-  assert.equal(report?.operations.find((row) => row.operationType === "study_items")?.subtotal.costUsd, 0.4);
+  assert.deepEqual(report?.operations.find((row) => row.operationType === "study_items")?.subtotal, {
+    wallClockMs: 8000,
+    calls: 10,
+    costUsd: 1,
+    tokens: 1000
+  });
 });
 
 test("cost-source failure preserves wall-clock and marks cost totals unavailable", async () => {
@@ -144,15 +165,24 @@ test("cost-source failure preserves wall-clock and marks cost totals unavailable
     details: [
       detail("gv-1", "minting", [[NON_LLM_STAGES.persist, 300]]),
       detail("enr-1", "enrichment", [[STAGE_TAGS.prerequisiteOrdering, 4000]]),
-      detail("enr-1", "study_items", [[STAGE_TAGS.studyItemGeneration, 5000]])
+      detail("enr-1", "study_items", [
+        [STAGE_TAGS.conceptLessonGeneration, 1000],
+        [STAGE_TAGS.studyItemGeneration, 5000],
+        [STAGE_TAGS.impostorGeneration, 2000]
+      ])
     ],
     spend: new Error("LiteLLM down")
   });
   const report = await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
   assert.equal(report?.costAvailable, false);
-  assert.equal(report?.total.wallClockMs, 9300);
+  assert.equal(report?.total.wallClockMs, 12300);
   assert.equal(report?.total.costUsd, null);
   assert.ok(report?.operations.every((row) => row.subtotal.calls === null && row.subtotal.tokens === null));
+  assert.deepEqual(report?.operations.find((row) => row.operationType === "study_items")?.stages, [
+    { stage: STAGE_TAGS.conceptLessonGeneration, isLlmStage: true, stageKind: "llm", wallClockMs: 1000, calls: null, costUsd: null, tokens: null },
+    { stage: STAGE_TAGS.studyItemGeneration, isLlmStage: true, stageKind: "llm", wallClockMs: 5000, calls: null, costUsd: null, tokens: null },
+    { stage: STAGE_TAGS.impostorGeneration, isLlmStage: true, stageKind: "llm", wallClockMs: 2000, calls: null, costUsd: null, tokens: null }
+  ]);
 });
 
 test("non-LLM wall-clock rows and duplicate timeline rows keep current aggregation semantics", async () => {

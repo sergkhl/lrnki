@@ -673,3 +673,75 @@ maybe("a clean database has no claim, relation-registry, or published-claim tabl
     await sql.end();
   }
 });
+
+// U5: a synthetic (source-less) layer round-trips with a NULL graph_version_id and its
+// synthetic_primary nodes survive verbatim — no source, no published version, no anchor.
+maybe("round-trips a synthetic layer with a null version and synthetic_primary nodes", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const enrichmentId = randomUUID();
+    const coreId = randomUUID();
+    const secondId = randomUUID();
+    const layer: DerivedGraphLayer = {
+      enrichmentId,
+      graphVersionId: null,
+      enrichmentConfigHash: "synthetic-topic-generation",
+      judgeModel: "mock-ordering",
+      derivedNodes: [
+        // A synthetic_primary node with NO mintingReason.
+        { nodeKind: "enrichment", derivedNodeId: coreId, groundingOrigin: "llm_grounded", role: "synthetic_primary", layer: "derived", canonicalLabel: "Photosynthesis", normalizedLabel: "photosynthesis", declaredDomain: "biology", aliases: [],
+          groundingBundle: { derivedNodeId: coreId, groundingOrigin: "llm_grounded", definitions: [{ passageType: "definition", text: "Photosynthesis converts light to chemical energy.", groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }], mentions: [], scaffoldedAnchorConceptIds: [], generatingModel: "mock-gen", rationale: "topic concept" } },
+        { nodeKind: "enrichment", derivedNodeId: secondId, groundingOrigin: "llm_grounded", role: "synthetic_primary", layer: "derived", canonicalLabel: "Chloroplast", normalizedLabel: "chloroplast", declaredDomain: "biology", aliases: ["chloroplasts"],
+          groundingBundle: { derivedNodeId: secondId, groundingOrigin: "llm_grounded", definitions: [{ passageType: "definition", text: "A chloroplast is the organelle where photosynthesis occurs.", groundingOrigin: "llm_grounded", headingPath: [], locator: {}, verbatimCheck: { disposition: "not_applicable_by_grounding", rationale: "generated" } }], mentions: [], scaffoldedAnchorConceptIds: [], generatingModel: "mock-gen", rationale: "topic concept" } }
+      ],
+      prerequisiteEdges: [
+        { prerequisiteDerivedNodeId: secondId, dependentDerivedNodeId: coreId, predicate: "inferred-prerequisite-of", confidence: 0.9, uncertain: false, provenance: { judgmentRationale: "organelle precedes process" } }
+      ],
+      difficulties: [
+        { derivedNodeId: coreId, score: 0.6, method: "dag-depth-mock", components: {}, neuralRationale: "synthetic concept" },
+        { derivedNodeId: secondId, score: 0.4, method: "dag-depth-mock", components: {}, neuralRationale: "synthetic concept" }
+      ]
+    };
+    const trace: EnrichmentRunTrace = {
+      enrichmentId, graphVersionId: null, enrichmentConfigHash: "synthetic-topic-generation",
+      derivedNodes: layer.derivedNodes, orderings: [], nodeExclusions: [], dispositions: [],
+      groundingDispositions: [
+        { derivedNodeId: coreId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated" },
+        { derivedNodeId: secondId, groundingOrigin: "llm_grounded", outcome: "not_applicable_by_grounding", rationale: "generated" }
+      ],
+      rescueDispositions: [], rescuedDefinitionDispositions: [], mintingDispositions: [], nodeMerges: [],
+      syntheticProbeDispositions: [
+        { conceptKey: "photosynthesis", canonicalLabel: "Photosynthesis", declaredDomain: "biology", disposition: "core_knowledge", agreementScore: 0.95, rationale: "high agreement", derivedNodeId: coreId },
+        { conceptKey: "chloroplast", canonicalLabel: "Chloroplast", declaredDomain: "biology", disposition: "core_knowledge", agreementScore: 0.91, rationale: "high agreement", derivedNodeId: secondId },
+        // A boundary concept held out of the trusted surface: no node.
+        { conceptKey: "photorespiration_edge", canonicalLabel: "An obscure boundary concept", declaredDomain: "biology", disposition: "boundary", agreementScore: 0.3, rationale: "dispersed answers", derivedNodeId: null }
+      ]
+    };
+    const store = new PostgresEnrichmentRunStore(sql);
+    // The artifact for a synthetic layer carries NO graphVersionId (undefined -> null).
+    await store.persist({ layer, artifact: { artifactId: `${enrichmentId}:enrichment-run`, artifactType: "enrichment_run", producer: "test", producerVersion: "0", configHash: "synthetic-topic-generation", createdAt: new Date().toISOString(), payload: trace } });
+
+    const hydrated = await store.getLayer(enrichmentId);
+    assert.ok(hydrated);
+    assert.equal(hydrated.graphVersionId, null, "the synthetic layer's version link is null");
+    assert.equal(hydrated.derivedNodes.length, 2);
+    for (const node of hydrated.derivedNodes) {
+      assert.equal(node.nodeKind, "enrichment");
+      assert.ok(node.groundingOrigin === "llm_grounded" && node.role === "synthetic_primary", "role survives as synthetic_primary");
+      assert.ok(!("mintingReason" in node) || node.mintingReason === undefined, "a synthetic node carries no mintingReason");
+    }
+
+    // The graph_enrichments row stores a null version.
+    const [{ graph_version_id }] = await sql<{ graph_version_id: string | null }[]>`
+      SELECT graph_version_id FROM graph_enrichments WHERE enrichment_id = ${enrichmentId}`;
+    assert.equal(graph_version_id, null);
+
+    // The JSON_TABLE inspection view returns the synthetic nodes with a null version.
+    const viewRows = await sql<{ graph_version_id: string | null; role: string }[]>`
+      SELECT graph_version_id, role FROM artifact_derived_graph_nodes WHERE enrichment_id = ${enrichmentId} ORDER BY role`;
+    assert.equal(viewRows.length, 2);
+    assert.ok(viewRows.every((row) => row.graph_version_id === null && row.role === "synthetic_primary"));
+  } finally {
+    await sql.end();
+  }
+});

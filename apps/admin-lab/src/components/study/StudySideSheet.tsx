@@ -6,21 +6,26 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { OptionSelectCard } from "@/components/study/OptionSelectCard";
+import { ImpostorCard } from "@/components/study/ImpostorCard";
 import { ConceptLessonCard } from "@/components/study/ConceptLessonCard";
-import type { ConceptLessonView, SheetContent as SheetContentPayload } from "@/components/study/studyView";
+import type { ConceptLessonView, SheetContent as SheetContentPayload, StudyItemView } from "@/components/study/studyView";
 
-// Transfer-ready, state-gated study side sheet. It keeps the graph visible and renders
-// content gated by the clicked node's learner state: a ready node opens an option-select
-// item or a cardless skip affordance; a locked node names unmet prerequisites; a mastered
-// node can clear a `known` verdict. All callbacks are injected props — no loader or server
-// action is imported.
+// Transfer-ready, state-gated study side sheet. It keeps the graph visible and renders content
+// gated by the clicked node's learner state: a ready (frontier) node stacks its theory (the
+// lesson) then its ordered study SEGMENTS (option-select, then impostor) — each independently
+// answerable (R10, KTD7) — plus a cardless skip affordance; a locked node names unmet
+// prerequisites; a mastered node can clear a `known` verdict. Gated one-at-a-time sequencing
+// and the polished render are deferred to the Learner App; the Admin Lab just stacks the cards.
+// All callbacks are injected props — no loader or server action is imported.
 export function StudySideSheet({
   open,
   onOpenChange,
   nodeLabel,
   content,
+  segments = [],
   lesson = null,
-  onSelect,
+  onSelectOption,
+  onSelectImpostor,
   onSkipAsKnown,
   onClear,
   pending = false
@@ -31,13 +36,16 @@ export function StudySideSheet({
   onOpenChange: (open: boolean, eventDetails?: { reason?: string; event?: Event }) => void;
   nodeLabel: string | null;
   content: SheetContentPayload | null;
+  // The frontier node's ordered study segments; empty for a non-frontier or cardless node.
+  segments?: StudyItemView[];
   lesson?: ConceptLessonView | null;
-  onSelect: (optionId: string) => void;
+  onSelectOption: (studyItemId: string, optionId: string) => void;
+  onSelectImpostor: (studyItemId: string, statementId: string) => void;
   onSkipAsKnown: () => void;
   onClear: () => void;
   pending?: boolean;
 }>) {
-  const contentKey = content?.kind === "option_select" ? `option:${content.item.studyItemId}` : `${content?.kind ?? "none"}:${nodeLabel ?? ""}`;
+  const contentKey = `${content?.kind ?? "none"}:${nodeLabel ?? ""}`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
@@ -45,8 +53,10 @@ export function StudySideSheet({
         key={`${open}:${contentKey}`}
         nodeLabel={nodeLabel}
         content={content}
+        segments={segments}
         lesson={lesson}
-        onSelect={onSelect}
+        onSelectOption={onSelectOption}
+        onSelectImpostor={onSelectImpostor}
         onSkipAsKnown={onSkipAsKnown}
         onClear={onClear}
         pending={pending}
@@ -58,16 +68,20 @@ export function StudySideSheet({
 function StudySideSheetContent({
   nodeLabel,
   content,
+  segments,
   lesson,
-  onSelect,
+  onSelectOption,
+  onSelectImpostor,
   onSkipAsKnown,
   onClear,
   pending
 }: Readonly<{
   nodeLabel: string | null;
   content: SheetContentPayload | null;
+  segments: StudyItemView[];
   lesson: ConceptLessonView | null;
-  onSelect: (optionId: string) => void;
+  onSelectOption: (studyItemId: string, optionId: string) => void;
+  onSelectImpostor: (studyItemId: string, statementId: string) => void;
   onSkipAsKnown: () => void;
   onClear: () => void;
   pending: boolean;
@@ -81,10 +95,11 @@ function StudySideSheetContent({
     fn();
   };
 
-  // The lesson is shown ahead of the study item for a frontier node (R12) — read first, then
-  // answer. A locked or mastered node does not surface the lesson; it is a teaching prelude to
-  // studying, not a standalone reference here.
-  const showLesson = lesson !== null && (content?.kind === "option_select" || content?.kind === "cardless");
+  // A frontier node with study segments is the studying surface. The lesson is shown ahead of
+  // the segments (R12) — read first, then answer. A locked or mastered node does not surface
+  // the lesson; it is a teaching prelude to studying, not a standalone reference here.
+  const isFrontierWithSegments = segments.length > 0;
+  const showLesson = lesson !== null && (isFrontierWithSegments || content?.kind === "cardless");
 
   return (
     <SheetContent side="right" showOverlay={false} className="gap-4 overflow-y-auto p-6 sm:max-w-md data-[closed]:pointer-events-none">
@@ -98,9 +113,25 @@ function StudySideSheetContent({
 
         {showLesson && lesson ? <ConceptLessonCard lesson={lesson} /> : null}
 
-        {content?.kind === "option_select" ? (
+        {isFrontierWithSegments ? (
           <div className="flex flex-col gap-4">
-            <OptionSelectCard key={content.item.studyItemId} item={content.item} onSelect={(optionId) => startAction(() => onSelect(optionId))} pending={busy} />
+            {segments.map((segment) =>
+              segment.kind === "option_select" ? (
+                <OptionSelectCard
+                  key={segment.item.studyItemId}
+                  item={segment.item}
+                  onSelect={(optionId) => startAction(() => onSelectOption(segment.item.studyItemId, optionId))}
+                  pending={busy}
+                />
+              ) : (
+                <ImpostorCard
+                  key={segment.item.studyItemId}
+                  item={segment.item}
+                  onSelect={(statementId) => startAction(() => onSelectImpostor(segment.item.studyItemId, statementId))}
+                  pending={busy}
+                />
+              )
+            )}
             <Button type="button" size="sm" variant="outline" className="self-start" disabled={busy} onClick={() => startAction(onSkipAsKnown)}>
               <CheckIcon data-icon="inline-start" />
               Skip as known
@@ -153,6 +184,7 @@ function StudySideSheetContent({
 function StateBadge({ content }: Readonly<{ content: SheetContentPayload }>) {
   switch (content.kind) {
     case "option_select":
+    case "impostor":
     case "cardless":
       return <Badge variant="secondary">frontier</Badge>;
     case "mastered_review":
@@ -165,6 +197,7 @@ function StateBadge({ content }: Readonly<{ content: SheetContentPayload }>) {
 function descriptionFor(content: SheetContentPayload): string {
   switch (content.kind) {
     case "option_select":
+    case "impostor":
       return "Ready to study, or mark as already known.";
     case "cardless":
       return "Ready, but no study item exists.";

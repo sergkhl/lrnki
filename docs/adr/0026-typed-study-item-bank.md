@@ -9,9 +9,10 @@ and study-item coverage key to the node in one Derived Graph Layer, whether that
 an Enrichment Node. Asserted `concept_id` remains a separate identity available only for anchors.
 
 The learner-neutral **Study Item Bank** is a typed discriminated union keyed by `itemType`.
-`option_select` is the only implemented study-item payload and the only current source-level
-discriminant. A node's supported item types are derived from persisted generated items, never from a
-separately maintained capability map.
+`option_select` and `impostor` are the implemented study-item payloads — both auto-graded
+keyed-selection types: option-select keys the one correct option, impostor keys the one planted lie
+among three grounded truths. A node's supported item types are derived from persisted generated items,
+never from a separately maintained capability map.
 
 Study items preserve grounding provenance:
 
@@ -22,9 +23,14 @@ Study items preserve grounding provenance:
 Source citations retain source identifiers and verbatim evidence. Generated citations identify
 generated grounding and never masquerade as source quotes.
 
-Option-select study is auto-graded from the server-side keyed correct option and appends a graded
-Response Log entry. Its deterministic guard enforces only structural and provenance guarantees;
-distractor semantic quality is evaluated through real-use inspection.
+Keyed-selection study (option-select and impostor) is auto-graded from the server-side keyed
+selection — the correct option for option-select, the planted impostor for impostor — and appends a
+graded Response Log entry through one grading-neutral path; a node's mastery folds across all its
+graded observations at one threshold regardless of item type. Each type's deterministic guard enforces
+only structural and provenance guarantees: option-select keys exactly one correct option; impostor
+keys exactly one lie, verifies each of the three truths verbatim against its cited grounding, and
+makes a source-cited impostor unrepresentable. Semantic quality — distractor plausibility, lie
+plausibility, whether the reveal teaches — is evaluated through real-use inspection, not the guard.
 
 Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
 card. A learner records a mutable binary calibration verdict for a derived node. The application

@@ -12,6 +12,7 @@ import type { ConceptLessonGenerationPort, ConceptLessonStorePort, EnrichmentRun
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSelectGuard";
+import { validateImpostorItem, type ImpostorGrounding } from "./impostorGuard";
 import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding, type GroundingPassage } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
@@ -23,11 +24,12 @@ import { assembleConceptLesson } from "./assembleConceptLesson";
 // shared helper preserves input order, so the persisted item order is unchanged.
 export const DEFAULT_STUDY_ITEM_CONCURRENCY = 1;
 export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
+export const IMPOSTOR_GENERATION_ATTEMPTS = 2;
 
 export type { RejectedStudyItem };
 
 export type StudyItemBankGenerationResult = {
-  graphVersionId: string;
+  graphVersionId: string | null;
   enrichmentId: string;
   studyItems: StudyItem[];
   rejected: RejectedStudyItem[];
@@ -38,13 +40,16 @@ export type StudyItemBankGenerationResult = {
 };
 
 // Study Item Bank generation (U5, R7/R12/R13, ADR-0026) + Concept Lesson generation
-// (ADR-0031). For each Derived Graph Layer node this runs two stages in one operation: first
-// a Concept Lesson stage (generate a grounded teaching lesson, verify citations verbatim,
-// enforce the minimum, persist as the learner-neutral substrate), then an option-select stage
-// (a grounded correct answer + sibling-flavored distractors through the deterministic guard).
-// A node that yields no lesson is recorded lesson-absent; a node that yields no item is a
-// RejectedStudyItem with the exact reason. Learner-neutral and regenerable; never touches the
-// asserted graph or imports a graph/enrichment write port (R9).
+// (ADR-0031). For each Derived Graph Layer node this runs three stages in one operation:
+// first a Concept Lesson stage (generate a grounded teaching lesson, verify citations
+// verbatim, enforce the minimum, persist as the learner-neutral substrate), then an
+// option-select stage (a grounded correct answer + sibling-flavored distractors through the
+// deterministic guard), then an impostor stage (three lesson-grounded truths + one
+// sibling-or-generated lie through the impostor guard). Both item stages derive from the one
+// lesson substrate (rule 18). A node that yields no lesson is recorded lesson-absent; a node
+// that yields no item of a type is a RejectedStudyItem keyed by item type with the exact
+// reason. Learner-neutral and regenerable; never touches the asserted graph or imports a
+// graph/enrichment write port (R9).
 export async function generateStudyItemBank(input: {
   enrichmentId: string;
   configHash: string;
@@ -56,6 +61,7 @@ export async function generateStudyItemBank(input: {
   studyItemBankStore: StudyItemBankStorePort;
   newStudyItemId?: () => string;
   newOptionId?: () => string;
+  newStatementId?: () => string;
   // Parallel-ready seam (R11): bounded degree over the independent per-node units.
   // Defaults to 1 (sequential, unchanged behavior).
   concurrency?: number;
@@ -65,13 +71,22 @@ export async function generateStudyItemBank(input: {
 }): Promise<StudyItemBankGenerationResult> {
   const newStudyItemId = input.newStudyItemId ?? randomUUID;
   const newOptionId = input.newOptionId ?? randomUUID;
+  const newStatementId = input.newStatementId ?? randomUUID;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
   return runWithOperationTag(operationId, async () => {
   const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
   if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
-  const snapshot = await input.graphStore.getPublishedSnapshot(layer.graphVersionId);
-  if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${layer.graphVersionId} is not published.`);
+  // A synthetic (versionless) layer reads no published snapshot: every synthetic node is
+  // `llm_grounded` and self-grounds from its Grounding Bundle (selectNodeGrounding never
+  // touches the snapshot for a non-anchor node), so an EMPTY snapshot is sufficient and the
+  // null version threads through persistence unchanged (U7, KTD6). A source-derived layer
+  // still requires its published snapshot for anchor grounding.
+  const graphVersionId = layer.graphVersionId;
+  const snapshot = graphVersionId === null
+    ? { graphVersionId: "", baseGraphVersionId: null, concepts: [], evidenceProfiles: [] }
+    : await input.graphStore.getPublishedSnapshot(graphVersionId);
+  if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${graphVersionId} is not published.`);
   await reporter.beginOperation({ operationType: "study_items", operationId });
   // A thrown stage (e.g. a failed persist) closes the stage ok:false, marks the
   // operation `failed`, and propagates — the same single-source failure semantics
@@ -102,7 +117,7 @@ export async function generateStudyItemBank(input: {
         neighbors
       });
       const assembled = assembleConceptLesson({
-        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId },
+        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
         generatingModel: input.conceptLessonGeneration.model,
         configHash: input.configHash,
         grounding,
@@ -137,7 +152,7 @@ export async function generateStudyItemBank(input: {
 
   await studyStage(NON_LLM_STAGES.persist, () =>
     input.conceptLessonStore.persist({
-      graphVersionId: layer.graphVersionId,
+      graphVersionId: graphVersionId,
       enrichmentId: layer.enrichmentId,
       configHash: input.configHash,
       lessons,
@@ -159,11 +174,11 @@ export async function generateStudyItemBank(input: {
     // to the same source text.
     const lesson = lessonByNode.get(node.derivedNodeId);
     if (!lesson) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no option-select item: concept lesson is absent for this node" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: concept lesson is absent for this node" }] };
     }
-    const grounding = optionSelectGroundingFromLesson(lesson, node);
+    const grounding = studyItemGroundingFromLesson(lesson, node);
     if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no option-select item: the lesson has no grounded sections to anchor an item" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: the lesson has no grounded sections to anchor an item" }] };
     }
 
     let failureReason: string | null = null;
@@ -183,7 +198,7 @@ export async function generateStudyItemBank(input: {
         });
         const guardContext: OptionSelectGrounding = {
           studyItemId: newStudyItemId(),
-          graphVersionId: layer.graphVersionId,
+          graphVersionId: graphVersionId,
           enrichmentId: layer.enrichmentId,
           derivedNodeId: node.derivedNodeId,
           groundingProvenance: grounding.provenance,
@@ -207,6 +222,7 @@ export async function generateStudyItemBank(input: {
       rejected: [{
         derivedNodeId: node.derivedNodeId,
         canonicalLabel: node.canonicalLabel,
+        itemType: "option_select",
         reason: failureReason ?? "no study item could be grounded"
       }]
     };
@@ -230,9 +246,86 @@ export async function generateStudyItemBank(input: {
     rejected.push(...result.rejected);
   }
 
+  // --- Stage 3: impostor items (R3/R4/R7/R8/R9) ---------------------------------
+  // A node's impostor derives its three truths from the SAME lesson grounding the
+  // option-select stage used (studyItemGroundingFromLesson, rule 18) and reads the
+  // node's confusable siblings read-only as lie context. The model makes the hybrid
+  // sibling-vs-generated lie choice in one call (KTD2); the guard re-derives provenance
+  // and one fresh retry covers a citation-quality miss. A node that yields no groundable
+  // impostor is recorded impostor-absent — keyed per item type, independent of its
+  // option-select outcome (R9, KTD8). Never aborts the run (R13).
+  let impostorDone = 0;
+  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
+    const lesson = lessonByNode.get(node.derivedNodeId);
+    if (!lesson) {
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: concept lesson is absent for this node" }] };
+    }
+    const grounding = studyItemGroundingFromLesson(lesson, node);
+    if (!grounding) {
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: the lesson has no grounded sections to anchor an item" }] };
+    }
+
+    let failureReason: string | null = null;
+    const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
+    for (let attempt = 0; attempt < IMPOSTOR_GENERATION_ATTEMPTS; attempt += 1) {
+      try {
+        const draft = await input.studyItemGeneration.generateImpostor({
+          declaredDomain: node.declaredDomain,
+          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+          groundingProvenance: grounding.provenance,
+          groundingPassages: grounding.passages,
+          siblings
+        });
+        const guardContext: ImpostorGrounding = {
+          studyItemId: newStudyItemId(),
+          graphVersionId: graphVersionId,
+          enrichmentId: layer.enrichmentId,
+          derivedNodeId: node.derivedNodeId,
+          groundingProvenance: grounding.provenance,
+          generatingModel: input.studyItemGeneration.model,
+          configHash: input.configHash,
+          passages: grounding.passages
+        };
+        const guarded = validateImpostorItem(draft, guardContext, newStatementId);
+        if (guarded.ok) {
+          return { items: [guarded.item], rejected: [] };
+        } else {
+          failureReason = guarded.reason;
+        }
+      } catch (error) {
+        failureReason = `impostor generation failed: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    }
+
+    return {
+      items: [],
+      rejected: [{
+        derivedNodeId: node.derivedNodeId,
+        canonicalLabel: node.canonicalLabel,
+        itemType: "impostor",
+        reason: failureReason ?? "no impostor item could be grounded"
+      }]
+    };
+  };
+  const perNodeImpostor = await studyStage(
+    STAGE_TAGS.impostorGeneration,
+    () =>
+      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+        const result = await generateImpostorForNode(node);
+        impostorDone += 1;
+        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.impostorGeneration, done: impostorDone });
+        return result;
+      }),
+    layer.derivedNodes.length
+  );
+  for (const result of perNodeImpostor) {
+    studyItems.push(...result.items);
+    rejected.push(...result.rejected);
+  }
+
   await studyStage(NON_LLM_STAGES.persist, () =>
     input.studyItemBankStore.persist({
-      graphVersionId: layer.graphVersionId,
+      graphVersionId: graphVersionId,
       enrichmentId: layer.enrichmentId,
       configHash: input.configHash,
       studyItems,
@@ -240,18 +333,20 @@ export async function generateStudyItemBank(input: {
     })
   );
   await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
-  return { graphVersionId: layer.graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected, lessons, lessonAbsent };
+  return { graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected, lessons, lessonAbsent };
   });
 }
 
-// Derive option-select grounding from a Concept Lesson's grounded sections (U7, R10, rule 18).
-// Source-origin nodes require citations, because only cited sections carry a source-verifiable
-// trace. Generated-origin nodes may fall back to their generated substantive lesson sections
-// when no citation survived, because the item remains honestly generated and still derives
-// from the lesson substrate rather than raw graph grounding. Synthesized gist/intuition/
-// applications never become fallback grounding.
+// Derive study-item grounding from a Concept Lesson's grounded sections (U5, R10, rule 18).
+// Shared by the option-select and impostor stages: both derive their grounded content from
+// the one lesson substrate, never from raw passages (KTD3). Source-origin nodes require
+// citations, because only cited sections carry a source-verifiable trace. Generated-origin
+// nodes may fall back to their generated substantive lesson sections when no citation
+// survived, because the item remains honestly generated and still derives from the lesson
+// substrate rather than raw graph grounding. Synthesized gist/intuition/applications never
+// become fallback grounding.
 // Returns null when the lesson has no grounded section to anchor an item.
-function optionSelectGroundingFromLesson(
+function studyItemGroundingFromLesson(
   lesson: ConceptLesson,
   node: DerivedGraphNode
 ): { provenance: "source_cep" | "source_mentioned" | "generated"; passages: GroundingPassage[] } | null {

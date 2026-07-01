@@ -11,6 +11,7 @@ import type {
   LessonAbsentNode,
   StudyItem,
   OptionSelectItemDraft,
+  ImpostorItemDraft,
   StudyItemGroundingProvenance,
   StudyItemType,
   ConceptDifficulty,
@@ -25,6 +26,8 @@ import type {
   ExtractionQualityIssue,
   ExtractionRunResult,
   GeneratedGroundingBundle,
+  SynthesizedConcept,
+  KnowledgeBoundaryProbeAnswer,
   WholeSetOrdering,
   GraphSnapshot,
   InferredPrerequisiteEdge,
@@ -302,7 +305,39 @@ export interface GroundingGenerationPort {
     declaredDomain: string;
     nodeLabel: string;
     scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
+    // Topic context for the anchor-less synthetic case (KTD3, R3). When
+    // `scaffoldedAnchors` is empty (synthetic generation), the bundle is grounded on
+    // the originating topic instead of scaffolded anchors; absent/empty for the
+    // enrichment-minting path, which keeps scaffolding on its anchors unchanged.
+    topic?: string;
   }): Promise<GeneratedGroundingBundle>;
+}
+
+// ---------------------------------------------------------------------------
+// Synthetic topic generation ports (ADR-0019 amended, plan 2026-06-30-001). The
+// source-less front half of the second pipeline arm: concept-set synthesis is the
+// source-less analog of Candidate Discovery, and the knowledge-boundary probe is a
+// single-draw factual answer the application samples K times (U3). Both stay
+// domain-neutral and untuned with expected topics (AGENTS rule 17).
+// ---------------------------------------------------------------------------
+
+// Concept-set synthesis (R1, R2, KTD7). ONE forced-tool call generates a bounded
+// concept set from `topic + declaredDomain` alone — no source, no coverage/grain gate
+// in this build. The generator stays DeepSeek-family (AGENTS rule 5); the probe below
+// is a cross-family second opinion.
+export interface ConceptSetSynthesisPort {
+  readonly model: string;
+  synthesize(input: { topic: string; declaredDomain: string }): Promise<SynthesizedConcept[]>;
+}
+
+// Knowledge-boundary probe (R6, R7, KTD4). ONE draw: a pointed factual answer about
+// one concept, on a dedicated SMALL cross-family alias independent of the synthesizer,
+// returned via a forced named tool. The K-draw loop, moderate temperature, and
+// semantic-agreement aggregation live in the application (U3), mirroring how
+// runGraphEnrichment owns `orderingSampleCount` rather than the ordering adapter.
+export interface KnowledgeBoundaryProbePort {
+  readonly model: string;
+  probe(input: { conceptLabel: string; declaredDomain: string }): Promise<KnowledgeBoundaryProbeAnswer>;
 }
 
 // Missing-prerequisite proposal (R7, KTD6, handoff constraint). The explicit,
@@ -404,7 +439,7 @@ export interface LearnerPathStorePort {
 // stored map (KTD2, rule 18). Rejected nodes are persisted so the no-item frontier
 // fallback reads the real rejection reason instead of guessing from grounding origin.
 export interface StudyItemBankStorePort {
-  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
+  persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
   listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]>;
   supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
@@ -419,7 +454,7 @@ export interface StudyItemBankStorePort {
 // powers the Study Session ride-down and the operator visibility surface. A learner-NEUTRAL
 // derived asset: this port imports no graph/enrichment write port (R9).
 export interface ConceptLessonStorePort {
-  persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
+  persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void>;
   getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined>;
   listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]>;
   listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
@@ -444,6 +479,22 @@ export interface StudyItemGenerationPort {
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];
   }): Promise<OptionSelectItemDraft>;
+  // Impostor generation (R3/R5/R6/R7). Takes the same grounding + siblings as option-select
+  // and returns a pre-verification ImpostorItemDraft: three grounded truths each citing a
+  // passage and exactly one planted lie — preferentially a true fact about one provided
+  // neighbor mis-attributed to this node, else a freshly minted misconception, labeled
+  // generated with no citation — plus a reveal and the model's `lieSource` choice. The
+  // deterministic guard (U4) re-derives provenance; this port never decides it.
+  generateImpostor(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    siblings: { label: string; snippet: string }[];
+  }): Promise<ImpostorItemDraft>;
 }
 
 // Concept Lesson generation (ADR-0031, R2/R4/R6/R7/R11/R14). Forced named tool schema
@@ -660,7 +711,9 @@ export interface DerivedGraphNode {
   difficultyRationale: string | null;
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
-  role: "anchor" | "prerequisite";
+  // `synthetic_primary` is a first-class topic concept from the synthetic arm (ADR-0019
+  // amended); it renders like any other derived node in the inspection surface.
+  role: "anchor" | "prerequisite" | "synthetic_primary";
   hasStudyItem: boolean;
   grounding: NodeGroundingView | null;
 }
@@ -712,7 +765,8 @@ export interface NodeMergeView {
 
 export interface EnrichmentSummary {
   enrichmentId: string;
-  graphVersionId: string;
+  // NULL for a synthetic (source-less) layer; non-null for source-derived enrichment.
+  graphVersionId: string | null;
   enrichmentConfigHash: string;
   judgeModel: string;
   difficultyMethod: string;

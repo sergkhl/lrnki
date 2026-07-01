@@ -55,7 +55,9 @@ test("declares reportable stages by operation type", () => {
     NON_LLM_STAGES.persist
   ]);
   assert.deepEqual(operationTimelineStagesForOperation("study_items").map((row) => row.stage), [
+    STAGE_TAGS.conceptLessonGeneration,
     STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.impostorGeneration,
     NON_LLM_STAGES.persist
   ]);
 });
@@ -63,8 +65,14 @@ test("declares reportable stages by operation type", () => {
 test("checks operation ownership without claiming unknown stages", () => {
   assert.equal(stageBelongsToOperation(STAGE_TAGS.admission, "extraction"), true);
   assert.equal(stageBelongsToOperation(STAGE_TAGS.admission, "enrichment"), false);
-  assert.equal(stageBelongsToOperation(STAGE_TAGS.studyItemGeneration, "study_items"), true);
-  assert.equal(stageBelongsToOperation(STAGE_TAGS.studyItemGeneration, "enrichment"), false);
+  for (const stage of [
+    STAGE_TAGS.conceptLessonGeneration,
+    STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.impostorGeneration
+  ]) {
+    assert.equal(stageBelongsToOperation(stage, "study_items"), true, `${stage} belongs to study_items`);
+    assert.equal(stageBelongsToOperation(stage, "enrichment"), false, `${stage} does not belong to enrichment`);
+  }
   assert.equal(stageBelongsToOperation(NON_LLM_STAGES.persist, "minting"), true);
   assert.equal(stageBelongsToOperation("not-a-real-stage", "extraction"), false);
 });
@@ -72,6 +80,14 @@ test("checks operation ownership without claiming unknown stages", () => {
 test("spend ownership excludes non-LLM and unknown stages", () => {
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "extraction"), true);
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "enrichment"), false);
+  for (const stage of [
+    STAGE_TAGS.conceptLessonGeneration,
+    STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.impostorGeneration
+  ]) {
+    assert.equal(spendStageBelongsToOperation(stage, "study_items"), true, `${stage} spend belongs to study_items`);
+    assert.equal(spendStageBelongsToOperation(stage, "enrichment"), false, `${stage} spend does not belong to enrichment`);
+  }
   assert.equal(spendStageBelongsToOperation(NON_LLM_STAGES.persist, "minting"), false);
   assert.equal(spendStageBelongsToOperation("not-a-real-stage", "extraction"), false);
 });

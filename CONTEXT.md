@@ -133,6 +133,28 @@ _Avoid_: published concept, asserted node, anchor
 The CEP-shaped, source-quoteless grounding generated for an `llm_grounded` Enrichment Node.
 _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 
+**Synthetic Topic Generation**:
+The second derived-fact-producing operation. From a `topic` plus a Declared Domain it generates a
+free-standing, **anchor-less** Derived Graph Layer of `synthetic_primary` nodes with a null
+published-version link, gated per concept by the Knowledge-Boundary Probe. It runs no Extraction Run
+and no Graph-Version Build and never writes the asserted graph. Owned by
+[ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
+_Avoid_: synthetic Grounding Origin, asserted synthetic concept, curated-source treatment of generated text
+
+**Synthetic Concept**:
+A `synthetic_primary` `llm_grounded` Enrichment Node — a first-class topic concept produced by
+Synthetic Topic Generation and grounded by a Generated Grounding Bundle that cites no source. Its
+provenance is owned by [ADR-0023](docs/adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
+_Avoid_: minted prerequisite, `source_mentioned`, published concept
+
+**Knowledge-Boundary Probe**:
+The per-concept gate for Synthetic Topic Generation: a small cross-family LiteLLM alias answers K
+times at moderate temperature, and semantic agreement measured with the existing embedding port
+yields `core_knowledge` (synthesize) or `boundary` (an `uncertain` disposition, retained and
+inspectable but held out of trusted learner surfaces). Owned by
+[ADR-0030](docs/adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+_Avoid_: verbalized confidence, lexical overlap, new judge
+
 **Learner Path**:
 A projection of one Derived Graph Layer for a target `derived_node_id` and Learner State.
 _Avoid_: course, personalized graph, concept-keyed learner state
@@ -140,9 +162,11 @@ _Avoid_: course, personalized graph, concept-keyed learner state
 **Study Session**:
 A learner-stateful, goal-scoped projection over one Derived Graph Layer that gates each in-scope
 derived node into locked / frontier / mastered and carries its study payload. It advances the learner
-toward a target `derived_node_id` and is composed behind an application use-case, not the UI. It
-carries each node's **Concept Lesson** for reading before the study item.
-_Avoid_: study screen, quiz session
+toward a target `derived_node_id` and is composed behind an application use-case, not the UI. A
+node's study surface is an ordered linear segment sequence — its **Concept Lesson** (theory),
+then each study item type in canonical order (option-select, then impostor) — each segment
+independently answerable and folding into the node's single mastery number.
+_Avoid_: study screen, quiz session, item picker
 
 **Learner App**:
 The downstream learner-facing application that turns Derived Graph Layers and Learner State into
@@ -157,7 +181,7 @@ _Avoid_: static difficulty target, engagement score
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
 in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
-come from option-select study responses.
+come from keyed-selection study responses (option-select and impostor).
 
 **Study Item Bank**:
 A learner-neutral study-asset set generated alongside one Derived Graph Layer and keyed to

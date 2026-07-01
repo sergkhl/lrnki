@@ -66,6 +66,30 @@ function optionItem(derivedNodeId: string): StudyItem {
   };
 }
 
+function impostorItem(derivedNodeId: string): StudyItem {
+  const sourceCitation = { provenance: "source" as const, sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "q", matchKind: "exact" as const };
+  return {
+    studyItemId: `imp-${derivedNodeId}`,
+    graphVersionId: "g",
+    enrichmentId: "e",
+    derivedNodeId,
+    groundingProvenance: "source_cep",
+    generatingModel: "deepseek",
+    configHash: "cfg",
+    itemType: "impostor",
+    question: `Spot the lie about ${derivedNodeId}`,
+    statements: [
+      { statementId: `s-${derivedNodeId}-2`, ordinal: 0, text: "Truth A", isImpostor: false, provenance: "source", citation: sourceCitation },
+      { statementId: `s-${derivedNodeId}-1`, ordinal: 1, text: "Truth B", isImpostor: false, provenance: "source", citation: sourceCitation },
+      { statementId: `s-${derivedNodeId}-3`, ordinal: 2, text: "Truth C", isImpostor: false, provenance: "source", citation: sourceCitation },
+      { statementId: `s-${derivedNodeId}-4`, ordinal: 3, text: "The planted lie", isImpostor: true, provenance: "generated" }
+    ],
+    reveal: "The fourth statement is false; it is actually true of Borrowing.",
+    lieSource: "sibling",
+    siblingLabel: "Borrowing"
+  };
+}
+
 function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"], attemptSeq: number): ResponseLogRow {
   return {
     responseId: `r-${derivedNodeId}-${attemptSeq}`,
@@ -202,6 +226,33 @@ test("the study-item mapper dispatches on item type (KTD4 extensibility seam)", 
   assert.equal(studyItemViewToSheet(view).kind, "option_select");
 });
 
+test("studyItemToView maps an impostor item to a view exposing statements, reveal, lieSource, siblingLabel", () => {
+  const view = studyItemToView(impostorItem("scope"));
+  assert.equal(view.kind, "impostor");
+  if (view.kind !== "impostor") return;
+  assert.equal(view.item.statements.length, 4);
+  // statements sorted by id (not always-last impostor): the impostor sorts to its id position.
+  assert.deepEqual(view.item.statements.map((s) => s.statementId), ["s-scope-1", "s-scope-2", "s-scope-3", "s-scope-4"]);
+  assert.equal(view.item.statements.filter((s) => s.isImpostor).length, 1);
+  assert.equal(view.item.reveal, "The fourth statement is false; it is actually true of Borrowing.");
+  assert.equal(view.item.lieSource, "sibling");
+  assert.equal(view.item.siblingLabel, "Borrowing");
+  assert.equal(studyItemViewToSheet(view).kind, "impostor");
+});
+
+test("studySegmentsByNode lists a node's segments in canonical order (option_select before impostor)", () => {
+  const session = compose({ target: "move", studyItems: [impostorItem("scope"), optionItem("scope")] });
+  assert.deepEqual(session.studySegmentsByNode.scope.map((segment) => segment.kind), ["option_select", "impostor"]);
+  // The node-level sheet content resolves to the FIRST segment (option_select) for the badge.
+  assert.equal(session.sheetByNode.scope.kind, "option_select");
+});
+
+test("a node with only an impostor lists one segment and gates to an impostor sheet", () => {
+  const session = compose({ target: "move", studyItems: [impostorItem("scope")] });
+  assert.deepEqual(session.studySegmentsByNode.scope.map((segment) => segment.kind), ["impostor"]);
+  assert.equal(session.sheetByNode.scope.kind, "impostor");
+});
+
 test("composeStudySession rides each node's lesson down into lessonByNode with honest provenance", () => {
   const session = compose({ target: "ownership", lessons: [lessonFor("scope")] });
   const lesson = session.lessonByNode["scope"];
@@ -223,4 +274,37 @@ test("composeStudySession surfaces lesson-absent nodes with their label and reas
 test("conceptLessonToView badges source vs generated sections from authoritative provenance", () => {
   const view = conceptLessonToView(lessonFor("scope"));
   assert.deepEqual(view.sections.map((s) => s.isSourceCited), [false, true, false]);
+});
+
+// U7/R10: the Study Session projection renders over an ANCHOR-LESS synthetic layer with no
+// new primitive. A synthetic detail carries only enrichment/synthetic_primary nodes and a
+// null version; target resolution and locked/frontier gating key on derivedNodeId, so the
+// session composes identically to a source-grounded layer.
+function syntheticDetail(): DerivedGraphDetail {
+  const base = detail();
+  return {
+    ...base,
+    summary: { ...base.summary, graphVersionId: null },
+    nodes: base.nodes.map((n) => ({ ...n, nodeKind: "enrichment", groundingOrigin: "llm_grounded", role: "synthetic_primary" }))
+  };
+}
+
+test("composeStudySession renders over an anchor-less synthetic layer, resolving the target and gating by derivedNodeId (R10)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "move",
+    detail: syntheticDetail(),
+    studyItems: [optionItem("scope")],
+    rows: [],
+    verdicts: []
+  });
+  // The synthetic target resolves and the DAG gates: scope is the frontier, move stays locked
+  // behind its certain prerequisite (ownership); the uncertain edge is excluded — identical to
+  // the source-grounded projection, with no anchor in the layer.
+  assert.equal(session.classification.selectedFrontierTarget, "scope");
+  assert.equal(session.sheetByNode.scope.kind, "option_select");
+  const move = session.sheetByNode.move;
+  assert.equal(move.kind, "locked");
+  assert.deepEqual(move.kind === "locked" && move.unmetPrerequisiteLabels, ["Ownership"]);
 });

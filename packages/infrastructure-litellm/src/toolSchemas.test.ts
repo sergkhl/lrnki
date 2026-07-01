@@ -13,6 +13,8 @@ import {
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
+  impostorSchema,
+  impostorValidator,
   toolValidators
 } from "./toolSchemas";
 
@@ -147,6 +149,35 @@ test("concept lesson validator accepts a section with and without a diagram desc
       { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
     ]
   }));
+});
+
+test("impostor schema folds nullable citation scalars, fixes four statements, and is registered", () => {
+  // Registration: membership keeps the impostor schema under the strict-invariant and
+  // domain-neutral sweeps that iterate toolValidators (U3).
+  assert.ok(toolValidators.includes(impostorValidator));
+
+  const statementsNode = (impostorSchema.properties as Record<string, { minItems?: number; maxItems?: number; items: { properties: Record<string, unknown> } }>).statements;
+  // Exactly four statements (three truths + one impostor), shape fail-closed (rule 6).
+  assert.equal(statementsNode.minItems, 4);
+  assert.equal(statementsNode.maxItems, 4);
+  const statement = statementsNode.items.properties;
+  // Citation fields fold to plain nullable scalars (a truth cites; the impostor is null).
+  assert.deepEqual((statement.citationPassageId as Record<string, unknown>).type, ["string", "null"]);
+  assert.deepEqual((statement.citationEvidenceQuote as Record<string, unknown>).type, ["string", "null"]);
+  // siblingLabel folds to a nullable scalar (present only for a sibling-sourced lie).
+  assert.deepEqual(((impostorSchema.properties as Record<string, Record<string, unknown>>).siblingLabel).type, ["string", "null"]);
+});
+
+test("impostorValidator rejects a source citation on the impostor's required nullable fields only via shape", () => {
+  // The schema enforces SHAPE; semantic honesty (impostor carries no citation) is the
+  // guard's job (U4). Here we only assert the lieSource enum is closed (fail-closed).
+  const four = [
+    { text: "a", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "b", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "c", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "d", isImpostor: true, citationPassageId: null, citationEvidenceQuote: null }
+  ];
+  assert.throws(() => impostorValidator.parse({ question: "Q?", statements: four, reveal: "r", lieSource: "neighbor", siblingLabel: null }));
 });
 
 function assertStrictForcedToolSchema(schema: unknown): void {

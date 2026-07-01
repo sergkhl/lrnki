@@ -20,6 +20,11 @@ timeline. Every LLM request carries its operation id as request-scoped telemetry
 tag. Per-operation calls, tokens, and cost remain owned by LiteLLM and are read on demand from
 LiteLLM's request log; the application does not compute or persist cost.
 
+Any change that adds, removes, or renames an operation stage must update the shared stage vocabulary,
+the operation timeline catalog's stage ownership, and bottleneck-report coverage in the same change.
+No new LLM or non-LLM pipeline stage may ship unregistered, because unregistered stages break the
+wall-clock to spend join and make usage reports silently incomplete.
+
 The bottleneck report supports one operation or one **Processing Journey** as defined in
 [CONTEXT.md](../../CONTEXT.md). Journey-scoped reporting resolves existing lineage read-only; it does
 not create a pipeline identity or orchestration boundary. Enrichment and study-item operations share

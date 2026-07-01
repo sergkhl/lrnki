@@ -64,6 +64,18 @@ export {
   type ConceptIdentityResolutionResult,
   type ConceptIdentityUnavailable
 } from "./resolveConceptIdentity";
+export {
+  probeKnowledgeBoundary,
+  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  type KnowledgeBoundaryDisposition,
+  type KnowledgeBoundaryVerdict,
+  type KnowledgeBoundaryProbeConfig
+} from "./knowledgeBoundaryProbe";
+export {
+  runSyntheticGeneration,
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+  type SyntheticGenerationConfig
+} from "./runSyntheticGeneration";
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
@@ -91,9 +103,9 @@ export {
   type AssembleConceptLessonResult
 } from "./assembleConceptLesson";
 export {
-  appendOptionSelectOutcome,
+  appendGradedSelectionOutcome,
   AUTO_GRADER_IDENTITY
-} from "./optionSelectOutcome";
+} from "./gradedSelectionOutcome";
 export {
   loadResponseLogLearnerState,
   foldConceptMastery,
@@ -122,6 +134,7 @@ export {
   type SheetContent,
   type StudyItemView,
   type StudyOptionSelectView,
+  type StudyImpostorView,
   type ConceptLessonView,
   type ConceptLessonSectionView,
   type LessonAbsentView,

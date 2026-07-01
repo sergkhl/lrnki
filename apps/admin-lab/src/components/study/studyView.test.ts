@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { nextStudyTarget, shouldAcceptSheetOpenChange } from "./studyView";
+import { allSegmentsAnswered, nextStudyTarget, shouldAcceptSheetOpenChange } from "./studyView";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -30,10 +30,26 @@ test("sheet open is always accepted, including during answer-triggered retargeti
   assert.equal(shouldAcceptSheetOpenChange(true, true), true);
 });
 
+const segment = (studyItemId: string) => ({ item: { studyItemId } });
+
+test("allSegmentsAnswered holds the node until every stacked segment is answered, then advances (KTD7)", () => {
+  const segments = [segment("os-1"), segment("imp-1")];
+  assert.equal(allSegmentsAnswered(segments, new Set()), false);
+  // Answering only option-select does NOT advance — the impostor is still pending.
+  assert.equal(allSegmentsAnswered(segments, new Set(["os-1"])), false);
+  assert.equal(allSegmentsAnswered(segments, new Set(["os-1", "imp-1"])), true);
+});
+
+test("allSegmentsAnswered: a single-segment node advances after its one answer; an empty node never completes", () => {
+  assert.equal(allSegmentsAnswered([segment("os-1")], new Set(["os-1"])), true);
+  // A cardless node has no segments and is advanced via skip-as-known, never this gate.
+  assert.equal(allSegmentsAnswered([], new Set(["anything"])), false);
+});
+
 // Covers R15: the transfer-ready modules import no Admin-Lab loader and no server action,
 // so a later Learner app consumes them unchanged. A structural guard on the import surface.
 test("study modules import no @/lib loader and no server action (Covers R15)", () => {
-  for (const file of ["OptionSelectCard.tsx", "StudySideSheet.tsx", "studyView.ts"]) {
+  for (const file of ["OptionSelectCard.tsx", "ImpostorCard.tsx", "StudySideSheet.tsx", "studyView.ts"]) {
     const source = readFileSync(join(here, file), "utf8");
     assert.equal(source.includes("@/lib/"), false, `${file} must not import an Admin-Lab loader`);
     assert.equal(source.includes("/study/actions"), false, `${file} must not import a study server action`);
