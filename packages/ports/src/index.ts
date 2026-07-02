@@ -502,8 +502,8 @@ export interface StudyItemGenerationPort {
 // returns a pre-verification ConceptLessonDraft — an ordered set of sections each citing a
 // grounding passage by id when source-supported. Provenance honesty is re-derived
 // authoritatively by the pure assembler (U6); this port never decides what is source-cited.
-// Synthesized sections are generated unconditionally this iteration (R11; confidence-gating
-// is deferred to ADR-0030).
+// Synthesized sections are generated only when the current lesson grounding supports
+// them; source-less concept synthesis gating is owned by ADR-0030.
 export interface ConceptLessonGenerationPort {
   readonly model: string;
   generate(input: {

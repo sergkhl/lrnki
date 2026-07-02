@@ -800,7 +800,7 @@ CREATE TABLE concept_lessons (
 -- does not apply is simply ABSENT (no placeholder row, R3). `grounding_provenance` records
 -- the authoritative provenance the assembler re-derived (a section is `source_*` only when
 -- its quote verified verbatim). The diagram descriptor (R14) is an optional caption+spec
--- pair, persisted but never rendered this iteration; the CHECK keeps the pair all-or-nothing.
+-- pair; the CHECK keeps the pair all-or-nothing.
 -- Cascade so lesson regeneration (delete-then-insert) clears sections too.
 CREATE TABLE concept_lesson_sections (
   concept_lesson_section_id uuid PRIMARY KEY,

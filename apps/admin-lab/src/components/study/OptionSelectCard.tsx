@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { StudyOptionSelectView } from "@/components/study/studyView";
@@ -27,10 +26,6 @@ export function OptionSelectCard({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{item.groundingProvenance}</Badge>
-        <Badge variant="secondary">option select</Badge>
-      </div>
       <p className="text-sm font-medium">{item.question}</p>
       <Separator />
       <div className="flex flex-col gap-2">

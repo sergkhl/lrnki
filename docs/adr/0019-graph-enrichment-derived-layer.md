@@ -1,21 +1,21 @@
-# Give Graph Enrichment exclusive ownership of inferred graph facts
+# Keep inferred graph facts in Derived Graph Layers
 
 Status: Accepted
 
 ## Decision
 
-Graph Enrichment creates learner-neutral graph facts not asserted by a source. Each immutable
-**Enrichment Run** consumes one explicit published graph version and one enrichment configuration
-and produces a separate **Derived Graph Layer**.
+Learner-neutral graph facts not asserted by a source belong only in **Derived Graph Layers**. A
+derived-layer operation never mutates the asserted graph or `graph_versions`.
 
-**Amendment (2026-06-30, plan 2026-06-30-001).** Graph Enrichment is no longer the *sole* creator of
-derived facts. **Synthetic Topic Generation** is a second derived-fact producer: a `topic` plus a
-Declared Domain yields a free-standing, anchor-less Derived Graph Layer of `synthetic_primary`
-`llm_grounded` nodes (ADR-0023), reading no published graph version and writing nothing asserted. Its
-layer stores a NULL `graphVersionId`; it reuses the same back half (prerequisite ordering, intrinsic
-difficulty) and the same `EnrichmentRunStorePort` persistence. Both arms coexist; a Processing
-Journey is either source-grounded or synthetic. The invariant that no derived operation ever mutates
-the asserted graph or `graph_versions` is unchanged.
+Two derived-layer producers exist:
+
+- **Graph Enrichment** consumes one explicit published graph version and one enrichment configuration
+  and produces a separate Derived Graph Layer.
+- **Synthetic Topic Generation** consumes a `topic` plus a Declared Domain and produces a
+  free-standing, anchor-less Derived Graph Layer of `synthetic_primary` `llm_grounded` nodes
+  (ADR-0023). It reads no published graph version and writes nothing asserted; its layer stores a
+  NULL `graphVersionId` and reuses prerequisite ordering, intrinsic difficulty, and the same
+  persistence boundary. A Processing Journey is either source-grounded or synthetic.
 
 The Derived Graph Layer contains:
 
@@ -44,7 +44,7 @@ distributions, exclusions, judge dispositions, and deterministic graph transform
 same inputs creates a new observation and may produce a different layer. Reproducibility means
 retaining and replaying the immutable artifact, not re-deriving identical model output.
 
-Graph Enrichment never mutates the asserted graph. Its only edge predicate is
+Derived-layer operations never mutate the asserted graph. The only derived edge predicate is
 `inferred-prerequisite-of`; source relationship prose remains CEP evidence under ADR-0007.
 
 ## Context

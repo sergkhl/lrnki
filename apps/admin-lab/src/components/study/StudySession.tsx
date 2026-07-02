@@ -43,7 +43,10 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   const questComplete = isPathComplete(session.classification, session.isFoundationalRoot);
   const sourceSummary = session.responseSourceSummary;
   const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
-  const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
+  const selectedNode = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId) ?? null : null;
+  const selectedLabel = selectedNode?.label ?? selectedNodeId;
+  // Learner-neutral intrinsic difficulty for the open node (ADR-0024), surfaced on the sheet.
+  const selectedDifficulty = selectedNode?.difficulty ?? null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
   // The ordered study segments for the open node (option_select, then impostor), each rendered
   // as its own card in the stacked sheet (R10).
@@ -389,6 +392,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         open={sheetOpen}
         onOpenChange={onSheetOpenChange}
         nodeLabel={selectedLabel}
+        difficulty={selectedDifficulty}
         content={selectedContent}
         segments={selectedSegments}
         lesson={selectedLesson}
