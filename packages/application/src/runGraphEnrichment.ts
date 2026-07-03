@@ -16,7 +16,6 @@ import type {
   RescueDisposition
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   DifficultyPort,
   EnrichmentRunStorePort,
@@ -32,7 +31,7 @@ import type {
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
-import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
 import { transitiveReduction } from "./prerequisiteDag";
@@ -177,203 +176,198 @@ export async function runGraphEnrichment(input: {
   const config = input.config ?? DEFAULT_ENRICHMENT_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
-  return runWithOperationTag(operationId, async () => {
-  // Bracket each enrichment sub-stage onto the durable timeline; a thrown stage marks
-  // the operation failed before propagating, so a failed enrichment leaves a readable
-  // timeline — no partial layer is ever persisted.
-  const runStage = bracketStage(reporter, "enrichment", operationId);
-  await reporter.beginOperation({ operationType: "enrichment", operationId });
-  const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
-  if (!snapshot) {
-    throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
-  }
-  const concepts = snapshot.concepts;
-  const newNodeId = input.newNodeId ?? randomUUID;
-  const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
+  return runInstrumentedOperation(reporter, "enrichment", operationId, async (runStage) => {
+    const snapshot = await input.graphStore.getPublishedSnapshot(input.graphVersionId);
+    if (!snapshot) {
+      throw new Error(`runGraphEnrichment: published version ${input.graphVersionId} not found.`);
+    }
+    const concepts = snapshot.concepts;
+    const newNodeId = input.newNodeId ?? randomUUID;
+    const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
 
-  // Anchors: a per-run projection of the asserted snapshot (KTD2). Identity is the
-  // frozen conceptId; nothing here mutates the asserted layer (R5).
-  const anchorNodes: AnchorProjectionNode[] = concepts.map((concept) => ({
-    nodeKind: "anchor",
-    derivedNodeId: deterministicUuid(input.enrichmentId, concept.conceptId),
-    conceptId: concept.conceptId,
-    groundingOrigin: "document_anchored",
-    role: "anchor",
-    layer: "asserted",
-    canonicalLabel: concept.canonicalLabel,
-    normalizedLabel: concept.normalizedLabel,
-    declaredDomain: concept.declaredDomain,
-    aliases: concept.aliases
-  }));
-
-  // Step 0 — rescue + mint enrichment nodes (U5), then re-apply the verbatim floor
-  // per grounding origin (U6). Only runs when the enrichment-node ports are provided.
-  let enrichmentNodes: EnrichmentNode[] = [];
-  let groundingDispositions: GroundingVerbatimDisposition[] = [];
-  let rescueDispositions: RescueDisposition[] = [];
-  let rescuedDefinitionDispositions: DefinitionPassageDisposition[] = [];
-  let mintingDispositions: MintingDisposition[] = [];
-  if (input.missingPrerequisiteProposal && input.groundingGeneration) {
-    // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
-    // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
-    // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
-    // and LLM-free — they need no stage row (they carry no spend to join).
-    const rescueCandidates = await input.enrichmentStore.nonCoreRescueCandidates(input.graphVersionId);
-    const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
+    // Anchors: a per-run projection of the asserted snapshot (KTD2). Identity is the
+    // frozen conceptId; nothing here mutates the asserted layer (R5).
+    const anchorNodes: AnchorProjectionNode[] = concepts.map((concept) => ({
+      nodeKind: "anchor",
+      derivedNodeId: deterministicUuid(input.enrichmentId, concept.conceptId),
       conceptId: concept.conceptId,
+      groundingOrigin: "document_anchored",
+      role: "anchor",
+      layer: "asserted",
       canonicalLabel: concept.canonicalLabel,
       normalizedLabel: concept.normalizedLabel,
       declaredDomain: concept.declaredDomain,
-      definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
+      aliases: concept.aliases
     }));
-    const assembled = await assembleEnrichmentNodes({
-      anchors: mintingAnchors,
-      rescueCandidates,
-      proposalPort: input.missingPrerequisiteProposal!,
-      groundingPort: input.groundingGeneration!,
-      rescueDurabilityJudge: input.rescueDurabilityJudge,
-      mintingDurabilityJudge: input.mintingDurabilityJudge,
-      bounds: config.mintingBounds,
-      newNodeId,
-      stage: runStage
-    });
-    rescueDispositions = assembled.rescueDispositions;
-    mintingDispositions = assembled.mintingDispositions;
-    input.onMintingSummary?.({
-      accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
-      dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
-      unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
-    });
-    // The floor verifies source_mentioned passages verbatim against their cited block
-    // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
-    // does not verify is dropped before it can enter the derived layer.
-    const blockTextById = new Map<string, string>();
-    for (const candidate of rescueCandidates) {
-      for (const definition of candidate.definitions) blockTextById.set(definition.sourceBlockId, definition.blockText);
-      for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
+
+    // Step 0 — rescue + mint enrichment nodes (U5), then re-apply the verbatim floor
+    // per grounding origin (U6). Only runs when the enrichment-node ports are provided.
+    let enrichmentNodes: EnrichmentNode[] = [];
+    let groundingDispositions: GroundingVerbatimDisposition[] = [];
+    let rescueDispositions: RescueDisposition[] = [];
+    let rescuedDefinitionDispositions: DefinitionPassageDisposition[] = [];
+    let mintingDispositions: MintingDisposition[] = [];
+    if (input.missingPrerequisiteProposal && input.groundingGeneration) {
+      // No coarse `rescue-mint` bracket: assembleEnrichmentNodes brackets each inner LLM
+      // call onto its fine STAGE_TAGS name (U1), so wall-clock joins the cost the calls
+      // already self-tag. The surrounding candidate fetch + verbatim floor are deterministic
+      // and LLM-free — they need no stage row (they carry no spend to join).
+      const rescueCandidates = await input.enrichmentStore.nonCoreRescueCandidates(input.graphVersionId);
+      const mintingAnchors: MintingAnchor[] = concepts.map((concept) => ({
+        conceptId: concept.conceptId,
+        canonicalLabel: concept.canonicalLabel,
+        normalizedLabel: concept.normalizedLabel,
+        declaredDomain: concept.declaredDomain,
+        definitionQuotes: (profileByConcept.get(concept.conceptId)?.definitions ?? []).map((passage) => passage.evidenceQuote)
+      }));
+      const assembled = await assembleEnrichmentNodes({
+        anchors: mintingAnchors,
+        rescueCandidates,
+        proposalPort: input.missingPrerequisiteProposal!,
+        groundingPort: input.groundingGeneration!,
+        rescueDurabilityJudge: input.rescueDurabilityJudge,
+        mintingDurabilityJudge: input.mintingDurabilityJudge,
+        bounds: config.mintingBounds,
+        newNodeId,
+        stage: runStage
+      });
+      rescueDispositions = assembled.rescueDispositions;
+      mintingDispositions = assembled.mintingDispositions;
+      input.onMintingSummary?.({
+        accepted: mintingDispositions.filter((disposition) => disposition.disposition === "accepted").length,
+        dropped: mintingDispositions.filter((disposition) => disposition.disposition === "dropped").length,
+        unavailable: mintingDispositions.filter((disposition) => disposition.disposition === "kept_judge_unavailable").length
+      });
+      // The floor verifies source_mentioned passages verbatim against their cited block
+      // and records the llm_grounded exemption (R9, AE3). A rescued node whose evidence
+      // does not verify is dropped before it can enter the derived layer.
+      const blockTextById = new Map<string, string>();
+      for (const candidate of rescueCandidates) {
+        for (const definition of candidate.definitions) blockTextById.set(definition.sourceBlockId, definition.blockText);
+        for (const mention of candidate.mentions) blockTextById.set(mention.sourceBlockId, mention.blockText);
+      }
+      const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
+      groundingDispositions = floored.dispositions;
+      // Rescue-seam Definition-Passage quality gate (plan 2026-06-26-001 U3). Runs over the
+      // VERIFIED floored nodes — exactly the rescued `definition`-typed passages that reach
+      // study items — and drops hollow ones so a mis-picked optional definition never
+      // surfaces as a learner-facing definition. Its own fine stage tag so the added judging
+      // cost joins the enrichment operation (ADR-0029). Opt-in: only when the judge is wired.
+      if (input.rescuedDefinitionQualityJudge) {
+        const judge = input.rescuedDefinitionQualityJudge;
+        const rescuedJudged = await runStage(STAGE_TAGS.rescueDefinitionQuality, () =>
+          applyRescuedDefinitionQualityJudge({ nodes: floored.nodes, judge })
+        );
+        enrichmentNodes = rescuedJudged.nodes;
+        rescuedDefinitionDispositions = rescuedJudged.dispositions;
+      } else {
+        enrichmentNodes = floored.nodes;
+      }
     }
-    const floored = applyVerbatimFloorByGrounding({ nodes: [...assembled.rescuedNodes, ...assembled.mintedNodes], blockTextById });
-    groundingDispositions = floored.dispositions;
-    // Rescue-seam Definition-Passage quality gate (plan 2026-06-26-001 U3). Runs over the
-    // VERIFIED floored nodes — exactly the rescued `definition`-typed passages that reach
-    // study items — and drops hollow ones so a mis-picked optional definition never
-    // surfaces as a learner-facing definition. Its own fine stage tag so the added judging
-    // cost joins the enrichment operation (ADR-0029). Opt-in: only when the judge is wired.
-    if (input.rescuedDefinitionQualityJudge) {
-      const judge = input.rescuedDefinitionQualityJudge;
-      const rescuedJudged = await runStage(STAGE_TAGS.rescueDefinitionQuality, () =>
-        applyRescuedDefinitionQualityJudge({ nodes: floored.nodes, judge })
+
+    const assembledNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
+
+    // Step 0.5 — semantic deduplication of the derived node set (plan U3, ADR-0012, AGENTS
+    // rule 20). Runs BEFORE per-node judging so duplicate nodes never reach the judge and
+    // prerequisite chains form on the collapsed set (KTD4). Opt-in: only when both dedup
+    // ports are provided. Embeddings PROPOSE within-domain near-duplicate pairs; a
+    // cross-family adjudicator DECIDES each merge; raw cosine never merges (R2/R3). Absorbed
+    // evidence is threaded into the canonical node's judge context below (R6). Published
+    // identity is never touched — an anchor is never absorbed (R7/KTD6).
+    let allNodes = assembledNodes;
+    let nodeMerges: NodeMergeRecord[] = [];
+    let absorbedGroundingByCanonical = new Map<string, string[]>();
+    if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
+      // No coarse `dedup` bracket: deduplicateDerivedNodes brackets its two phases onto the
+      // fine `node-embedding` / `node-merge-adjudication` names (U2), so wall-clock joins the
+      // cost the embedding + adjudication calls already self-tag. Building the dedup context
+      // is deterministic and LLM-free — no stage row.
+      const dedupContext = new Map<string, DedupNodeContext>(
+        assembledNodes.map((node) => {
+          const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
+          return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
+        })
       );
-      enrichmentNodes = rescuedJudged.nodes;
-      rescuedDefinitionDispositions = rescuedJudged.dispositions;
-    } else {
-      enrichmentNodes = floored.nodes;
+      let unavailable = 0;
+      const result = await deduplicateDerivedNodes({
+        nodes: assembledNodes,
+        contextByNodeId: dedupContext,
+        embedding: input.nodeEmbedding,
+        adjudicator: input.nodeMergeAdjudicator,
+        config: config.dedup,
+        onUnavailable: () => {
+          unavailable += 1;
+        },
+        stage: runStage
+      });
+      allNodes = result.nodes;
+      nodeMerges = result.merges;
+      absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
+      input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
     }
-  }
 
-  const assembledNodes: DerivedGraphNode[] = [...anchorNodes, ...enrichmentNodes];
+    // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
+    // their published CEP; enrichment nodes use their grounding (generated text for
+    // llm_grounded, verbatim mention quotes for source_mentioned). The bare label is
+    // never the evidence — an empty context is treated as insufficient upstream. A
+    // canonical node also carries its absorbed nodes' evidence (R6).
+    const pairingNodes = allNodes.map((node) => ({
+      derivedNodeId: node.derivedNodeId,
+      declaredDomain: node.declaredDomain,
+      groundingOrigin: node.groundingOrigin,
+      context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair, absorbedGroundingByCanonical.get(node.derivedNodeId))
+    }));
+    const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
+      derivedNodeId: node.derivedNodeId,
+      canonicalLabel: node.context.canonicalLabel,
+      aliases: node.context.aliases,
+      declaredDomain: node.declaredDomain,
+      groundingOrigin: node.groundingOrigin,
+      definitions: node.context.definitions,
+      mentions: node.context.mentions
+    }));
+    // Step 1 — group EVIDENCED nodes by Declared Domain (ADR-0015 keeps ordering
+    // same-domain). A node with no definition/mention evidence cannot ground a judgment, so
+    // it is EXCLUDED from the ordering input and recorded ONCE (R4) — not once per pair.
+    const nodeExclusions: NodeEvidenceExclusion[] = [];
+    const byDomain = new Map<string, typeof pairingNodes>();
+    for (const node of pairingNodes) {
+      if (!hasEvidence(node.context)) {
+        nodeExclusions.push({ derivedNodeId: node.derivedNodeId, declaredDomain: node.declaredDomain, reason: "insufficient_evidence" });
+        continue;
+      }
+      const existing = byDomain.get(node.declaredDomain);
+      if (existing) existing.push(node);
+      else byDomain.set(node.declaredDomain, [node]);
+    }
 
-  // Step 0.5 — semantic deduplication of the derived node set (plan U3, ADR-0012, AGENTS
-  // rule 20). Runs BEFORE per-node judging so duplicate nodes never reach the judge and
-  // prerequisite chains form on the collapsed set (KTD4). Opt-in: only when both dedup
-  // ports are provided. Embeddings PROPOSE within-domain near-duplicate pairs; a
-  // cross-family adjudicator DECIDES each merge; raw cosine never merges (R2/R3). Absorbed
-  // evidence is threaded into the canonical node's judge context below (R6). Published
-  // identity is never touched — an anchor is never absorbed (R7/KTD6).
-  let allNodes = assembledNodes;
-  let nodeMerges: NodeMergeRecord[] = [];
-  let absorbedGroundingByCanonical = new Map<string, string[]>();
-  if (input.nodeEmbedding && input.nodeMergeAdjudicator) {
-    // No coarse `dedup` bracket: deduplicateDerivedNodes brackets its two phases onto the
-    // fine `node-embedding` / `node-merge-adjudication` names (U2), so wall-clock joins the
-    // cost the embedding + adjudication calls already self-tag. Building the dedup context
-    // is deterministic and LLM-free — no stage row.
-    const dedupContext = new Map<string, DedupNodeContext>(
-      assembledNodes.map((node) => {
-        const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
-        return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
+    const K = Math.max(1, Math.trunc(config.orderingSampleCount));
+    const {
+      orderings: orderingTraces,
+      certainEdges,
+      uncertainEdges,
+      weakEdges
+    } = await runStage(STAGE_TAGS.prerequisiteOrdering, () =>
+      deriveConsensusOrdering({
+        domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({
+          declaredDomain,
+          nodes: members.map((node) => node.context)
+        })),
+        prerequisiteOrdering: input.prerequisiteOrdering,
+        orderingSampleCount: config.orderingSampleCount,
+        directionContestMinorityFraction: config.directionContestMinorityFraction,
+        minEdgeConfidence: config.minEdgeConfidence,
+        maxDomainPromptChars: config.maxDomainPromptChars
       })
     );
-    let unavailable = 0;
-    const result = await deduplicateDerivedNodes({
-      nodes: assembledNodes,
-      contextByNodeId: dedupContext,
-      embedding: input.nodeEmbedding,
-      adjudicator: input.nodeMergeAdjudicator,
-      config: config.dedup,
-      onUnavailable: () => {
-        unavailable += 1;
-      },
-      stage: runStage
-    });
-    allNodes = result.nodes;
-    nodeMerges = result.merges;
-    absorbedGroundingByCanonical = result.absorbedGroundingByCanonical;
-    input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
-  }
 
-  // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
-  // their published CEP; enrichment nodes use their grounding (generated text for
-  // llm_grounded, verbatim mention quotes for source_mentioned). The bare label is
-  // never the evidence — an empty context is treated as insufficient upstream. A
-  // canonical node also carries its absorbed nodes' evidence (R6).
-  const pairingNodes = allNodes.map((node) => ({
-    derivedNodeId: node.derivedNodeId,
-    declaredDomain: node.declaredDomain,
-    groundingOrigin: node.groundingOrigin,
-    context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair, absorbedGroundingByCanonical.get(node.derivedNodeId))
-  }));
-  const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
-    derivedNodeId: node.derivedNodeId,
-    canonicalLabel: node.context.canonicalLabel,
-    aliases: node.context.aliases,
-    declaredDomain: node.declaredDomain,
-    groundingOrigin: node.groundingOrigin,
-    definitions: node.context.definitions,
-    mentions: node.context.mentions
-  }));
-  // Step 1 — group EVIDENCED nodes by Declared Domain (ADR-0015 keeps ordering
-  // same-domain). A node with no definition/mention evidence cannot ground a judgment, so
-  // it is EXCLUDED from the ordering input and recorded ONCE (R4) — not once per pair.
-  const nodeExclusions: NodeEvidenceExclusion[] = [];
-  const byDomain = new Map<string, typeof pairingNodes>();
-  for (const node of pairingNodes) {
-    if (!hasEvidence(node.context)) {
-      nodeExclusions.push({ derivedNodeId: node.derivedNodeId, declaredDomain: node.declaredDomain, reason: "insufficient_evidence" });
-      continue;
-    }
-    const existing = byDomain.get(node.declaredDomain);
-    if (existing) existing.push(node);
-    else byDomain.set(node.declaredDomain, [node]);
-  }
-
-  const K = Math.max(1, Math.trunc(config.orderingSampleCount));
-  const {
-    orderings: orderingTraces,
-    certainEdges,
-    uncertainEdges,
-    weakEdges
-  } = await runStage(STAGE_TAGS.prerequisiteOrdering, () =>
-    deriveConsensusOrdering({
-      domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({
-        declaredDomain,
-        nodes: members.map((node) => node.context)
-      })),
-      prerequisiteOrdering: input.prerequisiteOrdering,
-      orderingSampleCount: config.orderingSampleCount,
-      directionContestMinorityFraction: config.directionContestMinorityFraction,
-      minEdgeConfidence: config.minEdgeConfidence,
-      maxDomainPromptChars: config.maxDomainPromptChars
-    })
-  );
-
-  // Step 3 — symbolic reduction over the acyclic CERTAIN edges (symbolic constrains). Pure
-  // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
-  // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
-  // acyclicity is enforced upstream by cycle-routing (KTD3).
-  const disposal = await runStage(NON_LLM_STAGES.symbolicDisposal, async () => {
-    const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
-    return { reducedEdges, transitiveEdges };
+    // Step 3 — symbolic reduction over the acyclic CERTAIN edges (symbolic constrains). Pure
+    // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
+    // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
+    // acyclicity is enforced upstream by cycle-routing (KTD3).
+    const disposal = await runStage(NON_LLM_STAGES.symbolicDisposal, async () => {
+      const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
+      return { reducedEdges, transitiveEdges };
   });
   const { reducedEdges, transitiveEdges } = disposal;
 
@@ -439,7 +433,6 @@ export async function runGraphEnrichment(input: {
       }
     })
   );
-  await reporter.completeOperation({ operationType: "enrichment", operationId, status: "succeeded" });
   return layer;
   });
 }

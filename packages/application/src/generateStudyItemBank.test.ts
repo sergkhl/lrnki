@@ -14,8 +14,9 @@ import type {
 } from "@lrnki/domain-core";
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
-import type { ConceptLessonGenerationPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, ImpostorLieValidityJudgmentPort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
+import type { ConceptLessonGenerationPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, ImpostorLieValidityJudgmentPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
 import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
+import { NON_LLM_STAGES } from "./runProgressReporter";
 
 installNodeOperationTagContext();
 
@@ -144,6 +145,26 @@ function enrichmentStoreReturning(layer: DerivedGraphLayer): EnrichmentRunStoreP
     async persist() { /* unused */ },
     async getLayer() { return layer; }
   } as unknown as EnrichmentRunStorePort;
+}
+
+type ReporterCall =
+  | { method: "beginOperation"; operationType: string; operationId: string }
+  | { method: "enterStage"; stage: string }
+  | { method: "completeStage"; stage: string; ok: boolean; errorDetail?: StageErrorDetail }
+  | { method: "completeOperation"; status: string };
+
+function recordingReporter(): { reporter: RunProgressReporterPort; calls: ReporterCall[] } {
+  const calls: ReporterCall[] = [];
+  return {
+    calls,
+    reporter: {
+      async beginOperation(input) { calls.push({ method: "beginOperation", operationType: input.operationType, operationId: input.operationId }); },
+      async enterStage(input) { calls.push({ method: "enterStage", stage: input.stage }); },
+      async recordProgress() {},
+      async completeStage(input) { calls.push({ method: "completeStage", stage: input.stage, ok: input.ok, errorDetail: input.errorDetail }); },
+      async completeOperation(input) { calls.push({ method: "completeOperation", status: input.status }); }
+    }
+  };
 }
 
 function osDraft(correctQuote: string, distractors: [string, string, string] = ["Stack", "Register", "Cache"], passageId = "b1"): OptionSelectItemDraft {
@@ -323,6 +344,35 @@ test("the study-item operation context reaches generation calls", async () => {
     }),
     studyItemBankStore: store
   });
+});
+
+test("missing enrichment leaves a failed study-item timeline with load-stage error detail", async () => {
+  const { reporter, calls } = recordingReporter();
+
+  await assert.rejects(
+    () => generateStudyItemBank({
+      enrichmentId: "missing-enr",
+      configHash: "cfg-1",
+      graphStore: graphStoreReturning(snapshotWith([])),
+      enrichmentStore: { async getLayer() { return undefined; } } as unknown as EnrichmentRunStorePort,
+      conceptLessonGeneration: lessonGenerationReturning({}),
+      impostorLieValidityJudge: lieJudgePassing(),
+      conceptLessonStore: capturingLessonStore().store,
+      studyItemGeneration: generationReturning({}),
+      studyItemBankStore: capturingStore().store,
+      reporter
+    }),
+    /missing-enr/
+  );
+
+  assert.deepEqual(calls[0], { method: "beginOperation", operationType: "study_items", operationId: "missing-enr" });
+  assert.deepEqual(calls[1], { method: "enterStage", stage: NON_LLM_STAGES.load });
+  assert.equal(calls[2].method, "completeStage");
+  assert.equal((calls[2] as { stage: string; ok: boolean }).stage, NON_LLM_STAGES.load);
+  assert.equal((calls[2] as { ok: boolean }).ok, false);
+  assert.match((calls[2] as { errorDetail?: StageErrorDetail }).errorDetail?.message ?? "", /missing-enr/);
+  assert.deepEqual(calls.at(-1), { method: "completeOperation", status: "failed" });
+  assert.ok(!calls.some((call) => call.method === "completeOperation" && (call as { status: string }).status === "succeeded"));
 });
 
 test("concurrent per-node generation persists items and rejections in input order", async () => {

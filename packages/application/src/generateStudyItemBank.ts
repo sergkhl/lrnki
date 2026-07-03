@@ -7,7 +7,6 @@ import {
   type RejectedStudyItem,
   type StudyItem
 } from "@lrnki/domain-core";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   ConceptLessonGenerationPort,
   ConceptLessonStorePort,
@@ -19,7 +18,7 @@ import type {
   StudyItemGenerationPort
 } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
-import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSelectGuard";
 import { validateImpostorItem, type ImpostorGrounding } from "./impostorGuard";
 import { selectSiblingContext } from "./selectSiblingContext";
@@ -84,24 +83,22 @@ export async function generateStudyItemBank(input: {
   const newStatementId = input.newStatementId ?? randomUUID;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
-  return runWithOperationTag(operationId, async () => {
-  const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
-  if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
-  // A synthetic (versionless) layer reads no published snapshot: every synthetic node is
-  // `llm_grounded` and self-grounds from its Grounding Bundle (selectNodeGrounding never
-  // touches the snapshot for a non-anchor node), so an EMPTY snapshot is sufficient and the
-  // null version threads through persistence unchanged (U7, KTD6). A source-derived layer
-  // still requires its published snapshot for anchor grounding.
-  const graphVersionId = layer.graphVersionId;
-  const snapshot = graphVersionId === null
-    ? { graphVersionId: "", baseGraphVersionId: null, concepts: [], evidenceProfiles: [] }
-    : await input.graphStore.getPublishedSnapshot(graphVersionId);
-  if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${graphVersionId} is not published.`);
-  await reporter.beginOperation({ operationType: "study_items", operationId });
-  // A thrown stage (e.g. a failed persist) closes the stage ok:false, marks the
-  // operation `failed`, and propagates — the same single-source failure semantics
-  // extraction/enrichment use, rather than stranding a permanent `running` row.
-  const studyStage = bracketStage(reporter, "study_items", operationId);
+  return runInstrumentedOperation(reporter, "study_items", operationId, async (studyStage) => {
+    const { layer, graphVersionId, snapshot } = await studyStage(NON_LLM_STAGES.load, async () => {
+      const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
+      if (!layer) throw new Error(`generateStudyItemBank: enrichment ${input.enrichmentId} was not found.`);
+      // A synthetic (versionless) layer reads no published snapshot: every synthetic node is
+      // `llm_grounded` and self-grounds from its Grounding Bundle (selectNodeGrounding never
+      // touches the snapshot for a non-anchor node), so an EMPTY snapshot is sufficient and the
+      // null version threads through persistence unchanged (U7, KTD6). A source-derived layer
+      // still requires its published snapshot for anchor grounding.
+      const graphVersionId = layer.graphVersionId;
+      const snapshot = graphVersionId === null
+        ? { graphVersionId: "", baseGraphVersionId: null, concepts: [], evidenceProfiles: [] }
+        : await input.graphStore.getPublishedSnapshot(graphVersionId);
+      if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${graphVersionId} is not published.`);
+      return { layer, graphVersionId, snapshot };
+  });
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
   const studyItems: StudyItem[] = [];
@@ -394,7 +391,6 @@ export async function generateStudyItemBank(input: {
       rejected
     })
   );
-  await reporter.completeOperation({ operationType: "study_items", operationId, status: "succeeded" });
   return { graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected, lessons, lessonAbsent };
   });
 }

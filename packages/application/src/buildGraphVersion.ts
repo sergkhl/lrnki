@@ -12,9 +12,8 @@ import {
   type RefinementDecisionRecord,
   type TrustTier
 } from "@lrnki/domain-core";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type { GraphVersionStorePort, ExtractionRunStorePort, RunProgressReporterPort } from "@lrnki/ports";
-import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.6.0";
@@ -51,75 +50,63 @@ export async function buildGraphVersion(input: {
   if (input.runIds.length === 0) throw new Error("buildGraphVersion requires explicit run IDs to publish.");
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.graphVersionId;
-  return runWithOperationTag(operationId, async () => {
+  return runInstrumentedOperation(reporter, "minting", operationId, async (buildStage) => {
+    // Load — resolve the selected runs and the base version, failing closed on a
+    // quarantine decision or an incomplete core CEP before any assembly.
+    const { runs, base, existingIdentities } = await buildStage(NON_LLM_STAGES.load, async () => {
+      const runs = await input.runStore.runsForBuildByIds(input.runIds);
+      if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
 
-  // Bracket each phase onto the timeline; a thrown phase closes its stage ok:false,
-  // marks the operation `failed`, and propagates — exactly as extraction and
-  // enrichment do. Minting's validation gates (quarantine, incomplete CEP, unpublished
-  // base, the publish-time quality floors) throw on common operator errors, so a failed
-  // build must reach a terminal `failed` status rather than masquerade as a permanent
-  // `running` row. The failure semantics live once in `bracketStage`.
-  const buildStage = bracketStage(reporter, "minting", operationId);
+      // Quarantine gate (CONTEXT.md Graph-Version Build): a quarantine decision in any
+      // selected run blocks publication until its identity or meaning conflict is
+      // resolved. Fail closed before any assembly and name the offenders, rather than
+      // silently publishing around them (AGENTS rule 11).
+      const quarantined = runs
+        .flatMap((run) => run.quarantinedCandidates.map((candidate) => `${run.runId}:${candidate.canonicalLabel}`));
+      if (quarantined.length) {
+        throw new Error(`Refusing to build: selected run(s) contain unresolved quarantine decisions: ${quarantined.join(", ")}`);
+      }
 
-  // The parent `running` row exists from entry.
-  await reporter.beginOperation({ operationType: "minting", operationId });
+      // Identity-resolution case B (plan R7, KTD4): a cluster of two-or-more already-
+      // published Concepts is a published-identity collision the build must refuse rather
+      // than re-key — resolving it would retire a minted IRI (ADR-0010/ADR-0015). Fail
+      // closed before any assembly and name the colliding published Concepts; quarantine
+      // plus re-run is the v1 escape hatch (R10).
+      const identityQuarantines = (input.identityDecisions ?? []).filter((decision) => decision.outcome === "quarantine");
+      if (identityQuarantines.length) {
+        const collisions = identityQuarantines.map((decision) => {
+          const published = decision.members.filter((member) => member.published).map((member) => member.canonicalLabel);
+          return `${decision.declaredDomain}: ${published.join(" ⇄ ")}`;
+        });
+        throw new Error(`Refusing to build: identity resolution quarantined ${identityQuarantines.length} two-already-published collision(s): ${collisions.join("; ")}`);
+      }
 
-  // Load — resolve the selected runs and the base version, failing closed on a
-  // quarantine decision or an incomplete core CEP before any assembly.
-  const { runs, base, existingIdentities } = await buildStage(NON_LLM_STAGES.load, async () => {
-    const runs = await input.runStore.runsForBuildByIds(input.runIds);
-    if (runs.length === 0) throw new Error("No extraction runs resolved for the requested run IDs.");
-
-    // Quarantine gate (CONTEXT.md Graph-Version Build): a quarantine decision in any
-    // selected run blocks publication until its identity or meaning conflict is
-    // resolved. Fail closed before any assembly and name the offenders, rather than
-    // silently publishing around them (AGENTS rule 11).
-    const quarantined = runs
-      .flatMap((run) => run.quarantinedCandidates.map((candidate) => `${run.runId}:${candidate.canonicalLabel}`));
-    if (quarantined.length) {
-      throw new Error(`Refusing to build: selected run(s) contain unresolved quarantine decisions: ${quarantined.join(", ")}`);
-    }
-
-    // Identity-resolution case B (plan R7, KTD4): a cluster of two-or-more already-
-    // published Concepts is a published-identity collision the build must refuse rather
-    // than re-key — resolving it would retire a minted IRI (ADR-0010/ADR-0015). Fail
-    // closed before any assembly and name the colliding published Concepts; quarantine
-    // plus re-run is the v1 escape hatch (R10).
-    const identityQuarantines = (input.identityDecisions ?? []).filter((decision) => decision.outcome === "quarantine");
-    if (identityQuarantines.length) {
-      const collisions = identityQuarantines.map((decision) => {
-        const published = decision.members.filter((member) => member.published).map((member) => member.canonicalLabel);
-        return `${decision.declaredDomain}: ${published.join(" ⇄ ")}`;
-      });
-      throw new Error(`Refusing to build: identity resolution quarantined ${identityQuarantines.length} two-already-published collision(s): ${collisions.join("; ")}`);
-    }
-
-    // Every selected run's admitted-core Concept must carry a complete CEP (R1). A
-    // core candidate with a missing or incomplete profile fails the build before any
-    // publication so a Concept with no source-grounded meaning never enters the graph
-    // (test scenario U4.3).
-    for (const run of runs) {
-      const profilesByKey = new Map(run.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
-      for (const candidate of run.coreCandidates) {
-        const profile = profilesByKey.get(candidate.candidateKey);
-        if (!profile || !profile.complete || profile.definitions.length === 0) {
-          throw new Error(`Refusing to build: run ${run.runId} core concept ${candidate.candidateKey} (${candidate.canonicalLabel}) has no complete Concept Evidence Profile.`);
+      // Every selected run's admitted-core Concept must carry a complete CEP (R1). A
+      // core candidate with a missing or incomplete profile fails the build before any
+      // publication so a Concept with no source-grounded meaning never enters the graph
+      // (test scenario U4.3).
+      for (const run of runs) {
+        const profilesByKey = new Map(run.evidenceProfiles.map((profile) => [profile.candidateKey, profile] as const));
+        for (const candidate of run.coreCandidates) {
+          const profile = profilesByKey.get(candidate.candidateKey);
+          if (!profile || !profile.complete || profile.definitions.length === 0) {
+            throw new Error(`Refusing to build: run ${run.runId} core concept ${candidate.candidateKey} (${candidate.canonicalLabel}) has no complete Concept Evidence Profile.`);
+          }
         }
       }
-    }
 
-    // The base version this build extends (ADR-0007 reset R3). Its published CEP
-    // evidence is carried forward and unioned with the new runs; `null` only for the
-    // initial build.
-    const base = input.baseGraphVersionId
-      ? await input.graphStore.getPublishedSnapshot(input.baseGraphVersionId)
-      : undefined;
-    if (input.baseGraphVersionId && !base) {
-      throw new Error(`Base graph version ${input.baseGraphVersionId} is not published; cannot extend it.`);
-    }
+      // The base version this build extends (ADR-0007 reset R3). Its published CEP
+      // evidence is carried forward and unioned with the new runs; `null` only for the
+      // initial build.
+      const base = input.baseGraphVersionId
+        ? await input.graphStore.getPublishedSnapshot(input.baseGraphVersionId)
+        : undefined;
+      if (input.baseGraphVersionId && !base) {
+        throw new Error(`Base graph version ${input.baseGraphVersionId} is not published; cannot extend it.`);
+      }
 
-    const existingIdentities = await input.graphStore.existingConceptIdentities();
-    return { runs, base, existingIdentities };
+      const existingIdentities = await input.graphStore.existingConceptIdentities();
+      return { runs, base, existingIdentities };
   });
 
   // Refine — deterministic identity resolution, IRI minting, and CEP evidence union.
@@ -432,7 +419,6 @@ export async function buildGraphVersion(input: {
       artifact
     })
   );
-  await reporter.completeOperation({ operationType: "minting", operationId, status: "succeeded" });
   return snapshot;
   });
 }

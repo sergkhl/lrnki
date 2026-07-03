@@ -9,7 +9,6 @@ import {
   type RunEvidenceProfile,
   type StructuredDocument
 } from "@lrnki/domain-core";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   AdmissionLabelJudgmentPort,
   AssertionEntailmentJudgmentPort,
@@ -22,7 +21,7 @@ import type {
 } from "@lrnki/ports";
 import { admitSource } from "./admitSource";
 import { mapWithConcurrency } from "./mapWithConcurrency";
-import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import { applyAssertionEntailmentJudge } from "./applyAssertionEntailmentJudge";
 import { applyDefinitionPassageQualityJudge } from "./applyDefinitionPassageQualityJudge";
 import { applyEvidenceProfilePolicy } from "./applyEvidenceProfilePolicy";
@@ -63,42 +62,35 @@ export async function executeExtractionRun(input: {
   const startedAt = Date.now();
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.runId;
-  return runWithOperationTag(operationId, async () => {
-  const { document, declaredDomain } = input.source;
+  return runInstrumentedOperation(reporter, "extraction", operationId, async (runStage) => {
+    const { document, declaredDomain } = input.source;
 
-  // Bracket each stage onto the timeline; a thrown stage marks the operation failed and
-  // propagates, so a failed run leaves a readable timeline without a whole-body try.
-  const runStage = bracketStage(reporter, "extraction", operationId);
+    const maxMentionsPerConceptPerSource = input.maxMentionsPerConceptPerSource ?? DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE;
+    const evidenceNeighborhoodConfig = input.evidenceNeighborhoodConfig ?? DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG;
+    const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
 
-  // The parent `running` row exists from entry — the fix for "no row until done".
-  await reporter.beginOperation({ operationType: "extraction", operationId });
+    // Stage 1 — recall-oriented Candidate Discovery.
+    const discovered = await runStage(STAGE_TAGS.conceptDiscovery, () =>
+      input.discovery.discover({ document, declaredDomain })
+    );
 
-  const maxMentionsPerConceptPerSource = input.maxMentionsPerConceptPerSource ?? DEFAULT_MAX_MENTIONS_PER_CONCEPT_PER_SOURCE;
-  const evidenceNeighborhoodConfig = input.evidenceNeighborhoodConfig ?? DEFAULT_EVIDENCE_NEIGHBORHOOD_CONFIG;
-  const blockText = new Map(document.blocks.map((block) => [block.blockId, block.text] as const));
-
-  // Stage 1 — recall-oriented Candidate Discovery.
-  const discovered = await runStage(STAGE_TAGS.conceptDiscovery, () =>
-    input.discovery.discover({ document, declaredDomain })
-  );
-
-  // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
-  // `admitSource` owns the whole-source admission decision: fail-closed cross-atom
-  // resolution (R13 split atoms), the deterministic per-atom boundary, and the neural
-  // concept-vs-proposition downgrade (ADR-0005). Tier reconciliation against CEP
-  // completeness runs AFTER extraction (`reconcileUngroundableCores`).
-  // One wall-clock bracket for the admission phase. The nested admission-label-judge
-  // LLM call (inside admitSource) is attributed its own LiteLLM spend tag; U7 surfaces
-  // that cost even though it shares this stage's wall-clock.
-  const candidates = await runStage(STAGE_TAGS.admission, async () => {
-    const admissionProposals = await input.admission.admit({ document, declaredDomain, candidates: discovered });
-    return admitSource({
-      discovered,
-      admissionProposals,
-      blockText,
-      declaredDomain,
-      labelJudge: input.admissionLabelJudge
-    });
+    // Stage 2 — precision-first Concept Admission (separate prompt, never collapsed).
+    // `admitSource` owns the whole-source admission decision: fail-closed cross-atom
+    // resolution (R13 split atoms), the deterministic per-atom boundary, and the neural
+    // concept-vs-proposition downgrade (ADR-0005). Tier reconciliation against CEP
+    // completeness runs AFTER extraction (`reconcileUngroundableCores`).
+    // One wall-clock bracket for the admission phase. The nested admission-label-judge
+    // LLM call (inside admitSource) is attributed its own LiteLLM spend tag; U7 surfaces
+    // that cost even though it shares this stage's wall-clock.
+    const candidates = await runStage(STAGE_TAGS.admission, async () => {
+      const admissionProposals = await input.admission.admit({ document, declaredDomain, candidates: discovered });
+      return admitSource({
+        discovered,
+        admissionProposals,
+        blockText,
+        declaredDomain,
+        labelJudge: input.admissionLabelJudge
+      });
   });
 
   // CEPs are extracted for every admitted core or optional proposal when possible.
@@ -237,7 +229,6 @@ export async function executeExtractionRun(input: {
   // a non-LLM stage (wall-clock only, never appears in the cost half of the R5 join).
   await runStage(NON_LLM_STAGES.persist, () => input.store.persist(runResult, artifact));
 
-  await reporter.completeOperation({ operationType: "extraction", operationId, status: "succeeded" });
   return runResult;
   });
 }
