@@ -47,6 +47,7 @@ export {
 } from "./toolSchemas";
 export {
   LiteLlmStudyItemGenerationAdapter,
+  LiteLlmImpostorLieValidityJudgmentAdapter,
   STUDY_ITEM_GENERATION_MODEL
 } from "./studyItemGenerationAdapters";
 export {

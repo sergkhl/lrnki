@@ -83,7 +83,11 @@ function TargetList({
               ) : (
                 <Badge variant="secondary">{candidate.coneSize} prerequisites</Badge>
               )}
-              {candidate.hasStudyItem ? null : <Badge variant="outline">no item</Badge>}
+              {candidate.missingStudyItemCount > 0 ? (
+                <Badge variant="outline">
+                  {candidate.missingStudyItemCount} {candidate.missingStudyItemCount === 1 ? "node" : "nodes"} missing items
+                </Badge>
+              ) : null}
             </span>
           </Link>
         </li>

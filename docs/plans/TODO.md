@@ -2,33 +2,14 @@
 
 ## TODO
 
-1. **Fix quest-quality defects surfaced by markdown Study Item Bank generation.** The
-   markdown-only workflow over graph version `69617c45` / enrichment `90768af5` produced usable
-   Study Item Bank coverage (100 items, 63 lessons) but the real-use inspection is `FIX_FIRST` for
-   learner-facing quests. Root defects to address before promoting quest UX:
-   - Add an impostor validation/judge pass that verifies the keyed lie is false for the target
-     concept, not merely true for a sibling; the `INSTRUCTKG framework` impostor currently keys the
-     true statement "uses two types of directed edges: depends-on and part-of" as false, while the
-     reveal explains a different statement.
-   - Make impostor statement/reveal consistency structural, so the keyed lie, ordinal, and reveal
-     cannot drift.
-   - Rank recommended quests by whole trusted-cone study readiness, penalizing target cones with
-     no-item nodes. Current examples: `Clone` has 3 missing study nodes in a 10-node cone
-     (`Copy trait`, `Stack`, `Stack and Heap`); `Heap allocation` has 1 missing node.
-   - Add retry/repair for forced-tool invalid JSON in study-item generation and improve fallback for
-     lessons with no grounded sections, which account for much of the 28 rejected study-item rows.
-   Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
-   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
-   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-2. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
+1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
    evidence.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-3. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
+2. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
    learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
    `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
    shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
@@ -36,7 +17,7 @@
    behavior-preserving and does not require a new ADR.
    Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
-4. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -46,14 +27,14 @@
    Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
    `tmp/2026-06-30-generation-metering/`.
 
-5. **Validate learner-facing projections for anchor-less synthetic layers.** The Learner Paths view,
+4. **Validate learner-facing projections for anchor-less synthetic layers.** The Learner Paths view,
    the deferred adaptive path, and anchor-based target resolution were validated only on
    source-grounded layers. The now-landed Synthetic Topic Generation arm introduces anchor-less
    `llm_grounded` layers those projections have never seen; the `nodeKind === "anchor"` target
    resolution is the known assumption. Audit and adapt them beyond the Study Session already covered.
    Decision: [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md).
 
-6. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+5. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
@@ -64,6 +45,16 @@
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
 ## COMPLETED
+
+- **Quest-quality defects in Study Item Bank generation.** The learner-facing quest bank now
+  attributes rejected study-item rows, retries source-grounded lessons once when no substantive
+  source citation survives, falls back to generated-labeled lesson sections when citation grounding
+  is absent, binds impostor reveal/source metadata to the keyed lie statement, runs a fail-closed
+  cross-family lie-validity judge with one informed retry, and ranks recommended quests by full
+  readiness before cone size while showing missing-item counts. Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Concept Lesson gist as a framing hook distinct from the definition.** The `gist` is now
   generated as the concept's framing hook — the problem it solves, why it matters, or the tension it
@@ -140,6 +131,30 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Quest-quality Study Item Bank fixes, 2026-07-03.** Deterministic envelope: `pnpm run check`
+  exit 0 after the final prompt and comment cleanup (0 ESLint errors, 2 pre-existing warnings
+  outside this diff); targeted application, LiteLLM, and domain-core checks also passed while
+  iterating. **Real regenerate-and-inspect gate (rule 14):** enrichment `90768af5` was regenerated
+  with production aliases after the strict lie-validity prompt (`generate-study-items
+  90768af5-a9f5-4e0a-9dc0-0be71abfffdf --concurrency 6`, clean exit `lessons=63 lessonAbsent=1
+  items=104 rejected=24`). Stored rows show 59 option-select items and 45 impostors; generated
+  fallback is active for 23 items. Rejection reasons are inspectable: 14 citation-verification
+  rejects, 7 forced-tool shape/exhaustion rejects, 2 lesson-absent rejects, and 1 lie rejected by
+  the new judge. The inspected Rust false-by-attribution defect now drops: `Variable binding`
+  rejected because the proposed lie was true-but-misattributed; persisted `Owner`, `Variable Scope`,
+  `Clone`, and related impostors are plainly false for their target nodes with reveal/source metadata
+  attached to the keyed lie row. Real recommendation output for the same enrichment ranks fully
+  ready quests first (`INSTRUCTKG framework`, `DEBUG operator`, `IMPROVE operator`, etc., all
+  `missing=0`). **Defects found by the gate and fixed before pass:** nested forced-tool lie objects
+  caused invalid-JSON regressions, so the production wire schema stays shallow while the adapter
+  binds scalars into the domain lie object; the first stricter pass exposed true-but-misattributed
+  lie wording, so the generator and judge now require contradiction/impossibility rather than
+  "belongs to sibling." **Review:** CE subagent review dispatch was attempted but unavailable due
+  usage quota; fallback manual diff review found and fixed a pre-existing NUL-byte comment in
+  `domain-core` by replacing it with literal `\u0000`. **Result: PASS.** Trail:
+  `tmp/2026-07-02-quest-quality-regen-strict-lie.log` and
+  `tmp/2026-07-02-rejection-attribution/`.
 
 - **Concept Lesson gist distinctiveness, 2026-07-02.** Deterministic envelope: `pnpm run check`
   exit 0 (0 ESLint errors, 2 pre-existing warnings outside this diff); `@lrnki/infrastructure-litellm`

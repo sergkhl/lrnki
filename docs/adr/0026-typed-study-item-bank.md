@@ -14,6 +14,12 @@ keyed-selection types: option-select keys the one correct option, impostor keys 
 among three grounded truths. A node's supported item types are derived from persisted generated items,
 never from a separately maintained capability map.
 
+The impostor item shape single-sources the planted lie. Generation returns three cited truths plus
+one lie payload; the application inserts that lie into the four statement positions, and persistence
+stores `reveal`, `lie_source`, and `sibling_label` on the keyed lie statement row. The item itself
+does not duplicate lie metadata. This keeps the learner-facing reveal, grading key, and persisted
+statement identity bound to the same lie object.
+
 Study items preserve grounding provenance:
 
 - `source_cep` for anchor evidence;
@@ -29,8 +35,12 @@ graded Response Log entry through one grading-neutral path; a node's mastery fol
 graded observations at one threshold regardless of item type. Each type's deterministic guard enforces
 only structural and provenance guarantees: option-select keys exactly one correct option; impostor
 keys exactly one lie, verifies each of the three truths verbatim against its cited grounding, and
-makes a source-cited impostor unrepresentable. Semantic quality — distractor plausibility, lie
-plausibility, whether the reveal teaches — is evaluated through real-use inspection, not the guard.
+makes a source-cited impostor unrepresentable. A cross-family lie-validity judge then checks whether
+the keyed lie is actually false for the target node. A rejected lie gets one judge-informed retry; if
+the retry still does not produce a false lie, or if the judge is unavailable, the impostor is dropped
+with an operator-visible rejected-row reason. This judge is intentionally fail-closed because a true
+"lie" teaches a falsehood, while a missing impostor item is the designed safe state. Distractor
+plausibility and broader teaching quality remain real-use inspection responsibilities.
 
 Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
 card. A learner records a mutable binary calibration verdict for a derived node. The application

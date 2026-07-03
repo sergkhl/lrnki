@@ -13,6 +13,8 @@ import {
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
+  impostorLieValidityJudgmentSchema,
+  impostorLieValidityJudgmentValidator,
   impostorSchema,
   impostorValidator,
   toolValidators
@@ -151,33 +153,36 @@ test("concept lesson validator accepts a section with and without a diagram desc
   }));
 });
 
-test("impostor schema folds nullable citation scalars, fixes four statements, and is registered", () => {
+test("impostor schema binds three truths and scalar lie fields, and is registered", () => {
   // Registration: membership keeps the impostor schema under the strict-invariant and
   // domain-neutral sweeps that iterate toolValidators (U3).
   assert.ok(toolValidators.includes(impostorValidator));
 
-  const statementsNode = (impostorSchema.properties as Record<string, { minItems?: number; maxItems?: number; items: { properties: Record<string, unknown> } }>).statements;
-  // Exactly four statements (three truths + one impostor), shape fail-closed (rule 6).
-  assert.equal(statementsNode.minItems, 4);
-  assert.equal(statementsNode.maxItems, 4);
-  const statement = statementsNode.items.properties;
-  // Citation fields fold to plain nullable scalars (a truth cites; the impostor is null).
-  assert.deepEqual((statement.citationPassageId as Record<string, unknown>).type, ["string", "null"]);
-  assert.deepEqual((statement.citationEvidenceQuote as Record<string, unknown>).type, ["string", "null"]);
-  // siblingLabel folds to a nullable scalar (present only for a sibling-sourced lie).
-  assert.deepEqual(((impostorSchema.properties as Record<string, Record<string, unknown>>).siblingLabel).type, ["string", "null"]);
+  const truthsNode = (impostorSchema.properties as Record<string, { minItems?: number; maxItems?: number; items: { properties: Record<string, unknown> } }>).truths;
+  assert.equal(truthsNode.minItems, 3);
+  assert.equal(truthsNode.maxItems, 3);
+  assert.ok(truthsNode.items.properties.citationPassageId);
+  assert.ok(truthsNode.items.properties.citationEvidenceQuote);
+  const properties = impostorSchema.properties as Record<string, Record<string, unknown>>;
+  assert.ok(properties.lieText);
+  assert.ok(properties.reveal);
+  assert.deepEqual(properties.siblingLabel.type, ["string", "null"]);
 });
 
-test("impostorValidator rejects a source citation on the impostor's required nullable fields only via shape", () => {
-  // The schema enforces SHAPE; semantic honesty (impostor carries no citation) is the
-  // guard's job (U4). Here we only assert the lieSource enum is closed (fail-closed).
-  const four = [
-    { text: "a", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "b", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "c", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "d", isImpostor: true, citationPassageId: null, citationEvidenceQuote: null }
+test("impostorValidator rejects a non-closed lieSource enum", () => {
+  const truths = [
+    { text: "a", citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "b", citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "c", citationPassageId: "p", citationEvidenceQuote: "q" }
   ];
-  assert.throws(() => impostorValidator.parse({ question: "Q?", statements: four, reveal: "r", lieSource: "neighbor", siblingLabel: null }));
+  assert.throws(() => impostorValidator.parse({ question: "Q?", truths, lieText: "d", reveal: "r", lieSource: "neighbor", siblingLabel: null }));
+});
+
+test("impostor lie-validity judgment schema is registered and fail-closed", () => {
+  assert.ok(toolValidators.includes(impostorLieValidityJudgmentValidator));
+  assert.ok(impostorLieValidityJudgmentSchema.properties);
+  assert.doesNotThrow(() => impostorLieValidityJudgmentValidator.parse({ verdict: "lie_is_false", reason: "false for the node" }));
+  assert.throws(() => impostorLieValidityJudgmentValidator.parse({ verdict: "maybe", reason: "unclear" }));
 });
 
 function assertStrictForcedToolSchema(schema: unknown): void {

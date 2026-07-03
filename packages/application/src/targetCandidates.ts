@@ -9,6 +9,10 @@ export type TargetCandidate = {
   nodeKind: DerivedNodeKind;
   hasStudyItem: boolean;
   coneSize: number;
+  questNodeCount: number;
+  readyNodeCount: number;
+  missingStudyItemCount: number;
+  isFullyReady: boolean;
   isFoundational: boolean;
 };
 
@@ -20,14 +24,26 @@ function trustedEdges(edges: CandidateEdge[]): CandidateEdge[] {
 }
 
 function compareTargetCandidates(a: TargetCandidate, b: TargetCandidate): number {
-  return b.coneSize - a.coneSize || a.label.localeCompare(b.label) || a.derivedNodeId.localeCompare(b.derivedNodeId);
+  const aReadyFraction = a.questNodeCount === 0 ? 0 : a.readyNodeCount / a.questNodeCount;
+  const bReadyFraction = b.questNodeCount === 0 ? 0 : b.readyNodeCount / b.questNodeCount;
+  return Number(b.isFullyReady) - Number(a.isFullyReady) ||
+    bReadyFraction - aReadyFraction ||
+    b.coneSize - a.coneSize ||
+    a.label.localeCompare(b.label) ||
+    a.derivedNodeId.localeCompare(b.derivedNodeId);
 }
 
 export function buildTargetCandidates(detail: CandidateDetail): TargetCandidate[] {
   const edges = trustedEdges(detail.edges);
+  const nodeById = new Map(detail.nodes.map((node) => [node.derivedNodeId, node] as const));
   return detail.nodes
     .map((node) => {
-      const coneSize = prerequisiteAncestors(node.derivedNodeId, edges).size;
+      const ancestors = prerequisiteAncestors(node.derivedNodeId, edges);
+      const questScope = new Set([node.derivedNodeId, ...ancestors]);
+      const readyNodeCount = [...questScope].filter((derivedNodeId) => nodeById.get(derivedNodeId)?.hasStudyItem === true).length;
+      const questNodeCount = questScope.size;
+      const missingStudyItemCount = questNodeCount - readyNodeCount;
+      const coneSize = ancestors.size;
       return {
         derivedNodeId: node.derivedNodeId,
         label: node.label,
@@ -36,6 +52,10 @@ export function buildTargetCandidates(detail: CandidateDetail): TargetCandidate[
         nodeKind: node.nodeKind,
         hasStudyItem: node.hasStudyItem,
         coneSize,
+        questNodeCount,
+        readyNodeCount,
+        missingStudyItemCount,
+        isFullyReady: missingStudyItemCount === 0,
         isFoundational: coneSize === 0
       };
     })

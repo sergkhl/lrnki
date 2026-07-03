@@ -13,9 +13,13 @@ const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.1.0";
 // JSON_TABLE view flattens. `persist` writes them all in ONE transaction so there is
 // never authoritative relational state without its artifact (mirrors
 // PostgresEnrichmentRunStore). Items are a learner-NEUTRAL derived asset: regeneration
-// replaces an enrichment's items rather than mutating learner state. `supportedItemTypes`
-// is a SELECT DISTINCT query — the supported set is the byproduct of which items grounded,
-// never a stored map (KTD2, rule 18).
+// supersedes an enrichment's prior items rather than deleting them, because
+// response_log.study_item_id (append-only, no cascade) must keep resolving even after
+// the bank moves on — a hard delete-then-insert here would FK-violate the moment any
+// response has been logged against the item being replaced. All three read methods
+// scope to `superseded_at IS NULL` (the current generation); `supportedItemTypes`
+// is a SELECT DISTINCT query over that same current scope — the supported set is the
+// byproduct of which items grounded, never a stored map (KTD2, rule 18).
 export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   constructor(private readonly sql: Sql) {}
 
@@ -23,11 +27,14 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
     for (const item of studyItems) assertPersistableItem(item);
     // All items in one persist belong to a single enrichment layer. Regeneration is
-    // replay, not mutation: delete the enrichment's prior items (options + citations
-    // cascade) and prior rejections, then re-insert. Done even when 0 items survive so an
-    // all-rejected regeneration still clears stale items and records the rejections.
+    // replay, not mutation — but unlike rejections (which nothing outside this table
+    // references, so a plain delete-then-insert is safe), prior items are SUPERSEDED
+    // rather than deleted: response_log rows may already point at them. The superseded
+    // row, and its options/citations/impostor statements, stay in place as history. Done
+    // even when 0 items survive so an all-rejected regeneration still retires stale
+    // items and records the rejections.
     await this.sql.begin(async (tx) => {
-      await tx`DELETE FROM study_items WHERE enrichment_id = ${enrichmentId}`;
+      await tx`UPDATE study_items SET superseded_at = now() WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL`;
       await tx`DELETE FROM rejected_study_items WHERE enrichment_id = ${enrichmentId}`;
       for (const rejection of rejected) {
         await tx`
@@ -86,10 +93,10 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   // backstop behind the guard) — a source-cited impostor is unrepresentable.
   private async insertImpostorStatement(tx: Sql | TransactionSql, item: ImpostorItem, statement: ImpostorStatement): Promise<void> {
     if (statement.isImpostor) {
-      const siblingLabel = item.lieSource === "sibling" ? (item.siblingLabel ?? null) : null;
+      const siblingLabel = statement.lieSource === "sibling" ? (statement.siblingLabel ?? null) : null;
       await tx`
         INSERT INTO impostor_statements (impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, reveal_text, lie_source, sibling_label)
-        VALUES (${statement.statementId}, ${item.studyItemId}, ${statement.ordinal}, ${statement.text}, true, 'generated', ${item.reveal}, ${item.lieSource}, ${siblingLabel})`;
+        VALUES (${statement.statementId}, ${item.studyItemId}, ${statement.ordinal}, ${statement.text}, true, 'generated', ${statement.reveal}, ${statement.lieSource}, ${siblingLabel})`;
       return;
     }
     const citation = statement.citation;
@@ -108,7 +115,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
-      FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} LIMIT 1`;
+      FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
     return item;
@@ -117,13 +124,13 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
-      FROM study_items WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id, item_type`;
+      FROM study_items WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
 
   async supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]> {
     const rows = await this.sql<{ item_type: string }[]>`
-      SELECT DISTINCT item_type FROM study_items WHERE derived_node_id = ${derivedNodeId} ORDER BY item_type`;
+      SELECT DISTINCT item_type FROM study_items WHERE derived_node_id = ${derivedNodeId} AND superseded_at IS NULL ORDER BY item_type`;
     return rows.map((row) => row.item_type as StudyItemType);
   }
 
@@ -178,14 +185,10 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       if (row.item_type === "impostor") {
         const statementRowsForItem = statementsByItem.get(row.study_item_id) ?? [];
         const statements: ImpostorStatement[] = statementRowsForItem.map(toImpostorStatement);
-        const impostorRow = statementRowsForItem.find((statement) => statement.is_impostor);
         return {
           ...base,
           itemType: "impostor",
-          statements,
-          reveal: impostorRow?.reveal_text ?? "",
-          lieSource: (impostorRow?.lie_source ?? "generated") as ImpostorItem["lieSource"],
-          ...(impostorRow?.sibling_label ? { siblingLabel: impostorRow.sibling_label } : {})
+          statements
         };
       }
       const citations = (citationsByItem.get(row.study_item_id) ?? []).map(toCitation);
@@ -216,7 +219,7 @@ function assertPersistableItem(item: StudyItem): void {
     if (item.statements.length !== 4) throw new Error(`impostor ${item.studyItemId} must have exactly four statements.`);
     const impostors = item.statements.filter((statement) => statement.isImpostor);
     if (impostors.length !== 1) throw new Error(`impostor ${item.studyItemId} must have exactly one impostor statement.`);
-    if (impostors[0].citation) throw new Error(`impostor ${item.studyItemId} impostor statement must carry no citation.`);
+    if (!impostors[0].reveal.trim()) throw new Error(`impostor ${item.studyItemId} impostor statement must carry a reveal.`);
     if (item.statements.some((statement) => !statement.isImpostor && !statement.citation)) throw new Error(`impostor ${item.studyItemId} truths must each carry a citation.`);
     return;
   }
@@ -230,18 +233,28 @@ function toCitation(row: CitationRow): StudyItemCitation {
 }
 
 function toImpostorStatement(row: ImpostorStatementRow): ImpostorStatement {
-  const citation: StudyItemCitation | undefined = row.is_impostor
-    ? undefined
-    : row.provenance === "source"
-      ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote!, matchKind: row.match_kind! }
-      : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
+  if (row.is_impostor) {
+    return {
+      statementId: row.impostor_statement_id,
+      ordinal: row.ordinal,
+      text: row.statement_text,
+      isImpostor: true,
+      provenance: "generated",
+      reveal: row.reveal_text ?? "",
+      lieSource: (row.lie_source ?? "generated") as "sibling" | "generated",
+      ...(row.sibling_label ? { siblingLabel: row.sibling_label } : {})
+    };
+  }
+  const citation: StudyItemCitation = row.provenance === "source"
+    ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote!, matchKind: row.match_kind! }
+    : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
   return {
     statementId: row.impostor_statement_id,
     ordinal: row.ordinal,
     text: row.statement_text,
-    isImpostor: row.is_impostor,
+    isImpostor: false,
     provenance: row.provenance,
-    ...(citation ? { citation } : {})
+    citation
   };
 }
 

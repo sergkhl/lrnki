@@ -148,7 +148,9 @@ export function studyItemToView(item: StudyItem): StudyItemView {
             .map((option) => ({ optionId: option.optionId, text: option.text, isCorrect: option.isCorrect, provenance: option.provenance }))
         }
       };
-    case "impostor":
+    case "impostor": {
+      const lie = item.statements.find((statement) => statement.isImpostor);
+      if (!lie) throw new Error(`impostor item ${item.studyItemId} has no keyed impostor statement.`);
       return {
         kind: "impostor",
         item: {
@@ -161,11 +163,12 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           statements: [...item.statements]
             .sort((a, b) => a.statementId.localeCompare(b.statementId))
             .map((statement) => ({ statementId: statement.statementId, text: statement.text, isImpostor: statement.isImpostor, provenance: statement.provenance })),
-          reveal: item.reveal,
-          lieSource: item.lieSource,
-          ...(item.siblingLabel ? { siblingLabel: item.siblingLabel } : {})
+          reveal: lie.reveal,
+          lieSource: lie.lieSource,
+          ...(lie.siblingLabel ? { siblingLabel: lie.siblingLabel } : {})
         }
       };
+    }
   }
 }
 

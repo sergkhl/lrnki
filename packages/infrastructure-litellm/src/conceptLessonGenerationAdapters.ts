@@ -42,6 +42,7 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
     groundingProvenance: "source_cep" | "source_mentioned" | "generated";
     groundingPassages: GroundingPassage[];
     neighbors: { parents: NeighborGroup; children: NeighborGroup; siblings: NeighborGroup };
+    retryFeedback?: string;
   }): Promise<ConceptLessonDraft> {
     const system = [
       "You write ONE ordered teaching lesson for a single learning node, conditioned ONLY on the provided grounding passages and neighbor concepts.",
@@ -69,6 +70,7 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
       renderNeighbors(input.neighbors.children),
       "Sibling concepts in the same domain:",
       renderNeighbors(input.neighbors.siblings),
+      ...(input.retryFeedback ? ["", "Retry feedback from the previous rejected draft:", input.retryFeedback] : []),
       "",
       "Call submit_concept_lesson with the ordered sections this grounding supports."
     ].join("\n");

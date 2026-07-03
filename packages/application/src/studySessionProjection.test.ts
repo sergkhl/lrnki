@@ -82,11 +82,17 @@ function impostorItem(derivedNodeId: string): StudyItem {
       { statementId: `s-${derivedNodeId}-2`, ordinal: 0, text: "Truth A", isImpostor: false, provenance: "source", citation: sourceCitation },
       { statementId: `s-${derivedNodeId}-1`, ordinal: 1, text: "Truth B", isImpostor: false, provenance: "source", citation: sourceCitation },
       { statementId: `s-${derivedNodeId}-3`, ordinal: 2, text: "Truth C", isImpostor: false, provenance: "source", citation: sourceCitation },
-      { statementId: `s-${derivedNodeId}-4`, ordinal: 3, text: "The planted lie", isImpostor: true, provenance: "generated" }
-    ],
-    reveal: "The fourth statement is false; it is actually true of Borrowing.",
-    lieSource: "sibling",
-    siblingLabel: "Borrowing"
+      {
+        statementId: `s-${derivedNodeId}-4`,
+        ordinal: 3,
+        text: "The planted lie",
+        isImpostor: true,
+        provenance: "generated",
+        reveal: "The fourth statement is false; it is actually true of Borrowing.",
+        lieSource: "sibling",
+        siblingLabel: "Borrowing"
+      }
+    ]
   };
 }
 
