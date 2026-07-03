@@ -10,7 +10,6 @@ import type {
   SyntheticProbeDisposition
 } from "@lrnki/domain-core";
 import { normalizeConceptLabel, STAGE_TAGS } from "@lrnki/domain-core";
-import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import type {
   ConceptSetSynthesisPort,
   DifficultyPort,
@@ -22,7 +21,7 @@ import type {
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { randomUUID } from "node:crypto";
-import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
+import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
 import { transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
@@ -105,14 +104,11 @@ export async function runSyntheticGeneration(input: {
   const declaredDomain = input.declaredDomain;
   const newNodeId = input.newNodeId ?? randomUUID;
 
-  return runWithOperationTag(operationId, async () => {
+  return runInstrumentedOperation(reporter, "enrichment", operationId, async (runStage) => {
     // The synthetic operation persists a DerivedGraphLayer through the enrichment store, so
     // its timeline rides the `enrichment` operation type; its own fine STAGE_TAGS
     // (concept-set-synthesis, knowledge-boundary-probe, grounding-generation, ...) keep the
-    // cost split separable in spend (ADR-0029). A thrown stage leaves a readable failed
-    // timeline and never persists a partial layer.
-    const runStage = bracketStage(reporter, "enrichment", operationId);
-    await reporter.beginOperation({ operationType: "enrichment", operationId });
+    // cost split separable in spend (ADR-0029).
 
     // Stage 1 — synthesize the concept set from topic + Declared Domain alone (R1, R2).
     const synthesized = await runStage(STAGE_TAGS.conceptSetSynthesis, () =>
@@ -289,7 +285,6 @@ export async function runSyntheticGeneration(input: {
         }
       })
     );
-    await reporter.completeOperation({ operationType: "enrichment", operationId, status: "succeeded" });
     return layer;
   });
 }

@@ -55,6 +55,7 @@ test("declares reportable stages by operation type", () => {
     NON_LLM_STAGES.persist
   ]);
   assert.deepEqual(operationTimelineStagesForOperation("study_items").map((row) => row.stage), [
+    NON_LLM_STAGES.load,
     STAGE_TAGS.conceptLessonGeneration,
     STAGE_TAGS.studyItemGeneration,
     STAGE_TAGS.impostorGeneration,

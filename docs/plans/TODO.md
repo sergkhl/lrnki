@@ -39,6 +39,15 @@
 
 ## COMPLETED
 
+- **Operation lifecycle wrapper and application barrel prune.** The ADR-0029 operation lifecycle now
+  has one application wrapper for operation-tag scope, begin-at-entry, and terminal succeeded/failed
+  status; stage bracketing owns only stage close/error detail. `generateStudyItemBank` precondition
+  failures now persist a failed `study_items` timeline with a failed `load` stage. The
+  `@lrnki/application` barrel is pruned to the mechanically consumed external surface. Decisions:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) and
+  [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md). Framing:
+  [architecture review](../brainstorms/2026-07-03-architecture-deepening-review.md).
+
 - **Quest-quality defects in Study Item Bank generation.** The learner-facing quest bank now
   attributes rejected study-item rows, retries source-grounded lessons once when no substantive
   source citation survives, falls back to generated-labeled lesson sections when citation grounding
@@ -131,6 +140,24 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Operation lifecycle wrapper and application barrel prune, 2026-07-03.** Deterministic envelope:
+  `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint with 2 pre-existing
+  warnings, and Admin Lab production build). Mechanical public-surface check found 42 external
+  `@lrnki/application` consumers across `apps`, `scripts`, and non-application packages, with zero
+  missing or extra barrel exports. `rg` found no remaining `runWithOperationTag` operation call sites
+  outside `runProgressReporter.ts`; `beginOperation`/`completeOperation` callers are limited to the
+  wrapper, tests, and the Postgres adapter. **Real-use quality evaluation:** with `.env` loaded, a
+  real `generate-study-items` run against nonexistent enrichment
+  `bcdd6e8f-459f-4f66-97b4-ae0eca0a5a54` failed as expected and persisted a `study_items` operation
+  with status `failed`, current stage `load`, and a failed `load` stage whose redacted `error_detail`
+  names the missing enrichment. A real graph-version build
+  `710c2dc0-d1b8-4844-a67b-211288456d89` from the existing succeeded extraction run published
+  successfully with `BUILD_DISABLE_IDENTITY_RESOLUTION=1`; its persisted `minting` timeline shows
+  completed `load`, `refine`, and `persist` stages with `ok=true` and terminal `succeeded`. Admin Lab
+  operations and bottleneck pages rendered both operation ids, statuses, and stages from the same DB.
+  **Result: PASS.** Trail: `tmp/real-use-missing-enrichment-id.txt`,
+  `tmp/real-use-build-graph-output.txt`, `tmp/admin-operations.html`, and `tmp/admin-bottleneck.html`.
 
 - **Persisted Learner Path retirement, 2026-07-03.** Deterministic envelope: `pnpm run check` exit 0
   after the deletion (0 ESLint errors, 2 pre-existing warnings outside this diff). Targeted gates also

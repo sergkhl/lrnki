@@ -1,4 +1,5 @@
 import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
+import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { isLlmStage, NON_LLM_STAGES, type NonLlmStage } from "./operationTimelineCatalog";
 
 // The reporter seam's application-facing surface (KTD4, R7). Operations import the
@@ -35,11 +36,35 @@ export { isLlmStage, NON_LLM_STAGES, type NonLlmStage };
 // with, closing the bottleneck-report join.
 export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: number) => Promise<T>;
 
+// Instrumented operation wrapper shared by every operation (ADR-0029). It owns the
+// operation lifecycle: ambient operation tag, begin-at-entry, exactly one terminal
+// status, and propagation of the original result/error.
+export async function runInstrumentedOperation<T>(
+  reporter: RunProgressReporterPort,
+  operationType: OperationType,
+  operationId: string,
+  fn: (runStage: StageBracket) => Promise<T>
+): Promise<T> {
+  return runWithOperationTag(operationId, async () => {
+    await reporter.beginOperation({ operationType, operationId });
+    const runStage = bracketStage(reporter, operationType, operationId);
+    let result: T;
+    try {
+      result = await fn(runStage);
+    } catch (error) {
+      await reporter.completeOperation({ operationType, operationId, status: "failed" });
+      throw error;
+    }
+    await reporter.completeOperation({ operationType, operationId, status: "succeeded" });
+    return result;
+  });
+}
+
 // Stage-bracket factory shared by every instrumented operation (R1). Open a stage, run
-// it, close it ok:true; a throw closes it ok:false, marks the OPERATION failed, and
-// rethrows — so a thrown stage always leaves a readable failed timeline without each
-// operation re-implementing the try/catch (and the failure semantics stay one source
-// of truth). `total` seeds an N-of-M heartbeat for stages that iterate.
+// it, close it ok:true; a throw closes it ok:false with redacted detail and rethrows.
+// Operation terminal status is owned by runInstrumentedOperation so failures between
+// stages cannot strand a permanent `running` row. `total` seeds an N-of-M heartbeat
+// for stages that iterate.
 export function bracketStage(reporter: RunProgressReporterPort, operationType: OperationType, operationId: string): StageBracket {
   return async <T>(stage: string, fn: () => Promise<T>, total?: number): Promise<T> => {
     await reporter.enterStage({ operationType, operationId, stage, total });
@@ -51,7 +76,6 @@ export function bracketStage(reporter: RunProgressReporterPort, operationType: O
       // Persist the redacted reason (ADR-0006 fail-closed, inspectable) before failing the
       // stage. We never re-throw a different error or alter the fail-closed decision.
       await reporter.completeStage({ operationType, operationId, stage, ok: false, errorDetail: toStageErrorDetail(error) });
-      await reporter.completeOperation({ operationType, operationId, status: "failed" });
       throw error;
     }
   };
