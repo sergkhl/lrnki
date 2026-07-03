@@ -39,7 +39,7 @@ export class PostgresEnrichmentInspectionRead implements EnrichmentInspectionRea
 
     const nodeRows = await this.sql<NodeRow[]>`
       SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.aliases, n.declared_domain, d.score, d.neural_rationale,
-             EXISTS (SELECT 1 FROM study_items si WHERE si.derived_node_id = n.derived_node_id) AS has_study_item
+             EXISTS (SELECT 1 FROM study_items si WHERE si.derived_node_id = n.derived_node_id AND si.superseded_at IS NULL) AS has_study_item
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
       WHERE n.enrichment_id = ${header.enrichment_id}
@@ -177,7 +177,7 @@ const enrichmentSummaryColumns = (sql: Sql) => sql`
   (SELECT count(*) FROM inferred_prerequisite_edges e WHERE e.enrichment_id = g.enrichment_id) AS edge_count,
   (SELECT count(*) FROM inferred_prerequisite_edges e WHERE e.enrichment_id = g.enrichment_id AND NOT e.uncertain) AS certain_edge_count,
   (SELECT count(*) FROM concept_difficulties d WHERE d.enrichment_id = g.enrichment_id) AS concept_count,
-  (SELECT count(*) FROM study_items si WHERE si.enrichment_id = g.enrichment_id) AS study_item_count`;
+  (SELECT count(*) FROM study_items si WHERE si.enrichment_id = g.enrichment_id AND si.superseded_at IS NULL) AS study_item_count`;
 
 function toEnrichmentSummary(row: EnrichmentSummaryRow): EnrichmentSummary {
   const edgeCount = Number(row.edge_count);

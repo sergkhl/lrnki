@@ -8,7 +8,16 @@ import {
   type StudyItem
 } from "@lrnki/domain-core";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import type { ConceptLessonGenerationPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, RunProgressReporterPort, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
+import type {
+  ConceptLessonGenerationPort,
+  ConceptLessonStorePort,
+  EnrichmentRunStorePort,
+  GraphVersionStorePort,
+  ImpostorLieValidityJudgmentPort,
+  RunProgressReporterPort,
+  StudyItemBankStorePort,
+  StudyItemGenerationPort
+} from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { bracketStage, NON_LLM_STAGES, noopRunProgressReporter } from "./runProgressReporter";
 import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSelectGuard";
@@ -16,7 +25,7 @@ import { validateImpostorItem, type ImpostorGrounding } from "./impostorGuard";
 import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding, type GroundingPassage } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
-import { assembleConceptLesson } from "./assembleConceptLesson";
+import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 
 // Bounded concurrency for per-node study-item generation (plan U6/R11). Defaults to 1 so
 // behavior is byte-identical to the prior sequential loop; raising it later parallelizes
@@ -56,6 +65,7 @@ export async function generateStudyItemBank(input: {
   graphStore: GraphVersionStorePort;
   enrichmentStore: EnrichmentRunStorePort;
   conceptLessonGeneration: ConceptLessonGenerationPort;
+  impostorLieValidityJudge: ImpostorLieValidityJudgmentPort;
   conceptLessonStore: ConceptLessonStorePort;
   studyItemGeneration: StudyItemGenerationPort;
   studyItemBankStore: StudyItemBankStorePort;
@@ -109,20 +119,40 @@ export async function generateStudyItemBank(input: {
     }
     try {
       const neighbors = selectLessonNeighborhood(node, layer);
-      const draft = await input.conceptLessonGeneration.generate({
+      const initialDraft = await input.conceptLessonGeneration.generate({
         declaredDomain: node.declaredDomain,
         node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
         groundingProvenance: grounding.provenance,
         groundingPassages: grounding.passages,
         neighbors
       });
-      const assembled = assembleConceptLesson({
+      let assembled = assembleConceptLesson({
         node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
         generatingModel: input.conceptLessonGeneration.model,
         configHash: input.configHash,
         grounding,
-        draft
+        draft: initialDraft
       });
+      if (shouldRetryLesson(node, assembled.kind === "lesson" ? assembled.lesson : undefined)) {
+        const retryDraft = await input.conceptLessonGeneration.generate({
+          declaredDomain: node.declaredDomain,
+          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+          groundingProvenance: grounding.provenance,
+          groundingPassages: grounding.passages,
+          neighbors,
+          retryFeedback: lessonRetryFeedback(assembled.kind === "lesson" ? assembled.lesson : undefined)
+        });
+        const retryAssembled = assembleConceptLesson({
+          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
+          generatingModel: input.conceptLessonGeneration.model,
+          configHash: input.configHash,
+          grounding,
+          draft: retryDraft
+        });
+        if (retryAssembled.kind === "lesson" && hasVerifiedSubstantiveSourceCitation(retryAssembled.lesson)) {
+          assembled = retryAssembled;
+        }
+      }
       return assembled.kind === "lesson" ? { lesson: assembled.lesson } : { absent: assembled.absent };
     } catch (error) {
       return { absent: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: `concept-lesson generation failed: ${error instanceof Error ? error.message : String(error)}` } };
@@ -176,7 +206,7 @@ export async function generateStudyItemBank(input: {
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: concept lesson is absent for this node" }] };
     }
-    const grounding = studyItemGroundingFromLesson(lesson, node);
+    const grounding = studyItemGroundingFromLesson(lesson);
     if (!grounding) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: the lesson has no grounded sections to anchor an item" }] };
     }
@@ -260,12 +290,13 @@ export async function generateStudyItemBank(input: {
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: concept lesson is absent for this node" }] };
     }
-    const grounding = studyItemGroundingFromLesson(lesson, node);
+    const grounding = studyItemGroundingFromLesson(lesson);
     if (!grounding) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: the lesson has no grounded sections to anchor an item" }] };
     }
 
     let failureReason: string | null = null;
+    let retryFeedback: string | undefined;
     const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
     for (let attempt = 0; attempt < IMPOSTOR_GENERATION_ATTEMPTS; attempt += 1) {
       try {
@@ -274,7 +305,8 @@ export async function generateStudyItemBank(input: {
           node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
           groundingProvenance: grounding.provenance,
           groundingPassages: grounding.passages,
-          siblings
+          siblings,
+          retryFeedback
         });
         const guardContext: ImpostorGrounding = {
           studyItemId: newStudyItemId(),
@@ -288,13 +320,43 @@ export async function generateStudyItemBank(input: {
         };
         const guarded = validateImpostorItem(draft, guardContext, newStatementId);
         if (guarded.ok) {
-          return { items: [guarded.item], rejected: [] };
+          // validateImpostorItem always splices exactly one isImpostor:true statement into
+          // a successful item, so the keyed lie is always found here.
+          const lie = guarded.item.statements.find((statement) => statement.isImpostor)!;
+          try {
+            const judgment = await input.impostorLieValidityJudge.judge({
+              declaredDomain: node.declaredDomain,
+              node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+              lie: { text: lie.text, reveal: lie.reveal },
+              groundingPassages: grounding.passages,
+              siblings
+            });
+            if (judgment.verdict === "lie_is_false") {
+              return { items: [guarded.item], rejected: [] };
+            }
+            failureReason = `impostor lie rejected by judge: ${judgment.reason}`;
+            retryFeedback = judgment.reason;
+          } catch (error) {
+            return {
+              items: [],
+              rejected: [{
+                derivedNodeId: node.derivedNodeId,
+                canonicalLabel: node.canonicalLabel,
+                itemType: "impostor",
+                reason: `impostor lie-validity judge unavailable: ${error instanceof Error ? error.message : String(error)}`
+              }]
+            };
+          }
         } else {
           failureReason = guarded.reason;
         }
       } catch (error) {
         failureReason = `impostor generation failed: ${error instanceof Error ? error.message : String(error)}`;
       }
+      // A wrong impostor actively teaches a falsehood; no-impostor is the safe state. The
+      // loop bound (IMPOSTOR_GENERATION_ATTEMPTS) caps every failure kind — including a
+      // judge rejection — at one retry, after which the rejected-row reason is the operator
+      // signal instead of passing a suspect lie through.
     }
 
     return {
@@ -347,8 +409,7 @@ export async function generateStudyItemBank(input: {
 // become fallback grounding.
 // Returns null when the lesson has no grounded section to anchor an item.
 function studyItemGroundingFromLesson(
-  lesson: ConceptLesson,
-  node: DerivedGraphNode
+  lesson: ConceptLesson
 ): { provenance: "source_cep" | "source_mentioned" | "generated"; passages: GroundingPassage[] } | null {
   const passages: GroundingPassage[] = [];
   let sourceProvenance: "source_cep" | "source_mentioned" | null = null;
@@ -376,9 +437,9 @@ function studyItemGroundingFromLesson(
       });
     }
   }
-  if (passages.length === 0 && node.groundingOrigin === "llm_grounded") {
+  if (passages.length === 0) {
     for (const section of lesson.sections) {
-      if (section.kind !== "definition" && section.kind !== "examples" && section.kind !== "formulas") continue;
+      if (!SUBSTANTIVE_KINDS.includes(section.kind)) continue;
       const passageKind: "definition" | "mention" = section.kind === "definition" ? "definition" : "mention";
       passages.push({
         passageId: `${lesson.derivedNodeId}:${passageKind}:lesson`,
@@ -390,4 +451,24 @@ function studyItemGroundingFromLesson(
   }
   if (passages.length === 0) return null;
   return { provenance: sourceProvenance ?? "generated", passages };
+}
+
+function hasVerifiedSubstantiveSourceCitation(lesson: ConceptLesson): boolean {
+  return lesson.sections.some((section) =>
+    SUBSTANTIVE_KINDS.includes(section.kind) && section.citation?.provenance === "source"
+  );
+}
+
+function shouldRetryLesson(node: DerivedGraphNode, lesson: ConceptLesson | undefined): boolean {
+  return node.groundingOrigin !== "llm_grounded" && (!lesson || !hasVerifiedSubstantiveSourceCitation(lesson));
+}
+
+function lessonRetryFeedback(lesson: ConceptLesson | undefined): string {
+  if (!lesson) return "The previous lesson did not produce a valid substantive source-cited section. Regenerate with a definition, examples, or formulas section whose evidence quote is copied verbatim from one provided grounding passage.";
+  const failed = lesson.sections
+    .filter((section) => SUBSTANTIVE_KINDS.includes(section.kind))
+    .filter((section) => section.citation?.provenance !== "source")
+    .map((section) => section.kind);
+  const named = failed.length ? [...new Set(failed)].join(", ") : "definition/examples/formulas";
+  return `The previous lesson had no verified source citation in a substantive section. Regenerate with a source-cited ${named} section whose evidence quote is copied verbatim from one provided grounding passage.`;
 }

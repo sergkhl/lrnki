@@ -72,12 +72,12 @@ test("generateImpostor assembles a draft: three cited truths + one generated imp
       calls.push(input);
       return {
         question: "Which statement about the Heap is false?",
-        statements: [
-          { text: "The heap allocates at runtime.", isImpostor: false, citationPassageId: "b1", citationEvidenceQuote: "the heap allocates at runtime" },
-          { text: "The heap stores dynamically sized data.", isImpostor: false, citationPassageId: "b1", citationEvidenceQuote: "the heap allocates" },
-          { text: "The heap holds long-lived allocations.", isImpostor: false, citationPassageId: "b1", citationEvidenceQuote: "at runtime" },
-          { text: "The heap is a LIFO region for call frames.", isImpostor: true, citationPassageId: null, citationEvidenceQuote: null }
+        truths: [
+          { text: "The heap allocates at runtime.", citationPassageId: "b1", citationEvidenceQuote: "the heap allocates at runtime" },
+          { text: "The heap stores dynamically sized data.", citationPassageId: "b1", citationEvidenceQuote: "the heap allocates" },
+          { text: "The heap holds long-lived allocations.", citationPassageId: "b1", citationEvidenceQuote: "at runtime" }
         ],
+        lieText: "The heap is a LIFO region for call frames.",
         reveal: "The LIFO statement is false; that is actually true of the Stack.",
         lieSource: "sibling",
         siblingLabel: "Stack"
@@ -95,15 +95,13 @@ test("generateImpostor assembles a draft: three cited truths + one generated imp
   });
 
   assert.equal(draft.itemType, "impostor");
-  assert.equal(draft.statements.length, 4);
-  const impostors = draft.statements.filter((s) => s.isImpostor);
-  assert.equal(impostors.length, 1);
-  assert.equal(impostors[0].citation, undefined);
-  for (const truth of draft.statements.filter((s) => !s.isImpostor)) {
+  assert.equal(draft.truths.length, 3);
+  for (const truth of draft.truths) {
     assert.ok(truth.citation, "truth carries a citation");
   }
-  assert.equal(draft.lieSource, "sibling");
-  assert.equal(draft.siblingLabel, "Stack");
+  assert.equal(draft.lie.text, "The heap is a LIFO region for call frames.");
+  assert.equal(draft.lie.lieSource, "sibling");
+  assert.equal(draft.lie.siblingLabel, "Stack");
   assert.equal(calls[0].toolName, "submit_impostor_item");
   assert.equal(calls[0].maxRetries, 4);
   assert.deepEqual(calls[0].tags, ["impostor-generation"]);
@@ -115,12 +113,12 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
     async call() {
       return {
         question: "Which is false?",
-        statements: [
-          { text: "t1", isImpostor: false, citationPassageId: "p0", citationEvidenceQuote: "tracks which binding frees a value" },
-          { text: "t2", isImpostor: false, citationPassageId: "p0", citationEvidenceQuote: "tracks which binding" },
-          { text: "t3", isImpostor: false, citationPassageId: "p0", citationEvidenceQuote: "frees a value" },
-          { text: "a fresh misconception", isImpostor: true, citationPassageId: null, citationEvidenceQuote: null }
+        truths: [
+          { text: "t1", citationPassageId: "p0", citationEvidenceQuote: "tracks which binding frees a value" },
+          { text: "t2", citationPassageId: "p0", citationEvidenceQuote: "tracks which binding" },
+          { text: "t3", citationPassageId: "p0", citationEvidenceQuote: "frees a value" }
         ],
+        lieText: "a fresh misconception",
         reveal: "The fourth is invented and false.",
         lieSource: "generated",
         siblingLabel: null
@@ -135,27 +133,25 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
     groundingPassages: [{ passageId: "p0", kind: "definition", text: "tracks which binding frees a value", derivedNodeId: "n2" }],
     siblings: []
   });
-  assert.equal(draft.lieSource, "generated");
-  assert.equal(draft.siblingLabel, undefined);
+  assert.equal(draft.lie.lieSource, "generated");
+  assert.equal(draft.lie.siblingLabel, undefined);
 });
 
-test("impostorValidator rejects the wrong statement count (fail-closed, rule 6)", () => {
-  const three = [
-    { text: "a", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "b", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "c", isImpostor: true, citationPassageId: null, citationEvidenceQuote: null }
+test("impostorValidator rejects the wrong truth count (fail-closed, rule 6)", () => {
+  const two = [
+    { text: "a", citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "b", citationPassageId: "p", citationEvidenceQuote: "q" }
   ];
-  assert.throws(() => impostorValidator.parse({ question: "Q?", statements: three, reveal: "r", lieSource: "generated", siblingLabel: null }));
+  assert.throws(() => impostorValidator.parse({ question: "Q?", truths: two, lieText: "c", reveal: "r", lieSource: "generated", siblingLabel: null }));
 });
 
 test("impostorValidator rejects arguments missing reveal", () => {
-  const four = [
-    { text: "a", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "b", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "c", isImpostor: false, citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "d", isImpostor: true, citationPassageId: null, citationEvidenceQuote: null }
+  const truths = [
+    { text: "a", citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "b", citationPassageId: "p", citationEvidenceQuote: "q" },
+    { text: "c", citationPassageId: "p", citationEvidenceQuote: "q" }
   ];
-  assert.throws(() => impostorValidator.parse({ question: "Q?", statements: four, lieSource: "generated", siblingLabel: null }));
+  assert.throws(() => impostorValidator.parse({ question: "Q?", truths, lieText: "d", lieSource: "generated", siblingLabel: null }));
 });
 
 test("optionSelectValidator rejects arguments missing correctAnswer", () => {

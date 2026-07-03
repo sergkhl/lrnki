@@ -42,10 +42,12 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
     groundingProvenance: "source_cep" | "source_mentioned" | "generated";
     groundingPassages: GroundingPassage[];
     neighbors: { parents: NeighborGroup; children: NeighborGroup; siblings: NeighborGroup };
+    retryFeedback?: string;
   }): Promise<ConceptLessonDraft> {
     const system = [
       "You write ONE ordered teaching lesson for a single learning node, conditioned ONLY on the provided grounding passages and neighbor concepts.",
       "A lesson is an ordered set of independently optional sections. The default compact shape is: a one-sentence gist, one precise substantive section (definition, examples, or formulas), and a short applications bridge to the neighbor concepts.",
+      "The gist is a framing hook, not a summary. In one sentence, orient the learner with the concept's core idea — the problem it solves, why it matters, or the tension it resolves — so they know what to attend to before the details. It must NOT restate the definition's formal 'what it is'; the gist and the definition carry different information, and a gist that paraphrases the definition is wrong.",
       "Emit intuition only when the grounding supports a genuinely distinct mental model that is not already covered by the gist or substantive section. Do not use repetitive analogy templates such as 'Think of...' unless the analogy is necessary and specifically grounded.",
       "Length budgets: gist is one sentence; definition, examples, formulas, and applications are at most two short sentences each.",
       "Never assume a section applies. Emit a section ONLY when the provided grounding supports it; omit any section that does not apply rather than writing a placeholder.",
@@ -68,6 +70,7 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
       renderNeighbors(input.neighbors.children),
       "Sibling concepts in the same domain:",
       renderNeighbors(input.neighbors.siblings),
+      ...(input.retryFeedback ? ["", "Retry feedback from the previous rejected draft:", input.retryFeedback] : []),
       "",
       "Call submit_concept_lesson with the ordered sections this grounding supports."
     ].join("\n");

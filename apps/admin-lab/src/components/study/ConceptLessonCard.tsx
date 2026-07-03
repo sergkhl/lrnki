@@ -1,24 +1,23 @@
 "use client";
 
-import { BookOpenIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import type { ConceptLessonView, ConceptLessonSectionView } from "@/components/study/studyView";
 
 // The Concept Lesson reading surface (ADR-0031, R12). It TEACHES the concept before the
 // learner is tested: an ordered set of honest, provenance-badged sections shown ahead of the
-// option-select card. Reading is non-graded (R13) — this component has no answer callback and
-// writes nothing. Per-section labels keep the learner's trust visible: a `source` section is
-// grounded in the source material, a `generated` section is a synthesized aid.
+// study items. Reading is non-graded (R13) — this component has no answer callback and writes
+// nothing. Per-section labels keep the learner's trust visible: a `source` section is grounded
+// in the source material, a `generated` section is a synthesized aid. The card chrome and the
+// collapse toggle are owned by the enclosing `StudySegmentSection`; this renders only the list.
 //
-// AGENTS rule 22 (learner-app play priority): even as an Admin-Lab inspector, the reading
-// surface stays inviting — a clear arc, soft section headers, and a friendly icon — so the
-// teaching experience is felt, not just verified.
+// Every stored section renders in canonical teaching order. The lesson leads with its `gist`
+// ("In a nutshell") — a framing hook that is distinct from the definition by generation (ADR-0031),
+// so it is a genuine lead-in rather than a duplicate summary and is never suppressed.
 
 // Friendly, domain-neutral header per section kind, in the canonical teaching order.
 const SECTION_HEADERS: Record<ConceptLessonSectionView["kind"], string> = {
   gist: "In a nutshell",
-  intuition: "The intuition",
+  intuition: "Intuition",
   definition: "Definition",
   examples: "Examples",
   applications: "Where it connects",
@@ -28,29 +27,22 @@ const SECTION_HEADERS: Record<ConceptLessonSectionView["kind"], string> = {
 export function ConceptLessonCard({ lesson }: Readonly<{ lesson: ConceptLessonView }>) {
   if (lesson.sections.length === 0) return null;
   return (
-    <section aria-label="Concept lesson" className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4">
-      <header className="flex items-center gap-2 text-sm font-semibold">
-        <BookOpenIcon className="size-4 text-primary" />
-        Lesson
-      </header>
-      <Separator />
-      <div className="flex flex-col gap-4">
-        {lesson.sections.map((section, index) => (
-          <article key={`${section.kind}:${index}`} className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-sm font-medium">{SECTION_HEADERS[section.kind]}</h4>
-              <ProvenanceBadge section={section} />
-            </div>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">{section.text}</p>
-            {section.diagram ? (
-              <p className="rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground">
-                <span className="font-medium">Diagram:</span> {section.diagram.caption}
-              </p>
-            ) : null}
-          </article>
-        ))}
-      </div>
-    </section>
+    <div className="flex flex-col gap-4">
+      {lesson.sections.map((section, index) => (
+        <article key={`${section.kind}:${index}`} className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-sm font-medium">{SECTION_HEADERS[section.kind]}</h4>
+            <ProvenanceBadge section={section} />
+          </div>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90">{section.text}</p>
+          {section.diagram ? (
+            <p className="rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground">
+              <span className="font-medium">Diagram:</span> {section.diagram.caption}
+            </p>
+          ) : null}
+        </article>
+      ))}
+    </div>
   );
 }
 

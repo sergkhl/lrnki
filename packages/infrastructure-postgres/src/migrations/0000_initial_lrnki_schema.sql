@@ -634,11 +634,18 @@ CREATE TABLE learner_path_steps (
 
 -- ---------------------------------------------------------------------------
 -- Learner Study Loop — learner-neutral typed Study Item Bank keyed to the Derived
--- Graph Layer (R7, R12, ADR-0026). At most one item PER TYPE per derived node
--- (UNIQUE (derived_node_id, item_type)), conditioned on that node's grounding. Items
+-- Graph Layer (R7, R12, ADR-0026). At most one CURRENT item PER TYPE per derived
+-- node (the partial unique index below), conditioned on that node's grounding. Items
 -- retain graph_version_id for publication scope and key their subject on
 -- derived_node_id so anchors and enrichment nodes share one identity space.
 -- Regenerable; never mutates the asserted core or the Derived Graph Layer.
+-- Regeneration never deletes a row: response_log.study_item_id (append-only, no
+-- cascade — see that table's header) must keep resolving to whatever item a
+-- learner actually answered, even after the bank moves on. `persist` supersedes
+-- (sets superseded_at) the enrichment's current rows instead of deleting them, so
+-- a prior generation survives as inspectable history alongside its own options /
+-- citations / impostor statements (their cascades target the still-live parent
+-- row, not a deleted one).
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE study_items (
@@ -652,8 +659,24 @@ CREATE TABLE study_items (
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (derived_node_id, item_type)
+  superseded_at timestamptz
 );
+
+-- Uniqueness holds only among CURRENT items — the same partial-index idiom as
+-- study_item_options_one_correct_per_item / impostor_statements_one_impostor_per_item
+-- below. A superseded row from a prior generation is exempt so history can coexist
+-- with a fresh regeneration.
+CREATE UNIQUE INDEX study_items_one_current_per_node_type
+  ON study_items (derived_node_id, item_type)
+  WHERE superseded_at IS NULL;
+
+-- Regeneration now supersedes rather than deletes, so a row's enrichment_id is scanned on
+-- every regeneration (the supersede UPDATE) and every bank read (listStudyItemsForEnrichment)
+-- against a table that only grows. Without this index both degrade to a full table scan as
+-- superseded history accumulates.
+CREATE INDEX study_items_enrichment_current_idx
+  ON study_items (enrichment_id)
+  WHERE superseded_at IS NULL;
 
 -- Options for option_select items (R9). Store writes validate the four-option shape; the
 -- schema backs that with ordinal bounds and at-most-one correct option per item.
@@ -706,8 +729,9 @@ CREATE TABLE study_item_citations (
 -- never a source quote (R5/R8). The impostor row, and only it, carries the reveal /
 -- lie_source / sibling_label (denormalized onto the lie's row). One CHECK enforces the
 -- three legal column shapes, so a source-cited impostor is unrepresentable — the structural
--- honesty backstop behind the application guard (U4). Cascade so item regeneration
--- (delete-then-insert) clears statements too.
+-- honesty backstop behind the application guard (U4). Cascade targets a hard-deleted
+-- study_items row (never a superseded one, since regeneration now sets superseded_at
+-- instead of deleting — see the study_items comment above).
 CREATE TABLE impostor_statements (
   impostor_statement_id uuid PRIMARY KEY,
   study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
@@ -800,7 +824,7 @@ CREATE TABLE concept_lessons (
 -- does not apply is simply ABSENT (no placeholder row, R3). `grounding_provenance` records
 -- the authoritative provenance the assembler re-derived (a section is `source_*` only when
 -- its quote verified verbatim). The diagram descriptor (R14) is an optional caption+spec
--- pair, persisted but never rendered this iteration; the CHECK keeps the pair all-or-nothing.
+-- pair; the CHECK keeps the pair all-or-nothing.
 -- Cascade so lesson regeneration (delete-then-insert) clears sections too.
 CREATE TABLE concept_lesson_sections (
   concept_lesson_section_id uuid PRIMARY KEY,

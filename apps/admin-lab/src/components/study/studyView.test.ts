@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { allSegmentsAnswered, nextStudyTarget, shouldAcceptSheetOpenChange } from "./studyView";
+import { allSegmentsAnswered, displayStatefulPathSteps, focusedMapHiddenNodeIds, groupStepsByTier, isPathComplete, nextStudyTarget, shouldAcceptSheetOpenChange, type StatefulLearnerPathStep } from "./studyView";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -14,7 +14,7 @@ test("nextStudyTarget returns the freshly-advanced frontier target when present 
   assert.equal(nextStudyTarget({ selectedFrontierTarget: "node-2" }), "node-2");
 });
 
-test("nextStudyTarget returns null when the goal is reached (no frontier target)", () => {
+test("nextStudyTarget returns null when the path is complete (no frontier target)", () => {
   assert.equal(nextStudyTarget({ selectedFrontierTarget: null }), null);
 });
 
@@ -31,6 +31,14 @@ test("sheet open is always accepted, including during answer-triggered retargeti
 });
 
 const segment = (studyItemId: string) => ({ item: { studyItemId } });
+const step = (derivedNodeId: string, topologicalDepth: number, position: number, isTarget = false): StatefulLearnerPathStep => ({
+  derivedNodeId,
+  topologicalDepth,
+  position,
+  difficulty: position / 10,
+  state: position === 0 ? "frontier" : "locked",
+  isTarget
+});
 
 test("allSegmentsAnswered holds the node until every stacked segment is answered, then advances (KTD7)", () => {
   const segments = [segment("os-1"), segment("imp-1")];
@@ -44,6 +52,38 @@ test("allSegmentsAnswered: a single-segment node advances after its one answer; 
   assert.equal(allSegmentsAnswered([segment("os-1")], new Set(["os-1"])), true);
   // A cardless node has no segments and is advanced via skip-as-known, never this gate.
   assert.equal(allSegmentsAnswered([], new Set(["anything"])), false);
+});
+
+test("groupStepsByTier groups ordered path steps into depth tiers", () => {
+  const tiers = groupStepsByTier([step("ownership", 1, 2), step("borrow", 0, 1), step("scope", 0, 0), step("move", 2, 3, true)]);
+  assert.deepEqual(tiers.map((tier) => tier.topologicalDepth), [0, 1, 2]);
+  assert.deepEqual(tiers[0].steps.map((s) => s.derivedNodeId), ["scope", "borrow"]);
+});
+
+test("displayStatefulPathSteps collapses adapted-hidden prerequisites without changing state or target visibility", () => {
+  const displayed = displayStatefulPathSteps([step("scope", 0, 0), step("move", 1, 1, true)], new Set(["scope", "move"]));
+  assert.equal(displayed[0].collapsed, true);
+  assert.equal(displayed[0].state, "frontier");
+  assert.equal(displayed[1].collapsed, false);
+});
+
+test("isPathComplete requires no selected frontier and excludes foundational roots", () => {
+  assert.equal(isPathComplete({ selectedFrontierTarget: null }, false), true);
+  assert.equal(isPathComplete({ selectedFrontierTarget: "scope" }, false), false);
+  assert.equal(isPathComplete({ selectedFrontierTarget: null }, true), false);
+});
+
+test("focusedMapHiddenNodeIds hides out-of-scope nodes, unions adapted hidden nodes, and preserves the target", () => {
+  const detail = {
+    nodes: [
+      { derivedNodeId: "scope" },
+      { derivedNodeId: "ownership" },
+      { derivedNodeId: "move" },
+      { derivedNodeId: "outside" }
+    ]
+  };
+  const hidden = focusedMapHiddenNodeIds(detail, [step("scope", 0, 0), step("ownership", 1, 1), step("move", 2, 2, true)], new Set(["scope", "move"]));
+  assert.deepEqual([...hidden].sort(), ["outside", "scope"]);
 });
 
 // Covers R15: the transfer-ready modules import no Admin-Lab loader and no server action,

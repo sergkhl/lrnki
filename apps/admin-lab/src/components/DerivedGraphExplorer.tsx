@@ -204,6 +204,12 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect, hiddenNode
       layout: { name: "preset" },
       minZoom: 0.2,
       maxZoom: 3,
+      // Lock the map view: no wheel/pinch zoom and no node dragging, so the sphere-grid layout
+      // stays legible. `userZoomingEnabled` (not `zoomingEnabled`) preserves programmatic
+      // `cy.fit()` / `recenterOnFocus()` framing; `autoungrabify` freezes node positions while
+      // canvas panning stays enabled.
+      userZoomingEnabled: false,
+      autoungrabify: true,
       style: [
         {
           // Region parents (R2): one bordered, labeled box per domain/learning loop. A
@@ -465,7 +471,8 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect, hiddenNode
           <p className="text-xs text-muted-foreground">
             Right-angle tracks point from prerequisite to dependent; each dashed-bordered region is
             one domain (a learning loop), and no edge crosses between regions. Dashed edges = uncertain
-            inferred edges (excluded from learner paths). Scroll to zoom, drag to pan.
+            inferred edges (excluded from learner paths). Drag the canvas to pan; zoom and node
+            dragging are locked to keep the layout stable.
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">

@@ -38,6 +38,7 @@ import {
   LiteLlmConceptAdmissionAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptLessonGenerationAdapter,
+  LiteLlmImpostorLieValidityJudgmentAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
@@ -233,6 +234,7 @@ function buildContext() {
     conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
+    impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql),
     responseLogStore: new PostgresResponseLogStore(sql),
     // Mutable calibration verdict store (R10): the synthetic prefill seeds verdicts here,
@@ -692,6 +694,7 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     conceptLessonGeneration: ctx.conceptLessonGeneration,
+    impostorLieValidityJudge: ctx.impostorLieValidityJudge,
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
@@ -707,7 +710,7 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
     } else {
       const impostor = item.statements.find((statement) => statement.isImpostor);
       const truths = item.statements.filter((statement) => !statement.isImpostor).map((statement) => statement.text);
-      console.log(`   impostor[${item.derivedNodeId}] provenance=${item.groundingProvenance} lieSource=${item.lieSource}${item.siblingLabel ? ` sibling=${item.siblingLabel}` : ""}\n     Q: ${item.question}\n     lie: ${impostor?.text}\n     truths: ${truths.join(" | ")}\n     reveal: ${item.reveal}`);
+      console.log(`   impostor[${item.derivedNodeId}] provenance=${item.groundingProvenance} lieSource=${impostor?.lieSource ?? "‼MISSING‼"}${impostor?.siblingLabel ? ` sibling=${impostor.siblingLabel}` : ""}\n     Q: ${item.question}\n     lie: ${impostor?.text}\n     truths: ${truths.join(" | ")}\n     reveal: ${impostor?.reveal ?? "‼MISSING‼"}`);
     }
   }
   for (const rejected of result.rejected) {

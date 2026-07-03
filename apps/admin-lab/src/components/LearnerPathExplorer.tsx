@@ -77,6 +77,11 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
       layout: { name: "preset" },
       minZoom: 0.2,
       maxZoom: 3,
+      // Lock the reading view: no wheel/pinch zoom and no node dragging, so the preset layout
+      // stays legible. `userZoomingEnabled` (not `zoomingEnabled`) leaves programmatic fit intact;
+      // `autoungrabify` freezes node positions while canvas panning stays enabled.
+      userZoomingEnabled: false,
+      autoungrabify: true,
       style: [
         {
           selector: "node",
@@ -182,7 +187,8 @@ export function LearnerPathExplorer({ detail }: LearnerPathExplorerProps) {
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
           <p className="text-xs text-muted-foreground">
             Solid blue = path order (prerequisites first). Red = target. Dashed = uncertain inferred
-            edges (excluded from the path). Scroll to zoom, drag to pan.
+            edges (excluded from the path). Drag the canvas to pan; zoom and node dragging are
+            locked to keep the layout stable.
           </p>
           <div
             ref={containerRef}

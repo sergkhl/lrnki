@@ -4,6 +4,7 @@ import {
   type ImpostorItem,
   type ImpostorItemDraft,
   type ImpostorStatement,
+  type ImpostorTruthStatement,
   type StudyItemCitation,
   type StudyItemGroundingProvenance
 } from "@lrnki/domain-core";
@@ -42,52 +43,44 @@ const REQUIRED_STATEMENT_COUNT = 4;
 export function validateImpostorItem(
   draft: ImpostorItemDraft,
   grounding: ImpostorGrounding,
-  newStatementId: () => string = randomUUID
+  newStatementId: () => string = randomUUID,
+  liePosition: () => number = () => Math.floor(Math.random() * REQUIRED_STATEMENT_COUNT)
 ): ImpostorGuardResult {
-  const statements = draft.statements;
+  const truths = draft.truths;
 
-  // (1) exactly four statements.
-  if (statements.length !== REQUIRED_STATEMENT_COUNT) {
-    return { ok: false, reason: `impostor requires exactly ${REQUIRED_STATEMENT_COUNT} statements, got ${statements.length}` };
+  // (1) exactly three truths plus one lie object.
+  if (truths.length !== 3) {
+    return { ok: false, reason: `impostor requires exactly 3 true statements, got ${truths.length}` };
   }
 
-  // (2) exactly one impostor.
-  const impostorCount = statements.filter((statement) => statement.isImpostor).length;
-  if (impostorCount !== 1) {
-    return { ok: false, reason: `impostor requires exactly one impostor statement, got ${impostorCount}` };
-  }
-
-  // (3) a non-empty reveal (R6 — a wrong guess must never leave a misconception unresolved).
-  if (!draft.reveal.trim()) {
+  // (2) a non-empty reveal (R6 — a wrong guess must never leave a misconception unresolved).
+  if (!draft.lie.reveal.trim()) {
     return { ok: false, reason: "impostor carries no reveal" };
   }
 
-  // (4) lieSource present, with siblingLabel non-empty IFF the lie is sibling-sourced.
-  const siblingLabel = draft.siblingLabel?.trim();
-  if (draft.lieSource !== "sibling" && draft.lieSource !== "generated") {
+  // (3) lieSource present, with siblingLabel non-empty IFF the lie is sibling-sourced.
+  const siblingLabel = draft.lie.siblingLabel?.trim();
+  if (draft.lie.lieSource !== "sibling" && draft.lie.lieSource !== "generated") {
     return { ok: false, reason: "impostor carries no lieSource" };
   }
-  if (draft.lieSource === "sibling" && !siblingLabel) {
+  if (draft.lie.lieSource === "sibling" && !siblingLabel) {
     return { ok: false, reason: "impostor lieSource 'sibling' requires a siblingLabel" };
   }
-  if (draft.lieSource === "generated" && siblingLabel) {
+  if (draft.lie.lieSource === "generated" && siblingLabel) {
     return { ok: false, reason: "impostor lieSource 'generated' must carry no siblingLabel" };
   }
 
-  // (5) build each statement. Each truth verifies verbatim against a cited grounding passage;
+  const insertedLiePosition = liePosition();
+  if (!Number.isInteger(insertedLiePosition) || insertedLiePosition < 0 || insertedLiePosition >= REQUIRED_STATEMENT_COUNT) {
+    return { ok: false, reason: "impostor lie position must be an integer from 0 to 3" };
+  }
+
+  // (4) build each truth. Each truth verifies verbatim against a cited grounding passage;
   // its resolved provenance is taken from the MATCHED passage (authoritative), never the
-  // draft's claim — fail-closed labeling. The impostor carries no citation, labeled
+  // draft's claim — fail-closed labeling. The lie object carries no citation, labeled
   // `generated` (a source-cited impostor is the honesty inversion this guard blocks).
-  const built: ImpostorStatement[] = [];
-  for (let ordinal = 0; ordinal < statements.length; ordinal += 1) {
-    const statement = statements[ordinal];
-    if (statement.isImpostor) {
-      if (statement.citation) {
-        return { ok: false, reason: "impostor statement must carry no grounding citation" };
-      }
-      built.push({ statementId: newStatementId(), ordinal, text: statement.text, isImpostor: true, provenance: "generated" });
-      continue;
-    }
+  const builtTruths: ImpostorTruthStatement[] = [];
+  for (const statement of truths) {
     if (!statement.citation) {
       return { ok: false, reason: "impostor true statement carries no grounding citation" };
     }
@@ -107,15 +100,28 @@ export function validateImpostorItem(
             matchKind
           }
         : { provenance: "generated", derivedNodeId: grounding.derivedNodeId, passageText: citationDraft.evidenceQuote };
-    built.push({ statementId: newStatementId(), ordinal, text: statement.text, isImpostor: false, provenance: citation.provenance, citation });
+    builtTruths.push({ statementId: newStatementId(), ordinal: 0, text: statement.text, isImpostor: false, provenance: citation.provenance, citation });
   }
 
-  // (6) the impostor is distinct from every truth after the shared normalization collapse.
-  const impostor = built.find((statement) => statement.isImpostor)!;
-  const impostorText = normalizeOptionText(impostor.text);
-  if (built.some((statement) => !statement.isImpostor && normalizeOptionText(statement.text) === impostorText)) {
+  const lie: ImpostorStatement = {
+    statementId: newStatementId(),
+    ordinal: 0,
+    text: draft.lie.text,
+    isImpostor: true,
+    provenance: "generated",
+    reveal: draft.lie.reveal,
+    lieSource: draft.lie.lieSource,
+    ...(draft.lie.lieSource === "sibling" ? { siblingLabel: siblingLabel! } : {})
+  };
+
+  // (5) the impostor is distinct from every truth after the shared normalization collapse.
+  const impostorText = normalizeOptionText(lie.text);
+  if (builtTruths.some((statement) => normalizeOptionText(statement.text) === impostorText)) {
     return { ok: false, reason: "impostor statement is identical to a true statement after normalization" };
   }
+  const built: ImpostorStatement[] = [...builtTruths];
+  built.splice(insertedLiePosition, 0, lie);
+  built.forEach((statement, ordinal) => { statement.ordinal = ordinal; });
 
   return {
     ok: true,
@@ -129,10 +135,7 @@ export function validateImpostorItem(
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
       question: draft.question,
-      statements: built,
-      reveal: draft.reveal,
-      lieSource: draft.lieSource,
-      ...(draft.lieSource === "sibling" ? { siblingLabel: siblingLabel! } : {})
+      statements: built
     }
   };
 }

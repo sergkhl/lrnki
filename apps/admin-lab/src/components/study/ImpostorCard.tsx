@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { CheckIcon, XIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { StudyImpostorView } from "@/components/study/studyView";
@@ -35,10 +34,6 @@ export function ImpostorCard({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">{item.groundingProvenance}</Badge>
-        <Badge variant="secondary">impostor · spot the lie</Badge>
-      </div>
       <p className="text-sm font-medium">{item.question}</p>
       <Separator />
       <div className="flex flex-col gap-2">

@@ -24,7 +24,9 @@ import type { GroundingPassage, NodeGrounding } from "./selectNodeGrounding";
 // The canonical teaching order. Sections are emitted in this order regardless of the order
 // the generator returned them, and at most one section per kind survives (first wins).
 const SECTION_ORDER: ConceptLessonSectionKind[] = ["gist", "intuition", "definition", "examples", "applications", "formulas"];
-const SUBSTANTIVE_KINDS: ConceptLessonSectionKind[] = ["definition", "examples", "formulas"];
+// Exported (rule 18): the study-item generation stage reuses this same "substantive" set to
+// decide lesson-retry and item-grounding fallback eligibility (R8/R9).
+export const SUBSTANTIVE_KINDS: ConceptLessonSectionKind[] = ["definition", "examples", "formulas"];
 
 export type AssembleConceptLessonInput = {
   node: { derivedNodeId: string; canonicalLabel: string; graphVersionId: string | null; enrichmentId: string };

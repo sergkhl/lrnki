@@ -41,6 +41,9 @@ export class PostgresLearnerLoopRead implements LearnerLoopReadPort {
              n.canonical_label AS concept_label, cd.question
       FROM response_log rl
       JOIN derived_graph_nodes n ON n.derived_node_id = rl.derived_node_id
+      -- No superseded_at filter: this must resolve the EXACT item a learner answered,
+      -- even if a later regeneration has since superseded it (study_item_id is a stable
+      -- key regardless of current/superseded status).
       JOIN study_items cd ON cd.study_item_id = rl.study_item_id
       WHERE rl.learner_state_ref = ${learnerStateRef}
       ORDER BY rl.attempt_seq`;
@@ -74,7 +77,7 @@ export class PostgresLearnerLoopRead implements LearnerLoopReadPort {
       JOIN derived_graph_nodes tn ON tn.derived_node_id = p.target_derived_node_id
       JOIN learner_path_steps s ON s.learner_path_id = p.learner_path_id
       JOIN derived_graph_nodes n ON n.derived_node_id = s.derived_node_id
-      LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'option_select'
+      LEFT JOIN study_items c ON c.derived_node_id = s.derived_node_id AND c.item_type = 'option_select' AND c.superseded_at IS NULL
       LEFT JOIN rejected_study_items rc ON rc.derived_node_id = s.derived_node_id AND rc.item_type = 'option_select'
       WHERE p.learner_state_ref = ${learnerStateRef}
       ORDER BY p.created_at DESC, s.position`;

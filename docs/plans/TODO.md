@@ -38,106 +38,58 @@
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
-   AE2's disposition is exercised by unit tests only. Measure-first: probe deliberately fringe or
+   the boundary disposition is exercised by unit tests only. Measure-first: probe deliberately fringe or
    contested concepts, inspect the K-draw semantic dispersion, and tune temperature/threshold (or
-   confirm the concepts are genuinely core knowledge) before the deferred `web_grounded` retrieval
-   branch is built on this seam. Decision:
+   confirm the concepts are genuinely core knowledge) before any `web_grounded` retrieval plan or
+   source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
 ## COMPLETED
 
-- **Synthetic Topic Generation — a second pipeline arm.** A `topic` plus a Declared Domain now
-  produces a free-standing, anchor-less Derived Graph Layer of `synthetic_primary` `llm_grounded`
-  nodes with no Extraction Run and no Graph-Version Build, gated per concept by the Knowledge-Boundary
-  Probe (a small cross-family LiteLLM alias sampled K times at moderate temperature, semantic
-  agreement measured via the existing embedding port). A `core_knowledge` concept synthesizes a
-  Generated Grounding Bundle and becomes a trusted node; a `boundary` concept routes to an `uncertain`
-  disposition held out of trusted surfaces — the seam the deferred `web_grounded` retrieval branch
-  replaces without restructuring. The layer stores a null published-version link (the relaxed nullable
-  `graph_version_id`), the asserted graph and `graph_versions` are never written, and the reused
-  downstream machinery — whole-set prerequisite ordering, intrinsic difficulty, Study Item Bank,
-  Concept Lessons, and the Study Session projection — runs over it with the single anchor-less
-  target-resolution fix (resolve by `derivedNodeId` when the layer has no anchor). Launched by the
-  worker `generate-synthetic-layer <topic> <declaredDomain>` command; the source-grounded arm is
-  untouched. Decisions: [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
+- **Quest-quality defects in Study Item Bank generation.** The learner-facing quest bank now
+  attributes rejected study-item rows, retries source-grounded lessons once when no substantive
+  source citation survives, falls back to generated-labeled lesson sections when citation grounding
+  is absent, binds impostor reveal/source metadata to the keyed lie statement, runs a fail-closed
+  cross-family lie-validity judge with one informed retry, and ranks recommended quests by full
+  readiness before cone size while showing missing-item counts. Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Concept Lesson gist as a framing hook distinct from the definition.** The `gist` is now
+  generated as the concept's framing hook — the problem it solves, why it matters, or the tension it
+  resolves — explicitly forbidden from restating the definition's formal "what it is", fixing the
+  lead-in for 100% of nodes (gist is the ADR-0031 required minimum). The change is in generation, not
+  presentation: the concept-lesson system prompt and the forced-tool `kind` description carry the
+  sharpened, domain-neutral role, `intuition` stays conditional (emitted only when it adds a distinct
+  mental model), and the ADR-0031 "unconditional" wording is reconciled with the conditional prompt.
+  The superseded display-only gist suppression in the Admin Lab lesson card is removed, so the gist
+  always leads. Decision: [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
+
+- **Quest Subgraph study mechanic.** Admin Lab study now starts from target recommendations and
+  search backed by trusted prerequisite cones. `StudySession` projects a stateful Learner Path ladder
+  with focused-map and full-map context, while graph-only enrichments remain inspectable with a
+  no-items warning. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md),
+  [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Synthetic Topic Generation.** A `topic` plus Declared Domain now creates an anchor-less Derived
+  Graph Layer of `synthetic_primary` `llm_grounded` nodes. The Knowledge-Boundary Probe gates
+  source-less concept synthesis; `boundary` concepts are retained as inspectable `uncertain`
+  dispositions and held out of trusted learner surfaces. Decisions:
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
   [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md), and
   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
-
-- **Generation pipeline metering and bounded Study Item Bank concurrency.** Bottleneck reports now
-  attribute every Study Item Bank LLM stage owned by the `study_items` operation:
-  `concept-lesson-generation`, `study-item-generation`, and `impostor-generation`. The operation
-  remains keyed by enrichment id, while stage-level wall-clock comes from the shared operation-stage
-  timeline and calls/tokens/cost come from LiteLLM spend logs through the existing read seam. Missing
-  spend data still renders as unavailable rather than zero. The worker now exposes an opt-in
-  `generate-study-items <enrichmentId> --concurrency <positiveInteger>` control; the default path is
-  unchanged and sequential, and application tests prove persisted item/rejection order is stable when
-  concurrent per-node generation resolves out of order. Decision:
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
-
-- **Impostor study item — a second auto-graded study-item type.** The Study Item Bank is now a
-  two-arm typed union (`option_select | impostor`). The Impostor presents four grounded statements
-  about a node — three true, one planted lie — and the learner selects the lie. The lie is
-  preferentially a true fact about a confusable graph sibling mis-attributed to this node
-  (`lieSource: "sibling"` with the named `siblingLabel`), falling back to a freshly minted
-  misconception (`lieSource: "generated"`); it is generated as Stage 3 of the `study_items` operation
-  (own `impostor-generation` spend tag) from the node's Concept Lesson via the shared
-  `studyItemGroundingFromLesson` helper, reading siblings read-only — it writes no graph node or edge.
-  A deterministic guard accepts only on structural/provenance guarantees (exactly one impostor; each
-  truth verifies verbatim against its cited lesson passage; the impostor is `generated` with no
-  citation; reveal/`lieSource` present), backed by a DB CHECK that makes a source-cited impostor
-  unrepresentable. It is auto-graded through one grading-neutral keyed-selection grader (shared with
-  option-select) into the existing 0.7 mastery fold, with a required post-answer reveal that names the
-  lie and teaches the distinction. A node's study surface is an ordered segment sequence (theory →
-  option-select → impostor); the Admin Lab stacks the cards and the projection exposes the durable
-  `studySegmentsByNode` seam for the Learner App (AGENTS rule 22). Decisions:
-  [ADR-0026](../adr/0026-typed-study-item-bank.md), [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md),
-  and [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
-
-- **Operator observability — inspectable forced-tool exhaustion and citation match fidelity.**
-  Two fail-closed behaviors that were previously opaque are now inspectable, with no change to any
-  fail-closed decision. (1) When a forced-tool call exhausts its retries, the litellm transport
-  captures a redacted per-attempt failure trail at the model-output boundary (the same rule-6 seam
-  that strips NUL bytes): each attempt records its deviation `kind`
-  (`http`/`no_tool_call`/`no_arguments`/`invalid_json`/`schema_invalid`/`other`), the HTTP status,
-  the violated schema PATHS only (never the offending values), and a bounded, control-stripped,
-  truncated arguments snippet. It throws a `ForcedToolExhaustionError` that carries the ports-defined
-  `stageErrorDetail`; the single `bracketStage` catch point duck-types that carrier and persists it
-  to a new `operation_run_stages.error_detail jsonb` on the failing close (a plain throw reduces to a
-  bounded `other` message), and the Admin Lab operations timeline renders the reason under the failed
-  stage. `bracketStage` still rethrows unchanged. (2) Source citations now record `matchKind`
-  (`exact` vs `normalized`) via one new `classifyEvidenceMatch` in domain-core, of which
-  `evidenceQuoteMatches` is the boolean projection (rule 18); the shared `StudyItemCitation` source
-  arm carries it so both option-select and Concept Lesson section citations persist a `match_kind`
-  column (folded into each citation table's per-provenance CHECK), and the Concept Lesson card shows
-  `source · exact` vs `source · normalized`. Decisions:
-  [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
-  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md),
-  [ADR-0011](../adr/0011-retain-minimal-admin-lab.md),
-  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
 - **Source-grounded asserted graph baseline.** Curated mixed-format sources normalize into structured
   blocks; atomic Concept Admission selects core Concepts; CEP extraction preserves verified
   definitions, mentions, and the single permitted typed assertion; explicitly selected Extraction
-  Runs build immutable graph versions with zero asserted edges. Decisions:
+  Runs build immutable asserted graph versions with zero asserted edges. Decisions:
   [ADR-0004](../adr/0004-normalize-curated-sources.md),
   [ADR-0005](../adr/0005-admit-atomic-concepts-before-evidence-profiles.md),
   [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md),
   [ADR-0016](../adr/0016-retire-relation-registry-keep-one-cep-assertion.md), and
-  [ADR-0017](../adr/0017-split-extraction-runs-from-graph-version-builds.md).
-
-- **Quality gates and forced-tool reliability.** Forced-tool schemas are single-sourced from zod, and
-  neural judge gates share one fail-safe boundary for bounded concurrency, index-aligned results, and
-  fail-closed pass-through behavior. Decisions:
-  [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
-  [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md), and
-  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
-
-- **Published Concept identity and static refinement.** Same-domain near-duplicates are proposed by
-  embeddings and decided separately; Graph-Version Builds consume recorded identity decisions while
-  preserving deterministic, LLM-free publication. Decisions:
-  [ADR-0012](../adr/0012-embeddings-permitted-except-prerequisite-derivation.md),
-  [ADR-0015](../adr/0015-deterministic-cross-source-identity.md), and
   [ADR-0017](../adr/0017-split-extraction-runs-from-graph-version-builds.md).
 
 - **Derived Graph Enrichment.** Enrichment rescues source-mentioned nodes, mints generated nodes only
@@ -148,131 +100,104 @@
   [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), and
   [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
 
-- **Learner study loop and Concept Lesson substrate.** Study assets key to `derived_node_id`,
-  option-select items are auto-graded into the append-only Response Log, calibration remains separate,
-  and the Concept Lesson is the learner-neutral teaching substrate that grounds downstream study
-  items. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
+- **Study assets and learner state.** The learner loop keys study assets and responses to
+  `derived_node_id`; Concept Lessons ground downstream study assets; the Study Item Bank supports
+  `option_select` and `impostor`; graded selections append to the Response Log while calibration
+  remains separate. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
+- **Operator observability and cost reporting.** Forced-tool exhaustion is inspectable without
+  relaxing fail-closed behavior, citation match fidelity is visible, and shared operation-stage
+  timelines support liveness plus bottleneck reports over one operation or one Processing Journey.
+  Decisions: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
+  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md), and
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
 - **Inspection and learner-projection boundaries.** Inspection surfaces use read-model ports, while
-  learner-facing projections compose reads with adaptation compute behind application use-cases; Admin
-  Lab remains a thin operator surface. Decisions:
+  learner-facing projections compose reads with adaptation compute behind application use-cases;
+  Admin Lab remains a thin operator surface. Decisions:
   [ADR-0011](../adr/0011-retain-minimal-admin-lab.md) and
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
-- **Operation observability and cost reporting.** Extraction, graph-version build, enrichment, and
-  study-item operations report shared durable stage timelines; LiteLLM spend is joined on
-  request-scoped operation tags for one operation or a
-  [Processing Journey](../../CONTEXT.md). Decision:
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+- **Quality gates and forced-tool reliability.** Forced-tool schemas are single-sourced from zod, and
+  neural judge gates share one fail-safe boundary for bounded concurrency, index-aligned results, and
+  fail-closed pass-through behavior. Decisions:
+  [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
+  [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md), and
+  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
 
 - **Extraction provider latency fix.** Routing production extraction aliases to DeepSeek first-party
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
 
-- **Synthetic Topic Generation, 2026-07-01.** Deterministic envelope: `@lrnki/infrastructure-litellm`
-  typecheck green and its suite green (102 tests) for the grounding-schema cap fix; U1–U7 landed their
-  package suites green in their own commits (`452c887`…`ed7494f`). **Real-use gate (rule 14):** three
-  topics across mixed domains ran end to end on real production calls on a live DB — Photosynthesis
-  [biology] (14 concepts, 14 `core_knowledge` / 0 `boundary`, enrichment `eb6e5ac1`), Quantum error
-  correction [physics] (12 / 12 / 0, `21b8c077`), and Mechanistic interpretability of neural networks
-  [machine learning] (12 / 12 / 0, `02afc709`) — each producing an anchor-less layer with a null
-  `graph_version_id`, whole-set prerequisite ordering, and intrinsic difficulty over every node. The
-  honesty invariant is proven at the data level across every synthetic run persisted (8 null-version
-  enrichments / 48 `synthetic_primary` nodes): **0 source-block citations, 0 evidence quotes, all
-  `llm_grounded`**, and the asserted `graph_versions` registry (192 rows) was untouched — 0 asserted
-  writes. Inspected synthesized definitions are domain-accurate (photosystems PSII/PSI; fault-tolerance
-  error thresholds; transversal gates), not filler. **Defect found and fixed by the gate:** the reused
-  generated-grounding schema capped `definitions` at 2 (sized for minted prerequisites) and exhausted
-  the forced-tool call when a first-class concept warranted 3, failing the whole operation; raised to
-  `max(4)` (3 of the 14 Photosynthesis nodes then legitimately persisted 3 definitions; 11 self-limited
-  to 2). **Result: PASS** for the core arm (AE1 core→`synthetic_primary` demonstrated 38/38; AE3
-  honesty invariant proven). **Caveat:** the `boundary`→`uncertain` route (AE2) did **not** fire on any
-  real run (0 / 38 concepts); its mechanism is unit-tested only, and probe calibration is TODO item 5.
-  Trail: `tmp/2026-07-01-synthetic-topic-rule14/`.
+- **Quest-quality Study Item Bank fixes, 2026-07-03.** Deterministic envelope: `pnpm run check`
+  exit 0 after the final prompt and comment cleanup (0 ESLint errors, 2 pre-existing warnings
+  outside this diff); targeted application, LiteLLM, and domain-core checks also passed while
+  iterating. **Real regenerate-and-inspect gate (rule 14):** enrichment `90768af5` was regenerated
+  with production aliases after the strict lie-validity prompt (`generate-study-items
+  90768af5-a9f5-4e0a-9dc0-0be71abfffdf --concurrency 6`, clean exit `lessons=63 lessonAbsent=1
+  items=104 rejected=24`). Stored rows show 59 option-select items and 45 impostors; generated
+  fallback is active for 23 items. Rejection reasons are inspectable: 14 citation-verification
+  rejects, 7 forced-tool shape/exhaustion rejects, 2 lesson-absent rejects, and 1 lie rejected by
+  the new judge. The inspected Rust false-by-attribution defect now drops: `Variable binding`
+  rejected because the proposed lie was true-but-misattributed; persisted `Owner`, `Variable Scope`,
+  `Clone`, and related impostors are plainly false for their target nodes with reveal/source metadata
+  attached to the keyed lie row. Real recommendation output for the same enrichment ranks fully
+  ready quests first (`INSTRUCTKG framework`, `DEBUG operator`, `IMPROVE operator`, etc., all
+  `missing=0`). **Defects found by the gate and fixed before pass:** nested forced-tool lie objects
+  caused invalid-JSON regressions, so the production wire schema stays shallow while the adapter
+  binds scalars into the domain lie object; the first stricter pass exposed true-but-misattributed
+  lie wording, so the generator and judge now require contradiction/impossibility rather than
+  "belongs to sibling." **Review:** CE subagent review dispatch was attempted but unavailable due
+  usage quota; fallback manual diff review found and fixed a pre-existing NUL-byte comment in
+  `domain-core` by replacing it with literal `\u0000`. **Result: PASS.** Trail:
+  `tmp/2026-07-02-quest-quality-regen-strict-lie.log` and
+  `tmp/2026-07-02-rejection-attribution/`.
 
-- **Generation pipeline metering and bounded Study Item Bank concurrency, 2026-06-30.** Application
-  test suite green (389 tests), kg-worker suite green (8 tests), and package typechecks green for
-  `@lrnki/application` and `@lrnki/kg-worker`. The corrected report over the existing Rust journey
-  (`7439e6f0`) now attributes all three `study_items` LLM stages: concept lessons 13 calls / 31,189
-  tokens / `$0.00354466`, option-select 13 / 20,046 / `$0.00195244`, and impostors 13 / 28,495 /
-  `$0.00329602`, for a corrected study-item total of 39 calls / 79,730 tokens / `$0.00879312`.
-  Direct LiteLLM aggregation matched the report rows. **Real-use gate (rule 14):** a fresh comparable
-  Rust enrichment over graph version `71006496` ran Study Item Bank generation with
-  `--concurrency 3` (`17567289`), producing 14 lessons, 12 option-select items, 11 impostor items, 2
-  option-select rejections, and 3 impostor rejections. Study-item wall-clock was 62.9s versus the
-  corrected sequential baseline's 162.1s, with 44 calls / 90,185 tokens / `$0.00942298` on the
-  slightly larger 14-node concurrent run. Inspected output stayed usable: lies are plausible sibling
-  misattributions or generated misconceptions, reveals teach the distinction, and the DB invariant
-  query found 0 source-cited impostor defects. Trail:
-  `tmp/2026-06-30-generation-metering/`.
+- **Concept Lesson gist distinctiveness, 2026-07-02.** Deterministic envelope: `pnpm run check`
+  exit 0 (0 ESLint errors, 2 pre-existing warnings outside this diff); `@lrnki/infrastructure-litellm`
+  102 tests and `@lrnki/admin-lab` 79 tests green, including the adapter's pinned system-prompt
+  substrings and no-fixture-leak assertions. **Real regenerate-and-inspect gate (rule 14):** the
+  Study Item Bank for enrichment `90768af5` (64 derived nodes; 63 lessons + 1 genuinely ungroundable
+  node) was regenerated on real production DeepSeek calls (`generate-study-items … --concurrency 6`,
+  clean exit `lessons=63 lessonAbsent=1 items=104 rejected=24`). Per-node gist-vs-definition snapshots
+  before/after show the lead-in is now durably distinct: mean lexical similarity `0.325 → 0.175`,
+  median `0.266 → 0.115`, near-restatements (ratio ≥ 0.6) `8 → 0`, max `0.736 → 0.500`; only one
+  trivially-mechanical node ("Pushing onto the stack") stays at 0.50 and even it adds a "why it
+  matters" clause. Real reading confirms the metric — new gists lead with the problem/motivation
+  (Clone, Allocating on the heap, Assignment semantics, Artifact, Move, Search policy) rather than
+  paraphrasing the definition. R3 minimum holds 63/63 and `lesson_absent` stayed at the same 1
+  ungroundable node — no regression; `intuition` coverage moved `10 → 3` as the sharper gist absorbs
+  more distinct-framing space (expected). **Defect found by the gate (pre-existing, out of scope):**
+  `generate-study-items` regeneration first failed on `response_log_study_item_id_fkey` because a
+  learner-answered item cannot be deleted (no `ON DELETE CASCADE`); lessons persist in a prior stage
+  and had already committed the new gists. Cleared the single dev response row (rule 9) and re-ran to
+  a clean exit. **Result: PASS.** Trail: `tmp/2026-07-02-gist-distinctiveness/`.
 
-- **Impostor study item, 2026-06-30.** Full workspace typecheck green; full recursive suite green
-  (domain-core 35; application 388 incl. the new `impostorGuard` 12-case suite, the impostor
-  orchestrator-stage cases, the shared `appendGradedSelectionOutcome` regression + impostor grading,
-  and the `studySegmentsByNode`/impostor-view projection cases; infrastructure-postgres 56 incl. the
-  live impostor round-trip, both-types load, statement-cascade, per-type rejection round-trip, and the
-  negative DB-CHECK cases — source-cited impostor and second-impostor both rejected; infrastructure-
-  litellm 98 incl. the impostor adapter/schema + registry-sweep cases; admin-lab 79 incl. the
-  `allSegmentsAnswered` advance-gate; kg-worker 4). ESLint 0 errors / 2 pre-existing warnings
-  (`domain-core/src/index.ts`, `infrastructure-litellm/src/extractionAdapters.ts`, both outside this
-  diff). Admin Lab production build passes. A fresh DB reset applied the single migration cleanly with
-  the new `impostor_statements` table, its column-discipline CHECK, and the partial one-impostor index.
-  **Real-use gate (rule 14):** two domains ran end to end on a freshly reset DB with production DeepSeek
-  calls — software engineering (Rust ownership, extraction `48551d92`, enrichment `7439e6f0`) and
-  molecular biology (DNA replication, extraction `38646ea8`, enrichment `5026234f`) — producing **38
-  impostor items**. Inspected output: lies are plausible sibling mis-attributions (Reference↔Pointer↔
-  Ownership; DNA double helix↔DNA polymerase, structure-vs-enzyme; conservative↔semi-conservative↔
-  dispersive replication models) with generated-fallback misconceptions where no clean sibling lie
-  existed (e.g. "buoyant density in a vacuum"); truths are verbatim-grounded; every reveal names the lie
-  and teaches the distinction (naming the sibling for a sibling lie). Honesty invariant proven at the
-  data level: **0 of the impostor statements carry any source citation**, every item has **exactly one**
-  impostor, every truth carries a citation, and **0** impostor text leaked into graph nodes/edges
-  (zero graph mutation). Per-type absence is recorded independently (impostor 10, option-select 5
-  rejections) and never failed a run. Result: PASS.
+- **Quest Subgraph study mechanic, 2026-07-01.** `pnpm run check` passed: full workspace typecheck,
+  recursive test suite, ESLint (0 errors / 2 pre-existing warnings outside the diff), and Admin Lab
+  production build. **Real-use gate (rule 14):** three existing real DB enrichments were inspected
+  through the application read model: mechanistic interpretability [machine learning] (`02afc709`),
+  quantum error correction [physics] (`21b8c077`), and photosynthesis [biology] (`eb6e5ac1`).
+  Recommended targets read as plausible milestones; ladders preserved prerequisite waves and
+  target-last ordering; focused map scope matched ladder scope. **Defect found and fixed by the
+  gate:** graph-only enrichments now render the quest ladder/map with an inline no-items warning.
+  **Result: PASS.** Caveat: inspected enrichments had zero study items, so graded card-completion UX
+  was not re-exercised. Trail: `tmp/2026-07-01-quest-subgraph-eval/`.
 
-- **Operator observability (forced-tool exhaustion + citation match fidelity), 2026-06-30.** Full
-  workspace typecheck green; full recursive suite green (domain-core 35 incl. the new
-  `classifyEvidenceMatch`/`evidenceQuoteMatches`-parity suite; application 368 incl. the new
-  `bracketStage`/`toStageErrorDetail` routing cases and the `matchKind` exact/normalized cases in
-  `assembleConceptLesson` and `optionSelectGuard`; infra-litellm 92 incl. the exhaustion cases —
-  schema-invalid records `kind:schema_invalid` + violated PATH only + bounded redacted snippet, HTTP
-  records `kind:http`+status, invalid-JSON truncates the snippet, all still fail closed; admin-lab 77;
-  kg-worker 4). ESLint 0 errors / 2 pre-existing warnings (`domain-core/src/index.ts`,
-  `infrastructure-litellm/src/extractionAdapters.ts`, both outside this diff). Admin Lab production
-  build passes. DB-backed (DATABASE_URL from `.env`, schema reset + re-migrated): the live
-  `PostgresRunProgressReporter` suite (9) includes a new round-trip proving a failing `completeStage`
-  persists `error_detail jsonb` that reads back verbatim through `PostgresOperationTimelineRead`
-  (paths + redacted snippet preserved) and that an ok close stores NULL; the
-  `PostgresLearnerLoopStores` citation suite (17) round-trips `match_kind` under the tightened
-  per-provenance CHECK. **Real-use gate (rule 14):** a clean single-Rust journey on a freshly reset DB
-  ran end to end on real model calls — extraction `d5e1373a` (`core=10 CEPs=30 defs=38 mentions=138
-  assertions=11`), graph version `c000ce32` (9 concepts), enrichment `6bf1b68b` (9 anchors / 17
-  enrichment nodes), study items `lessons=26 absent=0 items=25 rejected=1`. The successful run
-  recorded **0 of 50 stages with a non-null `error_detail`** (0 failed). Citations carry a realistic
-  fidelity mix: lesson sections **26 source·exact / 3 source·normalized / 26 generated(null)**,
-  option-select **14 source·exact / 11 generated(null)**, with **0** CHECK-invariant violations
-  (every source row has a `match_kind`, every generated row NULL). Forcing a real failure (extraction
-  with `LITELLM_BASE_URL` pointed at a 404 route) persisted on the failed `concept-discovery` stage:
-  `{kind:forced_tool_exhaustion, model:kg-concept-discovery, toolName:submit_concept_candidates,
-  attempts:[3× {kind:http, status:404}], message:"…failed after 3 attempt(s): LiteLLM request failed
-  with 404."}` and the worker exited non-zero — fail-closed preserved, reason now inspectable. Result:
-  PASS. Trail: `tmp/2026-06-30-operator-observability/`.
-
-- **Latest deterministic suite, 2026-06-30.** Full workspace typecheck and recursive tests are green
-  (domain-core, application, infrastructure-postgres DB-skipped cases, infrastructure-litellm,
-  kg-worker, and admin-lab). ESLint reports zero errors and two pre-existing warnings outside the
-  latest docs/behavior diff.
-
-- **Latest real-use gate, 2026-06-30.** With `DATABASE_URL` loaded from `.env`, the live
-  `PostgresLearnerLoopStores` suite passed all DB-backed cases, including the regression that fans 16
-  concurrent same-learner Response Log appends and proves distinct, gapless `attempt_seq` assignment.
-  A clean real Rust journey also exercised all six measured judge gates end to end with production
-  LLM calls and no unavailable pass-throughs. Detailed historical validation trails live in git
-  history and generated artifacts under `tmp/`.
+- **Synthetic Topic Generation, 2026-07-01.** Three topics ran end to end on real production calls on
+  a live DB: Photosynthesis [biology] (`eb6e5ac1`), Quantum error correction [physics] (`21b8c077`),
+  and Mechanistic interpretability of neural networks [machine learning] (`02afc709`). The real-use
+  gate verified anchor-less layers with null `graph_version_id`, whole-set prerequisite ordering,
+  intrinsic difficulty, no asserted graph writes, and no source-block citations or evidence quotes on
+  `llm_grounded` nodes. **Defect found and fixed by the gate:** the generated-grounding schema cap was
+  too low for first-class synthetic concepts. **Result: PASS** for the core arm. Caveat: the
+  `boundary` -> `uncertain` route did not fire on any real run (0 / 38 concepts); probe calibration
+  remains in TODO. Trail: `tmp/2026-07-01-synthetic-topic-rule14/`.
 
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims come from
-  inspected real model output.
+  inspected real model output. Older validation trails live in git history and generated artifacts
+  under `tmp/`.

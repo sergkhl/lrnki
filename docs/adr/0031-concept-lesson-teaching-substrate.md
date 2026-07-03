@@ -22,7 +22,9 @@ provenance and citation contract ([ADR-0026](0026-typed-study-item-bank.md)). A 
 assembly boundary; any unverifiable citation is demoted to `generated` and never persisted as a
 source quote. A `generated` section carries no source identifiers. Definition, examples, and formulas
 are source-cited where the source supports them; gist, intuition, and applications are synthesized
-and labeled `generated`.
+and labeled `generated`. The gist is a framing hook — the concept's core idea, the problem it
+solves, or why it matters — and is deliberately distinct from the definition's formal statement of
+what the concept is; a gist that restates the definition is a defect, not a valid section.
 
 A section that cannot be produced or grounded is **absent, not placeholder**. A lesson is valid only
 when it meets the minimum — a gist, at least one application, and at least one substantive section
@@ -35,9 +37,11 @@ stage in the same per-node pass — one worker run, no new `operation_type`. It 
 LiteLLM spend tag (`concept-lesson-generation`) so its cost and wall-clock are separately attributable
 ([ADR-0029](0029-persist-shared-operation-stage-timelines.md)).
 
-Synthesized sections are generated unconditionally this iteration and labeled `generated`;
-confidence-gating synthesis is deferred to [ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md)
-(Proposed).
+Synthesized sections are generated only when the current lesson grounding supports them and are
+labeled `generated`. `gist` and `applications` are required by the lesson minimum; `intuition` remains
+optional and appears only when it adds a distinct mental model rather than repeating the gist or
+substantive section. Knowledge-boundary gating for source-less concept synthesis belongs to
+[ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md).
 
 The Study Session shows a node's Concept Lesson before its option-select item; reading a lesson writes
 no Response Log row. The lesson rides down the `composeStudySession` projection from lessons loaded
@@ -46,10 +50,9 @@ through a `ConceptLessonStorePort`; it is not served *through* a read port
 
 Lesson generation imports no graph or enrichment write port: it is a derived asset that never mutates
 the asserted graph or the Derived Graph Layer
-([ADR-0002](0002-define-learner-neutral-core-concept-graph.md), [AGENTS.md](../../AGENTS.md)). A
-section may carry an optional generated diagram descriptor (`{ caption, spec }`), persisted but not
-rendered this iteration; the lesson structure is rich enough to feed future playable projections, but
-no game UX ships here.
+([ADR-0002](0002-define-learner-neutral-core-concept-graph.md), [AGENTS.md](../../AGENTS.md)).
+Optional diagram descriptors are learner-neutral lesson content; their exact persisted shape is owned
+by source types and the initial migration, and rendering belongs to downstream UI.
 
 ## Context
 
@@ -70,7 +73,7 @@ lesson and its option-select projection are produced in the same per-node pass.
 ## Consequences
 
 - One canonical teaching artifact per node, regenerable and learner-neutral, that all item types and
-  future games project from.
+  Learner App projections consume.
 - A second per-node LLM call roughly doubles per-node generation work; the dedicated stage tag makes
   the cost regression immediately visible at the real-use gate owned by [AGENTS.md](../../AGENTS.md).
 - Option-select quality now depends on the lesson's source citations; the assembler demotes any

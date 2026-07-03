@@ -12,6 +12,7 @@ import type {
   StudyItem,
   OptionSelectItemDraft,
   ImpostorItemDraft,
+  ImpostorLieValidityJudgment,
   StudyItemGroundingProvenance,
   StudyItemType,
   ConceptDifficulty,
@@ -163,6 +164,25 @@ export interface RescueDurabilityJudgmentPort {
     candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
     anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
   }): Promise<RescueDurabilityJudgment>;
+}
+
+// Impostor lie-validity judge (ADR-0026 refinement). A bounded cross-family judgment over
+// a deterministic-guarded impostor lie. It answers whether the keyed lie is actually false
+// for the target node. Unlike other semantic judges that fail open/pass-through, the
+// application uses this one fail-closed with an operator-visible rejected-row reason because
+// a true "lie" teaches a falsehood and no-impostor is the designed safe state.
+export interface ImpostorLieValidityJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    lie: { text: string; reveal: string };
+    groundingPassages: (
+      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
+    )[];
+    siblings: { label: string; snippet: string }[];
+  }): Promise<ImpostorLieValidityJudgment>;
 }
 
 // Minting durability judge. A bounded, forced-tool LLM judgment over ONE proposed
@@ -433,11 +453,14 @@ export interface LearnerPathStorePort {
 // study items, their options + grounded-answer citations, AND its rejected (no-item)
 // nodes atomically, plus the immutable `study_item_bank` artifact, in one transaction
 // (no authoritative relational state without its artifact, matching the enrichment/
-// extraction stores). Regeneration replaces an enrichment's items and rejections
-// (delete-then-insert). `supportedItemTypes` is a `SELECT DISTINCT item_type` query —
-// the supported set is the literal byproduct of which typed items grounded, never a
-// stored map (KTD2, rule 18). Rejected nodes are persisted so the no-item frontier
-// fallback reads the real rejection reason instead of guessing from grounding origin.
+// extraction stores). Regeneration supersedes an enrichment's prior items rather than
+// deleting them (the append-only Response Log may already reference one), and replaces
+// its rejections (delete-then-insert — nothing else references those). All three read
+// methods here return only the current, non-superseded generation. `supportedItemTypes`
+// is a `SELECT DISTINCT item_type` query over that current scope — the supported set is
+// the literal byproduct of which typed items grounded, never a stored map (KTD2, rule
+// 18). Rejected nodes are persisted so the no-item frontier fallback reads the real
+// rejection reason instead of guessing from grounding origin.
 export interface StudyItemBankStorePort {
   persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
@@ -478,6 +501,7 @@ export interface StudyItemGenerationPort {
     // Same-domain neighbor descriptors that flavor the distractors (prompt-context only;
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];
+    retryFeedback?: string;
   }): Promise<OptionSelectItemDraft>;
   // Impostor generation (R3/R5/R6/R7). Takes the same grounding + siblings as option-select
   // and returns a pre-verification ImpostorItemDraft: three grounded truths each citing a
@@ -494,6 +518,7 @@ export interface StudyItemGenerationPort {
       | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
     )[];
     siblings: { label: string; snippet: string }[];
+    retryFeedback?: string;
   }): Promise<ImpostorItemDraft>;
 }
 
@@ -502,8 +527,8 @@ export interface StudyItemGenerationPort {
 // returns a pre-verification ConceptLessonDraft — an ordered set of sections each citing a
 // grounding passage by id when source-supported. Provenance honesty is re-derived
 // authoritatively by the pure assembler (U6); this port never decides what is source-cited.
-// Synthesized sections are generated unconditionally this iteration (R11; confidence-gating
-// is deferred to ADR-0030).
+// Synthesized sections are generated only when the current lesson grounding supports
+// them; source-less concept synthesis gating is owned by ADR-0030.
 export interface ConceptLessonGenerationPort {
   readonly model: string;
   generate(input: {
@@ -522,6 +547,7 @@ export interface ConceptLessonGenerationPort {
       children: { label: string; snippet: string }[];
       siblings: { label: string; snippet: string }[];
     };
+    retryFeedback?: string;
   }): Promise<ConceptLessonDraft>;
 }
 

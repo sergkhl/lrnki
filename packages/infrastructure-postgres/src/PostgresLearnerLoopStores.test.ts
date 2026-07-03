@@ -96,11 +96,17 @@ function impostorFor(s: Substrate, opts: { lieSource?: "sibling" | "generated"; 
       { statementId: randomUUID(), ordinal: 0, text: "Ownership governs memory.", isImpostor: false, provenance: "source", citation: sourceCitation },
       { statementId: randomUUID(), ordinal: 1, text: "Ownership is a set of rules.", isImpostor: false, provenance: "source", citation: sourceCitation },
       { statementId: randomUUID(), ordinal: 2, text: "Ownership applies to values that govern memory.", isImpostor: false, provenance: "source", citation: sourceCitation },
-      { statementId: randomUUID(), ordinal: 3, text: "Ownership lets you reference a value without taking it.", isImpostor: true, provenance: "generated" }
-    ],
-    reveal: "The fourth is false; that describes Borrowing.",
-    lieSource: opts.lieSource ?? "sibling",
-    ...((opts.lieSource ?? "sibling") === "sibling" ? { siblingLabel: opts.siblingLabel ?? "Borrowing" } : {})
+      {
+        statementId: randomUUID(),
+        ordinal: 3,
+        text: "Ownership lets you reference a value without taking it.",
+        isImpostor: true,
+        provenance: "generated",
+        reveal: "The fourth is false; that describes Borrowing.",
+        lieSource: opts.lieSource ?? "sibling",
+        ...((opts.lieSource ?? "sibling") === "sibling" ? { siblingLabel: opts.siblingLabel ?? "Borrowing" } : {})
+      }
+    ]
   };
 }
 
@@ -135,22 +141,69 @@ maybe("persists an option_select item; it round-trips with options + citation; s
   }
 });
 
-maybe("regeneration (delete-then-insert) replaces a prior bank, leaving no orphaned options or citations", async () => {
+maybe("regeneration (supersede-then-insert) retires a prior bank from current reads while keeping its options/citations as history", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
-    await bankFor(sql, s, [optionSelectFor(s)]);
+    const prior = optionSelectFor(s);
+    await bankFor(sql, s, [prior]);
     // Re-persist with no items and a rejection.
     await bankFor(sql, s, [], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", itemType: "option_select", reason: "no option-select item could be grounded" }]);
 
     const items = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
-    assert.equal(items.length, 0);
+    assert.equal(items.length, 0, "current reads see only the latest generation");
+
+    const [priorRow] = await sql<{ superseded_at: string | null }[]>`
+      SELECT superseded_at FROM study_items WHERE study_item_id = ${prior.studyItemId}`;
+    assert.ok(priorRow.superseded_at !== null, "the prior item is superseded, not deleted");
+
     const [{ options }] = await sql<{ options: number }[]>`
-      SELECT count(*)::int AS options FROM study_item_options o JOIN study_items si ON si.study_item_id = o.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
-    assert.equal(options, 0, "orphaned options are cascade-cleared");
+      SELECT count(*)::int AS options FROM study_item_options o WHERE o.study_item_id = ${prior.studyItemId}`;
+    assert.equal(options, 4, "the superseded item's options remain as history, not cascade-cleared");
     const [{ citations }] = await sql<{ citations: number }[]>`
-      SELECT count(*)::int AS citations FROM study_item_citations c JOIN study_items si ON si.study_item_id = c.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
-    assert.equal(citations, 0, "orphaned citations are cascade-cleared");
+      SELECT count(*)::int AS citations FROM study_item_citations c WHERE c.study_item_id = ${prior.studyItemId}`;
+    assert.equal(citations, 1, "the superseded item's citation remains as history, not cascade-cleared");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("regenerating a study item bank after a learner response was logged against it no longer violates response_log's FK (the original defect)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const prior = optionSelectFor(s);
+    await bankFor(sql, s, [prior]);
+
+    const responseId = randomUUID();
+    const learnerStateRef = randomUUID();
+    await new PostgresResponseLogStore(sql).append([
+      {
+        responseId,
+        learnerStateRef,
+        studyItemId: prior.studyItemId,
+        derivedNodeId: s.derivedNodeId,
+        signalType: "graded",
+        judgedOutcome: "correct",
+        gradedScore: 1,
+        responseSource: "synthetic",
+        graderIdentity: "test",
+        batchId: null,
+        submittedAnswer: "Memory"
+      } satisfies NewResponseLogRow
+    ]);
+
+    // Regenerating the bank used to `DELETE FROM study_items WHERE enrichment_id = ...`
+    // and fail with response_log_study_item_id_fkey once any response referenced an item
+    // in that set. It must now succeed.
+    await bankFor(sql, s, [optionSelectFor(s)]);
+
+    const items = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
+    assert.equal(items.length, 1, "the new generation is current");
+
+    const [response] = await sql<{ study_item_id: string }[]>`
+      SELECT study_item_id FROM response_log WHERE response_id = ${responseId}`;
+    assert.equal(response.study_item_id, prior.studyItemId, "the logged response still resolves to the exact item the learner answered");
   } finally {
     await sql.end();
   }
@@ -216,13 +269,12 @@ maybe("Covers AE3: persists an impostor item; it round-trips with four statement
     const impostors = item.statements.filter((st) => st.isImpostor);
     assert.equal(impostors.length, 1);
     assert.equal(impostors[0].provenance, "generated");
-    assert.equal(impostors[0].citation, undefined);
+    assert.equal(impostors[0].reveal, "The fourth is false; that describes Borrowing.");
+    assert.equal(impostors[0].lieSource, "sibling");
+    assert.equal(impostors[0].siblingLabel, "Borrowing");
     for (const truth of item.statements.filter((st) => !st.isImpostor)) {
       assert.ok(truth.citation && truth.citation.provenance === "source");
     }
-    assert.equal(item.reveal, "The fourth is false; that describes Borrowing.");
-    assert.equal(item.lieSource, "sibling");
-    assert.equal(item.siblingLabel, "Borrowing");
     assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["impostor"]);
   } finally {
     await sql.end();
@@ -243,15 +295,20 @@ maybe("listStudyItemsForEnrichment returns BOTH item types for a node that has b
   }
 });
 
-maybe("regenerating an enrichment replaces prior impostor statements (no orphan rows)", async () => {
+maybe("regenerating an enrichment retires prior impostor statements from current reads while keeping them as history", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
-    await bankFor(sql, s, [impostorFor(s)]);
+    const prior = impostorFor(s);
+    await bankFor(sql, s, [prior]);
     await bankFor(sql, s, [], [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", itemType: "impostor", reason: "no impostor item could be grounded" }]);
+
+    const items = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
+    assert.equal(items.length, 0, "current reads see only the latest generation");
+
     const [{ statements }] = await sql<{ statements: number }[]>`
-      SELECT count(*)::int AS statements FROM impostor_statements st JOIN study_items si ON si.study_item_id = st.study_item_id WHERE si.enrichment_id = ${s.enrichmentId}`;
-    assert.equal(statements, 0, "orphaned impostor statements are cascade-cleared");
+      SELECT count(*)::int AS statements FROM impostor_statements st WHERE st.study_item_id = ${prior.studyItemId}`;
+    assert.equal(statements, 4, "the superseded item's statements remain as history, not cascade-cleared");
   } finally {
     await sql.end();
   }

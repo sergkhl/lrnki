@@ -6,8 +6,9 @@ import type { Route } from "next";
 import { GraduationCapIcon, RotateCcwIcon, TriangleAlertIcon, TrophyIcon } from "lucide-react";
 import { submitOptionSelect, submitImpostor, setVerdict, clearVerdict, resetLearner } from "@/app/admin/lab/study/actions";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
+import { QuestLadder } from "@/components/study/QuestLadder";
 import { StudySideSheet } from "@/components/study/StudySideSheet";
-import { allSegmentsAnswered, nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
+import { allSegmentsAnswered, focusedMapHiddenNodeIds, isPathComplete, nextStudyTarget, shouldAcceptSheetOpenChange } from "@/components/study/studyView";
 import type { StudySession as StudySessionData } from "@/lib/studySession";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -18,10 +19,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 // option-select submit. Every write goes through server actions that revalidate the session
 // route, so mastery is never held client-side.
 export function StudySession({ session }: Readonly<{ session: StudySessionData }>) {
-  // A foundational root goal opens directly on its single node (R3) — never empty, never
-  // a premature "Goal reached."
+  // A foundational root target opens directly on its single node — never empty, never a
+  // premature completion state.
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(session.isFoundationalRoot ? session.target.derivedNodeId : null);
   const [sheetOpen, setSheetOpen] = useState(session.isFoundationalRoot);
+  const [mapScope, setMapScope] = useState<"focused" | "full">("focused");
   const [pending, startTransition] = useTransition();
   // Auto-advance bookkeeping (for graded option-select answers). After an answer we keep the
   // sheet open and snapshot the CURRENT session; the advance fires only once a DIFFERENT
@@ -36,19 +38,28 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
   // does not remount) and resets when the node changes.
   const [answeredSegmentIds, setAnsweredSegmentIds] = useState<Set<string>>(new Set());
 
-  // "Goal reached" only when the goal is NOT a foundational root and its whole cone is
-  // mastered. A foundational root always shows its single-node study screen instead (R3/AE1).
-  const goalReached = !session.isFoundationalRoot && session.classification.selectedFrontierTarget === null;
+  // Complete only when the target is NOT a foundational root and its whole cone is mastered.
+  // A foundational root always shows its single-node study screen instead.
+  const questComplete = isPathComplete(session.classification, session.isFoundationalRoot);
   const sourceSummary = session.responseSourceSummary;
   const calibrationQuery = new URLSearchParams({ enrichmentId: session.enrichmentId, target: session.target.derivedNodeId });
-  const selectedLabel = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId)?.label ?? selectedNodeId : null;
+  const selectedNode = selectedNodeId ? session.detail.nodes.find((node) => node.derivedNodeId === selectedNodeId) ?? null : null;
+  const selectedLabel = selectedNode?.label ?? selectedNodeId;
+  // Learner-neutral intrinsic difficulty for the open node (ADR-0024), surfaced on the sheet.
+  const selectedDifficulty = selectedNode?.difficulty ?? null;
   const selectedContent = selectedNodeId ? session.sheetByNode[selectedNodeId] ?? null : null;
   // The ordered study segments for the open node (option_select, then impostor), each rendered
   // as its own card in the stacked sheet (R10).
   const selectedSegments = selectedNodeId ? session.studySegmentsByNode[selectedNodeId] ?? [] : [];
   // The Concept Lesson for the open node, shown ahead of the study segments (R12).
   const selectedLesson = selectedNodeId ? session.lessonByNode[selectedNodeId] ?? null : null;
-  const hiddenNodeIds = useMemo(() => new Set(session.adaptedHiddenNodeIds), [session.adaptedHiddenNodeIds]);
+  const adaptedHiddenNodeIds = useMemo(() => new Set(session.adaptedHiddenNodeIds), [session.adaptedHiddenNodeIds]);
+  const labelByNode = useMemo(() => new Map(session.detail.nodes.map((node) => [node.derivedNodeId, node.label] as const)), [session.detail.nodes]);
+  const focusedHiddenNodeIds = useMemo(
+    () => focusedMapHiddenNodeIds(session.detail, session.statefulPath, adaptedHiddenNodeIds),
+    [session.detail, session.statefulPath, adaptedHiddenNodeIds]
+  );
+  const activeHiddenNodeIds = mapScope === "focused" ? focusedHiddenNodeIds : adaptedHiddenNodeIds;
 
   const openNode = (derivedNodeId: string) => {
     setSelectedNodeId(derivedNodeId);
@@ -109,9 +120,9 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
     answerSegment(studyItemId, () => submitImpostor({ learnerStateRef: session.learnerStateRef, studyItemId, chosenStatementId: statementId }));
   };
 
-  // Advance effect (R4/AE1): when a DIFFERENT session arrives after a graded answer, retarget
+  // Advance effect: when a DIFFERENT session arrives after a graded answer, retarget
   // the open sheet to the freshly-advanced frontier target; a null target with no foundational
-  // root means the goal is reached — close the sheet.
+  // root means the quest is complete — close the sheet.
   useEffect(() => {
     if (!pendingAdvanceRef.current || session === sessionAtAnswerRef.current) return;
     pendingAdvanceRef.current = false;
@@ -182,7 +193,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
             Learner <span className="font-mono text-xs">{session.learnerStateRef}</span> · frontier:{" "}
             {session.classification.selectedFrontierTarget
               ? session.detail.nodes.find((n) => n.derivedNodeId === session.classification.selectedFrontierTarget)?.label ?? "—"
-              : session.isFoundationalRoot ? "foundational — studied directly" : "goal reached"}
+            : session.isFoundationalRoot ? "foundational — studied directly" : "quest complete"}
             . Tap a ready node to study it, or skip it as already known.
           </CardDescription>
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -217,14 +228,28 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         </Card>
       ) : null}
 
-      {goalReached ? (
+      {session.studyItemCount === 0 ? (
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4 text-sm">
+            <TriangleAlertIcon className="size-5 text-chart-5" />
+            <span>
+              <span className="font-medium">No study items yet.</span>{" "}
+              <span className="text-muted-foreground">
+                The quest ladder and map are still inspectable; frontier steps open as cardless study actions.
+              </span>
+            </span>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {questComplete ? (
         <Card>
           <CardContent className="flex items-center gap-3 py-4 text-sm">
             <TrophyIcon className="size-5 text-chart-4" />
             <span>
-              <span className="font-medium">Goal reached.</span>{" "}
+              <span className="font-medium">Quest complete.</span>{" "}
               <span className="text-muted-foreground">
-                Every concept on the path to {session.target.label} is mastered — nothing left to study here.
+                Every concept on the path to {session.target.label} is mastered.
               </span>
             </span>
           </CardContent>
@@ -310,8 +335,56 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
       ) : null}
 
       <Card>
+        <CardHeader className="border-b">
+          <CardTitle className="text-base">Quest ladder</CardTitle>
+          <CardDescription>Progress toward {session.target.label}, grouped by prerequisite wave.</CardDescription>
+        </CardHeader>
         <CardContent className="pt-4">
-          <DerivedGraphExplorer detail={session.detail} adapted={session.classification} hiddenNodeIds={hiddenNodeIds} onNodeSelect={openNode} />
+          <QuestLadder
+            steps={session.statefulPath}
+            adaptedHiddenNodeIds={adaptedHiddenNodeIds}
+            labelByNode={labelByNode}
+            selectedFrontierTarget={session.classification.selectedFrontierTarget}
+            onOpenNode={openNode}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Quest map</CardTitle>
+              <CardDescription>
+                {mapScope === "focused" ? "Focused on the target and trusted prerequisites." : "Full Derived Graph Layer context."}
+              </CardDescription>
+            </div>
+            <div role="group" aria-label="Quest map scope" className="flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={mapScope === "focused" ? "default" : "outline"}
+                aria-pressed={mapScope === "focused"}
+                className="h-7 px-2.5"
+                onClick={() => setMapScope("focused")}
+              >
+                Focused
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mapScope === "full" ? "default" : "outline"}
+                aria-pressed={mapScope === "full"}
+                className="h-7 px-2.5"
+                onClick={() => setMapScope("full")}
+              >
+                Full map
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <DerivedGraphExplorer detail={session.detail} adapted={session.classification} hiddenNodeIds={activeHiddenNodeIds} onNodeSelect={openNode} />
         </CardContent>
       </Card>
 
@@ -319,6 +392,7 @@ export function StudySession({ session }: Readonly<{ session: StudySessionData }
         open={sheetOpen}
         onOpenChange={onSheetOpenChange}
         nodeLabel={selectedLabel}
+        difficulty={selectedDifficulty}
         content={selectedContent}
         segments={selectedSegments}
         lesson={selectedLesson}

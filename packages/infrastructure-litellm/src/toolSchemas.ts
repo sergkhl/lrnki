@@ -362,32 +362,46 @@ export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectVal
 
 // --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
 // One four-statement auto-graded item per node: three TRUE statements (each cited by
-// passage id + quote, verified verbatim at the guard) and exactly ONE planted lie. The lie
-// is preferentially a true fact about one provided neighbor concept, rewritten as if it were
-// about THIS node; when no clean neighbor lie exists, a freshly minted plausible
-// misconception. The lie is labeled generated and carries NO citation — never a source
-// quote. Citation fields are flattened to nullable scalars because the forced-tool dialect
-// folds only scalar nullables; the guard re-derives provenance, so a null citation marks the
-// lie. Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and
-// lists no exemplars. The deterministic guard (U4) enforces structure; this schema only
-// enforces SHAPE fail-closed (rule 6) — lie plausibility is judged by the rule-14 pass.
+// passage id + quote, verified verbatim at the guard) and exactly ONE planted lie object.
+// The lie object is preferentially a true fact about one provided neighbor concept,
+// rewritten as if it were about THIS node; when no clean neighbor lie exists, a freshly
+// minted plausible misconception. The wire schema deliberately stays shallow: real-use
+// regeneration showed deeper nested truth/lie objects caused many invalid-JSON tool calls
+// with the production generator. The adapter immediately binds these scalar lie fields into
+// the domain `lie` object, so the persisted contract still has one keyed lie source of truth.
+// Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and lists
+// no exemplars. The deterministic guard (U4) enforces structure; this schema only enforces
+// SHAPE fail-closed (rule 6) — lie validity is judged by the neural cross-family judge.
 
-const impostorStatement = z.object({
-  text: z.string().min(1).describe("One self-contained statement about the learning node. A true statement restates provided grounding; the single impostor reads as plausibly true of this node but is not."),
-  isImpostor: z.boolean().describe("true for the SINGLE planted lie; false for each of the three true statements. Exactly one statement has isImpostor true."),
-  citationPassageId: z.string().nullable().describe("For a TRUE statement, the exact passageId of the grounding passage it restates; null for the impostor, which is not grounded."),
-  citationEvidenceQuote: z.string().nullable().describe("For a TRUE statement, a substring copied from that grounding passage supporting it. For source-grounded passages copy it verbatim; null for the impostor.")
+const impostorTruth = z.object({
+  text: z.string().min(1).describe("One self-contained TRUE statement about the learning node, restating provided grounding."),
+  citationPassageId: z.string().min(1).describe("The exact passageId of the grounding passage this true statement restates."),
+  citationEvidenceQuote: z.string().min(1).describe("A substring copied from that grounding passage supporting this true statement. For source-grounded passages copy it verbatim.")
 }).strict();
 
 export const impostorValidator = z.object({
   question: z.string().min(1).describe("One self-contained prompt asking the learner to pick the false statement among the four. Do not reference 'the passage' or 'the source'."),
-  statements: z.array(impostorStatement).length(4).describe("Exactly four statements about the learning node: three true and grounded, and exactly one planted lie (isImpostor true)."),
-  reveal: z.string().min(1).describe("Post-answer explanation naming which statement is the lie and why it is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
+  truths: z.array(impostorTruth).length(3).describe("Exactly three true statements about the learning node, each grounded in one provided passage."),
+  lieText: z.string().min(1).describe("The single planted lie: a statement that reads plausibly true of the learning node but is false for that node."),
+  reveal: z.string().min(1).describe("Post-answer explanation naming why the lie is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
   lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighbor concept rewritten as if about this node. 'generated' when no clean neighbor lie existed and the lie is a freshly minted plausible misconception."),
   siblingLabel: z.string().nullable().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; null when lieSource is 'generated'.")
 }).strict();
 
 export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
+
+// --- Impostor lie-validity judgment: submit_impostor_lie_validity_judgment
+// Cross-family semantic judgment over the one generated lie object after deterministic
+// grounding checks pass. It answers whether the keyed lie is actually false for the target
+// node, not merely true of a sibling or unsupported by phrasing. The application stage owns
+// fail-closed drop semantics and records an operator-visible rejection reason.
+
+export const impostorLieValidityJudgmentValidator = z.object({
+  verdict: z.enum(["lie_is_false", "lie_is_true_of_node"]).describe("'lie_is_false' when the planted statement is false for the learning node. 'lie_is_true_of_node' when the statement is true, materially true, or not clearly false for the learning node."),
+  reason: z.string().min(1).describe("One terse explanation grounded in the provided node context, lie, reveal, grounding passages, and sibling labels.")
+}).strict();
+
+export const impostorLieValidityJudgmentSchema: JsonSchema = toForcedToolSchema(impostorLieValidityJudgmentValidator);
 
 // --- Concept Lesson generation: submit_concept_lesson (U2, R2/R4/R6/R7/R14) -----
 // One ordered teaching artifact per learning node (ADR-0031). Every section is
@@ -404,7 +418,7 @@ export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
 export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
 
 const conceptLessonSection = z.object({
-  kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line advance organizer; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
+  kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
   text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
@@ -437,5 +451,6 @@ export const toolValidators = [
   nodeMergeAdjudicationValidator,
   optionSelectValidator,
   impostorValidator,
+  impostorLieValidityJudgmentValidator,
   conceptLessonValidator
 ] as const;

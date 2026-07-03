@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CheckIcon, LockIcon, RotateCcwIcon } from "lucide-react";
+import { BookOpenIcon, CheckIcon, LockIcon, RotateCcwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { OptionSelectCard } from "@/components/study/OptionSelectCard";
 import { ImpostorCard } from "@/components/study/ImpostorCard";
 import { ConceptLessonCard } from "@/components/study/ConceptLessonCard";
+import { StudySegmentSection } from "@/components/study/StudySegmentSection";
 import type { ConceptLessonView, SheetContent as SheetContentPayload, StudyItemView } from "@/components/study/studyView";
 
 // Transfer-ready, state-gated study side sheet. It keeps the graph visible and renders content
@@ -21,6 +22,7 @@ export function StudySideSheet({
   open,
   onOpenChange,
   nodeLabel,
+  difficulty = null,
   content,
   segments = [],
   lesson = null,
@@ -35,6 +37,9 @@ export function StudySideSheet({
   // to distinguish a real dismiss from the graph-tap outside-press it must ignore.
   onOpenChange: (open: boolean, eventDetails?: { reason?: string; event?: Event }) => void;
   nodeLabel: string | null;
+  // Learner-neutral intrinsic difficulty for the open node (ADR-0024, EXPERIMENT_ONLY); null when
+  // the node has no computed difficulty.
+  difficulty?: number | null;
   content: SheetContentPayload | null;
   // The frontier node's ordered study segments; empty for a non-frontier or cardless node.
   segments?: StudyItemView[];
@@ -52,6 +57,7 @@ export function StudySideSheet({
       <StudySideSheetContent
         key={`${open}:${contentKey}`}
         nodeLabel={nodeLabel}
+        difficulty={difficulty}
         content={content}
         segments={segments}
         lesson={lesson}
@@ -67,6 +73,7 @@ export function StudySideSheet({
 
 function StudySideSheetContent({
   nodeLabel,
+  difficulty,
   content,
   segments,
   lesson,
@@ -77,6 +84,7 @@ function StudySideSheetContent({
   pending
 }: Readonly<{
   nodeLabel: string | null;
+  difficulty: number | null;
   content: SheetContentPayload | null;
   segments: StudyItemView[];
   lesson: ConceptLessonView | null;
@@ -104,32 +112,47 @@ function StudySideSheetContent({
   return (
     <SheetContent side="right" showOverlay={false} className="gap-4 overflow-y-auto p-6 sm:max-w-md data-[closed]:pointer-events-none">
         <SheetHeader className="p-0">
-          <SheetTitle className="flex items-center gap-2">
+          <SheetTitle className="flex flex-wrap items-center gap-2">
             {nodeLabel ?? "Node"}
             {content ? <StateBadge content={content} /> : null}
+            {difficulty !== null ? <Badge variant="outline">difficulty {difficulty.toFixed(2)}</Badge> : null}
           </SheetTitle>
           <SheetDescription>{content ? descriptionFor(content) : null}</SheetDescription>
         </SheetHeader>
 
-        {showLesson && lesson ? <ConceptLessonCard lesson={lesson} /> : null}
+        {showLesson && lesson ? (
+          <StudySegmentSection title="Lesson" icon={<BookOpenIcon className="size-4 text-primary" />}>
+            <ConceptLessonCard lesson={lesson} />
+          </StudySegmentSection>
+        ) : null}
 
         {isFrontierWithSegments ? (
           <div className="flex flex-col gap-4">
             {segments.map((segment) =>
               segment.kind === "option_select" ? (
-                <OptionSelectCard
+                <StudySegmentSection
                   key={segment.item.studyItemId}
-                  item={segment.item}
-                  onSelect={(optionId) => startAction(() => onSelectOption(segment.item.studyItemId, optionId))}
-                  pending={busy}
-                />
+                  title="Question"
+                  meta={<Badge variant="outline">{segment.item.groundingProvenance}</Badge>}
+                >
+                  <OptionSelectCard
+                    item={segment.item}
+                    onSelect={(optionId) => startAction(() => onSelectOption(segment.item.studyItemId, optionId))}
+                    pending={busy}
+                  />
+                </StudySegmentSection>
               ) : (
-                <ImpostorCard
+                <StudySegmentSection
                   key={segment.item.studyItemId}
-                  item={segment.item}
-                  onSelect={(statementId) => startAction(() => onSelectImpostor(segment.item.studyItemId, statementId))}
-                  pending={busy}
-                />
+                  title="Spot the impostor"
+                  meta={<Badge variant="outline">{segment.item.groundingProvenance}</Badge>}
+                >
+                  <ImpostorCard
+                    item={segment.item}
+                    onSelect={(statementId) => startAction(() => onSelectImpostor(segment.item.studyItemId, statementId))}
+                    pending={busy}
+                  />
+                </StudySegmentSection>
               )
             )}
             <Button type="button" size="sm" variant="outline" className="self-start" disabled={busy} onClick={() => startAction(onSkipAsKnown)}>
