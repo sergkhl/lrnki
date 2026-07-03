@@ -471,7 +471,7 @@ export function DerivedGraphExplorer({ detail, adapted, onNodeSelect, hiddenNode
           <p className="text-xs text-muted-foreground">
             Right-angle tracks point from prerequisite to dependent; each dashed-bordered region is
             one domain (a learning loop), and no edge crosses between regions. Dashed edges = uncertain
-            inferred edges (excluded from learner paths). Drag the canvas to pan; zoom and node
+            inferred edges (excluded from trusted Study Session scope). Drag the canvas to pan; zoom and node
             dragging are locked to keep the layout stable.
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

@@ -80,7 +80,6 @@ export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 export { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds } from "./enrichmentNodeMinting";
 export { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
-export { computeLearnerPath } from "./computeLearnerPath";
 export { getStudySession } from "./getStudySession";
 export { generateStudyItemBank, type StudyItemBankGenerationResult, type RejectedStudyItem } from "./generateStudyItemBank";
 export {
@@ -112,10 +111,8 @@ export {
   outcomeToMastery
 } from "./responseLogLearnerState";
 export {
-  selectFrontierTarget,
   selectScopedFrontierTarget,
   rankFrontier,
-  projectAdaptivePath,
   classifyAdaptedNodes,
   ADAPTIVE_MASTERY_THRESHOLD,
   type AdaptedNodeState,
@@ -146,26 +143,21 @@ export {
   buildMasteryMap,
   summarizeResponseSources,
   summarizeLearnerStates,
-  dedupeEnrichmentScopes,
   listLearnerStates,
   getLearnerLoopDetail,
-  getLearnerAdaptedGraphs,
   type ConflictKind,
   type ConceptConflict,
   type ResponseSourceSummary,
   type LearnerStateSummary,
   type TimestampedResponseLogRow,
   type LearnerResponseView,
-  type LearnerLoopDetail,
-  type LearnerAdaptedGraph,
-  type LearnerAdaptedGraphs
+  type LearnerLoopDetail
 } from "./learnerLoopProjection";
 export {
   synthesizeResponses,
   verdictByDifficulty,
   type SyntheticLearnerProfile
 } from "./syntheticResponses";
-export { projectLearnerPath, emptyLearnerState, DEFAULT_MASTERY_THRESHOLD } from "./learnerPathProjection";
 export { buildTargetCandidates, recommendedTargets, filterTargets, type TargetCandidate } from "./targetCandidates";
 export { projectStatefulLearnerPath, type StatefulLearnerPathStep } from "./statefulLearnerPath";
 export {

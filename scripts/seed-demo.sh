@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Repeatable demo-seed (plan 2026-06-20-002, U2). Produces ONE coherent full-manifest
 # state from an empty database: a published graph version, one enrichment carrying
-# difficulties + study items, and a few named demo learners whose adaptive paths render the
-# neutral/adapted graph pair (R1-R4). It is disposable orchestration over the stable
+# difficulties + study items, and a few named demo learners whose Study Sessions project
+# live mastered/frontier/locked state. It is disposable orchestration over the stable
 # worker CLI (KTD5) and hard-resets every run (AGENTS rules 8/9). Real LiteLLM calls
 # (extraction, enrichment, difficulty, cards, synthesis) run, so it needs the .env key
 # and a reachable Postgres + LiteLLM; any model/service outage fails the seed loudly
@@ -89,7 +89,7 @@ step "8/8 seed demo learners over goal anchors"
 # Pick goal anchors STRUCTURALLY, not by fixture-specific name (AGENTS rule 17): the
 # highest certain-prerequisite-in-degree anchor from each of the two richest domains.
 # This yields goals with clear prerequisite chains regardless of which sources were
-# extracted, so a non-deterministic reseed still produces renderable adaptive paths.
+# extracted, so a non-deterministic reseed still produces renderable quests.
 mapfile -t GOAL_NODES < <(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
   "SELECT derived_node_id FROM (
      SELECT DISTINCT ON (n.declared_domain)
@@ -105,7 +105,7 @@ mapfile -t GOAL_NODES < <(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
    LIMIT 2")
 if [ "${#GOAL_NODES[@]}" -eq 0 ]; then
   echo "! no anchor has a certain prerequisite edge — the DAG is too sparse to seed a" >&2
-  echo "  meaningful adaptive path. Inspect the enrichment before reseeding; aborting." >&2
+  echo "  meaningful Study Session quest. Inspect the enrichment before reseeding; aborting." >&2
   exit 1
 fi
 
@@ -113,24 +113,20 @@ SEEDED_REFS=()
 INDEX=0
 for GOAL_NODE in "${GOAL_NODES[@]}"; do
   INDEX=$((INDEX + 1))
-  GOAL_CONCEPT="$(psql_scalar \
-    "SELECT concept_id FROM derived_graph_nodes WHERE derived_node_id = '$GOAL_NODE'")"
   GOAL_LABEL="$(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
     "SELECT canonical_label FROM derived_graph_nodes WHERE derived_node_id = '$GOAL_NODE'")"
   EMPTY_REF="demo-empty-${INDEX}"
   SEEDED_REF="demo-seeded-${INDEX}"
   echo
-  echo "   goal ${INDEX}: ${GOAL_LABEL} (anchor concept ${GOAL_CONCEPT})"
+  echo "   goal ${INDEX}: ${GOAL_LABEL}"
 
-  # Empty learner: no responses → adapted overlay equals neutral (AE1).
-  echo "   -> empty learner ${EMPTY_REF} (adapted == neutral)"
-  pnpm worker:kg compute-adaptive-path "$ENRICHMENT_ID" "$GOAL_CONCEPT" "$EMPTY_REF"
+  # Empty learner: no responses yet.
+  echo "   -> empty learner ${EMPTY_REF} (no seeded responses)"
 
   # Seeded learner: synthesize responses toward the goal (badged synthetic), then a
-  # mastered/frontier/locked split appears in the adapted overlay (AE2/AE3).
-  echo "   -> seeded learner ${SEEDED_REF} (synthetic responses → mastered/frontier/locked split)"
+  # Study Session can project mastered/frontier/locked state live.
+  echo "   -> seeded learner ${SEEDED_REF} (synthetic responses)"
   pnpm worker:kg synthesize-responses "$ENRICHMENT_ID" "$GOAL_NODE" "$SEEDED_REF"
-  pnpm worker:kg compute-adaptive-path "$ENRICHMENT_ID" "$GOAL_CONCEPT" "$SEEDED_REF"
 
   SEEDED_REFS+=("$EMPTY_REF" "$SEEDED_REF")
 done

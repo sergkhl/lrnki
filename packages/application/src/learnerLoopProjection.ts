@@ -1,14 +1,6 @@
 import type { CalibrationVerdict, JudgedOutcome, ResponseLogRow } from "@lrnki/domain-core";
-import type {
-  DerivedGraphDetail,
-  EnrichmentInspectionReadPort,
-  LearnerLoopPathScope,
-  LearnerLoopReadPort,
-  LearnerStatePort,
-  PathStudyItemCoverage
-} from "@lrnki/ports";
+import type { LearnerLoopReadPort } from "@lrnki/ports";
 import { foldConceptMastery } from "./responseLogLearnerState";
-import { ADAPTIVE_MASTERY_THRESHOLD, classifyAdaptedNodes, type AdaptedNodeClassification } from "./adaptivePathProjection";
 
 // Pure learner-loop projection folds (ADR-0027 projection compute, KTD7). These turn a
 // learner's already-loaded verdicts + response rows into the conflict, mastery, source,
@@ -16,8 +8,8 @@ import { ADAPTIVE_MASTERY_THRESHOLD, classifyAdaptedNodes, type AdaptedNodeClass
 // data-in/data-out, so both the Admin Lab and the forthcoming Learner App reuse
 // one definition (AGENTS rule 18); the DB-bound reading use-cases over the read port live
 // in the same package and call these. The reading use-cases (getLearnerLoopDetail /
-// listLearnerStates / getLearnerAdaptedGraphs) and the read-port row shapes are added by
-// the learner-loop read port; this module owns only the pure folds.
+// listLearnerStates) and the read-port row shapes are added by the learner-loop read port;
+// this module owns only the pure folds.
 
 // --- Conflict detection (R12, AE3) -----------------------------------------
 
@@ -87,21 +79,6 @@ export function buildMasteryMap(rows: ResponseLogRow[]): Record<string, number> 
   return masteryByNode;
 }
 
-// Dedupe a learner's path scopes to distinct enrichments, keeping the first occurrence.
-// Callers pass paths latest-first (loaders return them `created_at DESC`), so the kept row
-// is the most recent path per enrichment — resubmits append new path rows, and without this
-// a surface would render duplicate panel-pairs for one enrichment.
-export function dedupeEnrichmentScopes<T extends { enrichmentId: string }>(paths: T[]): T[] {
-  const seen = new Set<string>();
-  const distinct: T[] = [];
-  for (const path of paths) {
-    if (seen.has(path.enrichmentId)) continue;
-    seen.add(path.enrichmentId);
-    distinct.push(path);
-  }
-  return distinct;
-}
-
 // --- Learner-state summaries -----------------------------------------------
 
 export type LearnerStateSummary = {
@@ -167,11 +144,8 @@ export type LearnerLoopDetail = {
   learnerStateRef: string;
   responses: LearnerResponseView[];
   conflicts: ConceptConflict[];
-  // Existing paths for this learner, so a resubmit knows which path(s) to recompute.
-  paths: LearnerLoopPathScope[];
-  coverage: PathStudyItemCoverage[];
   // The learner's folded per-derived-node mastery (EXPERIMENT_ONLY trust) and a
-  // synthetic-vs-human response-source tally — both feed the adapted-graph overlay (R3).
+  // synthetic-vs-human response-source tally for inspection badges.
   masteryByNode: Record<string, number>;
   responseSourceSummary: ResponseSourceSummary;
 };
@@ -183,15 +157,13 @@ export async function listLearnerStates(loopRead: LearnerLoopReadPort): Promise<
   return summarizeLearnerStates(rows, verdicts);
 }
 
-// One learner's loop detail (ADR-0027 projection): load the joined history, verdicts,
-// path scopes, and coverage through the read port, then add the conflict/mastery/summary
-// folds. No write port is imported, so it structurally cannot mutate learner state (R10).
+// One learner's loop detail (ADR-0027 projection): load the joined history and verdicts
+// through the read port, then add the conflict/mastery/summary folds. No write port is
+// imported, so it structurally cannot mutate learner state (R10).
 export async function getLearnerLoopDetail(loopRead: LearnerLoopReadPort, learnerStateRef: string): Promise<LearnerLoopDetail> {
-  const [rows, verdicts, paths, coverage] = await Promise.all([
+  const [rows, verdicts] = await Promise.all([
     loopRead.listResponsesForLearner(learnerStateRef),
-    loopRead.listVerdictsForLearner(learnerStateRef),
-    loopRead.listPathScopesForLearner(learnerStateRef),
-    loopRead.listCoverageForLearner(learnerStateRef)
+    loopRead.listVerdictsForLearner(learnerStateRef)
   ]);
   const logRows: ResponseLogRow[] = rows;
   return {
@@ -212,66 +184,7 @@ export async function getLearnerLoopDetail(loopRead: LearnerLoopReadPort, learne
       createdAt: row.createdAt
     })),
     conflicts: detectConflicts(verdicts, logRows),
-    paths,
-    coverage,
     masteryByNode: buildMasteryMap(logRows),
     responseSourceSummary: summarizeResponseSources(logRows)
   };
-}
-
-// --- Adapted-graph overlay use-case (R3, KTD7) -----------------------------
-
-export type LearnerAdaptedGraph = {
-  enrichmentId: string;
-  targetDerivedNodeId: string;
-  targetLabel: string;
-  // The enrichment's Derived Graph Layer (read-only) and the learner's mastered /
-  // frontier / locked classification over it.
-  detail: DerivedGraphDetail;
-  classification: AdaptedNodeClassification;
-};
-
-export type LearnerAdaptedGraphs = {
-  learnerStateRef: string;
-  responseSourceSummary: ResponseSourceSummary;
-  graphs: LearnerAdaptedGraph[];
-};
-
-// One adapted-graph scope per DISTINCT enrichment in the learner's paths (KTD7) — the piece
-// the Learner App most directly reuses. Read + projection only: it composes the
-// learner-loop detail with the read-only `EnrichmentInspectionReadPort` and the pure
-// `classifyAdaptedNodes`. No write port is imported (R10).
-export async function getLearnerAdaptedGraphs(
-  loopRead: LearnerLoopReadPort,
-  enrichmentRead: EnrichmentInspectionReadPort,
-  learnerStateRef: string
-): Promise<LearnerAdaptedGraphs> {
-  const detail = await getLearnerLoopDetail(loopRead, learnerStateRef);
-
-  // A synchronous LearnerStatePort over the already-folded mastery map (do not re-query).
-  const learnerState: LearnerStatePort = {
-    learnerStateRef,
-    mastery: (derivedNodeId: string) => detail.masteryByNode[derivedNodeId] ?? 0
-  };
-
-  const graphs: LearnerAdaptedGraph[] = [];
-  for (const scope of dedupeEnrichmentScopes(detail.paths)) {
-    const enrichmentDetail = await enrichmentRead.getDerivedGraphDetail(scope.enrichmentId);
-    if (!enrichmentDetail) continue;
-    const classification = classifyAdaptedNodes({
-      nodeIds: enrichmentDetail.nodes.map((node) => node.derivedNodeId),
-      prerequisiteEdges: enrichmentDetail.edges,
-      difficulties: enrichmentDetail.nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: node.difficulty })),
-      learnerState,
-      masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
-    });
-    graphs.push({
-      enrichmentId: scope.enrichmentId,
-      targetDerivedNodeId: scope.targetDerivedNodeId,
-      targetLabel: scope.targetLabel,
-      detail: enrichmentDetail,
-      classification
-    });
-  }
-  return { learnerStateRef, responseSourceSummary: detail.responseSourceSummary, graphs };
 }

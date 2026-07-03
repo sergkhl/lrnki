@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-core";
 import type { LearnerStatePort } from "@lrnki/ports";
-import { classifyAdaptedNodes, projectAdaptivePath, selectFrontierTarget } from "./adaptivePathProjection";
-import { emptyLearnerState, projectLearnerPath } from "./learnerPathProjection";
+import { classifyAdaptedNodes, selectScopedFrontierTarget } from "./adaptivePathProjection";
 
 // DAG: A -> B -> D, C -> D. Difficulty A<B<C<D.
 const edges: InferredPrerequisiteEdge[] = [
@@ -22,43 +21,39 @@ function learnerState(mastery: Record<string, number>): LearnerStatePort {
   return { learnerStateRef: "L1", mastery: (id) => mastery[id] ?? 0 };
 }
 
-test("frontier advances from the goal to the hardest ready unmastered node when a prerequisite is unmastered", () => {
+test("selectScopedFrontierTarget advances from the goal to the hardest ready unmastered node in scope", () => {
   // A and C mastered, B unmastered → only B is ready (its prereq A is mastered); D
   // is not ready (prereq B unmastered). Target advances D -> B.
   const state = learnerState({ nA: 0.7, nB: 0, nC: 0.8, nD: 0 });
-  const frontier = selectFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
+  const classification = classifyAdaptedNodes({ nodeIds: allNodeIds, prerequisiteEdges: edges, difficulties, learnerState: state });
+  const frontier = selectScopedFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, classification, difficulties });
   assert.equal(frontier, "nB");
 });
 
-test("high self-report across the calibration set with no graded rows prunes them and targets the hardest ready unmastered node (Covers AE2, R13)", () => {
+test("high self-report across the calibration set makes the goal the scoped frontier", () => {
   // A, B, C all mastered at 0.7; D unmastered. D becomes ready and the frontier.
   const state = learnerState({ nA: 0.7, nB: 0.7, nC: 0.7, nD: 0 });
-  const { targetNodeId, steps } = projectAdaptivePath({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
-  assert.equal(targetNodeId, "nD");
-  const ids = steps.map((s) => s.derivedNodeId);
-  assert.deepEqual(ids, ["nD"], "mastered prerequisites are pruned; only the frontier remains");
-});
-
-test("a concept at 0.7 is pruned; one at 0.5 (partial) is retained", () => {
-  // A mastered (0.7), B partial (0.5), C mastered (0.8). B is ready+unmastered →
-  // frontier B; A is pruned from the path.
-  const state = learnerState({ nA: 0.7, nB: 0.5, nC: 0.8, nD: 0 });
-  const { targetNodeId, steps } = projectAdaptivePath({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
-  assert.equal(targetNodeId, "nB", "0.5 is below threshold so B stays a target");
-  assert.equal(steps.some((s) => s.derivedNodeId === "nA"), false, "0.7 is at threshold so A is pruned");
-});
-
-test("the adaptive path differs from the mock:empty path for the same target+enrichment", () => {
-  const adaptive = projectAdaptivePath({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: learnerState({ nA: 0.7, nB: 0.7, nC: 0.7, nD: 0 }) });
-  const mock = projectLearnerPath({ targetDerivedNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: emptyLearnerState });
-  assert.equal(mock.length, 4, "mock prunes nothing (knows nothing, threshold 1)");
-  assert.notDeepEqual(adaptive.steps.map((s) => s.derivedNodeId), mock.map((s) => s.derivedNodeId));
-});
-
-test("when nothing in scope is both ready and unmastered, the frontier falls back to the goal target", () => {
-  const state = learnerState({ nA: 1, nB: 1, nC: 1, nD: 1 }); // everything mastered
-  const frontier = selectFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
+  const classification = classifyAdaptedNodes({ nodeIds: allNodeIds, prerequisiteEdges: edges, difficulties, learnerState: state });
+  const frontier = selectScopedFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, classification, difficulties });
   assert.equal(frontier, "nD");
+  assert.equal(classification.stateByNode.nD, "frontier");
+});
+
+test("a concept at 0.7 is mastered; one at 0.5 partial stays frontier", () => {
+  // A mastered (0.7), B partial (0.5), C mastered (0.8). B is ready+unmastered →
+  // frontier B.
+  const state = learnerState({ nA: 0.7, nB: 0.5, nC: 0.8, nD: 0 });
+  const classification = classifyAdaptedNodes({ nodeIds: allNodeIds, prerequisiteEdges: edges, difficulties, learnerState: state });
+  const frontier = selectScopedFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, classification, difficulties });
+  assert.equal(frontier, "nB", "0.5 is below threshold so B stays a target");
+  assert.equal(classification.stateByNode.nA, "mastered", "0.7 is at threshold so A is mastered");
+});
+
+test("when nothing in scope is both ready and unmastered, the scoped frontier is null", () => {
+  const state = learnerState({ nA: 1, nB: 1, nC: 1, nD: 1 }); // everything mastered
+  const classification = classifyAdaptedNodes({ nodeIds: allNodeIds, prerequisiteEdges: edges, difficulties, learnerState: state });
+  const frontier = selectScopedFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, classification, difficulties });
+  assert.equal(frontier, null);
 });
 
 // --- classifyAdaptedNodes (U1, R2) -----------------------------------------
@@ -100,12 +95,12 @@ test("uncertain prerequisite edges are excluded by default, so they do not lock 
   assert.equal(included.stateByNode.nB, "locked");
 });
 
-test("selectedFrontierTarget matches selectFrontierTarget for the same inputs (shared-helper parity)", () => {
-  // nD's ancestor scope is the whole DAG, so the classifier's whole-graph frontier
+test("selectedFrontierTarget matches selectScopedFrontierTarget when the goal scope is the whole graph", () => {
+  // nD's ancestor scope is the whole DAG, so the classifier's whole-layer frontier
   // selection must agree with the scoped selector.
   const state = learnerState({ nA: 0.7, nB: 0, nC: 0.8, nD: 0 });
   const classified = classifyAdaptedNodes({ nodeIds: allNodeIds, prerequisiteEdges: edges, difficulties, learnerState: state });
-  const selected = selectFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, difficulties, learnerState: state });
+  const selected = selectScopedFrontierTarget({ targetNodeId: "nD", prerequisiteEdges: edges, classification: classified, difficulties });
   assert.equal(classified.selectedFrontierTarget, selected);
 });
 

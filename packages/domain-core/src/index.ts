@@ -1292,9 +1292,7 @@ export type DerivedGraphLayer = {
 };
 
 // ---------------------------------------------------------------------------
-// Learner Path — the vertical slice's projection output (ADR-0019). A real port
-// boundary (LearnerState) with a mock impl; population IRT/KT (ADR-0024) replaces the
-// impl, never the shape. Computed by a CLI op, rendered read-only (ADR-0011).
+// Learner Path steps — live Study Session quest-ladder output.
 // ---------------------------------------------------------------------------
 
 export type LearnerPathStep = {
@@ -1302,16 +1300,6 @@ export type LearnerPathStep = {
   derivedNodeId: string;
   difficulty: number;
   includedReason: "prerequisite" | "target";
-};
-
-export type LearnerPath = {
-  learnerPathId: string;
-  graphVersionId: string;
-  enrichmentId: string;
-  targetDerivedNodeId: string;
-  // Identifies the learner state used; the mock is "mock:empty" (knows nothing).
-  learnerStateRef: string;
-  steps: LearnerPathStep[];
 };
 
 // ---------------------------------------------------------------------------

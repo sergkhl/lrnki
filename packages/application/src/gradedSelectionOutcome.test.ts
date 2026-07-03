@@ -93,5 +93,5 @@ test("Covers AE4: the shared grader serves impostor selection — picking the im
 
 test("appendGradedSelectionOutcome imports no graph or enrichment write port", () => {
   const source = readFileSync(new URL("./gradedSelectionOutcome.ts", import.meta.url), "utf8");
-  assert.equal(/GraphVersionStorePort|EnrichmentRunStorePort|LearnerPathStorePort/.test(source), false);
+  assert.equal(/GraphVersionStorePort|EnrichmentRunStorePort/.test(source), false);
 });

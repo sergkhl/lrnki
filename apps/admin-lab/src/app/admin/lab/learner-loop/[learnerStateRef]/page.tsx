@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { LearnerLoopReview } from "@/components/LearnerLoopReview";
 import { buttonVariants } from "@/components/ui/button";
-import { getLearnerAdaptedGraphs, getLearnerLoopDetail } from "@/lib/learnerLoop";
+import { getLearnerLoopDetail } from "@/lib/learnerLoop";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +13,7 @@ export default async function LearnerLoopDetailPage({
 }: Readonly<{ params: Promise<{ learnerStateRef: string }> }>) {
   const { learnerStateRef } = await params;
   const decodedLearnerStateRef = decodeURIComponent(learnerStateRef);
-  const [detail, adaptedGraphs] = await Promise.all([
-    getLearnerLoopDetail(decodedLearnerStateRef),
-    getLearnerAdaptedGraphs(decodedLearnerStateRef)
-  ]);
+  const detail = await getLearnerLoopDetail(decodedLearnerStateRef);
   if (!detail) notFound();
   return (
     <AdminShell active="learner-loop">
@@ -26,11 +23,7 @@ export default async function LearnerLoopDetailPage({
           All learners
         </Link>
       </div>
-      <LearnerLoopReview detail={detail} adaptedGraphs={adaptedGraphs ?? {
-        learnerStateRef: detail.learnerStateRef,
-        responseSourceSummary: detail.responseSourceSummary,
-        graphs: []
-      }} />
+      <LearnerLoopReview detail={detail} />
     </AdminShell>
   );
 }

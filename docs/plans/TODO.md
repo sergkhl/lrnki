@@ -9,13 +9,15 @@
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
 
-2. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
-   learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
-   `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
-   shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
-   both learner projections share one boundary before the Learner App is built. This is
-   behavior-preserving and does not require a new ADR.
-   Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
+2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+   synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
+   textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
+   shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
+   the boundary disposition is exercised by unit tests only. Measure-first: probe deliberately fringe or
+   contested concepts, inspect the K-draw semantic dispersion, and tune temperature/threshold (or
+   confirm the concepts are genuinely core knowledge) before any `web_grounded` retrieval plan or
+   source-less lesson gating depends on this seam. Decision:
+   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
 3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
@@ -27,22 +29,13 @@
    Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
    `tmp/2026-06-30-generation-metering/`.
 
-4. **Validate learner-facing projections for anchor-less synthetic layers.** The Learner Paths view,
-   the deferred adaptive path, and anchor-based target resolution were validated only on
-   source-grounded layers. The now-landed Synthetic Topic Generation arm introduces anchor-less
-   `llm_grounded` layers those projections have never seen; the `nodeKind === "anchor"` target
-   resolution is the known assumption. Audit and adapt them beyond the Study Session already covered.
-   Decision: [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md).
-
-5. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
-   synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
-   textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
-   shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
-   the boundary disposition is exercised by unit tests only. Measure-first: probe deliberately fringe or
-   contested concepts, inspect the K-draw semantic dispersion, and tune temperature/threshold (or
-   confirm the concepts are genuinely core knowledge) before any `web_grounded` retrieval plan or
-   source-less lesson gating depends on this seam. Decision:
-   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+4. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
+   learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
+   `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
+   shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
+   both learner projections share one boundary before the Learner App is built. This is
+   behavior-preserving and does not require a new ADR.
+   Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 ## COMPLETED
 
@@ -55,6 +48,13 @@
   [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Legacy persisted Learner Path stack retired.** The pre-Quest-Subgraph persisted path write/read
+  stack is gone: worker path commands, path tables, path store/read adapters, Admin Lab `/paths`, and
+  learner-loop path/coverage panels were deleted. The live Study Session remains the Learner Path
+  projection for source-grounded and anchor-less synthetic Derived Graph Layers. Requirements:
+  [brainstorm](../brainstorms/2026-07-03-anchor-less-learner-path-audit-requirements.md). Decision:
+  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md).
 
 - **Concept Lesson gist as a framing hook distinct from the definition.** The `gist` is now
   generated as the concept's framing hook — the problem it solves, why it matters, or the tension it
@@ -131,6 +131,22 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Persisted Learner Path retirement, 2026-07-03.** Deterministic envelope: `pnpm run check` exit 0
+  after the deletion (0 ESLint errors, 2 pre-existing warnings outside this diff). Targeted gates also
+  passed: `@lrnki/application` tests/typecheck, `@lrnki/kg-worker` tests/typecheck,
+  `@lrnki/infrastructure-postgres` tests with `.env` loaded, and Admin Lab tests/typecheck/build.
+  Schema reset/migration succeeded; `to_regclass('public.learner_paths')` and
+  `to_regclass('public.learner_path_steps')` both returned null. Reference sweep over `apps`,
+  `packages`, and `scripts` found no deleted path commands, stores, read models, tables, or legacy
+  projection helpers. **Real-use gate (rule 14):** a source-grounded Rust fixture ran through real
+  extraction, graph version build, enrichment, Study Item Bank generation, and synthetic learner
+  verdict seeding. A separate anchor-less synthetic `introductory fractions` layer generated with
+  `graphVersionId: null`, 12 nodes, 11 committed edges, and study items. Direct `getStudySession`
+  inspection showed the source-grounded Copy trait quest and synthetic Addition/Subtraction of
+  Fractions quest both project live stateful paths, frontier targets, and study segments without any
+  persisted path row. **Result: PASS.** Trail: `tmp/real-use-rust-manifest.json` and
+  `tmp/real-use-study-session-inspection.json`.
 
 - **Quest-quality Study Item Bank fixes, 2026-07-03.** Deterministic envelope: `pnpm run check`
   exit 0 after the final prompt and comment cleanup (0 ESLint errors, 2 pre-existing warnings

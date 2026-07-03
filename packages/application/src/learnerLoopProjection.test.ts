@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CalibrationVerdict, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
-import { buildMasteryMap, dedupeEnrichmentScopes, detectConflicts, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoopProjection";
+import { buildMasteryMap, detectConflicts, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoopProjection";
 
 let seq = 0;
 function verdict(derivedNodeId: string, v: Verdict, learnerStateRef = "L1"): CalibrationVerdict {
@@ -64,20 +64,6 @@ test("summarizeLearnerStates includes a learner with verdicts but no graded rows
   assert.equal(summaries[0].latestResponseAt, null);
   assert.equal(summaries[0].knownVerdictCount, 1);
   assert.equal(summaries[0].responseCount, 0);
-});
-
-test("dedupeEnrichmentScopes: two enrichments yield two entries; duplicates collapse keeping the first (latest-first input)", () => {
-  assert.deepEqual(
-    dedupeEnrichmentScopes([{ enrichmentId: "e1" }, { enrichmentId: "e2" }]).map((s) => s.enrichmentId),
-    ["e1", "e2"]
-  );
-  // Loaders return paths created_at DESC, so the first row for an enrichment is the latest.
-  const collapsed = dedupeEnrichmentScopes([
-    { enrichmentId: "e1", target: "latest" },
-    { enrichmentId: "e1", target: "older" }
-  ]);
-  assert.equal(collapsed.length, 1);
-  assert.equal(collapsed[0].target, "latest");
 });
 
 test("summarizeResponseSources: mixed, all-synthetic, and all-human tallies", () => {

@@ -32,7 +32,6 @@ import type {
   WholeSetOrdering,
   GraphSnapshot,
   InferredPrerequisiteEdge,
-  LearnerPath,
   NonCoreRescueCandidate,
   MissingPrerequisiteProposal,
   MintingDurabilityJudgment,
@@ -436,13 +435,6 @@ export interface EnrichmentRunStorePort {
   nonCoreRescueCandidates(graphVersionId: string): Promise<NonCoreRescueCandidate[]>;
 }
 
-// Learner Path persistence (ADR-0019, ADR-0011). The read-only surface the
-// Cytoscape view renders; the CLI computes and persists, the UI never computes.
-export interface LearnerPathStorePort {
-  persist(path: LearnerPath): Promise<void>;
-  getPath(input: { enrichmentId: string; targetDerivedNodeId: string; learnerStateRef: string }): Promise<LearnerPath | undefined>;
-}
-
 // ---------------------------------------------------------------------------
 // Learner Study Loop ports (R7–R16, ADR-0026). Learner-neutral typed Study Item Bank
 // plus the durable append-only Response Log. All learner structures are projection-only:
@@ -829,91 +821,20 @@ export interface EnrichmentInspectionReadPort {
   getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
 }
 
-// Learner Path inspection read surface (ADR-0027, ADR-0011). Paths are computed and
-// persisted by the CLI; the Admin Lab only reads them and never computes (AGENTS rule 12).
-// Pure inspection: the storage adapter owns the path/step/DAG SQL and row-stitch; the UI
-// renders the finished model. The learner-recall subject identity is `derived_node_id`
-// throughout (ADR-0026).
-export interface LearnerPathSummary {
-  learnerPathId: string;
-  targetDerivedNodeId: string;
-  targetLabel: string;
-  declaredDomain: string;
-  learnerStateRef: string;
-  stepCount: number;
-  graphVersionId: string;
-  enrichmentId: string;
-  createdAt: string;
-}
-
-export interface LearnerPathNode {
-  derivedNodeId: string;
-  label: string;
-  difficulty: number | null;
-  inPath: boolean;
-  position: number | null;
-  isTarget: boolean;
-}
-
-export interface LearnerPathEdge {
-  prerequisiteDerivedNodeId: string;
-  dependentDerivedNodeId: string;
-  confidence: number;
-  uncertain: boolean;
-  inPath: boolean;
-}
-
-export interface LearnerPathDetail {
-  summary: LearnerPathSummary;
-  steps: { position: number; derivedNodeId: string; label: string; difficulty: number; includedReason: string; groundingOrigin: string }[];
-  // The inferred prerequisite DAG of the path's enrichment, scoped to the target's
-  // Declared Domain (prerequisites are always same-domain, ADR-0015).
-  nodes: LearnerPathNode[];
-  edges: LearnerPathEdge[];
-}
-
-export interface LearnerPathInspectionReadPort {
-  listLearnerPaths(): Promise<LearnerPathSummary[]>;
-  getLearnerPathDetail(learnerPathId: string): Promise<LearnerPathDetail | undefined>;
-}
-
-// Learner Loop inspection read surface (ADR-0027, KTD7). The learner-loop history/coverage
-// reads are pure inspection — the storage adapter owns the joined-history SQL, the
-// learner-state list reads, the path-scope read, and the coverage stitch (including the
-// no-item fallback reason). The application's learner-loop projection use-cases add the
-// conflict/mastery/summary folds and the adapted-graph classify over these rows. Row shapes
-// are read-model types: the response rows carry the joined node label + question alongside
-// the full append-only Response Log row so a use-case can both render and re-fold from one
-// read.
+// Learner Loop inspection read surface (ADR-0027, KTD7). The learner-loop history reads are
+// pure inspection: the storage adapter owns the all-learner response/verdict reads and the
+// per-learner joined history. The application's learner-loop projection use-cases add the
+// conflict/mastery/summary folds over these rows. Row shapes are read-model types: the
+// response rows carry the joined node label + question alongside the full append-only
+// Response Log row so a use-case can both render and re-fold from one read.
 export type LearnerLoopResponseRow = ResponseLogRow & { createdAt: string };
 export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string };
-
-export type LearnerLoopPathScope = { enrichmentId: string; targetDerivedNodeId: string; targetLabel: string };
-
-export type PathStudyItemCoverageStep = {
-  position: number;
-  derivedNodeId: string;
-  label: string;
-  groundingOrigin: string;
-  includedReason: string;
-  studyItem: { studyItemId: string; question: string; provenance: "source_cep" | "source_mentioned" | "generated" } | null;
-  fallbackReason: string | null;
-};
-
-export type PathStudyItemCoverage = {
-  enrichmentId: string;
-  targetDerivedNodeId: string;
-  targetLabel: string;
-  steps: PathStudyItemCoverageStep[];
-};
 
 export interface LearnerLoopReadPort {
   listAllResponses(): Promise<LearnerLoopResponseRow[]>;
   listAllVerdicts(): Promise<CalibrationVerdict[]>;
   listResponsesForLearner(learnerStateRef: string): Promise<LearnerLoopResponseDetailRow[]>;
   listVerdictsForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]>;
-  listPathScopesForLearner(learnerStateRef: string): Promise<LearnerLoopPathScope[]>;
-  listCoverageForLearner(learnerStateRef: string): Promise<PathStudyItemCoverage[]>;
 }
 
 // ---------------------------------------------------------------------------

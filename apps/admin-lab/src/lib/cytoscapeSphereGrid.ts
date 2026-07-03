@@ -48,7 +48,7 @@ export function applySphereGridLayout(cy: Core, isStale: () => boolean, focusNod
   const layoutNodes: SphereGridNodeInput[] = nodes.map((node) => ({
     id: node.id(),
     label: String(node.data("label") ?? node.id()),
-    // Single-domain canvases (the learner path) carry no `domain`; they collapse into one
+    // Single-domain canvases carry no `domain`; they collapse into one
     // loop/region. Same-domain edges guarantee no inter-region edge either way.
     domain: typeof node.data("domain") === "string" ? node.data("domain") : "",
     difficulty: typeof node.data("difficulty") === "number" ? node.data("difficulty") : null

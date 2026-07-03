@@ -4,16 +4,12 @@ import path from "node:path";
 import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
-  computeLearnerPath,
   createIntrinsicDifficultyPort,
-  emptyLearnerState,
   resolveConceptIdentity,
   runExtractionOverSources,
   type ExtractionSourceUnit,
   generateStudyItemBank,
-  loadResponseLogLearnerState,
   synthesizeResponses,
-  ADAPTIVE_MASTERY_THRESHOLD,
   runGraphEnrichment,
   runSyntheticGeneration,
   bottleneckReport,
@@ -63,7 +59,6 @@ import {
   PostgresResponseLogStore,
   PostgresCalibrationVerdictStore,
   PostgresGraphVersionStore,
-  PostgresLearnerPathStore,
   PostgresSourceRegistrationStore,
   PostgresRunProgressReporter,
   PostgresOperationTimelineRead,
@@ -225,8 +220,6 @@ function buildContext() {
     nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
     difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
-    learnerState: emptyLearnerState,
-    pathStore: new PostgresLearnerPathStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays
     // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
     // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
@@ -464,41 +457,6 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
   }
 }
 
-async function computeLearnerPathCommand(ctx: Context, enrichmentId?: string, targetRef?: string) {
-  if (!enrichmentId || !targetRef) {
-    console.error("! compute-learner-path requires <enrichmentId> <target>.");
-    process.exitCode = 1;
-    return;
-  }
-  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
-  if (!layer) {
-    console.error(`! enrichment ${enrichmentId} not found.`);
-    process.exitCode = 1;
-    return;
-  }
-  // `target` is an operator-friendly reference: an anchor concept_id (resolved to its
-  // derived node) or a derived_node_id directly. The learner path subject identity is
-  // always the derived node (ADR-0026).
-  const resolvedTargetId =
-    layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId ??
-    targetRef;
-  const learnerPathId = randomUUID();
-  console.log(`\n>> learner path ${learnerPathId} for target ${targetRef} from enrichment ${enrichmentId}`);
-  const path = await computeLearnerPath({
-    learnerPathId,
-    enrichmentId,
-    targetDerivedNodeId: resolvedTargetId,
-    enrichmentStore: ctx.enrichmentStore,
-    learnerState: ctx.learnerState,
-    pathStore: ctx.pathStore,
-    artifacts: ctx.artifacts
-  });
-  console.log(`   learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
-  for (const step of path.steps) {
-    console.log(`   #${step.position} [${step.includedReason}] ${step.derivedNodeId} (difficulty=${step.difficulty.toFixed(2)})`);
-  }
-}
-
 async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, targetDerivedNodeId?: string, learnerStateRef?: string) {
   if (!enrichmentId || !targetDerivedNodeId || !learnerStateRef) {
     console.error("! synthesize-responses requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
@@ -526,50 +484,6 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     verdictStore: ctx.verdictStore
   });
   console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount}`);
-}
-
-async function computeAdaptivePathCommand(ctx: Context, enrichmentId?: string, targetRef?: string, learnerStateRef?: string) {
-  if (!enrichmentId || !targetRef || !learnerStateRef) {
-    console.error("! compute-adaptive-path requires <enrichmentId> <target> <learnerStateRef>.");
-    process.exitCode = 1;
-    return;
-  }
-  const layer = await ctx.enrichmentStore.getLayer(enrichmentId);
-  if (!layer) {
-    console.error(`! enrichment ${enrichmentId} not found.`);
-    process.exitCode = 1;
-    return;
-  }
-  // `target` is an anchor concept_id; the projection works in derived-node space, so
-  // resolve it to the goal anchor's derived node (ADR-0026).
-  const targetNodeId = layer.derivedNodes.find((node) => node.nodeKind === "anchor" && node.conceptId === targetRef)?.derivedNodeId;
-  if (!targetNodeId) {
-    console.error(`! target concept ${targetRef} is not an anchor in enrichment ${enrichmentId}.`);
-    process.exitCode = 1;
-    return;
-  }
-  const learnerState = await loadResponseLogLearnerState({
-    responseLog: ctx.responseLogStore,
-    learnerStateRef
-  });
-
-  const learnerPathId = randomUUID();
-  console.log(`\n>> adaptive path ${learnerPathId} for goal ${targetRef} / learner ${learnerStateRef} (threshold=${ADAPTIVE_MASTERY_THRESHOLD})`);
-  const path = await computeLearnerPath({
-    learnerPathId,
-    enrichmentId,
-    targetDerivedNodeId: targetNodeId,
-    enrichmentStore: ctx.enrichmentStore,
-    learnerState,
-    pathStore: ctx.pathStore,
-    artifacts: ctx.artifacts,
-    masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD,
-    frontierAdvance: true
-  });
-  console.log(`   advancedTarget=${path.targetDerivedNodeId} learnerState=${path.learnerStateRef} steps=${path.steps.length}`);
-  for (const step of path.steps) {
-    console.log(`   #${step.position} [${step.includedReason}] ${step.derivedNodeId} (difficulty=${step.difficulty.toFixed(2)})`);
-  }
 }
 
 // Bottleneck report renderer for code agents (ADR-0029): a per-stage table of
@@ -742,17 +656,11 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "generate-synthetic-layer":
       await generateSyntheticLayer(ctx, arg, rest[0]);
       break;
-    case "compute-learner-path":
-      await computeLearnerPathCommand(ctx, arg, rest[0]);
-      break;
     case "generate-study-items":
       await generateStudyItemsCommand(ctx, arg, rest);
       break;
     case "synthesize-responses":
       await synthesizeResponsesCommand(ctx, arg, rest[0], rest[1]);
-      break;
-    case "compute-adaptive-path":
-      await computeAdaptivePathCommand(ctx, arg, rest[0], rest[1]);
       break;
     case "list-sources":
       await listSources(ctx);
@@ -764,7 +672,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | compute-learner-path <enrichmentId> <targetDerivedNodeId> | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | compute-adaptive-path <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

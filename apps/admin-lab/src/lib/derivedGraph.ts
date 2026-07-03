@@ -1,7 +1,7 @@
 // Pure, JSX-free view-model for the Derived Graph Layer (ADR-0019). A Derived
 // Graph Layer is the inferred prerequisite DAG of one Enrichment Run over a
 // published version — kept SEPARATE from the published asserted layer (which has
-// zero edges, AE4) and from learner paths. These helpers are unit-testable under
+// zero edges, AE4) and from learner-specific projections. These helpers are unit-testable under
 // `tsx --test` and feed both the Cytoscape render and its required equivalent
 // textual node-and-edge representation (U6 test scenario 8).
 
