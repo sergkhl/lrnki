@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LEARNER_VOCABULARY, encodeLearnerStateRef, learnerTerm, type LearnerVocabularyKey } from "./vocabulary";
+import { LEARNER_VOCABULARY, encodeLearnerStateRef, learnerTerm, lessonSectionHeading, type LearnerVocabularyKey } from "./vocabulary";
 
 const USED_KEYS = [
   "routeName",
   "learnerRefLabel",
   "learnerRefPlaceholder",
   "enterAction",
-  "camp",
   "theoryStop",
-  "itemStop",
+  "question",
+  "spotTheFake",
   "capstone",
   "nextStop",
   "mastered",
@@ -17,8 +17,11 @@ const USED_KEYS = [
   "locked",
   "known",
   "examine",
-  "answer",
+  "continueAction",
+  "returnToTrail",
+  "submitAnswer",
   "skipKnown",
+  "groundedTooltip",
   "journal",
   "gemCollection",
   "surveyMap",
@@ -37,4 +40,13 @@ test("learnerTerm returns text for every learner UI key", () => {
 test("encodeLearnerStateRef trims, compacts, and URL-encodes learner refs", () => {
   assert.equal(encodeLearnerStateRef("  Ada   Lovelace  "), "Ada%20Lovelace");
   assert.equal(encodeLearnerStateRef("Cohort/One"), "Cohort%2FOne");
+});
+
+test("lessonSectionHeading maps section kinds to learner-facing headings", () => {
+  assert.equal(lessonSectionHeading("gist"), "In a nutshell");
+  assert.equal(lessonSectionHeading("intuition"), "Intuition");
+  assert.equal(lessonSectionHeading("definition"), "Definition");
+  assert.equal(lessonSectionHeading("examples"), "Examples");
+  assert.equal(lessonSectionHeading("applications"), "Where it applies");
+  assert.equal(lessonSectionHeading("formulas"), "Formulas");
 });

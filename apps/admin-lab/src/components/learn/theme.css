@@ -10,6 +10,7 @@
   --journal-gem-soft: #cbe7df;
   --journal-fog: #8d887c;
   --journal-frontier: #9c5f2b;
+  --journal-halo: rgb(156 95 43 / 0.28);
   min-height: 100svh;
   background:
     linear-gradient(180deg, rgb(247 240 222 / 0.96), rgb(238 228 205 / 0.98)),
