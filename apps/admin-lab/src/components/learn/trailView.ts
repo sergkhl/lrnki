@@ -23,13 +23,8 @@ export type TrailCluster = {
   stops: TrailStop[];
 };
 
-export type TrailCamp = {
-  topologicalDepth: number;
-  clusters: TrailCluster[];
-};
-
 export type TrailView = {
-  camps: TrailCamp[];
+  concepts: TrailCluster[];
   nextStopId: string | null;
   fogBoundaryStopId: string | null;
   masteredCount: number;
@@ -46,9 +41,10 @@ export function buildTrailView(session: StudySession): TrailView {
     const stops: TrailStop[] = [];
     const addStop = (kind: TrailStopKind, studyItemId: string | null) => {
       const stopId = `${step.derivedNodeId}:${kind}:${studyItemId ?? "main"}`;
-      const isNext = !nextStopAssigned && step.derivedNodeId === nextNodeId && baseState !== "complete";
+      const state = stateForStop({ baseState, kind, studyItemId, session });
+      const isNext = !nextStopAssigned && step.derivedNodeId === nextNodeId && state !== "complete";
       if (isNext) nextStopAssigned = true;
-      stops.push({ stopId, kind, derivedNodeId: step.derivedNodeId, label, state: baseState, isNext, isFogged: baseState === "locked", studyItemId });
+      stops.push({ stopId, kind, derivedNodeId: step.derivedNodeId, label, state, isNext, isFogged: baseState === "locked", studyItemId });
     };
 
     if (session.lessonByNode[step.derivedNodeId]) addStop("theory", null);
@@ -67,22 +63,24 @@ export function buildTrailView(session: StudySession): TrailView {
     };
   });
 
-  const camps = new Map<number, TrailCluster[]>();
-  for (const cluster of clusters) {
-    camps.set(cluster.topologicalDepth, [...(camps.get(cluster.topologicalDepth) ?? []), cluster]);
-  }
-
   const nextStopId = clusters.flatMap((cluster) => cluster.stops).find((stop) => stop.isNext)?.stopId ?? null;
   return {
-    camps: [...camps.entries()]
-      .sort(([a], [b]) => a - b)
-      .map(([topologicalDepth, campClusters]) => ({
-        topologicalDepth,
-        clusters: campClusters.sort((a, b) => a.label.localeCompare(b.label))
-      })),
+    concepts: clusters,
     nextStopId,
     fogBoundaryStopId: nextStopId,
     masteredCount: clusters.filter((cluster) => cluster.state === "mastered").length,
     totalClusters: clusters.length
   };
+}
+
+function stateForStop(input: {
+  baseState: TrailStopState;
+  kind: TrailStopKind;
+  studyItemId: string | null;
+  session: StudySession;
+}): TrailStopState {
+  if (input.kind === "theory" || input.kind === "capstone") return input.baseState;
+  if (input.baseState === "locked") return "locked";
+  if (!input.studyItemId) return input.baseState;
+  return input.session.latestOutcomeByStudyItemId[input.studyItemId] === "correct" ? "complete" : input.baseState;
 }

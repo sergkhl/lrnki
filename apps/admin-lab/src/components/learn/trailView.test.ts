@@ -5,13 +5,13 @@ import { buildTrailView } from "./trailView";
 
 test("buildTrailView emits theory before item stops and capstone last", () => {
   const view = buildTrailView(session());
-  const stops = view.camps[0].clusters[0].stops;
+  const stops = view.concepts[0].stops;
   assert.deepEqual(stops.map((stop) => stop.kind), ["theory", "option_select", "impostor", "capstone"]);
 });
 
 test("buildTrailView emits item stops only before capstone when a node has no lesson", () => {
   const view = buildTrailView(session({ withoutLesson: true }));
-  const stops = view.camps[0].clusters[0].stops;
+  const stops = view.concepts[0].stops;
   assert.deepEqual(stops.map((stop) => stop.kind), ["option_select", "impostor", "capstone"]);
 });
 
@@ -19,17 +19,29 @@ test("buildTrailView marks exactly one next stop across the trail", () => {
   const view = buildTrailView(session());
   assert.equal(view.nextStopId, "n1:theory:main");
   assert.equal(view.fogBoundaryStopId, "n1:theory:main");
-  assert.equal(view.camps.flatMap((camp) => camp.clusters).flatMap((cluster) => cluster.stops).filter((stop) => stop.isNext).length, 1);
+  assert.equal(view.concepts.flatMap((concept) => concept.stops).filter((stop) => stop.isNext).length, 1);
 });
 
 test("buildTrailView fogs locked territory and leaves frontier stops clear", () => {
   const view = buildTrailView(session({ includeLocked: true }));
-  const stops = view.camps.flatMap((camp) => camp.clusters).flatMap((cluster) => cluster.stops);
+  const stops = view.concepts.flatMap((concept) => concept.stops);
   assert.equal(stops.find((stop) => stop.derivedNodeId === "n1")?.isFogged, false);
   assert.equal(stops.find((stop) => stop.derivedNodeId === "n2")?.isFogged, true);
 });
 
-function session(opts: { withoutLesson?: boolean; includeLocked?: boolean } = {}): StudySession {
+test("buildTrailView keeps a flat ordered concept list", () => {
+  const view = buildTrailView(session({ includeLocked: true }));
+  assert.deepEqual(view.concepts.map((concept) => concept.derivedNodeId), ["n1", "n2"]);
+});
+
+test("buildTrailView fills study item stops only when their latest item outcome is correct", () => {
+  const view = buildTrailView(session({ latestOutcomeByStudyItemId: { i1: "correct", i2: "incorrect" } }));
+  const stops = view.concepts[0].stops;
+  assert.equal(stops.find((stop) => stop.studyItemId === "i1")?.state, "complete");
+  assert.equal(stops.find((stop) => stop.studyItemId === "i2")?.state, "available");
+});
+
+function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; latestOutcomeByStudyItemId?: StudySession["latestOutcomeByStudyItemId"] } = {}): StudySession {
   const nodes = [{
     derivedNodeId: "n1",
     label: "Ownership",
@@ -95,6 +107,7 @@ function session(opts: { withoutLesson?: boolean; includeLocked?: boolean } = {}
     restorations: [],
     sheetByNode: {},
     verdictByNode: {},
+    latestOutcomeByStudyItemId: opts.latestOutcomeByStudyItemId ?? {},
     studySegmentsByNode: {
       n1: [
         { kind: "option_select", item: { studyItemId: "i1", derivedNodeId: "n1", question: "Q?", groundingProvenance: "generated", options: [] } },
