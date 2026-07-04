@@ -13,20 +13,21 @@ const WINDING_STEP_PX = 28;
 
 export function CheckpointPath({ view, session }: Readonly<{ view: TrailView; session: StudySession }>) {
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
-  let globalStopIndex = 0;
   return (
     <>
       <div className="relative mx-auto flex w-full max-w-sm flex-col gap-5 overflow-hidden px-2 py-2">
         <svg aria-hidden className="pointer-events-none absolute left-1/2 top-0 h-full w-8 -translate-x-1/2 text-[color:var(--journal-trail-muted)]">
           <line x1="16" x2="16" y1="0" y2="100%" stroke="currentColor" strokeWidth="3" strokeDasharray="8 8" />
         </svg>
-        {view.concepts.map((concept) => (
+        {view.concepts.map((concept, conceptIndex) => (
           <section key={concept.derivedNodeId} className="relative z-10 flex flex-col gap-3">
             <ConceptMarker concept={concept} session={session} />
             <div className="flex flex-col gap-3">
-              {concept.stops.map((stop) => {
+              {concept.stops.map((stop, stopIndex) => {
+                const globalStopIndex = view.concepts
+                  .slice(0, conceptIndex)
+                  .reduce((count, priorConcept) => count + priorConcept.stops.length, stopIndex);
                 const offset = WINDING_OFFSETS[globalStopIndex % WINDING_OFFSETS.length] * WINDING_STEP_PX;
-                globalStopIndex += 1;
                 return (
                   <CheckpointStopRow
                     key={stop.stopId}

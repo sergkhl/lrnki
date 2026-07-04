@@ -31,11 +31,13 @@
 
 ## COMPLETED
 
-- **Learner App map-centered trail, activity sheet, and charting onboarding.** `/learn` now centers
-  the Expedition Journal on the trail, with fog display derived from Study Session state, one stop
-  opening one full-screen activity sheet, a single Journal route replacing the learner map, topic-first
-  charting with editable inferred Declared Domain, fiction-voiced charting stage copy, and an Admin Lab
-  door that ensures a playable `admin` expedition before redirecting. Requirements:
+- **Learner App checkpoint trail, activity sheet, and charting onboarding.** `/learn` now centers
+  the Expedition Journal on a Duolingo-style per-item checkpoint path, with fog display and per-item
+  completion derived from Study Session state, one stop opening one full-screen activity sheet with a
+  single primary footer action, opaque learner surfaces, headed lesson sections, icon-only grounded
+  provenance, concept-level skip popovers, a single Journal route replacing the learner map,
+  topic-first charting with editable inferred Declared Domain, fiction-voiced charting stage copy, and
+  an Admin Lab door that ensures a playable `admin` expedition before redirecting. Requirements:
   [brainstorm](../brainstorms/2026-07-04-learner-app-map-center-ux-requirements.md). Decision:
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
@@ -133,20 +135,18 @@
 
 ## VALIDATION
 
-- **Learner App map-centered trail, activity sheet, and charting onboarding, 2026-07-04.**
+- **Learner App checkpoint trail, activity sheet, and charting onboarding, 2026-07-04.**
   Deterministic envelope: `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint
   with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
   `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests, and
   `@lrnki/infrastructure-litellm` tests. Browser checks on `http://localhost:3000` passed for the
   real seeded enrichment `aa0e5b08-1510-4969-92b5-d2aabdf4f1b6`: desktop and 390px mobile expedition
-  pages showed the Journal-only nav and trail next stop; mobile activity sheet measured full-screen
-  at 390x844; no page or console errors. **Real-use quality evaluation:** the new
-  `kg-domain-inference` alias returned `Cognitive Psychology` for the real topic "Build intuition for
-  spaced practice and retrieval-based learning"; the Admin Lab door created then reused exactly one
-  `admin` learner expedition for the seeded enrichment, and `getStudySession` resolved a playable
-  session with 31 study items. Screenshots: `tmp/learner-expedition-desktop.png`,
-  `tmp/activity-sheet-desktop.png`, `tmp/learner-expedition-mobile.png`, and
-  `tmp/activity-sheet-mobile.png`. **Result: PASS.**
+  pages showed checkpoint circles, concept markers, the fog band, and no visible raw provenance/item
+  enums; the theory sheet showed headed single-block notes with Continue-only footer and no skip
+  action; the question sheet enforced select → Check → feedback → Continue, wrapped option text at
+  390px, and filled the question circle after a latest-correct retry; the concept-marker skip action
+  reduced locked activity buttons from 32 to 28. **Real-use quality evaluation:** PASS for the seeded
+  `admin` learner expedition. Screenshots and reports: `tmp/learner-checkpoint-ux/`.
 
 - **Learner App Expedition Journal surface, 2026-07-04.** Deterministic envelope:
   `pnpm run check` exit 0 after the review-fix pass (full workspace typecheck, recursive tests,

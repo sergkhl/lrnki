@@ -9,7 +9,6 @@ import { learnerTerm } from "./vocabulary";
 export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop; onSelect: (stopId: string) => void }>) {
   const disabled = stop.state === "locked";
   const label = `${labelForStop(stop)}: ${stop.label}`;
-  const Icon = iconForStop(stop);
   return (
     <div className="relative flex w-24 flex-col items-center gap-2">
       {stop.isNext ? (
@@ -37,7 +36,7 @@ export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop;
           if (!disabled) onSelect(stop.stopId);
         }}
       >
-        {stop.state === "complete" ? <CheckIcon /> : stop.state === "locked" ? <LockIcon /> : <Icon />}
+        {iconForStop(stop)}
       </button>
       {stop.isNext ? (
         <span className="max-w-24 text-center text-xs font-medium leading-tight text-[color:var(--journal-ink)]">
@@ -49,10 +48,12 @@ export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop;
 }
 
 function iconForStop(stop: TrailStop) {
-  if (stop.kind === "theory") return BookOpenIcon;
-  if (stop.kind === "option_select") return MapPinIcon;
-  if (stop.kind === "impostor") return SearchIcon;
-  return GemIcon;
+  if (stop.state === "complete") return <CheckIcon />;
+  if (stop.state === "locked") return <LockIcon />;
+  if (stop.kind === "theory") return <BookOpenIcon />;
+  if (stop.kind === "option_select") return <MapPinIcon />;
+  if (stop.kind === "impostor") return <SearchIcon />;
+  return <GemIcon />;
 }
 
 function labelForStop(stop: TrailStop): string {
