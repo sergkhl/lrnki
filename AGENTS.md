@@ -79,7 +79,7 @@ definitions and repair their references in the same change.
     practices. Prefer a conventional root-cause solution. Record why a bespoke approach is necessary
     if established methods conflict with this architecture or the learner-neutral contract.
 
-22. Prioritize the future Learner App's game UX under
+22. Prioritize the Learner App's game UX under
     [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Playful,
     delightful UX is a first-class goal of learner-facing projections, but this priority lives only
     downstream and never relaxes the learner-neutral core

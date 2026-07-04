@@ -135,9 +135,8 @@ _Avoid_: verbatim evidence, source quote, Concept Evidence Profile
 
 **Synthetic Topic Generation**:
 The second derived-fact-producing operation. From a `topic` plus a Declared Domain it generates a
-free-standing, **anchor-less** Derived Graph Layer of `synthetic_primary` nodes with a null
-published-version link, gated per concept by the Knowledge-Boundary Probe. It runs no Extraction Run
-and no Graph-Version Build and never writes the asserted graph. Owned by
+free-standing, **anchor-less** Derived Graph Layer of `synthetic_primary` nodes, gated per concept
+by the Knowledge-Boundary Probe. Its lifecycle and asserted-graph boundaries are owned by
 [ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
 _Avoid_: synthetic Grounding Origin, asserted synthetic concept, curated-source treatment of generated text
 
@@ -148,10 +147,9 @@ provenance is owned by [ADR-0023](docs/adr/0023-grounding-origin-model-and-cross
 _Avoid_: minted prerequisite, `source_mentioned`, published concept
 
 **Knowledge-Boundary Probe**:
-The per-concept gate for Synthetic Topic Generation: a small cross-family LiteLLM alias answers K
-times at moderate temperature, and semantic agreement measured with the existing embedding port
-yields `core_knowledge` (synthesize) or `boundary` (an `uncertain` disposition, retained and
-inspectable but held out of trusted learner surfaces). Owned by
+The per-concept gate for source-less synthesis that classifies a concept as `core_knowledge`
+(synthesize) or `boundary` (an `uncertain` disposition, retained and inspectable but held out of
+trusted learner surfaces). Probe mechanism and rationale are owned by
 [ADR-0030](docs/adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 _Avoid_: verbalized confidence, lexical overlap, new judge
 
