@@ -1,0 +1,68 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { CheckCircle2Icon } from "lucide-react";
+import type { StudySession } from "@lrnki/application";
+import { refreshLearnerExpedition, setLearnerVerdict } from "@/app/learn/[learnerStateRef]/actions";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { GemCapstone } from "./GemCapstone";
+import type { TrailCluster } from "./trailView";
+import { learnerTerm } from "./vocabulary";
+
+export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailCluster; session: StudySession }>) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const isMastered = concept.state === "mastered";
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-3 py-2 text-left shadow-sm"
+          />
+        }
+      >
+        <span className="min-w-0 truncate text-sm font-semibold">{concept.label}</span>
+        <GemCapstone collected={isMastered} />
+      </PopoverTrigger>
+      <PopoverContent className="flex flex-col gap-3 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-semibold">{concept.label}</p>
+          <p className="text-sm text-muted-foreground">
+            {stateLabel(concept.state)} · {concept.stops.length} stops
+          </p>
+        </div>
+        {!isMastered ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={() => {
+              startTransition(async () => {
+                await setLearnerVerdict({
+                  learnerStateRef: session.learnerStateRef,
+                  enrichmentId: session.enrichmentId,
+                  derivedNodeId: concept.derivedNodeId,
+                  verdict: "known"
+                });
+                await refreshLearnerExpedition({ learnerStateRef: session.learnerStateRef, enrichmentId: session.enrichmentId });
+                setOpen(false);
+              });
+            }}
+          >
+            <CheckCircle2Icon data-icon="inline-start" />
+            {learnerTerm("skipKnown")}
+          </Button>
+        ) : null}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function stateLabel(state: TrailCluster["state"]): string {
+  if (state === "mastered") return learnerTerm("mastered");
+  if (state === "frontier") return learnerTerm("frontier");
+  return learnerTerm("locked");
+}

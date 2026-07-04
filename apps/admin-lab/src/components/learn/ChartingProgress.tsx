@@ -25,9 +25,18 @@ export async function ChartingProgress({ expedition }: Readonly<{ expedition: Le
         <CardDescription>{expedition.status === "failed" ? expedition.failureMessage ?? "Charting failed." : stalled ? "Charting has stopped reporting progress." : stageCopy(currentStage)}</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Badge variant={expedition.status === "failed" || stalled ? "destructive" : "secondary"}>{stalled ? "stalled" : expedition.status}</Badge>
-        {expedition.currentOperationType ? <Badge variant="outline">{expedition.currentOperationType}</Badge> : null}
+        <Badge variant={expedition.status === "failed" || stalled ? "destructive" : "secondary"}>
+          {stalled ? "Stalled" : expeditionStatusLabel(expedition.status)}
+        </Badge>
+        {expedition.currentOperationType ? <Badge variant="outline">Charting run</Badge> : null}
       </CardContent>
     </Card>
   );
+}
+
+function expeditionStatusLabel(status: LearnerExpedition["status"]): string {
+  if (status === "ready") return "Ready";
+  if (status === "charting") return "Charting";
+  if (status === "failed") return "Charting stopped";
+  return "Archived";
 }

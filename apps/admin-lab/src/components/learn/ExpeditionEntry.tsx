@@ -48,11 +48,11 @@ export function ExpeditionEntry({
                   learnerExpeditionId: expedition.learnerExpeditionId,
                   enrichmentId: expedition.enrichmentId
                 });
-              }} className="flex items-center gap-3 rounded-md border border-[color:var(--journal-line)] bg-background/50 p-3">
+              }} className="flex items-center gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3">
                 <MapIcon />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{expedition.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{expedition.status}{expedition.active ? " · active" : ""}</p>
+                  <p className="truncate text-xs text-muted-foreground">{expeditionStatusLabel(expedition.status)}{expedition.active ? " · active" : ""}</p>
                 </div>
                 <Button type="submit" size="sm" variant={expedition.active ? "secondary" : "outline"} disabled={expedition.status !== "ready"}>
                   <ArrowRightIcon data-icon="inline-start" />
@@ -79,6 +79,13 @@ export function ExpeditionEntry({
       </section>
     </div>
   );
+}
+
+function expeditionStatusLabel(status: LearnerExpeditionEntry["learnerExpeditions"][number]["status"]): string {
+  if (status === "ready") return "Ready";
+  if (status === "charting") return "Charting";
+  if (status === "failed") return "Charting stopped";
+  return "Archived";
 }
 
 function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRef: string; candidate: ExpeditionCandidate }>) {

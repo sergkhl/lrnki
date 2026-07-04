@@ -2,6 +2,7 @@ import { BookOpenIcon, GemIcon } from "lucide-react";
 import type { StudySession } from "@/lib/learnerStudySession";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LessonSections } from "./LessonSections";
 
 export function JournalArchive({ session }: Readonly<{ session: StudySession }>) {
   const masteredIds = new Set(Object.entries(session.classification.stateByNode).filter(([, state]) => state === "mastered").map(([nodeId]) => nodeId));
@@ -36,12 +37,7 @@ export function JournalArchive({ session }: Readonly<{ session: StudySession }>)
               <CardDescription>Collected journal page</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-              {lesson.sections.map((section, index) => (
-                <article key={`${section.kind}:${index}`} className="rounded-md border border-[color:var(--journal-line)] bg-background/60 p-3">
-                  <Badge variant="outline" className="mb-2">{section.kind}</Badge>
-                  <p className="text-sm leading-6">{section.text}</p>
-                </article>
-              ))}
+              <LessonSections lesson={lesson} />
             </CardContent>
           </Card>
         ))}

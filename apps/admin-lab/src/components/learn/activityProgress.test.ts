@@ -73,6 +73,7 @@ function session(opts: { mastered?: boolean } = {}): StudySession {
     restorations: [],
     sheetByNode: {},
     verdictByNode: {},
+    latestOutcomeByStudyItemId: {},
     studySegmentsByNode: {
       n1: [
         { kind: "option_select", item: { studyItemId: "i1", derivedNodeId: "n1", question: "Q?", groundingProvenance: "generated", options: [] } },

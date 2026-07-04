@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeftIcon, BookOpenIcon } from "lucide-react";
 import { PostgresLearnerExpeditionStore, createDatabaseClient } from "@lrnki/infrastructure-postgres";
 import { Button } from "@/components/ui/button";
+import { CheckpointPath } from "@/components/learn/CheckpointPath";
 import { QuestHeader } from "@/components/learn/QuestHeader";
-import { Trail } from "@/components/learn/Trail";
 import { buildTrailView } from "@/components/learn/trailView";
 import { getLearnerStudySession } from "@/lib/learnerStudySession";
 
@@ -52,7 +52,7 @@ export default async function ExpeditionPage({
         </Button>
       </nav>
       <QuestHeader session={session} />
-      <Trail view={trail} session={session} />
+      <CheckpointPath view={trail} session={session} />
     </div>
   );
 }

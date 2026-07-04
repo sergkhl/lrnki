@@ -1,151 +1,118 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { CheckIcon, RotateCwIcon, XIcon } from "lucide-react";
-import type { StudyImpostorView, StudyOptionSelectView, StudySession } from "@lrnki/application";
+import { CheckIcon, XIcon } from "lucide-react";
+import type { StudyImpostorView, StudyOptionSelectView } from "@lrnki/application";
 import type { LearnerGradingResult } from "@/app/learn/[learnerStateRef]/actions";
-import { refreshLearnerExpedition, submitLearnerImpostor, submitLearnerOptionSelect } from "@/app/learn/[learnerStateRef]/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { GroundedBadge } from "./GroundedBadge";
 
-type AnswerState = LearnerGradingResult | null;
+type ActivityResult = LearnerGradingResult | null;
 
-export function OptionSelectActivity({ session, item }: Readonly<{ session: StudySession; item: StudyOptionSelectView }>) {
-  const router = useRouter();
-  const [answer, setAnswer] = useState<AnswerState>(null);
-  const [pending, startTransition] = useTransition();
-  const disabled = pending || answer !== null;
-
-  const choose = (optionId: string) => {
-    if (disabled) return;
-    startTransition(async () => {
-      setAnswer(await submitLearnerOptionSelect({
-        learnerStateRef: session.learnerStateRef,
-        enrichmentId: session.enrichmentId,
-        studyItemId: item.studyItemId,
-        chosenOptionId: optionId
-      }));
-    });
-  };
-
+export function OptionSelectBody({
+  item,
+  selectedId,
+  result,
+  onSelect
+}: Readonly<{
+  item: StudyOptionSelectView;
+  selectedId: string | null;
+  result: ActivityResult;
+  onSelect: (optionId: string) => void;
+}>) {
   return (
-    <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
-      <CardHeader>
-        <CardTitle>{item.question}</CardTitle>
-        <CardDescription>{item.groundingProvenance}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-2">
+    <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+      <div className="flex items-start gap-2">
+        <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
+        <GroundedBadge provenance={item.groundingProvenance} />
+      </div>
+      <div className="flex flex-col gap-2">
         {item.options.map((option) => {
-          const isChosen = answer?.graded && option.optionId === answer.chosenId;
-          const isCorrect = answer?.graded && option.optionId === answer.keyedCorrectId;
-          const variant = !answer?.graded ? "outline" : isCorrect ? "default" : isChosen ? "destructive" : "outline";
+          const graded = result?.graded === true;
+          const isChosen = graded ? option.optionId === result.chosenId : option.optionId === selectedId;
+          const isCorrect = graded && option.optionId === result.keyedCorrectId;
+          const variant = !graded ? isChosen ? "secondary" : "outline" : isCorrect ? "default" : isChosen ? "destructive" : "outline";
           return (
             <Button
               key={option.optionId}
               type="button"
               variant={variant}
-              className="h-auto min-h-9 w-full justify-start text-wrap"
-              disabled={disabled}
-              onClick={() => choose(option.optionId)}
+              disabled={graded}
+              className={cn(
+                "h-auto min-h-9 w-full justify-start whitespace-normal text-left",
+                isChosen && !graded ? "ring-2 ring-[color:var(--journal-frontier)]" : null
+              )}
+              onClick={() => onSelect(option.optionId)}
             >
               <span className="flex items-start gap-2">
-                {answer?.graded && isCorrect ? <CheckIcon className="mt-0.5 size-4 shrink-0" /> : null}
-                {answer?.graded && isChosen && !isCorrect ? <XIcon className="mt-0.5 size-4 shrink-0" /> : null}
+                {graded && isCorrect ? <CheckIcon className="mt-0.5" /> : null}
+                {graded && isChosen && !isCorrect ? <XIcon className="mt-0.5" /> : null}
                 <span>{option.text}</span>
               </span>
             </Button>
           );
         })}
-        <AnswerFooter answer={answer} session={session} onContinue={() => router.refresh()} />
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
-export function ImpostorActivity({ session, item }: Readonly<{ session: StudySession; item: StudyImpostorView }>) {
-  const router = useRouter();
-  const [answer, setAnswer] = useState<AnswerState>(null);
-  const [pending, startTransition] = useTransition();
-  const disabled = pending || answer !== null;
-
-  const choose = (statementId: string) => {
-    if (disabled) return;
-    startTransition(async () => {
-      setAnswer(await submitLearnerImpostor({
-        learnerStateRef: session.learnerStateRef,
-        enrichmentId: session.enrichmentId,
-        studyItemId: item.studyItemId,
-        chosenStatementId: statementId
-      }));
-    });
-  };
-
+export function ImpostorBody({
+  item,
+  selectedId,
+  result,
+  onSelect
+}: Readonly<{
+  item: StudyImpostorView;
+  selectedId: string | null;
+  result: ActivityResult;
+  onSelect: (statementId: string) => void;
+}>) {
   return (
-    <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
-      <CardHeader>
-        <CardTitle>{item.question}</CardTitle>
-        <CardDescription>{item.lieSource === "sibling" && item.siblingLabel ? `Confusable with ${item.siblingLabel}` : item.groundingProvenance}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-2">
+    <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+      <div className="flex items-start gap-2">
+        <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
+        <GroundedBadge provenance={item.groundingProvenance} />
+      </div>
+      <div className="flex flex-col gap-2">
         {item.statements.map((statement) => {
-          const isChosen = answer?.graded && statement.statementId === answer.chosenId;
-          const isImpostor = answer?.graded && statement.statementId === answer.keyedCorrectId;
-          const variant = !answer?.graded ? "outline" : isImpostor ? "default" : isChosen ? "destructive" : "outline";
+          const graded = result?.graded === true;
+          const isChosen = graded ? statement.statementId === result.chosenId : statement.statementId === selectedId;
+          const isImpostor = graded && statement.statementId === result.keyedCorrectId;
+          const variant = !graded ? isChosen ? "secondary" : "outline" : isImpostor ? "default" : isChosen ? "destructive" : "outline";
           return (
             <Button
               key={statement.statementId}
               type="button"
               variant={variant}
-              className="h-auto min-h-9 w-full justify-start text-wrap"
-              disabled={disabled}
-              onClick={() => choose(statement.statementId)}
+              disabled={graded}
+              className={cn(
+                "h-auto min-h-9 w-full justify-start whitespace-normal text-left",
+                isChosen && !graded ? "ring-2 ring-[color:var(--journal-frontier)]" : null
+              )}
+              onClick={() => onSelect(statement.statementId)}
             >
               <span className="flex items-start gap-2">
-                {answer?.graded && isChosen && isImpostor ? <CheckIcon className="mt-0.5 size-4 shrink-0" /> : null}
-                {answer?.graded && isImpostor && !isChosen ? <XIcon className="mt-0.5 size-4 shrink-0" /> : null}
-                {answer?.graded && isChosen && !isImpostor ? <XIcon className="mt-0.5 size-4 shrink-0" /> : null}
+                {graded && isChosen && isImpostor ? <CheckIcon className="mt-0.5" /> : null}
+                {graded && isChosen && !isImpostor ? <XIcon className="mt-0.5" /> : null}
+                {graded && isImpostor && !isChosen ? <XIcon className="mt-0.5" /> : null}
                 <span>{statement.text}</span>
               </span>
             </Button>
           );
         })}
-        {answer?.graded ? (
-          <div className="rounded-md border border-[color:var(--journal-line)] bg-background/60 p-3 text-sm">
-            <p className="font-medium">{answer.correct ? "Correct. You spotted the lie." : "Not quite. That statement is true."}</p>
-            <p className="mt-1 text-muted-foreground">{item.reveal}</p>
-            {item.lieSource === "sibling" && item.siblingLabel ? (
-              <p className="mt-1 text-xs text-muted-foreground">Actually true of <span className="font-medium text-foreground">{item.siblingLabel}</span>.</p>
-            ) : null}
-          </div>
-        ) : null}
-        <AnswerFooter answer={answer} session={session} onContinue={() => router.refresh()} />
-      </CardContent>
-    </Card>
-  );
-}
-
-function AnswerFooter({ answer, session, onContinue }: Readonly<{ answer: AnswerState; session: StudySession; onContinue: () => void }>) {
-  const [pending, startTransition] = useTransition();
-  if (!answer) return null;
-  if (!answer.graded) return <p className="text-sm text-destructive">{answer.message}</p>;
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-[color:var(--journal-line)] bg-background/60 p-3">
-      <p className="text-sm text-muted-foreground">{answer.correct ? "Recorded as correct." : "Recorded for practice."}</p>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={pending}
-        onClick={() => {
-          startTransition(async () => {
-            await refreshLearnerExpedition({ learnerStateRef: session.learnerStateRef, enrichmentId: session.enrichmentId });
-            onContinue();
-          });
-        }}
-      >
-        <RotateCwIcon data-icon="inline-start" />
-        Continue
-      </Button>
-    </div>
+      </div>
+      {result?.graded ? (
+        <div className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3 text-sm">
+          <p className="font-medium">{result.correct ? "Correct. You spotted the fake." : "Not quite. That statement is true."}</p>
+          <p className="mt-1 text-muted-foreground">{item.reveal}</p>
+          {item.lieSource === "sibling" && item.siblingLabel ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Actually true of <span className="font-medium text-foreground">{item.siblingLabel}</span>.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
