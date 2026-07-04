@@ -26,8 +26,8 @@ export function listOperationTimelines() {
   return withTimelineRead((read) => read.listOperationTimelines());
 }
 
-export function getOperationTimeline(operationId: string) {
-  return withTimelineRead((read) => read.getOperationTimeline(operationId));
+export function getOperationTimeline(operationId: string, operationType?: OperationType) {
+  return withTimelineRead((read) => read.getOperationTimeline(operationId, operationType));
 }
 
 // List every operation with its stage breakdown for the live progress view (R4), all

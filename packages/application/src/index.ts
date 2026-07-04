@@ -3,6 +3,7 @@ export { buildGraphVersion } from "./buildGraphVersion";
 export { runGraphEnrichment } from "./runGraphEnrichment";
 export { runSyntheticGeneration } from "./runSyntheticGeneration";
 export { generateStudyItemBank } from "./generateStudyItemBank";
+export { chartTopicExpedition } from "./chartTopicExpedition";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";
@@ -32,6 +33,11 @@ export {
   recommendedTargets,
   type TargetCandidate
 } from "./targetCandidates";
+export {
+  listExpeditionCandidates,
+  type ExpeditionCandidate,
+  type LearnerExpeditionEntry
+} from "./listExpeditionCandidates";
 
 export {
   labelFor,

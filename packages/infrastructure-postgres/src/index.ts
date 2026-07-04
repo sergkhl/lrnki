@@ -10,6 +10,7 @@ export { PostgresEnrichmentInspectionRead } from "./PostgresEnrichmentInspection
 export { PostgresLearnerLoopRead } from "./PostgresLearnerLoopRead";
 export { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
 export { PostgresStudyItemBankStore, PostgresConceptLessonStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
+export { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
 export { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
 export { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";

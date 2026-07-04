@@ -29,15 +29,19 @@
    Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
    `tmp/2026-06-30-generation-metering/`.
 
-4. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
-   learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
-   `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
-   shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
-   both learner projections share one boundary before the Learner App is built. This is
-   behavior-preserving and does not require a new ADR.
-   Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
-
 ## COMPLETED
+
+- **Learner App Expedition Journal surface.** `/learn` is now the learner-facing Expedition Journal:
+  readiness-ranked expedition entry, learner-owned expedition persistence, active selection, playable
+  trail/activity screen over `getStudySession`, journal/gem/map rewards, a learner-entered course-data
+  charting door, and progress/failure cards over ADR-0029 timelines. The superseded operator
+  `/admin/lab/study` route, calibration shell, study components, and study libs were deleted; the
+  prior calibration shell alignment TODO is resolved by deletion. The learner PDF/Docling door was
+  removed before completion, so learner-created expeditions currently use the synthetic course-data
+  path only. Decisions:
+  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md),
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Operation lifecycle wrapper and application barrel prune.** The ADR-0029 operation lifecycle now
   has one application wrapper for operation-tag scope, begin-at-entry, and terminal succeeded/failed
@@ -140,6 +144,27 @@
   resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
 
 ## VALIDATION
+
+- **Learner App Expedition Journal surface, 2026-07-04.** Deterministic envelope:
+  `pnpm run check` exit 0 after the review-fix pass (full workspace typecheck, recursive tests,
+  ESLint with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
+  `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests/typecheck, and
+  `@lrnki/infrastructure-postgres` typecheck. DB reset and the single initial migration succeeded
+  with the `learner_expeditions` indexes; `PostgresLearnerExpeditionStore` DB-backed tests passed
+  with `.env` loaded. Reference sweep over `apps`, `packages`, and `scripts` found no remaining
+  `/admin/lab/study`, `components/study`, `lib/studySession`, or `lib/calibrationSession`
+  references; a focused learner/admin-lab sweep found no remaining PDF upload, learner Docling, or
+  source-charting path. Review hardening fixed active-expedition idempotency, per-learner enrichment
+  uniqueness, operation-type-scoped progress reads, charting auto-refresh, caught background charting
+  failures, learner-facing failure-message sanitization, ready-expedition validation on study
+  actions, and activity progression that keeps a stop active until this learner answers all its
+  activities. **Real-use quality evaluation:** with DeepSeek balance restored, the learner
+  course-data charting path ran through production aliases under the $0.50/M output cap and produced
+  a ready expedition for enrichment `26c04779-f807-46f5-a63b-004e5ca88b3f`: 10 derived nodes, 10
+  lessons, 19 current study items, succeeded enrichment and study-item timelines, and a live
+  `getStudySession` projection with a 4-step path, selected frontier, and 2 first-frontier activity
+  segments. **Result: PASS for the learner course-data path.** The learner PDF/Docling path was
+  intentionally removed and not evaluated. Trail: `tmp/2026-07-03-learner-expedition-gate/`.
 
 - **Operation lifecycle wrapper and application barrel prune, 2026-07-03.** Deterministic envelope:
   `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint with 2 pre-existing

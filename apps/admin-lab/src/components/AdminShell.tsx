@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   ActivityIcon,
-  BookOpenCheckIcon,
   DatabaseIcon,
   EyeIcon,
   GitForkIcon,
@@ -37,7 +36,6 @@ const VIEWS = [
   { key: "sources", label: "Source Explorer", href: "/admin/lab/sources", icon: DatabaseIcon },
   { key: "enrichments", label: "Enrichment Runs", href: "/admin/lab/enrichments", icon: NetworkIcon },
   { key: "learner-loop", label: "Learner Loop", href: "/admin/lab/learner-loop", icon: GraduationCapIcon },
-  { key: "study", label: "Study", href: "/admin/lab/study", icon: BookOpenCheckIcon },
   { key: "operations", label: "Operations", href: "/admin/lab/operations", icon: ActivityIcon }
 ] as const;
 

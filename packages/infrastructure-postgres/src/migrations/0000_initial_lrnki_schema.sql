@@ -539,6 +539,44 @@ CREATE TABLE concept_difficulties (
   UNIQUE (enrichment_id, derived_node_id)
 );
 
+-- ---------------------------------------------------------------------------
+-- Learner Expeditions — learner-owned route/charting state for the Learner App.
+-- This table does not persist mastery, readiness, rewards, or trail shape; those
+-- derive from the Study Session projection and the published graph. It only
+-- remembers the learner's expedition rows, active selection, current charting
+-- operation pointer, and the ready enrichment/target once charting completes.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE learner_expeditions (
+  learner_expedition_id uuid PRIMARY KEY,
+  learner_state_ref text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('topic')),
+  title text NOT NULL,
+  declared_domain text NOT NULL,
+  status text NOT NULL CHECK (status IN ('charting', 'ready', 'failed')),
+  current_operation_id uuid,
+  current_operation_type text CHECK (current_operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
+  enrichment_id uuid REFERENCES graph_enrichments(enrichment_id),
+  target_derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  active boolean NOT NULL DEFAULT false,
+  failure_message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((current_operation_id IS NULL AND current_operation_type IS NULL) OR (current_operation_id IS NOT NULL AND current_operation_type IS NOT NULL)),
+  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL AND target_derived_node_id IS NOT NULL) OR status <> 'ready')
+);
+
+CREATE UNIQUE INDEX learner_expeditions_one_active_per_learner
+  ON learner_expeditions (learner_state_ref)
+  WHERE active;
+
+CREATE UNIQUE INDEX learner_expeditions_one_enrichment_per_learner
+  ON learner_expeditions (learner_state_ref, enrichment_id)
+  WHERE enrichment_id IS NOT NULL;
+
+CREATE INDEX learner_expeditions_learner_state_ref_idx ON learner_expeditions (learner_state_ref, created_at DESC);
+CREATE INDEX learner_expeditions_enrichment_idx ON learner_expeditions (enrichment_id);
+
 -- Rescue durability dispositions (U4, ADR-0019 refinement). One row per AGGREGATED
 -- source_mentioned rescue candidate the durability judge ruled on (U3). A `dropped`
 -- candidate has no derived_graph_nodes row, so derived_node_id is correlation-only

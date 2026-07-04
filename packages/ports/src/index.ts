@@ -435,6 +435,62 @@ export interface EnrichmentRunStorePort {
   nonCoreRescueCandidates(graphVersionId: string): Promise<NonCoreRescueCandidate[]>;
 }
 
+// Learner Expedition persistence (Learner App v1). This is learner-owned mutable
+// routing state only: it remembers which expedition rows belong to a learner and
+// which charting operation is in flight. Study readiness, mastery, and rewards
+// remain derived from existing learner-neutral projections.
+export type LearnerExpeditionKind = "topic";
+export type LearnerExpeditionStatus = "charting" | "ready" | "failed";
+
+export interface LearnerExpedition {
+  learnerExpeditionId: string;
+  learnerStateRef: string;
+  kind: LearnerExpeditionKind;
+  title: string;
+  declaredDomain: string;
+  status: LearnerExpeditionStatus;
+  currentOperationId: string | null;
+  currentOperationType: OperationType | null;
+  enrichmentId: string | null;
+  targetDerivedNodeId: string | null;
+  active: boolean;
+  failureMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewLearnerExpedition {
+  learnerExpeditionId: string;
+  learnerStateRef: string;
+  kind: LearnerExpeditionKind;
+  title: string;
+  declaredDomain: string;
+  status: LearnerExpeditionStatus;
+  currentOperationId?: string | null;
+  currentOperationType?: OperationType | null;
+  enrichmentId?: string | null;
+  targetDerivedNodeId?: string | null;
+  active?: boolean;
+  failureMessage?: string | null;
+}
+
+export interface LearnerExpeditionStorePort {
+  upsert(expedition: NewLearnerExpedition): Promise<void>;
+  listForLearner(learnerStateRef: string): Promise<LearnerExpedition[]>;
+  getForLearner(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<LearnerExpedition | undefined>;
+  getByEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<LearnerExpedition | undefined>;
+  setActive(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
+  updateProgress(input: {
+    learnerExpeditionId: string;
+    status?: LearnerExpeditionStatus;
+    currentOperationId?: string | null;
+    currentOperationType?: OperationType | null;
+    enrichmentId?: string | null;
+    targetDerivedNodeId?: string | null;
+    failureMessage?: string | null;
+  }): Promise<void>;
+}
+
 // ---------------------------------------------------------------------------
 // Learner Study Loop ports (R7–R16, ADR-0026). Learner-neutral typed Study Item Bank
 // plus the durable append-only Response Log. All learner structures are projection-only:

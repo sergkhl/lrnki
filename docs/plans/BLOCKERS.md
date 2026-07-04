@@ -1,3 +1,3 @@
 # Blockers
 
-_None._
+No current manual blockers.
