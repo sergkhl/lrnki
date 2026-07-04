@@ -19,14 +19,7 @@
    source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-3. **Learner App map-centered trail, one-activity flow, and charting onboarding.** Make the trail
-   the single home surface with in-place fog reveal, open activities one at a time as a full-screen
-   sheet, merge journal and gems into one surface, and ship one-field charting with inferred
-   Declared Domain and fiction-voiced stage copy. Requirements:
-   [brainstorm](../brainstorms/2026-07-04-learner-app-map-center-ux-requirements.md). Decision:
-   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-4. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -37,6 +30,14 @@
    `tmp/2026-06-30-generation-metering/`.
 
 ## COMPLETED
+
+- **Learner App map-centered trail, activity sheet, and charting onboarding.** `/learn` now centers
+  the Expedition Journal on the trail, with fog display derived from Study Session state, one stop
+  opening one full-screen activity sheet, a single Journal route replacing the learner map, topic-first
+  charting with editable inferred Declared Domain, fiction-voiced charting stage copy, and an Admin Lab
+  door that ensures a playable `admin` expedition before redirecting. Requirements:
+  [brainstorm](../brainstorms/2026-07-04-learner-app-map-center-ux-requirements.md). Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Learner App Expedition Journal surface.** `/learn` is now the learner-facing Expedition Journal:
   readiness-ranked expedition entry, learner-owned expedition persistence, active selection, playable
@@ -131,6 +132,21 @@
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
 
 ## VALIDATION
+
+- **Learner App map-centered trail, activity sheet, and charting onboarding, 2026-07-04.**
+  Deterministic envelope: `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint
+  with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
+  `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests, and
+  `@lrnki/infrastructure-litellm` tests. Browser checks on `http://localhost:3000` passed for the
+  real seeded enrichment `aa0e5b08-1510-4969-92b5-d2aabdf4f1b6`: desktop and 390px mobile expedition
+  pages showed the Journal-only nav and trail next stop; mobile activity sheet measured full-screen
+  at 390x844; no page or console errors. **Real-use quality evaluation:** the new
+  `kg-domain-inference` alias returned `Cognitive Psychology` for the real topic "Build intuition for
+  spaced practice and retrieval-based learning"; the Admin Lab door created then reused exactly one
+  `admin` learner expedition for the seeded enrichment, and `getStudySession` resolved a playable
+  session with 31 study items. Screenshots: `tmp/learner-expedition-desktop.png`,
+  `tmp/activity-sheet-desktop.png`, `tmp/learner-expedition-mobile.png`, and
+  `tmp/activity-sheet-mobile.png`. **Result: PASS.**
 
 - **Learner App Expedition Journal surface, 2026-07-04.** Deterministic envelope:
   `pnpm run check` exit 0 after the review-fix pass (full workspace typecheck, recursive tests,

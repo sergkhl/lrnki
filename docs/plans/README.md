@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [2026-07-04-001 — Learner App map-centered trail, activity sheet, and charting onboarding](./2026-07-04-001-feat-learner-map-center-ux-plan.md)
+No active implementation plans.
 
 ## Ownership rules
 

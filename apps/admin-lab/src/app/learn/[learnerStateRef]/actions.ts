@@ -12,7 +12,7 @@ import {
   PostgresResponseLogStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
-import { startTopicChart } from "@/lib/learnerCharting";
+import { inferDeclaredDomain, startTopicChart } from "@/lib/learnerCharting";
 
 export type LearnerGradingResult =
   | { graded: true; chosenId: string; keyedCorrectId: string; correct: boolean }
@@ -232,4 +232,16 @@ export async function startTopicExpedition(formData: FormData): Promise<void> {
   }));
   startTopicChart({ learnerExpeditionId, topic, declaredDomain });
   revalidatePath(learnerPath(learnerStateRef));
+}
+
+export async function inferExpeditionDomain(input: { topic: string }): Promise<{ ok: true; declaredDomain: string } | { ok: false; message: string }> {
+  const topic = input.topic.trim();
+  if (!topic) return { ok: false, message: "Add a topic first." };
+  try {
+    const result = await inferDeclaredDomain({ topic });
+    return { ok: true, declaredDomain: result.declaredDomain };
+  } catch (error) {
+    console.error("Declared Domain inference failed.", error);
+    return { ok: false, message: "Name the field before charting." };
+  }
 }

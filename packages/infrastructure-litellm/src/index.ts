@@ -36,6 +36,8 @@ export {
   missingPrerequisiteProposalValidator,
   intrinsicDifficultySchema,
   intrinsicDifficultyValidator,
+  declaredDomainInferenceSchema,
+  declaredDomainInferenceValidator,
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
   rescueDurabilityJudgmentSchema,
@@ -95,3 +97,8 @@ export {
   INTRINSIC_DIFFICULTY_JUDGE_MODEL,
   INTRINSIC_DIFFICULTY_SYSTEM_PROMPT
 } from "./intrinsicDifficultyAdapters";
+export {
+  LiteLlmDeclaredDomainInferenceAdapter,
+  DECLARED_DOMAIN_INFERENCE_MODEL,
+  DECLARED_DOMAIN_INFERENCE_SYSTEM_PROMPT
+} from "./domainInferenceAdapters";

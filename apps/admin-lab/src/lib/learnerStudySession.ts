@@ -32,17 +32,3 @@ export async function getLearnerStudySession(
     await sql.end({ timeout: 5 });
   }
 }
-
-export async function listAnsweredStudyItemIds(learnerStateRef: string): Promise<Set<string>> {
-  if (!process.env.DATABASE_URL) return new Set();
-  const sql = createDatabaseClient();
-  try {
-    const rows = await sql<{ study_item_id: string }[]>`
-      SELECT DISTINCT study_item_id
-      FROM response_log
-      WHERE learner_state_ref = ${learnerStateRef}`;
-    return new Set(rows.map((row) => row.study_item_id));
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
-}

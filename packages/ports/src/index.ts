@@ -389,6 +389,15 @@ export interface IntrinsicDifficultyJudgmentPort {
   judge(input: DifficultyNodeContext): Promise<{ neuralScore: number; rationale: string }>;
 }
 
+// Declared-domain inference (Learner charting). ONE forced-tool call maps a
+// learner's topic phrase to a short field-of-study label before the learner can
+// confirm or edit it. The learner-facing workflow owns confirmation; this port
+// only supplies the initial domain guess and fails closed on malformed output.
+export interface DeclaredDomainInferencePort {
+  readonly model: string;
+  infer(input: { topic: string }): Promise<{ declaredDomain: string }>;
+}
+
 // Node difficulty (ADR-0019). The current production direction is
 // learner-neutral intrinsic difficulty: neural source-grounded judgment fused
 // with deterministic graph/evidence components. Learner-calibrated IRT/BT stays

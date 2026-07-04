@@ -18,7 +18,7 @@ export const LEARNER_VOCABULARY = {
   journal: "Journal",
   gemCollection: "Gem collection",
   surveyMap: "Survey map",
-  topicDoor: "Chart course data",
+  topicDoor: "Chart course",
   progress: "Charting progress",
   summit: "Summit reached"
 } as const;

@@ -1,14 +1,26 @@
 import { CheckIcon, LockIcon, MapPinIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { TrailStop } from "./trailView";
 import { learnerTerm } from "./vocabulary";
 
-export function StopCard({ stop }: Readonly<{ stop: TrailStop }>) {
+export function StopCard({ stop, onSelect }: Readonly<{ stop: TrailStop; onSelect: (stopId: string) => void }>) {
   const Icon = stop.state === "complete" ? CheckIcon : stop.state === "locked" ? LockIcon : MapPinIcon;
+  const disabled = stop.state === "locked";
   return (
-    <Card data-next={stop.isNext || undefined} className="border-[color:var(--journal-line)] bg-background/70 data-[next]:ring-2 data-[next]:ring-[color:var(--journal-frontier)]">
-      <CardContent className="flex items-center gap-3 py-3">
+    <button
+      type="button"
+      disabled={disabled}
+      data-next={stop.isNext || undefined}
+      data-fogged={stop.isFogged || undefined}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-md border border-[color:var(--journal-line)] bg-background/70 p-3 text-left transition hover:bg-background data-[next]:ring-2 data-[next]:ring-[color:var(--journal-frontier)] data-[fogged]:opacity-55",
+        disabled ? "cursor-not-allowed" : "cursor-pointer"
+      )}
+      onClick={() => {
+        if (!disabled) onSelect(stop.stopId);
+      }}
+    >
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[color:var(--journal-gem-soft)] text-[color:var(--journal-ink)]">
           <Icon />
         </span>
@@ -17,8 +29,7 @@ export function StopCard({ stop }: Readonly<{ stop: TrailStop }>) {
           <p className="truncate text-xs text-muted-foreground">{stop.label}</p>
         </div>
         {stop.isNext ? <Badge>{learnerTerm("nextStop")}</Badge> : <Badge variant="outline">{stop.state}</Badge>}
-      </CardContent>
-    </Card>
+    </button>
   );
 }
 

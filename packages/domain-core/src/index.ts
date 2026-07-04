@@ -1627,6 +1627,7 @@ export const STAGE_TAGS = {
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
   groundingGeneration: "grounding-generation",
   intrinsicDifficulty: "intrinsic-difficulty",
+  declaredDomainInference: "declared-domain-inference",
   // Derived-node semantic deduplication. The embedding PROPOSE signal and the
   // cross-family merge-adjudication DECISION attribute separately so the recall vs
   // precision halves of the pass are individually visible in spend (AGENTS rule 20).

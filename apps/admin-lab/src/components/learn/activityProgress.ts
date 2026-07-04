@@ -1,33 +1,24 @@
-type ActivityPathStep = {
-  derivedNodeId: string;
-  state: string;
-};
+import type { ConceptLessonView, StudyImpostorView, StudyOptionSelectView, StudySession } from "@lrnki/application";
 
-type ActivitySegmentRef = {
-  item: {
-    studyItemId: string;
-  };
-};
+export type StopActivity =
+  | { kind: "theory"; derivedNodeId: string; label: string; lesson: ConceptLessonView | undefined }
+  | { kind: "option_select"; derivedNodeId: string; label: string; item: StudyOptionSelectView }
+  | { kind: "impostor"; derivedNodeId: string; label: string; item: StudyImpostorView }
+  | { kind: "capstone"; derivedNodeId: string; label: string; mastered: boolean }
+  | { kind: "missing"; message: string };
 
-export function selectActivityNodeId(input: {
-  path: readonly ActivityPathStep[];
-  studySegmentsByNode: Readonly<Record<string, readonly ActivitySegmentRef[]>>;
-  answeredStudyItemIds: ReadonlySet<string>;
-  selectedFrontierTarget: string | null;
-  fallbackTargetDerivedNodeId: string | null;
-}): string | null {
-  const firstUnansweredUnlocked = input.path.find((step) => {
-    if (step.state === "locked") return false;
-    return (input.studySegmentsByNode[step.derivedNodeId] ?? []).some(
-      (segment) => !input.answeredStudyItemIds.has(segment.item.studyItemId)
-    );
-  });
-  return firstUnansweredUnlocked?.derivedNodeId ?? input.selectedFrontierTarget ?? input.fallbackTargetDerivedNodeId;
-}
-
-export function unansweredActivitySegments<T extends ActivitySegmentRef>(
-  segments: readonly T[],
-  answeredStudyItemIds: ReadonlySet<string>
-): T[] {
-  return segments.filter((segment) => !answeredStudyItemIds.has(segment.item.studyItemId));
+export function resolveStopActivity(session: StudySession, stopId: string): StopActivity {
+  const [derivedNodeId, kind, studyItemId] = stopId.split(":");
+  const label = session.detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
+  if (!derivedNodeId || !kind) return { kind: "missing", message: "This stop is no longer on the trail." };
+  if (kind === "theory") return { kind: "theory", derivedNodeId, label, lesson: session.lessonByNode[derivedNodeId] };
+  if (kind === "capstone") {
+    const step = session.statefulPath.find((candidate) => candidate.derivedNodeId === derivedNodeId);
+    return { kind: "capstone", derivedNodeId, label, mastered: step?.state === "mastered" };
+  }
+  const segment = (session.studySegmentsByNode[derivedNodeId] ?? []).find((candidate) => candidate.item.studyItemId === studyItemId);
+  if (!segment) return { kind: "missing", message: "This activity is no longer available." };
+  return segment.kind === "option_select"
+    ? { kind: "option_select", derivedNodeId, label, item: segment.item }
+    : { kind: "impostor", derivedNodeId, label, item: segment.item };
 }

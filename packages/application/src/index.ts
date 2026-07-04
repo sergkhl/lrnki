@@ -4,6 +4,7 @@ export { runGraphEnrichment } from "./runGraphEnrichment";
 export { runSyntheticGeneration } from "./runSyntheticGeneration";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { chartTopicExpedition } from "./chartTopicExpedition";
+export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";

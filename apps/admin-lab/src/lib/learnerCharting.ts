@@ -11,6 +11,7 @@ import {
   LiteLlmImpostorLieValidityJudgmentAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmKnowledgeBoundaryProbeAdapter,
+  LiteLlmDeclaredDomainInferenceAdapter,
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
@@ -28,13 +29,17 @@ import {
 
 const STUDY_ITEM_BANK_CONFIG_HASH = "study-item-bank-v1";
 
-function buildContext() {
-  const sql = createDatabaseClient();
-  const baseClient = {
+function baseClientConfig() {
+  return {
     baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
     apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
     timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
   };
+}
+
+function buildContext() {
+  const sql = createDatabaseClient();
+  const baseClient = baseClientConfig();
   const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
   const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
   const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
@@ -60,6 +65,11 @@ function buildContext() {
     impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql)
   };
+}
+
+export async function inferDeclaredDomain(input: { topic: string }): Promise<{ declaredDomain: string }> {
+  const client = new LiteLlmForcedToolClient({ ...baseClientConfig(), temperature: 0, seed: 7 });
+  return new LiteLlmDeclaredDomainInferenceAdapter(client).infer(input);
 }
 
 export function startTopicChart(input: {

@@ -1,15 +1,13 @@
-import { ArrowRightIcon, CompassIcon, MapIcon, SparklesIcon } from "lucide-react";
+import { ArrowRightIcon, CompassIcon, MapIcon } from "lucide-react";
 import type { ExpeditionCandidate, LearnerExpeditionEntry } from "@lrnki/application";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { learnerTerm } from "./vocabulary";
-import { chooseCandidateExpedition, setActiveExpedition } from "@/app/learn/[learnerStateRef]/actions";
-import { startTopicExpedition } from "@/app/learn/[learnerStateRef]/actions";
+import { chooseCandidateExpedition, inferExpeditionDomain, setActiveExpedition, startTopicExpedition } from "@/app/learn/[learnerStateRef]/actions";
 import { ChartingProgress } from "./ChartingProgress";
+import { ChartCourseForm } from "./ChartCourseForm";
 
 export function ExpeditionEntry({
   learnerStateRef,
@@ -68,18 +66,14 @@ export function ExpeditionEntry({
         <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
           <CardHeader>
             <CardTitle>Chart a new course</CardTitle>
-            <CardDescription>Paste your course data, syllabus notes, or learning goal.</CardDescription>
+            <CardDescription>Start with a topic, then confirm the field before charting.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <form action={startTopicExpedition} className="flex flex-col gap-2">
-              <input type="hidden" name="learnerStateRef" value={learnerStateRef} />
-              <Textarea name="topic" placeholder="Course data" required className="min-h-28" />
-              <Input name="declaredDomain" placeholder="Domain" required />
-              <Button type="submit">
-                <SparklesIcon data-icon="inline-start" />
-                {learnerTerm("topicDoor")}
-              </Button>
-            </form>
+            <ChartCourseForm
+              learnerStateRef={learnerStateRef}
+              inferDomainAction={inferExpeditionDomain}
+              createExpeditionAction={startTopicExpedition}
+            />
           </CardContent>
         </Card>
       </section>

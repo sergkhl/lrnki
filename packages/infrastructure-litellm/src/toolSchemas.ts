@@ -243,6 +243,17 @@ export const intrinsicDifficultyValidator = z.object({
 
 export const intrinsicDifficultySchema: JsonSchema = toForcedToolSchema(intrinsicDifficultyValidator);
 
+// --- Declared domain inference: submit_declared_domain --------------------
+// One bounded learner-charting helper: infer a short field-of-study label from a
+// learner's topic phrase. The learner can confirm or edit this before generation.
+// The schema stays domain-neutral and contains no fixture-derived examples.
+
+export const declaredDomainInferenceValidator = z.object({
+  declaredDomain: z.string().trim().min(1).describe("A short field-of-study label that best frames the learner's topic. Return only the field label, not an explanation.")
+}).strict();
+
+export const declaredDomainInferenceSchema: JsonSchema = toForcedToolSchema(declaredDomainInferenceValidator);
+
 export const definitionEntailmentJudgmentValidator = z.object({
   subjectMatch: z.enum(["exact_or_interchangeable", "qualified_variant", "different_or_absent"]),
   subjectSpan: z.string().describe("Minimal exact sub-quote that identifies the subject; empty when different or absent."),

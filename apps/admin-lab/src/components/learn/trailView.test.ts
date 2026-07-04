@@ -18,10 +18,43 @@ test("buildTrailView emits item stops only before capstone when a node has no le
 test("buildTrailView marks exactly one next stop across the trail", () => {
   const view = buildTrailView(session());
   assert.equal(view.nextStopId, "n1:theory:main");
+  assert.equal(view.fogBoundaryStopId, "n1:theory:main");
   assert.equal(view.camps.flatMap((camp) => camp.clusters).flatMap((cluster) => cluster.stops).filter((stop) => stop.isNext).length, 1);
 });
 
-function session(opts: { withoutLesson?: boolean } = {}): StudySession {
+test("buildTrailView fogs locked territory and leaves frontier stops clear", () => {
+  const view = buildTrailView(session({ includeLocked: true }));
+  const stops = view.camps.flatMap((camp) => camp.clusters).flatMap((cluster) => cluster.stops);
+  assert.equal(stops.find((stop) => stop.derivedNodeId === "n1")?.isFogged, false);
+  assert.equal(stops.find((stop) => stop.derivedNodeId === "n2")?.isFogged, true);
+});
+
+function session(opts: { withoutLesson?: boolean; includeLocked?: boolean } = {}): StudySession {
+  const nodes = [{
+    derivedNodeId: "n1",
+    label: "Ownership",
+    aliases: [],
+    declaredDomain: "software engineering",
+    difficulty: null,
+    difficultyRationale: null,
+    nodeKind: "enrichment" as const,
+    groundingOrigin: "llm_grounded" as const,
+    role: "prerequisite" as const,
+    hasStudyItem: true,
+    grounding: null
+  }, ...(opts.includeLocked ? [{
+    derivedNodeId: "n2",
+    label: "Borrowing",
+    aliases: [],
+    declaredDomain: "software engineering",
+    difficulty: null,
+    difficultyRationale: null,
+    nodeKind: "enrichment" as const,
+    groundingOrigin: "llm_grounded" as const,
+    role: "prerequisite" as const,
+    hasStudyItem: true,
+    grounding: null
+  }] : [])];
   return {
     enrichmentId: "e1",
     learnerStateRef: "learner",
@@ -43,30 +76,21 @@ function session(opts: { withoutLesson?: boolean } = {}): StudySession {
         startedAt: "2026-01-01T00:00:00.000Z",
         completedAt: "2026-01-01T00:00:00.000Z"
       },
-      nodes: [{
-        derivedNodeId: "n1",
-        label: "Ownership",
-        aliases: [],
-        declaredDomain: "software engineering",
-        difficulty: null,
-        difficultyRationale: null,
-        nodeKind: "enrichment",
-        groundingOrigin: "llm_grounded",
-        role: "prerequisite",
-        hasStudyItem: true,
-        grounding: null
-      }],
+      nodes,
       edges: [],
       originCounts: [],
       rescueDispositions: [],
       mintingDispositions: [],
       merges: []
     },
-    classification: { stateByNode: { n1: "frontier" }, selectedFrontierTarget: "n1" },
+    classification: { stateByNode: { n1: "frontier", ...(opts.includeLocked ? { n2: "locked" as const } : {}) }, selectedFrontierTarget: "n1" },
     adaptedHiddenNodeIds: [],
     responseSourceSummary: { human: 0, synthetic: 0, total: 0 },
     isFoundationalRoot: true,
-    statefulPath: [{ position: 0, derivedNodeId: "n1", difficulty: 0, topologicalDepth: 0, state: "frontier", isTarget: true }],
+    statefulPath: [
+      { position: 0, derivedNodeId: "n1", difficulty: 0, topologicalDepth: 0, state: "frontier", isTarget: !opts.includeLocked },
+      ...(opts.includeLocked ? [{ position: 1, derivedNodeId: "n2", difficulty: 0, topologicalDepth: 1, state: "locked" as const, isTarget: true }] : [])
+    ],
     coexistence: [],
     restorations: [],
     sheetByNode: {},

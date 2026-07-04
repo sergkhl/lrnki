@@ -329,6 +329,10 @@ router_settings:
     # moderate probe temperature is set on the client the worker constructs, not here.
     kg-concept-synthesis: deepseek/deepseek-v4-flash-no-thinking
     kg-knowledge-boundary-probe: openrouter/meta-llama/llama-4-scout
+    # Learner charting helper: infer an editable Declared Domain from the
+    # learner's topic before source-less concept generation. Production
+    # extraction stays on DeepSeek V4 Flash with thinking disabled (AGENTS rule 5).
+    kg-domain-inference: deepseek/deepseek-v4-flash-no-thinking
     # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
     # U2/U5): ONE ordering call per Declared Domain returns the directed prerequisite
     # DAG over the deduplicated node set. Backed by gpt-oss-120b (reasoning-grade,

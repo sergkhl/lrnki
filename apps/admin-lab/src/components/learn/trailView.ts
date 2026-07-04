@@ -10,6 +10,7 @@ export type TrailStop = {
   label: string;
   state: TrailStopState;
   isNext: boolean;
+  isFogged: boolean;
   studyItemId: string | null;
 };
 
@@ -30,6 +31,7 @@ export type TrailCamp = {
 export type TrailView = {
   camps: TrailCamp[];
   nextStopId: string | null;
+  fogBoundaryStopId: string | null;
   masteredCount: number;
   totalClusters: number;
 };
@@ -46,7 +48,7 @@ export function buildTrailView(session: StudySession): TrailView {
       const stopId = `${step.derivedNodeId}:${kind}:${studyItemId ?? "main"}`;
       const isNext = !nextStopAssigned && step.derivedNodeId === nextNodeId && baseState !== "complete";
       if (isNext) nextStopAssigned = true;
-      stops.push({ stopId, kind, derivedNodeId: step.derivedNodeId, label, state: baseState, isNext, studyItemId });
+      stops.push({ stopId, kind, derivedNodeId: step.derivedNodeId, label, state: baseState, isNext, isFogged: baseState === "locked", studyItemId });
     };
 
     if (session.lessonByNode[step.derivedNodeId]) addStop("theory", null);
@@ -70,6 +72,7 @@ export function buildTrailView(session: StudySession): TrailView {
     camps.set(cluster.topologicalDepth, [...(camps.get(cluster.topologicalDepth) ?? []), cluster]);
   }
 
+  const nextStopId = clusters.flatMap((cluster) => cluster.stops).find((stop) => stop.isNext)?.stopId ?? null;
   return {
     camps: [...camps.entries()]
       .sort(([a], [b]) => a - b)
@@ -77,7 +80,8 @@ export function buildTrailView(session: StudySession): TrailView {
         topologicalDepth,
         clusters: campClusters.sort((a, b) => a.label.localeCompare(b.label))
       })),
-    nextStopId: clusters.flatMap((cluster) => cluster.stops).find((stop) => stop.isNext)?.stopId ?? null,
+    nextStopId,
+    fogBoundaryStopId: nextStopId,
     masteredCount: clusters.filter((cluster) => cluster.state === "mastered").length,
     totalClusters: clusters.length
   };
