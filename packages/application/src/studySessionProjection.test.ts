@@ -219,6 +219,22 @@ test("composeStudySession surfaces calibration↔graded coexistence rather than 
   assert.equal(session.coexistence[0].label, "Ownership");
 });
 
+test("composeStudySession exposes the latest graded outcome per study item", () => {
+  const session = compose({
+    target: "move",
+    studyItems: [optionItem("scope"), impostorItem("scope")],
+    rows: [
+      { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
+      { ...graded("scope", "incorrect", 2), studyItemId: "os-scope" },
+      { ...graded("scope", "correct", 3), studyItemId: "imp-scope" }
+    ]
+  });
+  assert.deepEqual(session.latestOutcomeByStudyItemId, {
+    "imp-scope": "correct",
+    "os-scope": "incorrect"
+  });
+});
+
 test("unmetPrerequisites returns only direct, non-mastered prerequisites, excluding uncertain edges", () => {
   const classification: AdaptedNodeClassification = {
     stateByNode: { scope: "mastered", ownership: "frontier", move: "locked", borrow: "frontier" },

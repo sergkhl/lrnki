@@ -248,6 +248,8 @@ export type RestorationSuggestion = {
   prerequisites: { derivedNodeId: string; label: string }[];
 };
 
+export type StudyItemOutcome = "correct" | "incorrect";
+
 export type StudySession = {
   enrichmentId: string;
   learnerStateRef: string;
@@ -281,6 +283,10 @@ export type StudySession = {
   // independently answerable. The durable seam the Learner App consumes; supersedes the prior
   // single-item-per-node `optionItemsByNode` (rule 18).
   studySegmentsByNode: Record<string, StudyItemView[]>;
+  // Latest graded result per study item, folded from the response log. The Learner App uses
+  // this for per-circle honest fill: only latest-correct fills; any other graded latest result
+  // remains open.
+  latestOutcomeByStudyItemId: Record<string, StudyItemOutcome>;
   // The Concept Lesson substrate that rides down (ADR-0031, KTD5): one teaching view per node
   // that has a lesson, rendered ahead of the option-select for a frontier node (R12). Reading
   // writes nothing (R13). `lessonAbsent` gives the operator thin visibility into which nodes
@@ -327,6 +333,15 @@ export function composeStudySession(input: {
   const knownClosure = pruneClosure(knownNodes, detail.edges);
   const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, targetDerivedNodeId);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(input.rows)));
+  const latestOutcomeByStudyItemId: Record<string, StudyItemOutcome> = {};
+  const latestAttemptByStudyItemId = new Map<string, number>();
+  for (const row of input.rows) {
+    if (row.signalType !== "graded" || !row.judgedOutcome) continue;
+    const currentAttempt = latestAttemptByStudyItemId.get(row.studyItemId);
+    if (currentAttempt !== undefined && row.attemptSeq <= currentAttempt) continue;
+    latestAttemptByStudyItemId.set(row.studyItemId, row.attemptSeq);
+    latestOutcomeByStudyItemId[row.studyItemId] = row.judgedOutcome === "correct" ? "correct" : "incorrect";
+  }
   const composed = composeMastery({ knownClosure, gradedByNode });
   const learnerState: LearnerStatePort = {
     learnerStateRef: input.learnerStateRef,
@@ -413,6 +428,7 @@ export function composeStudySession(input: {
     sheetByNode,
     verdictByNode: Object.fromEntries(verdictByNode),
     studySegmentsByNode,
+    latestOutcomeByStudyItemId,
     lessonByNode,
     lessonAbsent
   };
