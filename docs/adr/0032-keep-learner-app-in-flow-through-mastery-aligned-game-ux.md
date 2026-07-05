@@ -18,11 +18,22 @@ public use-case and projection surface
 ([ADR-0027](0027-serve-inspection-through-read-model-ports.md)); they import no operator components
 and no persistence adapters, so extracting a standalone Learner App later is an import-discipline
 move, not a rewrite.
-Version 1 starts orchestrated-first: the learner chooses a target or quest, and the app chooses the
-next mechanic or segment to preserve flow instead of asking the learner to pick a mechanic cold.
-Returning to the Learner App should resume the same learner-owned path with minimum friction; the
-client may remember the learner's name-ref locally because it is navigation state, not
-authentication or learner-neutral content.
+Version 1 starts orchestrated-first: the learner chooses an **expedition** (one Derived Graph Layer),
+and the app chooses the next mechanic or segment to preserve flow instead of asking the learner to
+pick a mechanic cold. The expedition is **layer-wide with a derived summit**: the trail covers the
+whole layer as one continuous **Expedition Trail** broken into milestone-anchored **Expedition
+Sections** ("graph as engine, line as interface"), and the summit is derived at read time as the last
+section's milestone rather than a learner-chosen target. There is no persisted expedition target;
+readiness is enrichment + study bank present. Returning to the Learner App should resume the same
+learner-owned path with minimum friction; the client may remember the learner's name-ref locally
+because it is navigation state, not authentication or learner-neutral content.
+
+Section entry is **prerequisite-gated, not line-gated**: per-node prerequisite gating already makes
+any node with mastered prerequisites playable, so disjoint sections are simultaneously available and
+the app never blocks the trail on section order. A **non-blocking section overview** is available on
+demand (never required by the guided continue flow): it lists every section with its state and
+progress, jumps to any unlocked section, and names the gating concepts of a locked one. Landing lands
+the learner on the next stop.
 
 The Learner App is **mobile-first**: design and build every learner-facing surface for a
 phone-sized portrait viewport with standard mobile best practices (touch-first interaction, no
@@ -36,14 +47,18 @@ the current goal: feedback, progress clarity, anticipation, reward, recovery, or
 concept map. Narrative, fantasy, collection, and social features must not become parallel objectives
 that distract from mastery.
 
-Completion rewards are part of the mastery flow, not decoration. Finishing the last activity for a
-concept advances into the capstone reward state before moving on; the learner should see the mastery
+Completion rewards are part of the mastery flow, not decoration. A concept is mastered by a
+**completion rule** — its lesson (if any) read AND every activity segment latest-correct — so
+finishing the *last* remaining activity advances into the capstone reward (gem) state; a single
+correct answer never collects the gem for a multi-segment concept. The learner should see the mastery
 beat and then continue to the next available stop, or return to the trail only when the expedition
-has no next stop.
+has no next stop. Every learner-facing count (progress, gems) derives from the same trail scope the
+projection walks, so counts never drift from the trail.
 
-Mechanics stay mobile-first in their interaction model. Matching uses compact selectable prompt
-chips and full-width answer rows on phone viewports so long generated text remains readable; the
-grading trace and server-side keys remain unchanged.
+Mechanics stay mobile-first in their interaction model. Matching uses **two-column tap-pairs** —
+clue tiles on the left, match tiles on the right, each column independently shuffled — with wrapping
+tiles so long generated text stays readable on phone viewports; the grading trace and server-side
+keys remain unchanged.
 
 When flow signals show boredom, overload, or stalled skill growth, the app uses a support ladder:
 clarify the goal or feedback, vary the mechanic or stakes, offer hints/retries/review, change the

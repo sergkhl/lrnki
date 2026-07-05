@@ -33,7 +33,10 @@ DAG and are candidates for the future learner-data posterior, not parts of the p
 
 Downstream projections may gate trail inclusion only on a **confident floor band**: a node banded
 at the floor *and* uncontested may be dropped as a trail stop with its prerequisite edges
-contracted, exempting the learner's chosen target and any node without a confident band (fail-open).
+contracted, exempting only nodes without a confident band (fail-open). There is no chosen-target
+exemption — the trail is layer-wide with a derived summit
+([ADR-0032](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)), so a confident
+floor-band terminal is floored like any other node and simply anchors no section.
 
 The signal's lifecycle is staged: banded LLM prior → pairwise calibration for contested bands
 (both implemented) → learner-data posterior via Elo/IRT once real graded responses exist
