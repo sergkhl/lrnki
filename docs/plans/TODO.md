@@ -2,22 +2,7 @@
 
 ## TODO
 
-1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
-   found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
-   evidence. Learner-facing symptom (2026-07-05): relation-like concepts (e.g. "Compositional
-   relationship") reach the trail as trivially easy stops, so the score cannot yet be trusted as a
-   gating signal — a difficulty floor for trail inclusion was considered and deferred until this
-   fix lands; the trivial-question half of that symptom is answer-leakage at item generation and is
-   handled there, not here.
-   - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
-   - Keep population calibration deferred until stable real learner-response data exists
-     ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
-   - Active plan:
-     [2026-07-05-002 — Comparative banded intrinsic difficulty and trail floor](./2026-07-05-002-fix-banded-intrinsic-difficulty-and-trail-floor-plan.md)
-     — in progress: banded judge, calibration, fusion deletion, and trail floor landed; the U6
-     rule-14 real-use gate is pending.
-
-2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+1. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
@@ -27,7 +12,7 @@
    source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+2. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -38,6 +23,16 @@
    `tmp/2026-06-30-generation-metering/`.
 
 ## COMPLETED
+
+- **Comparative banded intrinsic difficulty and trail floor.** Intrinsic difficulty is now a
+  K-sampled comparative in-set banded prior: one forced-tool call per Declared Domain bands every
+  concept 1–5 relative to that domain's set, dispersion marks contested bands, and a bounded
+  pairwise bracket against uncontested anchors calibrates them. The pointwise absolute judge, the
+  neural+structural fusion, and `dagDepthDifficulty` were deleted; the persisted score is
+  `(band − 1)/4`, the exact inverse of the diamond mapping, so the learner UI is unchanged. The
+  Study Session projection now floors confident band-1 non-target nodes out of the trail via edge
+  contraction (gating preserved), exposing `flooredNodeIds` for inspection. Decision:
+  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md) (amended).
 
 - **Learner trail polish.** The learner trail now uses opaque portal surfaces, one-tap option-select
   grading with generated explanations, persisted lesson-read completion, a linear next-pointer,
@@ -132,6 +127,24 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Comparative banded intrinsic difficulty and trail floor, 2026-07-05.** Deterministic envelope:
+  `pnpm run check` exit 0 (full workspace typecheck, recursive tests including DB-backed
+  integration tests with `.env` loaded, ESLint with 3 pre-existing warnings, Admin Lab production
+  build). **Real-use gate (rule 14):** baseline captured with the pristine fused judge (enrichment
+  `5384f4f1-5b4c-4842-81e8-e5dff11ce042`), then a hard reset re-seeded `rust-book-ch04-01` and
+  `aira-dojo-2507-02554v1-md` through real production LLM calls into banded enrichment
+  `dce4c6d4-4155-480f-8cc1-b99887b12eac` (36 scored nodes, 3 contested, 1 anchor-less unresolved).
+  Human inspection: evidence-thin rescued labels ("Ownership Rules", "Ownership") now band 1 with
+  rationales naming their evidence-thinness; the baseline's clearest scale-use-bias case
+  ("operator policy", neural 0.70 on one quote) was flagged contested and bracket-calibrated with
+  an evidence-grounded rationale; contested rows record their comparisons and uncontested rows
+  record zero; `round(score × 4) + 1 = band` on all 36 rows with the ConceptMarker diamonds
+  matching in the browser; on the seeded expedition 11 confident band-1 nodes vanished from the
+  trail with gating intact through contracted edges, and a band-1 node chosen as the target stayed
+  playable. A silent NaN-sample-count → zero-draws → garbage-persist path found during baselining
+  now fails loudly. **Result: PASS.** Trail: `tmp/2026-07-05-difficulty-baseline/`
+  (`rule14-report.md`, dumps, annotation, screenshots).
 
 - **Learner trail polish, 2026-07-04.** Deterministic envelope: `pnpm run check` exit 0 (full
   workspace typecheck, recursive tests, ESLint with 2 pre-existing warnings, and Admin Lab
