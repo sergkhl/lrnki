@@ -390,3 +390,106 @@ test("composeStudySession renders over an anchor-less synthetic layer, resolving
   assert.equal(move.kind, "locked");
   assert.deepEqual(move.kind === "locked" && move.unmetPrerequisiteLabels, ["Ownership"]);
 });
+
+// --- Minimal trail-inclusion difficulty floor (plan 2026-07-05-002 U4, AE4) ---------
+
+// The base fixture with banded confidence on each node: ownership is a CONFIDENT band-1
+// node sitting between scope and move on the certain chain.
+function bandedDetail(bands: Record<string, { band: number; contested: boolean }>): DerivedGraphDetail {
+  const base = detail();
+  return {
+    ...base,
+    nodes: base.nodes.map((node) => ({
+      ...node,
+      difficultyBand: bands[node.derivedNodeId]?.band ?? null,
+      difficultyContested: bands[node.derivedNodeId]?.contested ?? null
+    }))
+  };
+}
+
+const floorBands = {
+  scope: { band: 3, contested: false },
+  ownership: { band: 1, contested: false },
+  move: { band: 4, contested: false },
+  borrow: { band: 4, contested: false }
+};
+
+test("a confident band-1 node between two stops disappears from the trail and its gating contracts (AE4)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "move",
+    detail: bandedDetail(floorBands),
+    studyItems: [optionItem("ownership"), optionItem("scope")],
+    rows: [],
+    verdicts: []
+  });
+
+  assert.deepEqual(session.flooredNodeIds, ["ownership"]);
+  // No trail step and no activity segments for the floored node.
+  assert.ok(!session.statefulPath.some((step) => step.derivedNodeId === "ownership"));
+  assert.equal(session.studySegmentsByNode.ownership, undefined);
+  assert.equal(session.sheetByNode.ownership, undefined);
+  // Gating survives by contraction: move is locked behind scope directly.
+  const move = session.sheetByNode.move;
+  assert.equal(move.kind, "locked");
+  assert.deepEqual(move.kind === "locked" && move.unmetPrerequisiteLabels, ["Variable scope"]);
+  // The full detail still rides down for the map render.
+  assert.equal(session.detail.nodes.length, 4);
+});
+
+test("mastering the contracted prerequisite chain unlocks the dependent past the floored node (AE4)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "move",
+    detail: bandedDetail(floorBands),
+    studyItems: [],
+    rows: [],
+    verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }]
+  });
+  assert.equal(session.classification.stateByNode.move, "frontier");
+});
+
+test("choosing the floored node as the expedition target keeps it playable (AE4 exemption)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "ownership",
+    detail: bandedDetail(floorBands),
+    studyItems: [optionItem("ownership")],
+    rows: [],
+    verdicts: []
+  });
+  assert.deepEqual(session.flooredNodeIds, []);
+  assert.ok(session.statefulPath.some((step) => step.derivedNodeId === "ownership"));
+  assert.ok(session.sheetByNode.ownership);
+});
+
+test("contested and band-less nodes are never floored; a band-less detail is a no-op (fail-open)", () => {
+  const contested = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "move",
+    detail: bandedDetail({ ...floorBands, ownership: { band: 1, contested: true } }),
+    studyItems: [],
+    rows: [],
+    verdicts: []
+  });
+  assert.deepEqual(contested.flooredNodeIds, []);
+  assert.ok(contested.statefulPath.some((step) => step.derivedNodeId === "ownership"));
+
+  const baseline = compose({ target: "move" });
+  const bandless = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    targetDerivedNodeId: "move",
+    detail: detail(),
+    studyItems: [],
+    rows: [],
+    verdicts: []
+  });
+  assert.deepEqual(bandless.flooredNodeIds, []);
+  assert.deepEqual(bandless.statefulPath, baseline.statefulPath);
+  assert.deepEqual(Object.keys(bandless.sheetByNode).sort(), Object.keys(baseline.sheetByNode).sort());
+});

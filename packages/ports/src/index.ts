@@ -829,6 +829,13 @@ export interface DerivedGraphNode {
   declaredDomain: string;
   difficulty: number | null;
   difficultyRationale: string | null;
+  // The comparative banded prior's confidence interface (ADR-0024), read off the same
+  // concept_difficulties row as `difficulty`: the consensus band (1-5) and whether it
+  // was contested across the K draws. Optional-nullable: absent/null for a node without
+  // a difficulty row or a pre-banding layer. The trail-inclusion floor gates only on a
+  // CONFIDENT signal (band present AND uncontested), so nulls fail open.
+  difficultyBand?: number | null;
+  difficultyContested?: boolean | null;
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
   // `synthetic_primary` is a first-class topic concept from the synthetic arm (ADR-0019

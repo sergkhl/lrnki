@@ -29,6 +29,7 @@ function session(opts: { mastered?: boolean } = {}): StudySession {
     learnerStateRef: "learner",
     target: { derivedNodeId: "n1", label: "Ownership" },
     studyItemCount: 2,
+    flooredNodeIds: [],
     detail: {
       summary: {
         enrichmentId: "e1",

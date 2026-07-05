@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import type { ArtifactEnvelope, DerivedGraphLayer, EnrichmentRunTrace, ExtractionRunResult, GraphSnapshot, StructuredDocument } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
+import { PostgresEnrichmentInspectionRead } from "./PostgresEnrichmentInspectionRead";
 import { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
 import { PostgresExtractionRunStore, PostgresGraphVersionStore, PostgresSourceRegistrationStore } from "./PostgresStores";
 
@@ -299,8 +300,10 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
         provenance: { judgmentRationale: "test" }
       }],
       difficulties: [
-        { derivedNodeId: borrowingId, score: 0, method: "dag-depth-mock", components: { topoDepth: 0 }, neuralRationale: "borrowing is a foundational mechanic" },
-        { derivedNodeId: ownershipId, score: 1, method: "dag-depth-mock", components: { topoDepth: 1 }, neuralRationale: "ownership composes several prior ideas" }
+        // A pre-banding row (no band component) and a banded row: the inspection read
+        // must surface band/contested where present and null where absent.
+        { derivedNodeId: borrowingId, score: 0, method: "legacy-method", components: { topoDepth: 0 }, neuralRationale: "borrowing is a foundational mechanic" },
+        { derivedNodeId: ownershipId, score: 1, method: "intrinsic-banded-v2", components: { band: 5, kDraws: 5, modalShare: 0.4, contested: 1, pairwiseComparisons: 2, calibrationUnresolved: 0 }, neuralRationale: "ownership composes several prior ideas" }
       ]
     };
     const trace: EnrichmentRunTrace = {
@@ -337,6 +340,17 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     const rationaleByNode = new Map(hydrated.difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty.neuralRationale] as const));
     assert.equal(rationaleByNode.get(borrowingId), "borrowing is a foundational mechanic");
     assert.equal(rationaleByNode.get(ownershipId), "ownership composes several prior ideas");
+
+    // U4 (plan 2026-07-05-002): the inspection detail surfaces the banded prior's
+    // confidence interface off the same difficulty row — band/contested where the
+    // components carry them, null where they do not (pre-banding row).
+    const detail = await new PostgresEnrichmentInspectionRead(sql).getDerivedGraphDetail(enrichmentId);
+    assert.ok(detail);
+    const detailByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node] as const));
+    assert.equal(detailByNode.get(ownershipId)?.difficultyBand, 5);
+    assert.equal(detailByNode.get(ownershipId)?.difficultyContested, true);
+    assert.equal(detailByNode.get(borrowingId)?.difficultyBand, null);
+    assert.equal(detailByNode.get(borrowingId)?.difficultyContested, null);
   } finally {
     await sql.end();
   }

@@ -77,6 +77,7 @@ function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; lates
     learnerStateRef: "learner",
     target: { derivedNodeId: "n1", label: "Ownership" },
     studyItemCount: 2,
+    flooredNodeIds: [],
     detail: {
       summary: {
         enrichmentId: "e1",

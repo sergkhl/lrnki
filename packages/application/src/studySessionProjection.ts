@@ -7,6 +7,7 @@ import {
   type AdaptedNodeClassification,
   type ReadinessEdge
 } from "./adaptivePathProjection";
+import { applyDifficultyFloor } from "./applyDifficultyFloor";
 import { composeMastery, pruneClosure, struggledNodes, suggestRestorations } from "./calibrationClosure";
 import { prerequisiteAncestors } from "./prerequisiteDag";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoopProjection";
@@ -322,6 +323,10 @@ export type StudySession = {
   lessonByNode: Record<string, ConceptLessonView>;
   lessonReadByNode: Record<string, boolean>;
   lessonAbsent: LessonAbsentView[];
+  // Nodes excluded as trail stops by the minimal difficulty floor (ADR-0024 consumer):
+  // confident band-1, non-target. Their prerequisite gating survives by edge contraction
+  // inside the projection; this list exists for inspection — no surface renders it.
+  flooredNodeIds: string[];
 };
 
 // Compose the finished Study Session from already-loaded data (KTD2). Pure: the caller is
@@ -345,11 +350,31 @@ export function composeStudySession(input: {
   lessonAbsent?: LessonAbsentNode[];
 }): StudySession {
   const { detail, targetDerivedNodeId } = input;
+
+  // The minimal trail-inclusion difficulty floor (ADR-0024 consumer, ADR-0032 projection
+  // policy): confident band-1 non-target nodes are excluded BEFORE path/segment
+  // composition, with their gating preserved by edge contraction. Everything downstream
+  // composes from this contracted view, so floored nodes never reach the trail, the
+  // classifier, or the sheets; `detail` itself rides down untouched for the map render.
+  const floor = applyDifficultyFloor({
+    nodes: detail.nodes.map((node) => ({
+      derivedNodeId: node.derivedNodeId,
+      difficultyBand: node.difficultyBand ?? null,
+      difficultyContested: node.difficultyContested ?? null
+    })),
+    edges: detail.edges,
+    targetDerivedNodeId
+  });
+  const trailNodes = detail.nodes.filter((node) => floor.includedNodeIds.has(node.derivedNodeId));
+  const trailEdges = floor.contractedEdges;
+
   const itemViews = input.studyItems.map(studyItemToView);
   // Group a node's items into its ordered segment list (R10, KTD7): option_select, then
-  // impostor. A node with one type lists one segment.
+  // impostor. A node with one type lists one segment. A floored node contributes no
+  // activity segments (R5).
   const studySegmentsByNode: Record<string, StudyItemView[]> = {};
   for (const view of itemViews) {
+    if (!floor.includedNodeIds.has(view.item.derivedNodeId)) continue;
     (studySegmentsByNode[view.item.derivedNodeId] ??= []).push(view);
   }
   for (const segments of Object.values(studySegmentsByNode)) {
@@ -360,7 +385,7 @@ export function composeStudySession(input: {
   // verdicts is mastered via calibration; un-pruned nodes take their graded mastery; the
   // coexistence of the two is surfaced, never resolved by a hidden precedence rule.
   const knownNodes = input.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
-  const knownClosure = pruneClosure(knownNodes, detail.edges);
+  const knownClosure = pruneClosure(knownNodes, trailEdges);
   const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, targetDerivedNodeId);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(input.rows)));
   const latestOutcomeByStudyItemId: Record<string, StudyItemOutcome> = {};
@@ -377,41 +402,41 @@ export function composeStudySession(input: {
     learnerStateRef: input.learnerStateRef,
     mastery: (derivedNodeId: string) => composed.masteryByNode[derivedNodeId] ?? 0
   };
-  const difficulties = detail.nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: node.difficulty }));
+  const difficulties = trailNodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: node.difficulty }));
 
   const baseClassification = classifyAdaptedNodes({
-    nodeIds: detail.nodes.map((node) => node.derivedNodeId),
-    prerequisiteEdges: detail.edges,
+    nodeIds: trailNodes.map((node) => node.derivedNodeId),
+    prerequisiteEdges: trailEdges,
     difficulties,
     learnerState,
     masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
   });
   const selectedFrontierTarget = selectScopedFrontierTarget({
     targetNodeId: targetDerivedNodeId,
-    prerequisiteEdges: detail.edges,
+    prerequisiteEdges: trailEdges,
     classification: baseClassification,
     difficulties
   });
   const classification: AdaptedNodeClassification = { stateByNode: baseClassification.stateByNode, selectedFrontierTarget };
-  const statefulPath = projectStatefulLearnerPath({ targetDerivedNodeId, detail, stateByNode: classification.stateByNode });
+  const statefulPath = projectStatefulLearnerPath({ targetDerivedNodeId, detail: { nodes: trailNodes, edges: trailEdges }, stateByNode: classification.stateByNode });
 
   const labelByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
   const verdictByNode = new Map(input.verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
   const sheetByNode: Record<string, SheetContent> = {};
-  for (const node of detail.nodes) {
+  for (const node of trailNodes) {
     sheetByNode[node.derivedNodeId] = sheetContentFor({
       derivedNodeId: node.derivedNodeId,
       classification,
       segmentsByNode: studySegmentsByNode,
       verdictByNode,
-      edges: detail.edges,
+      edges: trailEdges,
       labelByNode
     });
   }
 
   // A DAG-root goal: its trusted prerequisite cone is empty, so it is studied directly as a
   // single node. Detected on the trusted edges, matching the prune/readiness trust model.
-  const certainEdges: DerivedGraphEdge[] = detail.edges.filter((edge) => !edge.uncertain);
+  const certainEdges: DerivedGraphEdge[] = trailEdges.filter((edge) => !edge.uncertain);
   const isFoundationalRoot = prerequisiteAncestors(targetDerivedNodeId, certainEdges).size === 0;
 
   const coexistence: CoexistenceFlag[] = composed.calibrationGradedCoexistence.map((flag) => ({
@@ -425,7 +450,7 @@ export function composeStudySession(input: {
   // direct-verdict set (not the full closure) so a "restore" — clearVerdict on the suggested
   // node — actually returns it to the gap (a transitively-pruned node has no verdict to clear).
   const directlyKnown = new Set(knownNodes);
-  const restorationMap = suggestRestorations({ struggledNodeIds: struggledNodes(input.rows), knownClosure: directlyKnown, edges: detail.edges });
+  const restorationMap = suggestRestorations({ struggledNodeIds: struggledNodes(input.rows), knownClosure: directlyKnown, edges: trailEdges });
   const restorations: RestorationSuggestion[] = Object.entries(restorationMap)
     .filter(([, prerequisiteIds]) => prerequisiteIds.length > 0)
     .map(([struggledNodeId, prerequisiteIds]) => ({
@@ -462,6 +487,7 @@ export function composeStudySession(input: {
     latestOutcomeByStudyItemId,
     lessonByNode,
     lessonReadByNode,
-    lessonAbsent
+    lessonAbsent,
+    flooredNodeIds: floor.flooredNodeIds
   };
 }
