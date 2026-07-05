@@ -146,7 +146,8 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
       "Weigh whether THIS source DEVELOPS the candidate or merely NAMES IT IN PASSING. The source develops a concept when it returns to it, explains or builds on it, or treats it as something the reader must carry forward. It names a concept in passing when it appears once as an aside, a cross-reference, a comparison, or a label, and is dropped without being developed. A concept the source only names in passing is NOT a durable prerequisite for the anchors this source teaches — even if it is a genuine, important concept in some other source — because nothing here establishes the learner must master it first.",
       "Judge from the candidate's MEANING, how this source treats it, and its relationship to the anchors, never from surface wordform or a fixed list of words.",
       "Precision-first: this is a veto that removes nodes, so return 'not_durable' ONLY on a clear, evidenced judgment; when genuinely unsure, return 'durable' and let the node stand.",
-      "When 'not_durable', set groundingSpan to a minimal verbatim sub-quote copied exactly from one of the candidate's own mention quotes that shows it is incidental or merely named in passing. When 'durable', return an empty groundingSpan."
+      "When 'not_durable', set groundingSpan to a minimal verbatim sub-quote copied exactly from one of the candidate's own mention quotes that shows it is incidental or merely named in passing. When 'durable', return an empty groundingSpan.",
+      "The candidate's label is taken from the sentence it was mentioned in, so it may read as a full statement rather than a concept name. When 'durable' AND the label reads as a sentence, proposition, or claim, set canonicalLabelProposal to a concise concept-shaped noun phrase naming the same single unit of knowledge; when the label already reads as a concept name, or the verdict is 'not_durable', return an empty canonicalLabelProposal. Only re-name the same concept; never introduce a different one."
     ].join("\n");
     const anchorLines = input.anchors.length
       ? input.anchors.map((anchor, index) => {
@@ -177,7 +178,12 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
       tags: [STAGE_TAGS.rescueDurability]
     });
 
-    return { verdict: result.verdict, groundingSpan: result.groundingSpan, rationale: result.rationale };
+    return {
+      verdict: result.verdict,
+      groundingSpan: result.groundingSpan,
+      rationale: result.rationale,
+      ...(result.canonicalLabelProposal?.trim() ? { canonicalLabelProposal: result.canonicalLabelProposal.trim() } : {})
+    };
   }
 }
 

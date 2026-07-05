@@ -248,6 +248,71 @@ test("the rescue durability judge drops a non-durable candidate before it become
   assert.equal(rescueDispositions.find((d) => d.canonicalLabel === "Lifetime")?.disposition, "accepted");
 });
 
+// A judge that accepts every candidate and proposes a concept-shaped re-label by candidate label.
+function relabelJudge(proposalByLabel: Record<string, string>): RescueDurabilityJudgmentPort {
+  return {
+    model: "kg-independent-judge",
+    judge: async (input) => ({
+      verdict: "durable",
+      groundingSpan: "",
+      rationale: "durable",
+      ...(proposalByLabel[input.candidate.canonicalLabel] ? { canonicalLabelProposal: proposalByLabel[input.candidate.canonicalLabel] } : {})
+    })
+  };
+}
+
+test("Covers AE6: a sentence-shaped rescued node adopts the proposed concept label; the original survives as an alias", async () => {
+  counter = 0;
+  const sentence = "Memory is freed when the owner goes out of scope";
+  const { rescuedNodes, rescueDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention(sentence, "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    rescueDurabilityJudge: relabelJudge({ [sentence]: "Ownership-based memory release" }),
+    newNodeId
+  });
+  const node = rescuedNodes[0];
+  assert.equal(node.canonicalLabel, "Ownership-based memory release");
+  assert.equal(node.normalizedLabel, "ownership based memory release", "normalized form drives the reservation key");
+  assert.ok(node.aliases.includes(sentence), "the original sentence survives as an alias");
+  const disposition = rescueDispositions.find((d) => d.derivedNodeId === node.derivedNodeId);
+  assert.equal(disposition?.relabeledFrom, sentence, "the disposition records the re-label");
+  assert.equal(disposition?.canonicalLabel, "Ownership-based memory release");
+});
+
+test("a re-label proposal that collides with an anchor label in the domain keeps the original label", async () => {
+  counter = 0;
+  const sentence = "The owner is the single binding responsible for a value";
+  const { rescuedNodes, rescueDispositions } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    // The proposal normalizes to "ownership", already taken by the anchor.
+    rescueCandidates: [mention(sentence, "run-1")],
+    proposalPort: proposer({}),
+    groundingPort: grounder,
+    rescueDurabilityJudge: relabelJudge({ [sentence]: "Ownership" }),
+    newNodeId
+  });
+  assert.equal(rescuedNodes[0].canonicalLabel, sentence, "a colliding proposal is discarded, original kept");
+  assert.equal(rescueDispositions[0].relabeledFrom, undefined);
+});
+
+test("a re-labeled rescued node reserves its new label, blocking a later same-domain mint proposal", async () => {
+  counter = 0;
+  const sentence = "A move transfers ownership to a new binding";
+  const { rescuedNodes, mintedNodes } = await assembleEnrichmentNodes({
+    anchors: [anchor("a", "Ownership")],
+    rescueCandidates: [mention(sentence, "run-1")],
+    // The proposer tries to mint the very concept label the rescued node adopted.
+    proposalPort: proposer({ a: [{ proposedLabel: "Move semantics", rationale: "r" }] }),
+    groundingPort: grounder,
+    rescueDurabilityJudge: relabelJudge({ [sentence]: "Move semantics" }),
+    newNodeId
+  });
+  assert.equal(rescuedNodes[0].canonicalLabel, "Move semantics");
+  assert.equal(mintedNodes.some((n) => n.canonicalLabel === "Move semantics"), false, "the reserved re-label blocks the mint");
+});
+
 test("a dropped rescue label is not resurrected as a minted node", async () => {
   counter = 0;
   const dropPointer: RescueDurabilityJudgmentPort = {

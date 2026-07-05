@@ -913,6 +913,13 @@ export type RescueDurabilityJudgment = {
   verdict: RescueDurabilityVerdict;
   groundingSpan: string;
   rationale: string;
+  // Optional concept-shaped canonical label proposal (R12). A rescued node's label is the
+  // source sentence it was mentioned in, which reads as a proposition rather than a concept.
+  // On a `durable` verdict the judge may propose a concise concept-shaped label; the minting
+  // stage adopts it only when its normalized form is unclaimed in the domain, demoting the
+  // original sentence to an alias (fail-open: empty proposal or a collision keeps the
+  // original). Empty string means no re-label.
+  canonicalLabelProposal?: string;
 };
 
 // Minting durability judgment. One bounded cross-family verdict over ONE generated
@@ -1048,6 +1055,11 @@ export type RescueDisposition = {
   disposition: RescueDispositionKind;
   rationale: string;
   groundingSpan: string;
+  // When the durability judge proposed a concept-shaped canonical label and minting adopted it
+  // (R12), the original sentence-shaped label the node was rescued under. `canonicalLabel` above
+  // then carries the adopted concept label and the original survives as a node alias. Absent when
+  // no re-label happened (no proposal, a collision, or a dropped node).
+  relabeledFrom?: string;
 };
 
 // The recorded disposition of one reserved minting proposal after durability judging.

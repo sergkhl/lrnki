@@ -153,6 +153,31 @@ export async function assembleEnrichmentNodes(input: {
     );
     rescuedNodes = judged.keptNodes;
     rescueDispositions = judged.dispositions;
+
+    // Canonical re-label (U8, R12): a durable rescued node whose label reads as a source
+    // sentence adopts the judge's concept-shaped proposal — but only when its normalized form is
+    // UNCLAIMED in the domain (the same `isTaken` authority that dedupes every enrichment node).
+    // On adoption the new label is reserved (blocking a later same-domain candidate from taking
+    // it), the original sentence is demoted to an alias, and the re-label is recorded on the
+    // disposition. A collision or an empty proposal keeps the original label (fail-open).
+    const dispositionByNodeId = new Map(rescueDispositions.map((disposition) => [disposition.derivedNodeId, disposition] as const));
+    for (const node of rescuedNodes) {
+      const proposal = judged.canonicalLabelProposalByNodeId.get(node.derivedNodeId);
+      if (!proposal) continue;
+      const normalized = normalizeConceptLabel(proposal);
+      if (normalized.length === 0 || normalized === node.normalizedLabel || isTaken(node.declaredDomain, normalized)) continue;
+      take(node.declaredDomain, normalized);
+      const original = node.canonicalLabel;
+      node.aliases = [original, ...node.aliases.filter((alias) => alias !== original)];
+      node.canonicalLabel = proposal;
+      node.normalizedLabel = normalized;
+      const disposition = dispositionByNodeId.get(node.derivedNodeId);
+      if (disposition) {
+        disposition.relabeledFrom = original;
+        disposition.canonicalLabel = proposal;
+        disposition.normalizedLabel = normalized;
+      }
+    }
   }
 
   // --- Mint: anchor-driven bounded llm_grounded nodes ----------------------------
