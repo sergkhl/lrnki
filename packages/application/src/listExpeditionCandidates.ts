@@ -7,14 +7,22 @@ import type {
   ResponseLogStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
-import { buildTargetCandidates, recommendedTargets, type TargetCandidate } from "./targetCandidates";
+import { deriveFlooredExpedition } from "./expeditionSections";
 
+// One Begin candidate per enrichment (U3): the whole layer is the trail, so an enrichment offers
+// a single expedition titled with its DERIVED summit. Readiness and counts are trail-scoped —
+// they read only non-floored nodes, the same scope the projection walks (U4, rule 18).
 export type ExpeditionCandidate = {
   enrichmentId: string;
   graphVersionId: string | null;
   title: string;
+  declaredDomain: string;
   startedAt: string;
-  target: TargetCandidate;
+  summitDerivedNodeId: string;
+  // Trail-scoped stop readiness: non-floored nodes that carry a study item over all non-floored
+  // nodes.
+  readyStopCount: number;
+  totalStopCount: number;
   readinessRank: number;
 };
 
@@ -42,7 +50,7 @@ export async function listExpeditionCandidates(input: {
       .map(async (summary) => ({ summary, detail: await input.enrichmentRead.getDerivedGraphDetail(summary.enrichmentId) }))
   );
 
-  const candidates = details.flatMap(({ summary, detail }) => detail ? candidatesForSummary(summary, detail) : []);
+  const candidates = details.flatMap(({ summary, detail }) => (detail ? candidateForSummary(summary, detail) : []));
   candidates.sort(compareExpeditionCandidates);
 
   return {
@@ -50,6 +58,7 @@ export async function listExpeditionCandidates(input: {
     learnerExpeditions: await withExpeditionProgress({
       learnerStateRef: input.learnerStateRef,
       expeditions: learnerExpeditions,
+      enrichmentRead: input.enrichmentRead,
       studyItemStore: input.studyItemStore,
       responseLog: input.responseLog
     })
@@ -59,6 +68,7 @@ export async function listExpeditionCandidates(input: {
 async function withExpeditionProgress(input: {
   learnerStateRef: string;
   expeditions: LearnerExpedition[];
+  enrichmentRead: EnrichmentInspectionReadPort;
   studyItemStore?: StudyItemBankStorePort;
   responseLog?: ResponseLogStorePort;
 }): Promise<LearnerExpeditionEntry["learnerExpeditions"]> {
@@ -73,31 +83,48 @@ async function withExpeditionProgress(input: {
   }
   return Promise.all(input.expeditions.map(async (expedition) => {
     if (expedition.status !== "ready" || !expedition.enrichmentId) return expedition;
-    const items = await input.studyItemStore!.listStudyItemsForEnrichment(expedition.enrichmentId);
-    const itemIds = new Set(items.map((item) => item.studyItemId));
+    const [items, detail] = await Promise.all([
+      input.studyItemStore!.listStudyItemsForEnrichment(expedition.enrichmentId),
+      input.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId)
+    ]);
+    // U4/AE3: count only items on TRAIL-reachable (non-floored) nodes, so the total matches the
+    // stop math the trail walks. A missing detail falls back to the whole bank.
+    const trailNodeIds = detail ? deriveFlooredExpedition(detail).trailNodeIds : null;
+    const trailItems = trailNodeIds ? items.filter((item) => trailNodeIds.has(item.derivedNodeId)) : items;
+    const itemIds = new Set(trailItems.map((item) => item.studyItemId));
     const itemsPassed = [...itemIds].filter((studyItemId) => latest.get(studyItemId)?.correct === true).length;
     return { ...expedition, progress: { itemsPassed, itemsTotal: itemIds.size } };
   }));
 }
 
-function candidatesForSummary(summary: EnrichmentSummary, detail: DerivedGraphDetail): ExpeditionCandidate[] {
-  return recommendedTargets(buildTargetCandidates(detail), detail, 3).map((target) => ({
+function candidateForSummary(summary: EnrichmentSummary, detail: DerivedGraphDetail): ExpeditionCandidate[] {
+  const { summit, trailNodeIds } = deriveFlooredExpedition(detail);
+  if (!summit) return [];
+  const trailNodes = detail.nodes.filter((node) => trailNodeIds.has(node.derivedNodeId));
+  const declaredDomain = detail.nodes.find((node) => node.derivedNodeId === summit.derivedNodeId)?.declaredDomain ?? detail.nodes[0]?.declaredDomain ?? "";
+  return [{
     enrichmentId: summary.enrichmentId,
     graphVersionId: summary.graphVersionId,
-    title: target.label,
+    title: summit.label,
+    declaredDomain,
     startedAt: summary.startedAt,
-    target,
+    summitDerivedNodeId: summit.derivedNodeId,
+    readyStopCount: trailNodes.filter((node) => node.hasStudyItem).length,
+    totalStopCount: trailNodes.length,
     readinessRank: 0
-  }));
+  }];
+}
+
+function readyFraction(candidate: ExpeditionCandidate): number {
+  return candidate.totalStopCount === 0 ? 0 : candidate.readyStopCount / candidate.totalStopCount;
 }
 
 function compareExpeditionCandidates(a: ExpeditionCandidate, b: ExpeditionCandidate): number {
-  const ready = Number(b.target.isFullyReady) - Number(a.target.isFullyReady);
-  if (ready !== 0) return ready;
-  const aReadyFraction = a.target.questNodeCount === 0 ? 0 : a.target.readyNodeCount / a.target.questNodeCount;
-  const bReadyFraction = b.target.questNodeCount === 0 ? 0 : b.target.readyNodeCount / b.target.questNodeCount;
-  return bReadyFraction - aReadyFraction ||
-    b.target.coneSize - a.target.coneSize ||
+  const aFullyReady = a.readyStopCount === a.totalStopCount && a.totalStopCount > 0;
+  const bFullyReady = b.readyStopCount === b.totalStopCount && b.totalStopCount > 0;
+  return Number(bFullyReady) - Number(aFullyReady) ||
+    readyFraction(b) - readyFraction(a) ||
+    b.totalStopCount - a.totalStopCount ||
     Date.parse(b.startedAt) - Date.parse(a.startedAt) ||
     a.title.localeCompare(b.title) ||
     a.enrichmentId.localeCompare(b.enrichmentId);

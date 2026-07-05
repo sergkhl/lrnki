@@ -25,7 +25,6 @@ test("chartTopicExpedition runs synthetic generation then study item generation 
   } as never);
 
   assert.equal(result.enrichmentId, "enrichment-1");
-  assert.equal(result.targetDerivedNodeId, "node-1");
   assert.deepEqual(calls, ["progress:enrichment", "synthetic", "progress:study_items", "items", "progress:ready"]);
 });
 
@@ -46,7 +45,7 @@ test("chartTopicExpedition marks a failed row when a stage throws", async () => 
   assert.deepEqual(calls, ["progress:enrichment", "progress:failed:model down"]);
 });
 
-test("chartTopicExpedition fails before ready when no target node is available", async () => {
+test("chartTopicExpedition fails loudly when the layer produced no concepts", async () => {
   const calls: string[] = [];
   await assert.rejects(() => chartTopicExpedition({
     learnerExpeditionId: "expedition",
@@ -58,8 +57,9 @@ test("chartTopicExpedition fails before ready when no target node is available",
       runSynthetic: async () => ({ derivedNodes: [], prerequisiteEdges: [], difficulties: [] }) as never,
       generateStudyItems: async () => ({ graphVersionId: null, enrichmentId: "enrichment-1", studyItems: [], rejected: [], lessons: [], lessonAbsent: [] }) as never
     }
-  } as never), /no target stop/);
-  assert.deepEqual(calls, ["progress:enrichment", "progress:study_items", "progress:failed:Charting produced no target stop."]);
+  } as never), /no concepts/);
+  // The empty-layer check fires right after synthetic generation, before study items run.
+  assert.deepEqual(calls, ["progress:enrichment", "progress:failed:Charting produced no concepts."]);
 });
 
 function progressStore(calls: string[]): LearnerExpeditionStorePort {

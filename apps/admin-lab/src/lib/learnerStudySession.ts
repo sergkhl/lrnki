@@ -13,7 +13,6 @@ export type { StudySession } from "@lrnki/application";
 
 export async function getLearnerStudySession(
   enrichmentId: string,
-  targetDerivedNodeId: string,
   learnerStateRef: string
 ): Promise<StudySession | undefined> {
   if (!process.env.DATABASE_URL) return undefined;
@@ -21,7 +20,6 @@ export async function getLearnerStudySession(
   try {
     return await loadStudySession({
       enrichmentId,
-      targetDerivedNodeId,
       learnerStateRef,
       enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
       studyItemStore: new PostgresStudyItemBankStore(sql),

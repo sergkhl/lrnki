@@ -19,7 +19,7 @@ export type TrailCluster = {
   label: string;
   difficulty: number;
   topologicalDepth: number;
-  state: StudySession["statefulPath"][number]["state"];
+  state: StudySession["expeditionPath"][number]["state"];
   isTarget: boolean;
   stops: TrailStop[];
 };
@@ -35,7 +35,7 @@ export type TrailView = {
 
 export function buildTrailView(session: StudySession): TrailView {
   const labelByNode = new Map(session.detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
-  const clusters: TrailCluster[] = session.statefulPath.map((step) => {
+  const clusters: TrailCluster[] = session.expeditionPath.map((step) => {
     const label = labelByNode.get(step.derivedNodeId) ?? step.derivedNodeId;
     const baseState: TrailStopState = step.state === "mastered" ? "complete" : step.state === "frontier" ? "available" : "locked";
     const stops: TrailStop[] = [];
@@ -57,7 +57,7 @@ export function buildTrailView(session: StudySession): TrailView {
       difficulty: step.difficulty,
       topologicalDepth: step.topologicalDepth,
       state: step.state,
-      isTarget: step.isTarget,
+      isTarget: step.isSummit,
       stops
     };
   });

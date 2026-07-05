@@ -51,11 +51,10 @@ async function withExpeditionStore<T>(fn: (store: PostgresLearnerExpeditionStore
 export async function chooseCandidateExpedition(input: {
   learnerStateRef: string;
   enrichmentId: string;
-  targetDerivedNodeId: string;
   title: string;
   declaredDomain: string;
 }): Promise<void> {
-  if (!input.learnerStateRef || !input.enrichmentId || !input.targetDerivedNodeId) return;
+  if (!input.learnerStateRef || !input.enrichmentId) return;
   await withExpeditionStore(async (store) => {
     const existing = await store.getByEnrichment({
       learnerStateRef: input.learnerStateRef,
@@ -70,7 +69,6 @@ export async function chooseCandidateExpedition(input: {
       declaredDomain: input.declaredDomain,
       status: "ready",
       enrichmentId: input.enrichmentId,
-      targetDerivedNodeId: input.targetDerivedNodeId,
       active: true
     });
   });

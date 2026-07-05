@@ -18,18 +18,18 @@ export type DifficultyFloorNode = {
 // segments. Its prerequisite gating survives by EDGE CONTRACTION — every prerequisite
 // of a floored node wires directly to every dependent (uncertain flag OR-ed, the more
 // conservative confidence kept), so a dependent stays locked until the contracted
-// prerequisite chain is mastered. Exempt: the learner's chosen target (always
-// playable), contested nodes, and nodes without a difficulty row — only a CONFIDENT
-// signal gates. Pure and deterministic; applied by the Study Session projection before
+// prerequisite chain is mastered. Exempt: contested nodes and nodes without a
+// difficulty row — only a CONFIDENT signal gates. The trail is layer-wide with a
+// derived summit (ADR-0032), so there is no learner-chosen target to exempt: a
+// confident band-1 terminal is floored like any other node and simply anchors no
+// section. Pure and deterministic; applied by the Study Session projection before
 // path/segment composition, so floored nodes simply never reach the views.
 export function applyDifficultyFloor(input: {
   nodes: DifficultyFloorNode[];
   edges: DerivedGraphEdge[];
-  targetDerivedNodeId: string;
 }): { includedNodeIds: Set<string>; contractedEdges: DerivedGraphEdge[]; flooredNodeIds: string[] } {
   const flooredNodeIds = input.nodes
     .filter((node) =>
-      node.derivedNodeId !== input.targetDerivedNodeId &&
       node.difficultyBand !== null &&
       node.difficultyBand <= TRAIL_DIFFICULTY_FLOOR_BAND &&
       node.difficultyContested === false)

@@ -560,13 +560,14 @@ CREATE TABLE learner_expeditions (
   current_operation_id uuid,
   current_operation_type text CHECK (current_operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
   enrichment_id uuid REFERENCES graph_enrichments(enrichment_id),
-  target_derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
   active boolean NOT NULL DEFAULT false,
   failure_message text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((current_operation_id IS NULL AND current_operation_type IS NULL) OR (current_operation_id IS NOT NULL AND current_operation_type IS NOT NULL)),
-  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL AND target_derived_node_id IS NOT NULL) OR status <> 'ready')
+  -- The summit is derived at read time (ADR-0032), so a ready expedition needs only its
+  -- enrichment; there is no persisted target to constrain.
+  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL) OR status <> 'ready')
 );
 
 CREATE UNIQUE INDEX learner_expeditions_one_active_per_learner

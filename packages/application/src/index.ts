@@ -57,7 +57,13 @@ export {
   type AdaptedNodeClassification,
   type AdaptedNodeState
 } from "./adaptivePathProjection";
-export { type StatefulLearnerPathStep } from "./statefulLearnerPath";
+export {
+  deriveFlooredExpedition,
+  projectExpeditionSections,
+  type ExpeditionSection,
+  type ExpeditionSectionStep,
+  type SectionedExpedition
+} from "./expeditionSections";
 
 export {
   composeCalibrationSession,

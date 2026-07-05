@@ -1,17 +1,15 @@
 import type { CalibrationVerdict, ConceptLesson, ConceptLessonSectionKind, LessonAbsentNode, ResponseLogRow, StudyItem, StudyItemGroundingProvenance, Verdict } from "@lrnki/domain-core";
-import type { DerivedGraphDetail, DerivedGraphEdge, LearnerStatePort } from "@lrnki/ports";
+import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
   classifyAdaptedNodes,
-  selectScopedFrontierTarget,
   type AdaptedNodeClassification,
   type ReadinessEdge
 } from "./adaptivePathProjection";
 import { applyDifficultyFloor } from "./applyDifficultyFloor";
 import { composeMastery, pruneClosure, struggledNodes, suggestRestorations } from "./calibrationClosure";
-import { prerequisiteAncestors } from "./prerequisiteDag";
 import { buildMasteryMap, summarizeResponseSources, type ResponseSourceSummary } from "./learnerLoopProjection";
-import { projectStatefulLearnerPath, type StatefulLearnerPathStep } from "./statefulLearnerPath";
+import { projectExpeditionSections, type ExpeditionSection, type ExpeditionSectionStep } from "./expeditionSections";
 
 // The PURE Study Session projection (ADR-0027 projection compute; CONTEXT.md "Study
 // Session"). A Study Session is a learner-stateful, goal-scoped projection over one Derived
@@ -236,9 +234,9 @@ export function unmetPrerequisites(nodeId: string, edges: ReadinessEdge[], class
 }
 
 // Serializable known-closure hide list for the Adapted render: the known closure minus the
-// goal target, so the goal itself stays visible even when marked known.
-export function adaptedHiddenNodeIds(knownClosure: ReadonlySet<string>, targetDerivedNodeId: string): string[] {
-  return [...knownClosure].filter((id) => id !== targetDerivedNodeId);
+// derived summit, so the summit itself stays visible even when marked known.
+export function adaptedHiddenNodeIds(knownClosure: ReadonlySet<string>, summitDerivedNodeId: string | null): string[] {
+  return [...knownClosure].filter((id) => id !== summitDerivedNodeId);
 }
 
 // The state-gated side-sheet payload for one node. Frontier nodes study their item when one
@@ -286,24 +284,28 @@ export type StudyItemOutcome = "correct" | "incorrect";
 export type StudySession = {
   enrichmentId: string;
   learnerStateRef: string;
+  // The DERIVED summit — the last section's milestone (ADR-0032). No longer a learner-chosen
+  // target; the whole floored layer is the trail. `derivedNodeId` is empty on an empty layer.
   target: { derivedNodeId: string; label: string };
   // How many study items this enrichment carries. 0 means a dead-end session — the surface
   // renders a remedy rather than dropping the learner into a cardless graph.
   studyItemCount: number;
   detail: DerivedGraphDetail;
-  // The whole-layer classification, with `selectedFrontierTarget` scoped to the goal cone
-  // so the adapted-graph ring marks the node the learner advances to next toward the goal.
+  // The whole-layer classification, with `selectedFrontierTarget` = the single hardest ready
+  // node so the adapted-graph ring marks the node the learner advances to next.
   classification: AdaptedNodeClassification;
   // Serializable known-closure hide list for the Adapted render. The full `detail` remains
   // untouched so Neutral can render the original cone.
   adaptedHiddenNodeIds: string[];
   responseSourceSummary: ResponseSourceSummary;
-  // A DAG-root goal whose trusted prerequisite cone is just itself — studied directly as a
-  // single-node screen; never an empty calibration nor a premature "Goal reached".
-  isFoundationalRoot: boolean;
-  // Ordered, unpruned target-scoped Learner Path steps. The state is read from the same
-  // whole-layer classification that the map overlay uses, so the ladder cannot drift.
-  statefulPath: StatefulLearnerPathStep[];
+  // The ordered, layer-wide SECTIONED expedition path (ADR-0032; R1–R3): every non-floored
+  // node in exactly one milestone-anchored section, concatenated in easiest-section-first
+  // order. Each step carries its section metadata alongside the per-step state. State is read
+  // from the same whole-layer classification the map overlay uses, so the trail cannot drift.
+  expeditionPath: ExpeditionSectionStep[];
+  // The section skeleton in trail order (milestone, claimed stops, mean difficulty) — the
+  // non-blocking overview and header counts render from this (R5, R9).
+  sections: ExpeditionSection[];
   // Calibration `known` ∩ graded — coexistence SURFACED, not silently resolved.
   coexistence: CoexistenceFlag[];
   // Restoration nudges for nodes the learner missed while studying the gap.
@@ -341,7 +343,6 @@ export type StudySession = {
 export function composeStudySession(input: {
   enrichmentId: string;
   learnerStateRef: string;
-  targetDerivedNodeId: string;
   detail: DerivedGraphDetail;
   studyItems: StudyItem[];
   rows: ResponseLogRow[];
@@ -353,21 +354,20 @@ export function composeStudySession(input: {
   lessonReads?: string[];
   lessonAbsent?: LessonAbsentNode[];
 }): StudySession {
-  const { detail, targetDerivedNodeId } = input;
+  const { detail } = input;
 
   // The minimal trail-inclusion difficulty floor (ADR-0024 consumer, ADR-0032 projection
-  // policy): confident band-1 non-target nodes are excluded BEFORE path/segment
-  // composition, with their gating preserved by edge contraction. Everything downstream
-  // composes from this contracted view, so floored nodes never reach the trail, the
-  // classifier, or the sheets; `detail` itself rides down untouched for the map render.
+  // policy): confident band-1 nodes are excluded BEFORE path/segment composition, with their
+  // gating preserved by edge contraction. Everything downstream composes from this contracted
+  // view, so floored nodes never reach the trail, the classifier, or the sheets; `detail`
+  // itself rides down untouched for the map render.
   const floor = applyDifficultyFloor({
     nodes: detail.nodes.map((node) => ({
       derivedNodeId: node.derivedNodeId,
       difficultyBand: node.difficultyBand ?? null,
       difficultyContested: node.difficultyContested ?? null
     })),
-    edges: detail.edges,
-    targetDerivedNodeId
+    edges: detail.edges
   });
   const trailNodes = detail.nodes.filter((node) => floor.includedNodeIds.has(node.derivedNodeId));
   const trailEdges = floor.contractedEdges;
@@ -394,7 +394,6 @@ export function composeStudySession(input: {
   // coexistence of the two is surfaced, never resolved by a hidden precedence rule.
   const knownNodes = input.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
   const knownClosure = pruneClosure(knownNodes, trailEdges);
-  const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, targetDerivedNodeId);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(input.rows)));
   const latestOutcomeByStudyItemId: Record<string, StudyItemOutcome> = {};
   const latestAttemptByStudyItemId = new Map<string, number>();
@@ -418,21 +417,21 @@ export function composeStudySession(input: {
   };
   const difficulties = trailNodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: node.difficulty }));
 
-  const baseClassification = classifyAdaptedNodes({
+  // The whole-layer classification over the floored trail. Its `selectedFrontierTarget` — the
+  // single hardest ready+unmastered node — is the advance-to-next ring (no goal cone to scope
+  // to now that the trail is layer-wide).
+  const classification = classifyAdaptedNodes({
     nodeIds: trailNodes.map((node) => node.derivedNodeId),
     prerequisiteEdges: trailEdges,
     difficulties,
     learnerState,
     masteryThreshold: ADAPTIVE_MASTERY_THRESHOLD
   });
-  const selectedFrontierTarget = selectScopedFrontierTarget({
-    targetNodeId: targetDerivedNodeId,
-    prerequisiteEdges: trailEdges,
-    classification: baseClassification,
-    difficulties
-  });
-  const classification: AdaptedNodeClassification = { stateByNode: baseClassification.stateByNode, selectedFrontierTarget };
-  const statefulPath = projectStatefulLearnerPath({ targetDerivedNodeId, detail: { nodes: trailNodes, edges: trailEdges }, stateByNode: classification.stateByNode });
+  // The layer-wide SECTIONED expedition (ADR-0032; R1–R3, R6): milestone-anchored sections over
+  // the floored/contracted layer, easiest section first, summit derived as the last milestone.
+  const expedition = projectExpeditionSections({ detail: { nodes: trailNodes, edges: trailEdges }, stateByNode: classification.stateByNode });
+  const summitId = expedition.summit?.derivedNodeId ?? null;
+  const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, summitId);
 
   const labelByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
   const verdictByNode = new Map(input.verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
@@ -447,11 +446,6 @@ export function composeStudySession(input: {
       labelByNode
     });
   }
-
-  // A DAG-root goal: its trusted prerequisite cone is empty, so it is studied directly as a
-  // single node. Detected on the trusted edges, matching the prune/readiness trust model.
-  const certainEdges: DerivedGraphEdge[] = trailEdges.filter((edge) => !edge.uncertain);
-  const isFoundationalRoot = prerequisiteAncestors(targetDerivedNodeId, certainEdges).size === 0;
 
   const coexistence: CoexistenceFlag[] = composed.calibrationGradedCoexistence.map((flag) => ({
     derivedNodeId: flag.derivedNodeId,
@@ -482,14 +476,14 @@ export function composeStudySession(input: {
   return {
     enrichmentId: input.enrichmentId,
     learnerStateRef: input.learnerStateRef,
-    target: { derivedNodeId: targetDerivedNodeId, label: labelFor(detail, targetDerivedNodeId) },
+    target: expedition.summit ?? { derivedNodeId: "", label: "" },
     studyItemCount: input.studyItems.length,
     detail,
     classification,
     adaptedHiddenNodeIds: hiddenNodeIds,
     responseSourceSummary: summarizeResponseSources(input.rows),
-    isFoundationalRoot,
-    statefulPath,
+    expeditionPath: expedition.steps,
+    sections: expedition.sections,
     coexistence,
     restorations,
     sheetByNode,

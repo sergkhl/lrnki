@@ -484,7 +484,6 @@ export interface LearnerExpedition {
   currentOperationId: string | null;
   currentOperationType: OperationType | null;
   enrichmentId: string | null;
-  targetDerivedNodeId: string | null;
   active: boolean;
   failureMessage: string | null;
   createdAt: string;
@@ -501,7 +500,6 @@ export interface NewLearnerExpedition {
   currentOperationId?: string | null;
   currentOperationType?: OperationType | null;
   enrichmentId?: string | null;
-  targetDerivedNodeId?: string | null;
   active?: boolean;
   failureMessage?: string | null;
 }
@@ -518,7 +516,6 @@ export interface LearnerExpeditionStorePort {
     currentOperationId?: string | null;
     currentOperationType?: OperationType | null;
     enrichmentId?: string | null;
-    targetDerivedNodeId?: string | null;
     failureMessage?: string | null;
   }): Promise<void>;
 }

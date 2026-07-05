@@ -104,11 +104,11 @@ function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; lates
     classification: { stateByNode: { n1: "frontier", ...(opts.includeLocked ? { n2: "locked" as const } : {}) }, selectedFrontierTarget: "n1" },
     adaptedHiddenNodeIds: [],
     responseSourceSummary: { human: 0, synthetic: 0, total: 0 },
-    isFoundationalRoot: true,
-    statefulPath: [
-      { position: 0, derivedNodeId: "n1", difficulty: opts.difficulty ?? 0, topologicalDepth: 0, state: "frontier", isTarget: !opts.includeLocked },
-      ...(opts.includeLocked ? [{ position: 1, derivedNodeId: "n2", difficulty: 0, topologicalDepth: 1, state: "locked" as const, isTarget: true }] : [])
+    expeditionPath: [
+      { position: 0, derivedNodeId: "n1", difficulty: opts.difficulty ?? 0, topologicalDepth: 0, state: "frontier", isSummit: !opts.includeLocked, sectionIndex: 0, sectionPositionIndex: 0, milestoneDerivedNodeId: opts.includeLocked ? "n2" : "n1", milestoneLabel: opts.includeLocked ? "Borrowing" : "Ownership", isMilestone: !opts.includeLocked },
+      ...(opts.includeLocked ? [{ position: 1, derivedNodeId: "n2", difficulty: 0, topologicalDepth: 1, state: "locked" as const, isSummit: true, sectionIndex: 0, sectionPositionIndex: 1, milestoneDerivedNodeId: "n2", milestoneLabel: "Borrowing", isMilestone: true }] : [])
     ],
+    sections: [{ sectionIndex: 0, milestoneDerivedNodeId: opts.includeLocked ? "n2" : "n1", milestoneLabel: opts.includeLocked ? "Borrowing" : "Ownership", stepDerivedNodeIds: opts.includeLocked ? ["n1", "n2"] : ["n1"], meanDifficulty: opts.difficulty ?? 0 }],
     coexistence: [],
     restorations: [],
     sheetByNode: {},

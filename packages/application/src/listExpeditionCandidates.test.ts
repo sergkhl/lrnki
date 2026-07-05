@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { DerivedGraphDetail, EnrichmentInspectionReadPort, EnrichmentSummary, LearnerExpedition, LearnerExpeditionStorePort } from "@lrnki/ports";
+import type { ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { DerivedGraphDetail, EnrichmentInspectionReadPort, EnrichmentSummary, LearnerExpedition, LearnerExpeditionStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import { listExpeditionCandidates } from "./listExpeditionCandidates";
 
 test("listExpeditionCandidates ranks fully ready targets above larger unready targets and caps the result", async () => {
@@ -28,6 +29,39 @@ test("listExpeditionCandidates ranks fully ready targets above larger unready ta
   assert.equal(result.candidates.length, 1);
   assert.equal(result.candidates[0].enrichmentId, "ready");
   assert.equal(result.candidates[0].readinessRank, 1);
+});
+
+test("Covers AE3: progress counts only items on trail-reachable (non-floored) nodes", async () => {
+  // Layer: easy(band-1 confident, floored) -> mid -> summit. `easy` carries an item that must
+  // NOT count toward the trail total; mid and summit items do.
+  const floorNode = (id: string, label: string, band: number | null): DerivedGraphDetail["nodes"][number] => ({
+    ...node(id, label, true),
+    difficulty: band,
+    difficultyBand: band,
+    difficultyContested: band === null ? null : false
+  });
+  const layer = detail("exp", [
+    floorNode("easy", "Trivial", 1),
+    floorNode("mid", "Middle", 3),
+    floorNode("summit", "Summit", 4)
+  ], [
+    { prerequisiteDerivedNodeId: "easy", dependentDerivedNodeId: "mid", confidence: 0.9, uncertain: false, judgeModel: "test" },
+    { prerequisiteDerivedNodeId: "mid", dependentDerivedNodeId: "summit", confidence: 0.9, uncertain: false, judgeModel: "test" }
+  ]);
+  const items: StudyItem[] = [studyItem("i-easy", "easy"), studyItem("i-mid", "mid"), studyItem("i-summit", "summit")];
+  const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
+
+  const result = await listExpeditionCandidates({
+    learnerStateRef: "learner-one",
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: layer }),
+    expeditionStore: fakeStore([ready]),
+    studyItemStore: fakeStudyItemStore(items),
+    responseLog: fakeResponseLog([gradedCorrect("i-mid")])
+  });
+
+  const progress = result.learnerExpeditions[0].progress;
+  // 3 items exist, but `easy` is floored → only mid + summit count. One is latest-correct.
+  assert.deepEqual(progress, { itemsPassed: 1, itemsTotal: 2 });
 });
 
 test("listExpeditionCandidates returns only the learner's own expedition rows", async () => {
@@ -115,6 +149,40 @@ function node(derivedNodeId: string, label: string, hasStudyItem: boolean): Deri
   };
 }
 
+function fakeStudyItemStore(items: StudyItem[]): StudyItemBankStorePort {
+  return {
+    async persist() {},
+    async getStudyItem() { return undefined; },
+    async listStudyItemsForEnrichment() { return items; },
+    async supportedItemTypes() { return []; }
+  };
+}
+
+function fakeResponseLog(rows: ResponseLogRow[]): ResponseLogStorePort {
+  return {
+    async append() {},
+    async listForLearner() { return rows; },
+    async listForLearnerNode() { return []; }
+  };
+}
+
+function studyItem(studyItemId: string, derivedNodeId: string): StudyItem {
+  return {
+    studyItemId, graphVersionId: null, enrichmentId: "exp", derivedNodeId,
+    groundingProvenance: "source_cep", generatingModel: "deepseek", configHash: "cfg",
+    itemType: "option_select", question: "Q", explanation: "E",
+    options: [{ optionId: "o1", text: "One", isCorrect: true, provenance: "source" }, { optionId: "o2", text: "Two", isCorrect: false, provenance: "generated" }]
+  };
+}
+
+function gradedCorrect(studyItemId: string): ResponseLogRow {
+  return {
+    responseId: `r-${studyItemId}`, learnerStateRef: "learner-one", studyItemId, derivedNodeId: "mid",
+    signalType: "graded", judgedOutcome: "correct", gradedScore: 1, responseSource: "synthetic",
+    graderIdentity: "kg-independent-judge", batchId: null, attemptSeq: 1, submittedAnswer: "x"
+  };
+}
+
 function expedition(learnerStateRef: string, learnerExpeditionId: string): LearnerExpedition {
   return {
     learnerExpeditionId,
@@ -126,7 +194,6 @@ function expedition(learnerStateRef: string, learnerExpeditionId: string): Learn
     currentOperationId: null,
     currentOperationType: null,
     enrichmentId: null,
-    targetDerivedNodeId: null,
     active: false,
     failureMessage: null,
     createdAt: "2026-01-01T00:00:00.000Z",

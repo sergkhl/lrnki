@@ -14,7 +14,7 @@ export function resolveStopActivity(session: StudySession, stopId: string): Stop
   if (!derivedNodeId || !kind) return { kind: "missing", message: "This stop is no longer on the trail." };
   if (kind === "theory") return { kind: "theory", derivedNodeId, label, lesson: session.lessonByNode[derivedNodeId] };
   if (kind === "capstone") {
-    const step = session.statefulPath.find((candidate) => candidate.derivedNodeId === derivedNodeId);
+    const step = session.expeditionPath.find((candidate) => candidate.derivedNodeId === derivedNodeId);
     return { kind: "capstone", derivedNodeId, label, mastered: step?.state === "mastered" };
   }
   const segment = (session.studySegmentsByNode[derivedNodeId] ?? []).find((candidate) => candidate.item.studyItemId === studyItemId);

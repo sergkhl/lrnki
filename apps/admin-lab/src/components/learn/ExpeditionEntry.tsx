@@ -25,7 +25,7 @@ export function ExpeditionEntry({
 
       <section className="grid gap-4 md:grid-cols-3">
         {entry.candidates.length === 0 ? <NoCandidates /> : entry.candidates.map((candidate) => (
-          <CandidateCard key={`${candidate.enrichmentId}:${candidate.target.derivedNodeId}`} learnerStateRef={learnerStateRef} candidate={candidate} />
+          <CandidateCard key={candidate.enrichmentId} learnerStateRef={learnerStateRef} candidate={candidate} />
         ))}
       </section>
 
@@ -109,7 +109,7 @@ function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRe
         <Badge variant="secondary" className="w-fit">Rank {candidate.readinessRank}</Badge>
         <CardTitle className="text-xl">{candidate.title}</CardTitle>
         <CardDescription>
-          {candidate.target.readyNodeCount}/{candidate.target.questNodeCount} stops ready
+          {candidate.readyStopCount}/{candidate.totalStopCount} stops ready
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -118,9 +118,8 @@ function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRe
           await chooseCandidateExpedition({
             learnerStateRef,
             enrichmentId: candidate.enrichmentId,
-            targetDerivedNodeId: candidate.target.derivedNodeId,
             title: candidate.title,
-            declaredDomain: candidate.target.declaredDomain
+            declaredDomain: candidate.declaredDomain
           });
         }}>
           <Button type="submit" className="w-full">

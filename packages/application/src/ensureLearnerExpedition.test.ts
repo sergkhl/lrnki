@@ -3,7 +3,7 @@ import test from "node:test";
 import type { DerivedGraphDetail, EnrichmentInspectionReadPort, LearnerExpedition, LearnerExpeditionStorePort, NewLearnerExpedition } from "@lrnki/ports";
 import { ensureLearnerExpedition } from "./ensureLearnerExpedition";
 
-test("ensureLearnerExpedition creates an admin expedition with the recommended ready target", async () => {
+test("ensureLearnerExpedition creates an admin expedition titled with the derived summit", async () => {
   const store = memoryStore();
   const result = await ensureLearnerExpedition({
     learnerStateRef: "admin",
@@ -16,14 +16,14 @@ test("ensureLearnerExpedition creates an admin expedition with the recommended r
   assert.deepEqual(result, {
     status: "ready",
     learnerExpeditionId: "learner-expedition-1",
-    enrichmentId: "enrichment-1",
-    targetDerivedNodeId: "target"
+    enrichmentId: "enrichment-1"
   });
   assert.equal(store.rows.length, 1);
   assert.equal(store.rows[0].learnerStateRef, "admin");
   assert.equal(store.rows[0].kind, "topic");
   assert.equal(store.rows[0].status, "ready");
   assert.equal(store.rows[0].active, true);
+  // The summit is the terminal node of the floored layer — "Target".
   assert.equal(store.rows[0].title, "Target");
   assert.equal(store.rows[0].declaredDomain, "software engineering");
 });
@@ -42,12 +42,12 @@ test("ensureLearnerExpedition reuses an existing learner expedition for the same
   assert.equal(store.rows.length, 1);
 });
 
-test("ensureLearnerExpedition returns no_target when no playable study items exist", async () => {
+test("ensureLearnerExpedition returns no_target when the floored layer has no summit (empty)", async () => {
   const store = memoryStore();
   const result = await ensureLearnerExpedition({
     learnerStateRef: "admin",
     enrichmentId: "enrichment-1",
-    enrichmentRead: readWith(detail({ noStudyItems: true })),
+    enrichmentRead: readWith(detail({ emptyLayer: true })),
     expeditionStore: store
   });
 
@@ -103,7 +103,6 @@ function row(input: Partial<LearnerExpedition> & Pick<LearnerExpedition, "learne
     currentOperationId: input.currentOperationId ?? null,
     currentOperationType: input.currentOperationType ?? null,
     enrichmentId: input.enrichmentId ?? "enrichment-1",
-    targetDerivedNodeId: input.targetDerivedNodeId ?? "target",
     active: input.active ?? true,
     failureMessage: input.failureMessage ?? null,
     createdAt: input.createdAt ?? "2026-01-01T00:00:00.000Z",
@@ -118,7 +117,7 @@ function readWith(enrichmentDetail: DerivedGraphDetail | undefined): EnrichmentI
   };
 }
 
-function detail(opts: { noStudyItems?: boolean } = {}): DerivedGraphDetail {
+function detail(opts: { noStudyItems?: boolean; emptyLayer?: boolean } = {}): DerivedGraphDetail {
   return {
     summary: {
       enrichmentId: "enrichment-1",
@@ -135,7 +134,7 @@ function detail(opts: { noStudyItems?: boolean } = {}): DerivedGraphDetail {
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: "2026-01-01T00:00:00.000Z"
     },
-    nodes: [
+    nodes: opts.emptyLayer ? [] : [
       {
         derivedNodeId: "prereq",
         label: "Prerequisite",
