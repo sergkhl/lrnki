@@ -26,6 +26,7 @@ export type TrailCluster = {
 export type TrailView = {
   concepts: TrailCluster[];
   nextStopId: string | null;
+  nextStopLabel: string | null;
   fogBoundaryStopId: string | null;
   masteredCount: number;
   totalClusters: number;
@@ -33,18 +34,14 @@ export type TrailView = {
 
 export function buildTrailView(session: StudySession): TrailView {
   const labelByNode = new Map(session.detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
-  const nextNodeId = session.classification.selectedFrontierTarget ?? (session.isFoundationalRoot ? session.target.derivedNodeId : null);
-  let nextStopAssigned = false;
   const clusters: TrailCluster[] = session.statefulPath.map((step) => {
     const label = labelByNode.get(step.derivedNodeId) ?? step.derivedNodeId;
     const baseState: TrailStopState = step.state === "mastered" ? "complete" : step.state === "frontier" ? "available" : "locked";
     const stops: TrailStop[] = [];
     const addStop = (kind: TrailStopKind, studyItemId: string | null) => {
       const stopId = `${step.derivedNodeId}:${kind}:${studyItemId ?? "main"}`;
-      const state = stateForStop({ baseState, kind, studyItemId, session });
-      const isNext = !nextStopAssigned && step.derivedNodeId === nextNodeId && state !== "complete";
-      if (isNext) nextStopAssigned = true;
-      stops.push({ stopId, kind, derivedNodeId: step.derivedNodeId, label, state, isNext, isFogged: baseState === "locked", studyItemId });
+      const state = stateForStop({ baseState, kind, studyItemId, derivedNodeId: step.derivedNodeId, session });
+      stops.push({ stopId, kind, derivedNodeId: step.derivedNodeId, label, state, isNext: false, isFogged: baseState === "locked", studyItemId });
     };
 
     if (session.lessonByNode[step.derivedNodeId]) addStop("theory", null);
@@ -63,11 +60,14 @@ export function buildTrailView(session: StudySession): TrailView {
     };
   });
 
-  const nextStopId = clusters.flatMap((cluster) => cluster.stops).find((stop) => stop.isNext)?.stopId ?? null;
+  const flatStops = clusters.flatMap((cluster) => cluster.stops);
+  const nextStop = flatStops.find((stop) => stop.state !== "complete" && stop.state !== "locked") ?? null;
+  if (nextStop) nextStop.isNext = true;
   return {
     concepts: clusters,
-    nextStopId,
-    fogBoundaryStopId: nextStopId,
+    nextStopId: nextStop?.stopId ?? null,
+    nextStopLabel: nextStop?.label ?? null,
+    fogBoundaryStopId: nextStop?.stopId ?? null,
     masteredCount: clusters.filter((cluster) => cluster.state === "mastered").length,
     totalClusters: clusters.length
   };
@@ -77,9 +77,14 @@ function stateForStop(input: {
   baseState: TrailStopState;
   kind: TrailStopKind;
   studyItemId: string | null;
+  derivedNodeId: string;
   session: StudySession;
 }): TrailStopState {
-  if (input.kind === "theory" || input.kind === "capstone") return input.baseState;
+  if (input.kind === "theory") {
+    if (input.baseState === "locked") return "locked";
+    return input.session.lessonReadByNode[input.derivedNodeId] ? "complete" : input.baseState;
+  }
+  if (input.kind === "capstone") return input.baseState;
   if (input.baseState === "locked") return "locked";
   if (!input.studyItemId) return input.baseState;
   return input.session.latestOutcomeByStudyItemId[input.studyItemId] === "correct" ? "complete" : input.baseState;

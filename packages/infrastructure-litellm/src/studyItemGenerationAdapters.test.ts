@@ -11,6 +11,7 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
       calls.push(input);
       return {
         question: "Where is memory allocated at runtime?",
+        explanation: "The heap is correct because the grounding says it allocates at runtime.",
         correctAnswer: { text: "Heap", citation: { passageId: "b1", evidenceQuote: "the heap allocates at runtime" } },
         distractors: ["Stack", "Register", "Cache"]
       };
@@ -27,6 +28,7 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
   });
 
   assert.equal(draft.itemType, "option_select");
+  assert.equal(draft.explanation, "The heap is correct because the grounding says it allocates at runtime.");
   assert.equal(draft.options.length, 4);
   const correct = draft.options.filter((o) => o.isCorrect);
   assert.equal(correct.length, 1);
@@ -49,6 +51,7 @@ test("generateOptionSelect labels the correct answer 'generated' on a generated-
     async call() {
       return {
         question: "Q?",
+        explanation: "Ownership is correct because the grounding describes what it tracks.",
         correctAnswer: { text: "Ownership", citation: { passageId: "p0", evidenceQuote: "tracks which binding frees a value" } },
         distractors: ["a", "b", "c"]
       };
@@ -155,24 +158,33 @@ test("impostorValidator rejects arguments missing reveal", () => {
 });
 
 test("optionSelectValidator rejects arguments missing correctAnswer", () => {
-  assert.throws(() => optionSelectValidator.parse({ question: "Q?", distractors: ["a", "b", "c"] }));
+  assert.throws(() => optionSelectValidator.parse({ question: "Q?", explanation: "Because.", distractors: ["a", "b", "c"] }));
 });
 
 test("optionSelectValidator rejects arguments missing distractors", () => {
   assert.throws(() =>
-    optionSelectValidator.parse({ question: "Q?", correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } } })
+    optionSelectValidator.parse({ question: "Q?", explanation: "Because.", correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } } })
   );
 });
 
 test("optionSelectValidator rejects the wrong distractor count (fail-closed, rule 6)", () => {
-  const base = { question: "Q?", correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } } };
+  const base = { question: "Q?", explanation: "Because.", correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } } };
   assert.throws(() => optionSelectValidator.parse({ ...base, distractors: ["a", "b"] }));
   assert.throws(() => optionSelectValidator.parse({ ...base, distractors: ["a", "b", "c", "d"] }));
+});
+
+test("optionSelectValidator rejects arguments missing explanation", () => {
+  assert.throws(() => optionSelectValidator.parse({
+    question: "Q?",
+    correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } },
+    distractors: ["a", "b", "c"]
+  }));
 });
 
 test("optionSelectValidator accepts a well-formed argument set (shape only, no content assertion)", () => {
   const parsed = optionSelectValidator.parse({
     question: "Q?",
+    explanation: "The correct option follows from the grounding.",
     correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } },
     distractors: ["a", "b", "c"]
   });

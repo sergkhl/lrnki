@@ -59,6 +59,7 @@ function optionItem(derivedNodeId: string): StudyItem {
     configHash: "cfg",
     itemType: "option_select",
     question: `Q ${derivedNodeId}`,
+    explanation: "The correct option follows from the grounded lesson.",
     options: [
       { optionId: `o-${derivedNodeId}-2`, text: "Two", isCorrect: false, provenance: "generated" },
       { optionId: `o-${derivedNodeId}-1`, text: "One", isCorrect: true, provenance: "source" }

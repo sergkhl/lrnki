@@ -51,6 +51,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
     const system = [
       "You write ONE four-option multiple-choice study item for a single learning node, conditioned ONLY on the provided grounding passages.",
       "Produce exactly one CORRECT answer, grounded strictly in the provided passages, plus exactly THREE distractors.",
+      "Also write a short explanation of why the correct answer is right, grounded in the provided passages.",
       "Cite the passage your correct answer derives from by its exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim; for generated grounding, quote only the generated grounding passage text.",
       "The correctAnswer field must be an object with text and citation. The citation evidenceQuote must be copied exactly from one listed grounding passage; do not paraphrase the citation quote.",
       "Write three plausible but INCORRECT distractors in the same domain register as the provided neighbor concepts, so wrong answers read like real domain answers. Each distractor must be clearly wrong for this question and never a paraphrase of the correct answer.",
@@ -69,7 +70,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       siblingText,
       ...(input.retryFeedback ? ["", "Retry feedback from the previous rejected draft:", input.retryFeedback] : []),
       "",
-      "Call submit_option_select_item with a question, a correctAnswer (text + citation), and exactly three distractors."
+      "Call submit_option_select_item with a question, explanation, a correctAnswer (text + citation), and exactly three distractors."
     ].join("\n");
 
     const args = await this.client.call({
@@ -91,7 +92,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       { text: args.correctAnswer.text, isCorrect: true, provenance: correctProvenance, citation: args.correctAnswer.citation },
       ...args.distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))
     ];
-    return { itemType: "option_select", question: args.question, options };
+    return { itemType: "option_select", question: args.question, explanation: args.explanation, options };
   }
 
   async generateImpostor(input: {

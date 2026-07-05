@@ -31,24 +31,33 @@
 
 ## COMPLETED
 
+- **Learner trail polish.** The learner trail now uses opaque portal surfaces, one-tap option-select
+  grading with generated explanations, persisted lesson-read completion, a linear next-pointer,
+  type-stable stop icons, gem-only capstone state, expedition domain/progress rows, and no Journal
+  route. Study-item generation and validation require option-select explanations, Study Session
+  projections expose lesson-read and explanation state, and learner expedition rows compute live
+  item progress from the study bank and latest responses. Requirements:
+  [brainstorm](../brainstorms/2026-07-04-learner-trail-polish-requirements.md). Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
 - **Learner App checkpoint trail, activity sheet, and charting onboarding.** `/learn` now centers
-  the Expedition Journal on a Duolingo-style per-item checkpoint path, with fog display and per-item
+  the learner expedition on a Duolingo-style per-item checkpoint path, with fog display and per-item
   completion derived from Study Session state, one stop opening one full-screen activity sheet with a
   single primary footer action, opaque learner surfaces, headed lesson sections, icon-only grounded
-  provenance, concept-level skip popovers, a single Journal route replacing the learner map,
-  topic-first charting with editable inferred Declared Domain, fiction-voiced charting stage copy, and
-  an Admin Lab door that ensures a playable `admin` expedition before redirecting. Requirements:
+  provenance, concept-level skip popovers, topic-first charting with editable inferred Declared
+  Domain, fiction-voiced charting stage copy, and an Admin Lab door that ensures a playable `admin`
+  expedition before redirecting. Requirements:
   [brainstorm](../brainstorms/2026-07-04-learner-app-map-center-ux-requirements.md). Decision:
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-- **Learner App Expedition Journal surface.** `/learn` is now the learner-facing Expedition Journal:
+- **Learner App expedition entry surface.** `/learn` is now the learner-facing expedition entry:
   readiness-ranked expedition entry, learner-owned expedition persistence, active selection, playable
-  trail/activity screen over `getStudySession`, journal/gem/map rewards, a learner-entered course-data
-  charting door, and progress/failure cards over ADR-0029 timelines. It supersedes the earlier Quest
-  Subgraph Admin Lab study surface; that milestone's target recommendations, trusted prerequisite
-  cones, and stateful Learner Path ladder live on as the application projections serving this route.
-  The superseded operator `/admin/lab/study` route, calibration shell, study components, and study
-  libs were deleted; the prior calibration shell alignment TODO is resolved by deletion. The learner
+  trail/activity screen over `getStudySession`, a learner-entered course-data charting door, and
+  progress/failure cards over ADR-0029 timelines. It supersedes the earlier Quest Subgraph Admin Lab
+  study surface; that milestone's target recommendations, trusted prerequisite cones, and stateful
+  Learner Path ladder live on as the application projections serving this route. The superseded
+  operator `/admin/lab/study` route, calibration shell, study components, and study libs were
+  deleted; the prior calibration shell alignment TODO is resolved by deletion. The learner
   PDF/Docling door was removed before completion, so learner-created expeditions currently use the
   synthetic course-data path only. Decisions:
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md),
@@ -114,26 +123,23 @@
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
-- **Forced-tool reliability, observability, and cost reporting.** Forced-tool schemas are
-  single-sourced from zod, and neural judge gates share one fail-safe boundary for bounded
-  concurrency, index-aligned results, and fail-closed pass-through behavior. Forced-tool exhaustion
-  is inspectable without relaxing fail-closed behavior, citation match fidelity is visible, and
-  shared operation-stage timelines support liveness plus bottleneck reports over one operation or one
-  Processing Journey. Routing production extraction aliases to DeepSeek first-party resolved the
-  prior extraction latency blocker and removed the dedicated OpenRouter-key blocker. Decisions:
-  [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
-  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md),
-  [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md),
-  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md), and
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
-
-- **Inspection and learner-projection boundaries.** Inspection surfaces use read-model ports, while
-  learner-facing projections compose reads with adaptation compute behind application use-cases;
-  Admin Lab remains a thin operator surface. Decisions:
-  [ADR-0011](../adr/0011-retain-minimal-admin-lab.md) and
-  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
-
 ## VALIDATION
+
+- **Learner trail polish, 2026-07-04.** Deterministic envelope: `pnpm run check` exit 0 (full
+  workspace typecheck, recursive tests, ESLint with 2 pre-existing warnings, and Admin Lab
+  production build). The single initial migration reset succeeded with `study_items.explanation` and
+  `lesson_reads`. Real-use gate: `scripts/seed-demo.sh` ran production LLM extraction, graph build,
+  enrichment, and Study Item Bank generation across the curated fixture set, publishing graph version
+  `e2e4ecd8-305c-4568-b35c-8e9582c698a0`, enrichment
+  `e7771ca2-51e4-42ab-8caa-bad614d2ad9a`, 91 lessons, and 160 current study items; 22 generated
+  study-item rows were rejected by the existing fail-closed gates. Browser inspection on
+  `http://localhost:3001` passed for the seeded `admin` expedition: expedition rows showed declared
+  domain and item progress, the trail showed gem count and no Journal navigation, the retired
+  Journal route returned 404, theory Continue persisted a lesson read, one-tap grading persisted a
+  response and showed explanation feedback, 390px mobile had no horizontal overflow, and concept
+  popovers remained opaque/readable. Caveat: Playwright observed one React hydration warning on form
+  control styling in the charting form, outside this trail flow. **Result: PASS.** Screenshots and
+  report: `tmp/learner-trail-polish/`.
 
 - **Learner App checkpoint trail, activity sheet, and charting onboarding, 2026-07-04.**
   Deterministic envelope: `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint
@@ -148,7 +154,7 @@
   reduced locked activity buttons from 32 to 28. **Real-use quality evaluation:** PASS for the seeded
   `admin` learner expedition. Screenshots and reports: `tmp/learner-checkpoint-ux/`.
 
-- **Learner App Expedition Journal surface, 2026-07-04.** Deterministic envelope:
+- **Learner App expedition entry surface, 2026-07-04.** Deterministic envelope:
   `pnpm run check` exit 0 after the review-fix pass (full workspace typecheck, recursive tests,
   ESLint with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
   `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests/typecheck, and

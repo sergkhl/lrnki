@@ -362,6 +362,7 @@ export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMe
 
 export const optionSelectValidator = z.object({
   question: z.string().min(1).describe("One self-contained multiple-choice question about the learning node with a single correct answer. Do not reference 'the passage' or 'the source'."),
+  explanation: z.string().min(1).describe("Short learner-facing rationale explaining why the correct answer follows from the provided grounding. Stay domain-neutral and do not mention tool or source mechanics."),
   correctAnswer: z.object({
     text: z.string().min(1).describe("The single correct option, grounded strictly in the provided passages."),
     citation: passageCitation

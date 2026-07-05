@@ -29,6 +29,7 @@ export type StudyOptionSelectView = {
   studyItemId: string;
   derivedNodeId: string;
   question: string;
+  explanation: string;
   groundingProvenance: StudyItemGroundingProvenance;
   options: {
     optionId: string;
@@ -142,6 +143,7 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           studyItemId: item.studyItemId,
           derivedNodeId: item.derivedNodeId,
           question: item.question,
+          explanation: item.explanation,
           groundingProvenance: item.groundingProvenance,
           options: [...item.options]
             .sort((a, b) => a.optionId.localeCompare(b.optionId))
@@ -292,6 +294,7 @@ export type StudySession = {
   // writes nothing (R13). `lessonAbsent` gives the operator thin visibility into which nodes
   // produced no lesson and why.
   lessonByNode: Record<string, ConceptLessonView>;
+  lessonReadByNode: Record<string, boolean>;
   lessonAbsent: LessonAbsentView[];
 };
 
@@ -312,6 +315,7 @@ export function composeStudySession(input: {
   // that have not yet wired the lesson store compose a session with no lessons (unchanged
   // behavior) rather than a type break; the real readers pass them (U8).
   lessons?: ConceptLesson[];
+  lessonReads?: string[];
   lessonAbsent?: LessonAbsentNode[];
 }): StudySession {
   const { detail, targetDerivedNodeId } = input;
@@ -408,6 +412,7 @@ export function composeStudySession(input: {
   // The lesson substrate rides down keyed by node (KTD5). Absences become a thin operator view.
   const lessonByNode: Record<string, ConceptLessonView> = {};
   for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
+  const lessonReadByNode = Object.fromEntries((input.lessonReads ?? []).map((derivedNodeId) => [derivedNodeId, true]));
   const lessonAbsent: LessonAbsentView[] = (input.lessonAbsent ?? [])
     .map((node) => ({ derivedNodeId: node.derivedNodeId, label: labelByNode.get(node.derivedNodeId) ?? node.canonicalLabel, reason: node.reason }))
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -430,6 +435,7 @@ export function composeStudySession(input: {
     studySegmentsByNode,
     latestOutcomeByStudyItemId,
     lessonByNode,
+    lessonReadByNode,
     lessonAbsent
   };
 }

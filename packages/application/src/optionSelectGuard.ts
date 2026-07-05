@@ -78,6 +78,10 @@ export function validateOptionSelectItem(
     return { ok: false, reason: `option-select requires exactly one correct option, got ${correctOptions.length}` };
   }
   const correct = correctOptions[0];
+  const explanation = draft.explanation.trim();
+  if (!explanation) {
+    return { ok: false, reason: "option-select requires a non-empty explanation" };
+  }
 
   // (4) the correct option's citation verifies verbatim against a grounding passage under
   // the provenance contract. The resolved provenance is taken from the MATCHED passage
@@ -126,6 +130,7 @@ export function validateOptionSelectItem(
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
       question: draft.question,
+      explanation,
       options: builtOptions
     }
   };

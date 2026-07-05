@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, ImpostorItem, ImpostorStatement, LessonAbsentNode, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
-import type { CalibrationVerdictStorePort, ConceptLessonStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { CalibrationVerdictStorePort, ConceptLessonStorePort, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
@@ -43,8 +43,8 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       }
       for (const item of studyItems) {
         await tx`
-          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
-          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.generatingModel}, ${item.configHash})`;
+          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, generating_model, config_hash)
+          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.itemType === "option_select" ? item.explanation : null}, ${item.generatingModel}, ${item.configHash})`;
 
         // Sequential await keeps the per-item child inserts ordered within the tx.
         if (item.itemType === "option_select") {
@@ -114,7 +114,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, generating_model, config_hash
       FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
@@ -123,7 +123,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, generating_model, config_hash
       FROM study_items WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
@@ -200,7 +200,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         provenance: option.provenance,
         ...(option.is_correct && citation ? { citation } : {})
       }));
-      return { ...base, itemType: "option_select", options };
+      return { ...base, itemType: "option_select", explanation: row.explanation ?? "", options };
     });
   }
 }
@@ -266,6 +266,7 @@ type StudyItemRow = {
   derived_node_id: string;
   grounding_provenance: string;
   question: string;
+  explanation: string | null;
   generating_model: string;
   config_hash: string;
 };
@@ -514,6 +515,30 @@ export class PostgresCalibrationVerdictStore implements CalibrationVerdictStoreP
 
   async clearLearner(learnerStateRef: string): Promise<void> {
     await this.sql`DELETE FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}`;
+  }
+}
+
+export class PostgresLessonReadStore implements LessonReadStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async markRead(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void> {
+    await this.sql`
+      INSERT INTO lesson_reads (learner_state_ref, derived_node_id)
+      VALUES (${input.learnerStateRef}, ${input.derivedNodeId})
+      ON CONFLICT (learner_state_ref, derived_node_id) DO NOTHING`;
+  }
+
+  async listForLearner(learnerStateRef: string): Promise<{ learnerStateRef: string; derivedNodeId: string; firstReadAt: string }[]> {
+    const rows = await this.sql<{ learner_state_ref: string; derived_node_id: string; first_read_at: string }[]>`
+      SELECT learner_state_ref, derived_node_id, first_read_at
+      FROM lesson_reads
+      WHERE learner_state_ref = ${learnerStateRef}
+      ORDER BY derived_node_id`;
+    return rows.map((row) => ({
+      learnerStateRef: row.learner_state_ref,
+      derivedNodeId: row.derived_node_id,
+      firstReadAt: new Date(row.first_read_at).toISOString()
+    }));
   }
 }
 

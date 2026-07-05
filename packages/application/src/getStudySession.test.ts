@@ -28,7 +28,7 @@ function detail(): DerivedGraphDetail {
 const optionItem: StudyItem = {
   studyItemId: "os-scope", graphVersionId: "g", enrichmentId: "e", derivedNodeId: "scope",
   groundingProvenance: "source_cep", generatingModel: "deepseek", configHash: "cfg",
-  itemType: "option_select", question: "Q", options: [
+  itemType: "option_select", question: "Q", explanation: "One is correct because the grounding says so.", options: [
     { optionId: "o1", text: "One", isCorrect: true, provenance: "source" },
     { optionId: "o2", text: "Two", isCorrect: false, provenance: "generated" }
   ]
@@ -78,6 +78,15 @@ function conceptLessonStore(lessons: ConceptLesson[], absent: LessonAbsentNode[]
   };
 }
 
+function lessonReadStore(reads: string[] = []) {
+  return {
+    async markRead() { throw new Error("not used"); },
+    async listForLearner() {
+      return reads.map((derivedNodeId) => ({ learnerStateRef: "L1", derivedNodeId, firstReadAt: "2026-01-01T00:00:00.000Z" }));
+    }
+  };
+}
+
 const scopeLesson: ConceptLesson = {
   derivedNodeId: "scope", graphVersionId: "g", enrichmentId: "e", generatingModel: "deepseek", configHash: "cfg",
   canonicalLabel: "Variable scope",
@@ -96,6 +105,7 @@ function callGetStudySession(args: { enrichmentId?: string; target?: string; ite
     enrichmentRead: enrichmentRead({ e: detail() }),
     studyItemStore: studyItemStore(args.items ?? [optionItem]),
     conceptLessonStore: conceptLessonStore(args.lessons ?? [], args.absent ?? []),
+    lessonReadStore: lessonReadStore(),
     responseLog: responseLog(args.rows ?? []),
     verdictStore: verdictStore(args.verdicts ?? [])
   });

@@ -69,6 +69,7 @@ function optionSelectFor(s: Substrate): OptionSelectItem {
     derivedNodeId: s.derivedNodeId,
     groundingProvenance: "source_cep",
     question: "What does ownership govern?",
+    explanation: "Ownership governs memory according to the grounded source.",
     generatingModel: "test-model",
     configHash: "cfg",
     options: [

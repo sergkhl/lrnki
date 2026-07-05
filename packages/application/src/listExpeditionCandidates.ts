@@ -3,7 +3,9 @@ import type {
   EnrichmentInspectionReadPort,
   EnrichmentSummary,
   LearnerExpedition,
-  LearnerExpeditionStorePort
+  LearnerExpeditionStorePort,
+  ResponseLogStorePort,
+  StudyItemBankStorePort
 } from "@lrnki/ports";
 import { buildTargetCandidates, recommendedTargets, type TargetCandidate } from "./targetCandidates";
 
@@ -18,13 +20,15 @@ export type ExpeditionCandidate = {
 
 export type LearnerExpeditionEntry = {
   candidates: ExpeditionCandidate[];
-  learnerExpeditions: LearnerExpedition[];
+  learnerExpeditions: (LearnerExpedition & { progress?: { itemsPassed: number; itemsTotal: number } })[];
 };
 
 export async function listExpeditionCandidates(input: {
   learnerStateRef: string;
   enrichmentRead: EnrichmentInspectionReadPort;
   expeditionStore: LearnerExpeditionStorePort;
+  studyItemStore?: StudyItemBankStorePort;
+  responseLog?: ResponseLogStorePort;
   limit?: number;
 }): Promise<LearnerExpeditionEntry> {
   const [summaries, learnerExpeditions] = await Promise.all([
@@ -43,8 +47,37 @@ export async function listExpeditionCandidates(input: {
 
   return {
     candidates: candidates.slice(0, input.limit ?? 3).map((candidate, index) => ({ ...candidate, readinessRank: index + 1 })),
-    learnerExpeditions
+    learnerExpeditions: await withExpeditionProgress({
+      learnerStateRef: input.learnerStateRef,
+      expeditions: learnerExpeditions,
+      studyItemStore: input.studyItemStore,
+      responseLog: input.responseLog
+    })
   };
+}
+
+async function withExpeditionProgress(input: {
+  learnerStateRef: string;
+  expeditions: LearnerExpedition[];
+  studyItemStore?: StudyItemBankStorePort;
+  responseLog?: ResponseLogStorePort;
+}): Promise<LearnerExpeditionEntry["learnerExpeditions"]> {
+  if (!input.studyItemStore || !input.responseLog) return input.expeditions;
+  const rows = await input.responseLog.listForLearner(input.learnerStateRef);
+  const latest = new Map<string, { attemptSeq: number; correct: boolean }>();
+  for (const row of rows) {
+    if (row.signalType !== "graded" || !row.judgedOutcome) continue;
+    const prior = latest.get(row.studyItemId);
+    if (prior && prior.attemptSeq >= row.attemptSeq) continue;
+    latest.set(row.studyItemId, { attemptSeq: row.attemptSeq, correct: row.judgedOutcome === "correct" });
+  }
+  return Promise.all(input.expeditions.map(async (expedition) => {
+    if (expedition.status !== "ready" || !expedition.enrichmentId) return expedition;
+    const items = await input.studyItemStore!.listStudyItemsForEnrichment(expedition.enrichmentId);
+    const itemIds = new Set(items.map((item) => item.studyItemId));
+    const itemsPassed = [...itemIds].filter((studyItemId) => latest.get(studyItemId)?.correct === true).length;
+    return { ...expedition, progress: { itemsPassed, itemsTotal: itemIds.size } };
+  }));
 }
 
 function candidatesForSummary(summary: EnrichmentSummary, detail: DerivedGraphDetail): ExpeditionCandidate[] {

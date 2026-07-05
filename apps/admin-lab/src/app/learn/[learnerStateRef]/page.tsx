@@ -2,6 +2,8 @@ import { listExpeditionCandidates } from "@lrnki/application";
 import {
   PostgresEnrichmentInspectionRead,
   PostgresLearnerExpeditionStore,
+  PostgresResponseLogStore,
+  PostgresStudyItemBankStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 import { ExpeditionEntry } from "@/components/learn/ExpeditionEntry";
@@ -15,7 +17,9 @@ async function loadEntry(learnerStateRef: string) {
     return await listExpeditionCandidates({
       learnerStateRef,
       enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-      expeditionStore: new PostgresLearnerExpeditionStore(sql)
+      expeditionStore: new PostgresLearnerExpeditionStore(sql),
+      studyItemStore: new PostgresStudyItemBankStore(sql),
+      responseLog: new PostgresResponseLogStore(sql)
     });
   } finally {
     await sql.end({ timeout: 5 });

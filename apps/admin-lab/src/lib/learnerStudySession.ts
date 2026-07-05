@@ -4,6 +4,7 @@ import {
   PostgresCalibrationVerdictStore,
   PostgresConceptLessonStore,
   PostgresEnrichmentInspectionRead,
+  PostgresLessonReadStore,
   PostgresResponseLogStore,
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
@@ -25,6 +26,7 @@ export async function getLearnerStudySession(
       enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
       studyItemStore: new PostgresStudyItemBankStore(sql),
       conceptLessonStore: new PostgresConceptLessonStore(sql),
+      lessonReadStore: new PostgresLessonReadStore(sql),
       responseLog: new PostgresResponseLogStore(sql),
       verdictStore: new PostgresCalibrationVerdictStore(sql)
     });

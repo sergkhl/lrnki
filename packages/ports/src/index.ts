@@ -540,6 +540,17 @@ export interface ConceptLessonStorePort {
   listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
 }
 
+export type LessonRead = {
+  learnerStateRef: string;
+  derivedNodeId: string;
+  firstReadAt: string;
+};
+
+export interface LessonReadStorePort {
+  markRead(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void>;
+  listForLearner(learnerStateRef: string): Promise<LessonRead[]>;
+}
+
 // Study Item generation (R9, R10). Forced named tool schemas routed through LiteLLM; the
 // generator stays DeepSeek-family (AGENTS rule 5). `generateOptionSelect` returns a
 // pre-verification OptionSelectItemDraft (a grounded correct answer + three

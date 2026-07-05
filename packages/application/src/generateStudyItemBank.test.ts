@@ -171,6 +171,7 @@ function osDraft(correctQuote: string, distractors: [string, string, string] = [
   return {
     itemType: "option_select",
     question: "Where is memory governed?",
+    explanation: "The lesson states memory is governed by this concept.",
     options: [
       { text: "Heap", isCorrect: true, provenance: "source", citation: { passageId, evidenceQuote: correctQuote } },
       ...distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))

@@ -19,12 +19,8 @@ const USED_KEYS = [
   "examine",
   "continueAction",
   "returnToTrail",
-  "submitAnswer",
   "skipKnown",
   "groundedTooltip",
-  "journal",
-  "gemCollection",
-  "surveyMap",
   "topicDoor",
   "progress",
   "summit"

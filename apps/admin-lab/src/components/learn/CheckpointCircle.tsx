@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenIcon, CheckIcon, GemIcon, LockIcon, MapPinIcon, SearchIcon } from "lucide-react";
+import { BookOpenIcon, GemIcon, LockIcon, MapPinIcon, SearchIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import type { TrailStop } from "./trailView";
@@ -48,7 +48,6 @@ export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop;
 }
 
 function iconForStop(stop: TrailStop) {
-  if (stop.state === "complete") return <CheckIcon />;
   if (stop.state === "locked") return <LockIcon />;
   if (stop.kind === "theory") return <BookOpenIcon />;
   if (stop.kind === "option_select") return <MapPinIcon />;

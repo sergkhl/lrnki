@@ -50,7 +50,7 @@ function distractor(text: string): StudyItemOptionDraft {
 }
 
 function draftOf(options: StudyItemOptionDraft[]): OptionSelectItemDraft {
-  return { itemType: "option_select", question: "Where is memory allocated at runtime?", options };
+  return { itemType: "option_select", question: "Where is memory allocated at runtime?", explanation: "The grounding says a heap allocates memory at runtime.", options };
 }
 
 test("happy path: four distinct options, one grounded correct, three generated → ok with assigned ids", () => {
@@ -61,6 +61,7 @@ test("happy path: four distinct options, one grounded correct, three generated �
   );
   assert.equal(result.ok, true);
   if (!result.ok) return;
+  assert.equal(result.item.explanation, "The grounding says a heap allocates memory at runtime.");
   assert.equal(result.item.options.length, 4);
   assert.deepEqual(
     result.item.options.map((o) => o.optionId),
@@ -159,6 +160,16 @@ test("correct option whose quote does not verify against grounding → reject (u
   assert.equal(result.ok, false);
   if (result.ok) return;
   assert.match(result.reason, /does not verify/i);
+});
+
+test("missing explanation → reject", () => {
+  const result = validateOptionSelectItem(
+    { ...draftOf([correct, distractor("Stack"), distractor("Register"), distractor("Cache")]), explanation: " " },
+    sourceGrounding()
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /explanation/i);
 });
 
 test("R10: non-correct option labeled 'source' → reject (distractor must be generated)", () => {

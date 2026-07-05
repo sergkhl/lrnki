@@ -52,7 +52,21 @@ export function ExpeditionEntry({
                 <MapIcon />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{expedition.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{expeditionStatusLabel(expedition.status)}{expedition.active ? " · active" : ""}</p>
+                  <p className="truncate text-xs text-muted-foreground">{expedition.declaredDomain}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {expedition.status === "ready" && expedition.progress
+                      ? `${expedition.progress.itemsPassed} of ${expedition.progress.itemsTotal} collected`
+                      : expeditionStatusLabel(expedition.status)}
+                    {expedition.active ? " · active" : ""}
+                  </p>
+                  {expedition.status === "ready" && expedition.progress ? (
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--journal-line)]">
+                      <div
+                        className="h-full rounded-full bg-[color:var(--journal-gem)]"
+                        style={{ width: `${expedition.progress.itemsTotal === 0 ? 0 : Math.round((expedition.progress.itemsPassed / expedition.progress.itemsTotal) * 100)}%` }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 <Button type="submit" size="sm" variant={expedition.active ? "secondary" : "outline"} disabled={expedition.status !== "ready"}>
                   <ArrowRightIcon data-icon="inline-start" />

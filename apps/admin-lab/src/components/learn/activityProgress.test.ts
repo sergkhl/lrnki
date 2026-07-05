@@ -76,11 +76,12 @@ function session(opts: { mastered?: boolean } = {}): StudySession {
     latestOutcomeByStudyItemId: {},
     studySegmentsByNode: {
       n1: [
-        { kind: "option_select", item: { studyItemId: "i1", derivedNodeId: "n1", question: "Q?", groundingProvenance: "generated", options: [] } },
+        { kind: "option_select", item: { studyItemId: "i1", derivedNodeId: "n1", question: "Q?", explanation: "Grounded explanation.", groundingProvenance: "generated", options: [] } },
         { kind: "impostor", item: { studyItemId: "i2", derivedNodeId: "n1", question: "Which is false?", groundingProvenance: "generated", statements: [], reveal: "Reveal", lieSource: "generated" } }
       ]
     },
     lessonByNode: { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [] } },
+    lessonReadByNode: {},
     lessonAbsent: []
   };
 }

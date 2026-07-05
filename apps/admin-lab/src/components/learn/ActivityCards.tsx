@@ -13,11 +13,13 @@ export function OptionSelectBody({
   item,
   selectedId,
   result,
+  disabled,
   onSelect
 }: Readonly<{
   item: StudyOptionSelectView;
   selectedId: string | null;
   result: ActivityResult;
+  disabled: boolean;
   onSelect: (optionId: string) => void;
 }>) {
   return (
@@ -37,7 +39,7 @@ export function OptionSelectBody({
               key={option.optionId}
               type="button"
               variant={variant}
-              disabled={graded}
+              disabled={disabled || graded}
               className={cn(
                 "h-auto min-h-9 w-full justify-start whitespace-normal text-left",
                 isChosen && !graded ? "ring-2 ring-[color:var(--journal-frontier)]" : null
@@ -53,6 +55,12 @@ export function OptionSelectBody({
           );
         })}
       </div>
+      {result?.graded ? (
+        <div className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3 text-sm">
+          <p className="font-medium">{result.correct ? "Correct." : "Not quite."}</p>
+          <p className="mt-1 text-muted-foreground">{item.explanation}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -61,11 +69,13 @@ export function ImpostorBody({
   item,
   selectedId,
   result,
+  disabled,
   onSelect
 }: Readonly<{
   item: StudyImpostorView;
   selectedId: string | null;
   result: ActivityResult;
+  disabled: boolean;
   onSelect: (statementId: string) => void;
 }>) {
   return (
@@ -85,7 +95,7 @@ export function ImpostorBody({
               key={statement.statementId}
               type="button"
               variant={variant}
-              disabled={graded}
+              disabled={disabled || graded}
               className={cn(
                 "h-auto min-h-9 w-full justify-start whitespace-normal text-left",
                 isChosen && !graded ? "ring-2 ring-[color:var(--journal-frontier)]" : null

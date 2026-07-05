@@ -8,6 +8,7 @@ import { appendGradedSelectionOutcome } from "@lrnki/application";
 import type { Verdict } from "@lrnki/domain-core";
 import {
   PostgresCalibrationVerdictStore,
+  PostgresLessonReadStore,
   PostgresLearnerExpeditionStore,
   PostgresResponseLogStore,
   createDatabaseClient
@@ -202,6 +203,33 @@ export async function setLearnerVerdict(input: {
       learnerStateRef: input.learnerStateRef,
       derivedNodeId: input.derivedNodeId,
       verdict: input.verdict
+    });
+  });
+  revalidatePath(expeditionPath(input.learnerStateRef, input.enrichmentId));
+}
+
+export async function markLearnerLessonRead(input: {
+  learnerStateRef: string;
+  enrichmentId: string;
+  derivedNodeId: string;
+}): Promise<void> {
+  if (!input.learnerStateRef || !input.enrichmentId || !input.derivedNodeId) return;
+  await withSqlClient(async (sql) => {
+    const rows = await sql<{ derived_node_id: string }[]>`
+      SELECT dgn.derived_node_id
+      FROM derived_graph_nodes dgn
+      JOIN learner_expeditions le
+        ON le.learner_state_ref = ${input.learnerStateRef}
+       AND le.enrichment_id = dgn.enrichment_id
+       AND le.status = 'ready'
+       AND le.active
+      WHERE dgn.derived_node_id = ${input.derivedNodeId}
+        AND dgn.enrichment_id = ${input.enrichmentId}
+      LIMIT 1`;
+    if (rows.length === 0) return;
+    await new PostgresLessonReadStore(sql).markRead({
+      learnerStateRef: input.learnerStateRef,
+      derivedNodeId: input.derivedNodeId
     });
   });
   revalidatePath(expeditionPath(input.learnerStateRef, input.enrichmentId));

@@ -664,6 +664,7 @@ CREATE TABLE study_items (
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   question text NOT NULL,
+  explanation text,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -902,6 +903,13 @@ CREATE TABLE calibration_verdicts (
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   verdict text NOT NULL CHECK (verdict IN ('known', 'learn')),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (learner_state_ref, derived_node_id)
+);
+
+CREATE TABLE lesson_reads (
+  learner_state_ref text NOT NULL,
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  first_read_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (learner_state_ref, derived_node_id)
 );
 

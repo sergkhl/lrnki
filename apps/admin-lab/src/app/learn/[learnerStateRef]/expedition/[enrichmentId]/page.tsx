@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeftIcon, BookOpenIcon } from "lucide-react";
+import { ArrowLeftIcon } from "lucide-react";
 import { PostgresLearnerExpeditionStore, createDatabaseClient } from "@lrnki/infrastructure-postgres";
 import { Button } from "@/components/ui/button";
 import { CheckpointPath } from "@/components/learn/CheckpointPath";
@@ -42,16 +42,8 @@ export default async function ExpeditionPage({
           <ArrowLeftIcon data-icon="inline-start" />
           Expeditions
         </Button>
-        <Button
-          variant="outline"
-          nativeButton={false}
-          render={<Link href={`/learn/${encodeURIComponent(learnerStateRef)}/expedition/${encodeURIComponent(enrichmentId)}/journal` as Route} />}
-        >
-          <BookOpenIcon data-icon="inline-start" />
-          Journal
-        </Button>
       </nav>
-      <QuestHeader session={session} />
+      <QuestHeader session={session} trail={trail} />
       <CheckpointPath view={trail} session={session} />
     </div>
   );

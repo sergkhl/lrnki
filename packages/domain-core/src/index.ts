@@ -1358,6 +1358,7 @@ type StudyItemBase = {
 export type OptionSelectItem = StudyItemBase & {
   itemType: "option_select";
   question: string;
+  explanation: string;
   options: StudyItemOption[];
 };
 
@@ -1426,6 +1427,7 @@ export type StudyItemOptionDraft = {
 export type OptionSelectItemDraft = {
   itemType: "option_select";
   question: string;
+  explanation: string;
   options: StudyItemOptionDraft[];
 };
 

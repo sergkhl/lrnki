@@ -2,15 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { GemIcon } from "lucide-react";
+import { CheckCircle2Icon, GemIcon } from "lucide-react";
 import type { StudySession } from "@lrnki/application";
 import type { LearnerGradingResult } from "@/app/learn/[learnerStateRef]/actions";
-import { refreshLearnerExpedition, submitLearnerImpostor, submitLearnerOptionSelect } from "@/app/learn/[learnerStateRef]/actions";
+import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerOptionSelect } from "@/app/learn/[learnerStateRef]/actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { LessonSections } from "./LessonSections";
 import { resolveStopActivity } from "./activityProgress";
+import { buildTrailView } from "./trailView";
 import { learnerTerm } from "./vocabulary";
 
 type Activity = ReturnType<typeof resolveStopActivity>;
@@ -27,7 +28,9 @@ export function ActivitySheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }>) {
-  const activity = stopId ? resolveStopActivity(session, stopId) : null;
+  const [localStop, setLocalStop] = useState<{ sourceStopId: string | null; activeStopId: string | null } | null>(null);
+  const activeStopId = localStop?.sourceStopId === stopId ? localStop.activeStopId : stopId;
+  const activity = activeStopId ? resolveStopActivity(session, activeStopId) : null;
   const title = activity && activity.kind !== "missing" ? activity.label : "Trail stop";
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -41,9 +44,11 @@ export function ActivitySheet({
         </SheetHeader>
         {activity ? (
           <ActivityController
-            key={stopId}
+            key={activeStopId}
             session={session}
             activity={activity}
+            stopId={activeStopId}
+            onAdvance={(nextStopId) => setLocalStop({ sourceStopId: stopId, activeStopId: nextStopId })}
             onDone={() => onOpenChange(false)}
           />
         ) : null}
@@ -55,32 +60,51 @@ export function ActivitySheet({
 function ActivityController({
   session,
   activity,
+  stopId,
+  onAdvance,
   onDone
-}: Readonly<{ session: StudySession; activity: Activity; onDone: () => void }>) {
+}: Readonly<{ session: StudySession; activity: Activity; stopId: string | null; onAdvance: (stopId: string) => void; onDone: () => void }>) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [result, setResult] = useState<ActivityResult>(null);
   const [pending, startTransition] = useTransition();
   const graded = result?.graded === true;
-  const canCheck = (activity.kind === "option_select" || activity.kind === "impostor") && selectedId !== null && !graded && !pending;
 
-  const closeAfterRefresh = () => {
+  const nextStopId = () => {
+    if (!stopId) return null;
+    const stops = buildTrailView(session).concepts.flatMap((concept) => concept.stops);
+    const currentIndex = stops.findIndex((stop) => stop.stopId === stopId);
+    if (currentIndex < 0) return null;
+    return stops.slice(currentIndex + 1).find((stop) => stop.state !== "locked")?.stopId ?? null;
+  };
+
+  const continueAfterRefresh = () => {
     startTransition(async () => {
+      if (activity.kind === "theory") {
+        await markLearnerLessonRead({
+          learnerStateRef: session.learnerStateRef,
+          enrichmentId: session.enrichmentId,
+          derivedNodeId: activity.derivedNodeId
+        });
+      }
       await refreshLearnerExpedition({ learnerStateRef: session.learnerStateRef, enrichmentId: session.enrichmentId });
       router.refresh();
-      onDone();
+      const next = nextStopId();
+      if (!next || next.includes(":capstone:")) onDone();
+      else onAdvance(next);
     });
   };
 
-  const check = () => {
-    if (!canCheck || !selectedId) return;
+  const submitSelection = (id: string) => {
+    if (pending || graded) return;
+    setSelectedId(id);
     startTransition(async () => {
       if (activity.kind === "option_select") {
         setResult(await submitLearnerOptionSelect({
           learnerStateRef: session.learnerStateRef,
           enrichmentId: session.enrichmentId,
           studyItemId: activity.item.studyItemId,
-          chosenOptionId: selectedId
+          chosenOptionId: id
         }));
       }
       if (activity.kind === "impostor") {
@@ -88,7 +112,7 @@ function ActivityController({
           learnerStateRef: session.learnerStateRef,
           enrichmentId: session.enrichmentId,
           studyItemId: activity.item.studyItemId,
-          chosenStatementId: selectedId
+          chosenStatementId: id
         }));
       }
     });
@@ -98,7 +122,8 @@ function ActivityController({
     <>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
-          <ActivityBody activity={activity} selectedId={selectedId} result={result} onSelect={setSelectedId} />
+          <CompletedIndicator session={session} activity={activity} result={result} />
+          <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} onSelect={submitSelection} />
           {result && !result.graded ? <p className="text-sm text-destructive">{result.message}</p> : null}
         </div>
       </div>
@@ -107,10 +132,8 @@ function ActivityController({
           <FooterButton
             activity={activity}
             pending={pending}
-            canCheck={canCheck}
             graded={graded}
-            onCheck={check}
-            onContinue={closeAfterRefresh}
+            onContinue={continueAfterRefresh}
             onDone={onDone}
           />
         </div>
@@ -123,16 +146,18 @@ function ActivityBody({
   activity,
   selectedId,
   result,
+  pending,
   onSelect
 }: Readonly<{
   activity: Activity;
   selectedId: string | null;
   result: ActivityResult;
+  pending: boolean;
   onSelect: (id: string) => void;
 }>) {
   if (activity.kind === "missing") return <p className="text-sm text-muted-foreground">{activity.message}</p>;
-  if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={result} onSelect={onSelect} />;
-  if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={result} onSelect={onSelect} />;
+  if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={result} disabled={pending} onSelect={onSelect} />;
+  if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={result} disabled={pending} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
     return (
       <section className="flex flex-col gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
@@ -159,17 +184,13 @@ function ActivityBody({
 function FooterButton({
   activity,
   pending,
-  canCheck,
   graded,
-  onCheck,
   onContinue,
   onDone
 }: Readonly<{
   activity: Activity;
   pending: boolean;
-  canCheck: boolean;
   graded: boolean;
-  onCheck: () => void;
   onContinue: () => void;
   onDone: () => void;
 }>) {
@@ -181,11 +202,7 @@ function FooterButton({
         </Button>
       );
     }
-    return (
-      <Button type="button" disabled={!canCheck} onClick={onCheck}>
-        {learnerTerm("submitAnswer")}
-      </Button>
-    );
+    return null;
   }
   if (activity.kind === "capstone") {
     return (
@@ -198,6 +215,25 @@ function FooterButton({
     <Button type="button" disabled={pending} onClick={activity.kind === "missing" ? onDone : onContinue}>
       {learnerTerm("continueAction")}
     </Button>
+  );
+}
+
+function CompletedIndicator({
+  session,
+  activity,
+  result
+}: Readonly<{ session: StudySession; activity: Activity; result: ActivityResult }>) {
+  const complete =
+    activity.kind === "theory" ? session.lessonReadByNode[activity.derivedNodeId] :
+    activity.kind === "option_select" || activity.kind === "impostor"
+      ? session.latestOutcomeByStudyItemId[activity.item.studyItemId] === "correct" || (result?.graded === true && result.correct)
+      : false;
+  if (!complete) return null;
+  return (
+    <div className="flex w-fit items-center gap-2 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-gem-soft)] px-3 py-2 text-sm font-medium text-[color:var(--journal-ink)]">
+      <CheckCircle2Icon className="size-4" />
+      Collected
+    </div>
   );
 }
 
