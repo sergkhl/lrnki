@@ -24,6 +24,16 @@
 
 ## COMPLETED
 
+- **Learner theory quality, sparse item blueprint, and game-flow polish.** Concept Lessons now carry
+  key terms and list-structured examples/applications; a cross-family redundancy judge retries then
+  drops redundant non-substantive sections; the lesson minimum is one substantive section; Study
+  Item Blueprint generation has a structural sparse pre-gate; itemless lesson nodes master through
+  lesson reads; and the Learner App remembers the learner name, uses a mobile-first matching layout,
+  and routes through the capstone reward before advancing. Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
 - **Comparative banded intrinsic difficulty and trail floor.** Intrinsic difficulty is now a
   K-sampled comparative in-set banded prior: one forced-tool call per Declared Domain bands every
   concept 1–5 relative to that domain's set, dispersion marks contested bands, and a bounded
@@ -101,24 +111,6 @@
   [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md), and
   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-- **Source-grounded asserted graph baseline.** Curated mixed-format sources normalize into structured
-  blocks; atomic Concept Admission selects core Concepts; CEP extraction preserves verified
-  definitions, mentions, and the single permitted typed assertion; explicitly selected Extraction
-  Runs build immutable asserted graph versions with zero asserted edges. Decisions:
-  [ADR-0004](../adr/0004-normalize-curated-sources.md),
-  [ADR-0005](../adr/0005-admit-atomic-concepts-before-evidence-profiles.md),
-  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md),
-  [ADR-0016](../adr/0016-retire-relation-registry-keep-one-cep-assertion.md), and
-  [ADR-0017](../adr/0017-split-extraction-runs-from-graph-version-builds.md).
-
-- **Derived Graph Enrichment.** Enrichment rescues source-mentioned nodes, mints generated nodes only
-  for source-absent prerequisites, records grounding origin structurally, derives prerequisite
-  structure through sampled whole-domain ordering, and keeps uncertainty inspectable. Decisions:
-  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
-  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md),
-  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), and
-  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
-
 - **Study assets and learner state.** The learner loop keys study assets and responses to
   `derived_node_id`; Concept Lessons ground downstream study assets; the Study Item Bank supports
   option-select, matching, and impostor through per-node blueprints; keyless learner views submit
@@ -128,6 +120,23 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Learner theory quality, sparse item blueprint, and game-flow polish, 2026-07-05.** Deterministic
+  envelope: `pnpm run typecheck`, `pnpm run test`, `pnpm run lint` (exit 0 with 3 pre-existing
+  warnings), `pnpm run build`, `@lrnki/application` tests, and `@lrnki/admin-lab` tests all passed;
+  `git diff --check` was clean. DB reset and the single initial migration succeeded. **Real-use
+  quality evaluation:** `SEED_MANIFEST=tmp/real-use-rust-manifest.json scripts/seed-demo.sh` ran the
+  Rust ownership fixture through real production LLM extraction, graph build, enrichment, Study
+  Item Bank generation, and demo learner seeding: graph version
+  `7fea20b6-a5e4-4ba5-94d2-e60ea5e2b479`, enrichment
+  `8a016179-6888-43da-babd-0c61f83a3ae8`, 20 lessons, 76 lesson sections, 58 sections with key
+  terms, 36 sections with list items, 44 current study items, and sparse blueprint/guard rejections
+  recorded for unsuitable item types. Artifact inspection showed list items/key terms on real
+  lessons such as "Allocating on the heap" and blueprint absences for lesson-absent nodes. Browser
+  verification on the built app at `http://localhost:3001` passed at 390px: `/learn` remembered
+  `demo-seeded-1`, created the first expedition through Begin, rendered the expedition trail, and
+  logged no console errors. **Result: PASS.** Screenshot: `tmp/learner-mobile-390.png`; seed log:
+  `tmp/real-use-seed.log`.
 
 - **Comparative banded intrinsic difficulty and trail floor, 2026-07-05.** Deterministic envelope:
   `pnpm run check` exit 0 (full workspace typecheck, recursive tests including DB-backed

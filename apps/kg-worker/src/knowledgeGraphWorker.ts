@@ -36,6 +36,7 @@ import {
   LiteLlmConceptAdmissionAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptLessonGenerationAdapter,
+  LiteLlmConceptLessonRedundancyJudgmentAdapter,
   LiteLlmStudyItemBlueprintAdapter,
   LiteLlmImpostorLieValidityJudgmentAdapter,
   LiteLlmConceptDiscoveryAdapter,
@@ -228,6 +229,7 @@ function buildContext() {
     // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
     // option-select, and persisted through its own store; option-select derives FROM it.
     conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
+    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),

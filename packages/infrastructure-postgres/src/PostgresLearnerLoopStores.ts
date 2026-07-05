@@ -422,8 +422,8 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
         for (const [ordinal, section] of lesson.sections.entries()) {
           const sectionId = randomUUID();
           await tx`
-            INSERT INTO concept_lesson_sections (concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, grounding_provenance, diagram_caption, diagram_spec)
-            VALUES (${sectionId}, ${lessonId}, ${ordinal}, ${section.kind}, ${section.text}, ${section.groundingProvenance}, ${section.diagram?.caption ?? null}, ${section.diagram?.spec ?? null})`;
+            INSERT INTO concept_lesson_sections (concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, key_terms, items, grounding_provenance, diagram_caption, diagram_spec)
+            VALUES (${sectionId}, ${lessonId}, ${ordinal}, ${section.kind}, ${section.text}, ${section.keyTerms ?? null}, ${section.items ?? null}, ${section.groundingProvenance}, ${section.diagram?.caption ?? null}, ${section.diagram?.spec ?? null})`;
           if (section.citation) await this.insertCitation(tx, sectionId, section.citation);
         }
       }
@@ -483,7 +483,7 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
     if (rows.length === 0) return [];
     const lessonIds = rows.map((row) => row.concept_lesson_id);
     const sectionRows = await this.sql<LessonSectionRow[]>`
-      SELECT concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, grounding_provenance, diagram_caption, diagram_spec
+      SELECT concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, key_terms, items, grounding_provenance, diagram_caption, diagram_spec
       FROM concept_lesson_sections WHERE concept_lesson_id IN ${this.sql(lessonIds)}
       ORDER BY concept_lesson_id, ordinal`;
     const sectionIds = sectionRows.map((row) => row.concept_lesson_section_id);
@@ -514,6 +514,8 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
           text: section.body_text,
           groundingProvenance: section.grounding_provenance as ConceptLessonSection["groundingProvenance"]
         };
+        if (section.key_terms?.length) base.keyTerms = section.key_terms;
+        if (section.items?.length) base.items = section.items;
         if (citationRow) base.citation = toCitation(citationRow as unknown as CitationRow);
         if (section.diagram_caption !== null && section.diagram_spec !== null) {
           base.diagram = { caption: section.diagram_caption, spec: section.diagram_spec };
@@ -540,6 +542,8 @@ type LessonSectionRow = {
   ordinal: number;
   kind: ConceptLessonSection["kind"];
   body_text: string;
+  key_terms: string[] | null;
+  items: string[] | null;
   grounding_provenance: string;
   diagram_caption: string | null;
   diagram_spec: string | null;

@@ -123,19 +123,21 @@ test("concept lesson validator accepts the R3 minimum and rejects empty or overl
   // (membership in the array is the optionality model; absent sections are omitted).
   assert.doesNotThrow(() => conceptLessonValidator.parse({
     sections: [
-      { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null },
-      { kind: "definition", text: "The precise statement.", citationPassageId: "block-1", citationEvidenceQuote: "The precise statement.", diagramCaption: null, diagramSpec: null },
-      { kind: "applications", text: "How it connects to neighbors.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+      { kind: "gist", text: "A one-line organizer.", keyTerms: [], items: [], citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null },
+      { kind: "definition", text: "The precise statement.", keyTerms: ["precise"], items: [], citationPassageId: "block-1", citationEvidenceQuote: "The precise statement.", diagramCaption: null, diagramSpec: null },
+      { kind: "applications", text: "How it connects to neighbors.", keyTerms: [], items: ["Use one.", "Use two."], citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
     ]
   }));
   // An empty `text` on any present section fails closed (rule 6).
   assert.throws(() => conceptLessonValidator.parse({
-    sections: [{ kind: "gist", text: "", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }]
+    sections: [{ kind: "gist", text: "", keyTerms: [], items: [], citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }]
   }));
   assert.throws(() => conceptLessonValidator.parse({
     sections: [{
       kind: "applications",
       text: "x".repeat(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH + 1),
+      keyTerms: [],
+      items: [],
       citationPassageId: null,
       citationEvidenceQuote: null,
       diagramCaption: null,
@@ -147,8 +149,8 @@ test("concept lesson validator accepts the R3 minimum and rejects empty or overl
 test("concept lesson validator accepts a section with and without a diagram descriptor", () => {
   assert.doesNotThrow(() => conceptLessonValidator.parse({
     sections: [
-      { kind: "examples", text: "A worked example.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: "A vs B", diagramSpec: "A relates to B" },
-      { kind: "gist", text: "A one-line organizer.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
+      { kind: "examples", text: "A worked example.", keyTerms: [], items: ["First example.", "Second example."], citationPassageId: null, citationEvidenceQuote: null, diagramCaption: "A vs B", diagramSpec: "A relates to B" },
+      { kind: "gist", text: "A one-line organizer.", keyTerms: [], items: [], citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
     ]
   }));
 });

@@ -201,3 +201,21 @@ test("duplicate kinds collapse to the first and sections order canonically", () 
   assert.deepEqual(result.lesson.sections.map((s) => s.kind), ["gist", "definition", "applications"]);
   assert.equal(result.lesson.sections[0].text, "First gist.");
 });
+
+test("key terms and list items survive assembly only when structurally valid", () => {
+  const draft: ConceptLessonDraft = {
+    sections: [
+      { kind: "gist", text: "Gist about ownership.", keyTerms: ["missing"] },
+      { kind: "definition", text: "Ownership is a set of rules that govern memory.", keyTerms: ["Ownership", "absent"], citation: { passageId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." } },
+      { kind: "applications", text: "Use ownership to reason about moves.", keyTerms: ["ownership"], items: ["Track the owner.", "Avoid dangling references."] },
+      { kind: "formulas", text: "No formula.", items: ["Should not render as a list."] }
+    ]
+  };
+  const result = assemble(draft, sourceGrounding);
+  assert.equal(result.kind, "lesson");
+  if (result.kind !== "lesson") return;
+  assert.deepEqual(result.lesson.sections.find((s) => s.kind === "definition")?.keyTerms, ["Ownership"]);
+  assert.deepEqual(result.lesson.sections.find((s) => s.kind === "applications")?.items, ["Track the owner.", "Avoid dangling references."]);
+  assert.equal(result.lesson.sections.find((s) => s.kind === "gist")?.keyTerms, undefined);
+  assert.equal(result.lesson.sections.find((s) => s.kind === "formulas")?.items, undefined);
+});

@@ -78,42 +78,43 @@ export function MatchingBoard({
         <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
         <GroundedBadge provenance={item.groundingProvenance} />
       </div>
-      <p className="text-sm text-muted-foreground">Tap a field clue, then tap its match.</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-2">
-          {promptIds.map((id) => {
-            const prompt = promptById.get(id);
-            if (!prompt) return null;
-            return (
-              <TileButton
-                key={id}
-                text={prompt.text}
-                selected={selected?.column === "prompt" && selected.id === id}
-                locked={lockedPromptIds.has(id)}
-                wrong={wrong.has(id)}
-                disabled={disabled || pending || complete}
-                onClick={() => choose("prompt", id)}
-              />
-            );
-          })}
-        </div>
-        <div className="flex flex-col gap-2">
-          {matchIds.map((id) => {
-            const match = matchById.get(id);
-            if (!match) return null;
-            return (
-              <TileButton
-                key={id}
-                text={match.text}
-                selected={selected?.column === "match" && selected.id === id}
-                locked={lockedMatchIds.has(id)}
-                wrong={wrong.has(id)}
-                disabled={disabled || pending || complete}
-                onClick={() => choose("match", id)}
-              />
-            );
-          })}
-        </div>
+      <p className="text-sm text-muted-foreground">
+        {matchedPairs.length} of {item.prompts.length} matched. Tap a field clue, then tap its match.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {promptIds.map((id) => {
+          const prompt = promptById.get(id);
+          if (!prompt) return null;
+          return (
+            <TileButton
+              key={id}
+              text={prompt.text}
+              compact
+              selected={selected?.column === "prompt" && selected.id === id}
+              locked={lockedPromptIds.has(id)}
+              wrong={wrong.has(id)}
+              disabled={disabled || pending || complete}
+              onClick={() => choose("prompt", id)}
+            />
+          );
+        })}
+      </div>
+      <div className="flex flex-col gap-2">
+        {matchIds.map((id) => {
+          const match = matchById.get(id);
+          if (!match) return null;
+          return (
+            <TileButton
+              key={id}
+              text={match.text}
+              selected={selected?.column === "match" && selected.id === id}
+              locked={lockedMatchIds.has(id)}
+              wrong={wrong.has(id)}
+              disabled={disabled || pending || complete}
+              onClick={() => choose("match", id)}
+            />
+          );
+        })}
       </div>
       {result?.graded ? (
         <div className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3 text-sm">
@@ -133,15 +134,20 @@ function TileButton({
   locked,
   wrong,
   disabled,
+  compact = false,
   onClick
-}: Readonly<{ text: string; selected: boolean; locked: boolean; wrong: boolean; disabled: boolean; onClick: () => void }>) {
+}: Readonly<{ text: string; selected: boolean; locked: boolean; wrong: boolean; disabled: boolean; compact?: boolean; onClick: () => void }>) {
   return (
     <motion.div animate={wrong ? { x: [0, -8, 8, -4, 4, 0] } : { x: 0 }} transition={{ duration: 0.32 }}>
       <Button
         type="button"
         variant={locked ? "default" : selected ? "secondary" : "outline"}
         disabled={disabled || locked}
-        className={cn("h-auto min-h-12 w-full justify-start whitespace-normal text-left", selected ? "ring-2 ring-[color:var(--journal-frontier)]" : null)}
+        className={cn(
+          "h-auto whitespace-normal text-left",
+          compact ? "min-h-9 max-w-full justify-start px-3 py-2 text-sm" : "min-h-12 w-full justify-start",
+          selected ? "ring-2 ring-[color:var(--journal-frontier)]" : null
+        )}
         onClick={onClick}
       >
         <span className="flex items-start gap-2">

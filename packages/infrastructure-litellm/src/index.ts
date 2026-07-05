@@ -51,7 +51,9 @@ export {
   studyItemBlueprintSchema,
   studyItemBlueprintValidator,
   matchingSchema,
-  matchingValidator
+  matchingValidator,
+  conceptLessonRedundancyJudgmentSchema,
+  conceptLessonRedundancyJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmStudyItemBlueprintAdapter,
@@ -63,6 +65,10 @@ export {
   LiteLlmConceptLessonGenerationAdapter,
   CONCEPT_LESSON_GENERATION_MODEL
 } from "./conceptLessonGenerationAdapters";
+export {
+  LiteLlmConceptLessonRedundancyJudgmentAdapter,
+  CONCEPT_LESSON_REDUNDANCY_JUDGE_MODEL
+} from "./conceptLessonRedundancyAdapters";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,

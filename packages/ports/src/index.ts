@@ -8,6 +8,8 @@ import type {
   ConceptIdentityResolutionOutcome,
   ConceptLesson,
   ConceptLessonDraft,
+  ConceptLessonRedundancyJudgment,
+  ConceptLessonSectionKind,
   LessonAbsentNode,
   MatchingItemDraft,
   StudyItem,
@@ -188,6 +190,15 @@ export interface ImpostorLieValidityJudgmentPort {
     groundingPassages: StudyItemGroundingPassage[];
     siblings: { label: string; snippet: string }[];
   }): Promise<ImpostorLieValidityJudgment>;
+}
+
+export interface ConceptLessonRedundancyJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    sections: { kind: ConceptLessonSectionKind; text: string; items?: string[] }[];
+  }): Promise<ConceptLessonRedundancyJudgment[]>;
 }
 
 // Minting durability judge. A bounded, forced-tool LLM judgment over ONE proposed

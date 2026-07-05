@@ -74,6 +74,8 @@ export type StudyMatchingView = {
 export type ConceptLessonSectionView = {
   kind: ConceptLessonSectionKind;
   text: string;
+  keyTerms?: string[];
+  items?: string[];
   groundingProvenance: StudyItemGroundingProvenance;
   // True when the section verified verbatim against a source block; the card shows a distinct
   // `source` vs `generated` badge from this.
@@ -107,6 +109,8 @@ export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
     sections: lesson.sections.map((section) => ({
       kind: section.kind,
       text: section.text,
+      ...(section.keyTerms?.length ? { keyTerms: section.keyTerms } : {}),
+      ...(section.items?.length ? { items: section.items } : {}),
       groundingProvenance: section.groundingProvenance,
       isSourceCited: section.citation?.provenance === "source",
       ...(section.citation?.provenance === "source" ? { matchKind: section.citation.matchKind } : {}),
@@ -380,6 +384,10 @@ export function composeStudySession(input: {
   for (const segments of Object.values(studySegmentsByNode)) {
     segments.sort((a, b) => STUDY_ITEM_TYPE_ORDER[a.kind] - STUDY_ITEM_TYPE_ORDER[b.kind]);
   }
+  const lessonReadByNode = Object.fromEntries((input.lessonReads ?? []).map((derivedNodeId) => [derivedNodeId, true]));
+  const lessonByNode: Record<string, ConceptLessonView> = {};
+  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
+  const lessonAbsentNodeIds = new Set((input.lessonAbsent ?? []).map((node) => node.derivedNodeId));
 
   // Calibration ∘ graded composition (R12): the trusted-edge down-closure of the `known`
   // verdicts is mastered via calibration; un-pruned nodes take their graded mastery; the
@@ -398,6 +406,12 @@ export function composeStudySession(input: {
     latestOutcomeByStudyItemId[row.studyItemId] = row.judgedOutcome === "correct" ? "correct" : "incorrect";
   }
   const composed = composeMastery({ knownClosure, gradedByNode });
+  for (const node of trailNodes) {
+    if ((studySegmentsByNode[node.derivedNodeId] ?? []).length > 0) continue;
+    if (lessonByNode[node.derivedNodeId] && !lessonReadByNode[node.derivedNodeId]) continue;
+    if (!lessonByNode[node.derivedNodeId] && !lessonAbsentNodeIds.has(node.derivedNodeId)) continue;
+    composed.masteryByNode[node.derivedNodeId] = 1;
+  }
   const learnerState: LearnerStatePort = {
     learnerStateRef: input.learnerStateRef,
     mastery: (derivedNodeId: string) => composed.masteryByNode[derivedNodeId] ?? 0
@@ -461,9 +475,6 @@ export function composeStudySession(input: {
     .sort((a, b) => a.struggledLabel.localeCompare(b.struggledLabel));
 
   // The lesson substrate rides down keyed by node (KTD5). Absences become a thin operator view.
-  const lessonByNode: Record<string, ConceptLessonView> = {};
-  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
-  const lessonReadByNode = Object.fromEntries((input.lessonReads ?? []).map((derivedNodeId) => [derivedNodeId, true]));
   const lessonAbsent: LessonAbsentView[] = (input.lessonAbsent ?? [])
     .map((node) => ({ derivedNodeId: node.derivedNodeId, label: labelByNode.get(node.derivedNodeId) ?? node.canonicalLabel, reason: node.reason }))
     .sort((a, b) => a.label.localeCompare(b.label));

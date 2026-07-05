@@ -425,7 +425,7 @@ WHERE a.artifact_type = 'study_item_bank';
 -- its derived node, label, and section count, for Admin Lab inspection (ADR-0031). Reads the
 -- immutable `concept_lesson_bank` artifact the Concept Lesson store writes beside its rows.
 CREATE VIEW artifact_concept_lessons AS
-SELECT a.graph_version_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count
+SELECT a.graph_version_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count, cl.sections
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -434,7 +434,8 @@ JSON_TABLE(
     derived_node_id text PATH '$.derivedNodeId',
     enrichment_id text PATH '$.enrichmentId',
     canonical_label text PATH '$.canonicalLabel',
-    section_count integer PATH '$.sections.size()'
+    section_count integer PATH '$.sections.size()',
+    sections json PATH '$.sections'
   )
 ) AS cl
 WHERE a.artifact_type = 'concept_lesson_bank';
@@ -870,6 +871,8 @@ CREATE TABLE concept_lesson_sections (
   ordinal integer NOT NULL CHECK (ordinal >= 0),
   kind text NOT NULL CHECK (kind IN ('gist', 'intuition', 'definition', 'examples', 'applications', 'formulas')),
   body_text text NOT NULL,
+  key_terms text[],
+  items text[],
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   diagram_caption text,
   diagram_spec text,

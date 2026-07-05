@@ -50,6 +50,8 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
       "The gist is a framing hook, not a summary. In one sentence, orient the learner with the concept's core idea — the problem it solves, why it matters, or the tension it resolves — so they know what to attend to before the details. It must NOT restate the definition's formal 'what it is'; the gist and the definition carry different information, and a gist that paraphrases the definition is wrong.",
       "Emit intuition only when the grounding supports a genuinely distinct mental model that is not already covered by the gist or substantive section. Do not use repetitive analogy templates such as 'Think of...' unless the analogy is necessary and specifically grounded.",
       "Length budgets: gist is one sentence; definition, examples, formulas, and applications are at most two short sentences each.",
+      "For every section, emit up to three keyTerms that occur verbatim in that section's text. Do not invent terms that are absent from the text.",
+      "For examples and applications sections, emit 2-4 short items as list structure. Keep the section text as a lead-in line. For every other section, emit an empty items array.",
       "Never assume a section applies. Emit a section ONLY when the provided grounding supports it; omit any section that does not apply rather than writing a placeholder.",
       "For a section that restates source-supported or generated-grounding content (typically definition, examples, or formulas), cite the grounding passage it derives from by its exact passageId and quote a substring of that passage; for source-grounded passages the quote must be verbatim. Leave gist and intuition uncited. Cite applications only when they directly restate one provided grounding passage; otherwise leave them synthesized.",
       "Every definition, examples, or formulas section must carry both citation fields. Use one cited grounding passage per section; do not combine multiple passages into a single cited section. If no single passage supports the section, omit that section.",
@@ -91,6 +93,8 @@ export class LiteLlmConceptLessonGenerationAdapter implements ConceptLessonGener
     // re-derives provenance, so a partial or absent citation simply marks it synthesized.
     const sections: ConceptLessonSectionDraft[] = args.sections.map((section) => {
       const draft: ConceptLessonSectionDraft = { kind: section.kind, text: section.text };
+      if (section.keyTerms?.length) draft.keyTerms = section.keyTerms;
+      if (section.items?.length) draft.items = section.items;
       if (section.citationPassageId && section.citationEvidenceQuote) {
         draft.citation = { passageId: section.citationPassageId, evidenceQuote: section.citationEvidenceQuote };
       }

@@ -12,8 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [2026-07-05-003 — Learner theory quality, sparse item blueprint, and game-flow polish](./2026-07-05-003-feat-learner-theory-quality-and-game-flow-plan.md)
-  — ready.
+None.
 
 ## Ownership rules
 

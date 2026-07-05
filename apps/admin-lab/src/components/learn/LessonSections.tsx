@@ -11,9 +11,27 @@ export function LessonSections({ lesson }: Readonly<{ lesson: ConceptLessonView 
             <h3 className="text-base font-semibold">{lessonSectionHeading(section.kind)}</h3>
             <GroundedBadge provenance={section.groundingProvenance} isSourceCited={section.isSourceCited} />
           </div>
-          <p className="max-w-prose text-base leading-7">{section.text}</p>
+          <p className="max-w-prose text-base leading-7">{renderWithKeyTerms(section.text, section.keyTerms ?? [])}</p>
+          {section.items?.length ? (
+            <ul className="flex list-disc flex-col gap-2 pl-5 text-base leading-7">
+              {section.items.map((item, itemIndex) => <li key={`${section.kind}:item:${itemIndex}`}>{renderWithKeyTerms(item, section.keyTerms ?? [])}</li>)}
+            </ul>
+          ) : null}
         </section>
       ))}
     </section>
+  );
+}
+
+function renderWithKeyTerms(text: string, keyTerms: string[]) {
+  const term = keyTerms.find((candidate) => text.includes(candidate));
+  if (!term) return text;
+  const index = text.indexOf(term);
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark className="rounded-sm bg-[color:var(--journal-gem-soft)] px-1 font-semibold text-[color:var(--journal-ink)]">{term}</mark>
+      {text.slice(index + term.length)}
+    </>
   );
 }

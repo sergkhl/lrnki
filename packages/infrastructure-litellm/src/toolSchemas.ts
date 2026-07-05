@@ -472,6 +472,19 @@ export const impostorLieValidityJudgmentValidator = z.object({
 
 export const impostorLieValidityJudgmentSchema: JsonSchema = toForcedToolSchema(impostorLieValidityJudgmentValidator);
 
+// --- Concept Lesson redundancy judgment: submit_concept_lesson_redundancy_judgment
+
+export const conceptLessonRedundancyJudgmentValidator = z.object({
+  judgments: z.array(z.object({
+    sectionKind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]),
+    verdict: z.enum(["distinct", "redundant"]),
+    redundantWith: z.string().nullable().describe("The kind this section repeats when verdict is redundant; null when verdict is distinct."),
+    reason: z.string().min(1)
+  }).strict())
+}).strict();
+
+export const conceptLessonRedundancyJudgmentSchema: JsonSchema = toForcedToolSchema(conceptLessonRedundancyJudgmentValidator);
+
 // --- Concept Lesson generation: submit_concept_lesson (U2, R2/R4/R6/R7/R14) -----
 // One ordered teaching artifact per learning node (ADR-0031). Every section is
 // INDEPENDENTLY OPTIONAL: a section that does not apply is simply OMITTED from the
@@ -489,6 +502,8 @@ export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
 const conceptLessonSection = z.object({
   kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
   text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
+  keyTerms: z.array(z.string().min(1).max(80)).max(3).describe("Up to three important terms that occur verbatim in this section text. Use an empty array when no term deserves emphasis."),
+  items: z.array(z.string().min(1).max(280)).max(4).describe("List items for examples/applications sections only. Use 2-4 items for examples or applications; otherwise use an empty array."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
   diagramCaption: z.string().nullable().describe("Optional one-line caption for a simple explanatory diagram for this section; null when there is none."),
@@ -524,5 +539,6 @@ export const toolValidators = [
   matchingValidator,
   impostorValidator,
   impostorLieValidityJudgmentValidator,
+  conceptLessonRedundancyJudgmentValidator,
   conceptLessonValidator
 ] as const;

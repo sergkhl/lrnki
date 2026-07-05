@@ -27,6 +27,7 @@ const SECTION_ORDER: ConceptLessonSectionKind[] = ["gist", "intuition", "definit
 // Exported (rule 18): the study-item generation stage reuses this same "substantive" set to
 // decide lesson-retry and item-grounding fallback eligibility (R8/R9).
 export const SUBSTANTIVE_KINDS: ConceptLessonSectionKind[] = ["definition", "examples", "formulas"];
+const LIST_SECTION_KINDS: ConceptLessonSectionKind[] = ["examples", "applications"];
 
 export type AssembleConceptLessonInput = {
   node: { derivedNodeId: string; canonicalLabel: string; graphVersionId: string | null; enrichmentId: string };
@@ -110,6 +111,15 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
       text: section.text,
       groundingProvenance: grounded.provenance
     };
+    const keyTerms = (section.keyTerms ?? [])
+      .map((term) => term.trim())
+      .filter((term, index, terms) => term.length > 0 && terms.indexOf(term) === index && section.text.includes(term))
+      .slice(0, 3);
+    if (keyTerms.length) assembled.keyTerms = keyTerms;
+    const items = LIST_SECTION_KINDS.includes(section.kind)
+      ? (section.items ?? []).map((item) => item.trim()).filter((item) => item.length > 0).slice(0, 4)
+      : [];
+    if (items.length) assembled.items = items;
     if (grounded.citation) assembled.citation = grounded.citation;
     if (section.diagram) assembled.diagram = section.diagram;
     byKind.set(section.kind, assembled);
@@ -117,22 +127,16 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
 
   const sections = SECTION_ORDER.filter((kind) => byKind.has(kind)).map((kind) => byKind.get(kind)!);
 
-  // The R3 minimum: a gist, at least one application, and at least one substantive section.
-  const hasGist = byKind.has("gist");
-  const hasApplication = byKind.has("applications");
+  // The relaxed minimum: at least one substantive section. Optional hooks may be absent or
+  // dropped by the redundancy gate without turning a good lesson into an absent node.
   const hasSubstantive = SUBSTANTIVE_KINDS.some((kind) => byKind.has(kind));
-  if (!hasGist || !hasApplication || !hasSubstantive) {
-    const missing = [
-      hasGist ? null : "gist",
-      hasApplication ? null : "applications",
-      hasSubstantive ? null : "a substantive section (definition, examples, or formulas)"
-    ].filter((part): part is string => part !== null);
+  if (!hasSubstantive) {
     return {
       kind: "absent",
       absent: {
         derivedNodeId: node.derivedNodeId,
         canonicalLabel: node.canonicalLabel,
-        reason: `lesson did not meet the minimum; missing ${missing.join(", ")}`
+        reason: "lesson did not meet the minimum; missing a substantive section (definition, examples, or formulas)"
       }
     };
   }

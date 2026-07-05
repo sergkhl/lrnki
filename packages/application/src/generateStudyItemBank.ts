@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import {
   STAGE_TAGS,
   type ConceptLesson,
+  type ConceptLessonRedundancyJudgment,
+  type ConceptLessonSectionKind,
   type DerivedGraphNode,
   type LessonAbsentNode,
   type RejectedStudyItem,
@@ -11,6 +13,7 @@ import {
 } from "@lrnki/domain-core";
 import type {
   ConceptLessonGenerationPort,
+  ConceptLessonRedundancyJudgmentPort,
   ConceptLessonStorePort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
@@ -70,6 +73,7 @@ export async function generateStudyItemBank(input: {
   graphStore: GraphVersionStorePort;
   enrichmentStore: EnrichmentRunStorePort;
   conceptLessonGeneration: ConceptLessonGenerationPort;
+  conceptLessonRedundancyJudge?: ConceptLessonRedundancyJudgmentPort;
   studyItemBlueprint?: StudyItemBlueprintPort;
   impostorLieValidityJudge: ImpostorLieValidityJudgmentPort;
   conceptLessonStore: ConceptLessonStorePort;
@@ -142,14 +146,19 @@ export async function generateStudyItemBank(input: {
         grounding,
         draft: initialDraft
       });
-      if (shouldRetryLesson(node, assembled.kind === "lesson" ? assembled.lesson : undefined)) {
+      let activeRedundancy: ConceptLessonRedundancyJudgment[] = [];
+      if (assembled.kind === "lesson") activeRedundancy = await judgeLessonRedundancy(input.conceptLessonRedundancyJudge, node, assembled.lesson);
+      if (shouldRetryLesson(node, assembled.kind === "lesson" ? assembled.lesson : undefined) || redundantNonSubstantiveKinds(activeRedundancy).length > 0) {
         const retryDraft = await input.conceptLessonGeneration.generate({
           declaredDomain: node.declaredDomain,
           node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
           groundingProvenance: grounding.provenance,
           groundingPassages: grounding.passages,
           neighbors,
-          retryFeedback: lessonRetryFeedback(assembled.kind === "lesson" ? assembled.lesson : undefined)
+          retryFeedback: [
+            lessonRetryFeedback(assembled.kind === "lesson" ? assembled.lesson : undefined),
+            redundancyRetryFeedback(activeRedundancy)
+          ].filter(Boolean).join(" ")
         });
         const retryAssembled = assembleConceptLesson({
           node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
@@ -158,10 +167,17 @@ export async function generateStudyItemBank(input: {
           grounding,
           draft: retryDraft
         });
-        if (retryAssembled.kind === "lesson" && hasVerifiedSubstantiveSourceCitation(retryAssembled.lesson)) {
+        let retryRedundancy: ConceptLessonRedundancyJudgment[] = [];
+        if (retryAssembled.kind === "lesson") {
+          retryRedundancy = await judgeLessonRedundancy(input.conceptLessonRedundancyJudge, node, retryAssembled.lesson);
+          retryAssembled.lesson = dropRedundantNonSubstantiveSections(retryAssembled.lesson, retryRedundancy);
+        }
+        if (retryAssembled.kind === "lesson" && (node.groundingOrigin === "llm_grounded" || hasVerifiedSubstantiveSourceCitation(retryAssembled.lesson) || assembled.kind !== "lesson")) {
           assembled = retryAssembled;
+          activeRedundancy = retryRedundancy;
         }
       }
+      if (assembled.kind === "lesson") assembled.lesson = dropRedundantNonSubstantiveSections(assembled.lesson, activeRedundancy);
       return assembled.kind === "lesson" ? { lesson: assembled.lesson } : { absent: assembled.absent };
     } catch (error) {
       return { absent: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: `concept-lesson generation failed: ${error instanceof Error ? error.message : String(error)}` } };
@@ -208,10 +224,8 @@ export async function generateStudyItemBank(input: {
   );
 
   // --- Stage 2: item blueprint --------------------------------------------------
-  const fallbackBlueprint = (node: DerivedGraphNode, itemTypes: StudyItemType[] = SUPPORTED_STUDY_ITEM_TYPES): StudyItemBlueprint => ({
-    derivedNodeId: node.derivedNodeId,
-    typePlans: itemTypes.map((itemType) => ({ itemType, generate: true as const, facet: "" }))
-  });
+  const fallbackBlueprint = (node: DerivedGraphNode, lesson: ConceptLesson | undefined): StudyItemBlueprint =>
+    structuralPreGateBlueprint(node, lesson);
   let blueprintDone = 0;
   const blueprintByNode = new Map<string, StudyItemBlueprint>();
   const blueprintResults = await studyStage(
@@ -222,11 +236,12 @@ export async function generateStudyItemBank(input: {
         if (!lesson) {
           blueprintDone += 1;
           await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemBlueprint, done: blueprintDone });
-          return fallbackBlueprint(node);
+          return fallbackBlueprint(node, lesson);
         }
+        const preGate = structuralPreGateBlueprint(node, lesson);
         try {
           const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
-          if (!input.studyItemBlueprint) return fallbackBlueprint(node);
+          if (!input.studyItemBlueprint) return preGate;
           const planned = await input.studyItemBlueprint.plan({
             declaredDomain: node.declaredDomain,
             node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
@@ -234,9 +249,9 @@ export async function generateStudyItemBank(input: {
             siblings,
             supportedItemTypes: SUPPORTED_STUDY_ITEM_TYPES
           });
-          return normalizeBlueprint(planned, node);
+          return applyStructuralPreGate(normalizeBlueprint(planned, node), preGate);
         } catch {
-          return fallbackBlueprint(node);
+          return preGate;
         } finally {
           blueprintDone += 1;
           await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemBlueprint, done: blueprintDone });
@@ -548,6 +563,47 @@ function normalizeBlueprint(blueprint: StudyItemBlueprint, node: DerivedGraphNod
   };
 }
 
+function structuralPreGateBlueprint(node: DerivedGraphNode, lesson: ConceptLesson | undefined): StudyItemBlueprint {
+  if (!lesson) {
+    return {
+      derivedNodeId: node.derivedNodeId,
+      typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => ({ itemType, generate: false as const, reason: "concept lesson is absent for this node" }))
+    };
+  }
+  const fragmentCount = groundedLessonFragments(lesson).size;
+  return {
+    derivedNodeId: node.derivedNodeId,
+    typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => {
+      if (itemType === "matching" && fragmentCount < 3) return { itemType, generate: false as const, reason: `matching requires at least 3 grounded fragments; found ${fragmentCount}` };
+      if (itemType === "impostor" && fragmentCount < 2) return { itemType, generate: false as const, reason: `impostor requires at least 2 grounded truth fragments; found ${fragmentCount}` };
+      if (fragmentCount < 1) return { itemType, generate: false as const, reason: "no grounded lesson fragments are available" };
+      return { itemType, generate: true as const, facet: "" };
+    })
+  };
+}
+
+function applyStructuralPreGate(planned: StudyItemBlueprint, preGate: StudyItemBlueprint): StudyItemBlueprint {
+  const gateByType = new Map(preGate.typePlans.map((plan) => [plan.itemType, plan] as const));
+  return {
+    derivedNodeId: planned.derivedNodeId,
+    typePlans: planned.typePlans.map((plan) => {
+      const gate = gateByType.get(plan.itemType);
+      if (gate && !gate.generate) return gate;
+      return plan;
+    })
+  };
+}
+
+function groundedLessonFragments(lesson: ConceptLesson): Set<string> {
+  const fragments = new Set<string>();
+  for (const section of lesson.sections) {
+    for (const item of section.items ?? []) fragments.add(item.trim().toLowerCase());
+    if (section.citation?.provenance === "source") fragments.add(section.citation.evidenceQuote.trim().toLowerCase());
+    if (section.citation?.provenance === "generated") fragments.add(section.citation.passageText.trim().toLowerCase());
+  }
+  return fragments;
+}
+
 function typePlanFor(blueprintByNode: ReadonlyMap<string, StudyItemBlueprint>, node: DerivedGraphNode, itemType: StudyItemType) {
   const plan = blueprintByNode.get(node.derivedNodeId)?.typePlans.find((candidate) => candidate.itemType === itemType);
   if (!plan) return { itemType, generate: false as const, reason: "blueprint did not request this item type" };
@@ -616,6 +672,43 @@ function hasVerifiedSubstantiveSourceCitation(lesson: ConceptLesson): boolean {
 
 function shouldRetryLesson(node: DerivedGraphNode, lesson: ConceptLesson | undefined): boolean {
   return node.groundingOrigin !== "llm_grounded" && (!lesson || !hasVerifiedSubstantiveSourceCitation(lesson));
+}
+
+const REDUNDANCY_DROPPABLE_KINDS: ReadonlySet<ConceptLessonSectionKind> = new Set(["gist", "intuition", "applications"]);
+
+async function judgeLessonRedundancy(
+  judge: ConceptLessonRedundancyJudgmentPort | undefined,
+  node: DerivedGraphNode,
+  lesson: ConceptLesson
+): Promise<ConceptLessonRedundancyJudgment[]> {
+  if (!judge) return [];
+  try {
+    return await judge.judge({
+      declaredDomain: node.declaredDomain,
+      node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+      sections: lesson.sections.map((section) => ({ kind: section.kind, text: section.text, ...(section.items?.length ? { items: section.items } : {}) }))
+    });
+  } catch {
+    return [];
+  }
+}
+
+function redundantNonSubstantiveKinds(judgments: ConceptLessonRedundancyJudgment[]): ConceptLessonSectionKind[] {
+  return judgments
+    .filter((judgment) => judgment.verdict === "redundant" && REDUNDANCY_DROPPABLE_KINDS.has(judgment.sectionKind))
+    .map((judgment) => judgment.sectionKind);
+}
+
+function dropRedundantNonSubstantiveSections(lesson: ConceptLesson, judgments: ConceptLessonRedundancyJudgment[]): ConceptLesson {
+  const redundant = new Set(redundantNonSubstantiveKinds(judgments));
+  if (redundant.size === 0) return lesson;
+  return { ...lesson, sections: lesson.sections.filter((section) => !redundant.has(section.kind)) };
+}
+
+function redundancyRetryFeedback(judgments: ConceptLessonRedundancyJudgment[]): string {
+  const redundant = judgments.filter((judgment) => judgment.verdict === "redundant");
+  if (!redundant.length) return "";
+  return `Previous lesson had redundant sections: ${redundant.map((judgment) => `${judgment.sectionKind}${judgment.redundantWith ? ` repeated ${judgment.redundantWith}` : ""} (${judgment.reason})`).join("; ")}. Rewrite those sections so each adds distinct information.`;
 }
 
 function lessonRetryFeedback(lesson: ConceptLesson | undefined): string {

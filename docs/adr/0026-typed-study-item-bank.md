@@ -16,6 +16,13 @@ which item types to generate for the node and assigns each generated type a dist
 Declined types are persisted as rejected study-item rows, not as a separate capability map. Exact
 payload fields and persistence shapes are owned by source types and the initial migration.
 
+Blueprints have a sparse default. A deterministic structural pre-gate vetoes only provable
+impossibilities from the Concept Lesson substrate: no lesson means no item type; matching requires
+enough distinct grounded fragments to form pairs; impostor requires enough truth fragments to test a
+false statement. The neural blueprint may decline additional types for semantic suitability, and
+blueprint failures fall back to the pre-gate survivors rather than generating every type. Sparse item
+sets are valid Study Item Banks, with every declined type recorded as an inspectable rejection.
+
 Learner-facing Study Session views never serialize answer keys. The client receives option ids,
 statement ids, and matching tile ids needed for interaction; grading re-resolves the server-side key
 from persisted current items.
@@ -46,6 +53,13 @@ Study responses are auto-graded from server-side keys:
 All item types append graded Response Log entries through one grading-neutral path; a node's mastery
 folds across all graded observations at one threshold regardless of item type. `partial` is a graded
 outcome below the mastery threshold and may remain replayable in learner projections.
+
+A node with a Concept Lesson and no current study items is still masterable downstream: the Study
+Session projection treats the persisted lesson read as completion for that itemless node. This does
+not write a Response Log row and does not change the graded-only response contract. A node with
+neither lesson nor current items may be treated as complete by projection only when it is explicitly
+recorded as lesson-absent, so sparse generation cannot deadlock dependents while silent missing data
+does not become mastery.
 
 Each type's deterministic guard enforces only structural and provenance guarantees. Option-select
 keys exactly one correct option; matching enforces pair count, distinct normalized prompt/match text,

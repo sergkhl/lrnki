@@ -1540,6 +1540,8 @@ export type ConceptLessonDiagramDescriptor = { caption: string; spec: string };
 export type ConceptLessonSection = {
   kind: ConceptLessonSectionKind;
   text: string;
+  keyTerms?: string[];
+  items?: string[];
   groundingProvenance: StudyItemGroundingProvenance;
   citation?: StudyItemCitation;
   diagram?: ConceptLessonDiagramDescriptor;
@@ -1575,12 +1577,21 @@ export type LessonAbsentNode = {
 export type ConceptLessonSectionDraft = {
   kind: ConceptLessonSectionKind;
   text: string;
+  keyTerms?: string[];
+  items?: string[];
   citation?: { passageId: string; evidenceQuote: string };
   diagram?: ConceptLessonDiagramDescriptor;
 };
 
 export type ConceptLessonDraft = {
   sections: ConceptLessonSectionDraft[];
+};
+
+export type ConceptLessonRedundancyJudgment = {
+  sectionKind: ConceptLessonSectionKind;
+  verdict: "distinct" | "redundant";
+  redundantWith?: ConceptLessonSectionKind;
+  reason: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -1690,6 +1701,7 @@ export const STAGE_TAGS = {
   // operation (KTD1) — no new operation type — but carries its own spend tag so its
   // cost ⋈ wall-clock join stays separable from option-select generation (R-cost).
   conceptLessonGeneration: "concept-lesson-generation",
+  lessonRedundancyJudgment: "lesson-redundancy-judgment",
   studyItemBlueprint: "study-item-blueprint",
   studyItemGeneration: "study-item-generation",
   matchingGeneration: "matching-generation",

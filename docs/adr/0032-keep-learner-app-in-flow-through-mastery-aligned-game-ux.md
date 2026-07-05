@@ -20,6 +20,9 @@ and no persistence adapters, so extracting a standalone Learner App later is an 
 move, not a rewrite.
 Version 1 starts orchestrated-first: the learner chooses a target or quest, and the app chooses the
 next mechanic or segment to preserve flow instead of asking the learner to pick a mechanic cold.
+Returning to the Learner App should resume the same learner-owned path with minimum friction; the
+client may remember the learner's name-ref locally because it is navigation state, not
+authentication or learner-neutral content.
 
 The Learner App is **mobile-first**: design and build every learner-facing surface for a
 phone-sized portrait viewport with standard mobile best practices (touch-first interaction, no
@@ -32,6 +35,15 @@ The first-class LeBlanc pleasures for the Learner App are **Challenge**, **Disco
 the current goal: feedback, progress clarity, anticipation, reward, recovery, or discovery of the
 concept map. Narrative, fantasy, collection, and social features must not become parallel objectives
 that distract from mastery.
+
+Completion rewards are part of the mastery flow, not decoration. Finishing the last activity for a
+concept advances into the capstone reward state before moving on; the learner should see the mastery
+beat and then continue to the next available stop, or return to the trail only when the expedition
+has no next stop.
+
+Mechanics stay mobile-first in their interaction model. Matching uses compact selectable prompt
+chips and full-width answer rows on phone viewports so long generated text remains readable; the
+grading trace and server-side keys remain unchanged.
 
 When flow signals show boredom, overload, or stalled skill growth, the app uses a support ladder:
 clarify the goal or feedback, vary the mechanic or stakes, offer hints/retries/review, change the

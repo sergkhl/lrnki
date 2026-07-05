@@ -134,7 +134,7 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
-function compose(args: { target: string; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonAbsent?: LessonAbsentNode[] }) {
+function compose(args: { target: string; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[] }) {
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
@@ -144,6 +144,7 @@ function compose(args: { target: string; studyItems?: StudyItem[]; rows?: Respon
     rows: args.rows ?? [],
     verdicts: args.verdicts ?? [],
     lessons: args.lessons,
+    lessonReads: args.lessonReads,
     lessonAbsent: args.lessonAbsent
   });
 }
@@ -155,7 +156,7 @@ function lessonFor(derivedNodeId: string): ConceptLesson {
     sections: [
       { kind: "gist", text: "A short gist.", groundingProvenance: "generated" },
       { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition.", matchKind: "exact" } },
-      { kind: "applications", text: "Connects to neighbors.", groundingProvenance: "generated" }
+      { kind: "applications", text: "Connects to neighbors.", keyTerms: ["neighbors"], items: ["First use.", "Second use."], groundingProvenance: "generated" }
     ]
   };
 }
@@ -172,6 +173,21 @@ test("composeStudySession gates a frontier node with an option-select item to an
 test("composeStudySession gives a frontier node with no item a cardless sheet", () => {
   const session = compose({ target: "move" });
   assert.equal(session.sheetByNode.scope.kind, "cardless");
+});
+
+test("composeStudySession masters itemless lesson nodes only after the lesson read", () => {
+  const unread = compose({ target: "move", lessons: [lessonFor("scope")] });
+  assert.equal(unread.classification.stateByNode.scope, "frontier");
+  assert.equal(unread.sheetByNode.scope.kind, "cardless");
+
+  const read = compose({ target: "move", lessons: [lessonFor("scope")], lessonReads: ["scope"] });
+  assert.equal(read.classification.stateByNode.scope, "mastered");
+});
+
+test("composeStudySession masters explicit no-lesson no-item absences so they do not block", () => {
+  const session = compose({ target: "move", lessonAbsent: [{ derivedNodeId: "scope", canonicalLabel: "Variable scope", reason: "no usable grounding passages" }] });
+  assert.equal(session.classification.stateByNode.scope, "mastered");
+  assert.equal(session.classification.stateByNode.ownership, "frontier");
 });
 
 test("composeStudySession names a locked node's unmet prerequisites and excludes the uncertain edge", () => {
@@ -356,6 +372,7 @@ test("composeStudySession surfaces lesson-absent nodes with their label and reas
 test("conceptLessonToView badges source vs generated sections from authoritative provenance", () => {
   const view = conceptLessonToView(lessonFor("scope"));
   assert.deepEqual(view.sections.map((s) => s.isSourceCited), [false, true, false]);
+  assert.deepEqual(view.sections.find((section) => section.kind === "applications")?.items, ["First use.", "Second use."]);
 });
 
 // U7/R10: the Study Session projection renders over an ANCHOR-LESS synthetic layer with no
