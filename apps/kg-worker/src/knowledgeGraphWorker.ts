@@ -5,6 +5,7 @@ import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
   createIntrinsicDifficultyPort,
+  DEFAULT_ENRICHMENT_CONFIG,
   STUDY_ITEM_BANK_CONFIG_HASH,
   resolveConceptIdentity,
   runExtractionOverSources,
@@ -220,7 +221,7 @@ function buildContext() {
     // without them for the U7 baseline.
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
     nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
+    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays
     // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.

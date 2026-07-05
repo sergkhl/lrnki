@@ -230,18 +230,51 @@ export const missingPrerequisiteProposalValidator = z.object({
 
 export const missingPrerequisiteProposalSchema: JsonSchema = toForcedToolSchema(missingPrerequisiteProposalValidator);
 
-// --- Intrinsic difficulty judgment: submit_intrinsic_difficulty ----------
-// One bounded learner-neutral difficulty judgment over a derived node's evidence.
-// The score is later fused with deterministic graph/evidence components; this
-// schema captures only the neural subscore and a short rationale. The rubric text
-// stays domain-neutral and contains no fixture-derived exemplars (AGENTS rule 17).
+// --- Comparative difficulty banding: submit_difficulty_bands --------------
+// ONE whole-domain-set banding call (ADR-0024 — comparative banded prior). The model
+// bands EVERY listed concept 1–5 RELATIVE to the listed set, citing each by the 1-based
+// concept NUMBER shown before it in the prompt — the same closed-set menu-pick idiom as
+// submit_prerequisite_ordering. Schema + validator are built per call from the node
+// count `n` so exact coverage is concrete: every listed number exactly once, band in
+// 1..5. A missing/duplicate/out-of-range number re-prompts once (maxRetries: 1), then
+// the intrinsic-difficulty stage fails closed (rule 6). Rubric text stays domain-neutral
+// and contains no fixture-derived exemplars (AGENTS rule 17).
 
-export const intrinsicDifficultyValidator = z.object({
-  neuralScore: z.number().min(0).max(1).describe("Learner-neutral intrinsic difficulty in [0,1], based on abstraction level, technical density, implied background load, and how much the evidence requires integrating multiple ideas."),
-  rationale: z.string().min(1).describe("One terse sentence explaining the generic difficulty factors that drove the score.")
+export function buildDifficultyBandsValidator(n: number) {
+  return z.object({
+    bands: z.array(z.object({
+      conceptNumber: z.number().int().min(1).max(n).describe("The 1-based Concept number (as shown before each concept) this band applies to. Every listed number must appear exactly once."),
+      band: z.number().int().min(1).max(5).describe("Intrinsic difficulty band RELATIVE to the listed concept set: 1 = the most accessible concepts of this set, 5 = the most demanding. Band from the evidence shown, never from how abstract a label sounds."),
+      rationale: z.string().min(1).describe("One terse sentence naming the generic difficulty factors, grounded in this concept's shown evidence.")
+    }).strict()).length(n).describe("Exactly one band per listed concept, each cited by its listed number.")
+  }).strict().superRefine((value, ctx) => {
+    const seen = new Set<number>();
+    for (const entry of value.bands) {
+      if (seen.has(entry.conceptNumber)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bands"], message: `Concept number ${entry.conceptNumber} was banded more than once; band every listed number exactly once.` });
+      }
+      seen.add(entry.conceptNumber);
+    }
+  });
+}
+
+export function buildDifficultyBandsSchema(n: number): JsonSchema {
+  return toForcedToolSchema(buildDifficultyBandsValidator(n));
+}
+
+// --- Pairwise difficulty comparison: submit_difficulty_comparison ---------
+// Bounded calibration for a CONTESTED band (modal share below the contest threshold):
+// one "which is harder to learn" judgment between the contested concept and an
+// uncontested anchor concept of a candidate band. At most two comparisons bracket a
+// contested concept; the bracket placement lives in the application. Domain-neutral
+// rubric (AGENTS rule 17).
+
+export const difficultyComparisonValidator = z.object({
+  harder: z.enum(["first", "second"]).describe("'first' when the first listed concept is harder for a learner to master, 'second' when the second is. Judge from the shown evidence and generic difficulty factors (abstraction, technical density, background load, integration burden), never from label phrasing."),
+  rationale: z.string().min(1).describe("One terse sentence grounded in the two concepts' shown evidence.")
 }).strict();
 
-export const intrinsicDifficultySchema: JsonSchema = toForcedToolSchema(intrinsicDifficultyValidator);
+export const difficultyComparisonSchema: JsonSchema = toForcedToolSchema(difficultyComparisonValidator);
 
 // --- Declared domain inference: submit_declared_domain --------------------
 // One bounded learner-charting helper: infer a short field-of-study label from a
@@ -478,7 +511,8 @@ export const toolValidators = [
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalValidator,
-  intrinsicDifficultyValidator,
+  buildDifficultyBandsValidator(3),
+  difficultyComparisonValidator,
   definitionEntailmentJudgmentValidator,
   definitionPassageQualityJudgmentValidator,
   admissionLabelJudgmentValidator,

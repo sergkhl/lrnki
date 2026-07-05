@@ -1,155 +1,208 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { DifficultyNodeContext, InferredPrerequisiteEdge } from "@lrnki/domain-core";
+import type { DifficultyBandEntry, DifficultyNodeContext } from "@lrnki/domain-core";
 import type { IntrinsicDifficultyJudgmentPort } from "@lrnki/ports";
 import { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 
-function node(id: string, definitions: string[] = [`${id} definition`], mentions: string[] = []): DifficultyNodeContext {
+function node(id: string, declaredDomain = "test"): DifficultyNodeContext {
   return {
     derivedNodeId: id,
     canonicalLabel: id.toUpperCase(),
     aliases: [],
-    declaredDomain: "test",
+    declaredDomain,
     groundingOrigin: "document_anchored",
-    definitions,
-    mentions
+    definitions: [`${id} definition`],
+    mentions: []
   };
 }
 
-function llmGroundedNode(id: string): DifficultyNodeContext {
-  return {
-    ...node(id, [`${id} generated definition`], [`${id} generated mention`]),
-    groundingOrigin: "llm_grounded"
-  };
-}
-
-function edge(prereq: string, dependent: string): InferredPrerequisiteEdge {
-  return {
-    prerequisiteDerivedNodeId: prereq,
-    dependentDerivedNodeId: dependent,
-    predicate: "inferred-prerequisite-of",
-    confidence: 0.9,
-    uncertain: false,
-    provenance: { judgmentRationale: "test" }
-  };
-}
-
-function judge(scores: Record<string, number>): IntrinsicDifficultyJudgmentPort {
-  return {
+// A judge whose banding draws are scripted per node LABEL: `bandsByLabel[label]` is the
+// sequence of bands the K draws return for that node (in draw order). `compareHarder`
+// answers from a scripted map keyed "first|second" labels, and records every comparison.
+function scriptedJudge(input: {
+  bandsByLabel: Record<string, number[]>;
+  harder?: (first: string, second: string) => "first" | "second";
+}) {
+  const comparisons: { first: string; second: string }[] = [];
+  let bandCalls = 0;
+  const judge: IntrinsicDifficultyJudgmentPort = {
     model: "stub-judge",
-    async judge(input) {
-      return { neuralScore: scores[input.derivedNodeId] ?? 0, rationale: "stub" };
+    async bandDomainSet({ nodes }): Promise<DifficultyBandEntry[]> {
+      const draw = bandCalls++;
+      return nodes.map((candidate, index) => {
+        const bands = input.bandsByLabel[candidate.canonicalLabel];
+        assert.ok(bands, `unscripted node ${candidate.canonicalLabel}`);
+        return { conceptNumber: index + 1, band: bands[draw % bands.length], rationale: `${candidate.canonicalLabel} draw ${draw} band ${bands[draw % bands.length]}` };
+      });
+    },
+    async compareHarder({ first, second }) {
+      comparisons.push({ first: first.canonicalLabel, second: second.canonicalLabel });
+      return { harder: input.harder?.(first.canonicalLabel, second.canonicalLabel) ?? "second" };
     }
   };
+  return { judge, comparisons, getBandCalls: () => bandCalls };
 }
 
-test("createIntrinsicDifficultyPort returns fused scores and interpretable components for every node", async () => {
-  const port = createIntrinsicDifficultyPort(judge({ a: 0.1, b: 0.5, c: 0.9 }));
-  const difficulties = await port.score({
-    nodes: [node("a"), node("b", ["b definition"], ["b mention"]), node("c")],
-    prerequisiteEdges: [edge("a", "b"), edge("b", "c")]
-  });
+test("uncontested consensus takes the modal band, scores (band-1)/4, and records zero comparisons (AE2, AE3)", async () => {
+  const { judge, comparisons } = scriptedJudge({ bandsByLabel: { A: [2, 2, 2, 2, 3], B: [5, 5, 5, 5, 5] } });
+  const port = createIntrinsicDifficultyPort(judge, 5);
+  const difficulties = await port.score({ nodes: [node("a"), node("b")] });
 
-  assert.equal(port.method, "intrinsic-fused-v1");
-  assert.equal(difficulties.length, 3);
-  assert.ok(difficulties.every((difficulty) => difficulty.method === "intrinsic-fused-v1"));
+  assert.equal(port.method, "intrinsic-banded-v2");
   const byId = new Map(difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
-  assert.equal(byId.get("a")?.components.neuralScore, 0.1);
-  assert.equal(byId.get("b")?.components.topoDepth, 1);
-  assert.equal(byId.get("c")?.components.transitiveAncestors, 2);
-  assert.equal(byId.get("b")?.components.fanIn, 1);
-  assert.equal(byId.get("b")?.components.evidenceDensity, 2);
-  assert.ok((byId.get("c")?.score ?? -1) >= 0);
-  assert.ok((byId.get("c")?.score ?? 2) <= 1);
-});
-
-test("same-depth nodes are differentiated by the neural subscore", async () => {
-  const port = createIntrinsicDifficultyPort(judge({ a: 0.1, b: 0.8, root: 0.1 }));
-  const difficulties = await port.score({
-    nodes: [node("root"), node("a"), node("b")],
-    prerequisiteEdges: [edge("root", "a"), edge("root", "b")]
-  });
-  const byId = new Map(difficulties.map((difficulty) => [difficulty.derivedNodeId, difficulty] as const));
-
-  assert.equal(byId.get("a")?.components.topoDepth, byId.get("b")?.components.topoDepth);
-  assert.ok((byId.get("b")?.score ?? 0) > (byId.get("a")?.score ?? 1));
-});
-
-test("structural components match hand-computed graph values", async () => {
-  const port = createIntrinsicDifficultyPort(judge({ a: 0, b: 0, c: 0, d: 0 }));
-  const difficulties = await port.score({
-    nodes: [node("a"), node("b"), node("c"), node("d", ["d def"], ["d mention 1", "d mention 2"])],
-    prerequisiteEdges: [edge("a", "b"), edge("a", "c"), edge("b", "d"), edge("c", "d")]
-  });
-  const d = difficulties.find((difficulty) => difficulty.derivedNodeId === "d");
-  assert.ok(d);
-  assert.equal(d.components.topoDepth, 2);
-  assert.equal(d.components.transitiveAncestors, 3);
-  assert.equal(d.components.fanIn, 2);
-  assert.equal(d.components.evidenceDensity, 3);
-  assert.equal(d.components.normalizedTopoDepth, 1);
-  assert.equal(d.components.normalizedTransitiveAncestors, 1);
-  assert.equal(d.components.normalizedFanIn, 1);
-  assert.equal(d.components.normalizedEvidenceDensity, 1);
-});
-
-test("fused score remains bounded across neural score boundaries", async () => {
-  const port = createIntrinsicDifficultyPort(judge({ a: 0, b: 1 }));
-  const difficulties = await port.score({ nodes: [node("a"), node("b")], prerequisiteEdges: [edge("a", "b")] });
+  const a = byId.get("a")!;
+  assert.equal(a.method, "intrinsic-banded-v2");
+  assert.equal(a.components.band, 2);
+  assert.equal(a.components.kDraws, 5);
+  assert.equal(a.components.modalShare, 0.8);
+  assert.equal(a.components.contested, 0);
+  assert.equal(a.components.pairwiseComparisons, 0);
+  assert.equal(a.components.calibrationUnresolved, 0);
+  assert.equal(a.score, 0.25);
+  assert.equal(byId.get("b")!.score, 1);
+  assert.equal(comparisons.length, 0);
+  // AE3 round-trip: the diamond mapping recovers the band from the score.
   for (const difficulty of difficulties) {
-    assert.ok(difficulty.score >= 0);
-    assert.ok(difficulty.score <= 1);
+    assert.equal(Math.round(difficulty.score * 4) + 1, difficulty.components.band);
   }
 });
 
-test("judge failures and out-of-range neural scores fail closed", async () => {
+test("the rationale comes from the first draw that voted the final band", async () => {
+  const { judge } = scriptedJudge({ bandsByLabel: { A: [3, 2, 2, 2, 2] } });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a")] });
+  assert.equal(difficulties[0].neuralRationale, "A draw 1 band 2");
+});
+
+test("a modal tie takes the LOWER band and is contested by construction", async () => {
+  // a: bands 2,2,4,4,3 → tie 2/2 between bands 2 and 4 → modal 2, share 0.4 → contested.
+  // Anchors: h at band 4 (5/5), l at band 2 (5/5). Bracket: not harder than H's anchor,
+  // not easier than L's anchor → confirms the middle → keeps modal band 2.
+  const { judge, comparisons } = scriptedJudge({
+    bandsByLabel: { A: [2, 2, 4, 4, 3], H: [4, 4, 4, 4, 4], L: [2, 2, 2, 2, 2] },
+    // Vs H's anchor: the anchor is harder. Vs L's anchor: A is harder. Middle confirmed.
+    harder: (_first, second) => (second === "H" ? "second" : "first")
+  });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a"), node("h"), node("l")] });
+  const a = difficulties.find((difficulty) => difficulty.derivedNodeId === "a")!;
+  assert.equal(a.components.band, 2);
+  assert.equal(a.components.contested, 1);
+  assert.equal(a.components.pairwiseComparisons, 2);
+  assert.equal(a.components.calibrationUnresolved, 0);
+  assert.deepEqual(comparisons, [
+    { first: "A", second: "H" },
+    { first: "A", second: "L" }
+  ]);
+});
+
+test("a contested concept harder than the high anchor takes band H after one comparison", async () => {
+  // a: 2,2,4,4,5 → modal tie 2/2 → modal 2 (lower), contested; candidates L=2, H=5.
+  const { judge, comparisons } = scriptedJudge({
+    bandsByLabel: { A: [2, 2, 4, 4, 5], H: [5, 5, 5, 5, 5], L: [2, 2, 2, 2, 2] },
+    harder: (first) => (first === "A" ? "first" : "second")
+  });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a"), node("h"), node("l")] });
+  const a = difficulties.find((difficulty) => difficulty.derivedNodeId === "a")!;
+  assert.equal(a.components.band, 5);
+  assert.equal(a.score, 1);
+  assert.equal(a.components.pairwiseComparisons, 1);
+  assert.equal(comparisons.length, 1);
+  // The rationale still comes from a draw that voted band 5.
+  assert.equal(a.neuralRationale, "A draw 4 band 5");
+});
+
+test("a contested concept easier than the low anchor takes band L after two comparisons", async () => {
+  // a: 3,3,4,4,2 → modal tie 3/3... counts: 3→2, 4→2, 2→1 → tie 3 vs 4 → modal 3, contested; L=2, H=4.
+  const { judge } = scriptedJudge({
+    bandsByLabel: { A: [3, 3, 4, 4, 2], H: [4, 4, 4, 4, 4], L: [2, 2, 2, 2, 2] },
+    // A vs H → H harder (second); A vs L → L harder (second) means A is easier than L's anchor.
+    harder: () => "second"
+  });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a"), node("h"), node("l")] });
+  const a = difficulties.find((difficulty) => difficulty.derivedNodeId === "a")!;
+  assert.equal(a.components.band, 2);
+  assert.equal(a.components.pairwiseComparisons, 2);
+  assert.equal(a.components.calibrationUnresolved, 0);
+});
+
+test("a missing needed anchor keeps the modal band and records calibrationUnresolved (AE5 shape)", async () => {
+  // Single contested concept in its domain: no uncontested anchors exist at all.
+  const { judge, comparisons } = scriptedJudge({ bandsByLabel: { A: [1, 2, 3, 4, 5] } });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a")] });
+  const a = difficulties[0];
+  assert.equal(a.components.contested, 1);
+  assert.equal(a.components.band, 1, "modal tie across all bands takes the lowest");
+  assert.equal(a.components.calibrationUnresolved, 1);
+  assert.equal(a.components.pairwiseComparisons, 0);
+  assert.equal(comparisons.length, 0);
+});
+
+test("a single-concept domain passes through as one accepted banding call (AE5)", async () => {
+  const { judge, getBandCalls } = scriptedJudge({ bandsByLabel: { A: [3] } });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a")] });
+  assert.equal(difficulties.length, 1);
+  assert.equal(difficulties[0].components.band, 3);
+  assert.equal(difficulties[0].components.contested, 0);
+  assert.equal(getBandCalls(), 5, "K draws still run; the set is just size 1");
+});
+
+test("domains band independently: one call set per Declared Domain, K draws each", async () => {
+  const { judge, getBandCalls } = scriptedJudge({ bandsByLabel: { A: [2], B: [4] } });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 3).score({
+    nodes: [node("a", "domain one"), node("b", "domain two")]
+  });
+  assert.equal(difficulties.length, 2);
+  assert.equal(getBandCalls(), 6, "3 draws for each of the 2 domains");
+});
+
+test("components are strictly numeric and the rationale lives beside them", async () => {
+  const { judge } = scriptedJudge({ bandsByLabel: { A: [2] } });
+  const difficulties = await createIntrinsicDifficultyPort(judge, 5).score({ nodes: [node("a")] });
+  assert.equal(Object.values(difficulties[0].components).every((value) => typeof value === "number"), true);
+  assert.equal(typeof difficulties[0].neuralRationale, "string");
+});
+
+test("a non-finite or non-positive sample count fails loudly at composition time", () => {
+  const { judge } = scriptedJudge({ bandsByLabel: { A: [2] } });
+  assert.throws(() => createIntrinsicDifficultyPort(judge, Number.NaN), /positive integer/);
+  assert.throws(() => createIntrinsicDifficultyPort(judge, 0), /positive integer/);
+  assert.throws(() => createIntrinsicDifficultyPort(judge, undefined as unknown as number), /positive integer/);
+});
+
+test("a draw with bad coverage or an out-of-range band fails the stage closed", async () => {
+  const badCoverage: IntrinsicDifficultyJudgmentPort = {
+    model: "bad",
+    async bandDomainSet({ nodes }) {
+      // Duplicate number 1, missing the last listed concept.
+      return nodes.map(() => ({ conceptNumber: 1, band: 2, rationale: "r" }));
+    },
+    async compareHarder() {
+      return { harder: "first" };
+    }
+  };
+  await assert.rejects(
+    () => createIntrinsicDifficultyPort(badCoverage, 2).score({ nodes: [node("a"), node("b")] }),
+    /outside or twice/
+  );
+
+  const badBand: IntrinsicDifficultyJudgmentPort = {
+    model: "bad",
+    async bandDomainSet({ nodes }) {
+      return nodes.map((candidate, index) => ({ conceptNumber: index + 1, band: 6, rationale: "r" }));
+    },
+    async compareHarder() {
+      return { harder: "first" };
+    }
+  };
+  await assert.rejects(() => createIntrinsicDifficultyPort(badBand, 2).score({ nodes: [node("a")] }), /out-of-range band/);
+
   const throwing: IntrinsicDifficultyJudgmentPort = {
     model: "throwing",
-    async judge() {
-      throw new Error("judge unavailable");
+    async bandDomainSet() {
+      throw new Error("banding re-prompt exhausted");
+    },
+    async compareHarder() {
+      return { harder: "first" };
     }
   };
-  await assert.rejects(() => createIntrinsicDifficultyPort(throwing).score({ nodes: [node("a")], prerequisiteEdges: [] }), /judge unavailable/);
-
-  await assert.rejects(
-    () => createIntrinsicDifficultyPort(judge({ a: 1.1 })).score({ nodes: [node("a")], prerequisiteEdges: [] }),
-    /out-of-range/
-  );
-});
-
-test("the judge's rationale passes through to the ConceptDifficulty while the fused score is unchanged", async () => {
-  // A judge returning a per-node rationale alongside its numeric subscore. The port
-  // must carry the text through verbatim (R5) and must NOT let it perturb the score (R7).
-  // This asserts the deterministic transform of the model's output, not the model's
-  // judgment content (AGENTS rule 11).
-  const rationaleJudge: IntrinsicDifficultyJudgmentPort = {
-    model: "stub-judge",
-    async judge(input) {
-      return { neuralScore: 0.4, rationale: `${input.derivedNodeId} is moderately abstract` };
-    }
-  };
-  // Isolated single node: no edges, defs=1/mentions=0 → structuralScore = (0+0+0+1)/4 = 0.25.
-  const difficulties = await createIntrinsicDifficultyPort(rationaleJudge).score({ nodes: [node("a")], prerequisiteEdges: [] });
-  assert.equal(difficulties.length, 1);
-  assert.equal(difficulties[0].neuralRationale, "a is moderately abstract");
-  // Same fused formula as before the field was added: 0.55*neural + 0.45*structural
-  // (in-range, so the port's clamp is identity here).
-  assert.equal(difficulties[0].score, 0.55 * 0.4 + 0.45 * 0.25);
-  // The rationale lives beside, never inside, the strictly-numeric components (KTD3).
-  assert.equal(Object.values(difficulties[0].components).every((value) => typeof value === "number"), true);
-});
-
-test("llm_grounded node context is scored from generated grounding text", async () => {
-  const seen: DifficultyNodeContext[] = [];
-  const port = createIntrinsicDifficultyPort({
-    model: "stub-judge",
-    async judge(input) {
-      seen.push(input);
-      return { neuralScore: 0.5, rationale: "stub" };
-    }
-  });
-  const difficulties = await port.score({ nodes: [llmGroundedNode("generated")], prerequisiteEdges: [] });
-  assert.equal(difficulties.length, 1);
-  assert.equal(seen[0].groundingOrigin, "llm_grounded");
-  assert.deepEqual(seen[0].definitions, ["generated generated definition"]);
+  await assert.rejects(() => createIntrinsicDifficultyPort(throwing, 5).score({ nodes: [node("a")] }), /re-prompt exhausted/);
 });

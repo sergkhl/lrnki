@@ -379,11 +379,11 @@ test("scores intrinsic difficulty with per-node evidence contexts over all deriv
   assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
 });
 
-test("default config hash reflects the K-sample ordering reshape", async () => {
+test("default config hash reflects the banded-difficulty reshape", async () => {
   const ports = buildPorts();
   const layer = await run(ports);
-  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "k-sample-ordering");
-  assert.equal(layer.enrichmentConfigHash, "k-sample-ordering");
+  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "banded-difficulty");
+  assert.equal(layer.enrichmentConfigHash, "banded-difficulty");
 });
 
 // An evidence-free snapshot reaches no ordering draw and persists with only exclusions.

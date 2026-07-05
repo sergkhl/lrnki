@@ -34,8 +34,10 @@ export {
   knowledgeBoundaryProbeValidator,
   missingPrerequisiteProposalSchema,
   missingPrerequisiteProposalValidator,
-  intrinsicDifficultySchema,
-  intrinsicDifficultyValidator,
+  buildDifficultyBandsSchema,
+  buildDifficultyBandsValidator,
+  difficultyComparisonSchema,
+  difficultyComparisonValidator,
   declaredDomainInferenceSchema,
   declaredDomainInferenceValidator,
   admissionLabelJudgmentSchema,
@@ -100,7 +102,8 @@ export {
 export {
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   INTRINSIC_DIFFICULTY_JUDGE_MODEL,
-  INTRINSIC_DIFFICULTY_SYSTEM_PROMPT
+  DIFFICULTY_BANDING_SYSTEM_PROMPT,
+  DIFFICULTY_COMPARISON_SYSTEM_PROMPT
 } from "./intrinsicDifficultyAdapters";
 export {
   LiteLlmDeclaredDomainInferenceAdapter,

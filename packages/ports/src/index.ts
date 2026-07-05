@@ -21,6 +21,7 @@ import type {
   DefinitionPassageQualityJudgment,
   NewResponseLogRow,
   ResponseLogRow,
+  DifficultyBandEntry,
   DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -384,15 +385,20 @@ export interface MissingPrerequisiteProposalPort {
   }): Promise<MissingPrerequisiteProposal[]>;
 }
 
-// Intrinsic difficulty judge (ADR-0024). A bounded, forced-tool neural judgment
-// over ONE derived node's evidence, run through an independent judge alias. It
-// estimates learner-neutral intrinsic difficulty from generic signals such as
-// abstraction level, technical density, and implied background load. The adapter
-// validates tool arguments fail-closed; fusion with graph structure happens in
-// the application layer.
+// Intrinsic difficulty judge (ADR-0024 — comparative banded prior). Two forced-tool
+// call kinds through the same independent judge alias:
+// `bandDomainSet` bands EVERY concept of one Declared Domain 1–5 RELATIVE to that
+// set in ONE call (numbered menu-pick; exact coverage validated fail-closed with one
+// corrective re-prompt). The application K-samples this call (ADR-0028), takes the
+// modal band as consensus, and treats dispersion as signal.
+// `compareHarder` is the bounded pairwise calibration for CONTESTED bands: one
+// "which is harder" judgment between the contested concept and an uncontested anchor.
+// The adapter validates tool arguments fail-closed; consensus, contest detection, and
+// the two-comparison bracket live in the application layer, never here.
 export interface IntrinsicDifficultyJudgmentPort {
   readonly model: string;
-  judge(input: DifficultyNodeContext): Promise<{ neuralScore: number; rationale: string }>;
+  bandDomainSet(input: { declaredDomain: string; nodes: DifficultyNodeContext[] }): Promise<DifficultyBandEntry[]>;
+  compareHarder(input: { declaredDomain: string; first: DifficultyNodeContext; second: DifficultyNodeContext }): Promise<{ harder: "first" | "second" }>;
 }
 
 // Declared-domain inference (Learner charting). ONE forced-tool call maps a
@@ -404,19 +410,20 @@ export interface DeclaredDomainInferencePort {
   infer(input: { topic: string }): Promise<{ declaredDomain: string }>;
 }
 
-// Node difficulty (ADR-0019). The current production direction is
-// learner-neutral intrinsic difficulty: neural source-grounded judgment fused
-// with deterministic graph/evidence components. Learner-calibrated IRT/BT stays
-// deferred until learner-response data exists. Reads concepts + the inferred
-// prereq DAG; one score each.
+// Node difficulty (ADR-0019). The current production direction is the
+// learner-neutral comparative banded prior (ADR-0024): a K-sampled in-set banding
+// judgment with pairwise calibration for contested bands. Structural DAG terms are
+// no longer fused in — depth/ancestors/fan-in re-encode the prerequisite structure
+// that already gates the path — so the port reads node evidence contexts only.
+// Learner-calibrated IRT/BT stays deferred until learner-response data exists.
 export interface DifficultyPort {
   readonly method: string;
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
-  // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
+  // Concepts: the derived layer spans the union, so difficulty must too. Generated
   // nodes are never fabricated into `Concept` values to satisfy the port (handoff
   // constraint). Both the input contexts and the returned difficulties key on
   // `derivedNodeId` (the difficulty store keys on derived_node_id).
-  score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
+  score(input: { nodes: DifficultyNodeContext[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0024 defers population learner modeling). MVP impl is a mock

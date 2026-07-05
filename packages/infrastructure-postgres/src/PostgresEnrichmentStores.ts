@@ -27,7 +27,9 @@ export class PostgresEnrichmentRunStore implements EnrichmentRunStorePort {
     artifact: ArtifactEnvelope<EnrichmentRunTrace>;
   }): Promise<void> {
     const { layer, artifact } = input;
-    const difficultyMethod = layer.difficulties[0]?.method ?? "dag-depth-mock";
+    // A layer with zero difficulty rows (e.g. an evidence-free snapshot) has no
+    // producing method to record; "unscored" states that plainly.
+    const difficultyMethod = layer.difficulties[0]?.method ?? "unscored";
     // Whole-set ordering (U4): ONE non-DeepSeek ordering alias orders every domain, so
     // every edge's judging model is the layer-level `judgeModel` — there is no per-pair
     // model split any more (the per-pair routing was deleted, rule 18).

@@ -1120,6 +1120,21 @@ export type WholeSetOrdering = {
   edges: WholeSetPrerequisiteEdge[];
 };
 
+// One concept's difficulty band from ONE whole-domain-set banding draw (comparative
+// banded intrinsic difficulty, ADR-0024). The judge cites the concept by the 1-based
+// NUMBER shown before it in the prompt (a closed-set menu pick, mirroring
+// WholeSetPrerequisiteEdge); the application maps number → derivedNodeId by position
+// fail-closed. `band` is 1–5 RELATIVE to the Declared Domain's concept set, not an
+// absolute scale — the pointwise absolute judge this replaces suffered scale-use bias
+// (abstract-SOUNDING labels scored high without evidence). K draws are sampled per
+// ADR-0028; consensus (modal band) and contested-band calibration live in the
+// application, never here.
+export type DifficultyBandEntry = {
+  conceptNumber: number;
+  band: number;
+  rationale: string;
+};
+
 // An edge of the inferred prerequisite DAG: prerequisite must precede dependent.
 // Survives only after deterministic cycle removal + transitive reduction +
 // weak-edge cut (ADR-0019). `uncertain` edges are retained for inspection but

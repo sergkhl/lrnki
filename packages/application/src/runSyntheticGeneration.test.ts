@@ -98,7 +98,7 @@ function fakeOrdering(): PrerequisiteOrderingPort {
 function fakeDifficulty(): DifficultyPort {
   return {
     method: "fake-difficulty",
-    async score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]> {
+    async score(input: { nodes: DifficultyNodeContext[] }): Promise<ConceptDifficulty[]> {
       return input.nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0.5, method: "fake-difficulty", components: {}, neuralRationale: "mock" }));
     }
   };
