@@ -72,7 +72,6 @@ export type StudyMatchingView = {
 export type ConceptLessonSectionView = {
   kind: ConceptLessonSectionKind;
   text: string;
-  keyTerms?: string[];
   items?: string[];
   groundingProvenance: StudyItemGroundingProvenance;
   // True when the section verified verbatim against a source block; the card shows a distinct
@@ -107,7 +106,6 @@ export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
     sections: lesson.sections.map((section) => ({
       kind: section.kind,
       text: section.text,
-      ...(section.keyTerms?.length ? { keyTerms: section.keyTerms } : {}),
       ...(section.items?.length ? { items: section.items } : {}),
       groundingProvenance: section.groundingProvenance,
       isSourceCited: section.citation?.provenance === "source",

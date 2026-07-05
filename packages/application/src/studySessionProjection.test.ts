@@ -155,7 +155,7 @@ function lessonFor(derivedNodeId: string): ConceptLesson {
     sections: [
       { kind: "gist", text: "A short gist.", groundingProvenance: "generated" },
       { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition.", matchKind: "exact" } },
-      { kind: "applications", text: "Connects to neighbors.", keyTerms: ["neighbors"], items: ["First use.", "Second use."], groundingProvenance: "generated" }
+      { kind: "applications", text: "Connects to neighbors.", items: ["First use.", "Second use."], groundingProvenance: "generated" }
     ]
   };
 }

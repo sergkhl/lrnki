@@ -111,11 +111,6 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
       text: section.text,
       groundingProvenance: grounded.provenance
     };
-    const keyTerms = (section.keyTerms ?? [])
-      .map((term) => term.trim())
-      .filter((term, index, terms) => term.length > 0 && terms.indexOf(term) === index && section.text.includes(term))
-      .slice(0, 3);
-    if (keyTerms.length) assembled.keyTerms = keyTerms;
     const items = LIST_SECTION_KINDS.includes(section.kind)
       ? (section.items ?? []).map((item) => item.trim()).filter((item) => item.length > 0).slice(0, 4)
       : [];

@@ -872,7 +872,6 @@ CREATE TABLE concept_lesson_sections (
   ordinal integer NOT NULL CHECK (ordinal >= 0),
   kind text NOT NULL CHECK (kind IN ('gist', 'intuition', 'definition', 'examples', 'applications', 'formulas')),
   body_text text NOT NULL,
-  key_terms text[],
   items text[],
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   diagram_caption text,

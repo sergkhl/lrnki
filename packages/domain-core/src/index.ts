@@ -1540,7 +1540,6 @@ export type ConceptLessonDiagramDescriptor = { caption: string; spec: string };
 export type ConceptLessonSection = {
   kind: ConceptLessonSectionKind;
   text: string;
-  keyTerms?: string[];
   items?: string[];
   groundingProvenance: StudyItemGroundingProvenance;
   citation?: StudyItemCitation;
@@ -1577,7 +1576,6 @@ export type LessonAbsentNode = {
 export type ConceptLessonSectionDraft = {
   kind: ConceptLessonSectionKind;
   text: string;
-  keyTerms?: string[];
   items?: string[];
   citation?: { passageId: string; evidenceQuote: string };
   diagram?: ConceptLessonDiagramDescriptor;

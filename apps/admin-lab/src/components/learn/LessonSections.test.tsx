@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LessonSections } from "./LessonSections";
 
-test("LessonSections renders list items and emphasizes the first matching key term", () => {
+test("LessonSections renders section text verbatim with list items and no highlight markup", () => {
   const html = renderToStaticMarkup(
     <LessonSections
       lesson={{
@@ -12,7 +12,6 @@ test("LessonSections renders list items and emphasizes the first matching key te
         sections: [{
           kind: "applications",
           text: "Ownership helps track moves.",
-          keyTerms: ["Ownership"],
           items: ["Ownership identifies one current owner.", "Moves transfer that owner."],
           groundingProvenance: "generated",
           isSourceCited: false
@@ -23,7 +22,8 @@ test("LessonSections renders list items and emphasizes the first matching key te
 
   assert.match(html, /<ul/);
   assert.match(html, /<li/);
-  assert.match(html, /<mark/);
+  assert.doesNotMatch(html, /<mark/, "key-term highlighting is removed end-to-end (R11)");
+  assert.match(html, /Ownership helps track moves\./);
   assert.match(html, /identifies one current owner/);
   assert.match(html, /Moves transfer that owner/);
 });
