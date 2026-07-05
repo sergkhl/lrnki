@@ -22,7 +22,13 @@ export const LEARNER_VOCABULARY = {
   groundedBadge: "Grounded in your source",
   topicDoor: "Chart course",
   progress: "Charting progress",
-  summit: "Summit reached"
+  summit: "Summit reached",
+  section: "Leg",
+  sectionPlural: "Legs",
+  sectionOverview: "Trail map",
+  sectionOverviewHint: "Jump to any open leg. Fogged legs unlock as you clear what they need.",
+  gems: "Gems",
+  gatedBy: "Clears after"
 } as const;
 
 export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;

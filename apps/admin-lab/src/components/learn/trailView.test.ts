@@ -18,8 +18,42 @@ test("buildTrailView emits item stops only before capstone when a node has no le
 test("buildTrailView marks exactly one next stop across the trail", () => {
   const view = buildTrailView(session());
   assert.equal(view.nextStopId, "n1:theory:main");
-  assert.equal(view.fogBoundaryStopId, "n1:theory:main");
   assert.equal(view.concepts.flatMap((concept) => concept.stops).filter((stop) => stop.isNext).length, 1);
+});
+
+test("buildTrailView groups concepts under their sections and marks section starts", () => {
+  const view = buildTrailView(session({ includeLocked: true }));
+  // Both fixture concepts share section 0 (one milestone cone), so only the first opens it.
+  assert.deepEqual(view.concepts.map((concept) => concept.sectionIndex), [0, 0]);
+  assert.deepEqual(view.concepts.map((concept) => concept.isSectionStart), [true, false]);
+  assert.equal(view.sections.length, 1);
+  assert.equal(view.sections[0].conceptCount, 2);
+});
+
+test("Covers AE4: a second disjoint section is playable before the first is touched", () => {
+  const base = session();
+  const litNode = (id: string, label: string) => ({ ...base.detail.nodes[0], derivedNodeId: id, label });
+  const twoSection: StudySession = {
+    ...base,
+    detail: { ...base.detail, nodes: [litNode("s0", "Section Zero"), litNode("s1", "Section One")] },
+    expeditionPath: [
+      { position: 0, derivedNodeId: "s0", difficulty: 0, topologicalDepth: 0, state: "locked", isSummit: false, sectionIndex: 0, sectionPositionIndex: 0, milestoneDerivedNodeId: "s0", milestoneLabel: "Section Zero", isMilestone: true },
+      { position: 1, derivedNodeId: "s1", difficulty: 0, topologicalDepth: 0, state: "frontier", isSummit: true, sectionIndex: 1, sectionPositionIndex: 0, milestoneDerivedNodeId: "s1", milestoneLabel: "Section One", isMilestone: true }
+    ],
+    sections: [
+      { sectionIndex: 0, milestoneDerivedNodeId: "s0", milestoneLabel: "Section Zero", stepDerivedNodeIds: ["s0"], meanDifficulty: 0 },
+      { sectionIndex: 1, milestoneDerivedNodeId: "s1", milestoneLabel: "Section One", stepDerivedNodeIds: ["s1"], meanDifficulty: 0 }
+    ],
+    studySegmentsByNode: {},
+    lessonByNode: {},
+    sheetByNode: { s0: { kind: "locked", unmetPrerequisiteLabels: ["Something earlier"] } }
+  };
+  const view = buildTrailView(twoSection);
+  assert.equal(view.sections.length, 2);
+  assert.equal(view.sections[1].state, "available", "the second section is playable before the first is cleared");
+  assert.equal(view.sections[0].state, "locked");
+  assert.deepEqual(view.sections[0].gatingLabels, ["Something earlier"]);
+  assert.equal(view.currentSectionIndex, 1, "the next stop lives in the playable second section");
 });
 
 test("buildTrailView fogs locked territory and leaves frontier stops clear", () => {
