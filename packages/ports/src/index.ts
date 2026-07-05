@@ -34,7 +34,6 @@ import type {
   KnowledgeBoundaryProbeAnswer,
   WholeSetOrdering,
   GraphSnapshot,
-  InferredPrerequisiteEdge,
   NonCoreRescueCandidate,
   MissingPrerequisiteProposal,
   MintingDurabilityJudgment,

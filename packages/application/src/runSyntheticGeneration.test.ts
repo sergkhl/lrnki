@@ -7,7 +7,6 @@ import type {
   DifficultyNodeContext,
   EnrichmentRunTrace,
   GeneratedGroundingBundle,
-  InferredPrerequisiteEdge,
   SynthesizedConcept,
   WholeSetOrdering
 } from "@lrnki/domain-core";
