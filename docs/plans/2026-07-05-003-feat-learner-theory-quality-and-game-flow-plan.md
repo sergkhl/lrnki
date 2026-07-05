@@ -15,8 +15,7 @@ the "In a nutshell restates Definition" defect, the item blueprint becomes a rea
 suitability decision that allows sparse item sets (with a mastery path for theory-only nodes), the
 learner's name is remembered on-device, the matching board gets a mobile-first relayout, and
 concept completion routes through an animated crystal-collect capstone whose Continue advances to
-the next concept. Hard reset and full regeneration; the plan also absorbs the doc close-out debt of
-the shipped game-UX plan `2026-07-05-001`.
+the next concept. Hard reset and full regeneration complete the release.
 
 ---
 
@@ -73,9 +72,8 @@ on the map instead of flowing into the next concept.
 
 - R10. Hard reset onto the edited single migration, full lesson + bank regeneration, and the
   rule-14 real-use gate at 390px.
-- R11. Doc debt cleared: plan `2026-07-05-001`'s durable decisions (matching, blueprint, facet,
-  keyless views) fold into ADR-0026 and CONTEXT.md, this plan's lesson changes amend ADR-0031, and
-  the stale plan file is deleted.
+- R11. Doc close-out: this plan's durable lesson, sparse-blueprint, theory-only mastery, and
+  capstone-flow decisions fold into ADRs/CONTEXT/TODO when implemented, then this plan is deleted.
 
 ---
 
@@ -199,7 +197,8 @@ browser-verifiable immediately with no schema change. U9 is the whole-release ch
   `packages/application/src/studySessionProjection.ts` (+ test: `ConceptLessonSectionView` gains
   the fields); `packages/application/src/studyItemBankConfig.ts` (bump to `study-item-bank-v3`).
 - **Patterns to follow:** the flat-nullable wire→nested-optional translation already in
-  `conceptLessonGenerationAdapters.ts:92-101`; the closed-view-column note from plan 001.
+  `conceptLessonGenerationAdapters.ts:92-101`; the closed-view-column ownership rule in
+  [docs/plans/README.md](./README.md).
 - **Test scenarios:** assembler keeps a verbatim key term and drops a non-occurring one; items
   survive persist→hydrate→projection round-trip; a section without items/terms round-trips absent
   (no empty arrays materialized); prompt/schema fixture-term leak scan (rule 17).
@@ -333,13 +332,11 @@ browser-verifiable immediately with no schema change. U9 is the whole-release ch
 
 - **Goal:** the release ships regenerated content, honest docs, and rule-14 evidence (R10, R11).
 - **Requirements:** R10, R11. **Dependencies:** U1–U8.
-- **Files:** `docs/adr/0026-typed-study-item-bank.md` (fold plan-001 debt: matching type,
-  blueprint policy + this redesign's suitability posture, facet, partial-credit identity, keyless
-  study views); `docs/adr/0031-concept-lesson-teaching-substrate.md` (list items, key terms,
-  relaxed minimum, redundancy policy); `CONTEXT.md` (Study Session segment order gains matching;
-  Concept Lesson wording); `docs/plans/README.md`, `docs/plans/TODO.md`; delete
-  `docs/plans/2026-07-05-001-feat-learner-game-ux-matching-and-mobile-polish-plan.md` and this
-  plan on completion.
+- **Files:** `docs/adr/0026-typed-study-item-bank.md` (sparse-blueprint posture and theory-only
+  mastery consequences if durable); `docs/adr/0031-concept-lesson-teaching-substrate.md` (list
+  items, key terms, relaxed minimum, redundancy policy); `CONTEXT.md` (Concept Lesson wording and
+  any accepted vocabulary); `docs/plans/README.md`, `docs/plans/TODO.md`; delete this plan on
+  completion.
 - **Approach:** reset the DB onto the edited migration (rules 8–9), run the full seed with
   production aliases, then apply `.agents/skills/real-use-quality-evaluation/SKILL.md`: inspect
   real lessons for list structure, key-term quality, and gist-definition distinctness; inspect
@@ -358,10 +355,10 @@ browser-verifiable immediately with no schema change. U9 is the whole-release ch
 ## System-Wide Impact
 
 - **`study_items` operation cost.** The redundancy judge adds one cheap cross-family call per
-  node to the pipeline's known cost bottleneck (repo TODO item 3). The new stage tag +
-  `OPERATION_TIMELINE_CATALOG` entry make the added cost first-class measurable in the same
-  reports that would indict it; redundancy-triggered retries add a second generation call only on
-  defective lessons.
+  node to the pipeline area tracked by [TODO](./TODO.md)'s bottleneck-report follow-up. The new
+  stage tag + `OPERATION_TIMELINE_CATALOG` entry make the added cost first-class measurable in the
+  same reports that would indict it; redundancy-triggered retries add a second generation call only
+  on defective lessons.
 - **Lesson consumers.** `studyItemGroundingFromLesson` reads section citations and text — list
   items live inside the section and do not alter citation verification. The blueprint prompt reads
   section texts; U4 threads items into its rendered lesson context so the pre-gate and rubric see
@@ -374,8 +371,8 @@ browser-verifiable immediately with no schema change. U9 is the whole-release ch
   outcome exists for item-less nodes), expedition progress rows (item counts already come from the
   bank, so sparse nodes report fewer activities, which is correct).
 - **Untouched:** grading actions and server-authoritative key resolution, Response Log schema,
-  `matching_pairs` schema and guard, difficulty banding and trail floor (plan 002, in progress on
-  this branch), seed scripts.
+  `matching_pairs` schema and guard, difficulty banding and trail floor
+  ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)), seed scripts.
 
 ---
 
@@ -389,9 +386,9 @@ browser-verifiable immediately with no schema change. U9 is the whole-release ch
   direction (lose a hook) is accepted over the shipped failure (duplicate sections). Inspected in
   the gate; if real lessons lose good gists, the revisit is judge-prompt calibration, not a
   threshold.
-- **Plan 002 shares this repo's difficulty surfaces.** Its U6 gate is pending on this branch; this
-  plan touches none of the difficulty stack, but U9's reseed should land after or with plan 002's
-  gate to avoid attributing one plan's regenerated content to the other's evaluation.
+- **Difficulty surfaces stay out of scope.** This plan touches none of the difficulty stack; U9's
+  real-use report must attribute only lesson, blueprint, sparse-mastery, name, matching-layout, and
+  capstone-flow changes.
 - **Hard reset needs production LLM balance** and the known LiteLLM container-restart-after-alias-
   edit gotcha (`kg-independent-judge` already exists; no alias edit is expected).
 
@@ -402,8 +399,8 @@ browser-verifiable immediately with no schema change. U9 is the whole-release ch
 - Intrinsic-difficulty trust and the trail floor — shipped 2026-07-05 (comparative banded prior,
   [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)); not re-opened here.
 - Auth or server-side learner identity; PWA/native packaging.
-- New study mechanics; whole-bank leakage judging (still gated on rule-14 evidence per plan 001's
-  deferred contingency).
+- New study mechanics; whole-bank leakage judging, which remains gated on rule-14 evidence under
+  [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md).
 - Cross-lesson deduplication (the same fact taught under two sibling concepts) — a different
   problem class (inter-document redundancy); revisit only if the gate shows it wasting real time.
 

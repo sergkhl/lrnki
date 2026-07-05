@@ -43,9 +43,9 @@ optional and appears only when it adds a distinct mental model rather than repea
 substantive section. Knowledge-boundary gating for source-less concept synthesis belongs to
 [ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md).
 
-The Study Session shows a node's Concept Lesson before its option-select item; reading a lesson writes
-no Response Log row. The lesson rides down the `composeStudySession` projection from lessons loaded
-through a `ConceptLessonStorePort`; it is not served *through* a read port
+The Study Session shows a node's Concept Lesson before its Study Item Bank segments; reading a lesson
+writes no Response Log row. The lesson rides down the `composeStudySession` projection from lessons
+loaded through a `ConceptLessonStorePort`; it is not served *through* a read port
 ([ADR-0027](0027-serve-inspection-through-read-model-ports.md)).
 
 Lesson generation imports no graph or enrichment write port: it is a derived asset that never mutates

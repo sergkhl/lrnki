@@ -161,8 +161,8 @@ _Avoid_: course, personalized graph, concept-keyed learner state
 A learner-stateful, goal-scoped projection over one Derived Graph Layer that gates each in-scope
 derived node into locked / frontier / mastered and carries its study payload. It advances the learner
 toward a target `derived_node_id` and is composed behind an application use-case, not the UI. A
-node's study surface is an ordered linear segment sequence — its **Concept Lesson** (theory),
-then each study item type in canonical order (option-select, then impostor) — each segment
+node's study surface is an ordered linear segment sequence — its **Concept Lesson** (theory), then
+each Study Item Bank type in canonical order (option-select, matching, then impostor) — each segment
 independently answerable and folding into the node's single mastery number.
 _Avoid_: study screen, quiz session, item picker
 
@@ -179,11 +179,12 @@ _Avoid_: static difficulty target, engagement score
 **Learner State**:
 A learner-specific account of calibration and graded outcomes consumed by projection and never stored
 in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
-come from keyed-selection study responses (option-select and impostor).
+come from server-graded study responses (option-select, matching, and impostor).
 
 **Study Item Bank**:
 A learner-neutral study-asset set generated alongside one Derived Graph Layer and keyed to
-`derived_node_id`. Item typing and learner-response identity are defined by
+`derived_node_id`; it contains option-select, matching, and impostor items when the per-node
+blueprint admits them. Item typing and learner-response identity are defined by
 [ADR-0026](docs/adr/0026-typed-study-item-bank.md).
 _Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 

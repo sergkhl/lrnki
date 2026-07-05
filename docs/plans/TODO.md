@@ -121,8 +121,9 @@
 
 - **Study assets and learner state.** The learner loop keys study assets and responses to
   `derived_node_id`; Concept Lessons ground downstream study assets; the Study Item Bank supports
-  `option_select` and `impostor`; graded selections append to the Response Log while calibration
-  remains separate. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  option-select, matching, and impostor through per-node blueprints; keyless learner views submit
+  ids while server-side grading appends to the Response Log, and calibration remains separate.
+  Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
