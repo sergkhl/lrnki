@@ -26,10 +26,11 @@ export type OptionSelectGroundingPassage =
   | { passageId: string; text: string; sourceResourceId: string; sourceBlockId: string }
   | { passageId: string; text: string; derivedNodeId: string };
 
-// The build-time context the guard needs to assemble a persistable OptionSelectItem: the
-// item identity + grounding provenance, plus the passages the correct answer must trace
-// to. Built by the fan-out (U5) from the node's selected grounding.
-export type OptionSelectGrounding = {
+// The build-time context every guard (option-select, matching, impostor) needs to assemble
+// a persistable item: the item identity + grounding provenance, plus the passages a citation
+// must trace to. Built by the fan-out (U5) from the node's selected grounding. One shape
+// shared by all three guards (rule 18) rather than three independently maintained copies.
+export type StudyItemGuardGrounding = {
   studyItemId: string;
   graphVersionId: string | null;
   enrichmentId: string;
@@ -37,8 +38,29 @@ export type OptionSelectGrounding = {
   groundingProvenance: StudyItemGroundingProvenance;
   generatingModel: string;
   configHash: string;
+  facet?: string;
   passages: OptionSelectGroundingPassage[];
 };
+
+export type OptionSelectGrounding = StudyItemGuardGrounding;
+
+// Resolves a draft citation against the grounding passages: finds the cited passage, verifies
+// the evidence quote against it, and re-derives provenance authoritatively from the MATCHED
+// passage (never trusted from the draft's claim — fail-closed labeling). Returns null when the
+// citation doesn't verify. Shared by every guard (option-select, matching, impostor) so a future
+// change to citation verification lands in one place (rule 18).
+export function resolveGroundingCitation(
+  passages: OptionSelectGroundingPassage[],
+  citationDraft: { passageId: string; evidenceQuote: string },
+  derivedNodeId: string
+): StudyItemCitation | null {
+  const candidate = passages.find((passage) => passage.passageId === citationDraft.passageId);
+  const matchKind = candidate ? classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote) : "none";
+  if (!candidate || matchKind === "none") return null;
+  return "sourceResourceId" in candidate
+    ? { provenance: "source", sourceResourceId: candidate.sourceResourceId, sourceBlockId: candidate.sourceBlockId, evidenceQuote: citationDraft.evidenceQuote, matchKind }
+    : { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote };
+}
 
 export type OptionSelectGuardResult =
   | { ok: true; item: OptionSelectItem }
@@ -90,21 +112,10 @@ export function validateOptionSelectItem(
     return { ok: false, reason: "option-select correct option carries no grounding citation" };
   }
   const citationDraft = correct.citation;
-  const candidate = grounding.passages.find((passage) => passage.passageId === citationDraft.passageId);
-  const matchKind = candidate ? classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote) : "none";
-  if (!candidate || matchKind === "none") {
+  const citation = resolveGroundingCitation(grounding.passages, citationDraft, grounding.derivedNodeId);
+  if (!citation) {
     return { ok: false, reason: "option-select correct option citation does not verify against grounding" };
   }
-  const citation: StudyItemCitation =
-    "sourceResourceId" in candidate
-      ? {
-          provenance: "source",
-          sourceResourceId: candidate.sourceResourceId,
-          sourceBlockId: candidate.sourceBlockId,
-          evidenceQuote: citationDraft.evidenceQuote,
-          matchKind
-        }
-      : { provenance: "generated", derivedNodeId: grounding.derivedNodeId, passageText: citationDraft.evidenceQuote };
 
   // (5) every non-correct option is labeled provenance 'generated' (R10).
   const mislabeledDistractor = options.some((option) => !option.isCorrect && option.provenance !== "generated");
@@ -129,6 +140,7 @@ export function validateOptionSelectItem(
       groundingProvenance: grounding.groundingProvenance,
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
+      ...(grounding.facet ? { facet: grounding.facet } : {}),
       question: draft.question,
       explanation,
       options: builtOptions

@@ -7,6 +7,7 @@ export const LEARNER_VOCABULARY = {
   enterAction: "Open expedition",
   theoryStop: "Field notes",
   question: "Question",
+  matching: "Match the pairs",
   spotTheFake: "Spot the fake",
   capstone: "Gem",
   nextStop: "Next stop",
@@ -18,7 +19,7 @@ export const LEARNER_VOCABULARY = {
   continueAction: "Continue",
   returnToTrail: "Return to trail",
   skipKnown: "I already know this ground",
-  groundedTooltip: "Grounded in your source",
+  groundedBadge: "Grounded in your source",
   topicDoor: "Chart course",
   progress: "Charting progress",
   summit: "Summit reached"

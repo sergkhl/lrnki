@@ -1314,7 +1314,7 @@ export type LearnerPathStep = {
 // over persisted items (ADR-0026).
 // ---------------------------------------------------------------------------
 
-export type StudyItemType = "option_select" | "impostor";
+export type StudyItemType = "option_select" | "matching" | "impostor";
 
 export type StudyItemGroundingProvenance = "source_cep" | "source_mentioned" | "generated";
 
@@ -1350,6 +1350,7 @@ type StudyItemBase = {
   groundingProvenance: StudyItemGroundingProvenance;
   generatingModel: string;
   configHash: string;
+  facet?: string;
 };
 
 // Option-select item — auto-graded studying (R9). Four options, exactly one keyed
@@ -1401,7 +1402,21 @@ export type ImpostorItem = StudyItemBase & {
   statements: ImpostorStatement[];
 };
 
-export type StudyItem = OptionSelectItem | ImpostorItem;
+export type MatchingPair = {
+  pairId: string;
+  matchId: string;
+  promptText: string;
+  matchText: string;
+  citation: StudyItemCitation;
+};
+
+export type MatchingItem = StudyItemBase & {
+  itemType: "matching";
+  question: string;
+  pairs: MatchingPair[];
+};
+
+export type StudyItem = OptionSelectItem | MatchingItem | ImpostorItem;
 
 // A derived node that produced NO study item of a given type (no usable grounding),
 // recorded as a durable fact rather than a transient log line. Keyed per `itemType` so a
@@ -1450,7 +1465,28 @@ export type ImpostorItemDraft = {
   lie: ImpostorLieDraft;
 };
 
-export type StudyItemDraft = OptionSelectItemDraft | ImpostorItemDraft;
+export type MatchingPairDraft = {
+  promptText: string;
+  matchText: string;
+  citation: { passageId: string; evidenceQuote: string };
+};
+
+export type MatchingItemDraft = {
+  itemType: "matching";
+  question: string;
+  pairs: MatchingPairDraft[];
+};
+
+export type StudyItemDraft = OptionSelectItemDraft | MatchingItemDraft | ImpostorItemDraft;
+
+export type StudyItemBlueprintTypePlan =
+  | { itemType: StudyItemType; generate: true; facet: string }
+  | { itemType: StudyItemType; generate: false; reason: string };
+
+export type StudyItemBlueprint = {
+  derivedNodeId: string;
+  typePlans: StudyItemBlueprintTypePlan[];
+};
 
 // ---------------------------------------------------------------------------
 // Concept Lesson — the learner-neutral teaching SUBSTRATE (ADR-0031). One lesson
@@ -1639,7 +1675,9 @@ export const STAGE_TAGS = {
   // operation (KTD1) — no new operation type — but carries its own spend tag so its
   // cost ⋈ wall-clock join stays separable from option-select generation (R-cost).
   conceptLessonGeneration: "concept-lesson-generation",
+  studyItemBlueprint: "study-item-blueprint",
   studyItemGeneration: "study-item-generation",
+  matchingGeneration: "matching-generation",
   // Impostor generation is a third stage WITHIN the `study_items` operation (KTD4) — no
   // new operation type — but carries its own spend tag so its cost ⋈ wall-clock join stays
   // separable from option-select and lesson generation (R7, ADR-0029).

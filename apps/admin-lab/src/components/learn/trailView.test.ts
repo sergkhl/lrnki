@@ -34,6 +34,11 @@ test("buildTrailView keeps a flat ordered concept list", () => {
   assert.deepEqual(view.concepts.map((concept) => concept.derivedNodeId), ["n1", "n2"]);
 });
 
+test("buildTrailView copies the stateful difficulty onto each trail cluster", () => {
+  const view = buildTrailView(session({ difficulty: 0.5 }));
+  assert.equal(view.concepts[0].difficulty, 0.5);
+});
+
 test("buildTrailView fills study item stops only when their latest item outcome is correct", () => {
   const view = buildTrailView(session({ latestOutcomeByStudyItemId: { i1: "correct", i2: "incorrect" } }));
   const stops = view.concepts[0].stops;
@@ -41,7 +46,7 @@ test("buildTrailView fills study item stops only when their latest item outcome 
   assert.equal(stops.find((stop) => stop.studyItemId === "i2")?.state, "available");
 });
 
-function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; latestOutcomeByStudyItemId?: StudySession["latestOutcomeByStudyItemId"] } = {}): StudySession {
+function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; latestOutcomeByStudyItemId?: StudySession["latestOutcomeByStudyItemId"]; difficulty?: number } = {}): StudySession {
   const nodes = [{
     derivedNodeId: "n1",
     label: "Ownership",
@@ -100,7 +105,7 @@ function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; lates
     responseSourceSummary: { human: 0, synthetic: 0, total: 0 },
     isFoundationalRoot: true,
     statefulPath: [
-      { position: 0, derivedNodeId: "n1", difficulty: 0, topologicalDepth: 0, state: "frontier", isTarget: !opts.includeLocked },
+      { position: 0, derivedNodeId: "n1", difficulty: opts.difficulty ?? 0, topologicalDepth: 0, state: "frontier", isTarget: !opts.includeLocked },
       ...(opts.includeLocked ? [{ position: 1, derivedNodeId: "n2", difficulty: 0, topologicalDepth: 1, state: "locked" as const, isTarget: true }] : [])
     ],
     coexistence: [],

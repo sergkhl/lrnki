@@ -7,6 +7,7 @@ import type {
   GraphSnapshot,
   ImpostorItemDraft,
   LessonAbsentNode,
+  MatchingItemDraft,
   OptionSelectItemDraft,
   PublishedEvidencePassage,
   RejectedStudyItem,
@@ -209,6 +210,19 @@ function impDraftFrom(passages: { passageId: string; text: string }[]): Impostor
   };
 }
 
+function matchingDraftFrom(passages: { passageId: string; text: string }[]): MatchingItemDraft {
+  const p = passages[0];
+  return {
+    itemType: "matching",
+    question: "Match each clue to its description.",
+    pairs: [
+      { promptText: "Clue one", matchText: "Description one", citation: { passageId: p.passageId, evidenceQuote: p.text } },
+      { promptText: "Clue two", matchText: "Description two", citation: { passageId: p.passageId, evidenceQuote: p.text } },
+      { promptText: "Clue three", matchText: "Description three", citation: { passageId: p.passageId, evidenceQuote: p.text } }
+    ]
+  };
+}
+
 // Canned generators keyed by derivedNodeId, or the literal "throw" to simulate a failure.
 // INPUT FIXTURES exercising the deterministic envelope (ADR-0013) — no assertion is ever made
 // on the model's judgment content. By default `generateImpostor` derives a guard-passing
@@ -217,6 +231,7 @@ function impDraftFrom(passages: { passageId: string; text: string }[]): Impostor
 function generationReturning(opts: {
   optionSelect?: Record<string, OptionSelectItemDraft | "throw">;
   impostor?: Record<string, ImpostorItemDraft | "throw" | "absent">;
+  matching?: Record<string, MatchingItemDraft | "throw" | "absent">;
   onGenerate?: () => void;
   onGenerateImpostor?: () => void;
 }): StudyItemGenerationPort {
@@ -239,6 +254,13 @@ function generationReturning(opts: {
       }
       if (override) return override;
       return impDraftFrom(input.groundingPassages);
+    },
+    async generateMatching(input) {
+      const override = opts.matching?.[input.node.derivedNodeId];
+      if (override === "throw") throw new Error("matching generation failed");
+      if (override === "absent") return { ...matchingDraftFrom(input.groundingPassages), pairs: [] };
+      if (override) return override;
+      return matchingDraftFrom(input.groundingPassages);
     }
   };
 }
@@ -316,12 +338,12 @@ test("a node whose lesson grounds an option-select that passes the guard persist
     studyItemBankStore: store
   });
 
-  // Both stages run: the node carries an option-select AND an impostor item (KTD7).
-  assert.equal(result.studyItems.length, 2);
+  // All three stages run: the node carries option-select, matching, AND impostor items (KTD7).
+  assert.equal(result.studyItems.length, 3);
   assert.equal(result.rejected.length, 0);
   assert.equal(result.lessons.length, 1);
   assert.equal(result.lessonAbsent.length, 0);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
   assert.deepEqual(persistedRejected, []);
   // The lesson is persisted through the lesson store, with a source-cited definition section.
   assert.equal(lessonStore.lessons.length, 1);
@@ -412,6 +434,10 @@ test("concurrent per-node generation persists items and rejections in input orde
     async generateImpostor(input) {
       await sleep(defs.get(input.node.derivedNodeId)!.delay);
       return impDraftFrom(input.groundingPassages);
+    },
+    async generateMatching(input) {
+      await sleep(defs.get(input.node.derivedNodeId)!.delay);
+      return matchingDraftFrom(input.groundingPassages);
     }
   };
   await generateStudyItemBank({
@@ -430,6 +456,9 @@ test("concurrent per-node generation persists items and rejections in input orde
   assert.deepEqual(lessonStore.lessons.map((lesson) => lesson.derivedNodeId), ["node-c1", "node-c2", "node-c3"]);
   assert.deepEqual(persisted.map((item) => `${item.derivedNodeId}/${item.itemType}`), [
     "node-c1/option_select",
+    "node-c1/matching",
+    "node-c2/matching",
+    "node-c3/matching",
     "node-c1/impostor",
     "node-c2/impostor",
     "node-c3/impostor"
@@ -456,11 +485,11 @@ test("an option-select guard rejection records the node as rejected", async () =
     studyItemBankStore: store
   });
 
-  // Option-select is rejected (its guard miss), but the impostor stage still grounds an item.
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
+  // Option-select is rejected (its guard miss), but the matching/impostor stages still ground an item.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching"]);
   const optionSelectRejections = persistedRejected.filter((r) => r.itemType === "option_select");
   assert.equal(optionSelectRejections.length, 1);
-  assert.deepEqual(await store.supportedItemTypes("node-c1"), ["impostor"]);
+  assert.deepEqual(await store.supportedItemTypes("node-c1"), ["impostor", "matching"]);
 });
 
 test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent and yields no item, without calling either generator", async () => {
@@ -477,7 +506,8 @@ test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent a
   const generation: StudyItemGenerationPort = {
     model: "mock",
     async generateOptionSelect() { osGeneratorCalled = true; throw new Error("should not be called"); },
-    async generateImpostor() { impostorGeneratorCalled = true; throw new Error("should not be called"); }
+    async generateImpostor() { impostorGeneratorCalled = true; throw new Error("should not be called"); },
+    async generateMatching() { throw new Error("should not be called"); }
   };
   const result = await generateStudyItemBank({
     enrichmentId: "enr-1",
@@ -496,11 +526,12 @@ test("Covers AE3/R3: a node with no usable grounding is recorded lesson-absent a
   assert.equal(lessonStore.absent.length, 1);
   assert.match(lessonStore.absent[0].reason, /no usable grounding/);
   assert.equal(lessonGeneratorCalled, false);
-  // R10/R9: neither item type is generated for a lesson-absent node; it is rejected per type,
+  // R10/R9: no item type is generated for a lesson-absent node; it is rejected per type,
   // each referencing the absent lesson (keyed independently — KTD8).
-  assert.equal(result.rejected.length, 2);
+  assert.equal(result.rejected.length, 3);
   const reasonsByType = new Map(persistedRejected.map((r) => [r.itemType, r.reason] as const));
   assert.match(reasonsByType.get("option_select")!, /lesson is absent/);
+  assert.match(reasonsByType.get("matching")!, /lesson is absent/);
   assert.match(reasonsByType.get("impostor")!, /lesson is absent/);
   assert.equal(osGeneratorCalled, false);
   assert.equal(impostorGeneratorCalled, false);
@@ -524,10 +555,10 @@ test("an option-select generation that throws rejects only that node and continu
     studyItemBankStore: store
   });
 
-  // Only node-c1's option-select is rejected; both nodes' impostors ground from their lessons.
+  // Only node-c1's option-select is rejected; both nodes' matching/impostor items ground from their lessons.
   assert.equal(result.rejected.filter((r) => r.itemType === "option_select").length, 1);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
-  assert.deepEqual(typesFor(persisted, "node-c2"), ["impostor", "option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching"]);
+  assert.deepEqual(typesFor(persisted, "node-c2"), ["impostor", "matching", "option_select"]);
 });
 
 test("an option-select whose correct answer cites text absent from the lesson grounding is rejected", async () => {
@@ -545,8 +576,8 @@ test("an option-select whose correct answer cites text absent from the lesson gr
     studyItemBankStore: store
   });
 
-  // The ungrounded option-select is rejected; the impostor still grounds from the lesson.
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
+  // The ungrounded option-select is rejected; matching/impostor still ground from the lesson.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching"]);
 });
 
 test("an option-select guard miss gets one fresh generation attempt before rejection", async () => {
@@ -572,6 +603,9 @@ test("an option-select guard miss gets one fresh generation attempt before rejec
         ],
         lie: { text: "a lie", reveal: "The fourth is false.", lieSource: "generated" }
       };
+    },
+    async generateMatching(input) {
+      return matchingDraftFrom(input.groundingPassages);
     }
   };
   await generateStudyItemBank({
@@ -587,7 +621,7 @@ test("an option-select guard miss gets one fresh generation attempt before rejec
   });
 
   assert.equal(calls, OPTION_SELECT_GENERATION_ATTEMPTS);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
 });
 
 test("Covers R10: option-select grounds in the lesson's source-cited section; a lesson with no grounded section falls back to generated substantive prose", async () => {
@@ -614,7 +648,7 @@ test("Covers R10: option-select grounds in the lesson's source-cited section; a 
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching"]);
   assert.ok(persisted.every((item) => item.groundingProvenance === "generated"));
   assert.match(persistedRejected[0].reason, /does not verify|no grounded sections/);
 });
@@ -775,8 +809,8 @@ test("Covers AE2: a node whose impostor fails the guard twice is recorded impost
     studyItemBankStore: store
   });
 
-  // Option-select still persists; the impostor is recorded absent with a guard reason.
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
+  // Option-select and matching still persist; the impostor is recorded absent with a guard reason.
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["matching", "option_select"]);
   const impostorRejection = persistedRejected.find((r) => r.itemType === "impostor");
   assert.ok(impostorRejection, "a per-type impostor rejection is recorded");
   assert.match(impostorRejection!.reason, /exactly 3 true statements/i);
@@ -804,6 +838,9 @@ test("judge rejection sends feedback to one impostor retry and persists only aft
     async generateImpostor(input) {
       retryFeedbacks.push(input.retryFeedback);
       return impDraftCiting("b1", "rules that govern memory", { lieSource: "generated" });
+    },
+    async generateMatching(input) {
+      return matchingDraftFrom(input.groundingPassages);
     }
   };
   await generateStudyItemBank({
@@ -820,7 +857,7 @@ test("judge rejection sends feedback to one impostor retry and persists only aft
 
   assert.equal(judgeCalls, 2);
   assert.deepEqual(retryFeedbacks, [undefined, "too true for this node"]);
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
   assert.deepEqual(persistedRejected, []);
 });
 
@@ -846,7 +883,7 @@ test("judge unavailable drops the impostor with a distinct operator-visible reas
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["option_select"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["matching", "option_select"]);
   const rejection = persistedRejected.find((item) => item.itemType === "impostor");
   assert.ok(rejection);
   assert.match(rejection.reason, /^impostor lie-validity judge unavailable: judge offline/);
@@ -899,6 +936,9 @@ test("rule 18: both stages derive grounding from the same lesson passages for a 
     async generateImpostor(input) {
       impostorPassages = input.groundingPassages.map((p) => ({ passageId: p.passageId, text: p.text }));
       return impDraftCiting("b1", "rules that govern memory");
+    },
+    async generateMatching(input) {
+      return matchingDraftFrom(input.groundingPassages);
     }
   };
   await generateStudyItemBank({

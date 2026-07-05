@@ -21,6 +21,12 @@ move, not a rewrite.
 Version 1 starts orchestrated-first: the learner chooses a target or quest, and the app chooses the
 next mechanic or segment to preserve flow instead of asking the learner to pick a mechanic cold.
 
+The Learner App is **mobile-first**: design and build every learner-facing surface for a
+phone-sized portrait viewport with standard mobile best practices (touch-first interaction, no
+hover-dependent affordances, thumb-reachable primary actions, safe-area awareness) as the default,
+then adapt upward. Desktop is a secondary adaptation of the mobile design, never the base layout
+that gets squeezed down.
+
 The first-class LeBlanc pleasures for the Learner App are **Challenge**, **Discovery**, and
 **Sensation**. Other pleasures may appear later, but game delight is allowed only when it reinforces
 the current goal: feedback, progress clarity, anticipation, reward, recovery, or discovery of the

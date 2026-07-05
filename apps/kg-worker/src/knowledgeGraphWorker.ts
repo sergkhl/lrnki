@@ -5,6 +5,7 @@ import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
   createIntrinsicDifficultyPort,
+  STUDY_ITEM_BANK_CONFIG_HASH,
   resolveConceptIdentity,
   runExtractionOverSources,
   type ExtractionSourceUnit,
@@ -34,6 +35,7 @@ import {
   LiteLlmConceptAdmissionAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptLessonGenerationAdapter,
+  LiteLlmStudyItemBlueprintAdapter,
   LiteLlmImpostorLieValidityJudgmentAdapter,
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
@@ -226,6 +228,7 @@ function buildContext() {
     // option-select, and persisted through its own store; option-select derives FROM it.
     conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
+    studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
     impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql),
@@ -235,9 +238,6 @@ function buildContext() {
     verdictStore: new PostgresCalibrationVerdictStore(sql)
   };
 }
-
-// Study Item Bank configuration identity — bump when an item prompt/schema/model changes.
-const STUDY_ITEM_BANK_CONFIG_HASH = "study-item-bank-v1";
 
 type Context = ReturnType<typeof buildContext>;
 type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
@@ -608,6 +608,7 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     conceptLessonGeneration: ctx.conceptLessonGeneration,
+    studyItemBlueprint: ctx.studyItemBlueprint,
     impostorLieValidityJudge: ctx.impostorLieValidityJudge,
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
@@ -621,6 +622,8 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
       const correct = item.options.find((option) => option.isCorrect);
       const distractors = item.options.filter((option) => !option.isCorrect).map((option) => option.text);
       console.log(`   option_select[${item.derivedNodeId}] provenance=${item.groundingProvenance}\n     Q: ${item.question}\n     correct: ${correct?.text}\n     distractors: ${distractors.join(" | ")}`);
+    } else if (item.itemType === "matching") {
+      console.log(`   matching[${item.derivedNodeId}] provenance=${item.groundingProvenance} pairs=${item.pairs.length}\n     Q: ${item.question}\n     prompts: ${item.pairs.map((pair) => pair.promptText).join(" | ")}\n     matches: ${item.pairs.map((pair) => pair.matchText).join(" | ")}`);
     } else {
       const impostor = item.statements.find((statement) => statement.isImpostor);
       const truths = item.statements.filter((statement) => !statement.isImpostor).map((statement) => statement.text);

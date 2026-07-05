@@ -45,9 +45,14 @@ export {
   mintingDurabilityJudgmentSchema,
   mintingDurabilityJudgmentValidator,
   optionSelectSchema,
-  optionSelectValidator
+  optionSelectValidator,
+  studyItemBlueprintSchema,
+  studyItemBlueprintValidator,
+  matchingSchema,
+  matchingValidator
 } from "./toolSchemas";
 export {
+  LiteLlmStudyItemBlueprintAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmImpostorLieValidityJudgmentAdapter,
   STUDY_ITEM_GENERATION_MODEL

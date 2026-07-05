@@ -17,6 +17,7 @@ export type TrailStop = {
 export type TrailCluster = {
   derivedNodeId: string;
   label: string;
+  difficulty: number;
   topologicalDepth: number;
   state: StudySession["statefulPath"][number]["state"];
   isTarget: boolean;
@@ -53,6 +54,7 @@ export function buildTrailView(session: StudySession): TrailView {
     return {
       derivedNodeId: step.derivedNodeId,
       label,
+      difficulty: step.difficulty,
       topologicalDepth: step.topologicalDepth,
       state: step.state,
       isTarget: step.isTarget,

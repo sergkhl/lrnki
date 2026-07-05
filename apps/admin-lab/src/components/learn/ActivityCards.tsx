@@ -6,6 +6,7 @@ import type { LearnerGradingResult } from "@/app/learn/[learnerStateRef]/actions
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { GroundedBadge } from "./GroundedBadge";
+import { useShuffledLookup } from "./useShuffledLookup";
 
 type ActivityResult = LearnerGradingResult | null;
 
@@ -22,6 +23,7 @@ export function OptionSelectBody({
   disabled: boolean;
   onSelect: (optionId: string) => void;
 }>) {
+  const { orderedIds, byId: optionById } = useShuffledLookup(item.options, (option) => option.optionId);
   return (
     <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
       <div className="flex items-start gap-2">
@@ -29,7 +31,9 @@ export function OptionSelectBody({
         <GroundedBadge provenance={item.groundingProvenance} />
       </div>
       <div className="flex flex-col gap-2">
-        {item.options.map((option) => {
+        {orderedIds.map((optionId) => {
+          const option = optionById.get(optionId);
+          if (!option) return null;
           const graded = result?.graded === true;
           const isChosen = graded ? option.optionId === result.chosenId : option.optionId === selectedId;
           const isCorrect = graded && option.optionId === result.keyedCorrectId;
@@ -78,6 +82,7 @@ export function ImpostorBody({
   disabled: boolean;
   onSelect: (statementId: string) => void;
 }>) {
+  const { orderedIds, byId: statementById } = useShuffledLookup(item.statements, (statement) => statement.statementId);
   return (
     <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
       <div className="flex items-start gap-2">
@@ -85,7 +90,9 @@ export function ImpostorBody({
         <GroundedBadge provenance={item.groundingProvenance} />
       </div>
       <div className="flex flex-col gap-2">
-        {item.statements.map((statement) => {
+        {orderedIds.map((statementId) => {
+          const statement = statementById.get(statementId);
+          if (!statement) return null;
           const graded = result?.graded === true;
           const isChosen = graded ? statement.statementId === result.chosenId : statement.statementId === selectedId;
           const isImpostor = graded && statement.statementId === result.keyedCorrectId;

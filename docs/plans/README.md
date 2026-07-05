@@ -12,7 +12,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-None.
+- [2026-07-05-001 — Learner game UX polish, item blueprint, and Matching Pairs](./2026-07-05-001-feat-learner-game-ux-matching-and-mobile-polish-plan.md)
+  — ready.
 
 ## Ownership rules
 

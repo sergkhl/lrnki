@@ -372,6 +372,30 @@ export const optionSelectValidator = z.object({
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
 
+export const studyItemBlueprintValidator = z.object({
+  typePlans: z.array(z.object({
+    itemType: z.enum(["option_select", "matching", "impostor"]),
+    generate: z.boolean(),
+    facet: z.string().nullable().describe("When generate=true, the distinct assessed facet this item type should test. Null when generate=false."),
+    reason: z.string().nullable().describe("When generate=false, a short reason this type should be skipped. Null when generate=true.")
+  }).strict()).length(3).describe("Exactly one plan for each supported item type.")
+}).strict();
+
+export const studyItemBlueprintSchema: JsonSchema = toForcedToolSchema(studyItemBlueprintValidator);
+
+const matchingPair = z.object({
+  promptText: z.string().min(1).describe("Left-column prompt: a concise concept-side clue or situation to recognize."),
+  matchText: z.string().min(1).describe("Right-column match: the corresponding example, scenario, description, or application from the lesson."),
+  citation: passageCitation
+}).strict();
+
+export const matchingValidator = z.object({
+  question: z.string().min(1).describe("One self-contained prompt asking the learner to match the pairs. Do not reference 'the passage' or 'the source'."),
+  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage.")
+}).strict();
+
+export const matchingSchema: JsonSchema = toForcedToolSchema(matchingValidator);
+
 // --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
 // One four-statement auto-graded item per node: three TRUE statements (each cited by
 // passage id + quote, verified verbatim at the guard) and exactly ONE planted lie object.
@@ -462,6 +486,8 @@ export const toolValidators = [
   mintingDurabilityJudgmentValidator,
   nodeMergeAdjudicationValidator,
   optionSelectValidator,
+  studyItemBlueprintValidator,
+  matchingValidator,
   impostorValidator,
   impostorLieValidityJudgmentValidator,
   conceptLessonValidator

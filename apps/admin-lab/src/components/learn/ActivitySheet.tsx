@@ -4,18 +4,19 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2Icon, GemIcon } from "lucide-react";
 import type { StudySession } from "@lrnki/application";
-import type { LearnerGradingResult } from "@/app/learn/[learnerStateRef]/actions";
-import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerOptionSelect } from "@/app/learn/[learnerStateRef]/actions";
+import type { LearnerGradingResult, LearnerMatchingResult } from "@/app/learn/[learnerStateRef]/actions";
+import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/app/learn/[learnerStateRef]/actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { LessonSections } from "./LessonSections";
+import { MatchingBoard } from "./MatchingBoard";
 import { resolveStopActivity } from "./activityProgress";
 import { buildTrailView } from "./trailView";
 import { learnerTerm } from "./vocabulary";
 
 type Activity = ReturnType<typeof resolveStopActivity>;
-type ActivityResult = LearnerGradingResult | null;
+type ActivityResult = LearnerGradingResult | LearnerMatchingResult | null;
 
 export function ActivitySheet({
   session,
@@ -118,16 +119,38 @@ function ActivityController({
     });
   };
 
+  const validateMatching = async (promptId: string, matchId: string) => {
+    if (activity.kind !== "matching") return false;
+    const checked = await validateLearnerMatchingAttempt({
+      learnerStateRef: session.learnerStateRef,
+      enrichmentId: session.enrichmentId,
+      studyItemId: activity.item.studyItemId,
+      promptId,
+      matchId
+    });
+    return checked.checked && checked.correct;
+  };
+
+  const submitMatching = async (trace: { promptId: string; chosenMatchId: string }[]) => {
+    if (activity.kind !== "matching") return;
+    setResult(await submitLearnerMatching({
+      learnerStateRef: session.learnerStateRef,
+      enrichmentId: session.enrichmentId,
+      studyItemId: activity.item.studyItemId,
+      trace
+    }));
+  };
+
   return (
     <>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4">
           <CompletedIndicator session={session} activity={activity} result={result} />
-          <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} onSelect={submitSelection} />
+          <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} onSelect={submitSelection} onMatchingAttempt={validateMatching} onMatchingComplete={submitMatching} />
           {result && !result.graded ? <p className="text-sm text-destructive">{result.message}</p> : null}
         </div>
       </div>
-      <SheetFooter className="shrink-0 border-t border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+      <SheetFooter className="shrink-0 border-t border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="mx-auto flex w-full max-w-3xl justify-end">
           <FooterButton
             activity={activity}
@@ -147,17 +170,22 @@ function ActivityBody({
   selectedId,
   result,
   pending,
-  onSelect
+  onSelect,
+  onMatchingAttempt,
+  onMatchingComplete
 }: Readonly<{
   activity: Activity;
   selectedId: string | null;
   result: ActivityResult;
   pending: boolean;
   onSelect: (id: string) => void;
+  onMatchingAttempt: (promptId: string, matchId: string) => Promise<boolean>;
+  onMatchingComplete: (trace: { promptId: string; chosenMatchId: string }[]) => Promise<void>;
 }>) {
   if (activity.kind === "missing") return <p className="text-sm text-muted-foreground">{activity.message}</p>;
-  if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={result} disabled={pending} onSelect={onSelect} />;
-  if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={result} disabled={pending} onSelect={onSelect} />;
+  if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
+  if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
+  if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
     return (
       <section className="flex flex-col gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
@@ -194,7 +222,7 @@ function FooterButton({
   onContinue: () => void;
   onDone: () => void;
 }>) {
-  if (activity.kind === "option_select" || activity.kind === "impostor") {
+  if (activity.kind === "option_select" || activity.kind === "impostor" || activity.kind === "matching") {
     if (graded) {
       return (
         <Button type="button" disabled={pending} onClick={onContinue}>
@@ -225,7 +253,7 @@ function CompletedIndicator({
 }: Readonly<{ session: StudySession; activity: Activity; result: ActivityResult }>) {
   const complete =
     activity.kind === "theory" ? session.lessonReadByNode[activity.derivedNodeId] :
-    activity.kind === "option_select" || activity.kind === "impostor"
+    activity.kind === "option_select" || activity.kind === "matching" || activity.kind === "impostor"
       ? session.latestOutcomeByStudyItemId[activity.item.studyItemId] === "correct" || (result?.graded === true && result.correct)
       : false;
   if (!complete) return null;
@@ -240,7 +268,16 @@ function CompletedIndicator({
 function descriptionFor(kind: Activity["kind"]): string {
   if (kind === "theory") return learnerTerm("theoryStop");
   if (kind === "option_select") return learnerTerm("question");
+  if (kind === "matching") return learnerTerm("matching");
   if (kind === "impostor") return learnerTerm("spotTheFake");
   if (kind === "capstone") return learnerTerm("capstone");
   return learnerTerm("nextStop");
+}
+
+function isSelectionResult(result: ActivityResult): result is LearnerGradingResult | null {
+  return result === null || result.kind === "selection";
+}
+
+function isMatchingResult(result: ActivityResult): result is LearnerMatchingResult | null {
+  return result === null || result.kind === "matching";
 }

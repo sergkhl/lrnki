@@ -4,7 +4,11 @@
 
 1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
-   evidence.
+   evidence. Learner-facing symptom (2026-07-05): relation-like concepts (e.g. "Compositional
+   relationship") reach the trail as trivially easy stops, so the score cannot yet be trusted as a
+   gating signal — a difficulty floor for trail inclusion was considered and deferred until this
+   fix lands; the trivial-question half of that symptom is answer-leakage at item generation and is
+   handled there, not here.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).

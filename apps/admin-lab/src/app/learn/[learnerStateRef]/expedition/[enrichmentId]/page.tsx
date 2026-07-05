@@ -32,8 +32,8 @@ export default async function ExpeditionPage({
   const trail = buildTrailView(session);
 
   return (
-    <div className="flex flex-col gap-4">
-      <nav className="flex flex-wrap gap-2">
+    <div className="-m-4 flex h-dvh flex-col overflow-hidden bg-[color:var(--journal-background)]">
+      <nav className="shrink-0 border-b border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-4 py-2">
         <Button
           variant="outline"
           nativeButton={false}
@@ -44,7 +44,9 @@ export default async function ExpeditionPage({
         </Button>
       </nav>
       <QuestHeader session={session} trail={trail} />
-      <CheckpointPath view={trail} session={session} />
+      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <CheckpointPath view={trail} session={session} />
+      </main>
     </div>
   );
 }

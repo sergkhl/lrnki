@@ -34,16 +34,14 @@ export type StudyOptionSelectView = {
   options: {
     optionId: string;
     text: string;
-    isCorrect: boolean;
     provenance: "source" | "generated";
   }[];
 };
 
 // The serializable Impostor view that rides down the projection (R10/R11). Four statements
 // the learner reads; the keyed answer (which is the impostor) is resolved SERVER-SIDE at
-// grading time (U8), never read off this payload. `isImpostor` rides along for the
-// post-answer reveal the card shows regardless of correctness (R6) — the renderer must not
-// pre-mark it. Statements are sorted by id so the impostor is not positionally predictable.
+// grading time, never read off this payload. Statements are sorted by id so the impostor is
+// not positionally predictable.
 export type StudyImpostorView = {
   studyItemId: string;
   derivedNodeId: string;
@@ -52,12 +50,20 @@ export type StudyImpostorView = {
   statements: {
     statementId: string;
     text: string;
-    isImpostor: boolean;
     provenance: "source" | "generated";
   }[];
   reveal: string;
   lieSource: "sibling" | "generated";
   siblingLabel?: string;
+};
+
+export type StudyMatchingView = {
+  studyItemId: string;
+  derivedNodeId: string;
+  question: string;
+  groundingProvenance: StudyItemGroundingProvenance;
+  prompts: { promptId: string; text: string }[];
+  matches: { matchId: string; text: string }[];
 };
 
 // The Concept Lesson view that rides down the projection (ADR-0031, KTD5). A serializable
@@ -114,11 +120,12 @@ export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
 // ordered `studySegmentsByNode` list (option_select, then impostor).
 export type StudyItemView =
   | { kind: "option_select"; item: StudyOptionSelectView }
+  | { kind: "matching"; item: StudyMatchingView }
   | { kind: "impostor"; item: StudyImpostorView };
 
 // Canonical render order for a node's study segments (R10): theory (the lesson) is shown
 // first by the surface, then option-select, then impostor. A new type extends this rank.
-const STUDY_ITEM_TYPE_ORDER: Record<StudyItemView["kind"], number> = { option_select: 0, impostor: 1 };
+const STUDY_ITEM_TYPE_ORDER: Record<StudyItemView["kind"], number> = { option_select: 0, matching: 1, impostor: 2 };
 
 // Side-sheet content gated by the node's learner state. Frontier nodes either render a study
 // item (one arm per item type) or a cardless "skip as known" affordance. A locked node names
@@ -127,6 +134,7 @@ const STUDY_ITEM_TYPE_ORDER: Record<StudyItemView["kind"], number> = { option_se
 // item-type → sheet-payload mapping (KTD4).
 export type SheetContent =
   | { kind: "option_select"; item: StudyOptionSelectView }
+  | { kind: "matching"; item: StudyMatchingView }
   | { kind: "impostor"; item: StudyImpostorView }
   | { kind: "cardless" }
   | { kind: "locked"; unmetPrerequisiteLabels: string[] }
@@ -147,7 +155,7 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           groundingProvenance: item.groundingProvenance,
           options: [...item.options]
             .sort((a, b) => a.optionId.localeCompare(b.optionId))
-            .map((option) => ({ optionId: option.optionId, text: option.text, isCorrect: option.isCorrect, provenance: option.provenance }))
+            .map((option) => ({ optionId: option.optionId, text: option.text, provenance: option.provenance }))
         }
       };
     case "impostor": {
@@ -164,13 +172,29 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           // option-select's option shuffle.
           statements: [...item.statements]
             .sort((a, b) => a.statementId.localeCompare(b.statementId))
-            .map((statement) => ({ statementId: statement.statementId, text: statement.text, isImpostor: statement.isImpostor, provenance: statement.provenance })),
+            .map((statement) => ({ statementId: statement.statementId, text: statement.text, provenance: statement.provenance })),
           reveal: lie.reveal,
           lieSource: lie.lieSource,
           ...(lie.siblingLabel ? { siblingLabel: lie.siblingLabel } : {})
         }
       };
     }
+    case "matching":
+      return {
+        kind: "matching",
+        item: {
+          studyItemId: item.studyItemId,
+          derivedNodeId: item.derivedNodeId,
+          question: item.question,
+          groundingProvenance: item.groundingProvenance,
+          prompts: [...item.pairs]
+            .sort((a, b) => a.pairId.localeCompare(b.pairId))
+            .map((pair) => ({ promptId: pair.pairId, text: pair.promptText })),
+          matches: [...item.pairs]
+            .sort((a, b) => a.matchId.localeCompare(b.matchId))
+            .map((pair) => ({ matchId: pair.matchId, text: pair.matchText }))
+        }
+      };
   }
 }
 
@@ -181,6 +205,8 @@ export function studyItemViewToSheet(view: StudyItemView): SheetContent {
   switch (view.kind) {
     case "option_select":
       return { kind: "option_select", item: view.item };
+    case "matching":
+      return { kind: "matching", item: view.item };
     case "impostor":
       return { kind: "impostor", item: view.item };
   }

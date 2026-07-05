@@ -1,6 +1,7 @@
 import {
   chartTopicExpedition,
-  createIntrinsicDifficultyPort
+  createIntrinsicDifficultyPort,
+  STUDY_ITEM_BANK_CONFIG_HASH
 } from "@lrnki/application";
 import {
   LiteLlmConceptLessonGenerationAdapter,
@@ -15,6 +16,7 @@ import {
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
+  LiteLlmStudyItemBlueprintAdapter,
   LiteLlmStudyItemGenerationAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
@@ -26,8 +28,6 @@ import {
   PostgresRunProgressReporter,
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
-
-const STUDY_ITEM_BANK_CONFIG_HASH = "study-item-bank-v1";
 
 function baseClientConfig() {
   return {
@@ -61,6 +61,7 @@ function buildContext() {
     difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
     conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
+    studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
     impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql)
@@ -95,6 +96,7 @@ export function startTopicChart(input: {
     enrichmentStore: ctx.enrichmentStore,
     graphStore: ctx.graphStore,
     conceptLessonGeneration: ctx.conceptLessonGeneration,
+    studyItemBlueprint: ctx.studyItemBlueprint,
     impostorLieValidityJudge: ctx.impostorLieValidityJudge,
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,

@@ -3,6 +3,7 @@ export { buildGraphVersion } from "./buildGraphVersion";
 export { runGraphEnrichment } from "./runGraphEnrichment";
 export { runSyntheticGeneration } from "./runSyntheticGeneration";
 export { generateStudyItemBank } from "./generateStudyItemBank";
+export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
 export { chartTopicExpedition } from "./chartTopicExpedition";
 export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
 
@@ -17,7 +18,7 @@ export {
   operationTimelineLlmSpendStageTags
 } from "./operationTimelineCatalog";
 
-export { appendGradedSelectionOutcome } from "./gradedSelectionOutcome";
+export { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 export {
   listLearnerStates,
   getLearnerLoopDetail,
@@ -47,6 +48,7 @@ export {
   type SheetContent,
   type StudyImpostorView,
   type StudyItemView,
+  type StudyMatchingView,
   type StudyOptionSelectView,
   type StudySession
 } from "./studySessionProjection";

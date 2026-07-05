@@ -52,7 +52,9 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
   study_items: [
     nonLlm(NON_LLM_STAGES.load),
     llm(STAGE_TAGS.conceptLessonGeneration),
+    llm(STAGE_TAGS.studyItemBlueprint),
     llm(STAGE_TAGS.studyItemGeneration),
+    llm(STAGE_TAGS.matchingGeneration),
     llm(STAGE_TAGS.impostorGeneration),
     nonLlm(NON_LLM_STAGES.persist)
   ]

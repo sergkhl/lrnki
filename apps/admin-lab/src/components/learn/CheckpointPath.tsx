@@ -6,6 +6,7 @@ import type { StudySession } from "@lrnki/application";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
+import { cn } from "@/lib/utils";
 import type { TrailStop, TrailView } from "./trailView";
 
 const WINDING_OFFSETS = [0, 1, 2, 1, 0, -1, -2, -1] as const;
@@ -61,15 +62,21 @@ function CheckpointStopRow({
   onSelect
 }: Readonly<{ stop: TrailStop; offset: number; showFogBoundary: boolean; onSelect: (stopId: string) => void }>) {
   return (
-    <div className="relative flex min-h-24 justify-center">
+    <div
+      className={cn(
+        "relative flex min-h-24 justify-center rounded-md py-1 transition",
+        stop.isFogged ? "opacity-55 saturate-50" : null,
+        showFogBoundary ? "before:absolute before:inset-x-0 before:top-1/2 before:h-16 before:-translate-y-1/2 before:bg-gradient-to-b before:from-transparent before:via-[color:var(--journal-fog)] before:to-transparent" : null
+      )}
+    >
       {showFogBoundary ? (
         <motion.div
           layout
           aria-hidden
-          className="absolute left-1/2 top-0 h-10 w-20 -translate-x-1/2 rounded-full bg-[color:var(--journal-fog)] shadow-inner"
+          className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[color:var(--journal-line)]"
         />
       ) : null}
-      <div style={{ transform: `translateX(${offset}px)` }}>
+      <div className="relative z-10" style={{ transform: `translateX(${offset}px)` }}>
         <CheckpointCircle stop={stop} onSelect={onSelect} />
       </div>
     </div>

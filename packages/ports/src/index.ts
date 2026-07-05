@@ -9,10 +9,12 @@ import type {
   ConceptLesson,
   ConceptLessonDraft,
   LessonAbsentNode,
+  MatchingItemDraft,
   StudyItem,
   OptionSelectItemDraft,
   ImpostorItemDraft,
   ImpostorLieValidityJudgment,
+  StudyItemBlueprint,
   StudyItemGroundingProvenance,
   StudyItemType,
   ConceptDifficulty,
@@ -165,6 +167,13 @@ export interface RescueDurabilityJudgmentPort {
   }): Promise<RescueDurabilityJudgment>;
 }
 
+// A grounding passage handed to a generator or judge: source-cited passages carry source ids
+// and require a verbatim source quote; generated passages carry no source ids. One shape
+// shared by every study-item/lesson port below (rule 18) instead of a repeated inline literal.
+export type StudyItemGroundingPassage =
+  | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
+  | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string };
+
 // Impostor lie-validity judge (ADR-0026 refinement). A bounded cross-family judgment over
 // a deterministic-guarded impostor lie. It answers whether the keyed lie is actually false
 // for the target node. Unlike other semantic judges that fail open/pass-through, the
@@ -176,10 +185,7 @@ export interface ImpostorLieValidityJudgmentPort {
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
     lie: { text: string; reveal: string };
-    groundingPassages: (
-      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
-      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
-    )[];
+    groundingPassages: StudyItemGroundingPassage[];
     siblings: { label: string; snippet: string }[];
   }): Promise<ImpostorLieValidityJudgment>;
 }
@@ -562,15 +568,22 @@ export interface StudyItemGenerationPort {
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
     groundingProvenance: StudyItemGroundingProvenance;
-    groundingPassages: (
-      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
-      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
-    )[];
+    groundingPassages: StudyItemGroundingPassage[];
     // Same-domain neighbor descriptors that flavor the distractors (prompt-context only;
     // a sibling-poor node still generates, just with thinner flavor — KTD3).
     siblings: { label: string; snippet: string }[];
+    facet?: string;
     retryFeedback?: string;
   }): Promise<OptionSelectItemDraft>;
+  generateMatching(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: StudyItemGroundingProvenance;
+    groundingPassages: StudyItemGroundingPassage[];
+    siblings: { label: string; snippet: string }[];
+    facet?: string;
+    retryFeedback?: string;
+  }): Promise<MatchingItemDraft>;
   // Impostor generation (R3/R5/R6/R7). Takes the same grounding + siblings as option-select
   // and returns a pre-verification ImpostorItemDraft: three grounded truths each citing a
   // passage and exactly one planted lie — preferentially a true fact about one provided
@@ -581,13 +594,22 @@ export interface StudyItemGenerationPort {
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
     groundingProvenance: StudyItemGroundingProvenance;
-    groundingPassages: (
-      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
-      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
-    )[];
+    groundingPassages: StudyItemGroundingPassage[];
     siblings: { label: string; snippet: string }[];
+    facet?: string;
     retryFeedback?: string;
   }): Promise<ImpostorItemDraft>;
+}
+
+export interface StudyItemBlueprintPort {
+  readonly model: string;
+  plan(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    lesson: ConceptLesson;
+    siblings: { label: string; snippet: string }[];
+    supportedItemTypes: StudyItemType[];
+  }): Promise<StudyItemBlueprint>;
 }
 
 // Concept Lesson generation (ADR-0031, R2/R4/R6/R7/R11/R14). Forced named tool schema
@@ -603,10 +625,7 @@ export interface ConceptLessonGenerationPort {
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
     groundingProvenance: StudyItemGroundingProvenance;
-    groundingPassages: (
-      | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
-      | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string }
-    )[];
+    groundingPassages: StudyItemGroundingPassage[];
     // Directional graph neighbors for the graph-aware applications section (R5). Each is a
     // label + grounding snippet; a neighbor-poor node still produces a lesson (prompt-context
     // only). Structurally compatible with the application's LessonNeighborhood.

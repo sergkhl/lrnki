@@ -9,6 +9,7 @@ const USED_KEYS = [
   "enterAction",
   "theoryStop",
   "question",
+  "matching",
   "spotTheFake",
   "capstone",
   "nextStop",
@@ -20,7 +21,7 @@ const USED_KEYS = [
   "continueAction",
   "returnToTrail",
   "skipKnown",
-  "groundedTooltip",
+  "groundedBadge",
   "topicDoor",
   "progress",
   "summit"

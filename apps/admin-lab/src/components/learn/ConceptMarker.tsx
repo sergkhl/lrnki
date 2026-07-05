@@ -31,7 +31,7 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
         <div className="flex flex-col gap-1">
           <p className="text-sm font-semibold">{concept.label}</p>
           <p className="text-sm text-muted-foreground">
-            {stateLabel(concept.state)} · {concept.stops.length} stops
+            {stateLabel(concept.state)} · {concept.stops.length} stops · <DifficultyRating difficulty={concept.difficulty} />
           </p>
         </div>
         {!isMastered ? (
@@ -58,6 +58,19 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
         ) : null}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function DifficultyRating({ difficulty }: Readonly<{ difficulty: number }>) {
+  const rating = Math.min(5, Math.max(1, Math.round(difficulty * 4) + 1));
+  return (
+    <span aria-label={`Difficulty ${rating} of 5`} className="inline-flex align-[-0.08em] text-[color:var(--journal-frontier)]">
+      {Array.from({ length: 5 }, (_, index) => (
+        <span key={index} aria-hidden>
+          {index < rating ? "◆" : "◇"}
+        </span>
+      ))}
+    </span>
   );
 }
 
