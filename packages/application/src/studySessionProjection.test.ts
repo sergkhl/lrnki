@@ -257,6 +257,66 @@ test("composeStudySession exposes the latest graded outcome per study item", () 
   });
 });
 
+test("Covers AE1: a lesson read + one of three activities correct leaves the node frontier and its dependents locked", () => {
+  const session = compose({
+    studyItems: [optionItem("scope"), impostorItem("scope")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    // Only the option-select is answered correctly; the impostor stop is untouched.
+    rows: [{ ...graded("scope", "correct", 1), studyItemId: "os-scope" }]
+  });
+  assert.equal(session.classification.stateByNode.scope, "frontier", "one correct activity does not master a multi-segment node");
+  assert.equal(session.classification.stateByNode.ownership, "locked", "dependents stay locked");
+});
+
+test("Covers AE2: a lesson read + every activity latest-correct masters the node and unlocks dependents", () => {
+  const session = compose({
+    studyItems: [optionItem("scope"), impostorItem("scope")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    rows: [
+      { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
+      { ...graded("scope", "correct", 2), studyItemId: "imp-scope" }
+    ]
+  });
+  assert.equal(session.classification.stateByNode.scope, "mastered");
+  assert.equal(session.classification.stateByNode.ownership, "frontier", "the dependent unlocks");
+});
+
+test("all activities correct but the lesson unread does not master the node", () => {
+  const session = compose({
+    studyItems: [optionItem("scope")],
+    lessons: [lessonFor("scope")],
+    // lessonReads omitted: the lesson is unread.
+    rows: [{ ...graded("scope", "correct", 1), studyItemId: "os-scope" }]
+  });
+  assert.equal(session.classification.stateByNode.scope, "frontier", "an unread lesson blocks completion even with all activities correct");
+});
+
+test("a matching partial outcome does not complete its node", () => {
+  const session = compose({
+    studyItems: [matchingItem("scope")],
+    rows: [{ ...graded("scope", "partial", 1), studyItemId: "match-scope" }]
+  });
+  assert.equal(session.classification.stateByNode.scope, "frontier", "partial is not latest-correct");
+});
+
+test("a latest-incorrect after an earlier correct reopens the stop and demotes completion", () => {
+  const mastered = compose({
+    studyItems: [optionItem("scope")],
+    rows: [{ ...graded("scope", "correct", 1), studyItemId: "os-scope" }]
+  });
+  assert.equal(mastered.classification.stateByNode.scope, "mastered", "single-activity node with no lesson masters on the correct answer");
+  const reopened = compose({
+    studyItems: [optionItem("scope")],
+    rows: [
+      { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
+      { ...graded("scope", "incorrect", 2), studyItemId: "os-scope" }
+    ]
+  });
+  assert.equal(reopened.classification.stateByNode.scope, "frontier", "the later incorrect reopens the stop");
+});
+
 test("unmetPrerequisites returns only direct, non-mastered prerequisites, excluding uncertain edges", () => {
   const classification: AdaptedNodeClassification = {
     stateByNode: { scope: "mastered", ownership: "frontier", move: "locked", borrow: "frontier" },

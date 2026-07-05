@@ -75,6 +75,11 @@ export function buildTrailView(session: StudySession): TrailView {
   };
 }
 
+// Per-stop state from that stop's OWN evidence (U2, R8): a theory stop completes when its
+// lesson is read; an activity stop completes only when its own latest outcome is correct. The
+// node-level `baseState` only distinguishes locked from playable — a "complete" node state never
+// leaks into an individual stop (that was the one-answer-completes-all bug). The capstone is the
+// gem: it mirrors the node's completion-based state (mastered ⟺ every stop complete).
 function stateForStop(input: {
   baseState: TrailStopState;
   kind: TrailStopKind;
@@ -82,12 +87,11 @@ function stateForStop(input: {
   derivedNodeId: string;
   session: StudySession;
 }): TrailStopState {
-  if (input.kind === "theory") {
-    if (input.baseState === "locked") return "locked";
-    return input.session.lessonReadByNode[input.derivedNodeId] ? "complete" : input.baseState;
-  }
   if (input.kind === "capstone") return input.baseState;
   if (input.baseState === "locked") return "locked";
-  if (!input.studyItemId) return input.baseState;
-  return input.session.latestOutcomeByStudyItemId[input.studyItemId] === "correct" ? "complete" : input.baseState;
+  if (input.kind === "theory") {
+    return input.session.lessonReadByNode[input.derivedNodeId] ? "complete" : "available";
+  }
+  if (!input.studyItemId) return "available";
+  return input.session.latestOutcomeByStudyItemId[input.studyItemId] === "correct" ? "complete" : "available";
 }

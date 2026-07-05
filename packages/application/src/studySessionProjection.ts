@@ -404,12 +404,29 @@ export function composeStudySession(input: {
     latestAttemptByStudyItemId.set(row.studyItemId, row.attemptSeq);
     latestOutcomeByStudyItemId[row.studyItemId] = row.judgedOutcome === "correct" ? "correct" : "incorrect";
   }
+  // Gating mastery is a COMPLETION rule now (U2, R7/R8 — ADR-0032), not a graded threshold
+  // crossing: a node is mastered only when its lesson (if any) is read AND every activity
+  // segment is latest-correct. This is the ONE rule that drives gating, the gem, and per-stop
+  // visuals, so a single correct answer can no longer complete a multi-segment node
+  // (the retired `foldConceptMastery` per-node latest-graded bug). The real graded fold still
+  // rides in `gradedByNode` for the calibration↔graded coexistence signal only. `known`
+  // verdicts keep instant mastery via `composeMastery`; partial graded progress folds to 0, so
+  // it stays below `ADAPTIVE_MASTERY_THRESHOLD` and the node stays frontier.
+  const nodeIsComplete = (derivedNodeId: string): boolean => {
+    const lessonPresent = Boolean(lessonByNode[derivedNodeId]);
+    const lessonRead = lessonReadByNode[derivedNodeId] === true;
+    if (lessonPresent && !lessonRead) return false; // an unread lesson always blocks completion
+    const segments = studySegmentsByNode[derivedNodeId] ?? [];
+    if (segments.length > 0) return segments.every((segment) => latestOutcomeByStudyItemId[segment.item.studyItemId] === "correct");
+    // Itemless carve-outs (preserved): a read lesson masters a lesson-only node; an explicitly
+    // lesson-absent node auto-masters so it never blocks. An itemless node with no lesson and no
+    // recorded absence stays unmastered (its teaching state is unknown).
+    return (lessonPresent && lessonRead) || lessonAbsentNodeIds.has(derivedNodeId);
+  };
   const composed = composeMastery({ knownClosure, gradedByNode });
   for (const node of trailNodes) {
-    if ((studySegmentsByNode[node.derivedNodeId] ?? []).length > 0) continue;
-    if (lessonByNode[node.derivedNodeId] && !lessonReadByNode[node.derivedNodeId]) continue;
-    if (!lessonByNode[node.derivedNodeId] && !lessonAbsentNodeIds.has(node.derivedNodeId)) continue;
-    composed.masteryByNode[node.derivedNodeId] = 1;
+    if (knownClosure.has(node.derivedNodeId)) continue; // a `known` node keeps its calibration mastery
+    composed.masteryByNode[node.derivedNodeId] = nodeIsComplete(node.derivedNodeId) ? 1 : 0;
   }
   const learnerState: LearnerStatePort = {
     learnerStateRef: input.learnerStateRef,
