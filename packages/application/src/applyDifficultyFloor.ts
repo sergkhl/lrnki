@@ -1,4 +1,5 @@
 import type { DerivedGraphEdge } from "@lrnki/ports";
+import { sortEdges } from "./prerequisiteDag";
 
 // The consensus band at (and below) which a node is too trivial to be a trail stop.
 export const TRAIL_DIFFICULTY_FLOOR_BAND = 1;
@@ -59,11 +60,7 @@ export function applyDifficultyFloor(input: {
       }
     }
   }
-  edges.sort((a, b) =>
-    a.prerequisiteDerivedNodeId.localeCompare(b.prerequisiteDerivedNodeId) ||
-    a.dependentDerivedNodeId.localeCompare(b.dependentDerivedNodeId));
-
   const floored = new Set(flooredNodeIds);
   const includedNodeIds = new Set(input.nodes.map((node) => node.derivedNodeId).filter((id) => !floored.has(id)));
-  return { includedNodeIds, contractedEdges: edges, flooredNodeIds };
+  return { includedNodeIds, contractedEdges: sortEdges(edges), flooredNodeIds };
 }

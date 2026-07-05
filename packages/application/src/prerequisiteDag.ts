@@ -14,7 +14,9 @@ type Edge = InferredPrerequisiteEdge;
 // ids. Both `InferredPrerequisiteEdge` and loader-facing graph edges satisfy it structurally.
 export type PrerequisiteEdgeRef = Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">;
 
-function sortEdges(edges: Edge[]): Edge[] {
+// Deterministic endpoint sort shared by every edge-producing seam (replay guarantee);
+// generic so InferredPrerequisiteEdge and the inspection DerivedGraphEdge both use it.
+export function sortEdges<E extends PrerequisiteEdgeRef>(edges: E[]): E[] {
   return [...edges].sort(
     (a, b) =>
       a.prerequisiteDerivedNodeId.localeCompare(b.prerequisiteDerivedNodeId) ||

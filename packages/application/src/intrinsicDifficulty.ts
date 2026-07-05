@@ -120,44 +120,18 @@ async function bandConsensus(input: {
     if (!anchorByBand.has(entry.modalBand)) anchorByBand.set(entry.modalBand, entry.node);
   }
 
-  const difficulties: ConceptDifficulty[] = [];
-  for (const entry of consensus) {
-    let finalBand = entry.modalBand;
-    let pairwiseComparisons = 0;
-    let calibrationUnresolved = 0;
-
-    if (entry.contested) {
-      // Two-comparison bracket against the extreme candidate bands the draws voted:
-      // harder than H's anchor → band H; easier than L's anchor → band L; otherwise
-      // the bracket confirms the middle → keep the modal band. A missing needed
-      // anchor keeps the modal band and records calibrationUnresolved.
-      const candidateBands = [...new Set(entry.votes.map((vote) => vote.band))].sort((a, b) => a - b);
-      const low = candidateBands[0];
-      const high = candidateBands[candidateBands.length - 1];
-      const highAnchor = anchorByBand.get(high);
-      const lowAnchor = anchorByBand.get(low);
-      if (!highAnchor) {
-        calibrationUnresolved = 1;
-      } else {
-        pairwiseComparisons += 1;
-        const versusHigh = await judge.compareHarder({ declaredDomain, first: entry.node, second: highAnchor });
-        if (versusHigh.harder === "first") {
-          finalBand = high;
-        } else if (!lowAnchor) {
-          calibrationUnresolved = 1;
-        } else {
-          pairwiseComparisons += 1;
-          const versusLow = await judge.compareHarder({ declaredDomain, first: entry.node, second: lowAnchor });
-          if (versusLow.harder === "second") finalBand = low;
-          // Otherwise the bracket confirms the middle: keep the modal band, resolved.
-        }
-      }
-    }
+  // Anchors are fixed before any calibration runs, so each contested concept's bracket
+  // is independent of every other's — calibrate them concurrently (bounded like the
+  // draws) while mapWithConcurrency preserves input order for the returned rows.
+  return mapWithConcurrency(consensus, k, async (entry) => {
+    const { finalBand, pairwiseComparisons, calibrationUnresolved } = entry.contested
+      ? await resolveContestedBand({ judge, declaredDomain, entry, anchorByBand })
+      : { finalBand: entry.modalBand, pairwiseComparisons: 0, calibrationUnresolved: 0 };
 
     // The rationale of the first draw that voted the final band. The bracket only
     // ever selects a voted band, so one always exists.
     const rationale = entry.votes.find((vote) => vote.band === finalBand)?.rationale ?? "";
-    difficulties.push({
+    return {
       derivedNodeId: entry.node.derivedNodeId,
       score: (finalBand - 1) / 4,
       method: METHOD,
@@ -170,7 +144,31 @@ async function bandConsensus(input: {
         pairwiseComparisons,
         calibrationUnresolved
       }
-    });
-  }
-  return difficulties;
+    };
+  });
+}
+
+// The two-comparison bracket against the extreme candidate bands the draws voted:
+// harder than H's anchor → band H; easier than L's anchor → band L; otherwise the
+// bracket confirms the middle → keep the modal band. A missing needed anchor keeps
+// the modal band and records calibrationUnresolved.
+async function resolveContestedBand(input: {
+  judge: IntrinsicDifficultyJudgmentPort;
+  declaredDomain: string;
+  entry: { node: DifficultyNodeContext; votes: { band: number }[]; modalBand: number };
+  anchorByBand: Map<number, DifficultyNodeContext>;
+}): Promise<{ finalBand: number; pairwiseComparisons: number; calibrationUnresolved: number }> {
+  const { judge, declaredDomain, entry, anchorByBand } = input;
+  const candidateBands = [...new Set(entry.votes.map((vote) => vote.band))].sort((a, b) => a - b);
+  const low = candidateBands[0];
+  const high = candidateBands[candidateBands.length - 1];
+  const highAnchor = anchorByBand.get(high);
+  const lowAnchor = anchorByBand.get(low);
+
+  if (!highAnchor) return { finalBand: entry.modalBand, pairwiseComparisons: 0, calibrationUnresolved: 1 };
+  const versusHigh = await judge.compareHarder({ declaredDomain, first: entry.node, second: highAnchor });
+  if (versusHigh.harder === "first") return { finalBand: high, pairwiseComparisons: 1, calibrationUnresolved: 0 };
+  if (!lowAnchor) return { finalBand: entry.modalBand, pairwiseComparisons: 1, calibrationUnresolved: 1 };
+  const versusLow = await judge.compareHarder({ declaredDomain, first: entry.node, second: lowAnchor });
+  return { finalBand: versusLow.harder === "second" ? low : entry.modalBand, pairwiseComparisons: 2, calibrationUnresolved: 0 };
 }

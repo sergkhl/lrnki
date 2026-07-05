@@ -34,8 +34,10 @@ export const MINTING_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 export const PREREQUISITE_ORDERING_MODEL = "kg-prerequisite-ordering";
 
 // Render one Concept's published CEP for the judge: its role, label, aliases, verbatim
-// definition and mention quotes, and LABELED `defines` assertions.
-function renderConcept(role: string, context: PrerequisiteConceptContext): string {
+// definition and mention quotes, and LABELED `defines` assertions. Shared with the
+// intrinsic-difficulty adapter (whose contexts carry no assertions) so the two
+// whole-domain-set prompts cannot drift in quote formatting.
+export function renderConcept(role: string, context: PrerequisiteConceptContext): string {
   const lines = [
     `${role}: "${context.canonicalLabel}"${context.aliases.length ? ` (aka ${context.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
     "  Definitions:",

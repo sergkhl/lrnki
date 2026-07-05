@@ -1,5 +1,6 @@
 import type { DifficultyBandEntry, DifficultyNodeContext } from "@lrnki/domain-core";
 import type { IntrinsicDifficultyJudgmentPort } from "@lrnki/ports";
+import { renderConcept } from "./enrichmentAdapters";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { buildDifficultyBandsSchema, buildDifficultyBandsValidator, difficultyComparisonSchema, difficultyComparisonValidator } from "./toolSchemas";
@@ -92,15 +93,8 @@ export class LiteLlmIntrinsicDifficultyJudgmentAdapter implements IntrinsicDiffi
 }
 
 function renderNode(role: string, node: DifficultyNodeContext): string {
-  return [
-    `${role}: "${node.canonicalLabel}"${node.aliases.length ? ` (aka ${node.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
-    "  Definitions:",
-    ...renderQuotes(node.definitions),
-    "  Mentions:",
-    ...renderQuotes(node.mentions)
-  ].join("\n");
-}
-
-function renderQuotes(quotes: string[]): string[] {
-  return quotes.length ? quotes.map((quote, index) => `    [${index + 1}] "${quote}"`) : ["    (none)"];
+  // Difficulty contexts carry no labeled assertions; the shared renderer skips its
+  // assertions section on an empty list, so both whole-domain-set prompts keep one
+  // quote format that cannot drift.
+  return renderConcept(role, { ...node, assertions: [] });
 }
