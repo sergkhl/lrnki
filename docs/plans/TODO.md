@@ -4,7 +4,11 @@
 
 1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
    found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
-   evidence.
+   evidence. Learner-facing symptom (2026-07-05): relation-like concepts (e.g. "Compositional
+   relationship") reach the trail as trivially easy stops, so the score cannot yet be trusted as a
+   gating signal — a difficulty floor for trail inclusion was considered and deferred until this
+   fix lands; the trivial-question half of that symptom is answer-leakage at item generation and is
+   handled there, not here.
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
@@ -29,15 +33,40 @@
    Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
    `tmp/2026-06-30-generation-metering/`.
 
-4. **Align the calibration shell to the study use-case shape (optional fast-follow).** The
-   learner-facing reads now follow the ADR-0027 split (see COMPLETED), but
-   `composeCalibrationSession` / `calibrationSession.ts` still use the older pure-compose +
-   shell-wiring shape. Bring it onto the same injected-ports use-case shape as `getStudySession` so
-   both learner projections share one boundary before the Learner App is built. This is
-   behavior-preserving and does not require a new ADR.
-   Decision: [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
-
 ## COMPLETED
+
+- **Learner trail polish.** The learner trail now uses opaque portal surfaces, one-tap option-select
+  grading with generated explanations, persisted lesson-read completion, a linear next-pointer,
+  type-stable stop icons, gem-only capstone state, expedition domain/progress rows, and no Journal
+  route. Study-item generation and validation require option-select explanations, Study Session
+  projections expose lesson-read and explanation state, and learner expedition rows compute live
+  item progress from the study bank and latest responses. Requirements:
+  [brainstorm](../brainstorms/2026-07-04-learner-trail-polish-requirements.md). Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Learner App checkpoint trail, activity sheet, and charting onboarding.** `/learn` now centers
+  the learner expedition on a Duolingo-style per-item checkpoint path, with fog display and per-item
+  completion derived from Study Session state, one stop opening one full-screen activity sheet with a
+  single primary footer action, opaque learner surfaces, headed lesson sections, icon-only grounded
+  provenance, concept-level skip popovers, topic-first charting with editable inferred Declared
+  Domain, fiction-voiced charting stage copy, and an Admin Lab door that ensures a playable `admin`
+  expedition before redirecting. Requirements:
+  [brainstorm](../brainstorms/2026-07-04-learner-app-map-center-ux-requirements.md). Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Learner App expedition entry surface.** `/learn` is now the learner-facing expedition entry:
+  readiness-ranked expedition entry, learner-owned expedition persistence, active selection, playable
+  trail/activity screen over `getStudySession`, a learner-entered course-data charting door, and
+  progress/failure cards over ADR-0029 timelines. It supersedes the earlier Quest Subgraph Admin Lab
+  study surface; that milestone's target recommendations, trusted prerequisite cones, and stateful
+  Learner Path ladder live on as the application projections serving this route. The superseded
+  operator `/admin/lab/study` route, calibration shell, study components, and study libs were
+  deleted; the prior calibration shell alignment TODO is resolved by deletion. The learner
+  PDF/Docling door was removed before completion, so learner-created expeditions currently use the
+  synthetic course-data path only. Decisions:
+  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md),
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Operation lifecycle wrapper and application barrel prune.** The ADR-0029 operation lifecycle now
   has one application wrapper for operation-tag scope, begin-at-entry, and terminal succeeded/failed
@@ -48,40 +77,22 @@
   [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md). Framing:
   [architecture review](../brainstorms/2026-07-03-architecture-deepening-review.md).
 
-- **Quest-quality defects in Study Item Bank generation.** The learner-facing quest bank now
-  attributes rejected study-item rows, retries source-grounded lessons once when no substantive
-  source citation survives, falls back to generated-labeled lesson sections when citation grounding
-  is absent, binds impostor reveal/source metadata to the keyed lie statement, runs a fail-closed
-  cross-family lie-validity judge with one informed retry, and ranks recommended quests by full
-  readiness before cone size while showing missing-item counts. Decisions:
-  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+- **Study Item Bank and Concept Lesson generation quality.** The learner-facing bank attributes
+  rejected study-item rows, retries source-grounded lessons once when no substantive source citation
+  survives, falls back to generated-labeled lesson sections when citation grounding is absent, binds
+  impostor reveal/source metadata to the keyed lie statement, runs a fail-closed cross-family
+  lie-validity judge with one informed retry, and ranks recommended quests by full readiness before
+  cone size while showing missing-item counts. The Concept Lesson `gist` is generated as a framing
+  hook distinct from the definition's formal statement, with `intuition` emitted only when it adds a
+  distinct mental model. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Legacy persisted Learner Path stack retired.** The pre-Quest-Subgraph persisted path write/read
   stack is gone: worker path commands, path tables, path store/read adapters, Admin Lab `/paths`, and
   learner-loop path/coverage panels were deleted. The live Study Session remains the Learner Path
-  projection for source-grounded and anchor-less synthetic Derived Graph Layers. Requirements:
-  [brainstorm](../brainstorms/2026-07-03-anchor-less-learner-path-audit-requirements.md). Decision:
+  projection for source-grounded and anchor-less synthetic Derived Graph Layers. Decision:
   [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md).
-
-- **Concept Lesson gist as a framing hook distinct from the definition.** The `gist` is now
-  generated as the concept's framing hook — the problem it solves, why it matters, or the tension it
-  resolves — explicitly forbidden from restating the definition's formal "what it is", fixing the
-  lead-in for 100% of nodes (gist is the ADR-0031 required minimum). The change is in generation, not
-  presentation: the concept-lesson system prompt and the forced-tool `kind` description carry the
-  sharpened, domain-neutral role, `intuition` stays conditional (emitted only when it adds a distinct
-  mental model), and the ADR-0031 "unconditional" wording is reconciled with the conditional prompt.
-  The superseded display-only gist suppression in the Admin Lab lesson card is removed, so the gist
-  always leads. Decision: [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
-
-- **Quest Subgraph study mechanic.** Admin Lab study now starts from target recommendations and
-  search backed by trusted prerequisite cones. `StudySession` projects a stateful Learner Path ladder
-  with focused-map and full-map context, while graph-only enrichments remain inspectable with a
-  no-items warning. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
-  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md),
-  [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Synthetic Topic Generation.** A `topic` plus Declared Domain now creates an anchor-less Derived
   Graph Layer of `synthetic_primary` `llm_grounded` nodes. The Knowledge-Boundary Probe gates
@@ -116,30 +127,57 @@
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
-- **Operator observability and cost reporting.** Forced-tool exhaustion is inspectable without
-  relaxing fail-closed behavior, citation match fidelity is visible, and shared operation-stage
-  timelines support liveness plus bottleneck reports over one operation or one Processing Journey.
-  Decisions: [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
-  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md), and
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
-
-- **Inspection and learner-projection boundaries.** Inspection surfaces use read-model ports, while
-  learner-facing projections compose reads with adaptation compute behind application use-cases;
-  Admin Lab remains a thin operator surface. Decisions:
-  [ADR-0011](../adr/0011-retain-minimal-admin-lab.md) and
-  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md).
-
-- **Quality gates and forced-tool reliability.** Forced-tool schemas are single-sourced from zod, and
-  neural judge gates share one fail-safe boundary for bounded concurrency, index-aligned results, and
-  fail-closed pass-through behavior. Decisions:
-  [ADR-0006](../adr/0006-use-forced-named-tool-schemas.md),
-  [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md), and
-  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
-
-- **Extraction provider latency fix.** Routing production extraction aliases to DeepSeek first-party
-  resolved the prior extraction latency blocker and removed the dedicated OpenRouter-key blocker.
-
 ## VALIDATION
+
+- **Learner trail polish, 2026-07-04.** Deterministic envelope: `pnpm run check` exit 0 (full
+  workspace typecheck, recursive tests, ESLint with 2 pre-existing warnings, and Admin Lab
+  production build). The single initial migration reset succeeded with `study_items.explanation` and
+  `lesson_reads`. Real-use gate: `scripts/seed-demo.sh` ran production LLM extraction, graph build,
+  enrichment, and Study Item Bank generation across the curated fixture set, publishing graph version
+  `e2e4ecd8-305c-4568-b35c-8e9582c698a0`, enrichment
+  `e7771ca2-51e4-42ab-8caa-bad614d2ad9a`, 91 lessons, and 160 current study items; 22 generated
+  study-item rows were rejected by the existing fail-closed gates. Browser inspection on
+  `http://localhost:3001` passed for the seeded `admin` expedition: expedition rows showed declared
+  domain and item progress, the trail showed gem count and no Journal navigation, the retired
+  Journal route returned 404, theory Continue persisted a lesson read, one-tap grading persisted a
+  response and showed explanation feedback, 390px mobile had no horizontal overflow, and concept
+  popovers remained opaque/readable. Caveat: Playwright observed one React hydration warning on form
+  control styling in the charting form, outside this trail flow. **Result: PASS.** Screenshots and
+  report: `tmp/learner-trail-polish/`.
+
+- **Learner App checkpoint trail, activity sheet, and charting onboarding, 2026-07-04.**
+  Deterministic envelope: `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint
+  with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
+  `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests, and
+  `@lrnki/infrastructure-litellm` tests. Browser checks on `http://localhost:3000` passed for the
+  real seeded enrichment `aa0e5b08-1510-4969-92b5-d2aabdf4f1b6`: desktop and 390px mobile expedition
+  pages showed checkpoint circles, concept markers, the fog band, and no visible raw provenance/item
+  enums; the theory sheet showed headed single-block notes with Continue-only footer and no skip
+  action; the question sheet enforced select → Check → feedback → Continue, wrapped option text at
+  390px, and filled the question circle after a latest-correct retry; the concept-marker skip action
+  reduced locked activity buttons from 32 to 28. **Real-use quality evaluation:** PASS for the seeded
+  `admin` learner expedition. Screenshots and reports: `tmp/learner-checkpoint-ux/`.
+
+- **Learner App expedition entry surface, 2026-07-04.** Deterministic envelope:
+  `pnpm run check` exit 0 after the review-fix pass (full workspace typecheck, recursive tests,
+  ESLint with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
+  `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests/typecheck, and
+  `@lrnki/infrastructure-postgres` typecheck. DB reset and the single initial migration succeeded
+  with the `learner_expeditions` indexes; `PostgresLearnerExpeditionStore` DB-backed tests passed
+  with `.env` loaded. Reference sweep over `apps`, `packages`, and `scripts` found no remaining
+  `/admin/lab/study`, `components/study`, `lib/studySession`, or `lib/calibrationSession`
+  references; a focused learner/admin-lab sweep found no remaining PDF upload, learner Docling, or
+  source-charting path. Review hardening fixed active-expedition idempotency, per-learner enrichment
+  uniqueness, operation-type-scoped progress reads, charting auto-refresh, caught background charting
+  failures, learner-facing failure-message sanitization, ready-expedition validation on study
+  actions, and activity progression that keeps a stop active until this learner answers all its
+  activities. **Real-use quality evaluation:** with DeepSeek balance restored, the learner
+  course-data charting path ran through production aliases under the $0.50/M output cap and produced
+  a ready expedition for enrichment `26c04779-f807-46f5-a63b-004e5ca88b3f`: 10 derived nodes, 10
+  lessons, 19 current study items, succeeded enrichment and study-item timelines, and a live
+  `getStudySession` projection with a 4-step path, selected frontier, and 2 first-frontier activity
+  segments. **Result: PASS for the learner course-data path.** The learner PDF/Docling path was
+  intentionally removed and not evaluated. Trail: `tmp/2026-07-03-learner-expedition-gate/`.
 
 - **Operation lifecycle wrapper and application barrel prune, 2026-07-03.** Deterministic envelope:
   `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint with 2 pre-existing
@@ -174,71 +212,6 @@
   Fractions quest both project live stateful paths, frontier targets, and study segments without any
   persisted path row. **Result: PASS.** Trail: `tmp/real-use-rust-manifest.json` and
   `tmp/real-use-study-session-inspection.json`.
-
-- **Quest-quality Study Item Bank fixes, 2026-07-03.** Deterministic envelope: `pnpm run check`
-  exit 0 after the final prompt and comment cleanup (0 ESLint errors, 2 pre-existing warnings
-  outside this diff); targeted application, LiteLLM, and domain-core checks also passed while
-  iterating. **Real regenerate-and-inspect gate (rule 14):** enrichment `90768af5` was regenerated
-  with production aliases after the strict lie-validity prompt (`generate-study-items
-  90768af5-a9f5-4e0a-9dc0-0be71abfffdf --concurrency 6`, clean exit `lessons=63 lessonAbsent=1
-  items=104 rejected=24`). Stored rows show 59 option-select items and 45 impostors; generated
-  fallback is active for 23 items. Rejection reasons are inspectable: 14 citation-verification
-  rejects, 7 forced-tool shape/exhaustion rejects, 2 lesson-absent rejects, and 1 lie rejected by
-  the new judge. The inspected Rust false-by-attribution defect now drops: `Variable binding`
-  rejected because the proposed lie was true-but-misattributed; persisted `Owner`, `Variable Scope`,
-  `Clone`, and related impostors are plainly false for their target nodes with reveal/source metadata
-  attached to the keyed lie row. Real recommendation output for the same enrichment ranks fully
-  ready quests first (`INSTRUCTKG framework`, `DEBUG operator`, `IMPROVE operator`, etc., all
-  `missing=0`). **Defects found by the gate and fixed before pass:** nested forced-tool lie objects
-  caused invalid-JSON regressions, so the production wire schema stays shallow while the adapter
-  binds scalars into the domain lie object; the first stricter pass exposed true-but-misattributed
-  lie wording, so the generator and judge now require contradiction/impossibility rather than
-  "belongs to sibling." **Review:** CE subagent review dispatch was attempted but unavailable due
-  usage quota; fallback manual diff review found and fixed a pre-existing NUL-byte comment in
-  `domain-core` by replacing it with literal `\u0000`. **Result: PASS.** Trail:
-  `tmp/2026-07-02-quest-quality-regen-strict-lie.log` and
-  `tmp/2026-07-02-rejection-attribution/`.
-
-- **Concept Lesson gist distinctiveness, 2026-07-02.** Deterministic envelope: `pnpm run check`
-  exit 0 (0 ESLint errors, 2 pre-existing warnings outside this diff); `@lrnki/infrastructure-litellm`
-  102 tests and `@lrnki/admin-lab` 79 tests green, including the adapter's pinned system-prompt
-  substrings and no-fixture-leak assertions. **Real regenerate-and-inspect gate (rule 14):** the
-  Study Item Bank for enrichment `90768af5` (64 derived nodes; 63 lessons + 1 genuinely ungroundable
-  node) was regenerated on real production DeepSeek calls (`generate-study-items … --concurrency 6`,
-  clean exit `lessons=63 lessonAbsent=1 items=104 rejected=24`). Per-node gist-vs-definition snapshots
-  before/after show the lead-in is now durably distinct: mean lexical similarity `0.325 → 0.175`,
-  median `0.266 → 0.115`, near-restatements (ratio ≥ 0.6) `8 → 0`, max `0.736 → 0.500`; only one
-  trivially-mechanical node ("Pushing onto the stack") stays at 0.50 and even it adds a "why it
-  matters" clause. Real reading confirms the metric — new gists lead with the problem/motivation
-  (Clone, Allocating on the heap, Assignment semantics, Artifact, Move, Search policy) rather than
-  paraphrasing the definition. R3 minimum holds 63/63 and `lesson_absent` stayed at the same 1
-  ungroundable node — no regression; `intuition` coverage moved `10 → 3` as the sharper gist absorbs
-  more distinct-framing space (expected). **Defect found by the gate (pre-existing, out of scope):**
-  `generate-study-items` regeneration first failed on `response_log_study_item_id_fkey` because a
-  learner-answered item cannot be deleted (no `ON DELETE CASCADE`); lessons persist in a prior stage
-  and had already committed the new gists. Cleared the single dev response row (rule 9) and re-ran to
-  a clean exit. **Result: PASS.** Trail: `tmp/2026-07-02-gist-distinctiveness/`.
-
-- **Quest Subgraph study mechanic, 2026-07-01.** `pnpm run check` passed: full workspace typecheck,
-  recursive test suite, ESLint (0 errors / 2 pre-existing warnings outside the diff), and Admin Lab
-  production build. **Real-use gate (rule 14):** three existing real DB enrichments were inspected
-  through the application read model: mechanistic interpretability [machine learning] (`02afc709`),
-  quantum error correction [physics] (`21b8c077`), and photosynthesis [biology] (`eb6e5ac1`).
-  Recommended targets read as plausible milestones; ladders preserved prerequisite waves and
-  target-last ordering; focused map scope matched ladder scope. **Defect found and fixed by the
-  gate:** graph-only enrichments now render the quest ladder/map with an inline no-items warning.
-  **Result: PASS.** Caveat: inspected enrichments had zero study items, so graded card-completion UX
-  was not re-exercised. Trail: `tmp/2026-07-01-quest-subgraph-eval/`.
-
-- **Synthetic Topic Generation, 2026-07-01.** Three topics ran end to end on real production calls on
-  a live DB: Photosynthesis [biology] (`eb6e5ac1`), Quantum error correction [physics] (`21b8c077`),
-  and Mechanistic interpretability of neural networks [machine learning] (`02afc709`). The real-use
-  gate verified anchor-less layers with null `graph_version_id`, whole-set prerequisite ordering,
-  intrinsic difficulty, no asserted graph writes, and no source-block citations or evidence quotes on
-  `llm_grounded` nodes. **Defect found and fixed by the gate:** the generated-grounding schema cap was
-  too low for first-class synthetic concepts. **Result: PASS** for the core arm. Caveat: the
-  `boundary` -> `uncertain` route did not fire on any real run (0 / 38 concepts); probe calibration
-  remains in TODO. Trail: `tmp/2026-07-01-synthetic-topic-rule14/`.
 
 - Tests remain deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims come from

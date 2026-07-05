@@ -57,7 +57,9 @@ test("declares reportable stages by operation type", () => {
   assert.deepEqual(operationTimelineStagesForOperation("study_items").map((row) => row.stage), [
     NON_LLM_STAGES.load,
     STAGE_TAGS.conceptLessonGeneration,
+    STAGE_TAGS.studyItemBlueprint,
     STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.matchingGeneration,
     STAGE_TAGS.impostorGeneration,
     NON_LLM_STAGES.persist
   ]);
@@ -68,7 +70,9 @@ test("checks operation ownership without claiming unknown stages", () => {
   assert.equal(stageBelongsToOperation(STAGE_TAGS.admission, "enrichment"), false);
   for (const stage of [
     STAGE_TAGS.conceptLessonGeneration,
+    STAGE_TAGS.studyItemBlueprint,
     STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.matchingGeneration,
     STAGE_TAGS.impostorGeneration
   ]) {
     assert.equal(stageBelongsToOperation(stage, "study_items"), true, `${stage} belongs to study_items`);
@@ -83,7 +87,9 @@ test("spend ownership excludes non-LLM and unknown stages", () => {
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "enrichment"), false);
   for (const stage of [
     STAGE_TAGS.conceptLessonGeneration,
+    STAGE_TAGS.studyItemBlueprint,
     STAGE_TAGS.studyItemGeneration,
+    STAGE_TAGS.matchingGeneration,
     STAGE_TAGS.impostorGeneration
   ]) {
     assert.equal(spendStageBelongsToOperation(stage, "study_items"), true, `${stage} spend belongs to study_items`);

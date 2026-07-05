@@ -5,7 +5,9 @@ import {
   type DerivedGraphNode,
   type LessonAbsentNode,
   type RejectedStudyItem,
-  type StudyItem
+  type StudyItem,
+  type StudyItemBlueprint,
+  type StudyItemType
 } from "@lrnki/domain-core";
 import type {
   ConceptLessonGenerationPort,
@@ -14,6 +16,7 @@ import type {
   GraphVersionStorePort,
   ImpostorLieValidityJudgmentPort,
   RunProgressReporterPort,
+  StudyItemBlueprintPort,
   StudyItemBankStorePort,
   StudyItemGenerationPort
 } from "@lrnki/ports";
@@ -21,6 +24,7 @@ import { mapWithConcurrency } from "./mapWithConcurrency";
 import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
 import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSelectGuard";
 import { validateImpostorItem, type ImpostorGrounding } from "./impostorGuard";
+import { validateMatchingItem, type MatchingGrounding } from "./matchingGuard";
 import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding, type GroundingPassage } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
@@ -32,7 +36,9 @@ import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesso
 // shared helper preserves input order, so the persisted item order is unchanged.
 export const DEFAULT_STUDY_ITEM_CONCURRENCY = 1;
 export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
+export const MATCHING_GENERATION_ATTEMPTS = 2;
 export const IMPOSTOR_GENERATION_ATTEMPTS = 2;
+const SUPPORTED_STUDY_ITEM_TYPES: StudyItemType[] = ["option_select", "matching", "impostor"];
 
 export type { RejectedStudyItem };
 
@@ -64,12 +70,14 @@ export async function generateStudyItemBank(input: {
   graphStore: GraphVersionStorePort;
   enrichmentStore: EnrichmentRunStorePort;
   conceptLessonGeneration: ConceptLessonGenerationPort;
+  studyItemBlueprint?: StudyItemBlueprintPort;
   impostorLieValidityJudge: ImpostorLieValidityJudgmentPort;
   conceptLessonStore: ConceptLessonStorePort;
   studyItemGeneration: StudyItemGenerationPort;
   studyItemBankStore: StudyItemBankStorePort;
   newStudyItemId?: () => string;
   newOptionId?: () => string;
+  newPairId?: () => string;
   newStatementId?: () => string;
   // Parallel-ready seam (R11): bounded degree over the independent per-node units.
   // Defaults to 1 (sequential, unchanged behavior).
@@ -80,6 +88,7 @@ export async function generateStudyItemBank(input: {
 }): Promise<StudyItemBankGenerationResult> {
   const newStudyItemId = input.newStudyItemId ?? randomUUID;
   const newOptionId = input.newOptionId ?? randomUUID;
+  const newPairId = input.newPairId ?? randomUUID;
   const newStatementId = input.newStatementId ?? randomUUID;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
@@ -102,7 +111,10 @@ export async function generateStudyItemBank(input: {
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
   const studyItems: StudyItem[] = [];
-  const rejected: RejectedStudyItem[] = [];
+  const rejectedByNodeType = new Map<string, RejectedStudyItem>();
+  const reject = (node: Pick<DerivedGraphNode, "derivedNodeId" | "canonicalLabel">, itemType: StudyItemType, reason: string) => {
+    rejectedByNodeType.set(`${node.derivedNodeId}:${itemType}`, { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType, reason });
+  };
 
   // --- Stage 1: Concept Lesson substrate (ADR-0031) -----------------------------
   // Generate one teaching lesson per node BEFORE the option-select stage. The lesson is the
@@ -176,6 +188,14 @@ export async function generateStudyItemBank(input: {
     if (result.lesson) { lessons.push(result.lesson); lessonByNode.set(result.lesson.derivedNodeId, result.lesson); }
     if (result.absent) lessonAbsent.push(result.absent);
   }
+  // One sibling-context computation per node, shared by every downstream stage (blueprint,
+  // option-select, matching, impostor) instead of each stage re-scanning the full layer.
+  const siblingsByNode = new Map<string, { label: string; snippet: string }[]>(
+    layer.derivedNodes.map((node) => [
+      node.derivedNodeId,
+      selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }))
+    ])
+  );
 
   await studyStage(NON_LLM_STAGES.persist, () =>
     input.conceptLessonStore.persist({
@@ -187,7 +207,53 @@ export async function generateStudyItemBank(input: {
     })
   );
 
-  // --- Stage 2: option-select items ---------------------------------------------
+  // --- Stage 2: item blueprint --------------------------------------------------
+  const fallbackBlueprint = (node: DerivedGraphNode, itemTypes: StudyItemType[] = SUPPORTED_STUDY_ITEM_TYPES): StudyItemBlueprint => ({
+    derivedNodeId: node.derivedNodeId,
+    typePlans: itemTypes.map((itemType) => ({ itemType, generate: true as const, facet: "" }))
+  });
+  let blueprintDone = 0;
+  const blueprintByNode = new Map<string, StudyItemBlueprint>();
+  const blueprintResults = await studyStage(
+    STAGE_TAGS.studyItemBlueprint,
+    () =>
+      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+        const lesson = lessonByNode.get(node.derivedNodeId);
+        if (!lesson) {
+          blueprintDone += 1;
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemBlueprint, done: blueprintDone });
+          return fallbackBlueprint(node);
+        }
+        try {
+          const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
+          if (!input.studyItemBlueprint) return fallbackBlueprint(node);
+          const planned = await input.studyItemBlueprint.plan({
+            declaredDomain: node.declaredDomain,
+            node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+            lesson,
+            siblings,
+            supportedItemTypes: SUPPORTED_STUDY_ITEM_TYPES
+          });
+          return normalizeBlueprint(planned, node);
+        } catch {
+          return fallbackBlueprint(node);
+        } finally {
+          blueprintDone += 1;
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemBlueprint, done: blueprintDone });
+        }
+      }),
+    layer.derivedNodes.length
+  );
+  for (const blueprint of blueprintResults) {
+    blueprintByNode.set(blueprint.derivedNodeId, blueprint);
+    const node = layer.derivedNodes.find((candidate) => candidate.derivedNodeId === blueprint.derivedNodeId);
+    if (!node) continue;
+    for (const plan of blueprint.typePlans) {
+      if (!plan.generate) reject(node, plan.itemType, `blueprint: ${plan.reason}`);
+    }
+  }
+
+  // --- Stage 3: option-select items ---------------------------------------------
   // Each derived node is an independent generation unit (R11). Driving them through the
   // shared bounded mapper at degree 1 is identical to the prior sequential loop; the seam
   // admits future parallelism (raise `concurrency`) without an architectural change.
@@ -195,6 +261,8 @@ export async function generateStudyItemBank(input: {
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;
   const generateForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
+    const typePlan = typePlanFor(blueprintByNode, node, "option_select");
+    if (!typePlan.generate) return { items: [], rejected: [] };
     // Option-select derives FROM the Concept Lesson, never from raw passages (R10, rule 18).
     // A lesson-absent node yields no item; the verbatim chain holds because the lesson's
     // source citations already verified against source blocks (U6), so the guard re-anchors
@@ -213,7 +281,7 @@ export async function generateStudyItemBank(input: {
     // Option-select — auto-graded studying. Generation/guard failure rejects this node
     // for the bank but never aborts the run. Citation guard failures are model-output
     // quality misses, so give the generator one fresh attempt before recording absence.
-    const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
+    const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
     for (let attempt = 0; attempt < OPTION_SELECT_GENERATION_ATTEMPTS; attempt += 1) {
       try {
         const draft = await input.studyItemGeneration.generateOptionSelect({
@@ -221,7 +289,8 @@ export async function generateStudyItemBank(input: {
           node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
           groundingProvenance: grounding.provenance,
           groundingPassages: grounding.passages,
-          siblings
+          siblings,
+          facet: typePlan.facet || undefined
         });
         const guardContext: OptionSelectGrounding = {
           studyItemId: newStudyItemId(),
@@ -231,6 +300,7 @@ export async function generateStudyItemBank(input: {
           groundingProvenance: grounding.provenance,
           generatingModel: input.studyItemGeneration.model,
           configHash: input.configHash,
+          facet: typePlan.facet || undefined,
           passages: grounding.passages
         };
         const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
@@ -270,10 +340,75 @@ export async function generateStudyItemBank(input: {
   // deterministic and unchanged from the prior sequential path.
   for (const result of perNode) {
     studyItems.push(...result.items);
-    rejected.push(...result.rejected);
+    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
   }
 
-  // --- Stage 3: impostor items (R3/R4/R7/R8/R9) ---------------------------------
+  // --- Stage 4: matching items ---------------------------------------------------
+  let matchingDone = 0;
+  const generateMatchingForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
+    const typePlan = typePlanFor(blueprintByNode, node, "matching");
+    if (!typePlan.generate) return { items: [], rejected: [] };
+    const lesson = lessonByNode.get(node.derivedNodeId);
+    if (!lesson) {
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: concept lesson is absent for this node" }] };
+    }
+    const grounding = studyItemGroundingFromLesson(lesson);
+    if (!grounding) {
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: the lesson has no grounded sections to anchor an item" }] };
+    }
+    let failureReason: string | null = null;
+    let retryFeedback: string | undefined;
+    const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
+    for (let attempt = 0; attempt < MATCHING_GENERATION_ATTEMPTS; attempt += 1) {
+      try {
+        const draft = await input.studyItemGeneration.generateMatching({
+          declaredDomain: node.declaredDomain,
+          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+          groundingProvenance: grounding.provenance,
+          groundingPassages: grounding.passages,
+          siblings,
+          facet: typePlan.facet || undefined,
+          retryFeedback
+        });
+        const guardContext: MatchingGrounding = {
+          studyItemId: newStudyItemId(),
+          graphVersionId: graphVersionId,
+          enrichmentId: layer.enrichmentId,
+          derivedNodeId: node.derivedNodeId,
+          groundingProvenance: grounding.provenance,
+          generatingModel: input.studyItemGeneration.model,
+          configHash: input.configHash,
+          facet: typePlan.facet || undefined,
+          passages: grounding.passages
+        };
+        const guarded = validateMatchingItem(draft, guardContext, newPairId, newPairId);
+        if (guarded.ok) return { items: [guarded.item], rejected: [] };
+        failureReason = guarded.reason;
+        retryFeedback = guarded.reason;
+      } catch (error) {
+        failureReason = `matching generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        retryFeedback = failureReason;
+      }
+    }
+    return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: failureReason ?? "no matching item could be grounded" }] };
+  };
+  const perNodeMatching = await studyStage(
+    STAGE_TAGS.matchingGeneration,
+    () =>
+      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+        const result = await generateMatchingForNode(node);
+        matchingDone += 1;
+        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.matchingGeneration, done: matchingDone });
+        return result;
+      }),
+    layer.derivedNodes.length
+  );
+  for (const result of perNodeMatching) {
+    studyItems.push(...result.items);
+    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
+  }
+
+  // --- Stage 5: impostor items (R3/R4/R7/R8/R9) ---------------------------------
   // A node's impostor derives its three truths from the SAME lesson grounding the
   // option-select stage used (studyItemGroundingFromLesson, rule 18) and reads the
   // node's confusable siblings read-only as lie context. The model makes the hybrid
@@ -283,6 +418,8 @@ export async function generateStudyItemBank(input: {
   // option-select outcome (R9, KTD8). Never aborts the run (R13).
   let impostorDone = 0;
   const generateImpostorForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
+    const typePlan = typePlanFor(blueprintByNode, node, "impostor");
+    if (!typePlan.generate) return { items: [], rejected: [] };
     const lesson = lessonByNode.get(node.derivedNodeId);
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: concept lesson is absent for this node" }] };
@@ -294,7 +431,7 @@ export async function generateStudyItemBank(input: {
 
     let failureReason: string | null = null;
     let retryFeedback: string | undefined;
-    const siblings = selectSiblingContext(node, layer).map((sibling) => ({ label: sibling.label, snippet: sibling.snippet }));
+    const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
     for (let attempt = 0; attempt < IMPOSTOR_GENERATION_ATTEMPTS; attempt += 1) {
       try {
         const draft = await input.studyItemGeneration.generateImpostor({
@@ -303,6 +440,7 @@ export async function generateStudyItemBank(input: {
           groundingProvenance: grounding.provenance,
           groundingPassages: grounding.passages,
           siblings,
+          facet: typePlan.facet || undefined,
           retryFeedback
         });
         const guardContext: ImpostorGrounding = {
@@ -313,6 +451,7 @@ export async function generateStudyItemBank(input: {
           groundingProvenance: grounding.provenance,
           generatingModel: input.studyItemGeneration.model,
           configHash: input.configHash,
+          facet: typePlan.facet || undefined,
           passages: grounding.passages
         };
         const guarded = validateImpostorItem(draft, guardContext, newStatementId);
@@ -379,9 +518,10 @@ export async function generateStudyItemBank(input: {
   );
   for (const result of perNodeImpostor) {
     studyItems.push(...result.items);
-    rejected.push(...result.rejected);
+    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
   }
 
+  const rejected = [...rejectedByNodeType.values()];
   await studyStage(NON_LLM_STAGES.persist, () =>
     input.studyItemBankStore.persist({
       graphVersionId: graphVersionId,
@@ -393,6 +533,25 @@ export async function generateStudyItemBank(input: {
   );
   return { graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId, studyItems, rejected, lessons, lessonAbsent };
   });
+}
+
+function normalizeBlueprint(blueprint: StudyItemBlueprint, node: DerivedGraphNode): StudyItemBlueprint {
+  const planByType = new Map(blueprint.typePlans.map((plan) => [plan.itemType, plan] as const));
+  return {
+    derivedNodeId: node.derivedNodeId,
+    typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => {
+      const plan = planByType.get(itemType);
+      if (!plan) return { itemType, generate: true as const, facet: "" };
+      if (plan.generate) return { itemType, generate: true as const, facet: plan.facet.trim() };
+      return { itemType, generate: false as const, reason: plan.reason.trim() || "blueprint declined this item type" };
+    })
+  };
+}
+
+function typePlanFor(blueprintByNode: ReadonlyMap<string, StudyItemBlueprint>, node: DerivedGraphNode, itemType: StudyItemType) {
+  const plan = blueprintByNode.get(node.derivedNodeId)?.typePlans.find((candidate) => candidate.itemType === itemType);
+  if (!plan) return { itemType, generate: false as const, reason: "blueprint did not request this item type" };
+  return plan;
 }
 
 // Derive study-item grounding from a Concept Lesson's grounded sections (U5, R10, rule 18).

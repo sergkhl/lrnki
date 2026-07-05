@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, ImpostorItem, ImpostorStatement, LessonAbsentNode, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
-import type { CalibrationVerdictStorePort, ConceptLessonStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, ImpostorItem, ImpostorStatement, LessonAbsentNode, MatchingItem, MatchingPair, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
+import type { CalibrationVerdictStorePort, ConceptLessonStorePort, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
@@ -23,7 +23,7 @@ const STUDY_ITEM_BANK_PRODUCER_VERSION = "0.1.0";
 export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
+  async persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void> {
     const { graphVersionId, enrichmentId, configHash, studyItems, rejected } = input;
     for (const item of studyItems) assertPersistableItem(item);
     // All items in one persist belong to a single enrichment layer. Regeneration is
@@ -43,8 +43,8 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       }
       for (const item of studyItems) {
         await tx`
-          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
-          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.generatingModel}, ${item.configHash})`;
+          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash)
+          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.itemType === "option_select" ? item.explanation : null}, ${item.facet ?? null}, ${item.generatingModel}, ${item.configHash})`;
 
         // Sequential await keeps the per-item child inserts ordered within the tx.
         if (item.itemType === "option_select") {
@@ -54,17 +54,23 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
               VALUES (${option.optionId}, ${item.studyItemId}, ${ordinal}, ${option.text}, ${option.isCorrect}, ${option.provenance})`;
             if (option.isCorrect && option.citation) await this.insertCitation(tx, item.studyItemId, option.citation);
           }
-        } else {
+        } else if (item.itemType === "matching") {
+          for (const [ordinal, pair] of item.pairs.entries()) {
+            await this.insertMatchingPair(tx, item, pair, ordinal);
+          }
+        } else if (item.itemType === "impostor") {
           for (const statement of item.statements) {
             await this.insertImpostorStatement(tx, item, statement);
           }
+        } else {
+          assertNever(item);
         }
       }
 
-      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }> = {
+      const artifact: ArtifactEnvelope<{ graphVersionId: string | null; enrichmentId: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }> = {
         artifactId: randomUUID(),
         artifactType: "study_item_bank",
-        graphVersionId,
+        ...(graphVersionId ? { graphVersionId } : {}),
         producer: STUDY_ITEM_BANK_PRODUCER,
         producerVersion: STUDY_ITEM_BANK_PRODUCER_VERSION,
         configHash,
@@ -73,6 +79,19 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       };
       await writeArtifactEnvelope(tx, artifact);
     });
+  }
+
+  private async insertMatchingPair(tx: Sql | TransactionSql, item: MatchingItem, pair: MatchingPair, ordinal: number): Promise<void> {
+    const citation = pair.citation;
+    if (citation.provenance === "source") {
+      await tx`
+        INSERT INTO matching_pairs (matching_pair_id, match_tile_id, study_item_id, ordinal, prompt_text, match_text, provenance, source_resource_id, source_block_id, evidence_quote, match_kind)
+        VALUES (${pair.pairId}, ${pair.matchId}, ${item.studyItemId}, ${ordinal}, ${pair.promptText}, ${pair.matchText}, 'source', ${citation.sourceResourceId}, ${citation.sourceBlockId}, ${citation.evidenceQuote}, ${citation.matchKind})`;
+    } else {
+      await tx`
+        INSERT INTO matching_pairs (matching_pair_id, match_tile_id, study_item_id, ordinal, prompt_text, match_text, provenance, derived_node_id, generated_passage_text)
+        VALUES (${pair.pairId}, ${pair.matchId}, ${item.studyItemId}, ${ordinal}, ${pair.promptText}, ${pair.matchText}, 'generated', ${citation.derivedNodeId}, ${citation.passageText})`;
+    }
   }
 
   private async insertCitation(tx: Sql | TransactionSql, studyItemId: string, citation: StudyItemCitation): Promise<void> {
@@ -114,7 +133,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash
       FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
@@ -123,7 +142,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash
       FROM study_items WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
@@ -137,6 +156,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
   private async hydrate(rows: StudyItemRow[]): Promise<StudyItem[]> {
     if (rows.length === 0) return [];
     const optionSelectIds = rows.filter((row) => row.item_type === "option_select").map((row) => row.study_item_id);
+    const matchingIds = rows.filter((row) => row.item_type === "matching").map((row) => row.study_item_id);
     const impostorIds = rows.filter((row) => row.item_type === "impostor").map((row) => row.study_item_id);
 
     const citationRows = optionSelectIds.length
@@ -144,6 +164,12 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
         FROM study_item_citations WHERE study_item_id IN ${this.sql(optionSelectIds)}
         ORDER BY study_item_id, study_item_citation_id`
+      : [];
+    const matchingRows = matchingIds.length
+      ? await this.sql<MatchingPairRow[]>`
+        SELECT matching_pair_id, match_tile_id, study_item_id, ordinal, prompt_text, match_text, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
+        FROM matching_pairs WHERE study_item_id IN ${this.sql(matchingIds)}
+        ORDER BY study_item_id, ordinal`
       : [];
     const optionRows = optionSelectIds.length
       ? await this.sql<OptionRow[]>`
@@ -170,6 +196,10 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     for (const statement of statementRows) {
       statementsByItem.set(statement.study_item_id, [...(statementsByItem.get(statement.study_item_id) ?? []), statement]);
     }
+    const matchingByItem = new Map<string, MatchingPairRow[]>();
+    for (const pair of matchingRows) {
+      matchingByItem.set(pair.study_item_id, [...(matchingByItem.get(pair.study_item_id) ?? []), pair]);
+    }
 
     return rows.map((row): StudyItem => {
       const base = {
@@ -180,6 +210,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         groundingProvenance: row.grounding_provenance as StudyItem["groundingProvenance"],
         generatingModel: row.generating_model,
         configHash: row.config_hash,
+        ...(row.facet ? { facet: row.facet } : {}),
         question: row.question
       };
       if (row.item_type === "impostor") {
@@ -191,6 +222,14 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
           statements
         };
       }
+      if (row.item_type === "matching") {
+        return {
+          ...base,
+          itemType: "matching",
+          pairs: (matchingByItem.get(row.study_item_id) ?? []).map(toMatchingPair)
+        };
+      }
+      if (row.item_type !== "option_select") throw new Error(`unsupported study item type: ${row.item_type}`);
       const citations = (citationsByItem.get(row.study_item_id) ?? []).map(toCitation);
       const citation = citations[0];
       const options: StudyItemOption[] = (optionsByItem.get(row.study_item_id) ?? []).map((option) => ({
@@ -200,7 +239,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         provenance: option.provenance,
         ...(option.is_correct && citation ? { citation } : {})
       }));
-      return { ...base, itemType: "option_select", options };
+      return { ...base, itemType: "option_select", explanation: row.explanation ?? "", options };
     });
   }
 }
@@ -223,7 +262,12 @@ function assertPersistableItem(item: StudyItem): void {
     if (item.statements.some((statement) => !statement.isImpostor && !statement.citation)) throw new Error(`impostor ${item.studyItemId} truths must each carry a citation.`);
     return;
   }
-  throw new Error(`unsupported study item type: ${String((item as { itemType?: string }).itemType)}`);
+  if (item.itemType === "matching") {
+    if (item.pairs.length < 3 || item.pairs.length > 4) throw new Error(`matching ${item.studyItemId} must have three or four pairs.`);
+    if (item.pairs.some((pair) => !pair.citation)) throw new Error(`matching ${item.studyItemId} pairs must each carry a citation.`);
+    return;
+  }
+  assertNever(item);
 }
 
 function toCitation(row: CitationRow): StudyItemCitation {
@@ -258,14 +302,33 @@ function toImpostorStatement(row: ImpostorStatementRow): ImpostorStatement {
   };
 }
 
+function toMatchingPair(row: MatchingPairRow): MatchingPair {
+  const citation: StudyItemCitation = row.provenance === "source"
+    ? { provenance: "source", sourceResourceId: row.source_resource_id!, sourceBlockId: row.source_block_id!, evidenceQuote: row.evidence_quote!, matchKind: row.match_kind! }
+    : { provenance: "generated", derivedNodeId: row.derived_node_id!, passageText: row.generated_passage_text! };
+  return {
+    pairId: row.matching_pair_id,
+    matchId: row.match_tile_id,
+    promptText: row.prompt_text,
+    matchText: row.match_text,
+    citation
+  };
+}
+
+function assertNever(value: never): never {
+  throw new Error(`unsupported study item type: ${String((value as { itemType?: string }).itemType)}`);
+}
+
 type StudyItemRow = {
   study_item_id: string;
   item_type: StudyItemType;
-  graph_version_id: string;
+  graph_version_id: string | null;
   enrichment_id: string;
   derived_node_id: string;
   grounding_provenance: string;
   question: string;
+  explanation: string | null;
+  facet: string | null;
   generating_model: string;
   config_hash: string;
 };
@@ -281,6 +344,22 @@ type OptionRow = {
 
 type CitationRow = {
   study_item_id: string;
+  provenance: "source" | "generated";
+  source_resource_id: string | null;
+  source_block_id: string | null;
+  evidence_quote: string | null;
+  match_kind: "exact" | "normalized" | null;
+  derived_node_id: string | null;
+  generated_passage_text: string | null;
+};
+
+type MatchingPairRow = {
+  matching_pair_id: string;
+  match_tile_id: string;
+  study_item_id: string;
+  ordinal: number;
+  prompt_text: string;
+  match_text: string;
   provenance: "source" | "generated";
   source_resource_id: string | null;
   source_block_id: string | null;
@@ -514,6 +593,30 @@ export class PostgresCalibrationVerdictStore implements CalibrationVerdictStoreP
 
   async clearLearner(learnerStateRef: string): Promise<void> {
     await this.sql`DELETE FROM calibration_verdicts WHERE learner_state_ref = ${learnerStateRef}`;
+  }
+}
+
+export class PostgresLessonReadStore implements LessonReadStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async markRead(input: { learnerStateRef: string; derivedNodeId: string }): Promise<void> {
+    await this.sql`
+      INSERT INTO lesson_reads (learner_state_ref, derived_node_id)
+      VALUES (${input.learnerStateRef}, ${input.derivedNodeId})
+      ON CONFLICT (learner_state_ref, derived_node_id) DO NOTHING`;
+  }
+
+  async listForLearner(learnerStateRef: string): Promise<{ learnerStateRef: string; derivedNodeId: string; firstReadAt: string }[]> {
+    const rows = await this.sql<{ learner_state_ref: string; derived_node_id: string; first_read_at: string }[]>`
+      SELECT learner_state_ref, derived_node_id, first_read_at
+      FROM lesson_reads
+      WHERE learner_state_ref = ${learnerStateRef}
+      ORDER BY derived_node_id`;
+    return rows.map((row) => ({
+      learnerStateRef: row.learner_state_ref,
+      derivedNodeId: row.derived_node_id,
+      firstReadAt: new Date(row.first_read_at).toISOString()
+    }));
   }
 }
 

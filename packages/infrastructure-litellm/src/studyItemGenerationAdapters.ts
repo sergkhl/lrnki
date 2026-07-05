@@ -1,5 +1,5 @@
-import type { ImpostorItemDraft, ImpostorLieValidityJudgment, OptionSelectItemDraft, StudyItemOptionDraft } from "@lrnki/domain-core";
-import type { ImpostorLieValidityJudgmentPort, StudyItemGenerationPort } from "@lrnki/ports";
+import type { ConceptLesson, ImpostorItemDraft, ImpostorLieValidityJudgment, MatchingItemDraft, OptionSelectItemDraft, StudyItemBlueprint, StudyItemOptionDraft, StudyItemType } from "@lrnki/domain-core";
+import type { ImpostorLieValidityJudgmentPort, StudyItemBlueprintPort, StudyItemGenerationPort } from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
@@ -8,8 +8,12 @@ import {
   impostorLieValidityJudgmentValidator,
   impostorSchema,
   impostorValidator,
+  matchingSchema,
+  matchingValidator,
   optionSelectSchema,
-  optionSelectValidator
+  optionSelectValidator,
+  studyItemBlueprintSchema,
+  studyItemBlueprintValidator
 } from "./toolSchemas";
 
 // Study item generation stays DeepSeek-family (AGENTS rule 5): the option-select correct
@@ -46,11 +50,13 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
     groundingProvenance: "source_cep" | "source_mentioned" | "generated";
     groundingPassages: GroundingPassage[];
     siblings: { label: string; snippet: string }[];
+    facet?: string;
     retryFeedback?: string;
   }): Promise<OptionSelectItemDraft> {
     const system = [
       "You write ONE four-option multiple-choice study item for a single learning node, conditioned ONLY on the provided grounding passages.",
       "Produce exactly one CORRECT answer, grounded strictly in the provided passages, plus exactly THREE distractors.",
+      "Also write a short explanation of why the correct answer is right, grounded in the provided passages.",
       "Cite the passage your correct answer derives from by its exact passageId, quoting a substring of the passage text. For source-grounded passages, the quote must be verbatim; for generated grounding, quote only the generated grounding passage text.",
       "The correctAnswer field must be an object with text and citation. The citation evidenceQuote must be copied exactly from one listed grounding passage; do not paraphrase the citation quote.",
       "Write three plausible but INCORRECT distractors in the same domain register as the provided neighbor concepts, so wrong answers read like real domain answers. Each distractor must be clearly wrong for this question and never a paraphrase of the correct answer.",
@@ -67,9 +73,10 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       "",
       "Same-domain neighbor concepts (flavor distractors after these; do NOT make a neighbor the correct answer):",
       siblingText,
+      ...(input.facet ? ["", `Assessed facet for this item: ${input.facet}.`] : []),
       ...(input.retryFeedback ? ["", "Retry feedback from the previous rejected draft:", input.retryFeedback] : []),
       "",
-      "Call submit_option_select_item with a question, a correctAnswer (text + citation), and exactly three distractors."
+      "Call submit_option_select_item with a question, explanation, a correctAnswer (text + citation), and exactly three distractors."
     ].join("\n");
 
     const args = await this.client.call({
@@ -91,7 +98,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       { text: args.correctAnswer.text, isCorrect: true, provenance: correctProvenance, citation: args.correctAnswer.citation },
       ...args.distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))
     ];
-    return { itemType: "option_select", question: args.question, options };
+    return { itemType: "option_select", question: args.question, explanation: args.explanation, options };
   }
 
   async generateImpostor(input: {
@@ -100,6 +107,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
     groundingProvenance: "source_cep" | "source_mentioned" | "generated";
     groundingPassages: GroundingPassage[];
     siblings: { label: string; snippet: string }[];
+    facet?: string;
     retryFeedback?: string;
   }): Promise<ImpostorItemDraft> {
     const system = [
@@ -122,6 +130,7 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
       "",
       "Same-domain neighbor concepts (prefer drawing the lie from one of these as a mis-attributed fact):",
       siblingText,
+      ...(input.facet ? ["", `Assessed facet for this item: ${input.facet}.`] : []),
       ...(input.retryFeedback ? ["", "Retry feedback from the previous rejected draft:", input.retryFeedback] : []),
       "",
       "Call submit_impostor_item with a question, exactly three truths, and one lie object."
@@ -154,6 +163,97 @@ export class LiteLlmStudyItemGenerationAdapter implements StudyItemGenerationPor
         lieSource: args.lieSource,
         ...(args.siblingLabel ? { siblingLabel: args.siblingLabel } : {})
       }
+    };
+  }
+
+  async generateMatching(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    groundingProvenance: "source_cep" | "source_mentioned" | "generated";
+    groundingPassages: GroundingPassage[];
+    siblings: { label: string; snippet: string }[];
+    facet?: string;
+    retryFeedback?: string;
+  }): Promise<MatchingItemDraft> {
+    const system = [
+      "You write ONE matching-pairs study item for a single learning node, conditioned ONLY on the provided grounding passages.",
+      "Produce three or four prompt-match pairs. The prompt side should be a concise concept-side clue or situation; the match side should be the corresponding example, scenario, description, or application from the lesson grounding.",
+      "Each pair must cite the passage it derives from by exact passageId and a copied evidenceQuote. For source-grounded passages, the quote must be verbatim.",
+      "Do not make a pair answerable by simply matching repeated words between the prompt text and match text. Use meaning, examples, scenarios, or descriptions.",
+      "Stay within the Declared Domain. Write learner-facing language; never reference 'the passage' or 'the source'."
+    ].join(" ");
+    const aliasText = input.node.aliases.length ? ` (aliases: ${input.node.aliases.join(", ")})` : "";
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Learning node: "${input.node.canonicalLabel}"${aliasText}.`,
+      `Grounding provenance: ${input.groundingProvenance}.`,
+      "Grounding passages (cite each pair by passageId):",
+      renderPassages(input.groundingPassages),
+      ...(input.facet ? ["", `Assessed facet for this item: ${input.facet}.`] : []),
+      ...(input.retryFeedback ? ["", "Retry feedback from the previous rejected draft:", input.retryFeedback] : []),
+      "",
+      "Call submit_matching_item with a question and three or four grounded pairs."
+    ].join("\n");
+    const args = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_matching_item",
+      toolDescription: "Submit one matching-pairs study item with three or four grounded pairs.",
+      parameters: matchingSchema,
+      validator: matchingValidator,
+      tags: [STAGE_TAGS.matchingGeneration],
+      maxRetries: 4
+    });
+    return { itemType: "matching", question: args.question, pairs: args.pairs };
+  }
+}
+
+export class LiteLlmStudyItemBlueprintAdapter implements StudyItemBlueprintPort {
+  readonly model: string;
+
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = STUDY_ITEM_GENERATION_MODEL) {
+    this.model = model;
+  }
+
+  async plan(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    lesson: ConceptLesson;
+    siblings: { label: string; snippet: string }[];
+    supportedItemTypes: StudyItemType[];
+  }): Promise<StudyItemBlueprint> {
+    const system = [
+      "You plan which study item types are worth generating for one learning node.",
+      "For each supported item type, decide whether the lesson grounding can support a non-duplicative, non-label-cued item.",
+      "When generating, assign a short distinct assessed facet. When skipping, give a short reason.",
+      "Do not use domain-specific examples beyond the provided lesson and neighbor labels. Do not add deterministic lexical rules; judge askability from meaning."
+    ].join(" ");
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      `Learning node: "${input.node.canonicalLabel}"${input.node.aliases.length ? ` (aliases: ${input.node.aliases.join(", ")})` : ""}.`,
+      `Supported item types: ${input.supportedItemTypes.join(", ")}.`,
+      "Lesson sections:",
+      ...input.lesson.sections.map((section) => `- ${section.kind}: ${section.text}`),
+      "Same-domain neighbors:",
+      renderSiblings(input.siblings),
+      "",
+      "Call submit_study_item_blueprint with exactly one plan for each supported item type."
+    ].join("\n");
+    const args = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_study_item_blueprint",
+      toolDescription: "Submit a per-item-type study item blueprint for one learning node.",
+      parameters: studyItemBlueprintSchema,
+      validator: studyItemBlueprintValidator,
+      tags: [STAGE_TAGS.studyItemBlueprint],
+      maxRetries: 2
+    });
+    return {
+      derivedNodeId: input.node.derivedNodeId,
+      typePlans: args.typePlans.map((plan) => plan.generate
+        ? { itemType: plan.itemType, generate: true, facet: plan.facet ?? "" }
+        : { itemType: plan.itemType, generate: false, reason: plan.reason ?? "blueprint declined this item type" })
     };
   }
 }

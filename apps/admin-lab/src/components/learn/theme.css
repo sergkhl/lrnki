@@ -1,0 +1,42 @@
+:root {
+  --journal-background: #f7f0de;
+  --journal-ink: #241f18;
+  --journal-muted: #6d6152;
+  --journal-panel: #fffaf0;
+  --journal-line: #d8c8aa;
+  --journal-trail: #617a55;
+  --journal-trail-muted: #b9ad92;
+  --journal-gem: #2f8f83;
+  --journal-gem-soft: #cbe7df;
+  --journal-fog: #8d887c;
+  --journal-frontier: #9c5f2b;
+  --journal-halo: rgb(156 95 43 / 0.28);
+}
+
+.learn-journal {
+  min-height: 100svh;
+  background:
+    linear-gradient(180deg, rgb(247 240 222 / 0.96), rgb(238 228 205 / 0.98)),
+    radial-gradient(circle at 20% 10%, rgb(97 122 85 / 0.12), transparent 34rem);
+  color: var(--journal-ink);
+}
+
+.learn-journal a {
+  color: inherit;
+}
+
+.learn-journal-shell {
+  margin: 0 auto;
+  display: flex;
+  min-height: 100svh;
+  width: min(100%, 72rem);
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .learn-journal-shell {
+    padding: 1.5rem;
+  }
+}

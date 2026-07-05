@@ -36,6 +36,8 @@ export {
   missingPrerequisiteProposalValidator,
   intrinsicDifficultySchema,
   intrinsicDifficultyValidator,
+  declaredDomainInferenceSchema,
+  declaredDomainInferenceValidator,
   admissionLabelJudgmentSchema,
   admissionLabelJudgmentValidator,
   rescueDurabilityJudgmentSchema,
@@ -43,9 +45,14 @@ export {
   mintingDurabilityJudgmentSchema,
   mintingDurabilityJudgmentValidator,
   optionSelectSchema,
-  optionSelectValidator
+  optionSelectValidator,
+  studyItemBlueprintSchema,
+  studyItemBlueprintValidator,
+  matchingSchema,
+  matchingValidator
 } from "./toolSchemas";
 export {
+  LiteLlmStudyItemBlueprintAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmImpostorLieValidityJudgmentAdapter,
   STUDY_ITEM_GENERATION_MODEL
@@ -95,3 +102,8 @@ export {
   INTRINSIC_DIFFICULTY_JUDGE_MODEL,
   INTRINSIC_DIFFICULTY_SYSTEM_PROMPT
 } from "./intrinsicDifficultyAdapters";
+export {
+  LiteLlmDeclaredDomainInferenceAdapter,
+  DECLARED_DOMAIN_INFERENCE_MODEL,
+  DECLARED_DOMAIN_INFERENCE_SYSTEM_PROMPT
+} from "./domainInferenceAdapters";

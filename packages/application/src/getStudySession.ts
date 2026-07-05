@@ -2,6 +2,7 @@ import type {
   CalibrationVerdictStorePort,
   ConceptLessonStorePort,
   EnrichmentInspectionReadPort,
+  LessonReadStorePort,
   ResponseLogStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
@@ -22,6 +23,7 @@ export async function getStudySession(input: {
   enrichmentRead: EnrichmentInspectionReadPort;
   studyItemStore: StudyItemBankStorePort;
   conceptLessonStore: ConceptLessonStorePort;
+  lessonReadStore?: LessonReadStorePort;
   responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
 }): Promise<StudySession | undefined> {
@@ -29,10 +31,11 @@ export async function getStudySession(input: {
   if (!detail) return undefined;
   if (!detail.nodes.some((node) => node.derivedNodeId === input.targetDerivedNodeId)) return undefined;
 
-  const [studyItems, lessons, lessonAbsent, rows, verdicts] = await Promise.all([
+  const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts] = await Promise.all([
     input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
     input.conceptLessonStore.listLessonsForEnrichment(input.enrichmentId),
     input.conceptLessonStore.listAbsentForEnrichment(input.enrichmentId),
+    input.lessonReadStore ? input.lessonReadStore.listForLearner(input.learnerStateRef) : Promise.resolve([]),
     input.responseLog.listForLearner(input.learnerStateRef),
     input.verdictStore.listForLearner(input.learnerStateRef)
   ]);
@@ -45,6 +48,7 @@ export async function getStudySession(input: {
     studyItems,
     lessons,
     lessonAbsent,
+    lessonReads: lessonReads.map((read) => read.derivedNodeId),
     rows,
     verdicts
   });

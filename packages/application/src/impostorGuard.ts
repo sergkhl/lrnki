@@ -1,14 +1,11 @@
 import { randomUUID } from "node:crypto";
 import {
-  classifyEvidenceMatch,
   type ImpostorItem,
   type ImpostorItemDraft,
   type ImpostorStatement,
-  type ImpostorTruthStatement,
-  type StudyItemCitation,
-  type StudyItemGroundingProvenance
+  type ImpostorTruthStatement
 } from "@lrnki/domain-core";
-import { normalizeOptionText, type OptionSelectGroundingPassage } from "./optionSelectGuard";
+import { normalizeOptionText, resolveGroundingCitation, type StudyItemGuardGrounding } from "./optionSelectGuard";
 
 // Deterministic impostor guard (U4, R1/R5/R6/R8, ADR-0026). Promotes an impostor draft to a
 // persistable item ONLY when it satisfies provable structural and provenance guarantees, and
@@ -21,18 +18,9 @@ import { normalizeOptionText, type OptionSelectGroundingPassage } from "./option
 // is simply recorded impostor-absent (R9, U5).
 
 // The build-time context the guard needs to assemble a persistable ImpostorItem: the item
-// identity + grounding provenance, plus the passages each true statement must trace to. The
-// passage shape is shared with option-select (rule 18). Built by the fan-out (U5).
-export type ImpostorGrounding = {
-  studyItemId: string;
-  graphVersionId: string | null;
-  enrichmentId: string;
-  derivedNodeId: string;
-  groundingProvenance: StudyItemGroundingProvenance;
-  generatingModel: string;
-  configHash: string;
-  passages: OptionSelectGroundingPassage[];
-};
+// identity + grounding provenance, plus the passages each true statement must trace to. Shared
+// with option-select and matching (rule 18). Built by the fan-out (U5).
+export type ImpostorGrounding = StudyItemGuardGrounding;
 
 export type ImpostorGuardResult =
   | { ok: true; item: ImpostorItem }
@@ -85,21 +73,10 @@ export function validateImpostorItem(
       return { ok: false, reason: "impostor true statement carries no grounding citation" };
     }
     const citationDraft = statement.citation;
-    const candidate = grounding.passages.find((passage) => passage.passageId === citationDraft.passageId);
-    const matchKind = candidate ? classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote) : "none";
-    if (!candidate || matchKind === "none") {
+    const citation = resolveGroundingCitation(grounding.passages, citationDraft, grounding.derivedNodeId);
+    if (!citation) {
       return { ok: false, reason: "impostor true statement citation does not verify against grounding" };
     }
-    const citation: StudyItemCitation =
-      "sourceResourceId" in candidate
-        ? {
-            provenance: "source",
-            sourceResourceId: candidate.sourceResourceId,
-            sourceBlockId: candidate.sourceBlockId,
-            evidenceQuote: citationDraft.evidenceQuote,
-            matchKind
-          }
-        : { provenance: "generated", derivedNodeId: grounding.derivedNodeId, passageText: citationDraft.evidenceQuote };
     builtTruths.push({ statementId: newStatementId(), ordinal: 0, text: statement.text, isImpostor: false, provenance: citation.provenance, citation });
   }
 
@@ -134,6 +111,7 @@ export function validateImpostorItem(
       groundingProvenance: grounding.groundingProvenance,
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
+      ...(grounding.facet ? { facet: grounding.facet } : {}),
       question: draft.question,
       statements: built
     }

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import type { NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
+import type { MatchingItem, NewResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
 import type { ResponseLogStorePort } from "@lrnki/ports";
-import { appendGradedSelectionOutcome, AUTO_GRADER_IDENTITY } from "./gradedSelectionOutcome";
+import { appendGradedMatchingOutcome, appendGradedSelectionOutcome, AUTO_GRADER_IDENTITY } from "./gradedSelectionOutcome";
 import { foldConceptMastery } from "./responseLogLearnerState";
 
 function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogRow[] } {
@@ -22,6 +22,23 @@ function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogR
 }
 
 const item = { studyItemId: "item-1", derivedNodeId: "node-1" };
+
+const matchingItem: MatchingItem = {
+  studyItemId: "match-1",
+  graphVersionId: "gv-1",
+  enrichmentId: "en-1",
+  derivedNodeId: "node-1",
+  groundingProvenance: "source_cep",
+  generatingModel: "test-model",
+  configHash: "cfg-1",
+  itemType: "matching",
+  question: "Match the pairs.",
+  pairs: [
+    { pairId: "p-1", matchId: "m-1", promptText: "Heap", matchText: "Runtime memory", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "Heap uses runtime memory." } },
+    { pairId: "p-2", matchId: "m-2", promptText: "Stack", matchText: "Call frames", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "Stack stores call frames." } },
+    { pairId: "p-3", matchId: "m-3", promptText: "Ownership", matchText: "Freeing responsibility", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "Ownership tracks freeing responsibility." } }
+  ]
+};
 
 test("a correct option appends one graded(auto) row with score 1 and no submitted answer (Covers AE1)", async () => {
   const log = fakeResponseLog();
@@ -89,6 +106,40 @@ test("Covers AE4: the shared grader serves impostor selection — picking the im
   assert.equal(hit.row.gradedScore, 1);
   assert.equal(miss.row.judgedOutcome, "incorrect");
   assert.equal(miss.row.gradedScore, 0);
+});
+
+test("matching grading scores all first attempts correct as a correct graded row with the attempt trace", async () => {
+  const log = fakeResponseLog();
+  const trace = [
+    { promptId: "p-1", chosenMatchId: "m-1" },
+    { promptId: "p-2", chosenMatchId: "m-2" },
+    { promptId: "p-3", chosenMatchId: "m-3" }
+  ];
+  const result = await appendGradedMatchingOutcome({ learnerStateRef: "L1", item: matchingItem, trace, responseSource: "human", responseLog: log.store });
+  assert.equal(result.row.judgedOutcome, "correct");
+  assert.equal(result.row.gradedScore, 1);
+  assert.equal(result.correctFirstTry, 3);
+  assert.equal(result.pairCount, 3);
+  assert.deepEqual(JSON.parse(result.row.submittedAnswer ?? "[]"), trace);
+});
+
+test("matching grading counts only the first attempt per prompt, yielding partial when a prompt misses first", async () => {
+  const log = fakeResponseLog();
+  const result = await appendGradedMatchingOutcome({
+    learnerStateRef: "L1",
+    item: matchingItem,
+    trace: [
+      { promptId: "p-1", chosenMatchId: "m-2" },
+      { promptId: "p-1", chosenMatchId: "m-1" },
+      { promptId: "p-2", chosenMatchId: "m-2" },
+      { promptId: "p-3", chosenMatchId: "m-3" }
+    ],
+    responseSource: "human",
+    responseLog: log.store
+  });
+  assert.equal(result.row.judgedOutcome, "partial");
+  assert.equal(result.row.gradedScore, 2 / 3);
+  assert.equal(result.correctFirstTry, 2);
 });
 
 test("appendGradedSelectionOutcome imports no graph or enrichment write port", () => {

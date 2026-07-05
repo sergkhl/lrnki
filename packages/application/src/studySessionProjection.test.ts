@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, MatchingItem, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
 import type { DerivedGraphDetail } from "@lrnki/ports";
 import {
   adaptedHiddenNodeIds,
@@ -59,6 +59,7 @@ function optionItem(derivedNodeId: string): StudyItem {
     configHash: "cfg",
     itemType: "option_select",
     question: `Q ${derivedNodeId}`,
+    explanation: "The correct option follows from the grounded lesson.",
     options: [
       { optionId: `o-${derivedNodeId}-2`, text: "Two", isCorrect: false, provenance: "generated" },
       { optionId: `o-${derivedNodeId}-1`, text: "One", isCorrect: true, provenance: "source" }
@@ -92,6 +93,26 @@ function impostorItem(derivedNodeId: string): StudyItem {
         lieSource: "sibling",
         siblingLabel: "Borrowing"
       }
+    ]
+  };
+}
+
+function matchingItem(derivedNodeId: string): MatchingItem {
+  const citation = { provenance: "generated" as const, derivedNodeId, passageText: "Generated grounding for a matching pair." };
+  return {
+    studyItemId: `match-${derivedNodeId}`,
+    graphVersionId: "g",
+    enrichmentId: "e",
+    derivedNodeId,
+    groundingProvenance: "generated",
+    generatingModel: "deepseek",
+    configHash: "cfg",
+    itemType: "matching",
+    question: `Match pairs for ${derivedNodeId}`,
+    pairs: [
+      { pairId: `p-${derivedNodeId}-2`, matchId: `m-${derivedNodeId}-3`, promptText: "Second prompt", matchText: "Third match", citation },
+      { pairId: `p-${derivedNodeId}-1`, matchId: `m-${derivedNodeId}-1`, promptText: "First prompt", matchText: "First match", citation },
+      { pairId: `p-${derivedNodeId}-3`, matchId: `m-${derivedNodeId}-2`, promptText: "Third prompt", matchText: "Second match", citation }
     ]
   };
 }
@@ -219,6 +240,22 @@ test("composeStudySession surfaces calibration↔graded coexistence rather than 
   assert.equal(session.coexistence[0].label, "Ownership");
 });
 
+test("composeStudySession exposes the latest graded outcome per study item", () => {
+  const session = compose({
+    target: "move",
+    studyItems: [optionItem("scope"), impostorItem("scope")],
+    rows: [
+      { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
+      { ...graded("scope", "incorrect", 2), studyItemId: "os-scope" },
+      { ...graded("scope", "correct", 3), studyItemId: "imp-scope" }
+    ]
+  });
+  assert.deepEqual(session.latestOutcomeByStudyItemId, {
+    "imp-scope": "correct",
+    "os-scope": "incorrect"
+  });
+});
+
 test("unmetPrerequisites returns only direct, non-mastered prerequisites, excluding uncertain edges", () => {
   const classification: AdaptedNodeClassification = {
     stateByNode: { scope: "mastered", ownership: "frontier", move: "locked", borrow: "frontier" },
@@ -247,16 +284,47 @@ test("studyItemToView maps an impostor item to a view exposing statements, revea
   assert.equal(view.item.statements.length, 4);
   // statements sorted by id (not always-last impostor): the impostor sorts to its id position.
   assert.deepEqual(view.item.statements.map((s) => s.statementId), ["s-scope-1", "s-scope-2", "s-scope-3", "s-scope-4"]);
-  assert.equal(view.item.statements.filter((s) => s.isImpostor).length, 1);
   assert.equal(view.item.reveal, "The fourth statement is false; it is actually true of Borrowing.");
   assert.equal(view.item.lieSource, "sibling");
   assert.equal(view.item.siblingLabel, "Borrowing");
   assert.equal(studyItemViewToSheet(view).kind, "impostor");
 });
 
-test("studySegmentsByNode lists a node's segments in canonical order (option_select before impostor)", () => {
-  const session = compose({ target: "move", studyItems: [impostorItem("scope"), optionItem("scope")] });
-  assert.deepEqual(session.studySegmentsByNode.scope.map((segment) => segment.kind), ["option_select", "impostor"]);
+test("studyItemToView maps matching into separate keyless prompt and match columns", () => {
+  const view = studyItemToView(matchingItem("scope"));
+  assert.equal(view.kind, "matching");
+  if (view.kind !== "matching") return;
+  assert.deepEqual(view.item.prompts.map((p) => p.promptId), ["p-scope-1", "p-scope-2", "p-scope-3"]);
+  assert.deepEqual(view.item.matches.map((m) => m.matchId), ["m-scope-1", "m-scope-2", "m-scope-3"]);
+  assert.equal("pairId" in view.item.matches[0], false);
+  assert.equal("matchId" in view.item.prompts[0], false);
+  assert.equal(studyItemViewToSheet(view).kind, "matching");
+});
+
+test("study item views do not serialize keyed answers to the learner client (AE6)", () => {
+  const optionView = studyItemToView(optionItem("scope"));
+  assert.equal(optionView.kind, "option_select");
+  if (optionView.kind === "option_select") {
+    assert.equal("isCorrect" in optionView.item.options[0], false);
+  }
+
+  const impostorView = studyItemToView(impostorItem("scope"));
+  assert.equal(impostorView.kind, "impostor");
+  if (impostorView.kind === "impostor") {
+    assert.equal("isImpostor" in impostorView.item.statements[0], false);
+  }
+
+  const matchingView = studyItemToView(matchingItem("scope"));
+  assert.equal(matchingView.kind, "matching");
+  if (matchingView.kind === "matching") {
+    assert.equal("pairId" in matchingView.item.matches[0], false);
+    assert.equal("matchId" in matchingView.item.prompts[0], false);
+  }
+});
+
+test("studySegmentsByNode lists a node's segments in canonical order (option_select before matching before impostor)", () => {
+  const session = compose({ target: "move", studyItems: [impostorItem("scope"), matchingItem("scope"), optionItem("scope")] });
+  assert.deepEqual(session.studySegmentsByNode.scope.map((segment) => segment.kind), ["option_select", "matching", "impostor"]);
   // The node-level sheet content resolves to the FIRST segment (option_select) for the badge.
   assert.equal(session.sheetByNode.scope.kind, "option_select");
 });

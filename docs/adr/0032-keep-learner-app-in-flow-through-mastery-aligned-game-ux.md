@@ -4,7 +4,7 @@ Status: Accepted
 
 ## Decision
 
-The future **Learner App** keeps the learner in a **Flow Channel**: clear goals,
+The **Learner App** keeps the learner in a **Flow Channel**: clear goals,
 not-too-easy and not-too-hard challenges, and nested tension/release pulses that make progress hard
 to ignore once a challenge is visible. The app's visible goals, rewards, feedback, and challenge
 selection must align with mastery progress toward a chosen target; the learner should not be able to
@@ -13,8 +13,19 @@ win a game layer while bypassing the concept understanding the layer exists to b
 The Learner App orchestrator owns flow. Learner-neutral assets - the Derived Graph Layer, Concept
 Lesson, and Study Item Bank - expose concepts, grounding, item types, difficulty signals, and graded
 observations, but do not encode learner-specific pacing, points, stakes, or personalized game arcs.
+Learner-facing routes consume those assets and Learner State only through the application package's
+public use-case and projection surface
+([ADR-0027](0027-serve-inspection-through-read-model-ports.md)); they import no operator components
+and no persistence adapters, so extracting a standalone Learner App later is an import-discipline
+move, not a rewrite.
 Version 1 starts orchestrated-first: the learner chooses a target or quest, and the app chooses the
 next mechanic or segment to preserve flow instead of asking the learner to pick a mechanic cold.
+
+The Learner App is **mobile-first**: design and build every learner-facing surface for a
+phone-sized portrait viewport with standard mobile best practices (touch-first interaction, no
+hover-dependent affordances, thumb-reachable primary actions, safe-area awareness) as the default,
+then adapt upward. Desktop is a secondary adaptation of the mobile design, never the base layout
+that gets squeezed down.
 
 The first-class LeBlanc pleasures for the Learner App are **Challenge**, **Discovery**, and
 **Sensation**. Other pleasures may appear later, but game delight is allowed only when it reinforces
@@ -28,7 +39,7 @@ sequence, and only then generate a **Learner-Scoped Scaffold**. Such scaffolds a
 support content, clearly labeled generated, and never mutate the Learner-Neutral Core Concept Graph,
 the Derived Graph Layer, or the neutral Study Item Bank.
 
-Each future Learner App mechanic must pass a Flow design gate before implementation: name the
+Each new Learner App mechanic must pass a Flow design gate before implementation: name the
 player-visible goal, confirm it matches the intended learning goal, identify distractions, describe
 the challenge curve and expected skill growth, state which pleasures it prioritizes, and define the
 focused runtime signals needed to inspect flow. The minimum focused signals are segment

@@ -401,7 +401,7 @@ WHERE a.artifact_type = 'enrichment_run';
 -- `study_item_bank` artifact the Study Item Bank store writes beside its normalized rows.
 CREATE VIEW artifact_study_items AS
 SELECT a.graph_version_id, si.study_item_id, si.item_type, si.enrichment_id, si.derived_node_id,
-       si.grounding_provenance, si.question, si.option_count, si.statement_count
+       si.grounding_provenance, si.question, si.facet, si.option_count, si.pair_count, si.statement_count
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -413,7 +413,9 @@ JSON_TABLE(
     derived_node_id text PATH '$.derivedNodeId',
     grounding_provenance text PATH '$.groundingProvenance',
     question text PATH '$.question',
+    facet text PATH '$.facet',
     option_count integer PATH '$.options.size()',
+    pair_count integer PATH '$.pairs.size()',
     statement_count integer PATH '$.statements.size()'
   )
 ) AS si
@@ -539,6 +541,44 @@ CREATE TABLE concept_difficulties (
   UNIQUE (enrichment_id, derived_node_id)
 );
 
+-- ---------------------------------------------------------------------------
+-- Learner Expeditions — learner-owned route/charting state for the Learner App.
+-- This table does not persist mastery, readiness, rewards, or trail shape; those
+-- derive from the Study Session projection and the published graph. It only
+-- remembers the learner's expedition rows, active selection, current charting
+-- operation pointer, and the ready enrichment/target once charting completes.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE learner_expeditions (
+  learner_expedition_id uuid PRIMARY KEY,
+  learner_state_ref text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('topic')),
+  title text NOT NULL,
+  declared_domain text NOT NULL,
+  status text NOT NULL CHECK (status IN ('charting', 'ready', 'failed')),
+  current_operation_id uuid,
+  current_operation_type text CHECK (current_operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
+  enrichment_id uuid REFERENCES graph_enrichments(enrichment_id),
+  target_derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  active boolean NOT NULL DEFAULT false,
+  failure_message text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((current_operation_id IS NULL AND current_operation_type IS NULL) OR (current_operation_id IS NOT NULL AND current_operation_type IS NOT NULL)),
+  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL AND target_derived_node_id IS NOT NULL) OR status <> 'ready')
+);
+
+CREATE UNIQUE INDEX learner_expeditions_one_active_per_learner
+  ON learner_expeditions (learner_state_ref)
+  WHERE active;
+
+CREATE UNIQUE INDEX learner_expeditions_one_enrichment_per_learner
+  ON learner_expeditions (learner_state_ref, enrichment_id)
+  WHERE enrichment_id IS NOT NULL;
+
+CREATE INDEX learner_expeditions_learner_state_ref_idx ON learner_expeditions (learner_state_ref, created_at DESC);
+CREATE INDEX learner_expeditions_enrichment_idx ON learner_expeditions (enrichment_id);
+
 -- Rescue durability dispositions (U4, ADR-0019 refinement). One row per AGGREGATED
 -- source_mentioned rescue candidate the durability judge ruled on (U3). A `dropped`
 -- candidate has no derived_graph_nodes row, so derived_node_id is correlation-only
@@ -620,12 +660,14 @@ CREATE TABLE derived_node_merges (
 
 CREATE TABLE study_items (
   study_item_id uuid PRIMARY KEY,
-  item_type text NOT NULL CHECK (item_type IN ('option_select', 'impostor')),
+  item_type text NOT NULL CHECK (item_type IN ('option_select', 'matching', 'impostor')),
   graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   question text NOT NULL,
+  explanation text,
+  facet text,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -667,6 +709,32 @@ CREATE TABLE study_item_options (
 CREATE UNIQUE INDEX study_item_options_one_correct_per_item
   ON study_item_options (study_item_id)
   WHERE is_correct;
+
+CREATE TABLE matching_pairs (
+  matching_pair_id uuid PRIMARY KEY,
+  match_tile_id uuid NOT NULL UNIQUE,
+  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id) ON DELETE CASCADE,
+  ordinal integer NOT NULL CHECK (ordinal BETWEEN 0 AND 3),
+  prompt_text text NOT NULL,
+  match_text text NOT NULL,
+  provenance text NOT NULL CHECK (provenance IN ('source', 'generated')),
+  source_resource_id uuid REFERENCES source_resources(source_resource_id),
+  source_block_id uuid REFERENCES source_blocks(source_block_id),
+  evidence_quote text,
+  match_kind text CHECK (match_kind IN ('exact', 'normalized')),
+  derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  generated_passage_text text,
+  CHECK (btrim(prompt_text) <> '' AND btrim(match_text) <> '' AND lower(btrim(prompt_text)) <> lower(btrim(match_text))),
+  CHECK (
+    (provenance = 'source' AND source_resource_id IS NOT NULL AND source_block_id IS NOT NULL AND evidence_quote IS NOT NULL AND match_kind IS NOT NULL AND derived_node_id IS NULL AND generated_passage_text IS NULL)
+    OR
+    (provenance = 'generated' AND source_resource_id IS NULL AND source_block_id IS NULL AND evidence_quote IS NULL AND match_kind IS NULL AND derived_node_id IS NOT NULL AND generated_passage_text IS NOT NULL)
+  ),
+  UNIQUE (study_item_id, ordinal),
+  UNIQUE (study_item_id, prompt_text),
+  UNIQUE (study_item_id, match_text),
+  UNIQUE (study_item_id, match_tile_id)
+);
 
 -- Grounded-answer citations are provenance-tagged. They back the option_select correct
 -- answer, keyed by study_item_id. Source
@@ -760,7 +828,7 @@ CREATE TABLE rejected_study_items (
   graph_version_id uuid REFERENCES graph_versions(graph_version_id),
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
-  item_type text NOT NULL CHECK (item_type IN ('option_select', 'impostor')),
+  item_type text NOT NULL CHECK (item_type IN ('option_select', 'matching', 'impostor')),
   reason text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -864,6 +932,13 @@ CREATE TABLE calibration_verdicts (
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   verdict text NOT NULL CHECK (verdict IN ('known', 'learn')),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (learner_state_ref, derived_node_id)
+);
+
+CREATE TABLE lesson_reads (
+  learner_state_ref text NOT NULL,
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  first_read_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (learner_state_ref, derived_node_id)
 );
 

@@ -243,6 +243,17 @@ export const intrinsicDifficultyValidator = z.object({
 
 export const intrinsicDifficultySchema: JsonSchema = toForcedToolSchema(intrinsicDifficultyValidator);
 
+// --- Declared domain inference: submit_declared_domain --------------------
+// One bounded learner-charting helper: infer a short field-of-study label from a
+// learner's topic phrase. The learner can confirm or edit this before generation.
+// The schema stays domain-neutral and contains no fixture-derived examples.
+
+export const declaredDomainInferenceValidator = z.object({
+  declaredDomain: z.string().trim().min(1).describe("A short field-of-study label that best frames the learner's topic. Return only the field label, not an explanation.")
+}).strict();
+
+export const declaredDomainInferenceSchema: JsonSchema = toForcedToolSchema(declaredDomainInferenceValidator);
+
 export const definitionEntailmentJudgmentValidator = z.object({
   subjectMatch: z.enum(["exact_or_interchangeable", "qualified_variant", "different_or_absent"]),
   subjectSpan: z.string().describe("Minimal exact sub-quote that identifies the subject; empty when different or absent."),
@@ -351,6 +362,7 @@ export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMe
 
 export const optionSelectValidator = z.object({
   question: z.string().min(1).describe("One self-contained multiple-choice question about the learning node with a single correct answer. Do not reference 'the passage' or 'the source'."),
+  explanation: z.string().min(1).describe("Short learner-facing rationale explaining why the correct answer follows from the provided grounding. Stay domain-neutral and do not mention tool or source mechanics."),
   correctAnswer: z.object({
     text: z.string().min(1).describe("The single correct option, grounded strictly in the provided passages."),
     citation: passageCitation
@@ -359,6 +371,30 @@ export const optionSelectValidator = z.object({
 }).strict();
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
+
+export const studyItemBlueprintValidator = z.object({
+  typePlans: z.array(z.object({
+    itemType: z.enum(["option_select", "matching", "impostor"]),
+    generate: z.boolean(),
+    facet: z.string().nullable().describe("When generate=true, the distinct assessed facet this item type should test. Null when generate=false."),
+    reason: z.string().nullable().describe("When generate=false, a short reason this type should be skipped. Null when generate=true.")
+  }).strict()).length(3).describe("Exactly one plan for each supported item type.")
+}).strict();
+
+export const studyItemBlueprintSchema: JsonSchema = toForcedToolSchema(studyItemBlueprintValidator);
+
+const matchingPair = z.object({
+  promptText: z.string().min(1).describe("Left-column prompt: a concise concept-side clue or situation to recognize."),
+  matchText: z.string().min(1).describe("Right-column match: the corresponding example, scenario, description, or application from the lesson."),
+  citation: passageCitation
+}).strict();
+
+export const matchingValidator = z.object({
+  question: z.string().min(1).describe("One self-contained prompt asking the learner to match the pairs. Do not reference 'the passage' or 'the source'."),
+  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage.")
+}).strict();
+
+export const matchingSchema: JsonSchema = toForcedToolSchema(matchingValidator);
 
 // --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
 // One four-statement auto-graded item per node: three TRUE statements (each cited by
@@ -450,6 +486,8 @@ export const toolValidators = [
   mintingDurabilityJudgmentValidator,
   nodeMergeAdjudicationValidator,
   optionSelectValidator,
+  studyItemBlueprintValidator,
+  matchingValidator,
   impostorValidator,
   impostorLieValidityJudgmentValidator,
   conceptLessonValidator
