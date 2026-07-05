@@ -30,7 +30,7 @@ Decided in conversation (2026-07-05); this section owns them until completion.
   are currently sorted by random UUID: random once, frozen forever, so retries leak the correct
   position. Shuffle client-side per attempt (every sheet open / retry re-shuffles); grading stays
   keyed by id. Applies to the Matching board's columns too.
-- **R2 — Compact difficulty rating as game UX.** Surface the fused 0–1 intrinsic difficulty in the
+- **R2 — Compact difficulty rating as game UX.** Surface the banded 0–1 intrinsic difficulty in the
   existing concept popover as a small learner-styled rating (no new surface, minimal space).
 - **R3 — No difficulty threshold gate.** Considered and deferred; recorded in `TODO.md` item 1
   (signal untrustworthy for relation-like labels). The "too easy" symptom is answer leakage and is
@@ -173,7 +173,7 @@ Acceptance examples:
   remounts = reshuffles). Persisted `ordinal` and projection id-sort stay as the stable server
   order; grading is id-keyed and untouched.
 - **Difficulty rating rides the existing popover.** `trailView.ts` copies the stateful path step's
-  fused 0–1 `difficulty` onto `TrailCluster`; `ConceptMarker` renders it as a compact 1–5 diamond
+  banded 0–1 `difficulty` onto `TrailCluster`; `ConceptMarker` renders it as a compact 1–5 diamond
   rating (`round(score * 4) + 1`) with an accessible label from `vocabulary.ts`. Display only — no
   behavioral consumer (TODO item 1 unchanged).
 - **Fog and header are pure layout work.** Fog: delete the fixed pill; the boundary row renders a
