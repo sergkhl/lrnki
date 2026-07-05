@@ -14,6 +14,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 - [2026-07-05-001 — Learner game UX polish, item blueprint, and Matching Pairs](./2026-07-05-001-feat-learner-game-ux-matching-and-mobile-polish-plan.md)
   — ready.
+- [2026-07-05-002 — Comparative banded intrinsic difficulty and trail floor](./2026-07-05-002-fix-banded-intrinsic-difficulty-and-trail-floor-plan.md)
+  — ready.
 
 ## Ownership rules
 

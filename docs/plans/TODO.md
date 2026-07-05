@@ -12,6 +12,9 @@
    - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
    - Keep population calibration deferred until stable real learner-response data exists
      ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
+   - Active plan:
+     [2026-07-05-002 — Comparative banded intrinsic difficulty and trail floor](./2026-07-05-002-fix-banded-intrinsic-difficulty-and-trail-floor-plan.md)
+     — ready.
 
 2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
