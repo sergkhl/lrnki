@@ -2,17 +2,7 @@
 
 ## TODO
 
-1. **Strengthen the rescued-node concept re-label so sentence-shaped labels are re-named more
-   reliably.** The U8 re-label rides the rescue durability judge as an *optional* concept-label
-   proposal; on the 2026-07-05 Rust real-use gate it left one clearly propositional label on the
-   trail ("Each value in Rust has an owner") because the judge returned an empty proposal for it.
-   Problem class: the judge under-proposes for borderline propositional labels. Root-cause options
-   (must stay domain-neutral, rule 17): strengthen the proposal clause, or raise the re-label to a
-   small dedicated measured step instead of an optional verdict field. A deterministic surface-pattern
-   rewrite is out (rule 16). Decision:
-   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+1. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
@@ -22,7 +12,7 @@
    source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+2. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -33,6 +23,18 @@
    `tmp/2026-06-30-generation-metering/`.
 
 ## COMPLETED
+
+- **Dedicated Rescued-Node Canonical Labeling step.** The rescued-node concept re-label is now a
+  dedicated measured step instead of an under-attended optional field on the rescue durability
+  judge. A new `RescuedNodeLabelingPort` runs one whole-set forced-tool call per Declared Domain
+  (on `kg-independent-judge`, `rescued-node-labeling` stage tag) over the domain's *durable*
+  rescued nodes, unconditionally returning a concept-shaped label for each (which may equal the
+  current one), number-cited and position-mapped fail-open. The durability judge's
+  `canonicalLabelProposal` field is deleted end-to-end (type, validator, prompt, application
+  surfacing, tests). Minting keeps the single adoption authority — the collision guard against the
+  domain's taken labels, alias demotion, reservation, and `relabeledFrom` recording are unchanged.
+  No migration and no `litellm` config change. Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Adaptive sectioned expedition trail and game-honesty pass.** The Study Session projection is now
   layer-wide and sectioned: milestone-anchored sections over the whole floored Derived Graph Layer,
@@ -146,6 +148,25 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Dedicated Rescued-Node Canonical Labeling step, 2026-07-06.** Deterministic envelope: full
+  workspace `typecheck` exit 0; recursive `test` exit 0 with `.env` loaded (0 failures — domain-core
+  36, application 465, infrastructure-litellm 115, infrastructure-postgres 59, kg-worker 8, admin-lab
+  87); `lint` 0 errors (3 pre-existing warnings); `build` exit 0. **Real-use gate (rule 14):** a hard
+  reset re-seeded the Rust ownership fixture through real production LLM, publishing graph version
+  `af23eb46-a2a5-468c-b8d8-51e309f944af` and enrichment `e8ba6143-be10-40bc-b941-b88acbf22c13`.
+  Inspection over the real enrichment: **all 15 derived node labels are concept-shaped noun phrases —
+  0 propositional/sentence labels survive** (the 2026-07-05 baseline left 1). Two rescued nodes were
+  re-labeled with the original demoted to an alias ("Heap allocation" ← "Allocating on the heap";
+  "Stack and heap" ← "The Stack and the Heap"); accepted rescue dispositions carry the post-relabel
+  `canonical_label`. The new `rescued-node-labeling` stage fired once (`ok`, 4.3s) — one whole-set
+  call for the single Declared Domain. Rename-only invariant held: rescue accepted 6, the layer holds
+  5 `source_mentioned` nodes, the single reduction being the pre-existing dedup merge of "Ownership
+  Rules" into the anchor "Ownership". Caveat: extraction is non-deterministic so the exact 2026-07-05
+  offender ("Each value in Rust has an owner") did not recur; the defect *class* is verified. The
+  learner trail renders `canonical_label AS label` (unchanged, test-covered path); no `/learn`
+  app-expedition browser pass because the seed's learner-loop path creates no `/learn` expedition row.
+  **Result: PASS.** Trail: `tmp/todo1-rescued-labeling-evidence.md`, `tmp/todo1-seed.log`.
 
 - **Adaptive sectioned expedition trail and game-honesty pass, 2026-07-05.** Deterministic envelope:
   full workspace `typecheck` exit 0 and the recursive test suite green (domain-core 36, ports,

@@ -913,13 +913,6 @@ export type RescueDurabilityJudgment = {
   verdict: RescueDurabilityVerdict;
   groundingSpan: string;
   rationale: string;
-  // Optional concept-shaped canonical label proposal (R12). A rescued node's label is the
-  // source sentence it was mentioned in, which reads as a proposition rather than a concept.
-  // On a `durable` verdict the judge may propose a concise concept-shaped label; the minting
-  // stage adopts it only when its normalized form is unclaimed in the domain, demoting the
-  // original sentence to an alias (fail-open: empty proposal or a collision keeps the
-  // original). Empty string means no re-label.
-  canonicalLabelProposal?: string;
 };
 
 // Minting durability judgment. One bounded cross-family verdict over ONE generated
@@ -1130,6 +1123,25 @@ export type WholeSetPrerequisiteEdge = {
 // draws are computed in the boundary, never asserted by the model (R9, rules 16/19).
 export type WholeSetOrdering = {
   edges: WholeSetPrerequisiteEdge[];
+};
+
+// One rescued node's concept-shaped canonical label from ONE whole-domain-set labeling
+// draw (TODO #1). A rescued `source_mentioned` node is labeled with the source sentence it
+// was mentioned in, which reads as a proposition rather than a concept name. This dedicated
+// measured step (replacing the durability judge's under-attended optional field) runs
+// UNCONDITIONALLY over the domain's durable rescued nodes, so there is no self-gate for the
+// model to skip: it returns the best concept-shaped label for EACH numbered node, which MAY
+// equal the current label when that already reads as a concept name. The judge cites the node
+// by the 1-based NUMBER shown before it in the prompt (a closed-set position pick, mirroring
+// WholeSetPrerequisiteEdge/DifficultyBandEntry); the application maps number → derivedNodeId by
+// position fail-open, and minting owns adoption (collision guard, alias demotion, reservation).
+export type RescuedNodeLabelEntry = {
+  nodeNumber: number;
+  conceptLabel: string;
+};
+
+export type RescuedNodeLabeling = {
+  labels: RescuedNodeLabelEntry[];
 };
 
 // One concept's difficulty band from ONE whole-domain-set banding draw (comparative
@@ -1696,6 +1708,7 @@ export const STAGE_TAGS = {
   // `generated-enrichment-judge` tags collapse into this single attribution bucket.
   prerequisiteOrdering: "prerequisite-ordering",
   rescueDurability: "rescue-durability",
+  rescuedNodeLabeling: "rescued-node-labeling",
   rescueDefinitionQuality: "rescue-definition-quality",
   mintingDurability: "minting-durability",
   missingPrerequisiteProposal: "missing-prerequisite-proposal",

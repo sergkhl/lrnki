@@ -26,6 +26,8 @@ export {
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
+  buildRescuedNodeLabelingSchema,
+  buildRescuedNodeLabelingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
   conceptSetSynthesisSchema,
@@ -86,9 +88,11 @@ export {
 export {
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
+  LiteLlmRescuedNodeLabelingAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
   PREREQUISITE_ORDERING_MODEL,
   RESCUE_DURABILITY_JUDGE_MODEL,
+  RESCUED_NODE_LABELING_MODEL,
   MINTING_DURABILITY_JUDGE_MODEL
 } from "./enrichmentAdapters";
 export {

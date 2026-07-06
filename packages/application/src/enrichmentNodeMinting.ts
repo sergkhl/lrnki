@@ -11,11 +11,13 @@ import type {
   GroundingGenerationPort,
   MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
-  RescueDurabilityJudgmentPort
+  RescueDurabilityJudgmentPort,
+  RescuedNodeLabelingPort
 } from "@lrnki/ports";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { applyMintingDurabilityJudge, type ReservedMintingProposal } from "./applyMintingDurabilityJudge";
 import { applyRescueDurabilityJudge } from "./applyRescueDurabilityJudge";
+import { applyRescuedNodeLabeling } from "./applyRescuedNodeLabeling";
 import { passthroughStageBracket, type StageBracket } from "./runProgressReporter";
 
 // Bounds on the anchor-driven minting pass (KTD6, R7). Defaults keep minting
@@ -63,6 +65,11 @@ export async function assembleEnrichmentNodes(input: {
   // disposition. Omitted -> rescue is unjudged (prior behavior) and every aggregated
   // node is accepted. Dropped labels stay "taken" so minting never resurrects them.
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional measured Rescued-Node Canonical Labeling judge (TODO #1). When provided, each
+  // KEPT durable rescued node is re-named to a concept-shaped label by a dedicated whole-set
+  // per-domain call, and minting adopts the proposal when its normalized form is unclaimed
+  // (demoting the original sentence to an alias). Omitted -> rescued labels stay as-is.
+  rescuedNodeLabelingJudge?: RescuedNodeLabelingPort;
   // Optional measured minting durability judge. When provided, each reserved
   // assumed-prerequisite proposal is judged before grounding generation. Omitted ->
   // minting is identical to prior behavior and emits no minting dispositions.
@@ -153,16 +160,33 @@ export async function assembleEnrichmentNodes(input: {
     );
     rescuedNodes = judged.keptNodes;
     rescueDispositions = judged.dispositions;
+  }
 
-    // Canonical re-label (U8, R12): a durable rescued node whose label reads as a source
-    // sentence adopts the judge's concept-shaped proposal — but only when its normalized form is
-    // UNCLAIMED in the domain (the same `isTaken` authority that dedupes every enrichment node).
-    // On adoption the new label is reserved (blocking a later same-domain candidate from taking
-    // it), the original sentence is demoted to an alias, and the re-label is recorded on the
-    // disposition. A collision or an empty proposal keeps the original label (fail-open).
+  // --- Rescued-Node Canonical Labeling over KEPT durable nodes (TODO #1) ----------
+  // A dedicated measured step re-names each durable rescued node — whose label is the source
+  // sentence it was mentioned in — to a concept-shaped label (one whole-set call per Declared
+  // Domain). Adoption keeps its single authority HERE: a proposal is adopted only when its
+  // normalized form is UNCLAIMED in the domain (the same `isTaken` guard that dedupes every
+  // enrichment node). On adoption the new label is reserved (blocking a later same-domain
+  // candidate from taking it), the original sentence is demoted to an alias, and the re-label is
+  // recorded on the disposition. A collision or an empty proposal keeps the original (fail-open).
+  if (input.rescuedNodeLabelingJudge && rescuedNodes.length > 0) {
+    const takenLabelsByDomain = new Map<string, string[]>();
+    for (const anchor of input.anchors) {
+      const bucket = takenLabelsByDomain.get(anchor.declaredDomain) ?? [];
+      bucket.push(anchor.canonicalLabel);
+      takenLabelsByDomain.set(anchor.declaredDomain, bucket);
+    }
+    const canonicalLabelProposalByNodeId = await stage(STAGE_TAGS.rescuedNodeLabeling, () =>
+      applyRescuedNodeLabeling({
+        rescuedNodes,
+        takenLabelsByDomain,
+        judge: input.rescuedNodeLabelingJudge!
+      })
+    );
     const dispositionByNodeId = new Map(rescueDispositions.map((disposition) => [disposition.derivedNodeId, disposition] as const));
     for (const node of rescuedNodes) {
-      const proposal = judged.canonicalLabelProposalByNodeId.get(node.derivedNodeId);
+      const proposal = canonicalLabelProposalByNodeId.get(node.derivedNodeId);
       if (!proposal) continue;
       const normalized = normalizeConceptLabel(proposal);
       if (normalized.length === 0 || normalized === node.normalizedLabel || isTaken(node.declaredDomain, normalized)) continue;

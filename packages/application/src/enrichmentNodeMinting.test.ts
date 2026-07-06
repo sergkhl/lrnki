@@ -6,7 +6,8 @@ import type {
   GroundingGenerationPort,
   MintingDurabilityJudgmentPort,
   MissingPrerequisiteProposalPort,
-  RescueDurabilityJudgmentPort
+  RescueDurabilityJudgmentPort,
+  RescuedNodeLabelingPort
 } from "@lrnki/ports";
 import { assembleEnrichmentNodes, type MintingAnchor } from "./enrichmentNodeMinting";
 import type { StageBracket } from "./runProgressReporter";
@@ -248,15 +249,17 @@ test("the rescue durability judge drops a non-durable candidate before it become
   assert.equal(rescueDispositions.find((d) => d.canonicalLabel === "Lifetime")?.disposition, "accepted");
 });
 
-// A judge that accepts every candidate and proposes a concept-shaped re-label by candidate label.
-function relabelJudge(proposalByLabel: Record<string, string>): RescueDurabilityJudgmentPort {
+// A labeling judge (TODO #1) that re-names each candidate by its current label. A candidate
+// absent from `proposalByLabel` keeps its own label (echoed back), mirroring the "may equal
+// current" contract of the real whole-set step.
+function relabelJudge(proposalByLabel: Record<string, string>): RescuedNodeLabelingPort {
   return {
     model: "kg-independent-judge",
-    judge: async (input) => ({
-      verdict: "durable",
-      groundingSpan: "",
-      rationale: "durable",
-      ...(proposalByLabel[input.candidate.canonicalLabel] ? { canonicalLabelProposal: proposalByLabel[input.candidate.canonicalLabel] } : {})
+    label: async (input) => ({
+      labels: input.nodes.map((node, index) => ({
+        nodeNumber: index + 1,
+        conceptLabel: proposalByLabel[node.canonicalLabel] ?? node.canonicalLabel
+      }))
     })
   };
 }
@@ -269,7 +272,8 @@ test("Covers AE6: a sentence-shaped rescued node adopts the proposed concept lab
     rescueCandidates: [mention(sentence, "run-1")],
     proposalPort: proposer({}),
     groundingPort: grounder,
-    rescueDurabilityJudge: relabelJudge({ [sentence]: "Ownership-based memory release" }),
+    rescueDurabilityJudge: acceptAllJudge,
+    rescuedNodeLabelingJudge: relabelJudge({ [sentence]: "Ownership-based memory release" }),
     newNodeId
   });
   const node = rescuedNodes[0];
@@ -290,7 +294,8 @@ test("a re-label proposal that collides with an anchor label in the domain keeps
     rescueCandidates: [mention(sentence, "run-1")],
     proposalPort: proposer({}),
     groundingPort: grounder,
-    rescueDurabilityJudge: relabelJudge({ [sentence]: "Ownership" }),
+    rescueDurabilityJudge: acceptAllJudge,
+    rescuedNodeLabelingJudge: relabelJudge({ [sentence]: "Ownership" }),
     newNodeId
   });
   assert.equal(rescuedNodes[0].canonicalLabel, sentence, "a colliding proposal is discarded, original kept");
@@ -306,7 +311,8 @@ test("a re-labeled rescued node reserves its new label, blocking a later same-do
     // The proposer tries to mint the very concept label the rescued node adopted.
     proposalPort: proposer({ a: [{ proposedLabel: "Move semantics", rationale: "r" }] }),
     groundingPort: grounder,
-    rescueDurabilityJudge: relabelJudge({ [sentence]: "Move semantics" }),
+    rescueDurabilityJudge: acceptAllJudge,
+    rescuedNodeLabelingJudge: relabelJudge({ [sentence]: "Move semantics" }),
     newNodeId
   });
   assert.equal(rescuedNodes[0].canonicalLabel, "Move semantics");

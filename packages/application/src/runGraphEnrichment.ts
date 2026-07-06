@@ -26,6 +26,7 @@ import type {
   NodeMergeAdjudicationPort,
   PrerequisiteOrderingPort,
   RescueDurabilityJudgmentPort,
+  RescuedNodeLabelingPort,
   DefinitionPassageQualityJudgmentPort,
   RunProgressReporterPort,
   GraphVersionStorePort
@@ -146,6 +147,10 @@ export async function runGraphEnrichment(input: {
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
   // unjudged (prior behavior).
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional measured Rescued-Node Canonical Labeling judge (TODO #1). When provided, each
+  // KEPT durable rescued node is re-named to a concept-shaped label before it enters the
+  // derived layer; omit it to leave rescued sentence-shaped labels as-is (prior behavior).
+  rescuedNodeLabelingJudge?: RescuedNodeLabelingPort;
   // Optional rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). When
   // provided, the `definition`-typed grounding passages of verbatim-floored
   // `source_mentioned` nodes are meaning-judged before they become learner-facing study
@@ -233,6 +238,7 @@ export async function runGraphEnrichment(input: {
         proposalPort: input.missingPrerequisiteProposal!,
         groundingPort: input.groundingGeneration!,
         rescueDurabilityJudge: input.rescueDurabilityJudge,
+        rescuedNodeLabelingJudge: input.rescuedNodeLabelingJudge,
         mintingDurabilityJudge: input.mintingDurabilityJudge,
         bounds: config.mintingBounds,
         newNodeId,

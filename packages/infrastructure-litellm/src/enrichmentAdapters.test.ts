@@ -5,12 +5,14 @@ import {
   LiteLlmMintingDurabilityJudgmentAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
+  LiteLlmRescuedNodeLabelingAdapter,
   MINTING_DURABILITY_JUDGE_MODEL,
   PREREQUISITE_ORDERING_MODEL,
-  RESCUE_DURABILITY_JUDGE_MODEL
+  RESCUE_DURABILITY_JUDGE_MODEL,
+  RESCUED_NODE_LABELING_MODEL
 } from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { buildPrerequisiteOrderingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
+import { buildPrerequisiteOrderingValidator, buildRescuedNodeLabelingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
   return { derivedNodeId, canonicalLabel, aliases: [], definitions: [`${canonicalLabel} def`], mentions: [], assertions: [] };
@@ -128,6 +130,66 @@ test("rescue judge passes through the validated verdict and grounding span (appl
   const notDurable = await rescueAdapterReturning({ verdict: "not_durable", groundingSpan: "We ablate variant B in Table 3.", rationale: "ablation label" }).judge(rescueInput);
   assert.equal(notDurable.verdict, "not_durable");
   assert.equal(notDurable.groundingSpan, "We ablate variant B in Table 3.");
+});
+
+// --- Rescued-Node Canonical Labeling (TODO #1) -----------------------------------
+
+type LabelEntry = { nodeNumber: number; conceptLabel: string };
+
+function labelingAdapterReturning(canned: { labels: LabelEntry[] }, capture?: { lastCall?: { tags?: string[]; toolName?: string; maxRetries?: number } }) {
+  const client = {
+    async call(input: unknown) {
+      if (capture) capture.lastCall = input as { tags?: string[]; toolName?: string; maxRetries?: number };
+      return canned;
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  return new LiteLlmRescuedNodeLabelingAdapter(client);
+}
+
+const labelingInput = {
+  declaredDomain: "software engineering",
+  nodes: [
+    { canonicalLabel: "Each value in Rust has an owner", aliases: [], mentionQuotes: ["Each value in Rust has an owner."] },
+    { canonicalLabel: "Borrowing", aliases: [], mentionQuotes: ["Borrowing lets code access a value."] }
+  ],
+  takenLabels: ["Ownership"]
+};
+
+test("labeling adapter runs on the independent cross-family alias", () => {
+  assert.equal(RESCUED_NODE_LABELING_MODEL, "kg-independent-judge");
+  assert.equal(labelingAdapterReturning({ labels: [] }).model, "kg-independent-judge");
+});
+
+// Happy path: number-cited labels pass through verbatim; a label may equal the current one.
+test("labeling adapter returns the validated number-cited labels verbatim", async () => {
+  const { labels } = await labelingAdapterReturning({
+    labels: [
+      { nodeNumber: 1, conceptLabel: "Value ownership" },
+      { nodeNumber: 2, conceptLabel: "Borrowing" }
+    ]
+  }).label(labelingInput);
+  assert.equal(labels.length, 2);
+  assert.equal(labels[0].nodeNumber, 1);
+  assert.equal(labels[0].conceptLabel, "Value ownership");
+  assert.equal(labels[1].conceptLabel, "Borrowing");
+});
+
+test("labeling request carries the stage tag, forced tool name, and single corrective re-prompt", async () => {
+  const capture: { lastCall?: { toolName?: string; tags?: string[]; maxRetries?: number } } = {};
+  await labelingAdapterReturning({ labels: [] }, capture).label(labelingInput);
+  assert.equal(capture.lastCall?.toolName, "submit_rescued_node_labeling");
+  assert.deepEqual(capture.lastCall?.tags, ["rescued-node-labeling"]);
+  assert.equal(capture.lastCall?.maxRetries, 1);
+});
+
+// Fail-closed (rule 6): the validator bounds nodeNumber to [1, N] and rejects an empty label.
+test("labeling validator rejects an out-of-range number or an empty label", () => {
+  assert.throws(() => buildRescuedNodeLabelingValidator(2).parse({
+    labels: [{ nodeNumber: 3, conceptLabel: "x" }] // 3 > N=2
+  }));
+  assert.throws(() => buildRescuedNodeLabelingValidator(2).parse({
+    labels: [{ nodeNumber: 1, conceptLabel: "" }] // empty label
+  }));
 });
 
 // --- Minting durability judge ----------------------------------------------------

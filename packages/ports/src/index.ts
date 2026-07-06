@@ -45,6 +45,7 @@ import type {
   RefinementDecisionRecord,
   RejectedStudyItem,
   RescueDurabilityJudgment,
+  RescuedNodeLabeling,
   RunCandidate,
   RunForBuild,
   SourceBlock,
@@ -167,6 +168,28 @@ export interface RescueDurabilityJudgmentPort {
     candidate: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] };
     anchors: { canonicalLabel: string; definitionQuotes: string[] }[];
   }): Promise<RescueDurabilityJudgment>;
+}
+
+// Dedicated measured Rescued-Node Canonical Labeling step (TODO #1), run on the independent
+// cross-family alias (`kg-independent-judge`) so the DeepSeek generator never names rescue
+// nodes. It replaces the rescue durability judge's under-attended optional `canonicalLabelProposal`
+// field: a rescued node's label is the source sentence it was mentioned in and reads as a
+// proposition, so this step re-names it to a concept-shaped noun phrase. ONE whole-set call per
+// Declared Domain over that domain's DURABLE rescued nodes; each node is shown with a 1-based
+// number and the judge returns one concept-shaped label per number, which MAY equal the current
+// label when it already reads as a concept name (unconditional — no self-gate). It never creates
+// or drops a node; the application maps number → node by position fail-OPEN, and minting owns
+// adoption (collision guard against the domain's taken labels, original demoted to an alias).
+export interface RescuedNodeLabelingPort {
+  readonly model: string;
+  label(input: {
+    declaredDomain: string;
+    nodes: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] }[];
+    // The domain's already-claimed labels (anchors + peer rescued nodes) so the judge avoids
+    // proposing a name that would fail the deterministic collision guard (mirrors the minting
+    // proposer's `existingNodeLabels`). Evidence-only; the model never re-uses one of them.
+    takenLabels: string[];
+  }): Promise<RescuedNodeLabeling>;
 }
 
 // A grounding passage handed to a generator or judge: source-cited passages carry source ids

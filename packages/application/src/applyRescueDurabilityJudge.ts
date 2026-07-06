@@ -20,11 +20,7 @@ export async function applyRescueDurabilityJudge(input: {
   anchorsByDomain: Map<string, { canonicalLabel: string; definitionQuotes: string[] }[]>;
   judge: RescueDurabilityJudgmentPort;
   concurrency?: number;
-}): Promise<{ keptNodes: SourceMentionedEnrichmentNode[]; dispositions: RescueDisposition[]; canonicalLabelProposalByNodeId: Map<string, string> }> {
-  // Concept-shaped canonical label proposals from `durable` verdicts (R12, U8), keyed by node
-  // id. The minting stage owns adoption (collision check against the domain's taken labels +
-  // reservation update); this stage only surfaces the proposal so that authority stays single.
-  const canonicalLabelProposalByNodeId = new Map<string, string>();
+}): Promise<{ keptNodes: SourceMentionedEnrichmentNode[]; dispositions: RescueDisposition[] }> {
   // The `RescueDisposition[]` IS the gate's index-aligned outcome array (rule 16,
   // gateByJudgment). `onVerdict` carries the confident-verdict branch — including the
   // grounding-span refinement that downgrades a `not_durable` verdict whose span is not
@@ -41,12 +37,7 @@ export async function applyRescueDurabilityJudge(input: {
         anchors: input.anchorsByDomain.get(node.declaredDomain) ?? []
       }),
     onVerdict: (node, judgment) => {
-      if (judgment.verdict !== "not_durable") {
-        // A durable node may carry a concept-shaped re-label proposal; surface it for minting.
-        const proposal = judgment.canonicalLabelProposal?.trim();
-        if (proposal) canonicalLabelProposalByNodeId.set(node.derivedNodeId, proposal);
-        return record(node, "accepted", judgment.rationale, "");
-      }
+      if (judgment.verdict !== "not_durable") return record(node, "accepted", judgment.rationale, "");
       const span = judgment.groundingSpan.trim();
       const grounded = span.length > 0 && mentionQuotesOf(node).some((quote) => evidenceQuoteMatches(quote, span));
       return grounded
@@ -59,7 +50,7 @@ export async function applyRescueDurabilityJudge(input: {
     dispositions.filter((disposition) => disposition.disposition === "dropped").map((disposition) => disposition.derivedNodeId)
   );
   const keptNodes = input.rescuedNodes.filter((node) => !dropped.has(node.derivedNodeId));
-  return { keptNodes, dispositions, canonicalLabelProposalByNodeId };
+  return { keptNodes, dispositions };
 }
 
 // The node's OWN verbatim mention evidence — the only text a confident drop may be

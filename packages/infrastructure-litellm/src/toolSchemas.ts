@@ -172,6 +172,25 @@ export function buildPrerequisiteOrderingSchema(n: number): JsonSchema {
   return toForcedToolSchema(buildPrerequisiteOrderingValidator(n));
 }
 
+// Rescued-Node Canonical Labeling (TODO #1). ONE whole-set call per Declared Domain returns a
+// concept-shaped label for EACH of the N listed durable rescued nodes, cited by its 1-based
+// number. Schema + validator are built per call from N so the index bounds [1, N] are concrete
+// (a drifting index re-prompts once, then the application fails OPEN keeping original labels).
+// The description text stays domain-neutral (rule 17): it describes concept-vs-proposition
+// wordform, never a fixture concept or expected outcome.
+export function buildRescuedNodeLabelingValidator(n: number) {
+  return z.object({
+    labels: z.array(z.object({
+      nodeNumber: z.number().int().min(1).max(n).describe("The 1-based Candidate number (as shown before each candidate) this label is for."),
+      conceptLabel: z.string().min(1).describe("A concise concept-shaped canonical label — a noun phrase naming the single durable unit of knowledge the numbered candidate is about. When the candidate's current label reads as a full sentence, proposition, or claim, re-name it to that noun phrase; when it already reads as a concept name, return it unchanged. Name the SAME concept the candidate is about — never introduce a different concept, and never re-use one of the already-named labels listed as taken.")
+    }).strict()).describe("Exactly one entry per listed candidate: its number and its concept-shaped canonical label. Cover every listed candidate number once.")
+  }).strict();
+}
+
+export function buildRescuedNodeLabelingSchema(n: number): JsonSchema {
+  return toForcedToolSchema(buildRescuedNodeLabelingValidator(n));
+}
+
 // --- Concept-set synthesis: submit_synthesized_concepts (U2, R1/R2) -------
 // The source-less analog of Candidate Discovery (plan 2026-06-30-001). ONE forced-tool
 // call generates a bounded concept set from a topic + Declared Domain alone; the set is
@@ -349,7 +368,6 @@ export const admissionLabelJudgmentSchema: JsonSchema = toForcedToolSchema(admis
 export const rescueDurabilityJudgmentValidator = z.object({
   verdict: z.enum(["durable", "not_durable"]).describe("'durable' when the candidate names a concept a learner would genuinely need to understand before the anchor concepts — a real, transferable unit of domain knowledge that scaffolds them. 'not_durable' when it is an incidental artifact rather than a durable prerequisite: a label specific to one method, system, experiment, dataset, or ablation; a pedagogical-role or section label; a passing or source-local detail that a learner does not need as a standalone prerequisite. Judge by the candidate's meaning and its relationship to the anchors, never by surface wordform. When genuinely unsure, prefer 'durable' (precision-first veto: only drop on a clear, evidenced non-durable judgment)."),
   groundingSpan: z.string().describe("When verdict is 'not_durable', the minimal verbatim sub-quote — copied exactly from one of the candidate's own mention quotes — that shows it is an incidental artifact rather than a durable prerequisite. Empty string when verdict is 'durable'."),
-  canonicalLabelProposal: z.string().describe("When verdict is 'durable' AND the candidate's current label reads as a full sentence, proposition, or claim rather than a concept name, propose a concise concept-shaped label — a noun phrase naming the single durable unit of knowledge the candidate is about. Otherwise (the label is already a concept name, or the verdict is 'not_durable') return an empty string. Never invent a concept absent from the candidate's evidence; only re-name the same concept more concisely."),
   rationale: z.string().min(1).describe("One terse sentence.")
 }).strict();
 
@@ -522,6 +540,7 @@ export const toolValidators = [
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingValidator(3),
+  buildRescuedNodeLabelingValidator(3),
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,

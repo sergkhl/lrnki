@@ -52,31 +52,6 @@ test("a durable verdict keeps the node and records an accepted disposition", asy
   assert.equal(dispositions[0].derivedNodeId, "node-1");
 });
 
-test("a durable verdict surfaces a concept-shaped canonical label proposal keyed by node (U8)", async () => {
-  const node = rescuedNode({ derivedNodeId: "node-9", canonicalLabel: "Memory is freed when the owner goes out of scope" });
-  const { canonicalLabelProposalByNodeId } = await applyRescueDurabilityJudge({
-    rescuedNodes: [node],
-    anchorsByDomain,
-    judge: judgeReturning({ verdict: "durable", groundingSpan: "", rationale: "durable prerequisite", canonicalLabelProposal: "Ownership-based memory release" })
-  });
-  assert.equal(canonicalLabelProposalByNodeId.get("node-9"), "Ownership-based memory release");
-});
-
-test("a not_durable verdict never surfaces a re-label proposal (U8)", async () => {
-  const node = rescuedNode({ derivedNodeId: "node-2" });
-  const { canonicalLabelProposalByNodeId } = await applyRescueDurabilityJudge({
-    rescuedNodes: [node],
-    anchorsByDomain,
-    judge: judgeReturning({
-      verdict: "not_durable",
-      groundingSpan: "We ablate variant B of the proposed system",
-      rationale: "incidental",
-      canonicalLabelProposal: "Should Be Ignored"
-    })
-  });
-  assert.equal(canonicalLabelProposalByNodeId.size, 0, "a dropped verdict's proposal is ignored");
-});
-
 test("a confident, grounded not_durable verdict drops the node with a recorded rationale", async () => {
   // Reproduces the InstructKG role/ablation/method-artifact noise generically — the
   // span is copied from the node's own mention, so the veto is grounded.

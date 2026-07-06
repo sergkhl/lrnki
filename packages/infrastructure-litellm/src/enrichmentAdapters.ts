@@ -2,14 +2,22 @@ import type {
   MintingDurabilityJudgment,
   PrerequisiteConceptContext,
   RescueDurabilityJudgment,
+  RescuedNodeLabeling,
   WholeSetOrdering
 } from "@lrnki/domain-core";
-import type { MintingDurabilityJudgmentPort, PrerequisiteOrderingPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import type {
+  MintingDurabilityJudgmentPort,
+  PrerequisiteOrderingPort,
+  RescueDurabilityJudgmentPort,
+  RescuedNodeLabelingPort
+} from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
+  buildRescuedNodeLabelingSchema,
+  buildRescuedNodeLabelingValidator,
   mintingDurabilityJudgmentSchema,
   mintingDurabilityJudgmentValidator,
   rescueDurabilityJudgmentSchema,
@@ -24,6 +32,11 @@ export const RESCUE_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 // Cross-family minting durability judge. Shares the independent alias with rescue
 // durability so the DeepSeek proposer/generator never grades its own mint proposal.
 export const MINTING_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
+
+// Cross-family Rescued-Node Canonical Labeling (TODO #1). Reuses the independent
+// `kg-independent-judge` alias so the DeepSeek generator never names rescue nodes. Goes
+// through LiteLLM, never a raw provider.
+export const RESCUED_NODE_LABELING_MODEL = "kg-independent-judge";
 
 // LiteLLM alias for the third operation (Graph Enrichment, ADR-0019 amended — whole-set
 // ordering, plan U2/U5). ONE non-DeepSeek ordering call per Declared Domain returns the
@@ -121,6 +134,76 @@ export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingP
   }
 }
 
+// Whole-set Rescued-Node Canonical Labeling adapter (TODO #1). Forced named tool schema;
+// in ONE call the model returns a concept-shaped canonical label for EACH durable rescued
+// node in a Declared Domain, citing each by the 1-based Candidate NUMBER shown in the prompt.
+// Schema + validator are built per call from the node count so the index bounds are concrete;
+// a drifting index re-prompts ONCE (maxRetries: 1) then the application fails OPEN (keeps
+// original labels). This adapter is a THIN LLM caller: it renders the candidate set + their
+// mention evidence + the domain's already-taken labels, validates the tool arguments, and
+// returns the typed number-cited labels. Number → derivedNodeId mapping by position and
+// adoption (collision guard, alias demotion, reservation) all live in the application boundary.
+export class LiteLlmRescuedNodeLabelingAdapter implements RescuedNodeLabelingPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = RESCUED_NODE_LABELING_MODEL) {
+    this.model = model;
+  }
+
+  async label(input: {
+    declaredDomain: string;
+    nodes: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] }[];
+    takenLabels: string[];
+  }): Promise<RescuedNodeLabeling> {
+    const system = [
+      "You give each candidate a concise CONCEPT-SHAPED canonical label for a learner-neutral concept graph.",
+      "Each candidate was MENTIONED in a source, so its current label is often the sentence it appeared in and reads as a full statement, proposition, or claim rather than a concept name.",
+      "For EVERY listed candidate, return a concise noun phrase naming the single durable unit of knowledge the candidate is ABOUT — the concept a learner would file it under.",
+      "When the candidate's current label already reads as a concept name, return it UNCHANGED. When it reads as a sentence/proposition/claim, re-name it to the underlying concept noun phrase.",
+      "Name the SAME concept the candidate's own evidence is about; never invent a different concept, and never re-use one of the already-taken labels listed below (those name other nodes).",
+      "Decide from each candidate's meaning and its own mention quotes only. Cover every listed candidate number exactly once."
+    ].join("\n");
+    const takenLines = input.takenLabels.length
+      ? input.takenLabels.map((label) => `  - "${label}"`)
+      : ["  (none)"];
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      "",
+      "Already-taken labels in this domain (name OTHER nodes — never re-use one of these):",
+      ...takenLines,
+      "",
+      "Candidates to label:",
+      ...input.nodes.map((node, index) => [
+        "",
+        `Candidate ${index + 1}: "${node.canonicalLabel}"${node.aliases.length ? ` (aka ${node.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
+        "  Mention quotes:",
+        ...(node.mentionQuotes.length
+          ? node.mentionQuotes.map((quote, quoteIndex) => `    [${quoteIndex + 1}] "${quote}"`)
+          : ["    (none)"])
+      ].join("\n")),
+      "",
+      "Call submit_rescued_node_labeling with one concept-shaped label per candidate, each citing its listed Candidate number."
+    ].join("\n");
+
+    // Bounds the index range to the actual node count: a drifting index re-prompts once
+    // (maxRetries: 1) under strict decoding, then the application fails OPEN (keeps originals).
+    const n = input.nodes.length;
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_rescued_node_labeling",
+      toolDescription: "Submit one concept-shaped canonical label for each listed rescue candidate, cited by its number.",
+      parameters: buildRescuedNodeLabelingSchema(n),
+      validator: buildRescuedNodeLabelingValidator(n),
+      tags: [STAGE_TAGS.rescuedNodeLabeling],
+      maxRetries: 1
+    });
+
+    // Thin: return the validated, number-cited labels verbatim. The application maps number →
+    // id by position and adopts each label only when its normalized form is unclaimed (KTD3).
+    return { labels: result.labels };
+  }
+}
+
 // Bounded rescue-durability judge (U3). Forced named tool schema, deterministic
 // decoding; one judgment per aggregated `source_mentioned` rescue candidate against
 // the same-domain anchors it would scaffold. This adapter is a thin LLM caller: it
@@ -146,8 +229,7 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
       "Weigh whether THIS source DEVELOPS the candidate or merely NAMES IT IN PASSING. The source develops a concept when it returns to it, explains or builds on it, or treats it as something the reader must carry forward. It names a concept in passing when it appears once as an aside, a cross-reference, a comparison, or a label, and is dropped without being developed. A concept the source only names in passing is NOT a durable prerequisite for the anchors this source teaches — even if it is a genuine, important concept in some other source — because nothing here establishes the learner must master it first.",
       "Judge from the candidate's MEANING, how this source treats it, and its relationship to the anchors, never from surface wordform or a fixed list of words.",
       "Precision-first: this is a veto that removes nodes, so return 'not_durable' ONLY on a clear, evidenced judgment; when genuinely unsure, return 'durable' and let the node stand.",
-      "When 'not_durable', set groundingSpan to a minimal verbatim sub-quote copied exactly from one of the candidate's own mention quotes that shows it is incidental or merely named in passing. When 'durable', return an empty groundingSpan.",
-      "The candidate's label is taken from the sentence it was mentioned in, so it may read as a full statement rather than a concept name. When 'durable' AND the label reads as a sentence, proposition, or claim, set canonicalLabelProposal to a concise concept-shaped noun phrase naming the same single unit of knowledge; when the label already reads as a concept name, or the verdict is 'not_durable', return an empty canonicalLabelProposal. Only re-name the same concept; never introduce a different one."
+      "When 'not_durable', set groundingSpan to a minimal verbatim sub-quote copied exactly from one of the candidate's own mention quotes that shows it is incidental or merely named in passing. When 'durable', return an empty groundingSpan."
     ].join("\n");
     const anchorLines = input.anchors.length
       ? input.anchors.map((anchor, index) => {
@@ -181,8 +263,7 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
     return {
       verdict: result.verdict,
       groundingSpan: result.groundingSpan,
-      rationale: result.rationale,
-      ...(result.canonicalLabelProposal?.trim() ? { canonicalLabelProposal: result.canonicalLabelProposal.trim() } : {})
+      rationale: result.rationale
     };
   }
 }
