@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { learnerTerm } from "./vocabulary";
-import { sectionAnchorId, type TrailSectionView } from "./trailView";
+import { SectionCrystalStrip } from "./SectionCrystalStrip";
+import { sectionAnchorId, type TrailCluster, type TrailSectionView } from "./trailView";
 
 // The non-blocking section overview (R5, U5). Opened on demand from the header — the guided
 // "continue" flow never requires it. Lists every section with its state and progress; tapping an
@@ -16,8 +17,9 @@ import { sectionAnchorId, type TrailSectionView } from "./trailView";
 // guided-continue affordance stays the default path (F1).
 export function SectionOverview({
   sections,
+  concepts,
   currentSectionIndex
-}: Readonly<{ sections: TrailSectionView[]; currentSectionIndex: number }>) {
+}: Readonly<{ sections: TrailSectionView[]; concepts: TrailCluster[]; currentSectionIndex: number }>) {
   const [open, setOpen] = useState(false);
   const current = sections.find((section) => section.sectionIndex === currentSectionIndex) ?? sections[0];
 
@@ -71,6 +73,10 @@ export function SectionOverview({
                       ? ` · ${learnerTerm("gatedBy")}: ${section.gatingLabels.join(", ")}`
                       : ""}
                   </p>
+                  <SectionCrystalStrip
+                    concepts={concepts.filter((concept) => concept.sectionIndex === section.sectionIndex)}
+                    className="mt-1"
+                  />
                 </div>
                 {section.state === "locked" ? null : <MoveRightIcon className="size-4 shrink-0 text-muted-foreground" />}
               </button>

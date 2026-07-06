@@ -1,12 +1,17 @@
 "use client";
 
-import { BookOpenIcon, GemIcon, LockIcon, MapPinIcon, Rows3Icon, SearchIcon } from "lucide-react";
+import { BookOpenIcon, LockIcon, MapPinIcon, Rows3Icon, SearchIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import type { TrailStop } from "./trailView";
+import { CrystalGlyph } from "./CrystalGlyph";
+import type { TrailCluster, TrailStop } from "./trailView";
 import { learnerTerm } from "./vocabulary";
 
-export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop; onSelect: (stopId: string) => void }>) {
+export function CheckpointCircle({
+  stop,
+  concept,
+  onSelect
+}: Readonly<{ stop: TrailStop; concept: TrailCluster; onSelect: (stopId: string) => void }>) {
   const disabled = stop.state === "locked";
   const label = `${labelForStop(stop)}: ${stop.label}`;
   return (
@@ -28,7 +33,13 @@ export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop;
         className={cn(
           "relative z-10 flex size-16 items-center justify-center rounded-full border-2 text-[color:var(--journal-ink)] shadow-sm transition focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
           stop.isNext ? "size-18 border-[color:var(--journal-frontier)] bg-[color:var(--journal-panel)] shadow-md" : null,
-          stop.state === "complete" ? "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem)] text-white" : null,
+          // A complete capstone keeps a soft backdrop so the collected crystal itself
+          // carries the color; other complete stops stay solid-filled.
+          stop.state === "complete"
+            ? stop.kind === "capstone"
+              ? "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem-soft)]"
+              : "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem)] text-white"
+            : null,
           stop.state === "available" && !stop.isNext ? "border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]" : null,
           stop.state === "locked" ? "cursor-not-allowed border-[color:var(--journal-fog)] bg-[color:var(--journal-fog)] text-white opacity-75" : "cursor-pointer active:-translate-y-0.5"
         )}
@@ -36,7 +47,7 @@ export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop;
           if (!disabled) onSelect(stop.stopId);
         }}
       >
-        {iconForStop(stop)}
+        {iconForStop(stop, concept)}
       </button>
       {stop.isNext ? (
         <span className="max-w-24 text-center text-xs font-medium leading-tight text-[color:var(--journal-ink)]">
@@ -47,13 +58,23 @@ export function CheckpointCircle({ stop, onSelect }: Readonly<{ stop: TrailStop;
   );
 }
 
-function iconForStop(stop: TrailStop) {
+function iconForStop(stop: TrailStop, concept: TrailCluster) {
   if (stop.state === "locked") return <LockIcon />;
   if (stop.kind === "theory") return <BookOpenIcon />;
   if (stop.kind === "option_select") return <MapPinIcon />;
   if (stop.kind === "matching") return <Rows3Icon />;
   if (stop.kind === "impostor") return <SearchIcon />;
-  return <GemIcon />;
+  // The capstone is the concept's own crystal, mid-growth until the completion rule
+  // masters the node — the same formation the marker, header, and vista show.
+  return (
+    <CrystalGlyph
+      derivedNodeId={concept.derivedNodeId}
+      difficulty={concept.difficulty}
+      growthFraction={concept.growthFraction}
+      state={stop.state === "complete" ? "mastered" : "frontier"}
+      size={40}
+    />
+  );
 }
 
 function labelForStop(stop: TrailStop): string {

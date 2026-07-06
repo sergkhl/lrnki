@@ -6,7 +6,7 @@ import type { StudySession } from "@lrnki/application";
 import { refreshLearnerExpedition, setLearnerVerdict } from "@/app/learn/[learnerStateRef]/actions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { GemCapstone } from "./GemCapstone";
+import { CrystalGlyph } from "./CrystalGlyph";
 import type { TrailCluster } from "./trailView";
 import { learnerTerm } from "./vocabulary";
 
@@ -25,7 +25,15 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
         }
       >
         <span className="min-w-0 truncate text-sm font-semibold">{concept.label}</span>
-        <GemCapstone collected={isMastered} />
+        <CrystalGlyph
+          derivedNodeId={concept.derivedNodeId}
+          difficulty={concept.difficulty}
+          growthFraction={concept.growthFraction}
+          state={concept.state}
+          size={26}
+          className="shrink-0"
+          ariaLabel={isMastered ? "Collected" : "Not collected"}
+        />
       </PopoverTrigger>
       <PopoverContent className="flex flex-col gap-3 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
         <div className="flex flex-col gap-1">

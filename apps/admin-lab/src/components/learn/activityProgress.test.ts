@@ -18,9 +18,15 @@ test("resolveStopActivity maps question and impostor stops to exactly one study 
   assert.equal(impostor.kind === "impostor" ? impostor.item.studyItemId : null, "i2");
 });
 
-test("resolveStopActivity maps capstone stops to gem state", () => {
+test("resolveStopActivity maps capstone stops to crystal state with full growth on mastery", () => {
   const activity = resolveStopActivity(session({ mastered: true }), "n1:capstone:main");
-  assert.deepEqual(activity, { kind: "capstone", derivedNodeId: "n1", label: "Ownership", mastered: true });
+  assert.deepEqual(activity, { kind: "capstone", derivedNodeId: "n1", label: "Ownership", mastered: true, difficulty: 0, growthFraction: 1 });
+});
+
+test("resolveStopActivity carries partial crystal growth on an unmastered capstone", () => {
+  const activity = resolveStopActivity(session(), "n1:capstone:main");
+  assert.equal(activity.kind === "capstone" ? activity.mastered : null, false);
+  assert.equal(activity.kind === "capstone" ? activity.growthFraction : null, 0);
 });
 
 function session(opts: { mastered?: boolean } = {}): StudySession {
