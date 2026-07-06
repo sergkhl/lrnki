@@ -25,7 +25,7 @@ export function OptionSelectBody({
 }>) {
   const { orderedIds, byId: optionById } = useShuffledLookup(item.options, (option) => option.optionId);
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+    <section className="flex flex-col gap-4 rounded-md border border-border bg-card p-4">
       <div className="flex items-start gap-2">
         <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
         <GroundedBadge provenance={item.groundingProvenance} />
@@ -60,7 +60,7 @@ export function OptionSelectBody({
         })}
       </div>
       {result?.graded ? (
-        <div className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3 text-sm">
+        <div className="rounded-md border border-border bg-card p-3 text-sm">
           <p className="font-medium">{result.correct ? "Correct." : "Not quite."}</p>
           <p className="mt-1 text-muted-foreground">{item.explanation}</p>
         </div>
@@ -84,7 +84,7 @@ export function ImpostorBody({
 }>) {
   const { orderedIds, byId: statementById } = useShuffledLookup(item.statements, (statement) => statement.statementId);
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+    <section className="flex flex-col gap-4 rounded-md border border-border bg-card p-4">
       <div className="flex items-start gap-2">
         <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
         <GroundedBadge provenance={item.groundingProvenance} />
@@ -120,7 +120,7 @@ export function ImpostorBody({
         })}
       </div>
       {result?.graded ? (
-        <div className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3 text-sm">
+        <div className="rounded-md border border-border bg-card p-3 text-sm">
           <p className="font-medium">{result.correct ? "Correct. You spotted the fake." : "Not quite. That statement is true."}</p>
           <p className="mt-1 text-muted-foreground">{item.reveal}</p>
           {item.lieSource === "sibling" && item.siblingLabel ? (

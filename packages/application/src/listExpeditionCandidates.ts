@@ -4,6 +4,7 @@ import type {
   EnrichmentSummary,
   LearnerExpedition,
   LearnerExpeditionStorePort,
+  LessonReadStorePort,
   ResponseLogStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
@@ -24,11 +25,12 @@ export type ExpeditionCandidate = {
   readyStopCount: number;
   totalStopCount: number;
   readinessRank: number;
+  existingLearnerExpeditionId?: string;
 };
 
 export type LearnerExpeditionEntry = {
   candidates: ExpeditionCandidate[];
-  learnerExpeditions: (LearnerExpedition & { progress?: { itemsPassed: number; itemsTotal: number } })[];
+  learnerExpeditions: (LearnerExpedition & { progress?: { itemsPassed: number; itemsAttempted: number; lessonsRead: number; itemsTotal: number } })[];
 };
 
 export async function listExpeditionCandidates(input: {
@@ -37,6 +39,7 @@ export async function listExpeditionCandidates(input: {
   expeditionStore: LearnerExpeditionStorePort;
   studyItemStore?: StudyItemBankStorePort;
   responseLog?: ResponseLogStorePort;
+  lessonReadStore?: LessonReadStorePort;
   limit?: number;
 }): Promise<LearnerExpeditionEntry> {
   const [summaries, learnerExpeditions] = await Promise.all([
@@ -50,7 +53,17 @@ export async function listExpeditionCandidates(input: {
       .map(async (summary) => ({ summary, detail: await input.enrichmentRead.getDerivedGraphDetail(summary.enrichmentId) }))
   );
 
-  const candidates = details.flatMap(({ summary, detail }) => (detail ? candidateForSummary(summary, detail) : []));
+  const learnerExpeditionIdByEnrichment = new Map(
+    learnerExpeditions
+      .filter((expedition) => expedition.enrichmentId)
+      .map((expedition) => [expedition.enrichmentId!, expedition.learnerExpeditionId] as const)
+  );
+  const candidates = details
+    .flatMap(({ summary, detail }) => (detail ? candidateForSummary(summary, detail) : []))
+    .map((candidate) => ({
+      ...candidate,
+      existingLearnerExpeditionId: learnerExpeditionIdByEnrichment.get(candidate.enrichmentId)
+    }));
   candidates.sort(compareExpeditionCandidates);
 
   return {
@@ -60,7 +73,8 @@ export async function listExpeditionCandidates(input: {
       expeditions: learnerExpeditions,
       enrichmentRead: input.enrichmentRead,
       studyItemStore: input.studyItemStore,
-      responseLog: input.responseLog
+      responseLog: input.responseLog,
+      lessonReadStore: input.lessonReadStore
     })
   };
 }
@@ -71,12 +85,18 @@ async function withExpeditionProgress(input: {
   enrichmentRead: EnrichmentInspectionReadPort;
   studyItemStore?: StudyItemBankStorePort;
   responseLog?: ResponseLogStorePort;
+  lessonReadStore?: LessonReadStorePort;
 }): Promise<LearnerExpeditionEntry["learnerExpeditions"]> {
   if (!input.studyItemStore || !input.responseLog) return input.expeditions;
-  const rows = await input.responseLog.listForLearner(input.learnerStateRef);
+  const [rows, lessonReads] = await Promise.all([
+    input.responseLog.listForLearner(input.learnerStateRef),
+    input.lessonReadStore ? input.lessonReadStore.listForLearner(input.learnerStateRef) : Promise.resolve([])
+  ]);
   const latest = new Map<string, { attemptSeq: number; correct: boolean }>();
+  const attempted = new Set<string>();
   for (const row of rows) {
     if (row.signalType !== "graded" || !row.judgedOutcome) continue;
+    attempted.add(row.studyItemId);
     const prior = latest.get(row.studyItemId);
     if (prior && prior.attemptSeq >= row.attemptSeq) continue;
     latest.set(row.studyItemId, { attemptSeq: row.attemptSeq, correct: row.judgedOutcome === "correct" });
@@ -93,7 +113,11 @@ async function withExpeditionProgress(input: {
     const trailItems = trailNodeIds ? items.filter((item) => trailNodeIds.has(item.derivedNodeId)) : items;
     const itemIds = new Set(trailItems.map((item) => item.studyItemId));
     const itemsPassed = [...itemIds].filter((studyItemId) => latest.get(studyItemId)?.correct === true).length;
-    return { ...expedition, progress: { itemsPassed, itemsTotal: itemIds.size } };
+    const itemsAttempted = [...itemIds].filter((studyItemId) => attempted.has(studyItemId)).length;
+    const lessonsRead = trailNodeIds
+      ? lessonReads.filter((read) => trailNodeIds.has(read.derivedNodeId)).length
+      : lessonReads.length;
+    return { ...expedition, progress: { itemsPassed, itemsAttempted, lessonsRead, itemsTotal: itemIds.size } };
   }));
 }
 

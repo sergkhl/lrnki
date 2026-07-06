@@ -23,7 +23,8 @@ function recordingReporter() {
     async enterStage(i) { calls.push({ method: "enterStage", stage: i.stage }); },
     async recordProgress() {},
     async completeStage(i) { calls.push({ method: "completeStage", stage: i.stage, ok: i.ok }); },
-    async completeOperation(i) { calls.push({ method: "completeOperation", status: i.status }); }
+    async completeOperation(i) { calls.push({ method: "completeOperation", status: i.status }); },
+    async touch() {}
   };
   return { reporter, calls };
 }

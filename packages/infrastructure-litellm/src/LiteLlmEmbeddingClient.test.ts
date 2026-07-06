@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
+import { EmbeddingExhaustionError, LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
+import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
 // Deterministic-envelope tests for the embedding transport (U1, R2/R13). They assert
 // the SHAPE of the request/response handling — endpoint, order preservation, the
@@ -9,9 +10,8 @@ import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 // (AGENTS rule 11). `fetch` is stubbed so the test never hits a network. maxRetries: 0
 // keeps the error-path tests from sleeping through the real back-off.
 
-const originalFetch = globalThis.fetch;
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  resetLiteLlmFetchForTests();
 });
 
 function client() {
@@ -22,11 +22,11 @@ function client() {
 function stubResponse(body: unknown, status = 200): { read: () => { url: string; body: Record<string, unknown> }; calls: () => number } {
   let captured = { url: "", body: {} as Record<string, unknown> };
   let count = 0;
-  globalThis.fetch = (async (url: string, init: RequestInit) => {
+  setLiteLlmFetchForTests(async (url: string, init: LiteLlmFetchInit) => {
     count += 1;
     captured = { url, body: JSON.parse(init.body as string) as Record<string, unknown> };
     return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-  }) as unknown as typeof fetch;
+  });
   return { read: () => captured, calls: () => count };
 }
 
@@ -94,4 +94,20 @@ test("tag: no tags omits metadata entirely", async () => {
   const capture = stubResponse({ data: [{ index: 0, embedding: [0.1] }] });
   await client().embed({ model: "m", texts: ["x"] });
   assert.ok(!("metadata" in capture.read().body), "no metadata key when no tags travel");
+});
+
+test("error path: exhaustion carries the classified attempt trail; a timeout is terminal after one call", async () => {
+  let count = 0;
+  setLiteLlmFetchForTests(async () => {
+    count += 1;
+    throw Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_BODY_TIMEOUT" } });
+  });
+  // maxRetries: 2 would allow three calls — the terminal timeout must stop at one.
+  const retryingClient = new LiteLlmEmbeddingClient({ baseUrl: "http://localhost:4000", apiKey: "sk-local", timeoutMs: 5000, maxRetries: 2 });
+  await assert.rejects(() => retryingClient.embed({ model: "m", texts: ["x"] }), (error: unknown) => {
+    assert.ok(error instanceof EmbeddingExhaustionError);
+    assert.deepEqual(error.attempts.map((a) => a.kind), ["timeout"]);
+    return true;
+  });
+  assert.equal(count, 1);
 });

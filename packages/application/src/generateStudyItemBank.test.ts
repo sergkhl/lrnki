@@ -164,7 +164,8 @@ function recordingReporter(): { reporter: RunProgressReporterPort; calls: Report
       async enterStage(input) { calls.push({ method: "enterStage", stage: input.stage }); },
       async recordProgress() {},
       async completeStage(input) { calls.push({ method: "completeStage", stage: input.stage, ok: input.ok, errorDetail: input.errorDetail }); },
-      async completeOperation(input) { calls.push({ method: "completeOperation", status: input.status }); }
+      async completeOperation(input) { calls.push({ method: "completeOperation", status: input.status }); },
+      async touch() {}
     }
   };
 }

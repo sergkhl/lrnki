@@ -1,25 +1,43 @@
-import { ArrowRightIcon, CompassIcon, MapIcon, PlusIcon } from "lucide-react";
+import { ArrowRightIcon, CompassIcon, MapIcon } from "lucide-react";
 import type { ExpeditionCandidate, LearnerExpeditionEntry } from "@lrnki/application";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { cn } from "@/lib/utils";
-import { learnerTerm } from "./vocabulary";
+import { expeditionStatusLabel, learnerTerm } from "./vocabulary";
 import { chooseCandidateExpedition, setActiveExpedition, startTopicExpedition, switchLearner } from "@/app/learn/actions";
-import { ChartingProgress } from "./ChartingProgress";
-import { ChartCourseForm } from "./ChartCourseForm";
+import { GenerationProgressCard } from "./GenerationProgressCard";
+import { PlanExpeditionDialog } from "./PlanExpeditionDialog";
 import { resumeLabel } from "./resumeLabel";
+
+const EXAMPLE_TOPICS = [
+  "Game Theory",
+  "Rust ownership",
+  "Bayesian statistics",
+  "Supply chain resilience",
+  "Database indexing",
+  "Photosynthesis",
+  "Contract law basics",
+  "Climate feedback loops",
+  "Classical conditioning",
+  "Cryptographic signatures",
+  "Cellular respiration",
+  "Linear algebra intuition",
+  "Urban transit planning",
+  "Macroeconomic inflation",
+  "Distributed systems consensus",
+  "Renaissance art history"
+] as const;
 
 export function ExpeditionEntry({
   learnerStateRef,
   entry
 }: Readonly<{ learnerStateRef: string; entry: LearnerExpeditionEntry }>) {
+  const exampleTopics = pickExampleTopics(EXAMPLE_TOPICS, 4);
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <Badge variant="outline" className="w-fit border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+        <Badge variant="outline" className="w-fit border-border bg-card">
           <CompassIcon data-icon="inline-start" />
           {learnerTerm("routeName")}
         </Badge>
@@ -43,31 +61,23 @@ export function ExpeditionEntry({
       </section>
 
       <section className="grid gap-4">
-        <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+        <Card className="border-border bg-card">
           <CardHeader className="flex flex-row items-start justify-between gap-3">
             <div className="min-w-0">
               <CardTitle>Your expeditions</CardTitle>
-              <CardDescription>Ready and surveying journals for this explorer.</CardDescription>
+              <CardDescription>Ready and scouting journals for this explorer.</CardDescription>
             </div>
-            <Dialog>
-              <DialogTrigger type="button" className={cn(buttonVariants({ size: "sm" }))}>
-                <PlusIcon data-icon="inline-start" />
-                Plan a new expedition
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Plan a new expedition</DialogTitle>
-                  <DialogDescription>Start with a topic. The field is inferred before surveying begins.</DialogDescription>
-                </DialogHeader>
-                <ChartCourseForm learnerStateRef={learnerStateRef} createExpeditionAction={startTopicExpedition} />
-              </DialogContent>
-            </Dialog>
+            <PlanExpeditionDialog
+              learnerStateRef={learnerStateRef}
+              exampleTopics={exampleTopics}
+              createExpeditionAction={startTopicExpedition}
+            />
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {entry.learnerExpeditions.length === 0 ? (
               <p className="text-sm text-muted-foreground">No expeditions yet.</p>
-            ) : entry.learnerExpeditions.map((expedition) => expedition.status === "charting" || expedition.status === "failed" ? (
-              <ChartingProgress key={expedition.learnerExpeditionId} expedition={expedition} />
+            ) : entry.learnerExpeditions.map((expedition) => expedition.status === "generating" || expedition.status === "failed" ? (
+              <GenerationProgressCard key={expedition.learnerExpeditionId} expedition={expedition} />
             ) : (
               <form key={expedition.learnerExpeditionId} action={async () => {
                 "use server";
@@ -76,7 +86,7 @@ export function ExpeditionEntry({
                   learnerExpeditionId: expedition.learnerExpeditionId,
                   enrichmentId: expedition.enrichmentId
                 });
-              }} className="flex items-center gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3">
+              }} className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
                 <MapIcon />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{expedition.title}</p>
@@ -109,16 +119,10 @@ export function ExpeditionEntry({
   );
 }
 
-function expeditionStatusLabel(status: LearnerExpeditionEntry["learnerExpeditions"][number]["status"]): string {
-  if (status === "ready") return "Ready";
-  if (status === "charting") return "Surveying";
-  if (status === "failed") return "Surveying stopped";
-  return "Archived";
-}
-
 function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRef: string; candidate: ExpeditionCandidate }>) {
+  const existingLearnerExpeditionId = candidate.existingLearnerExpeditionId;
   return (
-    <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+    <Card className="border-border bg-card">
       <CardHeader>
         <Badge variant="secondary" className="w-fit">{titleCase(candidate.declaredDomain)}</Badge>
         <CardTitle className="text-xl">Expedition: {candidate.title}</CardTitle>
@@ -129,6 +133,14 @@ function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRe
       <CardContent>
         <form action={async () => {
           "use server";
+          if (existingLearnerExpeditionId) {
+            await setActiveExpedition({
+              learnerStateRef,
+              learnerExpeditionId: existingLearnerExpeditionId,
+              enrichmentId: candidate.enrichmentId
+            });
+            return;
+          }
           await chooseCandidateExpedition({
             learnerStateRef,
             enrichmentId: candidate.enrichmentId,
@@ -138,7 +150,7 @@ function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRe
         }}>
           <Button type="submit" className="w-full">
             <CompassIcon data-icon="inline-start" />
-            Begin
+            {existingLearnerExpeditionId ? learnerTerm("resumeExpedition") : learnerTerm("beginExpedition")}
           </Button>
         </form>
       </CardContent>
@@ -156,7 +168,7 @@ function titleCase(value: string): string {
 
 function NoCandidates() {
   return (
-    <Card className="md:col-span-3 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+    <Card className="md:col-span-3 border-border bg-card">
       <CardContent className="pt-6">
         <Empty>
           <EmptyHeader>
@@ -167,4 +179,12 @@ function NoCandidates() {
       </CardContent>
     </Card>
   );
+}
+
+function pickExampleTopics(topics: readonly string[], count: number): string[] {
+  return [...topics]
+    .map((topic) => ({ topic, sort: Math.random() }))
+    .sort((a, b) => a.sort - b.sort)
+    .slice(0, count)
+    .map((entry) => entry.topic);
 }

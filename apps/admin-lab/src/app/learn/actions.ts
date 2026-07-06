@@ -13,7 +13,7 @@ import {
   PostgresResponseLogStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
-import { inferDeclaredDomain, startTopicChart } from "@/lib/learnerCharting";
+import { wakeTopicGenerationSupervisor } from "@/lib/topicGenerationSupervisor";
 import { clearLearnerRefCookie } from "@/lib/learnerSession";
 
 export type LearnerGradingResult =
@@ -391,26 +391,27 @@ export async function switchLearner(): Promise<void> {
 export async function startTopicExpedition(formData: FormData): Promise<void> {
   const learnerStateRef = String(formData.get("learnerStateRef") ?? "").trim();
   const topic = String(formData.get("topic") ?? "").trim();
-  let declaredDomain = String(formData.get("declaredDomain") ?? "").trim();
   if (!learnerStateRef || !topic) return;
-  if (!declaredDomain) {
-    try {
-      declaredDomain = (await inferDeclaredDomain({ topic })).declaredDomain;
-    } catch (error) {
-      console.error("Declared Domain inference failed.", error);
-      return;
-    }
-  }
   const learnerExpeditionId = randomUUID();
   await withExpeditionStore((store) => store.upsert({
     learnerExpeditionId,
     learnerStateRef,
     kind: "topic",
     title: topic,
-    declaredDomain,
-    status: "charting",
+    declaredDomain: null,
+    status: "generating",
     active: true
   }));
-  startTopicChart({ learnerExpeditionId, topic, declaredDomain });
+  wakeTopicGenerationSupervisor();
+  revalidatePath(learnerPath());
+}
+
+export async function retryTopicExpedition(input: {
+  learnerStateRef: string;
+  learnerExpeditionId: string;
+}): Promise<void> {
+  if (!input.learnerStateRef || !input.learnerExpeditionId) return;
+  await withExpeditionStore((store) => store.resetGeneration(input));
+  wakeTopicGenerationSupervisor();
   revalidatePath(learnerPath());
 }

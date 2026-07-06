@@ -56,7 +56,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
   const inspection = await getRunInspection(runId);
   if (!inspection) {
     return (
-      <AdminShell active="runs">
+      <AdminShell active="sources">
         <Empty className="min-h-[28rem] border bg-card">
           <EmptyHeader>
             <EmptyMedia variant="icon"><FileQuestionIcon /></EmptyMedia>
@@ -64,7 +64,7 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
             <EmptyDescription>No extraction run exists for <code className="font-mono">{runId}</code>.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Link className="text-sm font-medium underline underline-offset-4" href="/admin/lab/runs">Back to runs</Link>
+            <Link className="text-sm font-medium underline underline-offset-4" href="/admin/lab/sources">Back to sources</Link>
           </EmptyContent>
         </Empty>
       </AdminShell>
@@ -76,11 +76,11 @@ export default async function RunInspectorPage({ params }: { params: Promise<{ r
   const demotedCandidates = candidates.filter((candidate) => candidate.boundaryReasonCodes.includes(CORE_DEMOTED_UNGROUNDABLE_REASON));
 
   return (
-    <AdminShell active="runs">
+    <AdminShell active="sources">
       <div className="flex flex-col gap-4">
         <Breadcrumb>
           <BreadcrumbList>
-            <BreadcrumbItem><BreadcrumbLink render={<Link href="/admin/lab/runs" />}>Runs</BreadcrumbLink></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbLink render={<Link href="/admin/lab/sources" />}>Sources</BreadcrumbLink></BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem><BreadcrumbPage>{run.sourceTitle}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>

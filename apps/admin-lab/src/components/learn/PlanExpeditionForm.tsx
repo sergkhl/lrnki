@@ -11,12 +11,16 @@ export function canPlanExpedition(topic: string): boolean {
   return topic.trim().length > 0;
 }
 
-export function ChartCourseForm({
+export function PlanExpeditionForm({
   learnerStateRef,
-  createExpeditionAction
+  createExpeditionAction,
+  exampleTopics = [],
+  onSubmitted
 }: Readonly<{
   learnerStateRef: string;
   createExpeditionAction: (formData: FormData) => Promise<void>;
+  exampleTopics?: readonly string[];
+  onSubmitted?: () => void;
 }>) {
   const [topic, setTopic] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -37,15 +41,16 @@ export function ChartCourseForm({
         if (!canSubmit) return;
         startTransition(async () => {
           await submitCreate();
+          onSubmitted?.();
         });
       }}
     >
       <input type="hidden" name="learnerStateRef" value={learnerStateRef} />
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="chart-topic">Topic</FieldLabel>
+          <FieldLabel htmlFor="generate-topic">Topic</FieldLabel>
           <Textarea
-            id="chart-topic"
+            id="generate-topic"
             name="topic"
             value={topic}
             onChange={(event) => setTopic(event.target.value)}
@@ -57,6 +62,15 @@ export function ChartCourseForm({
           <FieldDescription>One topic, learning goal, or course idea.</FieldDescription>
         </Field>
       </FieldGroup>
+      {exampleTopics.length ? (
+        <div className="flex flex-wrap gap-2" aria-label="Example topics">
+          {exampleTopics.map((example) => (
+            <Button key={example} type="button" variant="outline" size="sm" onClick={() => setTopic(example)}>
+              {example}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       <Button type="submit" disabled={isPending || !canSubmit}>
         <SparklesIcon data-icon="inline-start" />
         {isPending ? "Planning" : learnerTerm("topicDoor")}

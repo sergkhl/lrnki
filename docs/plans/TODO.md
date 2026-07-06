@@ -24,6 +24,47 @@
 
 ## COMPLETED
 
+- **Admin run visibility and Learner App UX polish.** Operations page groups running/stalled
+  operations in an always-first Active section with `N running · M stalled · K failed` header chips
+  and auto-refreshes while any run is active (shared `AutoRefresh` replaces the learner-only
+  component). The journey and bottleneck report routes are folded into the Operations page as inline
+  per-card panels driven by `?report`/`?type`/`?journey` search params (both standalone routes
+  deleted); the Run Inspector list is merged into Source Explorer as a per-source "Extraction runs"
+  table (run *detail* retained under the Sources sidebar section, list route + sidebar entry
+  deleted, `SourceInspection` gained a `runs` field, `listRunSummaries` port method removed).
+  Learner fixes: `ActivitySheet` clears its in-sheet advance memory on close (extracted to a tested
+  `advanceMemory` helper) so re-opening an earlier stop opens that stop; generating card reads
+  "Planning progress" (dead `progress` vocabulary key deleted); the expedition H1 is the learner's
+  topic with the derived summit demoted to a secondary line; crystal contrast raised via same-hue
+  hairlines, higher silhouette opacity, and a dark vista rock-face panel (geometry untouched); the
+  journal palette maps onto the shadcn semantic tokens inside the learner scope (portaled
+  sheets/dialogs/popovers carry `learn-theme`), admin lab stays stock; and Crystal Vista crystals
+  are tappable to reveal a floating concept-name chip (mastered/known-ghost only, view-only per
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)).
+
+- **Generation queue reliability, probe routing, and queued-state UX.** Expedition generation now
+  runs bounded-parallel (cap 2) behind the DB-claim seam with a visible Queued card, a single
+  staleness predicate shared by claim and fail, operation-id fencing with a 30s heartbeat, a unified
+  transient-vs-terminal error classification (network/5xx/429/timeout release the claim to the
+  attempt budget; schema/no-concept failures fail immediately), a `failed`-only `resetGeneration`
+  guard, and a shared transport retry helper/dispatcher. Header/body timeouts are terminal at the
+  transport. The knowledge-boundary probe alias deny-lists Google (Vertex 400s on forced
+  tool_choice) and gains a LiteLLM ordered fallback to a small cross-family model
+  (`qwen/qwen3-30b-a3b-instruct-2507`) so a sustained Groq rate-limit no longer stalls generation.
+  Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) and
+  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+
+- **Expedition planning durability and entry UX.** Topic-expedition generation now starts as a
+  durable learner expedition row and is completed by the Admin Lab supervisor through claimed
+  `generating` work, stale-operation relaunch, bounded failure, and manual retry. `/learn` uses a
+  one-step Plan expedition dialog with example chips, one themed Scouting progress surface, immediate
+  return after submit, and Begin/Resume labels that account for lesson reads as well as answered
+  items. LiteLLM transport now uses an undici dispatcher with the production 300s header timeout, and
+  synthetic generation infers Declared Domain during generation instead of requiring it at entry.
+  Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md),
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md), and
+  [ADR-0033](../adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md).
+
 - **Growing crystals and Crystal Vista.** Per-concept procedural growing crystals now replace the
   gem icon across the learner trail, with deterministic crystal geometry, facet-by-facet growth for
   mastered activity segments, skipped-known ghost crystals, section-divider and overview strips, and
@@ -58,7 +99,7 @@
 - **Adaptive sectioned expedition trail and game-honesty pass.** The Study Session projection is now
   layer-wide and sectioned: milestone-anchored sections over the whole floored Derived Graph Layer,
   ordered easiest-first, with the summit derived at read time (the last section's milestone). The
-  persisted expedition target column and its ready CHECK are deleted; expeditions chart/ensure and
+  persisted expedition target column and its ready CHECK are deleted; expeditions generate/ensure and
   offer one Begin candidate per enrichment, and every learner-facing count derives from the shared
   trail scope. A node masters only when its lesson is read and every activity segment is
   latest-correct (one rule for gating, gem, and per-stop visuals). The learner trail renders sections
@@ -100,19 +141,19 @@
   [brainstorm](../brainstorms/2026-07-04-learner-trail-polish-requirements.md). Decision:
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-- **Learner App checkpoint trail, activity sheet, and charting onboarding.** `/learn` now centers
+- **Learner App checkpoint trail, activity sheet, and generation onboarding.** `/learn` now centers
   the learner expedition on a Duolingo-style per-item checkpoint path, with fog display and per-item
   completion derived from Study Session state, one stop opening one full-screen activity sheet with a
   single primary footer action, opaque learner surfaces, headed lesson sections, icon-only grounded
-  provenance, concept-level skip popovers, topic-first charting with editable inferred Declared
-  Domain, fiction-voiced charting stage copy, and an Admin Lab door that ensures a playable `admin`
+  provenance, concept-level skip popovers, topic-first generation with editable inferred Declared
+  Domain, fiction-voiced generation stage copy, and an Admin Lab door that ensures a playable `admin`
   expedition before redirecting. Requirements:
   [brainstorm](../brainstorms/2026-07-04-learner-app-map-center-ux-requirements.md). Decision:
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Learner App expedition entry surface.** `/learn` is now the learner-facing expedition entry:
   readiness-ranked expedition entry, learner-owned expedition persistence, active selection, playable
-  trail/activity screen over `getStudySession`, a learner-entered course-data charting door, and
+  trail/activity screen over `getStudySession`, a learner-entered course-data generation door, and
   progress/failure cards over ADR-0029 timelines. It supersedes the earlier Quest Subgraph Admin Lab
   study surface; that milestone's target recommendations, trusted prerequisite cones, and stateful
   Learner Path ladder live on as the application projections serving this route. The superseded
@@ -168,8 +209,58 @@
 
 ## VALIDATION
 
+- **Admin run visibility and Learner App UX polish, 2026-07-06.** Deterministic envelope: workspace
+  `typecheck` exit 0 (stale `.next/types` cleared for the deleted routes); recursive `test` exit 0
+  with `.env` loaded (admin-lab 122, incl. new `advanceMemory` stale-stop regression + vista
+  `labelChipFor`/`isNameableCrystal` tests); `lint` 0 errors (6 pre-existing warnings); production
+  build exit 0 with `/admin/lab/runs`, `/operations/bottleneck`, `/operations/journey` gone from the
+  route list. **Real-use gate (rule 14): PASS.** 390px + desktop browser pass: Operations page shows
+  Active (5) first with "5 running · 3 stalled · 137 failed" chips and a `stalled?` badge, re-polls
+  live without reload, and renders bottleneck/journey reports inline on their card; deleted routes
+  404; Sources shows a per-source Extraction runs table opening the retained run detail; re-clicking
+  an advanced-from stop reopens that stop; a live generating card reads "Planning progress 8 / 11";
+  the header H1 is "Bayesian statistics" with "Summit: Markov chain Monte Carlo" demoted; crystals
+  render on a dark vista rock face with hairline-outlined shards; learner buttons are trail-green
+  (themed tokens); tapping the known-ghost "Ownership" crystal shows its name chip and toggles off.
+  Evidence: `tmp/2026-07-06-admin-learner-polish-gate/` (screenshots + `evidence.md`). Caveat: the
+  vista chip check used a DB-seeded `known` verdict because the automated skip-known click did not
+  persist for that node; the skip-known flow itself is unchanged by this pass.
+
+- **Generation queue reliability, probe routing, and queued-state UX, 2026-07-06.** Deterministic
+  envelope: full workspace `typecheck` exit 0; recursive `test` exit 0 with `.env` loaded (0
+  failures — admin-lab 118 incl. new queued-card/progress-denominator/fence tests, application,
+  infrastructure-litellm incl. shared retry/terminal-timeout, infrastructure-postgres DB-backed
+  predicate/fence/guard tests); `lint` 0 errors (6 pre-existing warnings); `@lrnki/admin-lab`
+  production build exit 0. **Real-use gate (rule 14): PASS.** Three fresh topics (Nash Equilibrium
+  Basics, Fourier Series, Enzyme Kinetics) submitted at once under one learner: the concurrency cap
+  held at 2 (two Scouting cards + one distinct **Queued** card confirmed in a 390px browser pass —
+  "Your expedition is in line… Waiting for a scout"), a transient Groq 429 released a claim to the
+  attempt budget without failing, the `resetGeneration` failed-only guard re-queued cleanly, and
+  **all three reached `ready`** with real content (Game Theory 12 lessons/30 items, Biochemistry
+  19/43, Mathematics 8/18). The probe alias logged **0 Vertex 400s**; the added qwen3-30b fallback
+  gave 10/10 probe availability through a flaky Groq window. Defect found and fixed during the gate:
+  `require_parameters: true` over-restricted probe routing to Groq alone (frequently 429) and still
+  allowed a Vertex 400 fallback — replaced with an explicit Google provider deny-list plus the
+  ordered probe fallback. Evidence: `tmp/2026-07-06-generation-queue-gate/rule14-evidence.md` and
+  `queued-vs-scouting-390.png`.
+
+- **Expedition planning durability and entry UX, 2026-07-06.** Deterministic envelope:
+  `@lrnki/infrastructure-postgres` typecheck and DB-backed test suite green (63 tests, `.env`
+  loaded), full workspace `typecheck` exit 0, full recursive `test` exit 0 with `.env` loaded, full
+  workspace `lint` exit 0 with 6 pre-existing warnings, and `@lrnki/admin-lab` production build exit
+  0. **Real-use gate (rule 14): PASS with caveats.** Browser and DB inspection over real generated
+  topics proved instant submit, Scouting progress, failed-card Retry, stale-operation relaunch after
+  dev-server kill/restart, manual retry to ready, ready desktop/mobile `/learn` rendering, and
+  lesson-read-only Resume. Final real rows: Game Theory ready with 16 lessons and 35 study items;
+  Bayesian Statistics ready after relaunch/retry with 29 study items. Defects found and fixed during
+  the gate: undici dispatcher mismatch with global fetch, claim SQL ambiguity and nullable-join
+  locking, insufficient intrinsic-difficulty corrective retry budget, and retry active-row
+  unique-index handling. Caveats: one intermittent LiteLLM 400 failed the first Game Theory attempt
+  before Retry succeeded; a stale Next dev server-action id appeared only after live code edits and
+  cleared with dev-server restart. Evidence: `tmp/2026-07-06-expedition-durability-gate/`.
+
 - **Learner App UX polish pass, 2026-07-06.** Deterministic envelope: `@lrnki/admin-lab` test suite
-  green (113 tests including chartingProgress, matchingProgress, resumeLabel, skipped-known trail and
+  green (113 tests including generationProgress, matchingProgress, resumeLabel, skipped-known trail and
   vista coverage), `@lrnki/admin-lab` typecheck exit 0, `@lrnki/application` typecheck exit 0,
   `@lrnki/application` test suite green (466 tests), root ESLint exit 0 with 6 pre-existing warnings,
   and `@lrnki/admin-lab` production build exit 0 with `/learn`, `/learn/expedition/[enrichmentId]`,
@@ -182,7 +273,7 @@
   matching stayed at `3 of 4 matched` with no graded result; real known-skip UI changed from Ready to
   "Known ground" and exposed "Un-mark known." Defects found and fixed during the gate: server-action
   form data/cookie path replaced with `/learn/session`, absolute redirect host mismatch, DialogTrigger
-  hydration mismatch, stale "Charting produced no concepts" persisted failure copy, and skipped-known
+  hydration mismatch, stale "Generation produced no concepts" persisted failure copy, and skipped-known
   popover copy saying Collected. Evidence: `tmp/2026-07-06-learner-ux/`.
 
 - **Growing crystals and Crystal Vista, 2026-07-06.** Deterministic envelope: full workspace
@@ -288,10 +379,10 @@
   Journal route returned 404, theory Continue persisted a lesson read, one-tap grading persisted a
   response and showed explanation feedback, 390px mobile had no horizontal overflow, and concept
   popovers remained opaque/readable. Caveat: Playwright observed one React hydration warning on form
-  control styling in the charting form, outside this trail flow. **Result: PASS.** Screenshots and
+  control styling in the generation form, outside this trail flow. **Result: PASS.** Screenshots and
   report: `tmp/learner-trail-polish/`.
 
-- **Learner App checkpoint trail, activity sheet, and charting onboarding, 2026-07-04.**
+- **Learner App checkpoint trail, activity sheet, and generation onboarding, 2026-07-04.**
   Deterministic envelope: `pnpm run check` exit 0 (full workspace typecheck, recursive tests, ESLint
   with 2 pre-existing warnings, and Admin Lab production build). Focused checks also passed:
   `@lrnki/admin-lab` tests/typecheck, `@lrnki/application` tests, and
@@ -313,12 +404,12 @@
   with `.env` loaded. Reference sweep over `apps`, `packages`, and `scripts` found no remaining
   `/admin/lab/study`, `components/study`, `lib/studySession`, or `lib/calibrationSession`
   references; a focused learner/admin-lab sweep found no remaining PDF upload, learner Docling, or
-  source-charting path. Review hardening fixed active-expedition idempotency, per-learner enrichment
-  uniqueness, operation-type-scoped progress reads, charting auto-refresh, caught background charting
+  source-generation path. Review hardening fixed active-expedition idempotency, per-learner enrichment
+  uniqueness, operation-type-scoped progress reads, generation auto-refresh, caught background generation
   failures, learner-facing failure-message sanitization, ready-expedition validation on study
   actions, and activity progression that keeps a stop active until this learner answers all its
   activities. **Real-use quality evaluation:** with DeepSeek balance restored, the learner
-  course-data charting path ran through production aliases under the $0.50/M output cap and produced
+  course-data generation path ran through production aliases under the $0.50/M output cap and produced
   a ready expedition for enrichment `26c04779-f807-46f5-a63b-004e5ca88b3f`: 10 derived nodes, 10
   lessons, 19 current study items, succeeded enrichment and study-item timelines, and a live
   `getStudySession` projection with a 4-step path, selected frontier, and 2 first-frontier activity

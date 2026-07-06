@@ -38,3 +38,4 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0030 — Knowledge-boundary synthesis gate](./0030-confidence-gated-synthesis-with-web-grounding.md)
 - [0031 — Concept Lesson teaching substrate](./0031-concept-lesson-teaching-substrate.md)
 - [0032 — Mastery-aligned Game UX for the Learner App](./0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)
+- [0033 — Plain identifiers with themed learner vocabulary](./0033-plain-identifiers-single-themed-vocabulary-mapping.md)

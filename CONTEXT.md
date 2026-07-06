@@ -175,7 +175,7 @@ A milestone-anchored contiguous stretch of the Expedition Trail. A section ancho
 concept (no dependents on the trusted contracted edge set) and claims all its not-yet-claimed
 trusted ancestors, so every prerequisite lands in the earliest section needing it. Sections are
 ordered easiest-first (ascending mean difficulty); their concatenation is a topological order of the
-whole floored layer. Sections are derived at charting, never persisted.
+whole floored layer. Sections are derived during generation, never persisted.
 _Avoid_: quest, goal cone, chapter, persisted section
 
 **Learner App**:

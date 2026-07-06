@@ -3,6 +3,10 @@ import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
 import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { ZodError, type ZodType } from "zod";
+import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
+import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } from "./liteLlmRetry";
+
+export { LiteLlmHttpError } from "./liteLlmRetry";
 
 installNodeOperationTagContext();
 
@@ -14,12 +18,15 @@ type LiteLlmResponse = {
 };
 
 export class LiteLlmForcedToolClient {
+  private readonly dispatcher;
   // `temperature`/`seed` are the determinism lever (TODO 1). When set, every
   // forced-tool call samples greedily with a fixed seed so the neural stages
   // (discovery/admission/claims) stop drifting across re-runs. Left unset, the
   // client stays a neutral transport at the model's default sampling — the
   // composition root chooses the policy, not this transport.
-  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number; temperature?: number; seed?: number }) {}
+  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number; temperature?: number; seed?: number }) {
+    this.dispatcher = createLiteLlmDispatcher(options.timeoutMs);
+  }
 
   async call<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[]; maxRetries?: number }): Promise<T> {
     // Retry budget for transient model deviations (zero/multiple tool calls,
@@ -28,34 +35,27 @@ export class LiteLlmForcedToolClient {
     // lets one stage tighten the budget (e.g. ordering: first call + one corrective
     // re-prompt); otherwise fall back to the constructor value. Fail closed once exhausted.
     const maxRetries = input.maxRetries ?? this.options.maxRetries ?? 2;
-    let lastError: unknown;
-    // Per-attempt redacted failure trail (ADR-0006 fail-closed, made inspectable). On
-    // exhaustion this rides out on the thrown error so the operator timeline can show WHY
-    // a stage failed. Captured here at the model-output boundary — the same rule-6 seam
-    // that strips NUL bytes — so no schema value or unbounded blob escapes.
-    const attempts: ForcedToolFailureAttempt[] = [];
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await this.callOnce(input);
-      } catch (error) {
-        lastError = error;
-        attempts.push(classifyForcedToolFailure(attempt, error));
-        if (attempt < maxRetries) {
-          // Rate limits (429) need a real cooldown window, not a 500ms blip —
-          // back off exponentially and longer than for ordinary deviations.
-          const status = error instanceof LiteLlmHttpError ? error.status : undefined;
-          const base = status === 429 ? 2000 : 500;
-          await delay(base * 2 ** attempt);
-        }
+    // The shared transport loop owns backoff (429 cooldown vs ordinary blips), the
+    // per-attempt redacted failure trail (ADR-0006 fail-closed, made inspectable),
+    // and terminal timeout classification (a timed-out call may have completed
+    // server-side — never blind-retried here; the supervisor's attempt budget owns
+    // re-runs). The trail rides out on the thrown error so the operator timeline
+    // can show WHY a stage failed.
+    return runWithTransportRetries({
+      maxRetries,
+      attemptOnce: (_attempt, previousAttempt) =>
+        this.callOnce({ ...input, messages: buildRetryMessages(input.messages, previousAttempt) }),
+      classify: classifyForcedToolFailure,
+      onExhausted: (attempts, lastError) => {
+        throw new ForcedToolExhaustionError(input.toolName, input.model, attempts, lastError);
       }
-    }
-    throw new ForcedToolExhaustionError(input.toolName, input.model, attempts, lastError);
+    });
   }
 
   private async callOnce<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }): Promise<T> {
     const operationTag = currentOperationTag();
     const tags = [...(input.tags ?? []), ...(operationTag ? [operationTag] : [])];
-    const response = await fetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/chat/completions`, {
+    const response = await liteLlmFetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/chat/completions`, withLiteLlmDispatcher({
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },
       signal: AbortSignal.timeout(this.options.timeoutMs),
@@ -70,7 +70,7 @@ export class LiteLlmForcedToolClient {
         // `LiteLLM_SpendLogs`. The transport only labels requests; it never owns usage.
         ...(tags.length ? { metadata: { tags } } : {})
       })
-    });
+    }, this.dispatcher));
     if (!response.ok) throw new LiteLlmHttpError(response.status);
     const payload = await response.json() as LiteLlmResponse;
     const calls = (payload.choices?.[0]?.message?.tool_calls ?? []).filter((call) => call?.function?.name === input.toolName);
@@ -160,17 +160,6 @@ export class ForcedToolExhaustionError extends Error implements StageErrorReport
   }
 }
 
-export class LiteLlmHttpError extends Error {
-  constructor(readonly status: number) {
-    super(`LiteLLM request failed with ${status}.`);
-    this.name = "LiteLlmHttpError";
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // Cap for a redacted arguments snippet — bounded so an operator sees the shape of the
 // malformed output without persisting an unbounded blob.
 const SNIPPET_CAP = 500;
@@ -182,11 +171,30 @@ function redactArgumentSnippet(argumentsText: string): string {
   return cleaned.length > SNIPPET_CAP ? `${cleaned.slice(0, SNIPPET_CAP)}…[truncated]` : cleaned;
 }
 
+function buildRetryMessages(messages: ToolMessage[], previousAttempt: ForcedToolFailureAttempt | undefined): ToolMessage[] {
+  if (!previousAttempt || (previousAttempt.kind !== "schema_invalid" && previousAttempt.kind !== "invalid_json")) return messages;
+  const issueLine = previousAttempt.kind === "schema_invalid" && previousAttempt.schemaIssuePaths?.length
+    ? `Violated schema paths: ${previousAttempt.schemaIssuePaths.join(", ")}.`
+    : "The previous tool arguments were not valid JSON.";
+  return [
+    ...messages,
+    {
+      role: "assistant",
+      content: `Previous tool arguments, redacted and truncated for correction: ${previousAttempt.redactedSnippet ?? "[unavailable]"}`
+    },
+    {
+      role: "user",
+      content: `${issueLine} Return exactly one valid ${"forced tool"} call that satisfies the provided schema.`
+    }
+  ];
+}
+
 // Classify one caught forced-tool failure into a redacted, serializable attempt record.
 // Schema-invalid attempts carry the violated PATHS (never the offending values) plus a
 // bounded redacted snippet of the arguments; invalid JSON carries the snippet only.
 function classifyForcedToolFailure(attempt: number, error: unknown): ForcedToolFailureAttempt {
-  if (error instanceof LiteLlmHttpError) return { attempt, kind: "http", status: error.status };
+  const transport = classifyTransportFailure(attempt, error);
+  if (transport) return transport;
   if (error instanceof ForcedToolNoCallError) return { attempt, kind: "no_tool_call" };
   if (error instanceof ForcedToolNoArgumentsError) return { attempt, kind: "no_arguments" };
   if (error instanceof ForcedToolInvalidJsonError) {

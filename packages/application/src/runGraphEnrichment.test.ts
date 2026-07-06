@@ -36,7 +36,8 @@ function recordingReporter() {
     async enterStage(i) { calls.push(`enter:${i.stage}`); },
     async recordProgress(i) { calls.push(`progress:${i.stage}:${i.done}`); },
     async completeStage(i) { calls.push(`complete:${i.stage}:${i.ok}`); },
-    async completeOperation(i) { calls.push(`done:${i.status}`); }
+    async completeOperation(i) { calls.push(`done:${i.status}`); },
+    async touch() {}
   };
   return { reporter, calls };
 }

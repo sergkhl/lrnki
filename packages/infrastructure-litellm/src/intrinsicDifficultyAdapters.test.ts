@@ -103,7 +103,7 @@ test("bandDomainSet renders the numbered menu, bounds the call, and returns numb
   const call = calls[0] as { model: string; toolName: string; maxRetries: number; messages: { content: string }[] };
   assert.equal(call.model, "mock-difficulty-judge");
   assert.equal(call.toolName, "submit_difficulty_bands");
-  assert.equal(call.maxRetries, 1);
+  assert.equal(call.maxRetries, 2);
   assert.ok(call.messages.some((message) => message.content.includes("Concept 1: \"Example Concept\"")));
   assert.ok(call.messages.some((message) => message.content.includes("Concept 2: \"Second Concept\"")));
   assert.ok(call.messages.some((message) => message.content.includes("A concise definition explains Example Concept.")));

@@ -37,6 +37,7 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     nonLlm(NON_LLM_STAGES.persist)
   ],
   enrichment: [
+    llm(STAGE_TAGS.declaredDomainInference),
     llm(STAGE_TAGS.prerequisiteOrdering),
     llm(STAGE_TAGS.rescueDurability),
     llm(STAGE_TAGS.rescueDefinitionQuality),

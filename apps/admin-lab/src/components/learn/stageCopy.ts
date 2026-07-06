@@ -37,5 +37,5 @@ const STAGE_COPY: Record<string, string> = {
 };
 
 export function stageCopy(stage: string): string {
-  return STAGE_COPY[stage] ?? "Surveying the trail";
+  return STAGE_COPY[stage] ?? "Scouting the trail";
 }

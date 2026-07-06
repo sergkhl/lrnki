@@ -1,6 +1,7 @@
 import { listExpeditionCandidates } from "@lrnki/application";
 import {
   PostgresEnrichmentInspectionRead,
+  PostgresLessonReadStore,
   PostgresLearnerExpeditionStore,
   PostgresResponseLogStore,
   PostgresStudyItemBankStore,
@@ -21,7 +22,8 @@ async function loadEntry(learnerStateRef: string) {
       enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
       expeditionStore: new PostgresLearnerExpeditionStore(sql),
       studyItemStore: new PostgresStudyItemBankStore(sql),
-      responseLog: new PostgresResponseLogStore(sql)
+      responseLog: new PostgresResponseLogStore(sql),
+      lessonReadStore: new PostgresLessonReadStore(sql)
     });
   } finally {
     await sql.end({ timeout: 5 });

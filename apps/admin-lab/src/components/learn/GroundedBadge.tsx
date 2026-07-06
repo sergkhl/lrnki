@@ -27,7 +27,7 @@ export function GroundedBadge({
       <PopoverContent
         side="bottom"
         align="end"
-        className="w-auto border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-3 py-2 text-sm"
+        className="w-auto border-border bg-card px-3 py-2 text-sm"
       >
         {label}
       </PopoverContent>

@@ -35,6 +35,9 @@ export function CrystalGlyph({
   const grownIndexes = new Set(grown.map((shard) => shard.revealIndex));
   const fillFor = (shard: CrystalShard) =>
     `hsl(${spec.hue} ${CRYSTAL_SATURATION}% ${state === "mastered" ? shard.lightness + 8 : shard.lightness}%)`;
+  // Same-hue darker hairline: separates grown facets from the near-white journal
+  // paper without touching the fill palette (contrast fix, task 6).
+  const strokeFor = (shard: CrystalShard) => `hsl(${spec.hue} ${CRYSTAL_SATURATION}% ${Math.max(0, shard.lightness - 18)}%)`;
   // Shards scale up from the bedrock anchor, not the box center.
   const growFromBase = { transformOrigin: `${CRYSTAL_BASE.x}px ${CRYSTAL_BASE.y}px`, transformBox: "view-box" } as const;
 
@@ -56,7 +59,7 @@ export function CrystalGlyph({
             key={shard.revealIndex}
             points={toPoints(shard)}
             fill="var(--journal-fog)"
-            opacity={state === "locked" ? 0.4 : 0.16}
+            opacity={state === "locked" ? 0.55 : 0.3}
           />
         )
       )}
@@ -67,6 +70,8 @@ export function CrystalGlyph({
             key={shard.revealIndex}
             points={toPoints(shard)}
             fill={fillFor(shard)}
+            stroke={strokeFor(shard)}
+            strokeWidth={1}
             style={growFromBase}
             initial={{ opacity: 0, scale: 0.2 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -77,9 +82,9 @@ export function CrystalGlyph({
             key={shard.revealIndex}
             points={toPoints(shard)}
             fill={ghost ? "transparent" : fillFor(shard)}
-            stroke={ghost ? `hsl(${spec.hue} ${CRYSTAL_SATURATION}% ${shard.lightness + 6}%)` : undefined}
-            strokeWidth={ghost ? 2 : undefined}
-            opacity={ghost ? 0.5 : undefined}
+            stroke={ghost ? `hsl(${spec.hue} ${CRYSTAL_SATURATION}% ${shard.lightness - 4}%)` : strokeFor(shard)}
+            strokeWidth={ghost ? 2.5 : 1}
+            opacity={ghost ? 0.65 : undefined}
           />
         )
       )}

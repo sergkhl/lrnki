@@ -15,10 +15,6 @@ async function withInspectionRead<T>(fn: (read: PostgresInspectionRead) => Promi
   }
 }
 
-export function listRuns() {
-  return withInspectionRead((read) => read.listRunSummaries());
-}
-
 export function getRunInspection(runId: string) {
   return withInspectionRead((read) => read.getRunInspection(runId));
 }

@@ -6,7 +6,7 @@ import { learnerTerm } from "./vocabulary";
 
 export function LearnerNameGate() {
   return (
-    <Card className="w-full max-w-md border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+    <Card className="w-full max-w-md border-border bg-card">
       <CardHeader>
         <CardTitle>{learnerTerm("routeName")}</CardTitle>
         <CardDescription>Enter the name on your learning link.</CardDescription>

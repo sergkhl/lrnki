@@ -61,7 +61,8 @@ function recordingReporter(): RunProgressReporterPort & {
     async completeOperation(input) {
       events.push(`operation:${input.status}`);
       operations.push(input.status);
-    }
+    },
+    async touch() { events.push("touch"); }
   };
 }
 
@@ -163,7 +164,8 @@ test("runInstrumentedOperation does not rewrite a success-completion reporter fa
     async completeOperation(input) {
       operations.push(input.status);
       if (input.status === "succeeded") throw new Error("could not mark succeeded");
-    }
+    },
+    async touch() {}
   };
 
   await assert.rejects(

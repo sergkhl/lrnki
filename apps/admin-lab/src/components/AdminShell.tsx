@@ -7,8 +7,7 @@ import {
   EyeIcon,
   GitForkIcon,
   GraduationCapIcon,
-  NetworkIcon,
-  SearchCodeIcon
+  NetworkIcon
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,7 +31,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const VIEWS = [
   { key: "graph", label: "Graph Explorer", href: "/admin/lab", icon: GitForkIcon },
-  { key: "runs", label: "Run Inspector", href: "/admin/lab/runs", icon: SearchCodeIcon },
   { key: "sources", label: "Source Explorer", href: "/admin/lab/sources", icon: DatabaseIcon },
   { key: "enrichments", label: "Enrichment Runs", href: "/admin/lab/enrichments", icon: NetworkIcon },
   { key: "learner-loop", label: "Learner Loop", href: "/admin/lab/learner-loop", icon: GraduationCapIcon },

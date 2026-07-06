@@ -434,7 +434,7 @@ export interface IntrinsicDifficultyJudgmentPort {
   compareHarder(input: { declaredDomain: string; first: DifficultyNodeContext; second: DifficultyNodeContext }): Promise<{ harder: "first" | "second" }>;
 }
 
-// Declared-domain inference (Learner charting). ONE forced-tool call maps a
+// Declared-domain inference (Learner generation). ONE forced-tool call maps a
 // learner's topic phrase to a short field-of-study label before the learner can
 // confirm or edit it. The learner-facing workflow owns confirmation; this port
 // only supplies the initial domain guess and fails closed on malformed output.
@@ -492,23 +492,25 @@ export interface EnrichmentRunStorePort {
 
 // Learner Expedition persistence (Learner App v1). This is learner-owned mutable
 // routing state only: it remembers which expedition rows belong to a learner and
-// which charting operation is in flight. Study readiness, mastery, and rewards
+// which generation operation is in flight. Study readiness, mastery, and rewards
 // remain derived from existing learner-neutral projections.
 export type LearnerExpeditionKind = "topic";
-export type LearnerExpeditionStatus = "charting" | "ready" | "failed";
+export type LearnerExpeditionStatus = "generating" | "ready" | "failed";
 
 export interface LearnerExpedition {
   learnerExpeditionId: string;
   learnerStateRef: string;
   kind: LearnerExpeditionKind;
   title: string;
-  declaredDomain: string;
+  declaredDomain: string | null;
   status: LearnerExpeditionStatus;
   currentOperationId: string | null;
   currentOperationType: OperationType | null;
   enrichmentId: string | null;
   active: boolean;
   failureMessage: string | null;
+  generationAttempts: number;
+  claimedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -518,7 +520,7 @@ export interface NewLearnerExpedition {
   learnerStateRef: string;
   kind: LearnerExpeditionKind;
   title: string;
-  declaredDomain: string;
+  declaredDomain: string | null;
   status: LearnerExpeditionStatus;
   currentOperationId?: string | null;
   currentOperationType?: OperationType | null;
@@ -533,14 +535,24 @@ export interface LearnerExpeditionStorePort {
   getForLearner(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<LearnerExpedition | undefined>;
   getByEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<LearnerExpedition | undefined>;
   setActive(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
+  claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<LearnerExpedition | undefined>;
+  failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number; failureMessage: string }): Promise<number>;
+  resetGeneration(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
+  // Fenced worker write (lease + fencing token): the claim clears the operation id,
+  // and every generation write must state the operation id it EXPECTS to own
+  // (`null` before the run's first write, its own enrichment id after). A write whose
+  // expectation no longer holds affects 0 rows — the returned count tells a stale
+  // worker it lost the claim and must stop spending.
   updateProgress(input: {
     learnerExpeditionId: string;
+    expectedOperationId: string | null;
     status?: LearnerExpeditionStatus;
     currentOperationId?: string | null;
     currentOperationType?: OperationType | null;
     enrichmentId?: string | null;
+    declaredDomain?: string | null;
     failureMessage?: string | null;
-  }): Promise<void>;
+  }): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -798,12 +810,14 @@ export interface SourceInspection {
   parserName: string;
   parserVersion: string;
   blocks: { blockId: string; blockType: string; headingPath: string[]; text: string }[];
+  // This source's extraction runs, newest first — the door to the run detail view.
+  runs: { runId: string; status: string; degraded: boolean; latencyMs: number | null; startedAt: string }[];
 }
 
-// Run Inspector read surface: list summaries + one run's full inspection. Returns
-// `undefined` only for not-found; real DB errors propagate (ADR-0027 decision 5).
+// Run inspection read surface: one run's full inspection (the run list lives on its
+// source's SourceInspection). Returns `undefined` only for not-found; real DB errors
+// propagate (ADR-0027 decision 5).
 export interface RunInspectionReadPort {
-  listRunSummaries(): Promise<RunSummary[]>;
   getRunInspection(runId: string): Promise<RunInspection | undefined>;
 }
 
@@ -1009,6 +1023,8 @@ export type OperationType = "extraction" | "minting" | "enrichment" | "study_ite
 // arguments text bounded, control-char-stripped, and truncated.
 export type ForcedToolFailureKind =
   | "http"
+  | "network"
+  | "timeout"
   | "no_tool_call"
   | "no_arguments"
   | "invalid_json"
@@ -1019,6 +1035,7 @@ export interface ForcedToolFailureAttempt {
   attempt: number;
   kind: ForcedToolFailureKind;
   status?: number;
+  code?: string;
   schemaIssuePaths?: string[];
   redactedSnippet?: string;
 }
@@ -1059,6 +1076,10 @@ export interface RunProgressReporterPort {
   completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean; errorDetail?: StageErrorDetail }): Promise<void>;
   // Set the parent's terminal status + completed_at.
   completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void>;
+  // Liveness heartbeat: bump only last_progress_at on the open parent row. Driven on
+  // an interval by the operation lifecycle wrapper so a healthy run inside one long
+  // LLM call is never mistaken for a dead one by the stale-claim predicate.
+  touch(input: { operationType: OperationType; operationId: string }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

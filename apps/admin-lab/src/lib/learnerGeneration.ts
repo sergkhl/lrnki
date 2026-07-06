@@ -1,5 +1,5 @@
 import {
-  chartTopicExpedition,
+  generateTopicExpedition,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
   STUDY_ITEM_BANK_CONFIG_HASH
@@ -22,7 +22,6 @@ import {
   LiteLlmStudyItemGenerationAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
-  createDatabaseClient,
   PostgresConceptLessonStore,
   PostgresEnrichmentRunStore,
   PostgresGraphVersionStore,
@@ -30,6 +29,7 @@ import {
   PostgresRunProgressReporter,
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
+import type { DatabaseClient } from "./topicGenerationSupervisor";
 
 function baseClientConfig() {
   return {
@@ -39,8 +39,7 @@ function baseClientConfig() {
   };
 }
 
-function buildContext() {
-  const sql = createDatabaseClient();
+function buildContext(sql: DatabaseClient) {
   const baseClient = baseClientConfig();
   const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
   const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
@@ -49,11 +48,11 @@ function buildContext() {
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   return {
-    sql,
     graphStore,
     enrichmentStore,
     runProgressReporter,
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
+    declaredDomainInference: new LiteLlmDeclaredDomainInferenceAdapter(deterministicClient),
     conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
     knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
@@ -71,24 +70,18 @@ function buildContext() {
   };
 }
 
-export async function inferDeclaredDomain(input: { topic: string }): Promise<{ declaredDomain: string }> {
-  const client = new LiteLlmForcedToolClient({ ...baseClientConfig(), temperature: 0, seed: 7 });
-  return new LiteLlmDeclaredDomainInferenceAdapter(client).infer(input);
-}
-
-export function startTopicChart(input: {
+// `sql` is the supervisor's shared pool — this run borrows it and never closes it.
+export async function generateLearnerTopicExpedition(input: {
   learnerExpeditionId: string;
   topic: string;
-  declaredDomain: string;
-}): void {
-  const ctx = buildContext();
-  // Admin Lab runs as a long-lived Node process in development/demo deployments. If this
-  // route moves to request-scoped hosting, replace this background promise with a durable
-  // queue or platform wait-until primitive so charting cannot be cancelled at response end.
-  void chartTopicExpedition({
+  declaredDomain: string | null;
+}, sql: DatabaseClient): Promise<void> {
+  const ctx = buildContext(sql);
+  await generateTopicExpedition({
     learnerExpeditionId: input.learnerExpeditionId,
     topic: input.topic,
     declaredDomain: input.declaredDomain,
+    declaredDomainInference: ctx.declaredDomainInference,
     expeditionStore: ctx.expeditionStore,
     conceptSetSynthesis: ctx.conceptSetSynthesis,
     knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
@@ -106,9 +99,5 @@ export function startTopicChart(input: {
     studyItemBankStore: ctx.studyItemBankStore,
     configHash: STUDY_ITEM_BANK_CONFIG_HASH,
     reporter: ctx.runProgressReporter
-  }).catch((error: unknown) => {
-    console.error("Learner topic chart failed.", error);
-  }).finally(() => {
-    void ctx.sql.end({ timeout: 5 });
   });
 }

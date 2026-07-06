@@ -38,6 +38,7 @@ catalog:
   cytoscape: 3.33.4
   '@types/cytoscape': 3.21.9
   playwright: ^1.60.0
+  undici: ^8.7.0
 
 allowBuilds:
   esbuild: true

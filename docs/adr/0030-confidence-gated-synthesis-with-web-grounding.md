@@ -6,7 +6,11 @@ Status: Accepted
 
 Before a model synthesizes world-knowledge content for a concept it cannot cite to a curated
 source, probe whether the concept is core model knowledge. A dedicated small-parameter LiteLLM alias,
-separate from the synthesizing model and cross-family from it, runs the probe cheaply.
+separate from the synthesizing model and cross-family from it, runs the probe cheaply. Because the
+probe uses forced tool_choice, its alias must route only to providers that honor forced function
+calling: providers that reject it (e.g. Google Vertex) are deny-listed, and the alias carries an
+ordered fallback to a second small cross-family deployment so a sustained rate-limit on the primary
+provider degrades gracefully instead of stalling generation.
 
 - When the probe shows the concept is core knowledge, synthesize from parametric knowledge as today.
 - When the probe shows the concept at or beyond the model's knowledge boundary, do not synthesize

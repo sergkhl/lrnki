@@ -543,11 +543,11 @@ CREATE TABLE concept_difficulties (
 );
 
 -- ---------------------------------------------------------------------------
--- Learner Expeditions — learner-owned route/charting state for the Learner App.
+-- Learner Expeditions — learner-owned route/generation state for the Learner App.
 -- This table does not persist mastery, readiness, rewards, or trail shape; those
 -- derive from the Study Session projection and the published graph. It only
--- remembers the learner's expedition rows, active selection, current charting
--- operation pointer, and the ready enrichment/target once charting completes.
+-- remembers the learner's expedition rows, active selection, current generation
+-- operation pointer, and the ready enrichment once generation completes.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE learner_expeditions (
@@ -555,19 +555,21 @@ CREATE TABLE learner_expeditions (
   learner_state_ref text NOT NULL,
   kind text NOT NULL CHECK (kind IN ('topic')),
   title text NOT NULL,
-  declared_domain text NOT NULL,
-  status text NOT NULL CHECK (status IN ('charting', 'ready', 'failed')),
+  declared_domain text,
+  status text NOT NULL CHECK (status IN ('generating', 'ready', 'failed')),
   current_operation_id uuid,
   current_operation_type text CHECK (current_operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
   enrichment_id uuid REFERENCES graph_enrichments(enrichment_id),
   active boolean NOT NULL DEFAULT false,
   failure_message text,
+  generation_attempts integer NOT NULL DEFAULT 0,
+  claimed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((current_operation_id IS NULL AND current_operation_type IS NULL) OR (current_operation_id IS NOT NULL AND current_operation_type IS NOT NULL)),
   -- The summit is derived at read time (ADR-0032), so a ready expedition needs only its
   -- enrichment; there is no persisted target to constrain.
-  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL) OR status <> 'ready')
+  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL AND declared_domain IS NOT NULL) OR status <> 'ready')
 );
 
 CREATE UNIQUE INDEX learner_expeditions_one_active_per_learner

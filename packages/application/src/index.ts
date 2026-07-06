@@ -4,7 +4,7 @@ export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichm
 export { runSyntheticGeneration } from "./runSyntheticGeneration";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
-export { chartTopicExpedition } from "./chartTopicExpedition";
+export { generateTopicExpedition } from "./generateTopicExpedition";
 export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
