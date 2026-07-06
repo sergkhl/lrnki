@@ -1,5 +1,5 @@
 import {
-  chartTopicExpedition,
+  generateTopicExpedition,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
   STUDY_ITEM_BANK_CONFIG_HASH
@@ -54,6 +54,7 @@ function buildContext() {
     enrichmentStore,
     runProgressReporter,
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
+    declaredDomainInference: new LiteLlmDeclaredDomainInferenceAdapter(deterministicClient),
     conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
     knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
@@ -71,44 +72,37 @@ function buildContext() {
   };
 }
 
-export async function inferDeclaredDomain(input: { topic: string }): Promise<{ declaredDomain: string }> {
-  const client = new LiteLlmForcedToolClient({ ...baseClientConfig(), temperature: 0, seed: 7 });
-  return new LiteLlmDeclaredDomainInferenceAdapter(client).infer(input);
-}
-
-export function startTopicChart(input: {
+export async function generateLearnerTopicExpedition(input: {
   learnerExpeditionId: string;
   topic: string;
-  declaredDomain: string;
-}): void {
+  declaredDomain: string | null;
+}): Promise<void> {
   const ctx = buildContext();
-  // Admin Lab runs as a long-lived Node process in development/demo deployments. If this
-  // route moves to request-scoped hosting, replace this background promise with a durable
-  // queue or platform wait-until primitive so charting cannot be cancelled at response end.
-  void chartTopicExpedition({
-    learnerExpeditionId: input.learnerExpeditionId,
-    topic: input.topic,
-    declaredDomain: input.declaredDomain,
-    expeditionStore: ctx.expeditionStore,
-    conceptSetSynthesis: ctx.conceptSetSynthesis,
-    knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
-    embedding: ctx.nodeEmbedding,
-    groundingGeneration: ctx.groundingGeneration,
-    prerequisiteOrdering: ctx.prerequisiteOrdering,
-    difficulty: ctx.difficulty,
-    enrichmentStore: ctx.enrichmentStore,
-    graphStore: ctx.graphStore,
-    conceptLessonGeneration: ctx.conceptLessonGeneration,
-    studyItemBlueprint: ctx.studyItemBlueprint,
-    impostorLieValidityJudge: ctx.impostorLieValidityJudge,
-    conceptLessonStore: ctx.conceptLessonStore,
-    studyItemGeneration: ctx.studyItemGeneration,
-    studyItemBankStore: ctx.studyItemBankStore,
-    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
-    reporter: ctx.runProgressReporter
-  }).catch((error: unknown) => {
-    console.error("Learner topic chart failed.", error);
-  }).finally(() => {
-    void ctx.sql.end({ timeout: 5 });
-  });
+  try {
+    await generateTopicExpedition({
+      learnerExpeditionId: input.learnerExpeditionId,
+      topic: input.topic,
+      declaredDomain: input.declaredDomain,
+      declaredDomainInference: ctx.declaredDomainInference,
+      expeditionStore: ctx.expeditionStore,
+      conceptSetSynthesis: ctx.conceptSetSynthesis,
+      knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
+      embedding: ctx.nodeEmbedding,
+      groundingGeneration: ctx.groundingGeneration,
+      prerequisiteOrdering: ctx.prerequisiteOrdering,
+      difficulty: ctx.difficulty,
+      enrichmentStore: ctx.enrichmentStore,
+      graphStore: ctx.graphStore,
+      conceptLessonGeneration: ctx.conceptLessonGeneration,
+      studyItemBlueprint: ctx.studyItemBlueprint,
+      impostorLieValidityJudge: ctx.impostorLieValidityJudge,
+      conceptLessonStore: ctx.conceptLessonStore,
+      studyItemGeneration: ctx.studyItemGeneration,
+      studyItemBankStore: ctx.studyItemBankStore,
+      configHash: STUDY_ITEM_BANK_CONFIG_HASH,
+      reporter: ctx.runProgressReporter
+    });
+  } finally {
+    await ctx.sql.end({ timeout: 5 });
+  }
 }

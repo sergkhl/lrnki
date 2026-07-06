@@ -42,6 +42,7 @@ test("declares reportable stages by operation type", () => {
     NON_LLM_STAGES.persist
   ]);
   assert.deepEqual(operationTimelineStagesForOperation("enrichment").map((row) => row.stage), [
+    STAGE_TAGS.declaredDomainInference,
     STAGE_TAGS.prerequisiteOrdering,
     STAGE_TAGS.rescueDurability,
     STAGE_TAGS.rescueDefinitionQuality,

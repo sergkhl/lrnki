@@ -47,6 +47,10 @@ the current goal: feedback, progress clarity, anticipation, reward, recovery, or
 concept map. Narrative, fantasy, collection, and social features must not become parallel objectives
 that distract from mastery.
 
+Learner-facing theme language follows
+[ADR-0033](0033-plain-identifiers-single-themed-vocabulary-mapping.md): durable identifiers stay
+plain, and themed copy is rendered through the Learner App vocabulary and stage-copy mappings.
+
 Completion rewards are part of the mastery flow, not decoration. A concept is mastered by a
 **completion rule** — its lesson (if any) read AND every activity segment latest-correct — so
 finishing the *last* remaining activity advances into the capstone reward (gem) state; a single

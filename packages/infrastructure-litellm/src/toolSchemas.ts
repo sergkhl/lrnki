@@ -296,7 +296,7 @@ export const difficultyComparisonValidator = z.object({
 export const difficultyComparisonSchema: JsonSchema = toForcedToolSchema(difficultyComparisonValidator);
 
 // --- Declared domain inference: submit_declared_domain --------------------
-// One bounded learner-charting helper: infer a short field-of-study label from a
+// One bounded learner-generation helper: infer a short field-of-study label from a
 // learner's topic phrase. The learner can confirm or edit this before generation.
 // The schema stays domain-neutral and contains no fixture-derived examples.
 

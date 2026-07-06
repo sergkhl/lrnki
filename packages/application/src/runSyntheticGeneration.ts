@@ -12,6 +12,7 @@ import type {
 import { normalizeConceptLabel, STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   ConceptSetSynthesisPort,
+  DeclaredDomainInferencePort,
   DifficultyPort,
   EnrichmentRunStorePort,
   GroundingGenerationPort,
@@ -84,7 +85,8 @@ export const DEFAULT_SYNTHETIC_GENERATION_CONFIG: SyntheticGenerationConfig = {
 export async function runSyntheticGeneration(input: {
   enrichmentId: string;
   topic: string;
-  declaredDomain: string;
+  declaredDomain?: string | null;
+  declaredDomainInference?: DeclaredDomainInferencePort;
   conceptSetSynthesis: ConceptSetSynthesisPort;
   knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
   embedding: NodeEmbeddingPort;
@@ -96,12 +98,12 @@ export async function runSyntheticGeneration(input: {
   reporter?: RunProgressReporterPort;
   // Optional operator-visibility hook: counts of core/boundary concepts and derived edges.
   onSummary?: (summary: { concepts: number; core: number; boundary: number; nodes: number; committedEdges: number; uncertainEdges: number }) => void;
+  onDeclaredDomain?: (declaredDomain: string) => Promise<void>;
   newNodeId?: () => string;
 }): Promise<DerivedGraphLayer> {
   const config = input.config ?? DEFAULT_SYNTHETIC_GENERATION_CONFIG;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
-  const declaredDomain = input.declaredDomain;
   const newNodeId = input.newNodeId ?? randomUUID;
 
   return runInstrumentedOperation(reporter, "enrichment", operationId, async (runStage) => {
@@ -109,6 +111,8 @@ export async function runSyntheticGeneration(input: {
     // its timeline rides the `enrichment` operation type; its own fine STAGE_TAGS
     // (concept-set-synthesis, knowledge-boundary-probe, grounding-generation, ...) keep the
     // cost split separable in spend (ADR-0029).
+
+    const declaredDomain = await resolveDeclaredDomain(input, runStage);
 
     // Stage 1 — synthesize the concept set from topic + Declared Domain alone (R1, R2).
     const synthesized = await runStage(STAGE_TAGS.conceptSetSynthesis, () =>
@@ -287,6 +291,27 @@ export async function runSyntheticGeneration(input: {
     );
     return layer;
   });
+}
+
+async function resolveDeclaredDomain(
+  input: {
+    topic: string;
+    declaredDomain?: string | null;
+    declaredDomainInference?: DeclaredDomainInferencePort;
+    onDeclaredDomain?: (declaredDomain: string) => Promise<void>;
+  },
+  runStage: (stage: string, fn: () => Promise<{ declaredDomain: string }>) => Promise<{ declaredDomain: string }>
+): Promise<string> {
+  const existing = input.declaredDomain?.trim();
+  if (existing) return existing;
+  if (!input.declaredDomainInference) {
+    throw new Error("Declared Domain inference port is required when declaredDomain is missing.");
+  }
+  const inferred = await runStage(STAGE_TAGS.declaredDomainInference, () => input.declaredDomainInference!.infer({ topic: input.topic }));
+  const declaredDomain = inferred.declaredDomain.trim();
+  if (!declaredDomain) throw new Error("Declared Domain inference returned an empty domain.");
+  await input.onDeclaredDomain?.(declaredDomain);
+  return declaredDomain;
 }
 
 // Drop empty/duplicate normalized labels, preserving first-seen order, so two synthesized

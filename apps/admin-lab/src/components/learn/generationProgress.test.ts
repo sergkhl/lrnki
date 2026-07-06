@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationTimelineDetail } from "@lrnki/ports";
-import { EXPECTED_TOPIC_CHART_STAGES, chartingProgress } from "./chartingProgress";
+import { EXPECTED_TOPIC_GENERATION_STAGES, generationProgress } from "./generationProgress";
 
-test("chartingProgress counts completed expected stages against the fixed denominator", () => {
-  const progress = chartingProgress(timeline({
+test("generationProgress counts completed expected stages against the fixed denominator", () => {
+  const progress = generationProgress(timeline({
     stages: [
       closed(STAGE_TAGS.conceptSetSynthesis),
       closed(STAGE_TAGS.knowledgeBoundaryProbe),
@@ -15,12 +15,12 @@ test("chartingProgress counts completed expected stages against the fixed denomi
     ]
   }));
   assert.equal(progress.completed, 4);
-  assert.equal(progress.total, EXPECTED_TOPIC_CHART_STAGES.length);
-  assert.equal(progress.fraction, 4 / EXPECTED_TOPIC_CHART_STAGES.length);
+  assert.equal(progress.total, EXPECTED_TOPIC_GENERATION_STAGES.length);
+  assert.equal(progress.fraction, 4 / EXPECTED_TOPIC_GENERATION_STAGES.length);
 });
 
-test("chartingProgress offsets study-item timelines after synthetic stages", () => {
-  const progress = chartingProgress(timeline({
+test("generationProgress offsets study-item timelines after synthetic stages", () => {
+  const progress = generationProgress(timeline({
     operationType: "study_items",
     stages: [
       closed(STAGE_TAGS.conceptLessonGeneration),
@@ -28,19 +28,19 @@ test("chartingProgress offsets study-item timelines after synthetic stages", () 
       open(STAGE_TAGS.studyItemGeneration)
     ]
   }));
-  assert.equal(progress.completed, 7);
-  assert.equal(progress.total, EXPECTED_TOPIC_CHART_STAGES.length);
+  assert.equal(progress.completed, 8);
+  assert.equal(progress.total, EXPECTED_TOPIC_GENERATION_STAGES.length);
 });
 
-test("chartingProgress signals indeterminate for a running unexpected current stage", () => {
-  const progress = chartingProgress(timeline({ stages: [open("future-stage")] }));
+test("generationProgress signals indeterminate for a running unexpected current stage", () => {
+  const progress = generationProgress(timeline({ stages: [open("future-stage")] }));
   assert.equal(progress.completed, 0);
   assert.equal(progress.fraction, null);
   assert.equal(progress.indeterminate, true);
 });
 
-test("chartingProgress clamps a finished expected sequence to one", () => {
-  const progress = chartingProgress(timeline({
+test("generationProgress clamps a finished expected sequence to one", () => {
+  const progress = generationProgress(timeline({
     operationType: "study_items",
     status: "succeeded",
     stages: [

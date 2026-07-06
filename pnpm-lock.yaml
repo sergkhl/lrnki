@@ -78,6 +78,9 @@ catalogs:
     typescript:
       specifier: 6.0.3
       version: 6.0.3
+    undici:
+      specifier: ^8.7.0
+      version: 8.7.0
     zod:
       specifier: 4.4.3
       version: 4.4.3
@@ -282,6 +285,9 @@ importers:
       postgres:
         specifier: 'catalog:'
         version: 3.4.9
+      undici:
+        specifier: 'catalog:'
+        version: 8.7.0
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -3432,6 +3438,10 @@ packages:
 
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
+
+  undici@8.7.0:
+    resolution: {integrity: sha512-N7iQtfyLhIMOFgQubvmLV26svHpO0bqKnAiWotTQCVKCmWrcGbBotPuW1x+xwYZ2VHdSTVUfPQQnlEt1/LouTQ==}
+    engines: {node: '>=22.19.0'}
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -6760,6 +6770,8 @@ snapshots:
       which-boxed-primitive: 1.1.1
 
   undici-types@7.24.6: {}
+
+  undici@8.7.0: {}
 
   unicorn-magic@0.3.0: {}
 

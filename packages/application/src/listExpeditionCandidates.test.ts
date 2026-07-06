@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ResponseLogRow, StudyItem } from "@lrnki/domain-core";
-import type { DerivedGraphDetail, EnrichmentInspectionReadPort, EnrichmentSummary, LearnerExpedition, LearnerExpeditionStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { DerivedGraphDetail, EnrichmentInspectionReadPort, EnrichmentSummary, LearnerExpedition, LearnerExpeditionStorePort, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import { listExpeditionCandidates } from "./listExpeditionCandidates";
 
 test("listExpeditionCandidates ranks fully ready targets above larger unready targets and caps the result", async () => {
@@ -61,7 +61,45 @@ test("Covers AE3: progress counts only items on trail-reachable (non-floored) no
 
   const progress = result.learnerExpeditions[0].progress;
   // 3 items exist, but `easy` is floored → only mid + summit count. One is latest-correct.
-  assert.deepEqual(progress, { itemsPassed: 1, itemsTotal: 2 });
+  assert.deepEqual(progress, { itemsPassed: 1, itemsAttempted: 1, lessonsRead: 0, itemsTotal: 2 });
+});
+
+test("progress captures wrong-answer-only activity for Resume", async () => {
+  const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
+  const result = await listExpeditionCandidates({
+    learnerStateRef: "learner-one",
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("mid", "Middle", true)], []) }),
+    expeditionStore: fakeStore([ready]),
+    studyItemStore: fakeStudyItemStore([studyItem("i-mid", "mid")]),
+    responseLog: fakeResponseLog([gradedIncorrect("i-mid")])
+  });
+
+  assert.deepEqual(result.learnerExpeditions[0].progress, { itemsPassed: 0, itemsAttempted: 1, lessonsRead: 0, itemsTotal: 1 });
+});
+
+test("progress captures lesson-read-only activity for Resume", async () => {
+  const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
+  const result = await listExpeditionCandidates({
+    learnerStateRef: "learner-one",
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("mid", "Middle", true)], []) }),
+    expeditionStore: fakeStore([ready]),
+    studyItemStore: fakeStudyItemStore([studyItem("i-mid", "mid")]),
+    responseLog: fakeResponseLog([]),
+    lessonReadStore: fakeLessonReadStore(["mid"])
+  });
+
+  assert.deepEqual(result.learnerExpeditions[0].progress, { itemsPassed: 0, itemsAttempted: 0, lessonsRead: 1, itemsTotal: 1 });
+});
+
+test("candidates expose an existing learner expedition for Resume routing", async () => {
+  const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
+  const result = await listExpeditionCandidates({
+    learnerStateRef: "learner-one",
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("mid", "Middle", true)], []) }),
+    expeditionStore: fakeStore([ready])
+  });
+
+  assert.equal(result.candidates[0].existingLearnerExpeditionId, "row-1");
 });
 
 test("listExpeditionCandidates returns only the learner's own expedition rows", async () => {
@@ -99,6 +137,9 @@ function fakeStore(rows: LearnerExpedition[]): LearnerExpeditionStorePort {
       return undefined;
     },
     async setActive() {},
+    async claimNextGenerating() { return undefined; },
+    async failExhaustedGenerating() { return 0; },
+    async resetGeneration() {},
     async updateProgress() {}
   };
 }
@@ -166,6 +207,15 @@ function fakeResponseLog(rows: ResponseLogRow[]): ResponseLogStorePort {
   };
 }
 
+function fakeLessonReadStore(derivedNodeIds: string[]): LessonReadStorePort {
+  return {
+    async markRead() {},
+    async listForLearner(learnerStateRef: string) {
+      return derivedNodeIds.map((derivedNodeId) => ({ learnerStateRef, derivedNodeId, firstReadAt: "2026-01-01T00:00:00.000Z" }));
+    }
+  };
+}
+
 function studyItem(studyItemId: string, derivedNodeId: string): StudyItem {
   return {
     studyItemId, graphVersionId: null, enrichmentId: "exp", derivedNodeId,
@@ -183,6 +233,14 @@ function gradedCorrect(studyItemId: string): ResponseLogRow {
   };
 }
 
+function gradedIncorrect(studyItemId: string): ResponseLogRow {
+  return {
+    ...gradedCorrect(studyItemId),
+    judgedOutcome: "incorrect",
+    gradedScore: 0
+  };
+}
+
 function expedition(learnerStateRef: string, learnerExpeditionId: string): LearnerExpedition {
   return {
     learnerExpeditionId,
@@ -190,12 +248,14 @@ function expedition(learnerStateRef: string, learnerExpeditionId: string): Learn
     kind: "topic",
     title: "Topic",
     declaredDomain: "test",
-    status: "charting",
+    status: "generating",
     currentOperationId: null,
     currentOperationType: null,
     enrichmentId: null,
     active: false,
     failureMessage: null,
+    generationAttempts: 0,
+    claimedAt: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z"
   };

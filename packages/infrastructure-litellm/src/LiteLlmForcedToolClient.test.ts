@@ -3,6 +3,7 @@ import { afterEach, test } from "node:test";
 import { z } from "zod";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { ForcedToolExhaustionError, LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
 // Deterministic-envelope tests for the transport (U1, R2/AE3). They assert the SHAPE
 // of the request body — including the `metadata.tags` spend label — never any model
@@ -18,21 +19,33 @@ const baseInput = {
   validator
 };
 
-const originalFetch = globalThis.fetch;
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  resetLiteLlmFetchForTests();
 });
 
 // Capture the next request body and reply with one valid forced tool call.
 function captureBody(): { read: () => Record<string, unknown> } {
   let captured: Record<string, unknown> = {};
-  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+  setLiteLlmFetchForTests(async (_url: string, init: LiteLlmFetchInit) => {
     captured = JSON.parse(init.body as string) as Record<string, unknown>;
     return new Response(
       JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
-  }) as unknown as typeof fetch;
+  });
+  return { read: () => captured };
+}
+
+function captureBodies(responses: Array<Response | Error>): { read: () => Array<{ body: Record<string, unknown>; init: LiteLlmFetchInit }> } {
+  const captured: Array<{ body: Record<string, unknown>; init: LiteLlmFetchInit }> = [];
+  let i = 0;
+  setLiteLlmFetchForTests(async (_url: string, init: LiteLlmFetchInit) => {
+    captured.push({ body: JSON.parse(init.body as string) as Record<string, unknown>, init });
+    const response = responses[Math.min(i, responses.length - 1)];
+    i += 1;
+    if (response instanceof Error) throw response;
+    return response;
+  });
   return { read: () => captured };
 }
 
@@ -77,14 +90,25 @@ test("tags pass-through does not alter the forced tool_choice or strict contract
   assert.equal(tools[0].function.strict, true);
 });
 
+test("call passes an undici dispatcher so fetch honors the configured transport timeouts", async () => {
+  const capture = captureBodies([
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  await client().call(baseInput);
+  assert.ok(capture.read()[0]?.init.dispatcher, "dispatcher travels on the fetch request");
+});
+
 // --- ADR-0006 fail-closed exhaustion, made inspectable -----------------------
 // Reply with a fixed forced-tool arguments payload (string body) so a deviation repeats.
 function replyWithArguments(argumentsText: string): void {
-  globalThis.fetch = (async () =>
+  setLiteLlmFetchForTests(async () =>
     new Response(
       JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: argumentsText } }] } }] }),
       { status: 200, headers: { "content-type": "application/json" } }
-    )) as unknown as typeof fetch;
+    ));
 }
 
 test("exhausted schema-invalid args throw a fail-closed error carrying redacted detail", async () => {
@@ -108,7 +132,7 @@ test("exhausted schema-invalid args throw a fail-closed error carrying redacted 
 });
 
 test("an HTTP failure records kind:http with the status, still fails closed", async () => {
-  globalThis.fetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch;
+  setLiteLlmFetchForTests(async () => new Response("nope", { status: 503 }));
   await assert.rejects(
     () => client().call({ ...baseInput, maxRetries: 0 }),
     (error: unknown) => {
@@ -117,6 +141,24 @@ test("an HTTP failure records kind:http with the status, still fails closed", as
       assert.equal(attempt.kind, "http");
       assert.equal(attempt.status, 503);
       assert.equal(attempt.redactedSnippet, undefined, "no arguments to snippet on a transport failure");
+      return true;
+    }
+  );
+});
+
+test("a fetch TypeError with an undici cause is classified as a network failure", async () => {
+  setLiteLlmFetchForTests(async () => {
+    const error = new TypeError("fetch failed");
+    Object.defineProperty(error, "cause", { value: { code: "UND_ERR_HEADERS_TIMEOUT" } });
+    throw error;
+  });
+  await assert.rejects(
+    () => client().call({ ...baseInput, maxRetries: 0 }),
+    (error: unknown) => {
+      assert.ok(error instanceof ForcedToolExhaustionError);
+      const attempt = error.stageErrorDetail.attempts![0];
+      assert.equal(attempt.kind, "network");
+      assert.equal(attempt.code, "UND_ERR_HEADERS_TIMEOUT");
       return true;
     }
   );
@@ -135,4 +177,38 @@ test("invalid JSON arguments are classified and the redacted snippet is bounded"
       return true;
     }
   );
+});
+
+test("schema-invalid retry adds corrective paths and a redacted argument snippet", async () => {
+  const capture = captureBodies([
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: "wrong" }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    ),
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  assert.deepEqual(await client().call({ ...baseInput, maxRetries: 1 }), { ok: true });
+  const secondMessages = capture.read()[1]!.body.messages as Array<{ role: string; content: string }>;
+  assert.equal(secondMessages.length, 3);
+  assert.equal(secondMessages[1]!.role, "assistant");
+  assert.match(secondMessages[1]!.content, /Previous tool arguments/);
+  assert.match(secondMessages[1]!.content, /"ok":"wrong"/);
+  assert.equal(secondMessages[2]!.role, "user");
+  assert.match(secondMessages[2]!.content, /Violated schema paths: ok/);
+});
+
+test("HTTP-failure retry sends a byte-identical request body", async () => {
+  const capture = captureBodies([
+    new Response("nope", { status: 503 }),
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  assert.deepEqual(await client().call({ ...baseInput, maxRetries: 1 }), { ok: true });
+  const bodies = capture.read().map((call) => call.body);
+  assert.deepEqual(bodies[1], bodies[0]);
 });

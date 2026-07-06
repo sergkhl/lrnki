@@ -32,6 +32,11 @@ an operation id, so timeline reads retain operation type. Application-owned Oper
 semantics define reportable stage ownership and stage kind, keeping shared-id spend separate without
 creating a unified workflow identity.
 
+Learner topic-expedition generation is supervised by database claiming over the learner expedition
+row plus the operation heartbeat. The expedition row owns launch attempts and claim timestamps; the
+operation timeline owns liveness. A future durable orchestrator replaces this supervisor seam without
+changing the application generation activity.
+
 ## Context
 
 Terminal artifact rows previously appeared only when an operation completed, while stage timing was

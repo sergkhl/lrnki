@@ -1,7 +1,8 @@
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationTimelineDetail } from "@lrnki/ports";
 
-export const EXPECTED_TOPIC_CHART_STAGES = [
+export const EXPECTED_TOPIC_GENERATION_STAGES = [
+  STAGE_TAGS.declaredDomainInference,
   STAGE_TAGS.conceptSetSynthesis,
   STAGE_TAGS.knowledgeBoundaryProbe,
   STAGE_TAGS.groundingGeneration,
@@ -14,19 +15,19 @@ export const EXPECTED_TOPIC_CHART_STAGES = [
   STAGE_TAGS.impostorGeneration
 ] as const;
 
-const STUDY_ITEM_STAGE_OFFSET = EXPECTED_TOPIC_CHART_STAGES.indexOf(STAGE_TAGS.conceptLessonGeneration);
-const ENRICHMENT_STAGE_SET = new Set<string>(EXPECTED_TOPIC_CHART_STAGES.slice(0, STUDY_ITEM_STAGE_OFFSET));
-const STUDY_ITEM_STAGE_SET = new Set<string>(EXPECTED_TOPIC_CHART_STAGES.slice(STUDY_ITEM_STAGE_OFFSET));
+const STUDY_ITEM_STAGE_OFFSET = EXPECTED_TOPIC_GENERATION_STAGES.indexOf(STAGE_TAGS.conceptLessonGeneration);
+const ENRICHMENT_STAGE_SET = new Set<string>(EXPECTED_TOPIC_GENERATION_STAGES.slice(0, STUDY_ITEM_STAGE_OFFSET));
+const STUDY_ITEM_STAGE_SET = new Set<string>(EXPECTED_TOPIC_GENERATION_STAGES.slice(STUDY_ITEM_STAGE_OFFSET));
 
-export type TopicChartingProgress = {
+export type TopicGenerationProgressCard = {
   completed: number;
   total: number;
   fraction: number | null;
   indeterminate: boolean;
 };
 
-export function chartingProgress(timeline: OperationTimelineDetail | undefined): TopicChartingProgress {
-  const total = EXPECTED_TOPIC_CHART_STAGES.length;
+export function generationProgress(timeline: OperationTimelineDetail | undefined): TopicGenerationProgressCard {
+  const total = EXPECTED_TOPIC_GENERATION_STAGES.length;
   if (!timeline) return { completed: 0, total, fraction: null, indeterminate: true };
 
   const stageSet = timeline.summary.operationType === "study_items" ? STUDY_ITEM_STAGE_SET : ENRICHMENT_STAGE_SET;

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
+import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
 // Deterministic-envelope tests for the embedding transport (U1, R2/R13). They assert
 // the SHAPE of the request/response handling — endpoint, order preservation, the
@@ -9,9 +10,8 @@ import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
 // (AGENTS rule 11). `fetch` is stubbed so the test never hits a network. maxRetries: 0
 // keeps the error-path tests from sleeping through the real back-off.
 
-const originalFetch = globalThis.fetch;
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  resetLiteLlmFetchForTests();
 });
 
 function client() {
@@ -22,11 +22,11 @@ function client() {
 function stubResponse(body: unknown, status = 200): { read: () => { url: string; body: Record<string, unknown> }; calls: () => number } {
   let captured = { url: "", body: {} as Record<string, unknown> };
   let count = 0;
-  globalThis.fetch = (async (url: string, init: RequestInit) => {
+  setLiteLlmFetchForTests(async (url: string, init: LiteLlmFetchInit) => {
     count += 1;
     captured = { url, body: JSON.parse(init.body as string) as Record<string, unknown> };
     return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-  }) as unknown as typeof fetch;
+  });
   return { read: () => captured, calls: () => count };
 }
 

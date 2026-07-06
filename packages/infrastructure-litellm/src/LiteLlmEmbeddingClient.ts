@@ -1,5 +1,6 @@
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { LiteLlmHttpError } from "./LiteLlmForcedToolClient";
+import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
 
 // Embedding transport (plan U1, ADR-0012). The first embedding client since the CEP
 // reset removed the old clustering tier. A SIBLING of LiteLlmForcedToolClient, not an
@@ -19,7 +20,11 @@ type EmbeddingResponse = {
 };
 
 export class LiteLlmEmbeddingClient {
-  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number }) {}
+  private readonly dispatcher;
+
+  constructor(private readonly options: { baseUrl: string; apiKey: string; timeoutMs: number; maxRetries?: number }) {
+    this.dispatcher = createLiteLlmDispatcher(options.timeoutMs);
+  }
 
   async embed(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
     // No texts → no HTTP call; an empty embedding set is a valid (degenerate) result,
@@ -46,7 +51,7 @@ export class LiteLlmEmbeddingClient {
   private async embedOnce(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
     const operationTag = currentOperationTag();
     const tags = [...(input.tags ?? []), ...(operationTag ? [operationTag] : [])];
-    const response = await fetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/embeddings`, {
+    const response = await liteLlmFetch(`${this.options.baseUrl.replace(/\/$/, "")}/v1/embeddings`, withLiteLlmDispatcher({
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.options.apiKey}` },
       signal: AbortSignal.timeout(this.options.timeoutMs),
@@ -56,7 +61,7 @@ export class LiteLlmEmbeddingClient {
         // Same stage + ambient-operation spend labels as the forced-tool client.
         ...(tags.length ? { metadata: { tags } } : {})
       })
-    });
+    }, this.dispatcher));
     if (!response.ok) throw new LiteLlmHttpError(response.status);
     const payload = await response.json() as EmbeddingResponse;
     const rows = payload.data;

@@ -22,7 +22,15 @@ export const LEARNER_VOCABULARY = {
   unskipKnown: "Un-mark known",
   groundedBadge: "Grounded in your source",
   topicDoor: "Plan expedition",
-  progress: "Surveying progress",
+  generating: "Scouting",
+  generatingStopped: "Scouting stopped",
+  generatingProgress: "Scouting progress",
+  generatingStoppedDescription: "Scouting has stopped reporting progress.",
+  generatingFailedDescription: "Scouting failed.",
+  progress: "Scouting progress",
+  retryGeneration: "Retry",
+  beginExpedition: "Begin",
+  resumeExpedition: "Resume",
   summit: "Summit reached",
   section: "Leg",
   sectionPlural: "Legs",
@@ -38,6 +46,12 @@ export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;
 
 export function learnerTerm(key: LearnerVocabularyKey): string {
   return LEARNER_VOCABULARY[key];
+}
+
+export function expeditionStatusLabel(status: "generating" | "ready" | "failed"): string {
+  if (status === "ready") return "Ready";
+  if (status === "generating") return learnerTerm("generating");
+  return learnerTerm("generatingStopped");
 }
 
 export const LESSON_SECTION_HEADINGS = {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { LiteLlmNodeMergeAdjudicationAdapter } from "./dedupAdapters";
+import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
 // Deterministic-envelope tests for the merge-adjudication adapter (U2, R3/R12). The
 // canned tool call is an INPUT FIXTURE exercising the adapter's deterministic map +
@@ -9,21 +10,20 @@ import { LiteLlmNodeMergeAdjudicationAdapter } from "./dedupAdapters";
 // (AGENTS rule 11). `fetch` is stubbed so the test never hits a network. maxRetries: 0
 // keeps the rejection path from sleeping through the back-off.
 
-const originalFetch = globalThis.fetch;
 afterEach(() => {
-  globalThis.fetch = originalFetch;
+  resetLiteLlmFetchForTests();
 });
 
 // Reply with one forced tool call carrying `args`, capturing the request body.
 function stubToolCall(args: unknown): { read: () => Record<string, unknown> } {
   let captured: Record<string, unknown> = {};
-  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+  setLiteLlmFetchForTests(async (_url: string, init: LiteLlmFetchInit) => {
     captured = JSON.parse(init.body as string) as Record<string, unknown>;
     return new Response(
       JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_node_merge_decision", arguments: JSON.stringify(args) } }] } }] }),
       { status: 200, headers: { "content-type": "application/json" } }
     );
-  }) as unknown as typeof fetch;
+  });
   return { read: () => captured };
 }
 

@@ -40,7 +40,7 @@ export class LiteLlmIntrinsicDifficultyJudgmentAdapter implements IntrinsicDiffi
   // ONE banding draw over a whole Declared Domain set. The application K-samples this
   // call and owns consensus; this adapter is a thin LLM caller: it renders the numbered
   // node menu, validates exact coverage fail-closed (every listed number exactly once,
-  // band in 1..5) with one corrective re-prompt, and returns the number-cited entries.
+  // band in 1..5) with bounded corrective re-prompts, and returns the number-cited entries.
   // Number → derivedNodeId mapping by position lives in the application (rule 6).
   async bandDomainSet(input: { declaredDomain: string; nodes: DifficultyNodeContext[] }): Promise<DifficultyBandEntry[]> {
     const user = [
@@ -61,7 +61,7 @@ export class LiteLlmIntrinsicDifficultyJudgmentAdapter implements IntrinsicDiffi
       parameters: buildDifficultyBandsSchema(n),
       validator: buildDifficultyBandsValidator(n),
       tags: [STAGE_TAGS.intrinsicDifficulty],
-      maxRetries: 1
+      maxRetries: 2
     });
 
     return result.bands;

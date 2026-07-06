@@ -434,7 +434,7 @@ export interface IntrinsicDifficultyJudgmentPort {
   compareHarder(input: { declaredDomain: string; first: DifficultyNodeContext; second: DifficultyNodeContext }): Promise<{ harder: "first" | "second" }>;
 }
 
-// Declared-domain inference (Learner charting). ONE forced-tool call maps a
+// Declared-domain inference (Learner generation). ONE forced-tool call maps a
 // learner's topic phrase to a short field-of-study label before the learner can
 // confirm or edit it. The learner-facing workflow owns confirmation; this port
 // only supplies the initial domain guess and fails closed on malformed output.
@@ -492,23 +492,25 @@ export interface EnrichmentRunStorePort {
 
 // Learner Expedition persistence (Learner App v1). This is learner-owned mutable
 // routing state only: it remembers which expedition rows belong to a learner and
-// which charting operation is in flight. Study readiness, mastery, and rewards
+// which generation operation is in flight. Study readiness, mastery, and rewards
 // remain derived from existing learner-neutral projections.
 export type LearnerExpeditionKind = "topic";
-export type LearnerExpeditionStatus = "charting" | "ready" | "failed";
+export type LearnerExpeditionStatus = "generating" | "ready" | "failed";
 
 export interface LearnerExpedition {
   learnerExpeditionId: string;
   learnerStateRef: string;
   kind: LearnerExpeditionKind;
   title: string;
-  declaredDomain: string;
+  declaredDomain: string | null;
   status: LearnerExpeditionStatus;
   currentOperationId: string | null;
   currentOperationType: OperationType | null;
   enrichmentId: string | null;
   active: boolean;
   failureMessage: string | null;
+  generationAttempts: number;
+  claimedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -518,7 +520,7 @@ export interface NewLearnerExpedition {
   learnerStateRef: string;
   kind: LearnerExpeditionKind;
   title: string;
-  declaredDomain: string;
+  declaredDomain: string | null;
   status: LearnerExpeditionStatus;
   currentOperationId?: string | null;
   currentOperationType?: OperationType | null;
@@ -533,12 +535,16 @@ export interface LearnerExpeditionStorePort {
   getForLearner(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<LearnerExpedition | undefined>;
   getByEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<LearnerExpedition | undefined>;
   setActive(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
+  claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<LearnerExpedition | undefined>;
+  failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number; failureMessage: string }): Promise<number>;
+  resetGeneration(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
   updateProgress(input: {
     learnerExpeditionId: string;
     status?: LearnerExpeditionStatus;
     currentOperationId?: string | null;
     currentOperationType?: OperationType | null;
     enrichmentId?: string | null;
+    declaredDomain?: string | null;
     failureMessage?: string | null;
   }): Promise<void>;
 }
@@ -1009,6 +1015,7 @@ export type OperationType = "extraction" | "minting" | "enrichment" | "study_ite
 // arguments text bounded, control-char-stripped, and truncated.
 export type ForcedToolFailureKind =
   | "http"
+  | "network"
   | "no_tool_call"
   | "no_arguments"
   | "invalid_json"
@@ -1019,6 +1026,7 @@ export interface ForcedToolFailureAttempt {
   attempt: number;
   kind: ForcedToolFailureKind;
   status?: number;
+  code?: string;
   schemaIssuePaths?: string[];
   redactedSnippet?: string;
 }

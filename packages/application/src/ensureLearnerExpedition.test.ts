@@ -88,6 +88,9 @@ function memoryStore(initial: LearnerExpedition[] = []): LearnerExpeditionStoreP
       return rows.find((candidate) => candidate.learnerStateRef === input.learnerStateRef && candidate.enrichmentId === input.enrichmentId);
     },
     async setActive() {},
+    async claimNextGenerating() { return undefined; },
+    async failExhaustedGenerating() { return 0; },
+    async resetGeneration() {},
     async updateProgress() {}
   };
 }
@@ -105,6 +108,8 @@ function row(input: Partial<LearnerExpedition> & Pick<LearnerExpedition, "learne
     enrichmentId: input.enrichmentId ?? "enrichment-1",
     active: input.active ?? true,
     failureMessage: input.failureMessage ?? null,
+    generationAttempts: input.generationAttempts ?? 0,
+    claimedAt: input.claimedAt ?? null,
     createdAt: input.createdAt ?? "2026-01-01T00:00:00.000Z",
     updatedAt: input.updatedAt ?? "2026-01-01T00:00:00.000Z"
   };
