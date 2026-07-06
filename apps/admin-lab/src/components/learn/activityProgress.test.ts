@@ -18,17 +18,29 @@ test("resolveStopActivity maps question and impostor stops to exactly one study 
   assert.equal(impostor.kind === "impostor" ? impostor.item.studyItemId : null, "i2");
 });
 
-test("resolveStopActivity maps capstone stops to gem state", () => {
+test("resolveStopActivity maps capstone stops to crystal state with full growth on mastery", () => {
   const activity = resolveStopActivity(session({ mastered: true }), "n1:capstone:main");
-  assert.deepEqual(activity, { kind: "capstone", derivedNodeId: "n1", label: "Ownership", mastered: true });
+  assert.deepEqual(activity, { kind: "capstone", derivedNodeId: "n1", label: "Ownership", mastered: true, difficulty: 0, growthFraction: 1, isKnownSkipped: false });
 });
 
-function session(opts: { mastered?: boolean } = {}): StudySession {
+test("resolveStopActivity carries partial crystal growth on an unmastered capstone", () => {
+  const activity = resolveStopActivity(session(), "n1:capstone:main");
+  assert.equal(activity.kind === "capstone" ? activity.mastered : null, false);
+  assert.equal(activity.kind === "capstone" ? activity.growthFraction : null, 0);
+});
+
+test("resolveStopActivity marks a known-verdict capstone as skipped", () => {
+  const activity = resolveStopActivity(session({ mastered: true, knownSkipped: true }), "n1:capstone:main");
+  assert.equal(activity.kind === "capstone" ? activity.isKnownSkipped : null, true);
+});
+
+function session(opts: { mastered?: boolean; knownSkipped?: boolean } = {}): StudySession {
   return {
     enrichmentId: "e1",
     learnerStateRef: "learner",
     target: { derivedNodeId: "n1", label: "Ownership" },
     studyItemCount: 2,
+    flooredNodeIds: [],
     detail: {
       summary: {
         enrichmentId: "e1",
@@ -67,12 +79,12 @@ function session(opts: { mastered?: boolean } = {}): StudySession {
     classification: { stateByNode: { n1: opts.mastered ? "mastered" : "frontier" }, selectedFrontierTarget: opts.mastered ? null : "n1" },
     adaptedHiddenNodeIds: [],
     responseSourceSummary: { human: 0, synthetic: 0, total: 0 },
-    isFoundationalRoot: true,
-    statefulPath: [{ position: 0, derivedNodeId: "n1", difficulty: 0, topologicalDepth: 0, state: opts.mastered ? "mastered" : "frontier", isTarget: true }],
+    expeditionPath: [{ position: 0, derivedNodeId: "n1", difficulty: 0, topologicalDepth: 0, state: opts.mastered ? "mastered" : "frontier", isSummit: true, sectionIndex: 0, sectionPositionIndex: 0, milestoneDerivedNodeId: "n1", milestoneLabel: "Ownership", isMilestone: true }],
+    sections: [{ sectionIndex: 0, milestoneDerivedNodeId: "n1", milestoneLabel: "Ownership", stepDerivedNodeIds: ["n1"], meanDifficulty: 0 }],
     coexistence: [],
     restorations: [],
     sheetByNode: {},
-    verdictByNode: {},
+    verdictByNode: opts.knownSkipped ? { n1: "known" } : {},
     latestOutcomeByStudyItemId: {},
     studySegmentsByNode: {
       n1: [

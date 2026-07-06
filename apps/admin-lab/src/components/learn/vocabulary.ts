@@ -9,7 +9,7 @@ export const LEARNER_VOCABULARY = {
   question: "Question",
   matching: "Match the pairs",
   spotTheFake: "Spot the fake",
-  capstone: "Gem",
+  capstone: "Crystal",
   nextStop: "Next stop",
   mastered: "Collected",
   frontier: "Ready",
@@ -19,10 +19,19 @@ export const LEARNER_VOCABULARY = {
   continueAction: "Continue",
   returnToTrail: "Return to trail",
   skipKnown: "I already know this ground",
+  unskipKnown: "Un-mark known",
   groundedBadge: "Grounded in your source",
-  topicDoor: "Chart course",
-  progress: "Charting progress",
-  summit: "Summit reached"
+  topicDoor: "Plan expedition",
+  progress: "Surveying progress",
+  summit: "Summit reached",
+  section: "Leg",
+  sectionPlural: "Legs",
+  sectionOverview: "Trail map",
+  sectionOverviewHint: "Jump to any open leg. Fogged legs unlock as you clear what they need.",
+  gems: "Crystals",
+  gatedBy: "Clears after",
+  vistaTitle: "Crystal formation",
+  vistaHint: "Every concept you master grows a crystal here. Fogged shapes still wait in the rock."
 } as const;
 
 export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;
@@ -42,9 +51,4 @@ export const LESSON_SECTION_HEADINGS = {
 
 export function lessonSectionHeading(kind: ConceptLessonSectionView["kind"]): string {
   return LESSON_SECTION_HEADINGS[kind];
-}
-
-export function encodeLearnerStateRef(rawRef: string): string {
-  const compact = rawRef.trim().replace(/\s+/g, " ");
-  return encodeURIComponent(compact);
 }

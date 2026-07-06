@@ -12,6 +12,11 @@ export function LessonSections({ lesson }: Readonly<{ lesson: ConceptLessonView 
             <GroundedBadge provenance={section.groundingProvenance} isSourceCited={section.isSourceCited} />
           </div>
           <p className="max-w-prose text-base leading-7">{section.text}</p>
+          {section.items?.length ? (
+            <ul className="flex list-disc flex-col gap-2 pl-5 text-base leading-7">
+              {section.items.map((item, itemIndex) => <li key={`${section.kind}:item:${itemIndex}`}>{item}</li>)}
+            </ul>
+          ) : null}
         </section>
       ))}
     </section>

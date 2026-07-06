@@ -228,7 +228,7 @@ export async function runSyntheticGeneration(input: {
       };
     });
     const difficulties = await runStage(STAGE_TAGS.intrinsicDifficulty, () =>
-      input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges })
+      input.difficulty.score({ nodes: difficultyNodes })
     );
 
     input.onSummary?.({

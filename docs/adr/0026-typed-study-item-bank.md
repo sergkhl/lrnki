@@ -9,10 +9,23 @@ and study-item coverage key to the node in one Derived Graph Layer, whether that
 an Enrichment Node. Asserted `concept_id` remains a separate identity available only for anchors.
 
 The learner-neutral **Study Item Bank** is a typed discriminated union keyed by `itemType`.
-`option_select` and `impostor` are the implemented study-item payloads — both auto-graded
-keyed-selection types: option-select keys the one correct option, impostor keys the one planted lie
-among three grounded truths. A node's supported item types are derived from persisted generated items,
-never from a separately maintained capability map.
+Implemented item payloads are `option_select`, `matching`, and `impostor`.
+
+A per-node Study Item Blueprint stage runs inside the existing `study_items` operation. It decides
+which item types to generate for the node and assigns each generated type a distinct assessed facet.
+Declined types are persisted as rejected study-item rows, not as a separate capability map. Exact
+payload fields and persistence shapes are owned by source types and the initial migration.
+
+Blueprints have a sparse default. A deterministic structural pre-gate vetoes only provable
+impossibilities from the Concept Lesson substrate: no lesson means no item type; matching requires
+enough distinct grounded fragments to form pairs; impostor requires enough truth fragments to test a
+false statement. The neural blueprint may decline additional types for semantic suitability, and
+blueprint failures fall back to the pre-gate survivors rather than generating every type. Sparse item
+sets are valid Study Item Banks, with every declined type recorded as an inspectable rejection.
+
+Learner-facing Study Session views never serialize answer keys. The client receives option ids,
+statement ids, and matching tile ids needed for interaction; grading re-resolves the server-side key
+from persisted current items.
 
 The impostor item shape single-sources the planted lie. Generation returns three cited truths plus
 one lie payload; the application inserts that lie into the four statement positions, and persistence
@@ -29,18 +42,35 @@ Study items preserve grounding provenance:
 Source citations retain source identifiers and verbatim evidence. Generated citations identify
 generated grounding and never masquerade as source quotes.
 
-Keyed-selection study (option-select and impostor) is auto-graded from the server-side keyed
-selection — the correct option for option-select, the planted impostor for impostor — and appends a
-graded Response Log entry through one grading-neutral path; a node's mastery folds across all its
-graded observations at one threshold regardless of item type. Each type's deterministic guard enforces
-only structural and provenance guarantees: option-select keys exactly one correct option; impostor
-keys exactly one lie, verifies each of the three truths verbatim against its cited grounding, and
-makes a source-cited impostor unrepresentable. A cross-family lie-validity judge then checks whether
-the keyed lie is actually false for the target node. A rejected lie gets one judge-informed retry; if
-the retry still does not produce a false lie, or if the judge is unavailable, the impostor is dropped
-with an operator-visible rejected-row reason. This judge is intentionally fail-closed because a true
-"lie" teaches a falsehood, while a missing impostor item is the designed safe state. Distractor
-plausibility and broader teaching quality remain real-use inspection responsibilities.
+Study responses are auto-graded from server-side keys:
+
+- `option_select` keys the one correct option.
+- `matching` keys each prompt to one match tile and grades one completed board from the submitted
+  attempt trace. A zero-mispair board records `correct`; a cleared board with mispairs records
+  `partial` with fractional score for inspection.
+- `impostor` keys the one planted lie among three grounded truths.
+
+All item types append graded Response Log entries through one grading-neutral path; a node's mastery
+folds across all graded observations at one threshold regardless of item type. `partial` is a graded
+outcome below the mastery threshold and may remain replayable in learner projections.
+
+A node with a Concept Lesson and no current study items is still masterable downstream: the Study
+Session projection treats the persisted lesson read as completion for that itemless node. This does
+not write a Response Log row and does not change the graded-only response contract. A node with
+neither lesson nor current items may be treated as complete by projection only when it is explicitly
+recorded as lesson-absent, so sparse generation cannot deadlock dependents while silent missing data
+does not become mastery.
+
+Each type's deterministic guard enforces only structural and provenance guarantees. Option-select
+keys exactly one correct option; matching enforces pair count, distinct normalized prompt/match text,
+non-self matches, and citation verification; impostor keys exactly one lie, verifies each grounded
+truth verbatim against its cited grounding, and makes a source-cited impostor unrepresentable. A
+cross-family lie-validity judge then checks whether the keyed lie is actually false for the target
+node. A rejected lie gets one judge-informed retry; if the retry still does not produce a false lie,
+or if the judge is unavailable, the impostor is dropped with an operator-visible rejected-row reason.
+This judge is intentionally fail-closed because a true "lie" teaches a falsehood, while a missing
+impostor item is the designed safe state. Distractor plausibility, matching anti-cueing, blueprint
+quality, and broader teaching quality remain real-use inspection responsibilities.
 
 Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
 card. A learner records a mutable binary calibration verdict for a derived node. The application

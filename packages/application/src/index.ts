@@ -1,6 +1,6 @@
 export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { buildGraphVersion } from "./buildGraphVersion";
-export { runGraphEnrichment } from "./runGraphEnrichment";
+export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichment";
 export { runSyntheticGeneration } from "./runSyntheticGeneration";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
@@ -57,7 +57,13 @@ export {
   type AdaptedNodeClassification,
   type AdaptedNodeState
 } from "./adaptivePathProjection";
-export { type StatefulLearnerPathStep } from "./statefulLearnerPath";
+export {
+  deriveFlooredExpedition,
+  projectExpeditionSections,
+  type ExpeditionSection,
+  type ExpeditionSectionStep,
+  type SectionedExpedition
+} from "./expeditionSections";
 
 export {
   composeCalibrationSession,

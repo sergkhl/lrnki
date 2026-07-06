@@ -1048,6 +1048,11 @@ export type RescueDisposition = {
   disposition: RescueDispositionKind;
   rationale: string;
   groundingSpan: string;
+  // When the durability judge proposed a concept-shaped canonical label and minting adopted it
+  // (R12), the original sentence-shaped label the node was rescued under. `canonicalLabel` above
+  // then carries the adopted concept label and the original survives as a node alias. Absent when
+  // no re-label happened (no proposal, a collision, or a dropped node).
+  relabeledFrom?: string;
 };
 
 // The recorded disposition of one reserved minting proposal after durability judging.
@@ -1118,6 +1123,40 @@ export type WholeSetPrerequisiteEdge = {
 // draws are computed in the boundary, never asserted by the model (R9, rules 16/19).
 export type WholeSetOrdering = {
   edges: WholeSetPrerequisiteEdge[];
+};
+
+// One rescued node's concept-shaped canonical label from ONE whole-domain-set labeling
+// draw (TODO #1). A rescued `source_mentioned` node is labeled with the source sentence it
+// was mentioned in, which reads as a proposition rather than a concept name. This dedicated
+// measured step (replacing the durability judge's under-attended optional field) runs
+// UNCONDITIONALLY over the domain's durable rescued nodes, so there is no self-gate for the
+// model to skip: it returns the best concept-shaped label for EACH numbered node, which MAY
+// equal the current label when that already reads as a concept name. The judge cites the node
+// by the 1-based NUMBER shown before it in the prompt (a closed-set position pick, mirroring
+// WholeSetPrerequisiteEdge/DifficultyBandEntry); the application maps number → derivedNodeId by
+// position fail-open, and minting owns adoption (collision guard, alias demotion, reservation).
+export type RescuedNodeLabelEntry = {
+  nodeNumber: number;
+  conceptLabel: string;
+};
+
+export type RescuedNodeLabeling = {
+  labels: RescuedNodeLabelEntry[];
+};
+
+// One concept's difficulty band from ONE whole-domain-set banding draw (comparative
+// banded intrinsic difficulty, ADR-0024). The judge cites the concept by the 1-based
+// NUMBER shown before it in the prompt (a closed-set menu pick, mirroring
+// WholeSetPrerequisiteEdge); the application maps number → derivedNodeId by position
+// fail-closed. `band` is 1–5 RELATIVE to the Declared Domain's concept set, not an
+// absolute scale — the pointwise absolute judge this replaces suffered scale-use bias
+// (abstract-SOUNDING labels scored high without evidence). K draws are sampled per
+// ADR-0028; consensus (modal band) and contested-band calibration live in the
+// application, never here.
+export type DifficultyBandEntry = {
+  conceptNumber: number;
+  band: number;
+  rationale: string;
 };
 
 // An edge of the inferred prerequisite DAG: prerequisite must precede dependent.
@@ -1525,6 +1564,7 @@ export type ConceptLessonDiagramDescriptor = { caption: string; spec: string };
 export type ConceptLessonSection = {
   kind: ConceptLessonSectionKind;
   text: string;
+  items?: string[];
   groundingProvenance: StudyItemGroundingProvenance;
   citation?: StudyItemCitation;
   diagram?: ConceptLessonDiagramDescriptor;
@@ -1560,12 +1600,20 @@ export type LessonAbsentNode = {
 export type ConceptLessonSectionDraft = {
   kind: ConceptLessonSectionKind;
   text: string;
+  items?: string[];
   citation?: { passageId: string; evidenceQuote: string };
   diagram?: ConceptLessonDiagramDescriptor;
 };
 
 export type ConceptLessonDraft = {
   sections: ConceptLessonSectionDraft[];
+};
+
+export type ConceptLessonRedundancyJudgment = {
+  sectionKind: ConceptLessonSectionKind;
+  verdict: "distinct" | "redundant";
+  redundantWith?: ConceptLessonSectionKind;
+  reason: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -1660,6 +1708,7 @@ export const STAGE_TAGS = {
   // `generated-enrichment-judge` tags collapse into this single attribution bucket.
   prerequisiteOrdering: "prerequisite-ordering",
   rescueDurability: "rescue-durability",
+  rescuedNodeLabeling: "rescued-node-labeling",
   rescueDefinitionQuality: "rescue-definition-quality",
   mintingDurability: "minting-durability",
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
@@ -1675,6 +1724,7 @@ export const STAGE_TAGS = {
   // operation (KTD1) — no new operation type — but carries its own spend tag so its
   // cost ⋈ wall-clock join stays separable from option-select generation (R-cost).
   conceptLessonGeneration: "concept-lesson-generation",
+  lessonRedundancyJudgment: "lesson-redundancy-judgment",
   studyItemBlueprint: "study-item-blueprint",
   studyItemGeneration: "study-item-generation",
   matchingGeneration: "matching-generation",

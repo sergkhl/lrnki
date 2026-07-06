@@ -10,7 +10,7 @@ import {
   studyItemViewToSheet,
   unmetPrerequisites
 } from "./studySessionProjection";
-import { selectScopedFrontierTarget, type AdaptedNodeClassification } from "./adaptivePathProjection";
+import { type AdaptedNodeClassification } from "./adaptivePathProjection";
 
 // DAG: scope -> ownership -> move (certain), plus borrow -> move (uncertain).
 const labelByNode: Record<string, string> = { scope: "Variable scope", ownership: "Ownership", move: "Move semantics", borrow: "Borrowing" };
@@ -134,16 +134,16 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
-function compose(args: { target: string; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonAbsent?: LessonAbsentNode[] }) {
+function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[] } = {}) {
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    targetDerivedNodeId: args.target,
     detail: detail(),
     studyItems: args.studyItems ?? [],
     rows: args.rows ?? [],
     verdicts: args.verdicts ?? [],
     lessons: args.lessons,
+    lessonReads: args.lessonReads,
     lessonAbsent: args.lessonAbsent
   });
 }
@@ -155,27 +155,44 @@ function lessonFor(derivedNodeId: string): ConceptLesson {
     sections: [
       { kind: "gist", text: "A short gist.", groundingProvenance: "generated" },
       { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition.", matchKind: "exact" } },
-      { kind: "applications", text: "Connects to neighbors.", groundingProvenance: "generated" }
+      { kind: "applications", text: "Connects to neighbors.", items: ["First use.", "Second use."], groundingProvenance: "generated" }
     ]
   };
 }
 
 test("composeStudySession gates a frontier node with an option-select item to an option_select sheet (options sorted by id)", () => {
-  const session = compose({ target: "move", studyItems: [optionItem("scope")] });
-  // No verdicts/rows: scope is the only frontier node in move's cone, so it is selected.
-  assert.equal(session.classification.selectedFrontierTarget, "scope");
+  const session = compose({ studyItems: [optionItem("scope")] });
+  // No verdicts/rows: scope and borrow are the ready frontier nodes; the whole-layer ring
+  // marks the HARDEST ready node, which is borrow (0.9 > scope 0.2).
+  assert.equal(session.classification.selectedFrontierTarget, "borrow");
+  assert.equal(session.classification.stateByNode.scope, "frontier");
   const sheet = session.sheetByNode.scope;
   assert.equal(sheet.kind, "option_select");
   assert.equal(sheet.kind === "option_select" && sheet.item.options.map((o) => o.optionId).join(","), "o-scope-1,o-scope-2");
 });
 
 test("composeStudySession gives a frontier node with no item a cardless sheet", () => {
-  const session = compose({ target: "move" });
+  const session = compose();
   assert.equal(session.sheetByNode.scope.kind, "cardless");
 });
 
+test("composeStudySession masters itemless lesson nodes only after the lesson read", () => {
+  const unread = compose({ lessons: [lessonFor("scope")] });
+  assert.equal(unread.classification.stateByNode.scope, "frontier");
+  assert.equal(unread.sheetByNode.scope.kind, "cardless");
+
+  const read = compose({ lessons: [lessonFor("scope")], lessonReads: ["scope"] });
+  assert.equal(read.classification.stateByNode.scope, "mastered");
+});
+
+test("composeStudySession masters explicit no-lesson no-item absences so they do not block", () => {
+  const session = compose({ lessonAbsent: [{ derivedNodeId: "scope", canonicalLabel: "Variable scope", reason: "no usable grounding passages" }] });
+  assert.equal(session.classification.stateByNode.scope, "mastered");
+  assert.equal(session.classification.stateByNode.ownership, "frontier");
+});
+
 test("composeStudySession names a locked node's unmet prerequisites and excludes the uncertain edge", () => {
-  const session = compose({ target: "move" });
+  const session = compose();
   const move = session.sheetByNode.move;
   assert.equal(move.kind, "locked");
   // move's certain prerequisite is ownership; the uncertain borrow edge is excluded.
@@ -184,54 +201,46 @@ test("composeStudySession names a locked node's unmet prerequisites and excludes
 
 test("composeStudySession opens a mastered node as a cardless review carrying its verdict", () => {
   // Mark scope known so its closure (just scope) masters it; target ownership keeps scope visible.
-  const session = compose({ target: "ownership", verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
+  const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
   const scope = session.sheetByNode.scope;
   assert.equal(scope.kind, "mastered_review");
   assert.equal(scope.kind === "mastered_review" && scope.verdict, "known");
 });
 
-test("selectScopedFrontierTarget picks the hardest frontier node within the goal cone, tie-broken by id", () => {
-  const classification: AdaptedNodeClassification = {
-    stateByNode: { scope: "mastered", ownership: "frontier", move: "locked", borrow: "frontier" },
-    selectedFrontierTarget: "ownership"
-  };
-  const difficulties = ["scope", "ownership", "move", "borrow"].map((id) => ({ derivedNodeId: id, score: difficultyByNode[id] }));
-  // Goal = move; scope cone = {scope, ownership, move}. borrow is frontier but OUTSIDE the cone.
-  assert.equal(selectScopedFrontierTarget({ targetNodeId: "move", prerequisiteEdges: detail().edges, classification, difficulties }), "ownership");
+test("composeStudySession treats a learn verdict as cleared calibration, not known closure mastery", () => {
+  const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "learn" }] });
+  assert.equal(session.classification.stateByNode.scope, "frontier");
+  assert.deepEqual(session.adaptedHiddenNodeIds, []);
+  assert.equal(session.sheetByNode.scope.kind, "cardless");
 });
 
-test("selectScopedFrontierTarget returns null when the goal cone has no frontier node", () => {
-  const done: AdaptedNodeClassification = { stateByNode: { scope: "mastered", ownership: "mastered", move: "mastered" }, selectedFrontierTarget: null };
-  assert.equal(selectScopedFrontierTarget({ targetNodeId: "move", prerequisiteEdges: detail().edges, classification: done, difficulties: [] }), null);
+test("composeStudySession rides down a layer-wide sectioned expedition path with the derived summit", () => {
+  const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
+  // The whole floored layer is the trail: move's cone (scope, ownership, move) then borrow's
+  // singleton section. Every non-floored node appears exactly once.
+  assert.deepEqual(session.expeditionPath.map((step) => step.derivedNodeId).sort(), ["borrow", "move", "ownership", "scope"]);
+  assert.equal(session.expeditionPath.find((step) => step.derivedNodeId === "scope")?.state, session.classification.stateByNode.scope);
+  // Summit is the last section's milestone — the hardest terminal, borrow.
+  assert.equal(session.target.derivedNodeId, "borrow");
+  assert.equal(session.expeditionPath.find((step) => step.derivedNodeId === "borrow")?.isSummit, true);
+  // Two milestone-anchored sections: move (easier cone) first, borrow second.
+  assert.deepEqual(session.sections.map((section) => section.milestoneDerivedNodeId), ["move", "borrow"]);
 });
 
-test("composeStudySession marks a DAG-root goal as a foundational root", () => {
-  assert.equal(compose({ target: "scope" }).isFoundationalRoot, true);
-  assert.equal(compose({ target: "move" }).isFoundationalRoot, false);
-});
-
-test("composeStudySession rides down an unpruned statefulPath scoped to the target and trusted ancestors", () => {
-  const session = compose({ target: "move", verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
-  assert.deepEqual(session.statefulPath.map((step) => step.derivedNodeId), ["scope", "ownership", "move"]);
-  assert.equal(session.statefulPath.find((step) => step.derivedNodeId === "scope")?.state, session.classification.stateByNode.scope);
-  assert.equal(session.statefulPath.find((step) => step.derivedNodeId === "move")?.isTarget, true);
-  assert.equal(session.statefulPath.some((step) => step.derivedNodeId === "borrow"), false, "uncertain ancestors are excluded from scope");
-});
-
-test("composeStudySession prunes the known closure, excludes the goal from the hide list even when known, and is ordering-independent", () => {
-  const verdicts: CalibrationVerdict[] = [{ learnerStateRef: "L1", derivedNodeId: "ownership", verdict: "known" }];
-  const session = compose({ target: "move", verdicts });
-  // Marking ownership known prunes its prerequisite closure (scope); both are hidden, the goal (move) is not.
+test("composeStudySession prunes the known closure and keeps the derived summit visible even when known", () => {
+  // Marking ownership known prunes its prerequisite closure (scope); both are hidden. The
+  // derived summit (borrow) is not in the closure, so it is untouched.
+  const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "ownership", verdict: "known" }] });
   assert.deepEqual([...session.adaptedHiddenNodeIds].sort(), ["ownership", "scope"]);
-  // When the goal itself is marked known it stays visible.
-  const goalKnown = compose({ target: "ownership", verdicts });
-  assert.equal(goalKnown.adaptedHiddenNodeIds.includes("ownership"), false);
-  assert.equal(goalKnown.adaptedHiddenNodeIds.includes("scope"), true);
+  // Marking the derived summit (borrow) known keeps it VISIBLE — the summit is exempt from the
+  // hide list so the trail always shows where it ends.
+  const summitKnown = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "borrow", verdict: "known" }] });
+  assert.equal(summitKnown.target.derivedNodeId, "borrow");
+  assert.equal(summitKnown.adaptedHiddenNodeIds.includes("borrow"), false);
 });
 
 test("composeStudySession surfaces calibration↔graded coexistence rather than resolving it", () => {
   const session = compose({
-    target: "move",
     verdicts: [{ learnerStateRef: "L1", derivedNodeId: "ownership", verdict: "known" }],
     rows: [graded("ownership", "incorrect", 1)]
   });
@@ -242,7 +251,6 @@ test("composeStudySession surfaces calibration↔graded coexistence rather than 
 
 test("composeStudySession exposes the latest graded outcome per study item", () => {
   const session = compose({
-    target: "move",
     studyItems: [optionItem("scope"), impostorItem("scope")],
     rows: [
       { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
@@ -256,6 +264,66 @@ test("composeStudySession exposes the latest graded outcome per study item", () 
   });
 });
 
+test("Covers AE1: a lesson read + one of three activities correct leaves the node frontier and its dependents locked", () => {
+  const session = compose({
+    studyItems: [optionItem("scope"), impostorItem("scope")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    // Only the option-select is answered correctly; the impostor stop is untouched.
+    rows: [{ ...graded("scope", "correct", 1), studyItemId: "os-scope" }]
+  });
+  assert.equal(session.classification.stateByNode.scope, "frontier", "one correct activity does not master a multi-segment node");
+  assert.equal(session.classification.stateByNode.ownership, "locked", "dependents stay locked");
+});
+
+test("Covers AE2: a lesson read + every activity latest-correct masters the node and unlocks dependents", () => {
+  const session = compose({
+    studyItems: [optionItem("scope"), impostorItem("scope")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    rows: [
+      { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
+      { ...graded("scope", "correct", 2), studyItemId: "imp-scope" }
+    ]
+  });
+  assert.equal(session.classification.stateByNode.scope, "mastered");
+  assert.equal(session.classification.stateByNode.ownership, "frontier", "the dependent unlocks");
+});
+
+test("all activities correct but the lesson unread does not master the node", () => {
+  const session = compose({
+    studyItems: [optionItem("scope")],
+    lessons: [lessonFor("scope")],
+    // lessonReads omitted: the lesson is unread.
+    rows: [{ ...graded("scope", "correct", 1), studyItemId: "os-scope" }]
+  });
+  assert.equal(session.classification.stateByNode.scope, "frontier", "an unread lesson blocks completion even with all activities correct");
+});
+
+test("a matching partial outcome does not complete its node", () => {
+  const session = compose({
+    studyItems: [matchingItem("scope")],
+    rows: [{ ...graded("scope", "partial", 1), studyItemId: "match-scope" }]
+  });
+  assert.equal(session.classification.stateByNode.scope, "frontier", "partial is not latest-correct");
+});
+
+test("a latest-incorrect after an earlier correct reopens the stop and demotes completion", () => {
+  const mastered = compose({
+    studyItems: [optionItem("scope")],
+    rows: [{ ...graded("scope", "correct", 1), studyItemId: "os-scope" }]
+  });
+  assert.equal(mastered.classification.stateByNode.scope, "mastered", "single-activity node with no lesson masters on the correct answer");
+  const reopened = compose({
+    studyItems: [optionItem("scope")],
+    rows: [
+      { ...graded("scope", "correct", 1), studyItemId: "os-scope" },
+      { ...graded("scope", "incorrect", 2), studyItemId: "os-scope" }
+    ]
+  });
+  assert.equal(reopened.classification.stateByNode.scope, "frontier", "the later incorrect reopens the stop");
+});
+
 test("unmetPrerequisites returns only direct, non-mastered prerequisites, excluding uncertain edges", () => {
   const classification: AdaptedNodeClassification = {
     stateByNode: { scope: "mastered", ownership: "frontier", move: "locked", borrow: "frontier" },
@@ -265,7 +333,7 @@ test("unmetPrerequisites returns only direct, non-mastered prerequisites, exclud
   assert.deepEqual(unmetPrerequisites("ownership", detail().edges, classification), []);
 });
 
-test("adaptedHiddenNodeIds returns the known closure minus the goal target", () => {
+test("adaptedHiddenNodeIds returns the known closure minus the derived summit", () => {
   assert.deepEqual(adaptedHiddenNodeIds(new Set(["scope", "ownership", "move"]), "move"), ["scope", "ownership"]);
   assert.deepEqual(adaptedHiddenNodeIds(new Set(["scope", "ownership"]), "move"), ["scope", "ownership"]);
   assert.deepEqual(adaptedHiddenNodeIds(new Set(), "move"), []);
@@ -323,20 +391,20 @@ test("study item views do not serialize keyed answers to the learner client (AE6
 });
 
 test("studySegmentsByNode lists a node's segments in canonical order (option_select before matching before impostor)", () => {
-  const session = compose({ target: "move", studyItems: [impostorItem("scope"), matchingItem("scope"), optionItem("scope")] });
+  const session = compose({ studyItems: [impostorItem("scope"), matchingItem("scope"), optionItem("scope")] });
   assert.deepEqual(session.studySegmentsByNode.scope.map((segment) => segment.kind), ["option_select", "matching", "impostor"]);
   // The node-level sheet content resolves to the FIRST segment (option_select) for the badge.
   assert.equal(session.sheetByNode.scope.kind, "option_select");
 });
 
 test("a node with only an impostor lists one segment and gates to an impostor sheet", () => {
-  const session = compose({ target: "move", studyItems: [impostorItem("scope")] });
+  const session = compose({ studyItems: [impostorItem("scope")] });
   assert.deepEqual(session.studySegmentsByNode.scope.map((segment) => segment.kind), ["impostor"]);
   assert.equal(session.sheetByNode.scope.kind, "impostor");
 });
 
 test("composeStudySession rides each node's lesson down into lessonByNode with honest provenance", () => {
-  const session = compose({ target: "ownership", lessons: [lessonFor("scope")] });
+  const session = compose({ lessons: [lessonFor("scope")] });
   const lesson = session.lessonByNode["scope"];
   assert.ok(lesson);
   assert.equal(lesson.sections.find((s) => s.kind === "definition")?.isSourceCited, true);
@@ -345,7 +413,7 @@ test("composeStudySession rides each node's lesson down into lessonByNode with h
 });
 
 test("composeStudySession surfaces lesson-absent nodes with their label and reason, sorted", () => {
-  const session = compose({ target: "ownership", lessonAbsent: [
+  const session = compose({ lessonAbsent: [
     { derivedNodeId: "move", canonicalLabel: "Move semantics", reason: "no usable grounding passages" },
     { derivedNodeId: "scope", canonicalLabel: "Variable scope", reason: "lesson did not meet the minimum" }
   ] });
@@ -356,6 +424,7 @@ test("composeStudySession surfaces lesson-absent nodes with their label and reas
 test("conceptLessonToView badges source vs generated sections from authoritative provenance", () => {
   const view = conceptLessonToView(lessonFor("scope"));
   assert.deepEqual(view.sections.map((s) => s.isSourceCited), [false, true, false]);
+  assert.deepEqual(view.sections.find((section) => section.kind === "applications")?.items, ["First use.", "Second use."]);
 });
 
 // U7/R10: the Study Session projection renders over an ANCHOR-LESS synthetic layer with no
@@ -371,22 +440,121 @@ function syntheticDetail(): DerivedGraphDetail {
   };
 }
 
-test("composeStudySession renders over an anchor-less synthetic layer, resolving the target and gating by derivedNodeId (R10)", () => {
+test("composeStudySession renders over an anchor-less synthetic layer, gating by derivedNodeId (R10)", () => {
   const session = composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    targetDerivedNodeId: "move",
     detail: syntheticDetail(),
     studyItems: [optionItem("scope")],
     rows: [],
     verdicts: []
   });
-  // The synthetic target resolves and the DAG gates: scope is the frontier, move stays locked
-  // behind its certain prerequisite (ownership); the uncertain edge is excluded — identical to
-  // the source-grounded projection, with no anchor in the layer.
-  assert.equal(session.classification.selectedFrontierTarget, "scope");
+  // The synthetic layer sections identically to a source-grounded one: scope is a frontier,
+  // move stays locked behind its certain prerequisite (ownership); the uncertain edge is
+  // excluded; the whole-layer ring marks the hardest ready node (borrow). No anchor in the layer.
+  assert.equal(session.classification.selectedFrontierTarget, "borrow");
   assert.equal(session.sheetByNode.scope.kind, "option_select");
   const move = session.sheetByNode.move;
   assert.equal(move.kind, "locked");
   assert.deepEqual(move.kind === "locked" && move.unmetPrerequisiteLabels, ["Ownership"]);
+});
+
+// --- Minimal trail-inclusion difficulty floor (plan 2026-07-05-002 U4, AE4) ---------
+
+// The base fixture with banded confidence on each node: ownership is a CONFIDENT band-1
+// node sitting between scope and move on the certain chain.
+function bandedDetail(bands: Record<string, { band: number; contested: boolean }>): DerivedGraphDetail {
+  const base = detail();
+  return {
+    ...base,
+    nodes: base.nodes.map((node) => ({
+      ...node,
+      difficultyBand: bands[node.derivedNodeId]?.band ?? null,
+      difficultyContested: bands[node.derivedNodeId]?.contested ?? null
+    }))
+  };
+}
+
+const floorBands = {
+  scope: { band: 3, contested: false },
+  ownership: { band: 1, contested: false },
+  move: { band: 4, contested: false },
+  borrow: { band: 4, contested: false }
+};
+
+test("a confident band-1 node between two stops disappears from the trail and its gating contracts (AE4)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: bandedDetail(floorBands),
+    studyItems: [optionItem("ownership"), optionItem("scope")],
+    rows: [],
+    verdicts: []
+  });
+
+  assert.deepEqual(session.flooredNodeIds, ["ownership"]);
+  // No trail step and no activity segments for the floored node.
+  assert.ok(!session.expeditionPath.some((step) => step.derivedNodeId === "ownership"));
+  assert.equal(session.studySegmentsByNode.ownership, undefined);
+  assert.equal(session.sheetByNode.ownership, undefined);
+  // Gating survives by contraction: move is locked behind scope directly.
+  const move = session.sheetByNode.move;
+  assert.equal(move.kind, "locked");
+  assert.deepEqual(move.kind === "locked" && move.unmetPrerequisiteLabels, ["Variable scope"]);
+  // The full detail still rides down for the map render.
+  assert.equal(session.detail.nodes.length, 4);
+});
+
+test("mastering the contracted prerequisite chain unlocks the dependent past the floored node (AE4)", () => {
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: bandedDetail(floorBands),
+    studyItems: [],
+    rows: [],
+    verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }]
+  });
+  assert.equal(session.classification.stateByNode.move, "frontier");
+});
+
+test("a confident band-1 terminal is floored like any other node (no target exemption)", () => {
+  // borrow is a band-1 confident TERMINAL. With no learner-chosen target there is no exemption:
+  // it is floored and anchors no section — the summit falls to the next-hardest terminal (move).
+  const session = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: bandedDetail({ ...floorBands, borrow: { band: 1, contested: false } }),
+    studyItems: [optionItem("scope")],
+    rows: [],
+    verdicts: []
+  });
+  assert.ok(session.flooredNodeIds.includes("borrow"));
+  assert.ok(!session.expeditionPath.some((step) => step.derivedNodeId === "borrow"));
+  assert.equal(session.sheetByNode.borrow, undefined);
+});
+
+test("contested and band-less nodes are never floored; a band-less detail is a no-op (fail-open)", () => {
+  const contested = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: bandedDetail({ ...floorBands, ownership: { band: 1, contested: true } }),
+    studyItems: [],
+    rows: [],
+    verdicts: []
+  });
+  assert.deepEqual(contested.flooredNodeIds, []);
+  assert.ok(contested.expeditionPath.some((step) => step.derivedNodeId === "ownership"));
+
+  const baseline = compose();
+  const bandless = composeStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    detail: detail(),
+    studyItems: [],
+    rows: [],
+    verdicts: []
+  });
+  assert.deepEqual(bandless.flooredNodeIds, []);
+  assert.deepEqual(bandless.expeditionPath, baseline.expeditionPath);
+  assert.deepEqual(Object.keys(bandless.sheetByNode).sort(), Object.keys(baseline.sheetByNode).sort());
 });

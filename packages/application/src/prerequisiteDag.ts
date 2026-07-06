@@ -1,10 +1,10 @@
-import type { ConceptDifficulty, InferredPrerequisiteEdge } from "@lrnki/domain-core";
+import type { InferredPrerequisiteEdge } from "@lrnki/domain-core";
 
 // ---------------------------------------------------------------------------
 // Symbolic half of Graph Enrichment (ADR-0019). These helpers are PURE and
 // DETERMINISTIC: no model calls, no store, no clock. The LLM proposes edges;
 // this module disposes — weak-edge cut, cycle removal, transitive reduction,
-// DAG-depth difficulty, prerequisite traversal. Every helper sorts its inputs
+// prerequisite traversal. Every helper sorts its inputs
 // so the same edge set always yields the same result (replay guarantee).
 // Convention: an edge means `prerequisiteDerivedNodeId` MUST precede `dependentDerivedNodeId`.
 // ---------------------------------------------------------------------------
@@ -14,7 +14,9 @@ type Edge = InferredPrerequisiteEdge;
 // ids. Both `InferredPrerequisiteEdge` and loader-facing graph edges satisfy it structurally.
 export type PrerequisiteEdgeRef = Pick<Edge, "prerequisiteDerivedNodeId" | "dependentDerivedNodeId">;
 
-function sortEdges(edges: Edge[]): Edge[] {
+// Deterministic endpoint sort shared by every edge-producing seam (replay guarantee);
+// generic so InferredPrerequisiteEdge and the inspection DerivedGraphEdge both use it.
+export function sortEdges<E extends PrerequisiteEdgeRef>(edges: E[]): E[] {
   return [...edges].sort(
     (a, b) =>
       a.prerequisiteDerivedNodeId.localeCompare(b.prerequisiteDerivedNodeId) ||
@@ -201,25 +203,3 @@ export function topologicalOrder(
   return order;
 }
 
-// Deterministic DAG-depth difficulty component producer. The production difficulty
-// method is neural intrinsic difficulty; learner-calibrated IRT/BT remains deferred
-// until learner-response data exists.
-export function dagDepthDifficulty(derivedNodeIds: string[], edges: Edge[]): ConceptDifficulty[] {
-  const depth = topologicalDepth(derivedNodeIds, edges);
-  const fanIn = new Map<string, number>();
-  for (const e of edges) fanIn.set(e.dependentDerivedNodeId, (fanIn.get(e.dependentDerivedNodeId) ?? 0) + 1);
-  const maxDepth = Math.max(1, ...[...depth.values()]);
-  return derivedNodeIds.map((derivedNodeId) => {
-    const topoDepth = depth.get(derivedNodeId) ?? 0;
-    return {
-      derivedNodeId,
-      score: topoDepth / maxDepth,
-      method: "dag-depth-mock",
-      // Structural-only producer: no neural subscore is consulted, so the rationale is
-      // empty. Its output is read only for `components`/`score` inside intrinsic fusion
-      // and is never persisted as a ConceptDifficulty row.
-      neuralRationale: "",
-      components: { topoDepth, fanIn: fanIn.get(derivedNodeId) ?? 0 }
-    };
-  });
-}

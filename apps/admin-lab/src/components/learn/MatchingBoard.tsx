@@ -4,10 +4,11 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { CheckIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { MatchingAttemptTrace, StudyMatchingView } from "@lrnki/application";
-import type { LearnerMatchingResult } from "@/app/learn/[learnerStateRef]/actions";
+import type { LearnerMatchingResult } from "@/app/learn/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { GroundedBadge } from "./GroundedBadge";
+import { canTryMatchingPair, matchingProgress } from "./matchingProgress";
 import { useShuffledLookup } from "./useShuffledLookup";
 
 type SelectedTile = { column: "prompt" | "match"; id: string } | null;
@@ -29,8 +30,7 @@ export function MatchingBoard({
   const { orderedIds: matchIds, byId: matchById } = useShuffledLookup(item.matches, (match) => match.matchId);
   const [selected, setSelected] = useState<SelectedTile>(null);
   const [matchedPairs, setMatchedPairs] = useState<{ promptId: string; matchId: string }[]>([]);
-  const lockedPromptIds = useMemo(() => new Set(matchedPairs.map((pair) => pair.promptId)), [matchedPairs]);
-  const lockedMatchIds = useMemo(() => new Set(matchedPairs.map((pair) => pair.matchId)), [matchedPairs]);
+  const progress = useMemo(() => matchingProgress(matchedPairs, item.prompts.length), [matchedPairs, item.prompts.length]);
   const [wrong, setWrong] = useState<Set<string>>(() => new Set());
   const [submitted, setSubmitted] = useState(false);
   const traceRef = useRef<MatchingAttemptTrace>([]);
@@ -38,9 +38,17 @@ export function MatchingBoard({
   const wrongTimeoutRef = useRef<number | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const complete = result?.graded === true || submitted;
+  const complete = result?.graded === true || submitted || progress.complete;
   const tryPair = (promptId: string, matchId: string) => {
-    if (disabled || pending || complete || lockedPromptIds.has(promptId)) return;
+    if (!canTryMatchingPair({
+      disabled,
+      pending,
+      complete,
+      lockedPromptIds: progress.lockedPromptIds,
+      lockedMatchIds: progress.lockedMatchIds,
+      promptId,
+      matchId
+    })) return;
     traceRef.current = [...traceRef.current, { promptId, chosenMatchId: matchId }];
     startTransition(async () => {
       const correct = await onAttempt(promptId, matchId);
@@ -48,7 +56,7 @@ export function MatchingBoard({
         const nextMatchedPairs = [...matchedPairs, { promptId, matchId }];
         setMatchedPairs(nextMatchedPairs);
         setSelected(null);
-        if (nextMatchedPairs.length === item.prompts.length && !submittedRef.current) {
+        if (matchingProgress(nextMatchedPairs, item.prompts.length).complete && !submittedRef.current) {
           submittedRef.current = true;
           setSubmitted(true);
           await onComplete(traceRef.current);
@@ -78,9 +86,14 @@ export function MatchingBoard({
         <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
         <GroundedBadge provenance={item.groundingProvenance} />
       </div>
-      <p className="text-sm text-muted-foreground">Tap a field clue, then tap its match.</p>
+      <p className="text-sm text-muted-foreground">
+        {matchedPairs.length} of {item.prompts.length} matched. Tap a clue on the left, then its match on the right.
+      </p>
+      {/* Two-column tap-pairs (R10): clues left, matches right, each independently shuffled.
+          Tapping a tile in either column selects it; tapping one in the other column pairs them. */}
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Clues</h3>
           {promptIds.map((id) => {
             const prompt = promptById.get(id);
             if (!prompt) return null;
@@ -89,7 +102,7 @@ export function MatchingBoard({
                 key={id}
                 text={prompt.text}
                 selected={selected?.column === "prompt" && selected.id === id}
-                locked={lockedPromptIds.has(id)}
+                locked={progress.lockedPromptIds.has(id)}
                 wrong={wrong.has(id)}
                 disabled={disabled || pending || complete}
                 onClick={() => choose("prompt", id)}
@@ -98,6 +111,7 @@ export function MatchingBoard({
           })}
         </div>
         <div className="flex flex-col gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Matches</h3>
           {matchIds.map((id) => {
             const match = matchById.get(id);
             if (!match) return null;
@@ -106,7 +120,7 @@ export function MatchingBoard({
                 key={id}
                 text={match.text}
                 selected={selected?.column === "match" && selected.id === id}
-                locked={lockedMatchIds.has(id)}
+                locked={progress.lockedMatchIds.has(id)}
                 wrong={wrong.has(id)}
                 disabled={disabled || pending || complete}
                 onClick={() => choose("match", id)}
@@ -139,9 +153,13 @@ function TileButton({
     <motion.div animate={wrong ? { x: [0, -8, 8, -4, 4, 0] } : { x: 0 }} transition={{ duration: 0.32 }}>
       <Button
         type="button"
-        variant={locked ? "default" : selected ? "secondary" : "outline"}
+        variant={locked ? "secondary" : selected ? "secondary" : "outline"}
         disabled={disabled || locked}
-        className={cn("h-auto min-h-12 w-full justify-start whitespace-normal text-left", selected ? "ring-2 ring-[color:var(--journal-frontier)]" : null)}
+        className={cn(
+          "h-auto min-h-12 w-full justify-start whitespace-normal text-left",
+          locked ? "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem-soft)] text-[color:var(--journal-ink)]" : null,
+          selected ? "ring-2 ring-[color:var(--journal-frontier)]" : null
+        )}
         onClick={onClick}
       >
         <span className="flex items-start gap-2">

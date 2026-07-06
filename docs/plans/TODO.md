@@ -2,18 +2,7 @@
 
 ## TODO
 
-1. **Address broad, evidence-thin intrinsic-difficulty distortion.** Real full-manifest inspection
-   found plausible ordering overall but over-weighted some broad or relation-like labels with sparse
-   evidence. Learner-facing symptom (2026-07-05): relation-like concepts (e.g. "Compositional
-   relationship") reach the trail as trivially easy stops, so the score cannot yet be trusted as a
-   gating signal — a difficulty floor for trail inclusion was considered and deferred until this
-   fix lands; the trivial-question half of that symptom is answer-leakage at item generation and is
-   handled there, not here.
-   - Prefer a measured neural judge over fixture-specific prompt tuning or deterministic proxies.
-   - Keep population calibration deferred until stable real learner-response data exists
-     ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md)).
-
-2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+1. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
@@ -23,7 +12,7 @@
    source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+2. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -34,6 +23,73 @@
    `tmp/2026-06-30-generation-metering/`.
 
 ## COMPLETED
+
+- **Growing crystals and Crystal Vista.** Per-concept procedural growing crystals now replace the
+  gem icon across the learner trail, with deterministic crystal geometry, facet-by-facet growth for
+  mastered activity segments, skipped-known ghost crystals, section-divider and overview strips, and
+  mastery reveal animation. The Crystal Vista gives a view-only bedrock-up formation for the
+  expedition and opens from the header tally or section-completion celebration. Accepted framing:
+  [2026-07-06 brainstorm](../brainstorms/2026-07-06-growing-crystals-and-vista-requirements.md).
+  Decision: [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Learner App UX polish pass.** The learner entry and expedition flow now use static `/learn` and
+  `/learn/expedition/{enrichmentId}` URLs with an httpOnly learner-ref cookie set by
+  `/learn/session`, plus a Switch explorer control. The expedition entry uses Begin/Resume labels,
+  domain-eyebrow candidate cards, and a shadcn Dialog for one-step "Plan expedition" topic creation
+  with server-side Declared Domain inference. Generation cards show fixed-denominator `k / N`
+  Surveying progress. Known-skipped concepts can be unmarked, render as "Known ground" ghost
+  crystals, stay complete for gating, and are excluded from collected-crystal tallies and Crystal
+  Vista growth. Matching activities now keep 3/4 matched pairs locked and incomplete until the final
+  pair, with completed pair styling distinct from ordinary primary buttons. Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Dedicated Rescued-Node Canonical Labeling step.** The rescued-node concept re-label is now a
+  dedicated measured step instead of an under-attended optional field on the rescue durability
+  judge. A new `RescuedNodeLabelingPort` runs one whole-set forced-tool call per Declared Domain
+  (on `kg-independent-judge`, `rescued-node-labeling` stage tag) over the domain's *durable*
+  rescued nodes, unconditionally returning a concept-shaped label for each (which may equal the
+  current one), number-cited and position-mapped fail-open. The durability judge's
+  `canonicalLabelProposal` field is deleted end-to-end (type, validator, prompt, application
+  surfacing, tests). Minting keeps the single adoption authority — the collision guard against the
+  domain's taken labels, alias demotion, reservation, and `relabeledFrom` recording are unchanged.
+  No migration and no `litellm` config change. Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Adaptive sectioned expedition trail and game-honesty pass.** The Study Session projection is now
+  layer-wide and sectioned: milestone-anchored sections over the whole floored Derived Graph Layer,
+  ordered easiest-first, with the summit derived at read time (the last section's milestone). The
+  persisted expedition target column and its ready CHECK are deleted; expeditions chart/ensure and
+  offer one Begin candidate per enrichment, and every learner-facing count derives from the shared
+  trail scope. A node masters only when its lesson is read and every activity segment is
+  latest-correct (one rule for gating, gem, and per-stop visuals). The learner trail renders sections
+  with a non-blocking on-demand overview (prerequisite-gated jumping), matching is two-column
+  tap-pairs, key terms are deleted end-to-end (generation, schema, types, render), and rescued
+  `source_mentioned` nodes adopt a concept-shaped canonical label from the durability judge (original
+  demoted to an alias, fail-open on collision). Terminology folded into
+  [CONTEXT.md](../../CONTEXT.md) (Study Session, Expedition Section). Decisions:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) and
+  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md) (target exemption removed).
+
+- **Learner theory quality, sparse item blueprint, and game-flow polish.** Concept Lessons carry
+  list-structured examples/applications (key-term highlighting was later deleted end-to-end); a
+  cross-family redundancy judge retries then
+  drops redundant non-substantive sections; the lesson minimum is one substantive section; Study
+  Item Blueprint generation has a structural sparse pre-gate; itemless lesson nodes master through
+  lesson reads; and the Learner App remembers the learner name, uses a mobile-first matching layout,
+  and routes through the capstone reward before advancing. Decisions:
+  [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Comparative banded intrinsic difficulty and trail floor.** Intrinsic difficulty is now a
+  K-sampled comparative in-set banded prior: one forced-tool call per Declared Domain bands every
+  concept 1–5 relative to that domain's set, dispersion marks contested bands, and a bounded
+  pairwise bracket against uncontested anchors calibrates them. The pointwise absolute judge, the
+  neural+structural fusion, and `dagDepthDifficulty` were deleted; the persisted score is
+  `(band − 1)/4`, the exact inverse of the diamond mapping, so the learner UI is unchanged. The
+  Study Session projection now floors confident band-1 non-target nodes out of the trail via edge
+  contraction (gating preserved), exposing `flooredNodeIds` for inspection. Decision:
+  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md) (amended).
 
 - **Learner trail polish.** The learner trail now uses opaque portal surfaces, one-tap option-select
   grading with generated explanations, persisted lesson-read completion, a linear next-pointer,
@@ -102,32 +158,122 @@
   [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md), and
   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-- **Source-grounded asserted graph baseline.** Curated mixed-format sources normalize into structured
-  blocks; atomic Concept Admission selects core Concepts; CEP extraction preserves verified
-  definitions, mentions, and the single permitted typed assertion; explicitly selected Extraction
-  Runs build immutable asserted graph versions with zero asserted edges. Decisions:
-  [ADR-0004](../adr/0004-normalize-curated-sources.md),
-  [ADR-0005](../adr/0005-admit-atomic-concepts-before-evidence-profiles.md),
-  [ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md),
-  [ADR-0016](../adr/0016-retire-relation-registry-keep-one-cep-assertion.md), and
-  [ADR-0017](../adr/0017-split-extraction-runs-from-graph-version-builds.md).
-
-- **Derived Graph Enrichment.** Enrichment rescues source-mentioned nodes, mints generated nodes only
-  for source-absent prerequisites, records grounding origin structurally, derives prerequisite
-  structure through sampled whole-domain ordering, and keeps uncertainty inspectable. Decisions:
-  [ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
-  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md),
-  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), and
-  [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md).
-
 - **Study assets and learner state.** The learner loop keys study assets and responses to
   `derived_node_id`; Concept Lessons ground downstream study assets; the Study Item Bank supports
-  `option_select` and `impostor`; graded selections append to the Response Log while calibration
-  remains separate. Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
+  option-select, matching, and impostor through per-node blueprints; keyless learner views submit
+  ids while server-side grading appends to the Response Log, and calibration remains separate.
+  Decisions: [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md), and
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Learner App UX polish pass, 2026-07-06.** Deterministic envelope: `@lrnki/admin-lab` test suite
+  green (113 tests including chartingProgress, matchingProgress, resumeLabel, skipped-known trail and
+  vista coverage), `@lrnki/admin-lab` typecheck exit 0, `@lrnki/application` typecheck exit 0,
+  `@lrnki/application` test suite green (466 tests), root ESLint exit 0 with 6 pre-existing warnings,
+  and `@lrnki/admin-lab` production build exit 0 with `/learn`, `/learn/expedition/[enrichmentId]`,
+  and `/learn/session` dynamic routes. **Real-use gate (rule 14): PASS.** A hard reset seeded the
+  Rust ownership fixture through real production LLM calls, publishing graph version
+  `84832116-a228-447e-be7f-3e8162b28c4b` and enrichment
+  `99c2d017-90db-42c1-b532-970f84732c0d` with 19 lessons and 35 accepted study items. Playwright
+  verification on `http://127.0.0.1:3010` proved the cookie session, static learner URLs, Switch
+  explorer, domain-eyebrow candidate cards, and static expedition URL; real generated Copy trait
+  matching stayed at `3 of 4 matched` with no graded result; real known-skip UI changed from Ready to
+  "Known ground" and exposed "Un-mark known." Defects found and fixed during the gate: server-action
+  form data/cookie path replaced with `/learn/session`, absolute redirect host mismatch, DialogTrigger
+  hydration mismatch, stale "Charting produced no concepts" persisted failure copy, and skipped-known
+  popover copy saying Collected. Evidence: `tmp/2026-07-06-learner-ux/`.
+
+- **Growing crystals and Crystal Vista, 2026-07-06.** Deterministic envelope: full workspace
+  `typecheck` exit 0, recursive test suite green (admin-lab 101 incl. new crystalGeometry 7 /
+  crystalVistaView 3 / trailView growth 3 / capstone activity 2), ESLint 0 errors. **Real-use gate
+  (rule 14): PASS.** 390px Playwright pass over real enrichment
+  `e8ba6143-be10-40bc-b941-b88acbf22c13` (heap-allocation domain, 11 trail concepts, 20 edges)
+  through the real Begin charter flow: per-concept crystals render visually distinct and
+  byte-identical across reloads (determinism probe STABLE); the Heap node was mastered through real
+  graded play (option-select first-try, matching brute-then-replay to clean sweep, impostor
+  first-try) with the capstone crystal growing facet-by-facet; the mastery reveal played the
+  facet-assembly + glint; marking one remaining Leg-1 concept known auto-opened the vista with the
+  "Leg 1 crystallized ✦" celebration; the header tally, section-divider strips, and overview strips
+  all tracked the same counts. One defect found and fixed during the gate: the vista formation
+  scaled down to thumbnail size on a wide layout — now floored at ~58% layout scale with horizontal
+  pan. Caveat: partial multi-segment growth mid-crystal was verified on the live trail visuals and
+  unit tests, not screenshot-archived per stop. Evidence: `tmp/2026-07-06-crystals-gate/*.png` +
+  drive scripts.
+
+- **Dedicated Rescued-Node Canonical Labeling step, 2026-07-06.** Deterministic envelope: full
+  workspace `typecheck` exit 0; recursive `test` exit 0 with `.env` loaded (0 failures — domain-core
+  36, application 465, infrastructure-litellm 115, infrastructure-postgres 59, kg-worker 8, admin-lab
+  87); `lint` 0 errors (3 pre-existing warnings); `build` exit 0. **Real-use gate (rule 14):** a hard
+  reset re-seeded the Rust ownership fixture through real production LLM, publishing graph version
+  `af23eb46-a2a5-468c-b8d8-51e309f944af` and enrichment `e8ba6143-be10-40bc-b941-b88acbf22c13`.
+  Inspection over the real enrichment: **all 15 derived node labels are concept-shaped noun phrases —
+  0 propositional/sentence labels survive** (the 2026-07-05 baseline left 1). Two rescued nodes were
+  re-labeled with the original demoted to an alias ("Heap allocation" ← "Allocating on the heap";
+  "Stack and heap" ← "The Stack and the Heap"); accepted rescue dispositions carry the post-relabel
+  `canonical_label`. The new `rescued-node-labeling` stage fired once (`ok`, 4.3s) — one whole-set
+  call for the single Declared Domain. Rename-only invariant held: rescue accepted 6, the layer holds
+  5 `source_mentioned` nodes, the single reduction being the pre-existing dedup merge of "Ownership
+  Rules" into the anchor "Ownership". Caveat: extraction is non-deterministic so the exact 2026-07-05
+  offender ("Each value in Rust has an owner") did not recur; the defect *class* is verified. The
+  learner trail renders `canonical_label AS label` (unchanged, test-covered path); no `/learn`
+  app-expedition browser pass because the seed's learner-loop path creates no `/learn` expedition row.
+  **Result: PASS.** Trail: `tmp/todo1-rescued-labeling-evidence.md`, `tmp/todo1-seed.log`.
+
+- **Adaptive sectioned expedition trail and game-honesty pass, 2026-07-05.** Deterministic envelope:
+  full workspace `typecheck` exit 0 and the recursive test suite green (domain-core 36, ports,
+  application 462, infrastructure-litellm 111, infrastructure-postgres 59 with `.env` loaded,
+  kg-worker 8, admin-lab 87). **Real-use gate (rule 14):** a hard reset re-seeded the Rust ownership
+  fixture through real production LLM (extraction → build → banded enrichment → Study Item Bank +
+  Concept Lessons; ~1467s), publishing graph version `c38f1ebd-1bd0-45d9-b7b8-dbc03ec92a5e` and
+  enrichment `f8105160-cebf-4f80-bd3f-70e57b0e337a` (27 nodes, 21 trusted edges, 27 lessons, 64 study
+  items). The reset applied the single migration cleanly with `learner_expeditions.target_derived_node_id`
+  and `concept_lesson_sections.key_terms` both absent (`rg -i keyterm` empty). Projection over the real
+  enrichment: 23 trail steps == 23 non-floored nodes (every node in exactly one section), **0
+  validity-invariant violations**, summit "Memory and Allocation" derived, 4 confident band-1 nodes
+  floored, every within-section difficulty decrease prerequisite-forced (R14). 390px browser pass on
+  the running trail: section dividers, header "Leg 1/15" + gem count, and the on-demand Trail-map
+  overlay listing all 15 legs with per-leg state/progress — locked legs naming their gate ("Clears
+  after: Ownership"). Rescue re-label fired (18 accepted; most labels concept-shaped). **Result: PASS
+  with one follow-up** — one propositional label ("Each value in Rust has an owner") survived because
+  the durability judge returned an empty re-label proposal (TODO #1). Trail: `tmp/u9-rule14-evidence.md`,
+  `tmp/u9-trail-390.png`, `tmp/u9-overview-390.png`, `tmp/u9-trail-desktop.png`, `tmp/u9-seed.log`.
+
+- **Learner theory quality, sparse item blueprint, and game-flow polish, 2026-07-05.** Deterministic
+  envelope: `pnpm run typecheck`, `pnpm run test`, `pnpm run lint` (exit 0 with 3 pre-existing
+  warnings), `pnpm run build`, `@lrnki/application` tests, and `@lrnki/admin-lab` tests all passed;
+  `git diff --check` was clean. DB reset and the single initial migration succeeded. **Real-use
+  quality evaluation:** `SEED_MANIFEST=tmp/real-use-rust-manifest.json scripts/seed-demo.sh` ran the
+  Rust ownership fixture through real production LLM extraction, graph build, enrichment, Study
+  Item Bank generation, and demo learner seeding: graph version
+  `7fea20b6-a5e4-4ba5-94d2-e60ea5e2b479`, enrichment
+  `8a016179-6888-43da-babd-0c61f83a3ae8`, 20 lessons, 76 lesson sections, 58 sections with key
+  terms, 36 sections with list items, 44 current study items, and sparse blueprint/guard rejections
+  recorded for unsuitable item types. Artifact inspection showed list items/key terms on real
+  lessons such as "Allocating on the heap" and blueprint absences for lesson-absent nodes. Browser
+  verification on the built app at `http://localhost:3001` passed at 390px: `/learn` remembered
+  `demo-seeded-1`, created the first expedition through Begin, rendered the expedition trail, and
+  logged no console errors. **Result: PASS.** Screenshot: `tmp/learner-mobile-390.png`; seed log:
+  `tmp/real-use-seed.log`.
+
+- **Comparative banded intrinsic difficulty and trail floor, 2026-07-05.** Deterministic envelope:
+  `pnpm run check` exit 0 (full workspace typecheck, recursive tests including DB-backed
+  integration tests with `.env` loaded, ESLint with 3 pre-existing warnings, Admin Lab production
+  build). **Real-use gate (rule 14):** baseline captured with the pristine fused judge (enrichment
+  `5384f4f1-5b4c-4842-81e8-e5dff11ce042`), then a hard reset re-seeded `rust-book-ch04-01` and
+  `aira-dojo-2507-02554v1-md` through real production LLM calls into banded enrichment
+  `dce4c6d4-4155-480f-8cc1-b99887b12eac` (36 scored nodes, 3 contested, 1 anchor-less unresolved).
+  Human inspection: evidence-thin rescued labels ("Ownership Rules", "Ownership") now band 1 with
+  rationales naming their evidence-thinness; the baseline's clearest scale-use-bias case
+  ("operator policy", neural 0.70 on one quote) was flagged contested and bracket-calibrated with
+  an evidence-grounded rationale; contested rows record their comparisons and uncontested rows
+  record zero; `round(score × 4) + 1 = band` on all 36 rows with the ConceptMarker diamonds
+  matching in the browser; on the seeded expedition 11 confident band-1 nodes vanished from the
+  trail with gating intact through contracted edges, and a band-1 node chosen as the target stayed
+  playable. A silent NaN-sample-count → zero-draws → garbage-persist path found during baselining
+  now fails loudly. **Result: PASS.** Trail: `tmp/2026-07-05-difficulty-baseline/`
+  (`rule14-report.md`, dumps, annotation, screenshots).
 
 - **Learner trail polish, 2026-07-04.** Deterministic envelope: `pnpm run check` exit 0 (full
   workspace typecheck, recursive tests, ESLint with 2 pre-existing warnings, and Admin Lab

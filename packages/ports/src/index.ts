@@ -8,6 +8,8 @@ import type {
   ConceptIdentityResolutionOutcome,
   ConceptLesson,
   ConceptLessonDraft,
+  ConceptLessonRedundancyJudgment,
+  ConceptLessonSectionKind,
   LessonAbsentNode,
   MatchingItemDraft,
   StudyItem,
@@ -21,6 +23,7 @@ import type {
   DefinitionPassageQualityJudgment,
   NewResponseLogRow,
   ResponseLogRow,
+  DifficultyBandEntry,
   DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
@@ -33,7 +36,6 @@ import type {
   KnowledgeBoundaryProbeAnswer,
   WholeSetOrdering,
   GraphSnapshot,
-  InferredPrerequisiteEdge,
   NonCoreRescueCandidate,
   MissingPrerequisiteProposal,
   MintingDurabilityJudgment,
@@ -43,6 +45,7 @@ import type {
   RefinementDecisionRecord,
   RejectedStudyItem,
   RescueDurabilityJudgment,
+  RescuedNodeLabeling,
   RunCandidate,
   RunForBuild,
   SourceBlock,
@@ -167,6 +170,28 @@ export interface RescueDurabilityJudgmentPort {
   }): Promise<RescueDurabilityJudgment>;
 }
 
+// Dedicated measured Rescued-Node Canonical Labeling step (TODO #1), run on the independent
+// cross-family alias (`kg-independent-judge`) so the DeepSeek generator never names rescue
+// nodes. It replaces the rescue durability judge's under-attended optional `canonicalLabelProposal`
+// field: a rescued node's label is the source sentence it was mentioned in and reads as a
+// proposition, so this step re-names it to a concept-shaped noun phrase. ONE whole-set call per
+// Declared Domain over that domain's DURABLE rescued nodes; each node is shown with a 1-based
+// number and the judge returns one concept-shaped label per number, which MAY equal the current
+// label when it already reads as a concept name (unconditional — no self-gate). It never creates
+// or drops a node; the application maps number → node by position fail-OPEN, and minting owns
+// adoption (collision guard against the domain's taken labels, original demoted to an alias).
+export interface RescuedNodeLabelingPort {
+  readonly model: string;
+  label(input: {
+    declaredDomain: string;
+    nodes: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] }[];
+    // The domain's already-claimed labels (anchors + peer rescued nodes) so the judge avoids
+    // proposing a name that would fail the deterministic collision guard (mirrors the minting
+    // proposer's `existingNodeLabels`). Evidence-only; the model never re-uses one of them.
+    takenLabels: string[];
+  }): Promise<RescuedNodeLabeling>;
+}
+
 // A grounding passage handed to a generator or judge: source-cited passages carry source ids
 // and require a verbatim source quote; generated passages carry no source ids. One shape
 // shared by every study-item/lesson port below (rule 18) instead of a repeated inline literal.
@@ -188,6 +213,15 @@ export interface ImpostorLieValidityJudgmentPort {
     groundingPassages: StudyItemGroundingPassage[];
     siblings: { label: string; snippet: string }[];
   }): Promise<ImpostorLieValidityJudgment>;
+}
+
+export interface ConceptLessonRedundancyJudgmentPort {
+  readonly model: string;
+  judge(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    sections: { kind: ConceptLessonSectionKind; text: string; items?: string[] }[];
+  }): Promise<ConceptLessonRedundancyJudgment[]>;
 }
 
 // Minting durability judge. A bounded, forced-tool LLM judgment over ONE proposed
@@ -384,15 +418,20 @@ export interface MissingPrerequisiteProposalPort {
   }): Promise<MissingPrerequisiteProposal[]>;
 }
 
-// Intrinsic difficulty judge (ADR-0024). A bounded, forced-tool neural judgment
-// over ONE derived node's evidence, run through an independent judge alias. It
-// estimates learner-neutral intrinsic difficulty from generic signals such as
-// abstraction level, technical density, and implied background load. The adapter
-// validates tool arguments fail-closed; fusion with graph structure happens in
-// the application layer.
+// Intrinsic difficulty judge (ADR-0024 — comparative banded prior). Two forced-tool
+// call kinds through the same independent judge alias:
+// `bandDomainSet` bands EVERY concept of one Declared Domain 1–5 RELATIVE to that
+// set in ONE call (numbered menu-pick; exact coverage validated fail-closed with one
+// corrective re-prompt). The application K-samples this call (ADR-0028), takes the
+// modal band as consensus, and treats dispersion as signal.
+// `compareHarder` is the bounded pairwise calibration for CONTESTED bands: one
+// "which is harder" judgment between the contested concept and an uncontested anchor.
+// The adapter validates tool arguments fail-closed; consensus, contest detection, and
+// the two-comparison bracket live in the application layer, never here.
 export interface IntrinsicDifficultyJudgmentPort {
   readonly model: string;
-  judge(input: DifficultyNodeContext): Promise<{ neuralScore: number; rationale: string }>;
+  bandDomainSet(input: { declaredDomain: string; nodes: DifficultyNodeContext[] }): Promise<DifficultyBandEntry[]>;
+  compareHarder(input: { declaredDomain: string; first: DifficultyNodeContext; second: DifficultyNodeContext }): Promise<{ harder: "first" | "second" }>;
 }
 
 // Declared-domain inference (Learner charting). ONE forced-tool call maps a
@@ -404,19 +443,20 @@ export interface DeclaredDomainInferencePort {
   infer(input: { topic: string }): Promise<{ declaredDomain: string }>;
 }
 
-// Node difficulty (ADR-0019). The current production direction is
-// learner-neutral intrinsic difficulty: neural source-grounded judgment fused
-// with deterministic graph/evidence components. Learner-calibrated IRT/BT stays
-// deferred until learner-response data exists. Reads concepts + the inferred
-// prereq DAG; one score each.
+// Node difficulty (ADR-0019). The current production direction is the
+// learner-neutral comparative banded prior (ADR-0024): a K-sampled in-set banding
+// judgment with pairwise calibration for contested bands. Structural DAG terms are
+// no longer fused in — depth/ancestors/fan-in re-encode the prerequisite structure
+// that already gates the path — so the port reads node evidence contexts only.
+// Learner-calibrated IRT/BT stays deferred until learner-response data exists.
 export interface DifficultyPort {
   readonly method: string;
   // Scores DERIVED NODE ids — anchors AND enrichment nodes (R12) — not asserted
-  // Concepts: the inferred DAG spans the union, so difficulty must too. Generated
+  // Concepts: the derived layer spans the union, so difficulty must too. Generated
   // nodes are never fabricated into `Concept` values to satisfy the port (handoff
   // constraint). Both the input contexts and the returned difficulties key on
   // `derivedNodeId` (the difficulty store keys on derived_node_id).
-  score(input: { nodes: DifficultyNodeContext[]; prerequisiteEdges: InferredPrerequisiteEdge[] }): Promise<ConceptDifficulty[]>;
+  score(input: { nodes: DifficultyNodeContext[] }): Promise<ConceptDifficulty[]>;
 }
 
 // Learner mastery seam (ADR-0024 defers population learner modeling). MVP impl is a mock
@@ -467,7 +507,6 @@ export interface LearnerExpedition {
   currentOperationId: string | null;
   currentOperationType: OperationType | null;
   enrichmentId: string | null;
-  targetDerivedNodeId: string | null;
   active: boolean;
   failureMessage: string | null;
   createdAt: string;
@@ -484,7 +523,6 @@ export interface NewLearnerExpedition {
   currentOperationId?: string | null;
   currentOperationType?: OperationType | null;
   enrichmentId?: string | null;
-  targetDerivedNodeId?: string | null;
   active?: boolean;
   failureMessage?: string | null;
 }
@@ -501,7 +539,6 @@ export interface LearnerExpeditionStorePort {
     currentOperationId?: string | null;
     currentOperationType?: OperationType | null;
     enrichmentId?: string | null;
-    targetDerivedNodeId?: string | null;
     failureMessage?: string | null;
   }): Promise<void>;
 }
@@ -822,6 +859,13 @@ export interface DerivedGraphNode {
   declaredDomain: string;
   difficulty: number | null;
   difficultyRationale: string | null;
+  // The comparative banded prior's confidence interface (ADR-0024), read off the same
+  // concept_difficulties row as `difficulty`: the consensus band (1-5) and whether it
+  // was contested across the K draws. Optional-nullable: absent/null for a node without
+  // a difficulty row or a pre-banding layer. The trail-inclusion floor gates only on a
+  // CONFIDENT signal (band present AND uncontested), so nulls fail open.
+  difficultyBand?: number | null;
+  difficultyContested?: boolean | null;
   nodeKind: DerivedNodeKind;
   groundingOrigin: DerivedGroundingOrigin;
   // `synthetic_primary` is a first-class topic concept from the synthetic arm (ADR-0019

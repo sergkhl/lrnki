@@ -39,6 +39,7 @@ export class PostgresEnrichmentInspectionRead implements EnrichmentInspectionRea
 
     const nodeRows = await this.sql<NodeRow[]>`
       SELECT n.derived_node_id, n.node_kind, n.grounding_origin, n.role, n.canonical_label AS label, n.aliases, n.declared_domain, d.score, d.neural_rationale,
+             d.components->>'band' AS difficulty_band, d.components->>'contested' AS difficulty_contested,
              EXISTS (SELECT 1 FROM study_items si WHERE si.derived_node_id = n.derived_node_id AND si.superseded_at IS NULL) AS has_study_item
       FROM derived_graph_nodes n
       LEFT JOIN concept_difficulties d ON d.derived_node_id = n.derived_node_id AND d.enrichment_id = n.enrichment_id
@@ -118,6 +119,11 @@ export class PostgresEnrichmentInspectionRead implements EnrichmentInspectionRea
       declaredDomain: row.declared_domain,
       difficulty: row.score === null ? null : Number(row.score),
       difficultyRationale: row.neural_rationale,
+      // The banded prior's confidence interface (ADR-0024) off the same difficulty row.
+      // Null for a node without a difficulty row or a pre-banding layer (components
+      // carry no band) — the floor fails open on null.
+      difficultyBand: row.difficulty_band === null ? null : Number(row.difficulty_band),
+      difficultyContested: row.difficulty_contested === null ? null : row.difficulty_contested === "1",
       nodeKind: row.node_kind as DerivedGraphNode["nodeKind"],
       groundingOrigin: row.grounding_origin as DerivedGraphNode["groundingOrigin"],
       role: row.role as DerivedGraphNode["role"],
@@ -237,6 +243,9 @@ type NodeRow = {
   declared_domain: string;
   score: number | null;
   neural_rationale: string | null;
+  // JSONB `->>` projections of the banded components; null when the row or key is absent.
+  difficulty_band: string | null;
+  difficulty_contested: string | null;
   has_study_item: boolean;
 };
 

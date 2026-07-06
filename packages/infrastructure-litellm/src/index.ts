@@ -26,6 +26,8 @@ export {
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
+  buildRescuedNodeLabelingSchema,
+  buildRescuedNodeLabelingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
   conceptSetSynthesisSchema,
@@ -34,8 +36,10 @@ export {
   knowledgeBoundaryProbeValidator,
   missingPrerequisiteProposalSchema,
   missingPrerequisiteProposalValidator,
-  intrinsicDifficultySchema,
-  intrinsicDifficultyValidator,
+  buildDifficultyBandsSchema,
+  buildDifficultyBandsValidator,
+  difficultyComparisonSchema,
+  difficultyComparisonValidator,
   declaredDomainInferenceSchema,
   declaredDomainInferenceValidator,
   admissionLabelJudgmentSchema,
@@ -49,7 +53,9 @@ export {
   studyItemBlueprintSchema,
   studyItemBlueprintValidator,
   matchingSchema,
-  matchingValidator
+  matchingValidator,
+  conceptLessonRedundancyJudgmentSchema,
+  conceptLessonRedundancyJudgmentValidator
 } from "./toolSchemas";
 export {
   LiteLlmStudyItemBlueprintAdapter,
@@ -61,6 +67,10 @@ export {
   LiteLlmConceptLessonGenerationAdapter,
   CONCEPT_LESSON_GENERATION_MODEL
 } from "./conceptLessonGenerationAdapters";
+export {
+  LiteLlmConceptLessonRedundancyJudgmentAdapter,
+  CONCEPT_LESSON_REDUNDANCY_JUDGE_MODEL
+} from "./conceptLessonRedundancyAdapters";
 export {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmConceptAdmissionAdapter,
@@ -78,9 +88,11 @@ export {
 export {
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
+  LiteLlmRescuedNodeLabelingAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
   PREREQUISITE_ORDERING_MODEL,
   RESCUE_DURABILITY_JUDGE_MODEL,
+  RESCUED_NODE_LABELING_MODEL,
   MINTING_DURABILITY_JUDGE_MODEL
 } from "./enrichmentAdapters";
 export {
@@ -100,7 +112,8 @@ export {
 export {
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   INTRINSIC_DIFFICULTY_JUDGE_MODEL,
-  INTRINSIC_DIFFICULTY_SYSTEM_PROMPT
+  DIFFICULTY_BANDING_SYSTEM_PROMPT,
+  DIFFICULTY_COMPARISON_SYSTEM_PROMPT
 } from "./intrinsicDifficultyAdapters";
 export {
   LiteLlmDeclaredDomainInferenceAdapter,

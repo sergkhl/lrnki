@@ -5,6 +5,7 @@ import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
   createIntrinsicDifficultyPort,
+  DEFAULT_ENRICHMENT_CONFIG,
   STUDY_ITEM_BANK_CONFIG_HASH,
   resolveConceptIdentity,
   runExtractionOverSources,
@@ -35,6 +36,7 @@ import {
   LiteLlmConceptAdmissionAdapter,
   LiteLlmStudyItemGenerationAdapter,
   LiteLlmConceptLessonGenerationAdapter,
+  LiteLlmConceptLessonRedundancyJudgmentAdapter,
   LiteLlmStudyItemBlueprintAdapter,
   LiteLlmImpostorLieValidityJudgmentAdapter,
   LiteLlmConceptDiscoveryAdapter,
@@ -50,7 +52,8 @@ import {
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter
+  LiteLlmRescueDurabilityJudgmentAdapter,
+  LiteLlmRescuedNodeLabelingAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -202,6 +205,11 @@ function buildContext() {
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
     rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    // Measured Rescued-Node Canonical Labeling step (TODO #1): the SAME cross-family
+    // independent judge (kg-independent-judge) re-names each durable rescued node — labeled
+    // with the source sentence it was mentioned in — to a concept-shaped label, one whole-set
+    // call per Declared Domain. Rename-only; minting owns adoption (collision guard + alias).
+    rescuedNodeLabelingJudge: new LiteLlmRescuedNodeLabelingAdapter(deterministicClient),
     // Rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). The SAME
     // independent meaning judge (kg-independent-judge) and deterministic decoding as the
     // extraction-time core gate — no new alias — but tagged `rescue-definition-quality` so
@@ -220,13 +228,14 @@ function buildContext() {
     // without them for the U7 baseline.
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
     nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
+    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays
     // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
     // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
     // option-select, and persisted through its own store; option-select derives FROM it.
     conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
+    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
@@ -386,6 +395,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     missingPrerequisiteProposal: ctx.missingPrerequisiteProposal,
     groundingGeneration: ctx.groundingGeneration,
     rescueDurabilityJudge: ctx.rescueDurabilityJudge,
+    rescuedNodeLabelingJudge: ctx.rescuedNodeLabelingJudge,
     rescuedDefinitionQualityJudge: ctx.rescuedDefinitionQualityJudge,
     mintingDurabilityJudge: process.env.ENRICH_DISABLE_MINTING_DURABILITY ? undefined : ctx.mintingDurabilityJudge,
     // Dedup is opt-in (plan U3): ENRICH_DISABLE_DEDUP unsets both ports to produce the

@@ -15,7 +15,7 @@ export async function chartTopicExpedition(input: Omit<Parameters<typeof runSynt
   expeditionStore: LearnerExpeditionStorePort;
   deps?: ChartTopicExpeditionDeps;
   newEnrichmentId?: () => string;
-}): Promise<{ enrichmentId: string; targetDerivedNodeId: string }> {
+}): Promise<{ enrichmentId: string }> {
   const enrichmentId = (input.newEnrichmentId ?? randomUUID)();
   const runSynthetic = input.deps?.runSynthetic ?? runSyntheticGeneration;
   const generateStudyItems = input.deps?.generateStudyItems ?? generateStudyItemBank;
@@ -27,27 +27,28 @@ export async function chartTopicExpedition(input: Omit<Parameters<typeof runSynt
       currentOperationType: "enrichment"
     });
     const layer = await runSynthetic({ ...input, enrichmentId, topic: input.topic, declaredDomain: input.declaredDomain });
+    // Readiness is trail-wide now: an expedition is ready when its layer carries at least one
+    // concept and a study bank. The summit is DERIVED at read time (ADR-0032), so there is no
+    // target to persist — charting only fails loudly when the layer produced no concepts.
+    if (layer.derivedNodes.length === 0) {
+      throw new Error("Surveying produced no concepts.");
+    }
 
     await input.expeditionStore.updateProgress({
       learnerExpeditionId: input.learnerExpeditionId,
       currentOperationId: enrichmentId,
       currentOperationType: "study_items"
     });
-    const bank = await generateStudyItems({ ...input, enrichmentId });
-    const targetDerivedNodeId = bank.studyItems[0]?.derivedNodeId ?? layer.derivedNodes[0]?.derivedNodeId ?? null;
-    if (!targetDerivedNodeId) {
-      throw new Error("Charting produced no target stop.");
-    }
+    await generateStudyItems({ ...input, enrichmentId });
     await input.expeditionStore.updateProgress({
       learnerExpeditionId: input.learnerExpeditionId,
       status: "ready",
       enrichmentId,
-      targetDerivedNodeId,
       currentOperationId: null,
       currentOperationType: null,
       failureMessage: null
     });
-    return { enrichmentId, targetDerivedNodeId };
+    return { enrichmentId };
   } catch (error) {
     await input.expeditionStore.updateProgress({
       learnerExpeditionId: input.learnerExpeditionId,
@@ -60,5 +61,5 @@ export async function chartTopicExpedition(input: Omit<Parameters<typeof runSynt
 
 function chartingFailureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 240) || "Charting failed. Try again later.";
+  return message.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 240) || "Surveying failed. Try again later.";
 }

@@ -21,6 +21,7 @@ const STAGE_COPY: Record<string, string> = {
   [STAGE_TAGS.nodeEmbedding]: "Comparing landmarks",
   [STAGE_TAGS.nodeMergeAdjudication]: "Merging twin paths",
   [STAGE_TAGS.conceptLessonGeneration]: "Preparing camp notes",
+  [STAGE_TAGS.lessonRedundancyJudgment]: "Checking note overlap",
   [STAGE_TAGS.studyItemBlueprint]: "Planning survey stops",
   [STAGE_TAGS.studyItemGeneration]: "Setting survey stops",
   [STAGE_TAGS.matchingGeneration]: "Pairing field clues",
@@ -36,5 +37,5 @@ const STAGE_COPY: Record<string, string> = {
 };
 
 export function stageCopy(stage: string): string {
-  return STAGE_COPY[stage] ?? "Charting the trail";
+  return STAGE_COPY[stage] ?? "Surveying the trail";
 }

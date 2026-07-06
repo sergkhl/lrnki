@@ -2,14 +2,22 @@ import type {
   MintingDurabilityJudgment,
   PrerequisiteConceptContext,
   RescueDurabilityJudgment,
+  RescuedNodeLabeling,
   WholeSetOrdering
 } from "@lrnki/domain-core";
-import type { MintingDurabilityJudgmentPort, PrerequisiteOrderingPort, RescueDurabilityJudgmentPort } from "@lrnki/ports";
+import type {
+  MintingDurabilityJudgmentPort,
+  PrerequisiteOrderingPort,
+  RescueDurabilityJudgmentPort,
+  RescuedNodeLabelingPort
+} from "@lrnki/ports";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import {
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
+  buildRescuedNodeLabelingSchema,
+  buildRescuedNodeLabelingValidator,
   mintingDurabilityJudgmentSchema,
   mintingDurabilityJudgmentValidator,
   rescueDurabilityJudgmentSchema,
@@ -25,6 +33,11 @@ export const RESCUE_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 // durability so the DeepSeek proposer/generator never grades its own mint proposal.
 export const MINTING_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 
+// Cross-family Rescued-Node Canonical Labeling (TODO #1). Reuses the independent
+// `kg-independent-judge` alias so the DeepSeek generator never names rescue nodes. Goes
+// through LiteLLM, never a raw provider.
+export const RESCUED_NODE_LABELING_MODEL = "kg-independent-judge";
+
 // LiteLLM alias for the third operation (Graph Enrichment, ADR-0019 amended — whole-set
 // ordering, plan U2/U5). ONE non-DeepSeek ordering call per Declared Domain returns the
 // directed prerequisite DAG over the deduplicated node set; it is cross-family from the
@@ -34,8 +47,10 @@ export const MINTING_DURABILITY_JUDGE_MODEL = "kg-independent-judge";
 export const PREREQUISITE_ORDERING_MODEL = "kg-prerequisite-ordering";
 
 // Render one Concept's published CEP for the judge: its role, label, aliases, verbatim
-// definition and mention quotes, and LABELED `defines` assertions.
-function renderConcept(role: string, context: PrerequisiteConceptContext): string {
+// definition and mention quotes, and LABELED `defines` assertions. Shared with the
+// intrinsic-difficulty adapter (whose contexts carry no assertions) so the two
+// whole-domain-set prompts cannot drift in quote formatting.
+export function renderConcept(role: string, context: PrerequisiteConceptContext): string {
   const lines = [
     `${role}: "${context.canonicalLabel}"${context.aliases.length ? ` (aka ${context.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
     "  Definitions:",
@@ -119,6 +134,76 @@ export class LiteLlmPrerequisiteOrderingAdapter implements PrerequisiteOrderingP
   }
 }
 
+// Whole-set Rescued-Node Canonical Labeling adapter (TODO #1). Forced named tool schema;
+// in ONE call the model returns a concept-shaped canonical label for EACH durable rescued
+// node in a Declared Domain, citing each by the 1-based Candidate NUMBER shown in the prompt.
+// Schema + validator are built per call from the node count so the index bounds are concrete;
+// a drifting index re-prompts ONCE (maxRetries: 1) then the application fails OPEN (keeps
+// original labels). This adapter is a THIN LLM caller: it renders the candidate set + their
+// mention evidence + the domain's already-taken labels, validates the tool arguments, and
+// returns the typed number-cited labels. Number → derivedNodeId mapping by position and
+// adoption (collision guard, alias demotion, reservation) all live in the application boundary.
+export class LiteLlmRescuedNodeLabelingAdapter implements RescuedNodeLabelingPort {
+  readonly model: string;
+  constructor(private readonly client: LiteLlmForcedToolClient, model: string = RESCUED_NODE_LABELING_MODEL) {
+    this.model = model;
+  }
+
+  async label(input: {
+    declaredDomain: string;
+    nodes: { canonicalLabel: string; aliases: string[]; mentionQuotes: string[] }[];
+    takenLabels: string[];
+  }): Promise<RescuedNodeLabeling> {
+    const system = [
+      "You give each candidate a concise CONCEPT-SHAPED canonical label for a learner-neutral concept graph.",
+      "Each candidate was MENTIONED in a source, so its current label is often the sentence it appeared in and reads as a full statement, proposition, or claim rather than a concept name.",
+      "For EVERY listed candidate, return a concise noun phrase naming the single durable unit of knowledge the candidate is ABOUT — the concept a learner would file it under.",
+      "When the candidate's current label already reads as a concept name, return it UNCHANGED. When it reads as a sentence/proposition/claim, re-name it to the underlying concept noun phrase.",
+      "Name the SAME concept the candidate's own evidence is about; never invent a different concept, and never re-use one of the already-taken labels listed below (those name other nodes).",
+      "Decide from each candidate's meaning and its own mention quotes only. Cover every listed candidate number exactly once."
+    ].join("\n");
+    const takenLines = input.takenLabels.length
+      ? input.takenLabels.map((label) => `  - "${label}"`)
+      : ["  (none)"];
+    const user = [
+      `Declared domain: ${input.declaredDomain}.`,
+      "",
+      "Already-taken labels in this domain (name OTHER nodes — never re-use one of these):",
+      ...takenLines,
+      "",
+      "Candidates to label:",
+      ...input.nodes.map((node, index) => [
+        "",
+        `Candidate ${index + 1}: "${node.canonicalLabel}"${node.aliases.length ? ` (aka ${node.aliases.map((a) => `"${a}"`).join(", ")})` : ""}.`,
+        "  Mention quotes:",
+        ...(node.mentionQuotes.length
+          ? node.mentionQuotes.map((quote, quoteIndex) => `    [${quoteIndex + 1}] "${quote}"`)
+          : ["    (none)"])
+      ].join("\n")),
+      "",
+      "Call submit_rescued_node_labeling with one concept-shaped label per candidate, each citing its listed Candidate number."
+    ].join("\n");
+
+    // Bounds the index range to the actual node count: a drifting index re-prompts once
+    // (maxRetries: 1) under strict decoding, then the application fails OPEN (keeps originals).
+    const n = input.nodes.length;
+    const result = await this.client.call({
+      model: this.model,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      toolName: "submit_rescued_node_labeling",
+      toolDescription: "Submit one concept-shaped canonical label for each listed rescue candidate, cited by its number.",
+      parameters: buildRescuedNodeLabelingSchema(n),
+      validator: buildRescuedNodeLabelingValidator(n),
+      tags: [STAGE_TAGS.rescuedNodeLabeling],
+      maxRetries: 1
+    });
+
+    // Thin: return the validated, number-cited labels verbatim. The application maps number →
+    // id by position and adopts each label only when its normalized form is unclaimed (KTD3).
+    return { labels: result.labels };
+  }
+}
+
 // Bounded rescue-durability judge (U3). Forced named tool schema, deterministic
 // decoding; one judgment per aggregated `source_mentioned` rescue candidate against
 // the same-domain anchors it would scaffold. This adapter is a thin LLM caller: it
@@ -175,7 +260,11 @@ export class LiteLlmRescueDurabilityJudgmentAdapter implements RescueDurabilityJ
       tags: [STAGE_TAGS.rescueDurability]
     });
 
-    return { verdict: result.verdict, groundingSpan: result.groundingSpan, rationale: result.rationale };
+    return {
+      verdict: result.verdict,
+      groundingSpan: result.groundingSpan,
+      rationale: result.rationale
+    };
   }
 }
 

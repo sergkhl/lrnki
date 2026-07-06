@@ -3,6 +3,7 @@ import test from "node:test";
 import type {
   ConceptLesson,
   ConceptLessonDraft,
+  ConceptLessonRedundancyJudgment,
   DerivedGraphLayer,
   GraphSnapshot,
   ImpostorItemDraft,
@@ -15,7 +16,7 @@ import type {
 } from "@lrnki/domain-core";
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
 import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
-import type { ConceptLessonGenerationPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, ImpostorLieValidityJudgmentPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
+import type { ConceptLessonGenerationPort, ConceptLessonRedundancyJudgmentPort, ConceptLessonStorePort, EnrichmentRunStorePort, GraphVersionStorePort, ImpostorLieValidityJudgmentPort, RunProgressReporterPort, StageErrorDetail, StudyItemBankStorePort, StudyItemGenerationPort } from "@lrnki/ports";
 import { generateStudyItemBank, OPTION_SELECT_GENERATION_ATTEMPTS } from "./generateStudyItemBank";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 
@@ -188,7 +189,7 @@ function goodLessonDraft(passageId: string, defQuote: string): ConceptLessonDraf
     sections: [
       { kind: "gist", text: "A one-line gist." },
       { kind: "definition", text: "A definition restating the source.", citation: { passageId, evidenceQuote: defQuote } },
-      { kind: "applications", text: "How it connects to neighbors." }
+      { kind: "applications", text: "How it connects to neighbors.", items: ["First grounded use.", "Second grounded use."] }
     ]
   };
 }
@@ -286,6 +287,13 @@ function lessonGenerationReturning(opts: {
   };
 }
 
+function redundancyJudgeReturning(verdicts: ConceptLessonRedundancyJudgment[]): ConceptLessonRedundancyJudgmentPort {
+  return {
+    model: "mock-redundancy",
+    async judge() { return verdicts; }
+  };
+}
+
 function capturingLessonStore(): { store: ConceptLessonStorePort; lessons: ConceptLesson[]; absent: LessonAbsentNode[] } {
   const lessons: ConceptLesson[] = [];
   const absent: LessonAbsentNode[] = [];
@@ -348,6 +356,52 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   // The lesson is persisted through the lesson store, with a source-cited definition section.
   assert.equal(lessonStore.lessons.length, 1);
   assert.ok(lessonStore.lessons[0].sections.some((s) => s.kind === "definition" && s.groundingProvenance === "source_cep"));
+});
+
+test("structural blueprint pre-gate rejects matching and impostor when the lesson is too sparse", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store } = capturingStore();
+  const sparseLesson: ConceptLessonDraft = {
+    sections: [
+      { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: ownershipDef } }
+    ]
+  };
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": sparseLesson } }),
+    impostorLieValidityJudge: lieJudgePassing(),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
+    studyItemBankStore: store
+  });
+
+  assert.deepEqual(typesFor(result.studyItems, "node-c1"), ["option_select"]);
+  assert.deepEqual(result.rejected.map((row) => `${row.itemType}:${row.reason.startsWith("blueprint:")}`).sort(), ["impostor:true", "matching:true"]);
+});
+
+test("redundant non-substantive lesson sections are retried once then dropped", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const lessonStore = capturingLessonStore();
+  const result = await generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    conceptLessonRedundancyJudge: redundancyJudgeReturning([{ sectionKind: "gist", verdict: "redundant", redundantWith: "definition", reason: "repeats the definition" }]),
+    impostorLieValidityJudge: lieJudgePassing(),
+    conceptLessonStore: lessonStore.store,
+    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
+    studyItemBankStore: capturingStore().store
+  });
+
+  assert.equal(result.lessons.length, 1);
+  assert.equal(result.lessons[0].sections.some((section) => section.kind === "gist"), false);
+  assert.equal(result.lessonAbsent.length, 0);
+  assert.equal(lessonStore.lessons[0].sections.some((section) => section.kind === "gist"), false);
 });
 
 test("the study-item operation context reaches generation calls", async () => {
@@ -633,7 +687,15 @@ test("Covers R10: option-select grounds in the lesson's source-cited section; a 
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "examples", text: "An example with no citation." },
-      { kind: "applications", text: "Applications." }
+      {
+        kind: "applications",
+        text: "Applications.",
+        items: [
+          "Rules that govern memory keep one current owner.",
+          "Rules that govern memory describe transfer.",
+          "Rules that govern memory prevent stale use."
+        ]
+      }
     ]
   };
   await generateStudyItemBank({
@@ -966,7 +1028,7 @@ test("a minted lesson with no surviving citation can still anchor generated opti
     sections: [
       { kind: "gist", text: "A one-line gist." },
       { kind: "definition", text: generatedDef },
-      { kind: "applications", text: "How it connects to neighbors." }
+      { kind: "applications", text: "How it connects to neighbors.", items: ["Pointer arithmetic supports address calculations."] }
     ]
   };
   await generateStudyItemBank({

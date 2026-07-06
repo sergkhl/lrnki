@@ -14,6 +14,7 @@ import {
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 import { inferDeclaredDomain, startTopicChart } from "@/lib/learnerCharting";
+import { clearLearnerRefCookie } from "@/lib/learnerSession";
 
 export type LearnerGradingResult =
   | { kind: "selection"; graded: true; chosenId: string; keyedCorrectId: string; correct: boolean }
@@ -27,12 +28,12 @@ export type LearnerMatchingAttemptResult =
   | { checked: true; correct: boolean }
   | { checked: false; message: string };
 
-function learnerPath(learnerStateRef: string): string {
-  return `/learn/${encodeURIComponent(learnerStateRef)}`;
+function learnerPath(): string {
+  return "/learn";
 }
 
-function expeditionPath(learnerStateRef: string, enrichmentId: string): string {
-  return `${learnerPath(learnerStateRef)}/expedition/${encodeURIComponent(enrichmentId)}`;
+function expeditionPath(enrichmentId: string): string {
+  return `/learn/expedition/${encodeURIComponent(enrichmentId)}`;
 }
 
 async function withSqlClient<T>(fn: (sql: ReturnType<typeof createDatabaseClient>) => Promise<T>): Promise<T> {
@@ -51,11 +52,10 @@ async function withExpeditionStore<T>(fn: (store: PostgresLearnerExpeditionStore
 export async function chooseCandidateExpedition(input: {
   learnerStateRef: string;
   enrichmentId: string;
-  targetDerivedNodeId: string;
   title: string;
   declaredDomain: string;
 }): Promise<void> {
-  if (!input.learnerStateRef || !input.enrichmentId || !input.targetDerivedNodeId) return;
+  if (!input.learnerStateRef || !input.enrichmentId) return;
   await withExpeditionStore(async (store) => {
     const existing = await store.getByEnrichment({
       learnerStateRef: input.learnerStateRef,
@@ -70,12 +70,11 @@ export async function chooseCandidateExpedition(input: {
       declaredDomain: input.declaredDomain,
       status: "ready",
       enrichmentId: input.enrichmentId,
-      targetDerivedNodeId: input.targetDerivedNodeId,
       active: true
     });
   });
-  revalidatePath(learnerPath(input.learnerStateRef));
-  redirect(expeditionPath(input.learnerStateRef, input.enrichmentId) as Route);
+  revalidatePath(learnerPath());
+  redirect(expeditionPath(input.enrichmentId) as Route);
 }
 
 export async function setActiveExpedition(input: {
@@ -85,8 +84,8 @@ export async function setActiveExpedition(input: {
 }): Promise<void> {
   if (!input.learnerStateRef || !input.learnerExpeditionId) return;
   await withExpeditionStore((store) => store.setActive(input));
-  revalidatePath(learnerPath(input.learnerStateRef));
-  if (input.enrichmentId) redirect(expeditionPath(input.learnerStateRef, input.enrichmentId) as Route);
+  revalidatePath(learnerPath());
+  if (input.enrichmentId) redirect(expeditionPath(input.enrichmentId) as Route);
 }
 
 export async function submitLearnerOptionSelect(input: {
@@ -317,7 +316,35 @@ export async function setLearnerVerdict(input: {
       verdict: input.verdict
     });
   });
-  revalidatePath(expeditionPath(input.learnerStateRef, input.enrichmentId));
+  revalidatePath(expeditionPath(input.enrichmentId));
+}
+
+export async function clearLearnerVerdict(input: {
+  learnerStateRef: string;
+  enrichmentId: string;
+  derivedNodeId: string;
+}): Promise<void> {
+  if (!input.learnerStateRef || !input.enrichmentId || !input.derivedNodeId) return;
+  await withSqlClient(async (sql) => {
+    const rows = await sql<{ derived_node_id: string }[]>`
+      SELECT dgn.derived_node_id
+      FROM derived_graph_nodes dgn
+      JOIN learner_expeditions le
+        ON le.learner_state_ref = ${input.learnerStateRef}
+       AND le.enrichment_id = dgn.enrichment_id
+       AND le.status = 'ready'
+       AND le.active
+      WHERE dgn.derived_node_id = ${input.derivedNodeId}
+        AND dgn.enrichment_id = ${input.enrichmentId}
+      LIMIT 1`;
+    if (rows.length === 0) return;
+    await new PostgresCalibrationVerdictStore(sql).upsert({
+      learnerStateRef: input.learnerStateRef,
+      derivedNodeId: input.derivedNodeId,
+      verdict: "learn"
+    });
+  });
+  revalidatePath(expeditionPath(input.enrichmentId));
 }
 
 export async function markLearnerLessonRead(input: {
@@ -344,7 +371,7 @@ export async function markLearnerLessonRead(input: {
       derivedNodeId: input.derivedNodeId
     });
   });
-  revalidatePath(expeditionPath(input.learnerStateRef, input.enrichmentId));
+  revalidatePath(expeditionPath(input.enrichmentId));
 }
 
 export async function refreshLearnerExpedition(input: {
@@ -352,14 +379,28 @@ export async function refreshLearnerExpedition(input: {
   enrichmentId: string;
 }): Promise<void> {
   if (!input.learnerStateRef || !input.enrichmentId) return;
-  revalidatePath(expeditionPath(input.learnerStateRef, input.enrichmentId));
+  revalidatePath(expeditionPath(input.enrichmentId));
+}
+
+export async function switchLearner(): Promise<void> {
+  await clearLearnerRefCookie();
+  revalidatePath(learnerPath());
+  redirect("/learn" as Route);
 }
 
 export async function startTopicExpedition(formData: FormData): Promise<void> {
   const learnerStateRef = String(formData.get("learnerStateRef") ?? "").trim();
   const topic = String(formData.get("topic") ?? "").trim();
-  const declaredDomain = String(formData.get("declaredDomain") ?? "").trim();
-  if (!learnerStateRef || !topic || !declaredDomain) return;
+  let declaredDomain = String(formData.get("declaredDomain") ?? "").trim();
+  if (!learnerStateRef || !topic) return;
+  if (!declaredDomain) {
+    try {
+      declaredDomain = (await inferDeclaredDomain({ topic })).declaredDomain;
+    } catch (error) {
+      console.error("Declared Domain inference failed.", error);
+      return;
+    }
+  }
   const learnerExpeditionId = randomUUID();
   await withExpeditionStore((store) => store.upsert({
     learnerExpeditionId,
@@ -371,17 +412,5 @@ export async function startTopicExpedition(formData: FormData): Promise<void> {
     active: true
   }));
   startTopicChart({ learnerExpeditionId, topic, declaredDomain });
-  revalidatePath(learnerPath(learnerStateRef));
-}
-
-export async function inferExpeditionDomain(input: { topic: string }): Promise<{ ok: true; declaredDomain: string } | { ok: false; message: string }> {
-  const topic = input.topic.trim();
-  if (!topic) return { ok: false, message: "Add a topic first." };
-  try {
-    const result = await inferDeclaredDomain({ topic });
-    return { ok: true, declaredDomain: result.declaredDomain };
-  } catch (error) {
-    console.error("Declared Domain inference failed.", error);
-    return { ok: false, message: "Name the field before charting." };
-  }
+  revalidatePath(learnerPath());
 }

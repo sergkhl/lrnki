@@ -13,5 +13,5 @@ test("every known charting stage maps to fiction-voiced copy instead of raw ids"
 });
 
 test("unknown stages use a generic fallback instead of the raw string", () => {
-  assert.equal(stageCopy("future-stage-id"), "Charting the trail");
+  assert.equal(stageCopy("future-stage-id"), "Surveying the trail");
 });

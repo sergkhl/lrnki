@@ -3,7 +3,6 @@ import test from "node:test";
 import type { InferredPrerequisiteEdge } from "@lrnki/domain-core";
 import {
   cutWeakEdges,
-  dagDepthDifficulty,
   findCycleEdges,
   prerequisiteAncestors,
   topologicalDepth,
@@ -82,17 +81,6 @@ test("topologicalOrder respects prerequisites and breaks ties by the comparator"
 test("prerequisiteAncestors collects the transitive predecessors of a target", () => {
   const ancestors = prerequisiteAncestors("target", [edge("a", "b"), edge("b", "target"), edge("z", "unrelated")]);
   assert.deepEqual([...ancestors].sort(), ["a", "b"]);
-});
-
-test("dagDepthDifficulty normalizes depth and reports interpretable components", () => {
-  const difficulties = dagDepthDifficulty(["a", "b", "c"], [edge("a", "b"), edge("b", "c")]);
-  const byId = new Map(difficulties.map((d) => [d.derivedNodeId, d]));
-  assert.equal(byId.get("a")?.score, 0);
-  assert.equal(byId.get("b")?.score, 0.5);
-  assert.equal(byId.get("c")?.score, 1);
-  assert.equal(byId.get("c")?.method, "dag-depth-mock");
-  assert.equal(byId.get("b")?.components.topoDepth, 1);
-  assert.equal(byId.get("c")?.components.fanIn, 1);
 });
 
 test("cutWeakEdges drops edges below the confidence floor", () => {

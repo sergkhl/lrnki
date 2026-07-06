@@ -1,10 +1,12 @@
 import {
   chartTopicExpedition,
   createIntrinsicDifficultyPort,
+  DEFAULT_ENRICHMENT_CONFIG,
   STUDY_ITEM_BANK_CONFIG_HASH
 } from "@lrnki/application";
 import {
   LiteLlmConceptLessonGenerationAdapter,
+  LiteLlmConceptLessonRedundancyJudgmentAdapter,
   LiteLlmConceptSetSynthesisAdapter,
   LiteLlmEmbeddingClient,
   LiteLlmForcedToolClient,
@@ -58,8 +60,9 @@ function buildContext() {
     nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
     groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
     prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient)),
+    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
+    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
     studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
     studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),

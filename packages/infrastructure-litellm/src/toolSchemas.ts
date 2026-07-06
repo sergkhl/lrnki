@@ -172,6 +172,25 @@ export function buildPrerequisiteOrderingSchema(n: number): JsonSchema {
   return toForcedToolSchema(buildPrerequisiteOrderingValidator(n));
 }
 
+// Rescued-Node Canonical Labeling (TODO #1). ONE whole-set call per Declared Domain returns a
+// concept-shaped label for EACH of the N listed durable rescued nodes, cited by its 1-based
+// number. Schema + validator are built per call from N so the index bounds [1, N] are concrete
+// (a drifting index re-prompts once, then the application fails OPEN keeping original labels).
+// The description text stays domain-neutral (rule 17): it describes concept-vs-proposition
+// wordform, never a fixture concept or expected outcome.
+export function buildRescuedNodeLabelingValidator(n: number) {
+  return z.object({
+    labels: z.array(z.object({
+      nodeNumber: z.number().int().min(1).max(n).describe("The 1-based Candidate number (as shown before each candidate) this label is for."),
+      conceptLabel: z.string().min(1).describe("A concise concept-shaped canonical label — a noun phrase naming the single durable unit of knowledge the numbered candidate is about. When the candidate's current label reads as a full sentence, proposition, or claim, re-name it to that noun phrase; when it already reads as a concept name, return it unchanged. Name the SAME concept the candidate is about — never introduce a different concept, and never re-use one of the already-named labels listed as taken.")
+    }).strict()).describe("Exactly one entry per listed candidate: its number and its concept-shaped canonical label. Cover every listed candidate number once.")
+  }).strict();
+}
+
+export function buildRescuedNodeLabelingSchema(n: number): JsonSchema {
+  return toForcedToolSchema(buildRescuedNodeLabelingValidator(n));
+}
+
 // --- Concept-set synthesis: submit_synthesized_concepts (U2, R1/R2) -------
 // The source-less analog of Candidate Discovery (plan 2026-06-30-001). ONE forced-tool
 // call generates a bounded concept set from a topic + Declared Domain alone; the set is
@@ -230,18 +249,51 @@ export const missingPrerequisiteProposalValidator = z.object({
 
 export const missingPrerequisiteProposalSchema: JsonSchema = toForcedToolSchema(missingPrerequisiteProposalValidator);
 
-// --- Intrinsic difficulty judgment: submit_intrinsic_difficulty ----------
-// One bounded learner-neutral difficulty judgment over a derived node's evidence.
-// The score is later fused with deterministic graph/evidence components; this
-// schema captures only the neural subscore and a short rationale. The rubric text
-// stays domain-neutral and contains no fixture-derived exemplars (AGENTS rule 17).
+// --- Comparative difficulty banding: submit_difficulty_bands --------------
+// ONE whole-domain-set banding call (ADR-0024 — comparative banded prior). The model
+// bands EVERY listed concept 1–5 RELATIVE to the listed set, citing each by the 1-based
+// concept NUMBER shown before it in the prompt — the same closed-set menu-pick idiom as
+// submit_prerequisite_ordering. Schema + validator are built per call from the node
+// count `n` so exact coverage is concrete: every listed number exactly once, band in
+// 1..5. A missing/duplicate/out-of-range number re-prompts once (maxRetries: 1), then
+// the intrinsic-difficulty stage fails closed (rule 6). Rubric text stays domain-neutral
+// and contains no fixture-derived exemplars (AGENTS rule 17).
 
-export const intrinsicDifficultyValidator = z.object({
-  neuralScore: z.number().min(0).max(1).describe("Learner-neutral intrinsic difficulty in [0,1], based on abstraction level, technical density, implied background load, and how much the evidence requires integrating multiple ideas."),
-  rationale: z.string().min(1).describe("One terse sentence explaining the generic difficulty factors that drove the score.")
+export function buildDifficultyBandsValidator(n: number) {
+  return z.object({
+    bands: z.array(z.object({
+      conceptNumber: z.number().int().min(1).max(n).describe("The 1-based Concept number (as shown before each concept) this band applies to. Every listed number must appear exactly once."),
+      band: z.number().int().min(1).max(5).describe("Intrinsic difficulty band RELATIVE to the listed concept set: 1 = the most accessible concepts of this set, 5 = the most demanding. Band from the evidence shown, never from how abstract a label sounds."),
+      rationale: z.string().min(1).describe("One terse sentence naming the generic difficulty factors, grounded in this concept's shown evidence.")
+    }).strict()).length(n).describe("Exactly one band per listed concept, each cited by its listed number.")
+  }).strict().superRefine((value, ctx) => {
+    const seen = new Set<number>();
+    for (const entry of value.bands) {
+      if (seen.has(entry.conceptNumber)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["bands"], message: `Concept number ${entry.conceptNumber} was banded more than once; band every listed number exactly once.` });
+      }
+      seen.add(entry.conceptNumber);
+    }
+  });
+}
+
+export function buildDifficultyBandsSchema(n: number): JsonSchema {
+  return toForcedToolSchema(buildDifficultyBandsValidator(n));
+}
+
+// --- Pairwise difficulty comparison: submit_difficulty_comparison ---------
+// Bounded calibration for a CONTESTED band (modal share below the contest threshold):
+// one "which is harder to learn" judgment between the contested concept and an
+// uncontested anchor concept of a candidate band. At most two comparisons bracket a
+// contested concept; the bracket placement lives in the application. Domain-neutral
+// rubric (AGENTS rule 17).
+
+export const difficultyComparisonValidator = z.object({
+  harder: z.enum(["first", "second"]).describe("'first' when the first listed concept is harder for a learner to master, 'second' when the second is. Judge from the shown evidence and generic difficulty factors (abstraction, technical density, background load, integration burden), never from label phrasing."),
+  rationale: z.string().min(1).describe("One terse sentence grounded in the two concepts' shown evidence.")
 }).strict();
 
-export const intrinsicDifficultySchema: JsonSchema = toForcedToolSchema(intrinsicDifficultyValidator);
+export const difficultyComparisonSchema: JsonSchema = toForcedToolSchema(difficultyComparisonValidator);
 
 // --- Declared domain inference: submit_declared_domain --------------------
 // One bounded learner-charting helper: infer a short field-of-study label from a
@@ -439,6 +491,19 @@ export const impostorLieValidityJudgmentValidator = z.object({
 
 export const impostorLieValidityJudgmentSchema: JsonSchema = toForcedToolSchema(impostorLieValidityJudgmentValidator);
 
+// --- Concept Lesson redundancy judgment: submit_concept_lesson_redundancy_judgment
+
+export const conceptLessonRedundancyJudgmentValidator = z.object({
+  judgments: z.array(z.object({
+    sectionKind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]),
+    verdict: z.enum(["distinct", "redundant"]),
+    redundantWith: z.string().nullable().describe("The kind this section repeats when verdict is redundant; null when verdict is distinct."),
+    reason: z.string().min(1)
+  }).strict())
+}).strict();
+
+export const conceptLessonRedundancyJudgmentSchema: JsonSchema = toForcedToolSchema(conceptLessonRedundancyJudgmentValidator);
+
 // --- Concept Lesson generation: submit_concept_lesson (U2, R2/R4/R6/R7/R14) -----
 // One ordered teaching artifact per learning node (ADR-0031). Every section is
 // INDEPENDENTLY OPTIONAL: a section that does not apply is simply OMITTED from the
@@ -456,6 +521,7 @@ export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
 const conceptLessonSection = z.object({
   kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
   text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
+  items: z.array(z.string().min(1).max(280)).max(4).describe("List items for examples/applications sections only. Use 2-4 items for examples or applications; otherwise use an empty array."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
   diagramCaption: z.string().nullable().describe("Optional one-line caption for a simple explanatory diagram for this section; null when there is none."),
@@ -474,11 +540,13 @@ export const toolValidators = [
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptEvidenceProfileValidator,
   buildPrerequisiteOrderingValidator(3),
+  buildRescuedNodeLabelingValidator(3),
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
   missingPrerequisiteProposalValidator,
-  intrinsicDifficultyValidator,
+  buildDifficultyBandsValidator(3),
+  difficultyComparisonValidator,
   definitionEntailmentJudgmentValidator,
   definitionPassageQualityJudgmentValidator,
   admissionLabelJudgmentValidator,
@@ -490,5 +558,6 @@ export const toolValidators = [
   matchingValidator,
   impostorValidator,
   impostorLieValidityJudgmentValidator,
+  conceptLessonRedundancyJudgmentValidator,
   conceptLessonValidator
 ] as const;

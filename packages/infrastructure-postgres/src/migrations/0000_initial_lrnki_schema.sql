@@ -425,7 +425,7 @@ WHERE a.artifact_type = 'study_item_bank';
 -- its derived node, label, and section count, for Admin Lab inspection (ADR-0031). Reads the
 -- immutable `concept_lesson_bank` artifact the Concept Lesson store writes beside its rows.
 CREATE VIEW artifact_concept_lessons AS
-SELECT a.graph_version_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count
+SELECT a.graph_version_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count, cl.sections
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
@@ -434,7 +434,8 @@ JSON_TABLE(
     derived_node_id text PATH '$.derivedNodeId',
     enrichment_id text PATH '$.enrichmentId',
     canonical_label text PATH '$.canonicalLabel',
-    section_count integer PATH '$.sections.size()'
+    section_count integer PATH '$.sections.size()',
+    sections json PATH '$.sections'
   )
 ) AS cl
 WHERE a.artifact_type = 'concept_lesson_bank';
@@ -559,13 +560,14 @@ CREATE TABLE learner_expeditions (
   current_operation_id uuid,
   current_operation_type text CHECK (current_operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
   enrichment_id uuid REFERENCES graph_enrichments(enrichment_id),
-  target_derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
   active boolean NOT NULL DEFAULT false,
   failure_message text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK ((current_operation_id IS NULL AND current_operation_type IS NULL) OR (current_operation_id IS NOT NULL AND current_operation_type IS NOT NULL)),
-  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL AND target_derived_node_id IS NOT NULL) OR status <> 'ready')
+  -- The summit is derived at read time (ADR-0032), so a ready expedition needs only its
+  -- enrichment; there is no persisted target to constrain.
+  CHECK ((status = 'ready' AND enrichment_id IS NOT NULL) OR status <> 'ready')
 );
 
 CREATE UNIQUE INDEX learner_expeditions_one_active_per_learner
@@ -870,6 +872,7 @@ CREATE TABLE concept_lesson_sections (
   ordinal integer NOT NULL CHECK (ordinal >= 0),
   kind text NOT NULL CHECK (kind IN ('gist', 'intuition', 'definition', 'examples', 'applications', 'formulas')),
   body_text text NOT NULL,
+  items text[],
   grounding_provenance text NOT NULL CHECK (grounding_provenance IN ('source_cep', 'source_mentioned', 'generated')),
   diagram_caption text,
   diagram_spec text,

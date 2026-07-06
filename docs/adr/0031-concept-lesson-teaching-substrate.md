@@ -10,6 +10,11 @@ artifact generated alongside the Study Item Bank as a learner-neutral, regenerab
 intuition, definition, examples, applications, formulas/methods — that *teach* the concept before it
 is tested.
 
+Sections may carry generated presentation structure: up to three `keyTerms` that occur verbatim in
+the section text, and list `items` for examples/applications. These fields are learner-neutral
+display structure inside the section, not separate claims or citations; source types and the initial
+migration own their exact persisted shape.
+
 The Concept Lesson is the **single source of grounding** for downstream study assets. Option-select
 items derive from the lesson's source-cited sections, not from raw passages; no study-item type reads
 raw grounding once a lesson exists ([ADR-0001](0001-adopt-greenfield-deep-module-architecture.md),
@@ -26,11 +31,13 @@ and labeled `generated`. The gist is a framing hook — the concept's core idea,
 solves, or why it matters — and is deliberately distinct from the definition's formal statement of
 what the concept is; a gist that restates the definition is a defect, not a valid section.
 
-A section that cannot be produced or grounded is **absent, not placeholder**. A lesson is valid only
-when it meets the minimum — a gist, at least one application, and at least one substantive section
-(definition, examples, or formulas). A minted (`llm_grounded`) node's substantive section may be
-generated and still satisfy the minimum; a node is recorded **lesson-absent** with a reason only when
-its grounding is entirely unusable.
+A section that cannot be produced or grounded is **absent, not placeholder**. A lesson is valid when
+it has at least one substantive section (definition, examples, or formulas). The generator still
+aims for a compact teaching arc, but gist, intuition, and applications are optional hooks; dropping
+one must not turn a usable lesson into a **lesson-absent** node. A minted (`llm_grounded`) node's
+substantive section may be generated and still satisfy the minimum; a node is recorded
+**lesson-absent** with a reason only when its grounding is entirely unusable or no substantive
+section survives.
 
 Lesson generation is a stage **within** the existing `study_items` operation, before the option-select
 stage in the same per-node pass — one worker run, no new `operation_type`. It carries its own
@@ -38,14 +45,17 @@ LiteLLM spend tag (`concept-lesson-generation`) so its cost and wall-clock are s
 ([ADR-0029](0029-persist-shared-operation-stage-timelines.md)).
 
 Synthesized sections are generated only when the current lesson grounding supports them and are
-labeled `generated`. `gist` and `applications` are required by the lesson minimum; `intuition` remains
-optional and appears only when it adds a distinct mental model rather than repeating the gist or
-substantive section. Knowledge-boundary gating for source-less concept synthesis belongs to
+labeled `generated`. `gist`, `intuition`, and `applications` appear only when they add distinct
+instructional information rather than repeating the substantive section. A cross-family redundancy
+judge checks section distinctness after assembly. If a non-substantive section is redundant, lesson
+generation retries once with named feedback; if the retry still repeats, the redundant
+non-substantive section is dropped before persistence. The judge may remove hooks, never cited
+substantive sections. Knowledge-boundary gating for source-less concept synthesis belongs to
 [ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md).
 
-The Study Session shows a node's Concept Lesson before its option-select item; reading a lesson writes
-no Response Log row. The lesson rides down the `composeStudySession` projection from lessons loaded
-through a `ConceptLessonStorePort`; it is not served *through* a read port
+The Study Session shows a node's Concept Lesson before its Study Item Bank segments; reading a lesson
+writes no Response Log row. The lesson rides down the `composeStudySession` projection from lessons
+loaded through a `ConceptLessonStorePort`; it is not served *through* a read port
 ([ADR-0027](0027-serve-inspection-through-read-model-ports.md)).
 
 Lesson generation imports no graph or enrichment write port: it is a derived asset that never mutates
@@ -78,5 +88,9 @@ lesson and its option-select projection are produced in the same per-node pass.
   the cost regression immediately visible at the real-use gate owned by [AGENTS.md](../../AGENTS.md).
 - Option-select quality now depends on the lesson's source citations; the assembler demotes any
   unverifiable citation before persistence, so an item can never cite a quote the lesson did not verify.
+- Key terms and list items make lessons scan-friendly for learners without changing the grounding
+  contract; invalid key terms are ignored unless they occur verbatim in their section text.
+- Lesson redundancy adds another neural judge call inside `study_items`, but prevents duplicated
+  hooks from reaching the learner and fails open only by preserving the assembled lesson.
 - The substrate is game-ready but ungraded; per-learner personalization stays in downstream projections
   and the Learner App, never in this learner-neutral core.

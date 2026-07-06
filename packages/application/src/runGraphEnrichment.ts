@@ -26,6 +26,7 @@ import type {
   NodeMergeAdjudicationPort,
   PrerequisiteOrderingPort,
   RescueDurabilityJudgmentPort,
+  RescuedNodeLabelingPort,
   DefinitionPassageQualityJudgmentPort,
   RunProgressReporterPort,
   GraphVersionStorePort
@@ -50,6 +51,11 @@ export type GraphEnrichmentConfig = {
   // distribution; the boundary draws K times on the SAME input and tallies a per-pair
   // directional vote. Calibrated in the U6 rule-14 pass, never assumed (D8).
   orderingSampleCount: number;
+  // K for the comparative difficulty BANDING draws per Declared Domain (ADR-0024).
+  // Band consensus needs fewer draws than per-edge direction votes: bands are 5
+  // coarse buckets, not O(n²) directed decisions. Consumed at composition time —
+  // the wired DifficultyPort is created with this knob.
+  difficultySampleCount: number;
   // The minority-vote fraction at which a pair's prerequisite DIRECTION is judged
   // genuinely contested and routed to `uncertain` (D3/D6). A pair is contested when
   // `min(forward, reverse) / K >= directionContestMinorityFraction`. A FRACTION of K (not a
@@ -80,16 +86,18 @@ export type GraphEnrichmentConfig = {
 };
 
 export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
-  // Load-bearing enrichment identity (ADR-0019): changing the ordering BEHAVIOR
+  // Load-bearing enrichment identity (ADR-0019): changing enrichment BEHAVIOR
   // re-derives the layer. Unversioned `kind` name, consistent with the abolished `.vN`
-  // convention (KTD7) — K-sampling supersedes single-draw whole-set ordering.
-  enrichmentConfigHash: "k-sample-ordering",
+  // convention (KTD7) — comparative banded difficulty supersedes the fused pointwise
+  // judge, which itself superseded single-draw whole-set ordering ("k-sample-ordering").
+  enrichmentConfigHash: "banded-difficulty",
   // CALIBRATED in the U6 rule-14 pass against real K=8 gpt-oss-120b draws over the Rust +
   // economics fixtures (D8; tmp/2026-06-24-k-sample-ordering-rule14/). K=8 is the
   // probe-validated draw count. The contest fraction 0.1 catches a genuine 7:1 directional
   // flip at K=8 (min/K = 0.125 ≥ 0.1 → `uncertain`) while scaling with K — a single stray
   // reverse at K≥16 (≤0.0625) stays committed, so a robust pair is not routed to `uncertain`.
   orderingSampleCount: 8,
+  difficultySampleCount: 5,
   directionContestMinorityFraction: 0.1,
   // Now gates an AGREEMENT fraction (max(f,r)/K), not a 0.85-scale self-report — so 0.5
   // means "present in at least half the draws". Recalibrated in U6 (KTD2).
@@ -139,6 +147,10 @@ export async function runGraphEnrichment(input: {
   // same-domain anchors before becoming derived nodes; omit it to leave rescue
   // unjudged (prior behavior).
   rescueDurabilityJudge?: RescueDurabilityJudgmentPort;
+  // Optional measured Rescued-Node Canonical Labeling judge (TODO #1). When provided, each
+  // KEPT durable rescued node is re-named to a concept-shaped label before it enters the
+  // derived layer; omit it to leave rescued sentence-shaped labels as-is (prior behavior).
+  rescuedNodeLabelingJudge?: RescuedNodeLabelingPort;
   // Optional rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). When
   // provided, the `definition`-typed grounding passages of verbatim-floored
   // `source_mentioned` nodes are meaning-judged before they become learner-facing study
@@ -226,6 +238,7 @@ export async function runGraphEnrichment(input: {
         proposalPort: input.missingPrerequisiteProposal!,
         groundingPort: input.groundingGeneration!,
         rescueDurabilityJudge: input.rescueDurabilityJudge,
+        rescuedNodeLabelingJudge: input.rescuedNodeLabelingJudge,
         mintingDurabilityJudge: input.mintingDurabilityJudge,
         bounds: config.mintingBounds,
         newNodeId,
@@ -383,10 +396,11 @@ export async function runGraphEnrichment(input: {
   });
   const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
 
-  // Step 5 — intrinsic difficulty over the reduced DAG. Scores ALL derived node ids
-  // — anchors AND enrichment nodes (R12, handoff constraint).
+  // Step 5 — comparative banded intrinsic difficulty from node evidence contexts only
+  // (ADR-0024). Scores ALL derived node ids — anchors AND enrichment nodes (R12,
+  // handoff constraint); the DAG is not an input (structural fusion deleted).
   const difficulties = await runStage(STAGE_TAGS.intrinsicDifficulty, () =>
-    input.difficulty.score({ nodes: difficultyNodes, prerequisiteEdges: reducedEdges })
+    input.difficulty.score({ nodes: difficultyNodes })
   );
 
   const layer: DerivedGraphLayer = {

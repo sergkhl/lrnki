@@ -97,10 +97,9 @@ const scopeLesson: ConceptLesson = {
   ]
 };
 
-function callGetStudySession(args: { enrichmentId?: string; target?: string; items?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; absent?: LessonAbsentNode[] }) {
+function callGetStudySession(args: { enrichmentId?: string; items?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; absent?: LessonAbsentNode[] }) {
   return getStudySession({
     enrichmentId: args.enrichmentId ?? "e",
-    targetDerivedNodeId: args.target ?? "ownership",
     learnerStateRef: "L1",
     enrichmentRead: enrichmentRead({ e: detail() }),
     studyItemStore: studyItemStore(args.items ?? [optionItem]),
@@ -115,15 +114,11 @@ test("getStudySession returns undefined for an unknown enrichment", async () => 
   assert.equal(await callGetStudySession({ enrichmentId: "missing" }), undefined);
 });
 
-test("getStudySession returns undefined when the target is not a node (no second existence read needed)", async () => {
-  assert.equal(await callGetStudySession({ target: "not-a-node" }), undefined);
-});
-
 test("getStudySession returns exactly what composeStudySession produces for the loaded data", async () => {
   const rows: ResponseLogRow[] = [];
   const verdicts: CalibrationVerdict[] = [];
   const fromUseCase = await callGetStudySession({ items: [optionItem], rows, verdicts });
-  const fromPure = composeStudySession({ enrichmentId: "e", learnerStateRef: "L1", targetDerivedNodeId: "ownership", detail: detail(), studyItems: [optionItem], rows, verdicts });
+  const fromPure = composeStudySession({ enrichmentId: "e", learnerStateRef: "L1", detail: detail(), studyItems: [optionItem], rows, verdicts });
   assert.deepEqual(fromUseCase, fromPure);
 });
 

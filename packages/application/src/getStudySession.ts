@@ -18,7 +18,6 @@ import { composeStudySession, type StudySession } from "./studySessionProjection
 // structurally cannot mutate a published graph or the Derived Graph Layer (R10).
 export async function getStudySession(input: {
   enrichmentId: string;
-  targetDerivedNodeId: string;
   learnerStateRef: string;
   enrichmentRead: EnrichmentInspectionReadPort;
   studyItemStore: StudyItemBankStorePort;
@@ -29,7 +28,6 @@ export async function getStudySession(input: {
 }): Promise<StudySession | undefined> {
   const detail = await input.enrichmentRead.getDerivedGraphDetail(input.enrichmentId);
   if (!detail) return undefined;
-  if (!detail.nodes.some((node) => node.derivedNodeId === input.targetDerivedNodeId)) return undefined;
 
   const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts] = await Promise.all([
     input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
@@ -43,7 +41,6 @@ export async function getStudySession(input: {
   return composeStudySession({
     enrichmentId: input.enrichmentId,
     learnerStateRef: input.learnerStateRef,
-    targetDerivedNodeId: input.targetDerivedNodeId,
     detail,
     studyItems,
     lessons,
