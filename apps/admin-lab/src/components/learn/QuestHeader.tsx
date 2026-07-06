@@ -1,6 +1,6 @@
-import { GemIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import type { StudySession } from "@/lib/learnerStudySession";
+import { CrystalVista } from "./CrystalVista";
+import { buildCrystalFormation } from "./crystalVistaView";
 import { SectionOverview } from "./SectionOverview";
 import type { TrailView } from "./trailView";
 
@@ -15,11 +15,11 @@ export function QuestHeader({ session, trail }: Readonly<{ session: StudySession
         <div className="flex shrink-0 items-center gap-2">
           {/* Non-blocking overview trigger (R5): opens the section map on demand; the guided
               continue flow never needs it. */}
-          <SectionOverview sections={trail.sections} currentSectionIndex={trail.currentSectionIndex} />
-          <Badge variant="outline" className="gap-1">
-            <GemIcon className="size-3.5" />
-            {trail.masteredCount}/{trail.totalClusters}
-          </Badge>
+          <SectionOverview sections={trail.sections} concepts={trail.concepts} currentSectionIndex={trail.currentSectionIndex} />
+          {/* The crystal tally doubles as the vista door: tap the count to see the
+              whole formation. View-only by design (ADR-0032) — a reward to admire, not
+              a parallel objective. */}
+          <CrystalVista formations={[buildCrystalFormation(session, trail)]} />
         </div>
       </div>
     </header>

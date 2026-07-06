@@ -9,7 +9,7 @@ export const LEARNER_VOCABULARY = {
   question: "Question",
   matching: "Match the pairs",
   spotTheFake: "Spot the fake",
-  capstone: "Gem",
+  capstone: "Crystal",
   nextStop: "Next stop",
   mastered: "Collected",
   frontier: "Ready",
@@ -27,8 +27,10 @@ export const LEARNER_VOCABULARY = {
   sectionPlural: "Legs",
   sectionOverview: "Trail map",
   sectionOverviewHint: "Jump to any open leg. Fogged legs unlock as you clear what they need.",
-  gems: "Gems",
-  gatedBy: "Clears after"
+  gems: "Crystals",
+  gatedBy: "Clears after",
+  vistaTitle: "Crystal formation",
+  vistaHint: "Every concept you master grows a crystal here. Fogged shapes still wait in the rock."
 } as const;
 
 export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;

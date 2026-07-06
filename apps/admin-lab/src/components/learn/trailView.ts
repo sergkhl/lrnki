@@ -29,6 +29,10 @@ export type TrailCluster = {
   sectionIndex: number;
   milestoneLabel: string;
   isSectionStart: boolean;
+  // How far this concept's crystal has grown: the fraction of its own non-capstone
+  // stops complete. Mastery forces 1 (a calibration `known` node may have unread
+  // stops), so the crystal finishes exactly when the completion rule says so.
+  growthFraction: number;
   stops: TrailStop[];
 };
 
@@ -89,6 +93,14 @@ export function buildTrailView(session: StudySession): TrailView {
     const isSectionStart = step.sectionIndex !== previousSectionIndex;
     previousSectionIndex = step.sectionIndex;
 
+    const activityStops = stops.filter((stop) => stop.kind !== "capstone");
+    const growthFraction =
+      step.state === "mastered"
+        ? 1
+        : activityStops.length === 0
+          ? 0
+          : activityStops.filter((stop) => stop.state === "complete").length / activityStops.length;
+
     return {
       derivedNodeId: step.derivedNodeId,
       label,
@@ -99,6 +111,7 @@ export function buildTrailView(session: StudySession): TrailView {
       sectionIndex: step.sectionIndex,
       milestoneLabel: step.milestoneLabel,
       isSectionStart,
+      growthFraction,
       stops
     };
   });

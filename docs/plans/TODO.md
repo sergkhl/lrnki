@@ -2,7 +2,15 @@
 
 ## TODO
 
-1. **Strengthen the rescued-node concept re-label so sentence-shaped labels are re-named more
+1. **Growing crystals and the Crystal Vista (in progress, branch `feat/growing-crystals`).**
+   Per-concept procedural growing crystals replace the gem icon across the trail, and a view-only
+   Crystal Vista shows the expedition as one bedrock-up formation (header-tally trigger +
+   section-completion celebration). Accepted framing, scope, and rejections:
+   [2026-07-06 brainstorm](../brainstorms/2026-07-06-growing-crystals-and-vista-requirements.md).
+   Implementation complete and rule-14 gate PASS (see VALIDATION); remaining: merge and consolidate
+   the brainstorm into COMPLETED.
+
+2. **Strengthen the rescued-node concept re-label so sentence-shaped labels are re-named more
    reliably.** The U8 re-label rides the rescue durability judge as an *optional* concept-label
    proposal; on the 2026-07-05 Rust real-use gate it left one clearly propositional label on the
    trail ("Each value in Rust has an owner") because the judge returned an empty proposal for it.
@@ -12,7 +20,7 @@
    rewrite is out (rule 16). Decision:
    [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+3. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
@@ -22,7 +30,7 @@
    source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+4. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -146,6 +154,23 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Growing crystals and Crystal Vista, 2026-07-06.** Deterministic envelope: full workspace
+  `typecheck` exit 0, recursive test suite green (admin-lab 101 incl. new crystalGeometry 7 /
+  crystalVistaView 3 / trailView growth 3 / capstone activity 2), ESLint 0 errors. **Real-use gate
+  (rule 14): PASS.** 390px Playwright pass over real enrichment
+  `e8ba6143-be10-40bc-b941-b88acbf22c13` (heap-allocation domain, 11 trail concepts, 20 edges)
+  through the real Begin charter flow: per-concept crystals render visually distinct and
+  byte-identical across reloads (determinism probe STABLE); the Heap node was mastered through real
+  graded play (option-select first-try, matching brute-then-replay to clean sweep, impostor
+  first-try) with the capstone crystal growing facet-by-facet; the mastery reveal played the
+  facet-assembly + glint; marking one remaining Leg-1 concept known auto-opened the vista with the
+  "Leg 1 crystallized ✦" celebration; the header tally, section-divider strips, and overview strips
+  all tracked the same counts. One defect found and fixed during the gate: the vista formation
+  scaled down to thumbnail size on a wide layout — now floored at ~58% layout scale with horizontal
+  pan. Caveat: partial multi-segment growth mid-crystal was verified on the live trail visuals and
+  unit tests, not screenshot-archived per stop. Evidence: `tmp/2026-07-06-crystals-gate/*.png` +
+  drive scripts.
 
 - **Adaptive sectioned expedition trail and game-honesty pass, 2026-07-05.** Deterministic envelope:
   full workspace `typecheck` exit 0 and the recursive test suite green (domain-core 36, ports,

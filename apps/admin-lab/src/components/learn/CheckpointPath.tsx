@@ -6,6 +6,7 @@ import { FlagIcon } from "lucide-react";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
+import { SectionCrystalStrip } from "./SectionCrystalStrip";
 import { cn } from "@/lib/utils";
 import { learnerTerm } from "./vocabulary";
 import { sectionAnchorId, type TrailCluster, type TrailStop, type TrailView } from "./trailView";
@@ -33,7 +34,12 @@ export function CheckpointPath({ view, session }: Readonly<{ view: TrailView; se
         </svg>
         {view.concepts.map((concept, conceptIndex) => (
           <div key={concept.derivedNodeId} className="flex flex-col gap-5">
-            {concept.isSectionStart ? <SectionDivider concept={concept} /> : null}
+            {concept.isSectionStart ? (
+              <SectionDivider
+                concept={concept}
+                sectionConcepts={view.concepts.filter((candidate) => candidate.sectionIndex === concept.sectionIndex)}
+              />
+            ) : null}
             <section className="relative z-10 flex flex-col gap-3">
               <ConceptMarker concept={concept} session={session} />
               <div className="flex flex-col gap-3">
@@ -42,7 +48,7 @@ export function CheckpointPath({ view, session }: Readonly<{ view: TrailView; se
                     .slice(0, conceptIndex)
                     .reduce((count, priorConcept) => count + priorConcept.stops.length, stopIndex);
                   const offset = WINDING_OFFSETS[globalStopIndex % WINDING_OFFSETS.length] * WINDING_STEP_PX;
-                  return <CheckpointStopRow key={stop.stopId} stop={stop} offset={offset} onSelect={setSelectedStopId} />;
+                  return <CheckpointStopRow key={stop.stopId} stop={stop} concept={concept} offset={offset} onSelect={setSelectedStopId} />;
                 })}
               </div>
             </section>
@@ -62,7 +68,8 @@ export function CheckpointPath({ view, session }: Readonly<{ view: TrailView; se
 }
 
 // A section boundary marker (R5 display) carrying the scroll anchor the overview jumps to.
-function SectionDivider({ concept }: Readonly<{ concept: TrailCluster }>) {
+// Its crystal strip previews the section's formation growing as concepts complete.
+function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailCluster; sectionConcepts: TrailCluster[] }>) {
   return (
     <div
       id={sectionAnchorId(concept.sectionIndex)}
@@ -72,15 +79,17 @@ function SectionDivider({ concept }: Readonly<{ concept: TrailCluster }>) {
       <p className="min-w-0 truncate text-sm font-semibold">
         <span className="text-muted-foreground">{learnerTerm("section")} {concept.sectionIndex + 1}</span> · {concept.milestoneLabel}
       </p>
+      <SectionCrystalStrip concepts={sectionConcepts} className="ml-auto shrink-0 justify-end" />
     </div>
   );
 }
 
 function CheckpointStopRow({
   stop,
+  concept,
   offset,
   onSelect
-}: Readonly<{ stop: TrailStop; offset: number; onSelect: (stopId: string) => void }>) {
+}: Readonly<{ stop: TrailStop; concept: TrailCluster; offset: number; onSelect: (stopId: string) => void }>) {
   return (
     <div
       data-stop-id={stop.stopId}
@@ -92,7 +101,7 @@ function CheckpointStopRow({
       )}
     >
       <div className="relative z-10" style={{ transform: `translateX(${offset}px)` }}>
-        <CheckpointCircle stop={stop} onSelect={onSelect} />
+        <CheckpointCircle stop={stop} concept={concept} onSelect={onSelect} />
       </div>
     </div>
   );

@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2Icon, GemIcon } from "lucide-react";
-import { motion } from "motion/react";
+import { CheckCircle2Icon } from "lucide-react";
 import type { StudySession } from "@lrnki/application";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/app/learn/[learnerStateRef]/actions";
 import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/app/learn/[learnerStateRef]/actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
+import { CrystalGlyph } from "./CrystalGlyph";
 import { LessonSections } from "./LessonSections";
 import { MatchingBoard } from "./MatchingBoard";
 import { resolveStopActivity } from "./activityProgress";
@@ -192,20 +192,24 @@ function ActivityBody({
   if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
   if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
+    // The mastery reveal: the concept's crystal assembles facet by facet, then the
+    // glint seals it (one-shot, gated on the just-mastered transition).
     return (
       <section className="flex flex-col gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
         <div className="flex items-center gap-3">
-          <motion.div
-            initial={justAdvanced && activity.mastered ? { scale: 0.7, rotate: -12 } : false}
-            animate={justAdvanced && activity.mastered ? { scale: [0.7, 1.18, 1], rotate: [-12, 8, 0] } : { scale: 1, rotate: 0 }}
-            transition={{ duration: 0.65 }}
-          >
-            <GemIcon />
-          </motion.div>
+          <CrystalGlyph
+            derivedNodeId={activity.derivedNodeId}
+            difficulty={activity.difficulty}
+            growthFraction={activity.growthFraction}
+            state={activity.mastered ? "mastered" : "frontier"}
+            size={72}
+            assemble={justAdvanced && activity.mastered}
+            className="shrink-0"
+          />
           <div>
             <h2 className="text-lg font-semibold">{activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</h2>
             <p className="text-sm text-muted-foreground">
-              {activity.mastered ? "This gem is collected." : "Collect the earlier stops to unlock this gem."}
+              {activity.mastered ? "This crystal is collected." : "Complete the earlier stops to finish growing this crystal."}
             </p>
           </div>
         </div>

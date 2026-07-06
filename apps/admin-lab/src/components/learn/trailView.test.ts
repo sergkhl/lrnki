@@ -80,6 +80,27 @@ test("buildTrailView fills study item stops only when their latest item outcome 
   assert.equal(stops.find((stop) => stop.studyItemId === "i2")?.state, "available");
 });
 
+test("buildTrailView grows the crystal by the fraction of the node's own stops complete", () => {
+  // Fixture n1 has theory + two items = 3 activity stops; only i1 is latest-correct.
+  const view = buildTrailView(session({ latestOutcomeByStudyItemId: { i1: "correct" } }));
+  assert.equal(view.concepts[0].growthFraction, 1 / 3);
+});
+
+test("buildTrailView forces full crystal growth on a mastered node even with unread stops", () => {
+  const base = session();
+  const mastered: StudySession = {
+    ...base,
+    expeditionPath: [{ ...base.expeditionPath[0], state: "mastered" }]
+  };
+  assert.equal(buildTrailView(mastered).concepts[0].growthFraction, 1);
+});
+
+test("buildTrailView gives a stopless unmastered node zero growth", () => {
+  const base = session({ withoutLesson: true });
+  const stopless: StudySession = { ...base, studySegmentsByNode: {} };
+  assert.equal(buildTrailView(stopless).concepts[0].growthFraction, 0);
+});
+
 function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; latestOutcomeByStudyItemId?: StudySession["latestOutcomeByStudyItemId"]; difficulty?: number } = {}): StudySession {
   const nodes = [{
     derivedNodeId: "n1",
