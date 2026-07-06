@@ -37,7 +37,7 @@ export function ExpeditionEntry({
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <Badge variant="outline" className="w-fit border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+        <Badge variant="outline" className="w-fit border-border bg-card">
           <CompassIcon data-icon="inline-start" />
           {learnerTerm("routeName")}
         </Badge>
@@ -61,7 +61,7 @@ export function ExpeditionEntry({
       </section>
 
       <section className="grid gap-4">
-        <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+        <Card className="border-border bg-card">
           <CardHeader className="flex flex-row items-start justify-between gap-3">
             <div className="min-w-0">
               <CardTitle>Your expeditions</CardTitle>
@@ -86,7 +86,7 @@ export function ExpeditionEntry({
                   learnerExpeditionId: expedition.learnerExpeditionId,
                   enrichmentId: expedition.enrichmentId
                 });
-              }} className="flex items-center gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3">
+              }} className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
                 <MapIcon />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{expedition.title}</p>
@@ -122,7 +122,7 @@ export function ExpeditionEntry({
 function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRef: string; candidate: ExpeditionCandidate }>) {
   const existingLearnerExpeditionId = candidate.existingLearnerExpeditionId;
   return (
-    <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+    <Card className="border-border bg-card">
       <CardHeader>
         <Badge variant="secondary" className="w-fit">{titleCase(candidate.declaredDomain)}</Badge>
         <CardTitle className="text-xl">Expedition: {candidate.title}</CardTitle>
@@ -168,7 +168,7 @@ function titleCase(value: string): string {
 
 function NoCandidates() {
   return (
-    <Card className="md:col-span-3 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+    <Card className="md:col-span-3 border-border bg-card">
       <CardContent className="pt-6">
         <Empty>
           <EmptyHeader>

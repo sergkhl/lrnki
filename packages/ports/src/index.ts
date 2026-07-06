@@ -810,12 +810,14 @@ export interface SourceInspection {
   parserName: string;
   parserVersion: string;
   blocks: { blockId: string; blockType: string; headingPath: string[]; text: string }[];
+  // This source's extraction runs, newest first — the door to the run detail view.
+  runs: { runId: string; status: string; degraded: boolean; latencyMs: number | null; startedAt: string }[];
 }
 
-// Run Inspector read surface: list summaries + one run's full inspection. Returns
-// `undefined` only for not-found; real DB errors propagate (ADR-0027 decision 5).
+// Run inspection read surface: one run's full inspection (the run list lives on its
+// source's SourceInspection). Returns `undefined` only for not-found; real DB errors
+// propagate (ADR-0027 decision 5).
 export interface RunInspectionReadPort {
-  listRunSummaries(): Promise<RunSummary[]>;
   getRunInspection(runId: string): Promise<RunInspection | undefined>;
 }
 

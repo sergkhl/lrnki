@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { GenerationAutoRefresh } from "./GenerationAutoRefresh";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { generationProgress, isQueuedExpedition } from "./generationProgress";
 import { stageCopy } from "./stageCopy";
 import { expeditionStatusLabel, learnerTerm } from "./vocabulary";
@@ -20,8 +20,8 @@ export async function GenerationProgressCard({ expedition }: Readonly<{ expediti
   // Auto-refresh covers the queued → scouting transition.
   if (isQueuedExpedition(expedition)) {
     return (
-      <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
-        <GenerationAutoRefresh active />
+      <Card className="border-border bg-card">
+        <AutoRefresh active />
         <CardHeader>
           <CardTitle>{expedition.title}</CardTitle>
           <CardDescription>{learnerTerm("queuedDescription")}</CardDescription>
@@ -42,8 +42,8 @@ export async function GenerationProgressCard({ expedition }: Readonly<{ expediti
   const stalled = isStalled(timeline?.summary.status ?? expedition.status, timeline?.summary.lastProgressAt);
   const progress = generationProgress(timeline);
   return (
-    <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
-      <GenerationAutoRefresh active={expedition.status === "generating"} />
+    <Card className="border-border bg-card">
+      <AutoRefresh active={expedition.status === "generating"} />
       <CardHeader>
         <CardTitle>{expedition.title}</CardTitle>
         <CardDescription>{expedition.status === "failed" ? expedition.failureMessage ?? learnerTerm("generatingFailedDescription") : stalled ? learnerTerm("generatingStoppedDescription") : stageCopy(currentStage)}</CardDescription>

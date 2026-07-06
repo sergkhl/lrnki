@@ -44,8 +44,8 @@ export function SectionOverview({
           </Button>
         }
       />
-      <SheetContent side="bottom" className="max-h-[70dvh] gap-0 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-0">
-        <SheetHeader className="border-b border-[color:var(--journal-line)] px-4 py-3">
+      <SheetContent side="bottom" className="learn-theme max-h-[70dvh] gap-0 border-border bg-card p-0">
+        <SheetHeader className="border-b border-border px-4 py-3">
           <SheetTitle>{learnerTerm("sectionOverview")}</SheetTitle>
           <SheetDescription>{learnerTerm("sectionOverviewHint")}</SheetDescription>
         </SheetHeader>
@@ -57,8 +57,8 @@ export function SectionOverview({
                 disabled={section.state === "locked"}
                 onClick={() => jumpTo(section)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-md border border-[color:var(--journal-line)] p-3 text-left transition",
-                  section.state === "locked" ? "opacity-60" : "hover:bg-[color:var(--journal-background)]",
+                  "flex w-full items-center gap-3 rounded-md border border-border p-3 text-left transition",
+                  section.state === "locked" ? "opacity-60" : "hover:bg-background",
                   section.sectionIndex === currentSectionIndex ? "ring-2 ring-[color:var(--journal-frontier)]" : null
                 )}
               >

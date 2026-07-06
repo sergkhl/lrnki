@@ -81,7 +81,7 @@ export function MatchingBoard({
   };
 
   return (
-    <section className="flex flex-col gap-4 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+    <section className="flex flex-col gap-4 rounded-md border border-border bg-card p-4">
       <div className="flex items-start gap-2">
         <h2 className="text-lg font-semibold leading-7">{item.question}</h2>
         <GroundedBadge provenance={item.groundingProvenance} />
@@ -130,7 +130,7 @@ export function MatchingBoard({
         </div>
       </div>
       {result?.graded ? (
-        <div className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-3 text-sm">
+        <div className="rounded-md border border-border bg-card p-3 text-sm">
           <p className="font-medium">{result.correct ? "Clean sweep." : "Partly matched."}</p>
           <p className="mt-1 text-muted-foreground">
             {result.correctFirstTry} of {result.pairCount} matched on the first try.

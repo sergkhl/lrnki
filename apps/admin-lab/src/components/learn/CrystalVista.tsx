@@ -8,6 +8,8 @@ import { CrystalGlyph } from "./CrystalGlyph";
 import { learnerTerm } from "./vocabulary";
 import {
   completeSectionIndexes,
+  isNameableCrystal,
+  labelChipFor,
   placeFormation,
   VISTA_CRYSTAL_SIZE,
   type CrystalFormation,
@@ -69,8 +71,8 @@ export function CrystalVista({ formations }: Readonly<{ formations: CrystalForma
           </Button>
         }
       />
-      <SheetContent side="bottom" className="max-h-[85dvh] gap-0 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-0">
-        <SheetHeader className="border-b border-[color:var(--journal-line)] px-4 py-3">
+      <SheetContent side="bottom" className="learn-theme max-h-[85dvh] gap-0 border-border bg-card p-0">
+        <SheetHeader className="border-b border-border px-4 py-3">
           <SheetTitle>{learnerTerm("vistaTitle")}</SheetTitle>
           <SheetDescription>{learnerTerm("vistaHint")}</SheetDescription>
         </SheetHeader>
@@ -106,19 +108,32 @@ function FormationCanvas({
   celebratedSections: number[] | null;
   reducedMotion: boolean;
 }>) {
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   if (formation.crystals.length === 0) {
     return <p className="text-sm text-muted-foreground">Nothing has crystallized here yet.</p>;
   }
   const { viewBox } = formation;
+  const chip = labelChipFor(formation, selectedNodeId);
   const canvas = (
     <svg
       viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
       // Keep crystals admirable on a phone: never scale the formation below ~58% of
       // layout scale — a wide formation pans horizontally instead of shrinking.
       style={{ width: `max(100%, ${Math.round(viewBox.width * 0.58)}px)` }}
-      role="img"
       aria-label={formation.title}
     >
+      {/* Dark rock face behind the formation: crystals read against bedrock instead of
+          near-white paper — the single biggest contrast lift (task 6). Tapping the rock
+          dismisses the label chip. */}
+      <rect
+        x={viewBox.x}
+        y={viewBox.y}
+        width={viewBox.width}
+        height={viewBox.height}
+        rx={16}
+        fill="#28303a"
+        onClick={() => setSelectedNodeId(null)}
+      />
       {/* Prerequisite veins run beneath the crystals: the lattice the formation grew
           along. Uncertain edges stay visibly tentative (dashed). */}
       {formation.veins.map((vein) => (
@@ -132,25 +147,52 @@ function FormationCanvas({
           opacity={0.55}
         />
       ))}
-      {formation.crystals.map((crystal) => (
-        <g
-          key={crystal.derivedNodeId}
-          // Land the glyph's bedrock anchor (CRYSTAL_BASE at 50%,95% of its box) on the
-          // layout position, so veins meet crystals exactly where they root.
-          transform={`translate(${crystal.x - VISTA_CRYSTAL_SIZE * 0.5} ${crystal.y - VISTA_CRYSTAL_SIZE * 0.95})`}
-        >
-          <CrystalGlyph
-            derivedNodeId={crystal.derivedNodeId}
-            difficulty={crystal.difficulty}
-            growthFraction={crystal.growthFraction}
-            state={crystal.state}
-            ghost={crystal.isKnownSkipped}
-            size={VISTA_CRYSTAL_SIZE}
-            assemble={celebratedSections?.includes(crystal.sectionIndex) === true && crystal.state === "mastered"}
-            ariaLabel={crystal.label}
-          />
+      {formation.crystals.map((crystal) => {
+        const nameable = isNameableCrystal(crystal);
+        return (
+          <g
+            key={crystal.derivedNodeId}
+            // Land the glyph's bedrock anchor (CRYSTAL_BASE at 50%,95% of its box) on the
+            // layout position, so veins meet crystals exactly where they root.
+            transform={`translate(${crystal.x - VISTA_CRYSTAL_SIZE * 0.5} ${crystal.y - VISTA_CRYSTAL_SIZE * 0.95})`}
+            // Tap a mastered (or known-ghost) crystal to see which concept it is —
+            // fogged crystals stay unnamed mysteries. Still view-only (ADR-0032).
+            role={nameable ? "button" : undefined}
+            tabIndex={nameable ? 0 : undefined}
+            style={nameable ? { cursor: "pointer", outline: "none" } : undefined}
+            onClick={nameable ? () => setSelectedNodeId((current) => (current === crystal.derivedNodeId ? null : crystal.derivedNodeId)) : undefined}
+            onKeyDown={
+              nameable
+                ? (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedNodeId((current) => (current === crystal.derivedNodeId ? null : crystal.derivedNodeId));
+                    }
+                  }
+                : undefined
+            }
+          >
+            <CrystalGlyph
+              derivedNodeId={crystal.derivedNodeId}
+              difficulty={crystal.difficulty}
+              growthFraction={crystal.growthFraction}
+              state={crystal.state}
+              ghost={crystal.isKnownSkipped}
+              size={VISTA_CRYSTAL_SIZE}
+              assemble={celebratedSections?.includes(crystal.sectionIndex) === true && crystal.state === "mastered"}
+              ariaLabel={crystal.label}
+            />
+          </g>
+        );
+      })}
+      {chip ? (
+        <g aria-live="polite" pointerEvents="none">
+          <rect x={chip.x - chip.width / 2} y={chip.y - 26} width={chip.width} height={30} rx={8} fill="var(--journal-panel)" stroke="var(--journal-line)" />
+          <text x={chip.x} y={chip.y - 6} textAnchor="middle" fontSize={14} fontWeight={600} fill="var(--journal-ink)">
+            {chip.label}
+          </text>
         </g>
-      ))}
+      ) : null}
     </svg>
   );
   return (

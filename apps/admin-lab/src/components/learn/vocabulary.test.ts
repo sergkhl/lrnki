@@ -24,7 +24,7 @@ const USED_KEYS = [
   "unskipKnown",
   "groundedBadge",
   "topicDoor",
-  "progress",
+  "generatingProgress",
   "summit"
 ] satisfies LearnerVocabularyKey[];
 

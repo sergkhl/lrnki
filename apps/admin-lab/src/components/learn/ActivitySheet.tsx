@@ -12,6 +12,7 @@ import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { LessonSections } from "./LessonSections";
 import { MatchingBoard } from "./MatchingBoard";
+import { activeStopFor, type AdvanceMemory } from "./advanceMemory";
 import { resolveStopActivity } from "./activityProgress";
 import { buildTrailView } from "./trailView";
 import { learnerTerm } from "./vocabulary";
@@ -30,17 +31,25 @@ export function ActivitySheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }>) {
-  const [localStop, setLocalStop] = useState<{ sourceStopId: string | null; activeStopId: string | null } | null>(null);
-  const activeStopId = localStop?.sourceStopId === stopId ? localStop.activeStopId : stopId;
+  const [localStop, setLocalStop] = useState<AdvanceMemory>(null);
+  const activeStopId = activeStopFor(localStop, stopId);
   const activity = activeStopId ? resolveStopActivity(session, activeStopId) : null;
   const title = activity && activity.kind !== "missing" ? activity.label : "Trail stop";
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet
+      open={open}
+      onOpenChange={(nextOpen) => {
+        // Closing drops the in-sheet advance memory, so re-opening an earlier stop
+        // opens that stop's own activity instead of the one it advanced to.
+        if (!nextOpen) setLocalStop(null);
+        onOpenChange(nextOpen);
+      }}
+    >
       <SheetContent
         side="right"
-        className="!inset-0 !h-dvh !w-dvw !max-w-none gap-0 overflow-hidden border-0 bg-[color:var(--journal-background)] p-0 sm:!max-w-none"
+        className="learn-theme !inset-0 !h-dvh !w-dvw !max-w-none gap-0 overflow-hidden border-0 bg-background p-0 sm:!max-w-none"
       >
-        <SheetHeader className="shrink-0 border-b border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-4 py-3 pr-12">
+        <SheetHeader className="shrink-0 border-b border-border bg-card px-4 py-3 pr-12">
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{activity ? descriptionFor(activity.kind) : learnerTerm("nextStop")}</SheetDescription>
         </SheetHeader>
@@ -153,7 +162,7 @@ function ActivityController({
           {result && !result.graded ? <p className="text-sm text-destructive">{result.message}</p> : null}
         </div>
       </div>
-      <SheetFooter className="shrink-0 border-t border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <SheetFooter className="shrink-0 border-t border-border bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="mx-auto flex w-full max-w-3xl justify-end">
           <FooterButton
             activity={activity}
@@ -195,7 +204,7 @@ function ActivityBody({
     // The mastery reveal: the concept's crystal assembles facet by facet, then the
     // glint seals it (one-shot, gated on the just-mastered transition).
     return (
-      <section className="flex flex-col gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+      <section className="flex flex-col gap-3 rounded-md border border-border bg-card p-4">
         <div className="flex items-center gap-3">
           <CrystalGlyph
             derivedNodeId={activity.derivedNodeId}
@@ -223,7 +232,7 @@ function ActivityBody({
   }
   if (activity.lesson?.sections.length) return <LessonSections lesson={activity.lesson} />;
   return (
-    <section className="rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+    <section className="rounded-md border border-border bg-card p-4">
       <p className="text-sm text-muted-foreground">No field notes are available for this stop.</p>
     </section>
   );
@@ -279,7 +288,7 @@ function CompletedIndicator({
       : false;
   if (!complete) return null;
   return (
-    <div className="flex w-fit items-center gap-2 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-gem-soft)] px-3 py-2 text-sm font-medium text-[color:var(--journal-ink)]">
+    <div className="flex w-fit items-center gap-2 rounded-md border border-border bg-[color:var(--journal-gem-soft)] px-3 py-2 text-sm font-medium text-[color:var(--journal-ink)]">
       <CheckCircle2Icon className="size-4" />
       {activity.kind === "capstone" && activity.isKnownSkipped ? learnerTerm("known") : learnerTerm("mastered")}
     </div>

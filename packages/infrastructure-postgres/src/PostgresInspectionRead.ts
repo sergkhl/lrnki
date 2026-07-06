@@ -62,16 +62,6 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
     return assembleIdentityDecisions(rows);
   }
 
-  async listRunSummaries(): Promise<RunSummary[]> {
-    const sql = this.sql;
-    const rows = await sql<RunSummaryRow[]>`
-      SELECT ${runSummaryColumns(sql)}
-      FROM extraction_runs er
-      JOIN source_resources sr ON sr.source_resource_id = er.source_resource_id
-      ORDER BY er.started_at DESC`;
-    return rows.map(toRunSummary);
-  }
-
   async getRunInspection(runId: string): Promise<RunInspection | undefined> {
     const sql = this.sql;
     const headers = await sql<(RunSummaryRow & { pipeline_config_hash: string })[]>`
@@ -206,6 +196,12 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
     const blocks = await sql<{ block_id: string; block_type: string; heading_path: string[]; text: string }[]>`
       SELECT block_id, block_type, heading_path, text
       FROM source_blocks WHERE source_document_id = ${source.source_document_id} ORDER BY block_id`;
+    // This source's extraction runs, newest first — the Source Explorer is the one
+    // door to run detail (the standalone run list was folded in here).
+    const runs = await sql<{ run_id: string; status: string; degraded: boolean; latency_ms: number | null; started_at: string }[]>`
+      SELECT run_id, status, degraded, latency_ms, started_at
+      FROM extraction_runs WHERE source_resource_id = ${sourceResourceId}
+      ORDER BY started_at DESC`;
     return {
       source: {
         sourceResourceId: source.source_resource_id,
@@ -218,7 +214,14 @@ export class PostgresInspectionRead implements RunInspectionReadPort, SourceInsp
       },
       parserName: source.parser_name,
       parserVersion: source.parser_version,
-      blocks: blocks.map((row) => ({ blockId: row.block_id, blockType: row.block_type, headingPath: row.heading_path, text: row.text }))
+      blocks: blocks.map((row) => ({ blockId: row.block_id, blockType: row.block_type, headingPath: row.heading_path, text: row.text })),
+      runs: runs.map((row) => ({
+        runId: row.run_id,
+        status: row.status,
+        degraded: row.degraded,
+        latencyMs: row.latency_ms,
+        startedAt: new Date(row.started_at).toISOString()
+      }))
     };
   }
 }

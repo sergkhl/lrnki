@@ -24,6 +24,24 @@
 
 ## COMPLETED
 
+- **Admin run visibility and Learner App UX polish.** Operations page groups running/stalled
+  operations in an always-first Active section with `N running · M stalled · K failed` header chips
+  and auto-refreshes while any run is active (shared `AutoRefresh` replaces the learner-only
+  component). The journey and bottleneck report routes are folded into the Operations page as inline
+  per-card panels driven by `?report`/`?type`/`?journey` search params (both standalone routes
+  deleted); the Run Inspector list is merged into Source Explorer as a per-source "Extraction runs"
+  table (run *detail* retained under the Sources sidebar section, list route + sidebar entry
+  deleted, `SourceInspection` gained a `runs` field, `listRunSummaries` port method removed).
+  Learner fixes: `ActivitySheet` clears its in-sheet advance memory on close (extracted to a tested
+  `advanceMemory` helper) so re-opening an earlier stop opens that stop; generating card reads
+  "Planning progress" (dead `progress` vocabulary key deleted); the expedition H1 is the learner's
+  topic with the derived summit demoted to a secondary line; crystal contrast raised via same-hue
+  hairlines, higher silhouette opacity, and a dark vista rock-face panel (geometry untouched); the
+  journal palette maps onto the shadcn semantic tokens inside the learner scope (portaled
+  sheets/dialogs/popovers carry `learn-theme`), admin lab stays stock; and Crystal Vista crystals
+  are tappable to reveal a floating concept-name chip (mastered/known-ghost only, view-only per
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)).
+
 - **Generation queue reliability, probe routing, and queued-state UX.** Expedition generation now
   runs bounded-parallel (cap 2) behind the DB-claim seam with a visible Queued card, a single
   staleness predicate shared by claim and fail, operation-id fencing with a 30s heartbeat, a unified
@@ -190,6 +208,23 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Admin run visibility and Learner App UX polish, 2026-07-06.** Deterministic envelope: workspace
+  `typecheck` exit 0 (stale `.next/types` cleared for the deleted routes); recursive `test` exit 0
+  with `.env` loaded (admin-lab 122, incl. new `advanceMemory` stale-stop regression + vista
+  `labelChipFor`/`isNameableCrystal` tests); `lint` 0 errors (6 pre-existing warnings); production
+  build exit 0 with `/admin/lab/runs`, `/operations/bottleneck`, `/operations/journey` gone from the
+  route list. **Real-use gate (rule 14): PASS.** 390px + desktop browser pass: Operations page shows
+  Active (5) first with "5 running · 3 stalled · 137 failed" chips and a `stalled?` badge, re-polls
+  live without reload, and renders bottleneck/journey reports inline on their card; deleted routes
+  404; Sources shows a per-source Extraction runs table opening the retained run detail; re-clicking
+  an advanced-from stop reopens that stop; a live generating card reads "Planning progress 8 / 11";
+  the header H1 is "Bayesian statistics" with "Summit: Markov chain Monte Carlo" demoted; crystals
+  render on a dark vista rock face with hairline-outlined shards; learner buttons are trail-green
+  (themed tokens); tapping the known-ghost "Ownership" crystal shows its name chip and toggles off.
+  Evidence: `tmp/2026-07-06-admin-learner-polish-gate/` (screenshots + `evidence.md`). Caveat: the
+  vista chip check used a DB-seeded `known` verdict because the automated skip-known click did not
+  persist for that node; the skip-known flow itself is unchanged by this pass.
 
 - **Generation queue reliability, probe routing, and queued-state UX, 2026-07-06.** Deterministic
   envelope: full workspace `typecheck` exit 0; recursive `test` exit 0 with `.env` loaded (0

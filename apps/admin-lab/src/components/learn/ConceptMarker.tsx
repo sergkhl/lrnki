@@ -21,7 +21,7 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
         render={
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-3 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-3 py-2 text-left shadow-sm"
+            className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-left shadow-sm"
           />
         }
       >
@@ -37,7 +37,7 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
           ariaLabel={concept.isKnownSkipped ? learnerTerm("known") : isMastered ? "Collected" : "Not collected"}
         />
       </PopoverTrigger>
-      <PopoverContent className="flex flex-col gap-3 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+      <PopoverContent className="learn-theme flex flex-col gap-3 border-border bg-card">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-semibold">{concept.label}</p>
           <p className="text-sm text-muted-foreground">

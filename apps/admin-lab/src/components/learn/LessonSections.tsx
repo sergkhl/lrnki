@@ -4,7 +4,7 @@ import { lessonSectionHeading } from "./vocabulary";
 
 export function LessonSections({ lesson }: Readonly<{ lesson: ConceptLessonView }>) {
   return (
-    <section className="flex flex-col gap-5 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] p-4">
+    <section className="flex flex-col gap-5 rounded-md border border-border bg-card p-4">
       {lesson.sections.map((section, index) => (
         <section key={`${section.kind}:${index}`} className="flex flex-col gap-2">
           <div className="flex items-center gap-2">

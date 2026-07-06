@@ -107,6 +107,34 @@ export function placeFormation(formation: CrystalFormation): PlacedFormation {
   };
 }
 
+// Tap-to-name (task 8): mastered crystals and known-ghosts answer "which concept is
+// that?"; fogged/frontier crystals stay unnamed mystery shapes. View-only holds
+// (ADR-0032) — naming navigates nowhere.
+export function isNameableCrystal(crystal: Pick<CrystalFormationNode, "state" | "isKnownSkipped">): boolean {
+  return crystal.state === "mastered" || crystal.isKnownSkipped;
+}
+
+export type CrystalLabelChip = { derivedNodeId: string; label: string; x: number; y: number; width: number };
+
+// One floating label chip anchored above the selected crystal, in formation
+// coordinates so it pans and scales with the canvas. Returns null when nothing is
+// selected or the selected crystal is not nameable.
+export function labelChipFor(formation: PlacedFormation, selectedNodeId: string | null): CrystalLabelChip | null {
+  if (selectedNodeId === null) return null;
+  const crystal = formation.crystals.find((candidate) => candidate.derivedNodeId === selectedNodeId);
+  if (!crystal || !isNameableCrystal(crystal)) return null;
+  return {
+    derivedNodeId: crystal.derivedNodeId,
+    label: crystal.label,
+    x: crystal.x,
+    // Float just above the crystal's box (the glyph's top sits VISTA_CRYSTAL_SIZE
+    // above the bedrock anchor at 95% of the box).
+    y: crystal.y - VISTA_CRYSTAL_SIZE * 0.95 - 14,
+    // SVG has no auto-sized rects; a monospace-ish estimate keeps the chip snug.
+    width: crystal.label.length * 7.5 + 20
+  };
+}
+
 // The sections whose every concept is mastered — the vista celebrates when this set
 // gains a member (derived from the same nodes, so it cannot drift from the overview).
 export function completeSectionIndexes(formation: CrystalFormation): number[] {

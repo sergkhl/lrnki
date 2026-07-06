@@ -27,7 +27,15 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { getSourceInspection } from "@/lib/inspection";
+
+function runStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "succeeded") return "default";
+  if (status === "failed") return "destructive";
+  if (status === "running") return "secondary";
+  return "outline";
+}
 
 export const dynamic = "force-dynamic";
 
@@ -79,6 +87,40 @@ export default async function SourceExplorerPage({ params }: { params: Promise<{
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Parsed blocks</dt><dd>{source.blockCount}</dd></div>
               <div className="flex flex-col gap-1"><dt className="text-muted-foreground">Extraction runs</dt><dd>{source.runCount}</dd></div>
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Extraction runs</CardTitle>
+            <CardDescription>Concept discovery, admission, and Concept Evidence Profiles extracted from this source.</CardDescription>
+            <CardAction><Badge variant="outline">{inspection.runs.length}</Badge></CardAction>
+          </CardHeader>
+          <CardContent>
+            {inspection.runs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No extraction runs for this source yet.</p>
+            ) : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Run</TableHead><TableHead>Status</TableHead><TableHead>Latency</TableHead><TableHead>Started</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {inspection.runs.map((run) => (
+                    <TableRow key={run.runId}>
+                      <TableCell className="font-mono text-xs">
+                        <Link className="underline-offset-4 hover:underline" href={`/admin/lab/runs/${run.runId}`}>{run.runId}</Link>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant={runStatusVariant(run.status)}>{run.status}</Badge>
+                          {run.degraded ? <Badge variant="destructive">degraded</Badge> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>{run.latencyMs !== null ? `${Math.round(run.latencyMs / 1000)}s` : "—"}</TableCell>
+                      <TableCell className="font-mono text-xs"><LocalDateTime iso={run.startedAt} /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 

@@ -22,7 +22,7 @@ export function PlanExpeditionDialog({
         <PlusIcon data-icon="inline-start" />
         Plan a new expedition
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="learn-theme sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Plan a new expedition</DialogTitle>
           <DialogDescription>Start with a topic. Scouting begins as soon as the expedition is planned.</DialogDescription>

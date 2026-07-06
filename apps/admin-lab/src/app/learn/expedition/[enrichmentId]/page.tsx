@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CheckpointPath } from "@/components/learn/CheckpointPath";
 import { QuestHeader } from "@/components/learn/QuestHeader";
 import { buildTrailView } from "@/components/learn/trailView";
+import { getLearnerExpeditionByEnrichment } from "@/lib/learnerExpedition";
 import { getLearnerStudySession } from "@/lib/learnerStudySession";
 import { readLearnerRef } from "@/lib/learnerSession";
 
@@ -19,10 +20,13 @@ export default async function ExpeditionPage({
   const session = await getLearnerStudySession(enrichmentId, learnerStateRef);
   if (!session) notFound();
   const trail = buildTrailView(session);
+  // The learner's own topic titles the page (R5); the derived summit label demotes to a
+  // secondary line. Admin-door expeditions have no row and fall back to the summit label.
+  const expedition = await getLearnerExpeditionByEnrichment(enrichmentId, learnerStateRef);
 
   return (
-    <div className="-m-4 flex h-dvh flex-col overflow-hidden bg-[color:var(--journal-background)]">
-      <nav className="shrink-0 border-b border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-4 py-2">
+    <div className="-m-4 flex h-dvh flex-col overflow-hidden bg-background">
+      <nav className="shrink-0 border-b border-border bg-card px-4 py-2">
         <Button
           variant="outline"
           nativeButton={false}
@@ -32,7 +36,7 @@ export default async function ExpeditionPage({
           Expeditions
         </Button>
       </nav>
-      <QuestHeader session={session} trail={trail} />
+      <QuestHeader session={session} trail={trail} expeditionTitle={expedition?.title ?? null} />
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <CheckpointPath view={trail} session={session} />
       </main>

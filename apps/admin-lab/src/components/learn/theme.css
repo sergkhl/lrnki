@@ -13,6 +13,35 @@
   --journal-halo: rgb(156 95 43 / 0.28);
 }
 
+/* Learner theming pass (task 7): the journal palette becomes the shadcn semantic
+   tokens inside the learner surface, so Buttons, Cards, Sheets, Dialogs, Progress,
+   and Badges render themed by default. `.learn-theme` carries the same mapping onto
+   portaled containers (Sheet/Dialog content mounts outside `.learn-journal`).
+   Admin lab keeps stock tokens. `--journal-*` stays for non-semantic uses only
+   (crystal fog/halo/gem accents). */
+.learn-journal,
+.learn-theme {
+  --background: var(--journal-background);
+  --foreground: var(--journal-ink);
+  --card: var(--journal-panel);
+  --card-foreground: var(--journal-ink);
+  --popover: var(--journal-panel);
+  --popover-foreground: var(--journal-ink);
+  --primary: var(--journal-trail);
+  --primary-foreground: #fdfaf2;
+  --secondary: var(--journal-gem-soft);
+  --secondary-foreground: var(--journal-ink);
+  --muted: #eee4cd;
+  --muted-foreground: var(--journal-muted);
+  --accent: var(--journal-gem-soft);
+  --accent-foreground: var(--journal-ink);
+  --border: var(--journal-line);
+  --input: var(--journal-line);
+  --ring: var(--journal-gem);
+  --radius: 0.75rem;
+  color: var(--journal-ink);
+}
+
 .learn-journal {
   min-height: 100svh;
   background:

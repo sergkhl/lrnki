@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCrystalFormation, completeSectionIndexes, placeFormation, type CrystalFormation } from "./crystalVistaView";
+import { buildCrystalFormation, completeSectionIndexes, isNameableCrystal, labelChipFor, placeFormation, type CrystalFormation } from "./crystalVistaView";
 import { buildTrailView } from "./trailView";
 import type { StudySession } from "@lrnki/application";
 
@@ -121,3 +121,34 @@ function session(): StudySession {
     lessonAbsent: []
   };
 }
+
+test("labelChipFor names mastered and known-ghost crystals only, anchored above the crystal", () => {
+  const s = session();
+  const placed = placeFormation(buildCrystalFormation(s, buildTrailView(s)));
+  const mastered = placed.crystals.find((crystal) => crystal.derivedNodeId === "n1")!;
+  assert.equal(isNameableCrystal(mastered), true);
+
+  const chip = labelChipFor(placed, "n1")!;
+  assert.equal(chip.label, mastered.label);
+  assert.equal(chip.x, mastered.x);
+  assert.ok(chip.y < mastered.y, "chip floats above the crystal");
+
+  // Frontier crystals stay unnamed: no chip even when selected.
+  const frontier = placed.crystals.find((crystal) => crystal.derivedNodeId === "n2")!;
+  assert.equal(isNameableCrystal(frontier), false);
+  assert.equal(labelChipFor(placed, "n2"), null);
+  assert.equal(labelChipFor(placed, null), null);
+});
+
+test("labelChipFor names a known-ghost crystal", () => {
+  const base = session();
+  const s: StudySession = {
+    ...base,
+    verdictByNode: { n1: "known" },
+    expeditionPath: [{ ...base.expeditionPath[0], state: "mastered" }, base.expeditionPath[1]]
+  };
+  const placed = placeFormation(buildCrystalFormation(s, buildTrailView(s)));
+  const ghost = placed.crystals.find((crystal) => crystal.derivedNodeId === "n1")!;
+  assert.equal(isNameableCrystal(ghost), true);
+  assert.equal(labelChipFor(placed, "n1")!.label, ghost.label);
+});

@@ -73,7 +73,7 @@ function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailC
   return (
     <div
       id={sectionAnchorId(concept.sectionIndex)}
-      className="relative z-10 flex scroll-mt-20 items-center gap-2 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-panel)] px-3 py-2"
+      className="relative z-10 flex scroll-mt-20 items-center gap-2 rounded-md border border-border bg-card px-3 py-2"
     >
       <FlagIcon className="size-4 shrink-0 text-[color:var(--journal-frontier)]" />
       <p className="min-w-0 truncate text-sm font-semibold">

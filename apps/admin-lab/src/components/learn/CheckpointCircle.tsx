@@ -32,7 +32,7 @@ export function CheckpointCircle({
         data-current={stop.isNext || undefined}
         className={cn(
           "relative z-10 flex size-16 items-center justify-center rounded-full border-2 text-[color:var(--journal-ink)] shadow-sm transition focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-          stop.isNext ? "size-18 border-[color:var(--journal-frontier)] bg-[color:var(--journal-panel)] shadow-md" : null,
+          stop.isNext ? "size-18 border-[color:var(--journal-frontier)] bg-card shadow-md" : null,
           // A complete capstone keeps a soft backdrop so the collected crystal itself
           // carries the color; other complete stops stay solid-filled.
           stop.state === "complete"
@@ -40,7 +40,7 @@ export function CheckpointCircle({
               ? "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem-soft)]"
               : "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem)] text-white"
             : null,
-          stop.state === "available" && !stop.isNext ? "border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]" : null,
+          stop.state === "available" && !stop.isNext ? "border-border bg-card" : null,
           stop.state === "locked" ? "cursor-not-allowed border-[color:var(--journal-fog)] bg-[color:var(--journal-fog)] text-white opacity-75" : "cursor-pointer active:-translate-y-0.5"
         )}
         onClick={() => {
