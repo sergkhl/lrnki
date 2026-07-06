@@ -1,23 +1,43 @@
-import { redirect } from "next/navigation";
-import type { Route } from "next";
+import { listExpeditionCandidates } from "@lrnki/application";
+import {
+  PostgresEnrichmentInspectionRead,
+  PostgresLearnerExpeditionStore,
+  PostgresResponseLogStore,
+  PostgresStudyItemBankStore,
+  createDatabaseClient
+} from "@lrnki/infrastructure-postgres";
+import { ExpeditionEntry } from "@/components/learn/ExpeditionEntry";
 import { LearnerNameGate } from "@/components/learn/LearnerNameGate";
-import { encodeLearnerStateRef } from "@/components/learn/vocabulary";
+import { readLearnerRef } from "@/lib/learnerSession";
 
-async function openJournal(formData: FormData) {
-  "use server";
-
-  const learnerStateRef = String(formData.get("learnerStateRef") ?? "");
-  const encoded = encodeLearnerStateRef(learnerStateRef);
-  if (encoded.length === 0) {
-    redirect("/learn" as Route);
+async function loadEntry(learnerStateRef: string) {
+  if (!process.env.DATABASE_URL) {
+    return { candidates: [], learnerExpeditions: [] };
   }
-  redirect(`/learn/${encoded}` as Route);
+  const sql = createDatabaseClient();
+  try {
+    return await listExpeditionCandidates({
+      learnerStateRef,
+      enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+      expeditionStore: new PostgresLearnerExpeditionStore(sql),
+      studyItemStore: new PostgresStudyItemBankStore(sql),
+      responseLog: new PostgresResponseLogStore(sql)
+    });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }
 
-export default function LearnLandingPage() {
+export default async function LearnLandingPage() {
+  const learnerStateRef = await readLearnerRef();
+  if (learnerStateRef) {
+    const entry = await loadEntry(learnerStateRef);
+    return <ExpeditionEntry learnerStateRef={learnerStateRef} entry={entry} />;
+  }
+
   return (
     <section className="flex min-h-[calc(100svh-2rem)] items-center justify-center">
-      <LearnerNameGate action={openJournal} />
+      <LearnerNameGate />
     </section>
   );
 }

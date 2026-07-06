@@ -10,9 +10,27 @@ test("buildCrystalFormation maps trail clusters and keeps only on-trail edges", 
   assert.deepEqual(formation.nodes.map((node) => node.derivedNodeId), ["n1", "n2"]);
   assert.equal(formation.nodes[0].state, "mastered");
   assert.equal(formation.nodes[0].growthFraction, 1);
+  assert.equal(formation.nodes[0].isKnownSkipped, false);
   assert.equal(formation.nodes[1].state, "frontier");
   assert.deepEqual(formation.edges, [{ source: "n1", target: "n2", uncertain: false }]);
   assert.equal(formation.title, "Borrowing");
+});
+
+test("buildCrystalFormation renders skipped known concepts fogged and uncollected", () => {
+  const base = session();
+  const s: StudySession = {
+    ...base,
+    verdictByNode: { n1: "known" },
+    expeditionPath: [
+      { ...base.expeditionPath[0], state: "mastered" },
+      base.expeditionPath[1]
+    ]
+  };
+  const formation = buildCrystalFormation(s, buildTrailView(s));
+  const skipped = formation.nodes.find((node) => node.derivedNodeId === "n1")!;
+  assert.equal(skipped.isKnownSkipped, true);
+  assert.equal(skipped.state, "locked");
+  assert.equal(skipped.growthFraction, 0);
 });
 
 test("placeFormation grows bedrock-up: a prerequisite sits below its dependent", () => {
@@ -30,9 +48,9 @@ test("completeSectionIndexes reports only sections whose every concept is master
     title: "t",
     edges: [],
     nodes: [
-      { derivedNodeId: "a", label: "a", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0 },
-      { derivedNodeId: "b", label: "b", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0 },
-      { derivedNodeId: "c", label: "c", domain: "d", difficulty: 0, state: "frontier", growthFraction: 0.5, sectionIndex: 1 }
+      { derivedNodeId: "a", label: "a", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false },
+      { derivedNodeId: "b", label: "b", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false },
+      { derivedNodeId: "c", label: "c", domain: "d", difficulty: 0, state: "frontier", growthFraction: 0.5, sectionIndex: 1, isKnownSkipped: false }
     ]
   };
   assert.deepEqual(completeSectionIndexes(formation), [0]);

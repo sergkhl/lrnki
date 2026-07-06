@@ -8,6 +8,7 @@ import {
   PostgresEnrichmentInspectionRead,
   PostgresLearnerExpeditionStore
 } from "@lrnki/infrastructure-postgres";
+import { setLearnerRefCookie } from "@/lib/learnerSession";
 
 export async function openAdminLearnerExpedition(enrichmentId: string): Promise<void> {
   if (!process.env.DATABASE_URL) redirect(`/admin/lab/enrichments/${encodeURIComponent(enrichmentId)}?learnDoor=no-target` as Route);
@@ -22,7 +23,8 @@ export async function openAdminLearnerExpedition(enrichmentId: string): Promise<
     if (result.status === "no_target") {
       redirect(`/admin/lab/enrichments/${encodeURIComponent(enrichmentId)}?learnDoor=no-target` as Route);
     }
-    redirect(`/learn/admin/expedition/${encodeURIComponent(enrichmentId)}` as Route);
+    await setLearnerRefCookie("admin");
+    redirect(`/learn/expedition/${encodeURIComponent(enrichmentId)}` as Route);
   } finally {
     await sql.end({ timeout: 5 });
   }

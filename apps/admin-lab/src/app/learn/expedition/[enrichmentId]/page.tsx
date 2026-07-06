@@ -1,18 +1,20 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CheckpointPath } from "@/components/learn/CheckpointPath";
 import { QuestHeader } from "@/components/learn/QuestHeader";
 import { buildTrailView } from "@/components/learn/trailView";
 import { getLearnerStudySession } from "@/lib/learnerStudySession";
+import { readLearnerRef } from "@/lib/learnerSession";
 
 export default async function ExpeditionPage({
   params
-}: Readonly<{ params: Promise<{ learnerStateRef: string; enrichmentId: string }> }>) {
-  const { learnerStateRef: encodedLearnerStateRef, enrichmentId } = await params;
-  const learnerStateRef = decodeURIComponent(encodedLearnerStateRef);
+}: Readonly<{ params: Promise<{ enrichmentId: string }> }>) {
+  const { enrichmentId } = await params;
+  const learnerStateRef = await readLearnerRef();
+  if (!learnerStateRef) redirect("/learn" as Route);
   // The summit is derived inside the projection (ADR-0032); the page needs only the enrichment.
   const session = await getLearnerStudySession(enrichmentId, learnerStateRef);
   if (!session) notFound();
@@ -24,7 +26,7 @@ export default async function ExpeditionPage({
         <Button
           variant="outline"
           nativeButton={false}
-          render={<Link href={`/learn/${encodeURIComponent(learnerStateRef)}` as Route} />}
+          render={<Link href={"/learn" as Route} />}
         >
           <ArrowLeftIcon data-icon="inline-start" />
           Expeditions

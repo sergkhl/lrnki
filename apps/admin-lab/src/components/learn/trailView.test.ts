@@ -95,6 +95,30 @@ test("buildTrailView forces full crystal growth on a mastered node even with unr
   assert.equal(buildTrailView(mastered).concepts[0].growthFraction, 1);
 });
 
+test("buildTrailView marks known-verdict clusters as skipped but still complete for gating", () => {
+  const base = session();
+  const skipped: StudySession = {
+    ...base,
+    verdictByNode: { n1: "known" },
+    expeditionPath: [{ ...base.expeditionPath[0], state: "mastered" }]
+  };
+  const view = buildTrailView(skipped);
+  assert.equal(view.concepts[0].isKnownSkipped, true);
+  assert.equal(view.concepts[0].growthFraction, 1);
+  assert.equal(view.masteredCount, 0);
+});
+
+test("buildTrailView keeps earned mastered clusters counted as collected", () => {
+  const base = session();
+  const earned: StudySession = {
+    ...base,
+    expeditionPath: [{ ...base.expeditionPath[0], state: "mastered" }]
+  };
+  const view = buildTrailView(earned);
+  assert.equal(view.concepts[0].isKnownSkipped, false);
+  assert.equal(view.masteredCount, 1);
+});
+
 test("buildTrailView gives a stopless unmastered node zero growth", () => {
   const base = session({ withoutLesson: true });
   const stopless: StudySession = { ...base, studySegmentsByNode: {} };

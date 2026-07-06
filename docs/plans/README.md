@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-_None. Add ready/in-progress plans here; delete them once shipped and consolidated._
+None.
 
 ## Ownership rules
 

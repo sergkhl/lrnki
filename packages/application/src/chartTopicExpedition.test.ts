@@ -59,7 +59,7 @@ test("chartTopicExpedition fails loudly when the layer produced no concepts", as
     }
   } as never), /no concepts/);
   // The empty-layer check fires right after synthetic generation, before study items run.
-  assert.deepEqual(calls, ["progress:enrichment", "progress:failed:Charting produced no concepts."]);
+  assert.deepEqual(calls, ["progress:enrichment", "progress:failed:Surveying produced no concepts."]);
 });
 
 function progressStore(calls: string[]): LearnerExpeditionStorePort {

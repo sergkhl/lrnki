@@ -207,6 +207,13 @@ test("composeStudySession opens a mastered node as a cardless review carrying it
   assert.equal(scope.kind === "mastered_review" && scope.verdict, "known");
 });
 
+test("composeStudySession treats a learn verdict as cleared calibration, not known closure mastery", () => {
+  const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "learn" }] });
+  assert.equal(session.classification.stateByNode.scope, "frontier");
+  assert.deepEqual(session.adaptedHiddenNodeIds, []);
+  assert.equal(session.sheetByNode.scope.kind, "cardless");
+});
+
 test("composeStudySession rides down a layer-wide sectioned expedition path with the derived summit", () => {
   const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
   // The whole floored layer is the trail: move's cone (scope, ownership, move) then borrow's

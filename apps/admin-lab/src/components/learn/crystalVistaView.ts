@@ -13,6 +13,7 @@ export type CrystalFormationNode = {
   state: "locked" | "frontier" | "mastered";
   growthFraction: number;
   sectionIndex: number;
+  isKnownSkipped: boolean;
 };
 
 export type CrystalFormation = {
@@ -51,9 +52,10 @@ export function buildCrystalFormation(session: StudySession, trail: TrailView): 
       label: concept.label,
       domain: domainByNode.get(concept.derivedNodeId) ?? "",
       difficulty: concept.difficulty,
-      state: concept.state,
-      growthFraction: concept.growthFraction,
-      sectionIndex: concept.sectionIndex
+      state: concept.isKnownSkipped ? "locked" : concept.state,
+      growthFraction: concept.isKnownSkipped ? 0 : concept.growthFraction,
+      sectionIndex: concept.sectionIndex,
+      isKnownSkipped: concept.isKnownSkipped
     })),
     edges: session.detail.edges
       .filter((edge) => onTrail.has(edge.prerequisiteDerivedNodeId) && onTrail.has(edge.dependentDerivedNodeId))

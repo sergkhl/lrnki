@@ -2,15 +2,7 @@
 
 ## TODO
 
-1. **Growing crystals and the Crystal Vista (in progress, branch `feat/growing-crystals`).**
-   Per-concept procedural growing crystals replace the gem icon across the trail, and a view-only
-   Crystal Vista shows the expedition as one bedrock-up formation (header-tally trigger +
-   section-completion celebration). Accepted framing, scope, and rejections:
-   [2026-07-06 brainstorm](../brainstorms/2026-07-06-growing-crystals-and-vista-requirements.md).
-   Implementation complete and rule-14 gate PASS (see VALIDATION); remaining: consolidate the
-   brainstorm into COMPLETED.
-
-2. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
+1. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
    synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
    textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
    shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
@@ -20,7 +12,7 @@
    source-less lesson gating depends on this seam. Decision:
    [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
-3. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+2. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -31,6 +23,25 @@
    `tmp/2026-06-30-generation-metering/`.
 
 ## COMPLETED
+
+- **Growing crystals and Crystal Vista.** Per-concept procedural growing crystals now replace the
+  gem icon across the learner trail, with deterministic crystal geometry, facet-by-facet growth for
+  mastered activity segments, skipped-known ghost crystals, section-divider and overview strips, and
+  mastery reveal animation. The Crystal Vista gives a view-only bedrock-up formation for the
+  expedition and opens from the header tally or section-completion celebration. Accepted framing:
+  [2026-07-06 brainstorm](../brainstorms/2026-07-06-growing-crystals-and-vista-requirements.md).
+  Decision: [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+- **Learner App UX polish pass.** The learner entry and expedition flow now use static `/learn` and
+  `/learn/expedition/{enrichmentId}` URLs with an httpOnly learner-ref cookie set by
+  `/learn/session`, plus a Switch explorer control. The expedition entry uses Begin/Resume labels,
+  domain-eyebrow candidate cards, and a shadcn Dialog for one-step "Plan expedition" topic creation
+  with server-side Declared Domain inference. Generation cards show fixed-denominator `k / N`
+  Surveying progress. Known-skipped concepts can be unmarked, render as "Known ground" ghost
+  crystals, stay complete for gating, and are excluded from collected-crystal tallies and Crystal
+  Vista growth. Matching activities now keep 3/4 matched pairs locked and incomplete until the final
+  pair, with completed pair styling distinct from ordinary primary buttons. Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Dedicated Rescued-Node Canonical Labeling step.** The rescued-node concept re-label is now a
   dedicated measured step instead of an under-attended optional field on the rescue durability
@@ -156,6 +167,23 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Learner App UX polish pass, 2026-07-06.** Deterministic envelope: `@lrnki/admin-lab` test suite
+  green (113 tests including chartingProgress, matchingProgress, resumeLabel, skipped-known trail and
+  vista coverage), `@lrnki/admin-lab` typecheck exit 0, `@lrnki/application` typecheck exit 0,
+  `@lrnki/application` test suite green (466 tests), root ESLint exit 0 with 6 pre-existing warnings,
+  and `@lrnki/admin-lab` production build exit 0 with `/learn`, `/learn/expedition/[enrichmentId]`,
+  and `/learn/session` dynamic routes. **Real-use gate (rule 14): PASS.** A hard reset seeded the
+  Rust ownership fixture through real production LLM calls, publishing graph version
+  `84832116-a228-447e-be7f-3e8162b28c4b` and enrichment
+  `99c2d017-90db-42c1-b532-970f84732c0d` with 19 lessons and 35 accepted study items. Playwright
+  verification on `http://127.0.0.1:3010` proved the cookie session, static learner URLs, Switch
+  explorer, domain-eyebrow candidate cards, and static expedition URL; real generated Copy trait
+  matching stayed at `3 of 4 matched` with no graded result; real known-skip UI changed from Ready to
+  "Known ground" and exposed "Un-mark known." Defects found and fixed during the gate: server-action
+  form data/cookie path replaced with `/learn/session`, absolute redirect host mismatch, DialogTrigger
+  hydration mismatch, stale "Charting produced no concepts" persisted failure copy, and skipped-known
+  popover copy saying Collected. Evidence: `tmp/2026-07-06-learner-ux/`.
 
 - **Growing crystals and Crystal Vista, 2026-07-06.** Deterministic envelope: full workspace
   `typecheck` exit 0, recursive test suite green (admin-lab 101 incl. new crystalGeometry 7 /

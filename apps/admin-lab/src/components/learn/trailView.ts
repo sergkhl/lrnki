@@ -24,6 +24,7 @@ export type TrailCluster = {
   topologicalDepth: number;
   state: StudySession["expeditionPath"][number]["state"];
   isTarget: boolean;
+  isKnownSkipped: boolean;
   // Section metadata (U5, R3-display): which milestone-anchored section this concept belongs to,
   // and whether it opens that section on the trail (the first concept of the section).
   sectionIndex: number;
@@ -76,6 +77,7 @@ export function buildTrailView(session: StudySession): TrailView {
   let previousSectionIndex = -1;
   const clusters: TrailCluster[] = session.expeditionPath.map((step) => {
     const label = labelByNode.get(step.derivedNodeId) ?? step.derivedNodeId;
+    const isKnownSkipped = session.verdictByNode[step.derivedNodeId] === "known";
     const baseState: TrailStopState = step.state === "mastered" ? "complete" : step.state === "frontier" ? "available" : "locked";
     const stops: TrailStop[] = [];
     const addStop = (kind: TrailStopKind, studyItemId: string | null) => {
@@ -108,6 +110,7 @@ export function buildTrailView(session: StudySession): TrailView {
       topologicalDepth: step.topologicalDepth,
       state: step.state,
       isTarget: step.isSummit,
+      isKnownSkipped,
       sectionIndex: step.sectionIndex,
       milestoneLabel: step.milestoneLabel,
       isSectionStart,
@@ -131,7 +134,7 @@ export function buildTrailView(session: StudySession): TrailView {
     currentSectionIndex,
     nextStopId: nextStop?.stopId ?? null,
     nextStopLabel: nextStop?.label ?? null,
-    masteredCount: clusters.filter((cluster) => cluster.state === "mastered").length,
+    masteredCount: clusters.filter((cluster) => cluster.state === "mastered" && !cluster.isKnownSkipped).length,
     totalClusters: clusters.length
   };
 }

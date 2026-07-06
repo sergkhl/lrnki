@@ -31,7 +31,7 @@ export async function chartTopicExpedition(input: Omit<Parameters<typeof runSynt
     // concept and a study bank. The summit is DERIVED at read time (ADR-0032), so there is no
     // target to persist — charting only fails loudly when the layer produced no concepts.
     if (layer.derivedNodes.length === 0) {
-      throw new Error("Charting produced no concepts.");
+      throw new Error("Surveying produced no concepts.");
     }
 
     await input.expeditionStore.updateProgress({
@@ -61,5 +61,5 @@ export async function chartTopicExpedition(input: Omit<Parameters<typeof runSynt
 
 function chartingFailureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 240) || "Charting failed. Try again later.";
+  return message.replace(/[\x00-\x1f\x7f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 240) || "Surveying failed. Try again later.";
 }

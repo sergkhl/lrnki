@@ -19,9 +19,10 @@ export const LEARNER_VOCABULARY = {
   continueAction: "Continue",
   returnToTrail: "Return to trail",
   skipKnown: "I already know this ground",
+  unskipKnown: "Un-mark known",
   groundedBadge: "Grounded in your source",
-  topicDoor: "Chart course",
-  progress: "Charting progress",
+  topicDoor: "Plan expedition",
+  progress: "Surveying progress",
   summit: "Summit reached",
   section: "Leg",
   sectionPlural: "Legs",
@@ -50,9 +51,4 @@ export const LESSON_SECTION_HEADINGS = {
 
 export function lessonSectionHeading(kind: ConceptLessonSectionView["kind"]): string {
   return LESSON_SECTION_HEADINGS[kind];
-}
-
-export function encodeLearnerStateRef(rawRef: string): string {
-  const compact = rawRef.trim().replace(/\s+/g, " ");
-  return encodeURIComponent(compact);
 }

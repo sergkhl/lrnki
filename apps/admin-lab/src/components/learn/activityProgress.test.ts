@@ -20,7 +20,7 @@ test("resolveStopActivity maps question and impostor stops to exactly one study 
 
 test("resolveStopActivity maps capstone stops to crystal state with full growth on mastery", () => {
   const activity = resolveStopActivity(session({ mastered: true }), "n1:capstone:main");
-  assert.deepEqual(activity, { kind: "capstone", derivedNodeId: "n1", label: "Ownership", mastered: true, difficulty: 0, growthFraction: 1 });
+  assert.deepEqual(activity, { kind: "capstone", derivedNodeId: "n1", label: "Ownership", mastered: true, difficulty: 0, growthFraction: 1, isKnownSkipped: false });
 });
 
 test("resolveStopActivity carries partial crystal growth on an unmastered capstone", () => {
@@ -29,7 +29,12 @@ test("resolveStopActivity carries partial crystal growth on an unmastered capsto
   assert.equal(activity.kind === "capstone" ? activity.growthFraction : null, 0);
 });
 
-function session(opts: { mastered?: boolean } = {}): StudySession {
+test("resolveStopActivity marks a known-verdict capstone as skipped", () => {
+  const activity = resolveStopActivity(session({ mastered: true, knownSkipped: true }), "n1:capstone:main");
+  assert.equal(activity.kind === "capstone" ? activity.isKnownSkipped : null, true);
+});
+
+function session(opts: { mastered?: boolean; knownSkipped?: boolean } = {}): StudySession {
   return {
     enrichmentId: "e1",
     learnerStateRef: "learner",
@@ -79,7 +84,7 @@ function session(opts: { mastered?: boolean } = {}): StudySession {
     coexistence: [],
     restorations: [],
     sheetByNode: {},
-    verdictByNode: {},
+    verdictByNode: opts.knownSkipped ? { n1: "known" } : {},
     latestOutcomeByStudyItemId: {},
     studySegmentsByNode: {
       n1: [

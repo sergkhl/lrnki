@@ -16,6 +16,7 @@ export function CrystalGlyph({
   state,
   size = 24,
   assemble = false,
+  ghost = false,
   className,
   ariaLabel
 }: Readonly<{
@@ -25,11 +26,12 @@ export function CrystalGlyph({
   state: CrystalGlyphState;
   size?: number;
   assemble?: boolean;
+  ghost?: boolean;
   className?: string;
   ariaLabel?: string;
 }>) {
   const spec = crystalSpec(derivedNodeId, difficulty);
-  const grown = state === "mastered" ? visibleShards(spec, 1) : state === "locked" ? [] : visibleShards(spec, growthFraction);
+  const grown = ghost ? visibleShards(spec, 1) : state === "mastered" ? visibleShards(spec, 1) : state === "locked" ? [] : visibleShards(spec, growthFraction);
   const grownIndexes = new Set(grown.map((shard) => shard.revealIndex));
   const fillFor = (shard: CrystalShard) =>
     `hsl(${spec.hue} ${CRYSTAL_SATURATION}% ${state === "mastered" ? shard.lightness + 8 : shard.lightness}%)`;
@@ -71,10 +73,17 @@ export function CrystalGlyph({
             transition={{ delay: index * 0.08, duration: 0.4, ease: "backOut" }}
           />
         ) : (
-          <polygon key={shard.revealIndex} points={toPoints(shard)} fill={fillFor(shard)} />
+          <polygon
+            key={shard.revealIndex}
+            points={toPoints(shard)}
+            fill={ghost ? "transparent" : fillFor(shard)}
+            stroke={ghost ? `hsl(${spec.hue} ${CRYSTAL_SATURATION}% ${shard.lightness + 6}%)` : undefined}
+            strokeWidth={ghost ? 2 : undefined}
+            opacity={ghost ? 0.5 : undefined}
+          />
         )
       )}
-      {state === "mastered" ? <Glint shard={tallestShard(spec.shards)} assembleDelay={assemble ? grown.length * 0.08 + 0.15 : null} /> : null}
+      {state === "mastered" && !ghost ? <Glint shard={tallestShard(spec.shards)} assembleDelay={assemble ? grown.length * 0.08 + 0.15 : null} /> : null}
     </svg>
   );
 }

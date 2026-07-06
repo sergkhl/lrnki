@@ -4,10 +4,11 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { CheckIcon } from "lucide-react";
 import { motion } from "motion/react";
 import type { MatchingAttemptTrace, StudyMatchingView } from "@lrnki/application";
-import type { LearnerMatchingResult } from "@/app/learn/[learnerStateRef]/actions";
+import type { LearnerMatchingResult } from "@/app/learn/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { GroundedBadge } from "./GroundedBadge";
+import { canTryMatchingPair, matchingProgress } from "./matchingProgress";
 import { useShuffledLookup } from "./useShuffledLookup";
 
 type SelectedTile = { column: "prompt" | "match"; id: string } | null;
@@ -29,8 +30,7 @@ export function MatchingBoard({
   const { orderedIds: matchIds, byId: matchById } = useShuffledLookup(item.matches, (match) => match.matchId);
   const [selected, setSelected] = useState<SelectedTile>(null);
   const [matchedPairs, setMatchedPairs] = useState<{ promptId: string; matchId: string }[]>([]);
-  const lockedPromptIds = useMemo(() => new Set(matchedPairs.map((pair) => pair.promptId)), [matchedPairs]);
-  const lockedMatchIds = useMemo(() => new Set(matchedPairs.map((pair) => pair.matchId)), [matchedPairs]);
+  const progress = useMemo(() => matchingProgress(matchedPairs, item.prompts.length), [matchedPairs, item.prompts.length]);
   const [wrong, setWrong] = useState<Set<string>>(() => new Set());
   const [submitted, setSubmitted] = useState(false);
   const traceRef = useRef<MatchingAttemptTrace>([]);
@@ -38,9 +38,17 @@ export function MatchingBoard({
   const wrongTimeoutRef = useRef<number | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const complete = result?.graded === true || submitted;
+  const complete = result?.graded === true || submitted || progress.complete;
   const tryPair = (promptId: string, matchId: string) => {
-    if (disabled || pending || complete || lockedPromptIds.has(promptId)) return;
+    if (!canTryMatchingPair({
+      disabled,
+      pending,
+      complete,
+      lockedPromptIds: progress.lockedPromptIds,
+      lockedMatchIds: progress.lockedMatchIds,
+      promptId,
+      matchId
+    })) return;
     traceRef.current = [...traceRef.current, { promptId, chosenMatchId: matchId }];
     startTransition(async () => {
       const correct = await onAttempt(promptId, matchId);
@@ -48,7 +56,7 @@ export function MatchingBoard({
         const nextMatchedPairs = [...matchedPairs, { promptId, matchId }];
         setMatchedPairs(nextMatchedPairs);
         setSelected(null);
-        if (nextMatchedPairs.length === item.prompts.length && !submittedRef.current) {
+        if (matchingProgress(nextMatchedPairs, item.prompts.length).complete && !submittedRef.current) {
           submittedRef.current = true;
           setSubmitted(true);
           await onComplete(traceRef.current);
@@ -94,7 +102,7 @@ export function MatchingBoard({
                 key={id}
                 text={prompt.text}
                 selected={selected?.column === "prompt" && selected.id === id}
-                locked={lockedPromptIds.has(id)}
+                locked={progress.lockedPromptIds.has(id)}
                 wrong={wrong.has(id)}
                 disabled={disabled || pending || complete}
                 onClick={() => choose("prompt", id)}
@@ -112,7 +120,7 @@ export function MatchingBoard({
                 key={id}
                 text={match.text}
                 selected={selected?.column === "match" && selected.id === id}
-                locked={lockedMatchIds.has(id)}
+                locked={progress.lockedMatchIds.has(id)}
                 wrong={wrong.has(id)}
                 disabled={disabled || pending || complete}
                 onClick={() => choose("match", id)}
@@ -145,10 +153,11 @@ function TileButton({
     <motion.div animate={wrong ? { x: [0, -8, 8, -4, 4, 0] } : { x: 0 }} transition={{ duration: 0.32 }}>
       <Button
         type="button"
-        variant={locked ? "default" : selected ? "secondary" : "outline"}
+        variant={locked ? "secondary" : selected ? "secondary" : "outline"}
         disabled={disabled || locked}
         className={cn(
           "h-auto min-h-12 w-full justify-start whitespace-normal text-left",
+          locked ? "border-[color:var(--journal-gem)] bg-[color:var(--journal-gem-soft)] text-[color:var(--journal-ink)]" : null,
           selected ? "ring-2 ring-[color:var(--journal-frontier)]" : null
         )}
         onClick={onClick}

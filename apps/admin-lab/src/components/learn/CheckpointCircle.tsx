@@ -72,6 +72,7 @@ function iconForStop(stop: TrailStop, concept: TrailCluster) {
       difficulty={concept.difficulty}
       growthFraction={concept.growthFraction}
       state={stop.state === "complete" ? "mastered" : "frontier"}
+      ghost={concept.isKnownSkipped && stop.state === "complete"}
       size={40}
     />
   );

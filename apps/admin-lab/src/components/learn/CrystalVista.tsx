@@ -26,7 +26,7 @@ export function CrystalVista({ formations }: Readonly<{ formations: CrystalForma
   const placed = useMemo(() => formations.map(placeFormation), [formations]);
 
   const current = formations[0];
-  const masteredCount = current ? current.nodes.filter((node) => node.state === "mastered").length : 0;
+  const masteredCount = current ? current.nodes.filter((node) => node.state === "mastered" && !node.isKnownSkipped).length : 0;
   const totalCount = current ? current.nodes.length : 0;
 
   // Celebration: when the current expedition gains a fully-mastered section, open the
@@ -144,6 +144,7 @@ function FormationCanvas({
             difficulty={crystal.difficulty}
             growthFraction={crystal.growthFraction}
             state={crystal.state}
+            ghost={crystal.isKnownSkipped}
             size={VISTA_CRYSTAL_SIZE}
             assemble={celebratedSections?.includes(crystal.sectionIndex) === true && crystal.state === "mastered"}
             ariaLabel={crystal.label}

@@ -1,13 +1,16 @@
-import { ArrowRightIcon, CompassIcon, MapIcon } from "lucide-react";
+import { ArrowRightIcon, CompassIcon, MapIcon, PlusIcon } from "lucide-react";
 import type { ExpeditionCandidate, LearnerExpeditionEntry } from "@lrnki/application";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { cn } from "@/lib/utils";
 import { learnerTerm } from "./vocabulary";
-import { chooseCandidateExpedition, inferExpeditionDomain, setActiveExpedition, startTopicExpedition } from "@/app/learn/[learnerStateRef]/actions";
+import { chooseCandidateExpedition, setActiveExpedition, startTopicExpedition, switchLearner } from "@/app/learn/actions";
 import { ChartingProgress } from "./ChartingProgress";
 import { ChartCourseForm } from "./ChartCourseForm";
+import { resumeLabel } from "./resumeLabel";
 
 export function ExpeditionEntry({
   learnerStateRef,
@@ -20,7 +23,17 @@ export function ExpeditionEntry({
           <CompassIcon data-icon="inline-start" />
           {learnerTerm("routeName")}
         </Badge>
-        <h1 className="text-3xl font-semibold tracking-normal">Choose an expedition</h1>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-3xl font-semibold tracking-normal">Choose an expedition</h1>
+            <p className="truncate text-sm text-muted-foreground">Exploring as {learnerStateRef}</p>
+          </div>
+          <form action={switchLearner}>
+            <Button type="submit" variant="ghost" size="sm">
+              Switch explorer
+            </Button>
+          </form>
+        </div>
       </header>
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -29,11 +42,26 @@ export function ExpeditionEntry({
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-4">
         <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
-          <CardHeader>
-            <CardTitle>Your expeditions</CardTitle>
-            <CardDescription>Ready and charting journals for this explorer.</CardDescription>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle>Your expeditions</CardTitle>
+              <CardDescription>Ready and surveying journals for this explorer.</CardDescription>
+            </div>
+            <Dialog>
+              <DialogTrigger type="button" className={cn(buttonVariants({ size: "sm" }))}>
+                <PlusIcon data-icon="inline-start" />
+                Plan a new expedition
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Plan a new expedition</DialogTitle>
+                  <DialogDescription>Start with a topic. The field is inferred before surveying begins.</DialogDescription>
+                </DialogHeader>
+                <ChartCourseForm learnerStateRef={learnerStateRef} createExpeditionAction={startTopicExpedition} />
+              </DialogContent>
+            </Dialog>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {entry.learnerExpeditions.length === 0 ? (
@@ -70,24 +98,10 @@ export function ExpeditionEntry({
                 </div>
                 <Button type="submit" size="sm" variant={expedition.active ? "secondary" : "outline"} disabled={expedition.status !== "ready"}>
                   <ArrowRightIcon data-icon="inline-start" />
-                  Open
+                  {resumeLabel(expedition.progress)}
                 </Button>
               </form>
             ))}
-          </CardContent>
-        </Card>
-
-        <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
-          <CardHeader>
-            <CardTitle>Chart a new course</CardTitle>
-            <CardDescription>Start with a topic, then confirm the field before charting.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <ChartCourseForm
-              learnerStateRef={learnerStateRef}
-              inferDomainAction={inferExpeditionDomain}
-              createExpeditionAction={startTopicExpedition}
-            />
           </CardContent>
         </Card>
       </section>
@@ -97,8 +111,8 @@ export function ExpeditionEntry({
 
 function expeditionStatusLabel(status: LearnerExpeditionEntry["learnerExpeditions"][number]["status"]): string {
   if (status === "ready") return "Ready";
-  if (status === "charting") return "Charting";
-  if (status === "failed") return "Charting stopped";
+  if (status === "charting") return "Surveying";
+  if (status === "failed") return "Surveying stopped";
   return "Archived";
 }
 
@@ -106,10 +120,10 @@ function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRe
   return (
     <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
       <CardHeader>
-        <Badge variant="secondary" className="w-fit">Rank {candidate.readinessRank}</Badge>
-        <CardTitle className="text-xl">{candidate.title}</CardTitle>
+        <Badge variant="secondary" className="w-fit">{titleCase(candidate.declaredDomain)}</Badge>
+        <CardTitle className="text-xl">Expedition: {candidate.title}</CardTitle>
         <CardDescription>
-          {candidate.readyStopCount}/{candidate.totalStopCount} stops ready
+          {candidate.totalStopCount} concepts to the summit
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -130,6 +144,14 @@ function CandidateCard({ learnerStateRef, candidate }: Readonly<{ learnerStateRe
       </CardContent>
     </Card>
   );
+}
+
+function titleCase(value: string): string {
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function NoCandidates() {

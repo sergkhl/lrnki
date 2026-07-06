@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { LEARNER_VOCABULARY, encodeLearnerStateRef, learnerTerm, lessonSectionHeading, type LearnerVocabularyKey } from "./vocabulary";
+import { LEARNER_VOCABULARY, learnerTerm, lessonSectionHeading, type LearnerVocabularyKey } from "./vocabulary";
 
 const USED_KEYS = [
   "routeName",
@@ -21,6 +21,7 @@ const USED_KEYS = [
   "continueAction",
   "returnToTrail",
   "skipKnown",
+  "unskipKnown",
   "groundedBadge",
   "topicDoor",
   "progress",
@@ -32,11 +33,6 @@ test("learnerTerm returns text for every learner UI key", () => {
     assert.equal(learnerTerm(key), LEARNER_VOCABULARY[key]);
     assert.notEqual(learnerTerm(key).trim(), "");
   }
-});
-
-test("encodeLearnerStateRef trims, compacts, and URL-encodes learner refs", () => {
-  assert.equal(encodeLearnerStateRef("  Ada   Lovelace  "), "Ada%20Lovelace");
-  assert.equal(encodeLearnerStateRef("Cohort/One"), "Cohort%2FOne");
 });
 
 test("lessonSectionHeading maps section kinds to learner-facing headings", () => {

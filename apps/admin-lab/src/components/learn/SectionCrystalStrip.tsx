@@ -15,6 +15,7 @@ export function SectionCrystalStrip({ concepts, className }: Readonly<{ concepts
           difficulty={concept.difficulty}
           growthFraction={concept.growthFraction}
           state={concept.state}
+          ghost={concept.isKnownSkipped}
           size={14}
         />
       ))}

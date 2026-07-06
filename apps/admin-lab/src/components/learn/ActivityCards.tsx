@@ -2,7 +2,7 @@
 
 import { CheckIcon, XIcon } from "lucide-react";
 import type { StudyImpostorView, StudyOptionSelectView } from "@lrnki/application";
-import type { LearnerGradingResult } from "@/app/learn/[learnerStateRef]/actions";
+import type { LearnerGradingResult } from "@/app/learn/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { GroundedBadge } from "./GroundedBadge";

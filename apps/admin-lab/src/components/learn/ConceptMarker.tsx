@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2Icon } from "lucide-react";
+import { CheckCircle2Icon, Undo2Icon } from "lucide-react";
 import type { StudySession } from "@lrnki/application";
-import { refreshLearnerExpedition, setLearnerVerdict } from "@/app/learn/[learnerStateRef]/actions";
+import { clearLearnerVerdict, refreshLearnerExpedition, setLearnerVerdict } from "@/app/learn/actions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CrystalGlyph } from "./CrystalGlyph";
@@ -14,6 +14,7 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const isMastered = concept.state === "mastered";
+  const isKnownVerdict = session.verdictByNode[concept.derivedNodeId] === "known";
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -30,19 +31,40 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
           difficulty={concept.difficulty}
           growthFraction={concept.growthFraction}
           state={concept.state}
+          ghost={concept.isKnownSkipped}
           size={26}
           className="shrink-0"
-          ariaLabel={isMastered ? "Collected" : "Not collected"}
+          ariaLabel={concept.isKnownSkipped ? learnerTerm("known") : isMastered ? "Collected" : "Not collected"}
         />
       </PopoverTrigger>
       <PopoverContent className="flex flex-col gap-3 border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-semibold">{concept.label}</p>
           <p className="text-sm text-muted-foreground">
-            {stateLabel(concept.state)} · {concept.stops.length} stops · <DifficultyRating difficulty={concept.difficulty} />
+            {concept.isKnownSkipped ? learnerTerm("known") : stateLabel(concept.state)} · {concept.stops.length} stops · <DifficultyRating difficulty={concept.difficulty} />
           </p>
         </div>
-        {!isMastered ? (
+        {isKnownVerdict ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending}
+            onClick={() => {
+              startTransition(async () => {
+                await clearLearnerVerdict({
+                  learnerStateRef: session.learnerStateRef,
+                  enrichmentId: session.enrichmentId,
+                  derivedNodeId: concept.derivedNodeId
+                });
+                await refreshLearnerExpedition({ learnerStateRef: session.learnerStateRef, enrichmentId: session.enrichmentId });
+                setOpen(false);
+              });
+            }}
+          >
+            <Undo2Icon data-icon="inline-start" />
+            {learnerTerm("unskipKnown")}
+          </Button>
+        ) : !isMastered ? (
           <Button
             type="button"
             variant="outline"

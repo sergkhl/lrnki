@@ -6,7 +6,7 @@ export type StopActivity =
   | { kind: "option_select"; derivedNodeId: string; label: string; item: StudyOptionSelectView }
   | { kind: "matching"; derivedNodeId: string; label: string; item: StudyMatchingView }
   | { kind: "impostor"; derivedNodeId: string; label: string; item: StudyImpostorView }
-  | { kind: "capstone"; derivedNodeId: string; label: string; mastered: boolean; difficulty: number; growthFraction: number }
+  | { kind: "capstone"; derivedNodeId: string; label: string; mastered: boolean; difficulty: number; growthFraction: number; isKnownSkipped: boolean }
   | { kind: "missing"; message: string };
 
 export function resolveStopActivity(session: StudySession, stopId: string): StopActivity {
@@ -24,7 +24,8 @@ export function resolveStopActivity(session: StudySession, stopId: string): Stop
       label,
       mastered: cluster?.state === "mastered",
       difficulty: cluster?.difficulty ?? 0,
-      growthFraction: cluster?.growthFraction ?? 0
+      growthFraction: cluster?.growthFraction ?? 0,
+      isKnownSkipped: cluster?.isKnownSkipped ?? false
     };
   }
   const segment = (session.studySegmentsByNode[derivedNodeId] ?? []).find((candidate) => candidate.item.studyItemId === studyItemId);

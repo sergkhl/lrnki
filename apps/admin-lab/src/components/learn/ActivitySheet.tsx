@@ -4,8 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2Icon } from "lucide-react";
 import type { StudySession } from "@lrnki/application";
-import type { LearnerGradingResult, LearnerMatchingResult } from "@/app/learn/[learnerStateRef]/actions";
-import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/app/learn/[learnerStateRef]/actions";
+import type { LearnerGradingResult, LearnerMatchingResult } from "@/app/learn/actions";
+import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/app/learn/actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
@@ -202,14 +202,19 @@ function ActivityBody({
             difficulty={activity.difficulty}
             growthFraction={activity.growthFraction}
             state={activity.mastered ? "mastered" : "frontier"}
+            ghost={activity.isKnownSkipped}
             size={72}
-            assemble={justAdvanced && activity.mastered}
+            assemble={justAdvanced && activity.mastered && !activity.isKnownSkipped}
             className="shrink-0"
           />
           <div>
-            <h2 className="text-lg font-semibold">{activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</h2>
+            <h2 className="text-lg font-semibold">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</h2>
             <p className="text-sm text-muted-foreground">
-              {activity.mastered ? "This crystal is collected." : "Complete the earlier stops to finish growing this crystal."}
+              {activity.isKnownSkipped
+                ? "Known ground is complete, but no crystal is collected."
+                : activity.mastered
+                  ? "This crystal is collected."
+                  : "Complete the earlier stops to finish growing this crystal."}
             </p>
           </div>
         </div>
@@ -276,7 +281,7 @@ function CompletedIndicator({
   return (
     <div className="flex w-fit items-center gap-2 rounded-md border border-[color:var(--journal-line)] bg-[color:var(--journal-gem-soft)] px-3 py-2 text-sm font-medium text-[color:var(--journal-ink)]">
       <CheckCircle2Icon className="size-4" />
-      Collected
+      {activity.kind === "capstone" && activity.isKnownSkipped ? learnerTerm("known") : learnerTerm("mastered")}
     </div>
   );
 }
