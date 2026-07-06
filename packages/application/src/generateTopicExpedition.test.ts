@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { LearnerExpeditionStorePort } from "@lrnki/ports";
-import { generateTopicExpedition } from "./generateTopicExpedition";
+import { generateTopicExpedition, isTransientGenerationError } from "./generateTopicExpedition";
 
 test("generateTopicExpedition runs synthetic generation then study item generation and marks the row ready", async () => {
   const calls: string[] = [];
@@ -114,13 +114,73 @@ function progressStore(calls: string[]): LearnerExpeditionStorePort {
     async updateProgress(input) {
       if (input.status === "ready" || input.status === "failed") {
         calls.push(`progress:${[input.status, input.failureMessage].filter(Boolean).join(":")}`);
-        return;
+        return 1;
       }
       if (input.declaredDomain) {
         calls.push(`progress:domain:${input.declaredDomain}`);
-        return;
+        return 1;
       }
       calls.push(`progress:${input.currentOperationType}`);
+      return 1;
     }
   };
 }
+
+test("generateTopicExpedition releases the claim (stays generating) on transient exhaustion", async () => {
+  const calls: string[] = [];
+  const transient = Object.assign(new Error("timed out"), {
+    stageErrorDetail: {
+      kind: "forced_tool_exhaustion",
+      message: "timed out",
+      attempts: [{ attempt: 0, kind: "timeout", code: "UND_ERR_HEADERS_TIMEOUT" }]
+    }
+  });
+  await assert.rejects(() => generateTopicExpedition({
+    learnerExpeditionId: "expedition",
+    topic: "Rust ownership",
+    declaredDomain: "software engineering",
+    expeditionStore: progressStore(calls),
+    newEnrichmentId: () => "enrichment-1",
+    deps: {
+      runSynthetic: async () => {
+        throw transient;
+      }
+    }
+  } as never), /timed out/);
+  // No failed write: the operation id is cleared and the row stays `generating`
+  // for the supervisor's attempt budget to re-claim.
+  assert.deepEqual(calls, ["progress:enrichment", "progress:null"]);
+});
+
+test("generateTopicExpedition aborts without writes when a fenced write loses the claim", async () => {
+  const calls: string[] = [];
+  const store = progressStore(calls);
+  // Every write affects 0 rows: a competing claim owns the row.
+  store.updateProgress = async () => 0;
+  await assert.rejects(() => generateTopicExpedition({
+    learnerExpeditionId: "expedition",
+    topic: "Rust ownership",
+    declaredDomain: "software engineering",
+    expeditionStore: store,
+    newEnrichmentId: () => "enrichment-1",
+    deps: {
+      runSynthetic: async () => {
+        calls.push("synthetic");
+        return { derivedNodes: [{ derivedNodeId: "node-1" }], prerequisiteEdges: [], difficulties: [] } as never;
+      }
+    }
+  } as never), /claim lost/i);
+  // The run stopped at the first fenced write — no LLM work was spent.
+  assert.deepEqual(calls, []);
+});
+
+test("isTransientGenerationError separates infrastructure trails from model deviations", () => {
+  const withAttempts = (attempts: object[]) =>
+    Object.assign(new Error("x"), { stageErrorDetail: { kind: "forced_tool_exhaustion", message: "x", attempts } });
+  assert.equal(isTransientGenerationError(withAttempts([{ attempt: 0, kind: "network", code: "ECONNRESET" }])), true);
+  assert.equal(isTransientGenerationError(withAttempts([{ attempt: 0, kind: "http", status: 503 }, { attempt: 1, kind: "http", status: 429 }])), true);
+  assert.equal(isTransientGenerationError(withAttempts([{ attempt: 0, kind: "timeout" }])), true);
+  assert.equal(isTransientGenerationError(withAttempts([{ attempt: 0, kind: "network" }, { attempt: 1, kind: "schema_invalid" }])), false);
+  assert.equal(isTransientGenerationError(withAttempts([{ attempt: 0, kind: "http", status: 400 }])), false);
+  assert.equal(isTransientGenerationError(new Error("plain")), false);
+});

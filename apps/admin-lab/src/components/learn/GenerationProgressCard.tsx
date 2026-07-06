@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { GenerationAutoRefresh } from "./GenerationAutoRefresh";
-import { generationProgress } from "./generationProgress";
+import { generationProgress, isQueuedExpedition } from "./generationProgress";
 import { stageCopy } from "./stageCopy";
 import { expeditionStatusLabel, learnerTerm } from "./vocabulary";
 
@@ -17,6 +17,24 @@ function isStalled(status: string, lastProgressAt: string | null | undefined): b
 }
 
 export async function GenerationProgressCard({ expedition }: Readonly<{ expedition: LearnerExpedition }>) {
+  // Auto-refresh covers the queued → scouting transition.
+  if (isQueuedExpedition(expedition)) {
+    return (
+      <Card className="border-[color:var(--journal-line)] bg-[color:var(--journal-panel)]">
+        <GenerationAutoRefresh active />
+        <CardHeader>
+          <CardTitle>{expedition.title}</CardTitle>
+          <CardDescription>{learnerTerm("queuedDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium">{learnerTerm("queued")}</span>
+          </div>
+          <Progress value={null} />
+        </CardContent>
+      </Card>
+    );
+  }
   const timeline = expedition.currentOperationId
     ? await getOperationTimeline(expedition.currentOperationId, expedition.currentOperationType ?? undefined)
     : undefined;

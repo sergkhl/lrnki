@@ -4,6 +4,9 @@ import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag
 import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { ZodError, type ZodType } from "zod";
 import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
+import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } from "./liteLlmRetry";
+
+export { LiteLlmHttpError } from "./liteLlmRetry";
 
 installNodeOperationTagContext();
 
@@ -32,29 +35,21 @@ export class LiteLlmForcedToolClient {
     // lets one stage tighten the budget (e.g. ordering: first call + one corrective
     // re-prompt); otherwise fall back to the constructor value. Fail closed once exhausted.
     const maxRetries = input.maxRetries ?? this.options.maxRetries ?? 2;
-    let lastError: unknown;
-    // Per-attempt redacted failure trail (ADR-0006 fail-closed, made inspectable). On
-    // exhaustion this rides out on the thrown error so the operator timeline can show WHY
-    // a stage failed. Captured here at the model-output boundary — the same rule-6 seam
-    // that strips NUL bytes — so no schema value or unbounded blob escapes.
-    const attempts: ForcedToolFailureAttempt[] = [];
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const retryMessages = buildRetryMessages(input.messages, attempts.at(-1));
-      try {
-        return await this.callOnce({ ...input, messages: retryMessages });
-      } catch (error) {
-        lastError = error;
-        attempts.push(classifyForcedToolFailure(attempt, error));
-        if (attempt < maxRetries) {
-          // Rate limits (429) need a real cooldown window, not a 500ms blip —
-          // back off exponentially and longer than for ordinary deviations.
-          const status = error instanceof LiteLlmHttpError ? error.status : undefined;
-          const base = status === 429 ? 2000 : 500;
-          await delay(base * 2 ** attempt);
-        }
+    // The shared transport loop owns backoff (429 cooldown vs ordinary blips), the
+    // per-attempt redacted failure trail (ADR-0006 fail-closed, made inspectable),
+    // and terminal timeout classification (a timed-out call may have completed
+    // server-side — never blind-retried here; the supervisor's attempt budget owns
+    // re-runs). The trail rides out on the thrown error so the operator timeline
+    // can show WHY a stage failed.
+    return runWithTransportRetries({
+      maxRetries,
+      attemptOnce: (_attempt, previousAttempt) =>
+        this.callOnce({ ...input, messages: buildRetryMessages(input.messages, previousAttempt) }),
+      classify: classifyForcedToolFailure,
+      onExhausted: (attempts, lastError) => {
+        throw new ForcedToolExhaustionError(input.toolName, input.model, attempts, lastError);
       }
-    }
-    throw new ForcedToolExhaustionError(input.toolName, input.model, attempts, lastError);
+    });
   }
 
   private async callOnce<T>(input: { model: string; messages: ToolMessage[]; toolName: string; toolDescription: string; parameters: JsonSchema; validator: ZodType<T>; tags?: string[] }): Promise<T> {
@@ -165,17 +160,6 @@ export class ForcedToolExhaustionError extends Error implements StageErrorReport
   }
 }
 
-export class LiteLlmHttpError extends Error {
-  constructor(readonly status: number) {
-    super(`LiteLLM request failed with ${status}.`);
-    this.name = "LiteLlmHttpError";
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // Cap for a redacted arguments snippet — bounded so an operator sees the shape of the
 // malformed output without persisting an unbounded blob.
 const SNIPPET_CAP = 500;
@@ -209,9 +193,8 @@ function buildRetryMessages(messages: ToolMessage[], previousAttempt: ForcedTool
 // Schema-invalid attempts carry the violated PATHS (never the offending values) plus a
 // bounded redacted snippet of the arguments; invalid JSON carries the snippet only.
 function classifyForcedToolFailure(attempt: number, error: unknown): ForcedToolFailureAttempt {
-  if (error instanceof LiteLlmHttpError) return { attempt, kind: "http", status: error.status };
-  const networkCode = fetchFailureCode(error);
-  if (networkCode) return { attempt, kind: "network", code: networkCode };
+  const transport = classifyTransportFailure(attempt, error);
+  if (transport) return transport;
   if (error instanceof ForcedToolNoCallError) return { attempt, kind: "no_tool_call" };
   if (error instanceof ForcedToolNoArgumentsError) return { attempt, kind: "no_arguments" };
   if (error instanceof ForcedToolInvalidJsonError) {
@@ -227,12 +210,4 @@ function classifyForcedToolFailure(attempt: number, error: unknown): ForcedToolF
     };
   }
   return { attempt, kind: "other" };
-}
-
-function fetchFailureCode(error: unknown): string | undefined {
-  if (!(error instanceof TypeError)) return undefined;
-  const cause = error.cause;
-  if (!cause || typeof cause !== "object") return undefined;
-  const code = (cause as { code?: unknown }).code;
-  return typeof code === "string" && code.length > 0 ? code : undefined;
 }

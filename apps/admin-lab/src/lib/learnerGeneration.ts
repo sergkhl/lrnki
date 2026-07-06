@@ -22,7 +22,6 @@ import {
   LiteLlmStudyItemGenerationAdapter
 } from "@lrnki/infrastructure-litellm";
 import {
-  createDatabaseClient,
   PostgresConceptLessonStore,
   PostgresEnrichmentRunStore,
   PostgresGraphVersionStore,
@@ -30,6 +29,7 @@ import {
   PostgresRunProgressReporter,
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
+import type { DatabaseClient } from "./topicGenerationSupervisor";
 
 function baseClientConfig() {
   return {
@@ -39,8 +39,7 @@ function baseClientConfig() {
   };
 }
 
-function buildContext() {
-  const sql = createDatabaseClient();
+function buildContext(sql: DatabaseClient) {
   const baseClient = baseClientConfig();
   const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
   const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
@@ -49,7 +48,6 @@ function buildContext() {
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   return {
-    sql,
     graphStore,
     enrichmentStore,
     runProgressReporter,
@@ -72,37 +70,34 @@ function buildContext() {
   };
 }
 
+// `sql` is the supervisor's shared pool — this run borrows it and never closes it.
 export async function generateLearnerTopicExpedition(input: {
   learnerExpeditionId: string;
   topic: string;
   declaredDomain: string | null;
-}): Promise<void> {
-  const ctx = buildContext();
-  try {
-    await generateTopicExpedition({
-      learnerExpeditionId: input.learnerExpeditionId,
-      topic: input.topic,
-      declaredDomain: input.declaredDomain,
-      declaredDomainInference: ctx.declaredDomainInference,
-      expeditionStore: ctx.expeditionStore,
-      conceptSetSynthesis: ctx.conceptSetSynthesis,
-      knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
-      embedding: ctx.nodeEmbedding,
-      groundingGeneration: ctx.groundingGeneration,
-      prerequisiteOrdering: ctx.prerequisiteOrdering,
-      difficulty: ctx.difficulty,
-      enrichmentStore: ctx.enrichmentStore,
-      graphStore: ctx.graphStore,
-      conceptLessonGeneration: ctx.conceptLessonGeneration,
-      studyItemBlueprint: ctx.studyItemBlueprint,
-      impostorLieValidityJudge: ctx.impostorLieValidityJudge,
-      conceptLessonStore: ctx.conceptLessonStore,
-      studyItemGeneration: ctx.studyItemGeneration,
-      studyItemBankStore: ctx.studyItemBankStore,
-      configHash: STUDY_ITEM_BANK_CONFIG_HASH,
-      reporter: ctx.runProgressReporter
-    });
-  } finally {
-    await ctx.sql.end({ timeout: 5 });
-  }
+}, sql: DatabaseClient): Promise<void> {
+  const ctx = buildContext(sql);
+  await generateTopicExpedition({
+    learnerExpeditionId: input.learnerExpeditionId,
+    topic: input.topic,
+    declaredDomain: input.declaredDomain,
+    declaredDomainInference: ctx.declaredDomainInference,
+    expeditionStore: ctx.expeditionStore,
+    conceptSetSynthesis: ctx.conceptSetSynthesis,
+    knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
+    embedding: ctx.nodeEmbedding,
+    groundingGeneration: ctx.groundingGeneration,
+    prerequisiteOrdering: ctx.prerequisiteOrdering,
+    difficulty: ctx.difficulty,
+    enrichmentStore: ctx.enrichmentStore,
+    graphStore: ctx.graphStore,
+    conceptLessonGeneration: ctx.conceptLessonGeneration,
+    studyItemBlueprint: ctx.studyItemBlueprint,
+    impostorLieValidityJudge: ctx.impostorLieValidityJudge,
+    conceptLessonStore: ctx.conceptLessonStore,
+    studyItemGeneration: ctx.studyItemGeneration,
+    studyItemBankStore: ctx.studyItemBankStore,
+    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
+    reporter: ctx.runProgressReporter
+  });
 }

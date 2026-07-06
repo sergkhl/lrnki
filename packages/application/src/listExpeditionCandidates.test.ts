@@ -140,7 +140,7 @@ function fakeStore(rows: LearnerExpedition[]): LearnerExpeditionStorePort {
     async claimNextGenerating() { return undefined; },
     async failExhaustedGenerating() { return 0; },
     async resetGeneration() {},
-    async updateProgress() {}
+    async updateProgress() { return 1; }
   };
 }
 

@@ -538,15 +538,21 @@ export interface LearnerExpeditionStorePort {
   claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<LearnerExpedition | undefined>;
   failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number; failureMessage: string }): Promise<number>;
   resetGeneration(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
+  // Fenced worker write (lease + fencing token): the claim clears the operation id,
+  // and every generation write must state the operation id it EXPECTS to own
+  // (`null` before the run's first write, its own enrichment id after). A write whose
+  // expectation no longer holds affects 0 rows — the returned count tells a stale
+  // worker it lost the claim and must stop spending.
   updateProgress(input: {
     learnerExpeditionId: string;
+    expectedOperationId: string | null;
     status?: LearnerExpeditionStatus;
     currentOperationId?: string | null;
     currentOperationType?: OperationType | null;
     enrichmentId?: string | null;
     declaredDomain?: string | null;
     failureMessage?: string | null;
-  }): Promise<void>;
+  }): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1016,6 +1022,7 @@ export type OperationType = "extraction" | "minting" | "enrichment" | "study_ite
 export type ForcedToolFailureKind =
   | "http"
   | "network"
+  | "timeout"
   | "no_tool_call"
   | "no_arguments"
   | "invalid_json"
@@ -1067,6 +1074,10 @@ export interface RunProgressReporterPort {
   completeStage(input: { operationType: OperationType; operationId: string; stage: string; ok: boolean; errorDetail?: StageErrorDetail }): Promise<void>;
   // Set the parent's terminal status + completed_at.
   completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void>;
+  // Liveness heartbeat: bump only last_progress_at on the open parent row. Driven on
+  // an interval by the operation lifecycle wrapper so a healthy run inside one long
+  // LLM call is never mistaken for a dead one by the stale-claim predicate.
+  touch(input: { operationType: OperationType; operationId: string }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

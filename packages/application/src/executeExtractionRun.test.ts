@@ -40,7 +40,8 @@ function recordingReporter() {
     async enterStage(i) { calls.push({ method: "enterStage", stage: i.stage, total: i.total }); },
     async recordProgress(i) { calls.push({ method: "recordProgress", stage: i.stage, done: i.done }); },
     async completeStage(i) { calls.push({ method: "completeStage", stage: i.stage, ok: i.ok }); },
-    async completeOperation(i) { calls.push({ method: "completeOperation", status: i.status }); }
+    async completeOperation(i) { calls.push({ method: "completeOperation", status: i.status }); },
+    async touch() {}
   };
   return { reporter, calls };
 }

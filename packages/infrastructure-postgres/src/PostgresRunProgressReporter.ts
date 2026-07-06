@@ -82,6 +82,19 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
         AND s.ended_at IS NULL`;
   }
 
+  // Liveness heartbeat: bump only last_progress_at, and only while the run is open —
+  // a touch that raced the terminal write must not resurrect a completed run's
+  // freshness. Driven on an interval by runInstrumentedOperation so a single long
+  // LLM call cannot make a healthy run look stale-reclaimable.
+  async touch(input: { operationType: OperationType; operationId: string }): Promise<void> {
+    await this.sql`
+      UPDATE operation_runs
+      SET last_progress_at = now()
+      WHERE operation_type = ${input.operationType}
+        AND operation_id = ${input.operationId}
+        AND completed_at IS NULL`;
+  }
+
   // Set the parent's terminal status + completed_at.
   async completeOperation(input: { operationType: OperationType; operationId: string; status: "succeeded" | "failed" }): Promise<void> {
     await this.sql`

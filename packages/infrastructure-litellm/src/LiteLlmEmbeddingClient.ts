@@ -1,6 +1,8 @@
 import { currentOperationTag } from "@lrnki/domain-core/operation-tag-context";
-import { LiteLlmHttpError } from "./LiteLlmForcedToolClient";
+import { installNodeOperationTagContext } from "@lrnki/domain-core/operation-tag-context-node";
+import type { ForcedToolFailureAttempt, StageErrorDetail, StageErrorReporting } from "@lrnki/ports";
 import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./liteLlmFetch";
+import { classifyTransportFailure, LiteLlmHttpError, runWithTransportRetries } from "./liteLlmRetry";
 
 // Embedding transport (plan U1, ADR-0012). The first embedding client since the CEP
 // reset removed the old clustering tier. A SIBLING of LiteLlmForcedToolClient, not an
@@ -15,6 +17,8 @@ import { createLiteLlmDispatcher, liteLlmFetch, withLiteLlmDispatcher } from "./
 // treat the embedding signal as UNAVAILABLE and skip dedup rather than proposing pairs
 // from a malformed signal. Embeddings only PROPOSE candidate pairs; a separate
 // adjudicator decides each merge (AGENTS rule 20).
+installNodeOperationTagContext();
+
 type EmbeddingResponse = {
   data?: Array<{ embedding?: unknown; index?: unknown }>;
 };
@@ -30,22 +34,16 @@ export class LiteLlmEmbeddingClient {
     // No texts → no HTTP call; an empty embedding set is a valid (degenerate) result,
     // never an error.
     if (input.texts.length === 0) return [];
-    // Retry budget for transient blips, mirroring the forced-tool client's posture.
-    const maxRetries = this.options.maxRetries ?? 2;
-    let lastError: unknown;
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await this.embedOnce(input);
-      } catch (error) {
-        lastError = error;
-        if (attempt < maxRetries) {
-          const status = error instanceof LiteLlmHttpError ? error.status : undefined;
-          const base = status === 429 ? 2000 : 500;
-          await delay(base * 2 ** attempt);
-        }
+    // Shared transport retry loop (same posture as the forced-tool client): terminal
+    // timeouts, classified per-attempt trail, 429-aware backoff.
+    return runWithTransportRetries({
+      maxRetries: this.options.maxRetries ?? 2,
+      attemptOnce: () => this.embedOnce(input),
+      classify: (attempt, error) => classifyTransportFailure(attempt, error) ?? { attempt, kind: "other" },
+      onExhausted: (attempts, lastError) => {
+        throw new EmbeddingExhaustionError(input.model, attempts, lastError);
       }
-    }
-    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+    });
   }
 
   private async embedOnce(input: { model: string; texts: string[]; tags?: string[] }): Promise<number[][]> {
@@ -91,6 +89,21 @@ export class LiteLlmEmbeddingClient {
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// Exhaustion carrier mirroring ForcedToolExhaustionError: the classified attempt
+// trail rides out on the thrown error (and its duck-typed stageErrorDetail) so a
+// failing embed stage is inspectable and transient-classifiable by the application.
+export class EmbeddingExhaustionError extends Error implements StageErrorReporting {
+  readonly stageErrorDetail: StageErrorDetail;
+
+  constructor(
+    readonly model: string,
+    readonly attempts: ForcedToolFailureAttempt[],
+    cause: unknown
+  ) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(`Embedding call to "${model}" failed after ${attempts.length} attempt(s): ${reason}`);
+    this.name = "EmbeddingExhaustionError";
+    this.cause = cause;
+    this.stageErrorDetail = { kind: "other", message: this.message, model, attempts };
+  }
 }

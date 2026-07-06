@@ -15,7 +15,8 @@ export const noopRunProgressReporter: RunProgressReporterPort = {
   async enterStage() {},
   async recordProgress() {},
   async completeStage() {},
-  async completeOperation() {}
+  async completeOperation() {},
+  async touch() {}
 };
 
 // Non-LLM stage identifiers (R2). These are timed for wall-clock like any stage but
@@ -48,17 +49,28 @@ export async function runInstrumentedOperation<T>(
   return runWithOperationTag(operationId, async () => {
     await reporter.beginOperation({ operationType, operationId });
     const runStage = bracketStage(reporter, operationType, operationId);
+    // Liveness heartbeat while the operation is open: stage boundaries alone leave
+    // last_progress_at frozen through one long LLM call, which the expedition
+    // supervisor's stale-claim predicate would read as a dead run. Touch failures are
+    // swallowed — a missed heartbeat must never fail the work itself.
+    const heartbeat = setInterval(() => {
+      void reporter.touch({ operationType, operationId }).catch(() => {});
+    }, HEARTBEAT_INTERVAL_MS);
     let result: T;
     try {
       result = await fn(runStage);
     } catch (error) {
+      clearInterval(heartbeat);
       await reporter.completeOperation({ operationType, operationId, status: "failed" });
       throw error;
     }
+    clearInterval(heartbeat);
     await reporter.completeOperation({ operationType, operationId, status: "succeeded" });
     return result;
   });
 }
+
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 // Stage-bracket factory shared by every instrumented operation (R1). Open a stage, run
 // it, close it ok:true; a throw closes it ok:false with redacted detail and rethrows.

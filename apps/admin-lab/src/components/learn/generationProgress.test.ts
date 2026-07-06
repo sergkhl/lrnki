@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationTimelineDetail } from "@lrnki/ports";
-import { EXPECTED_TOPIC_GENERATION_STAGES, generationProgress } from "./generationProgress";
+import { EXPECTED_TOPIC_GENERATION_STAGES, generationProgress, isQueuedExpedition } from "./generationProgress";
 
 test("generationProgress counts completed expected stages against the fixed denominator", () => {
   const progress = generationProgress(timeline({
@@ -86,3 +86,39 @@ function closed(stage: string): OperationTimelineDetail["stages"][number] {
 function open(stage: string): OperationTimelineDetail["stages"][number] {
   return { stage, startedAt: "2026-01-01T00:00:00.000Z", endedAt: null, durationMs: null, ok: null, progressDone: null, progressTotal: null, errorDetail: null };
 }
+
+test("a succeeded study_items timeline with absent conditional stages still reaches 11/11", () => {
+  const progress = generationProgress(timeline({
+    operationType: "study_items",
+    status: "succeeded",
+    stages: [
+      closed(STAGE_TAGS.conceptLessonGeneration),
+      closed(STAGE_TAGS.studyItemBlueprint),
+      closed(STAGE_TAGS.studyItemGeneration)
+      // matching/impostor absent: the blueprint admitted none
+    ]
+  }));
+  assert.equal(progress.completed, progress.total);
+  assert.equal(progress.fraction, 1);
+});
+
+test("a succeeded enrichment timeline with domain inference skipped reaches its phase boundary (6/11)", () => {
+  const progress = generationProgress(timeline({
+    status: "succeeded",
+    stages: [
+      closed(STAGE_TAGS.conceptSetSynthesis),
+      closed(STAGE_TAGS.knowledgeBoundaryProbe),
+      closed(STAGE_TAGS.groundingGeneration),
+      closed(STAGE_TAGS.prerequisiteOrdering),
+      closed(STAGE_TAGS.intrinsicDifficulty)
+    ]
+  }));
+  assert.equal(progress.completed, 6);
+});
+
+test("isQueuedExpedition: generating + no operation id is queued; claimed or terminal rows are not", () => {
+  assert.equal(isQueuedExpedition({ status: "generating", currentOperationId: null }), true);
+  assert.equal(isQueuedExpedition({ status: "generating", currentOperationId: "op-1" }), false);
+  assert.equal(isQueuedExpedition({ status: "ready", currentOperationId: null }), false);
+  assert.equal(isQueuedExpedition({ status: "failed", currentOperationId: null }), false);
+});

@@ -23,6 +23,8 @@ export const LEARNER_VOCABULARY = {
   groundedBadge: "Grounded in your source",
   topicDoor: "Plan expedition",
   generating: "Scouting",
+  queued: "Waiting for a scout",
+  queuedDescription: "Your expedition is in line. Scouting starts as soon as a scout is free.",
   generatingStopped: "Scouting stopped",
   generatingProgress: "Scouting progress",
   generatingStoppedDescription: "Scouting has stopped reporting progress.",

@@ -116,6 +116,28 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
     });
   }
 
+  // ONE staleness predicate, shared verbatim by claim and fail-exhausted (only the
+  // attempts comparison differs). A row is dead — reclaimable or failable — when it
+  // was never claimed, or its claim aged past the stale window AND its operation
+  // heartbeat did too. COALESCE covers the crash window where an operation id is set
+  // but the operation_runs row was never inserted: the expedition's own updated_at
+  // stands in for the missing heartbeat, so no row is permanently untouchable.
+  // claimed_at alone (not `current_operation_id IS NULL`) gates re-claims: the claim
+  // clears the operation id as the fence, so a freshly-claimed row must not look
+  // immediately reclaimable, and a transiently-released row keeps its claimed_at as
+  // natural backoff.
+  private generatingStaleness(staleBefore: Date) {
+    return this.sql`
+      le.status = 'generating'
+      AND (
+        le.claimed_at IS NULL
+        OR (
+          le.claimed_at < ${staleBefore}
+          AND COALESCE(opr.last_progress_at, le.updated_at) < ${staleBefore}
+        )
+      )`;
+  }
+
   async claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<LearnerExpedition | undefined> {
     const rows = await this.sql<LearnerExpeditionRow[]>`
       WITH candidate AS (
@@ -124,15 +146,8 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
         LEFT JOIN operation_runs opr
           ON opr.operation_id = le.current_operation_id
          AND opr.operation_type = le.current_operation_type
-        WHERE le.status = 'generating'
+        WHERE ${this.generatingStaleness(input.staleBefore)}
           AND le.generation_attempts < ${input.maxAttempts}
-          AND (
-            le.current_operation_id IS NULL
-            OR (
-              le.claimed_at < ${input.staleBefore}
-              AND COALESCE(opr.last_progress_at, le.updated_at) < ${input.staleBefore}
-            )
-          )
         ORDER BY le.created_at ASC
         LIMIT 1
         FOR UPDATE OF le SKIP LOCKED
@@ -140,6 +155,8 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
       UPDATE learner_expeditions le
       SET claimed_at = now(),
           generation_attempts = le.generation_attempts + 1,
+          current_operation_id = null,
+          current_operation_type = null,
           updated_at = now()
       FROM candidate
       WHERE le.learner_expedition_id = candidate.learner_expedition_id
@@ -149,34 +166,37 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
 
   async failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number; failureMessage: string }): Promise<number> {
     const rows = await this.sql<{ learner_expedition_id: string }[]>`
+      WITH candidate AS (
+        SELECT le.learner_expedition_id
+        FROM learner_expeditions le
+        LEFT JOIN operation_runs opr
+          ON opr.operation_id = le.current_operation_id
+         AND opr.operation_type = le.current_operation_type
+        WHERE ${this.generatingStaleness(input.staleBefore)}
+          AND le.generation_attempts >= ${input.maxAttempts}
+        FOR UPDATE OF le SKIP LOCKED
+      )
       UPDATE learner_expeditions le
       SET status = 'failed',
           failure_message = ${input.failureMessage},
           claimed_at = null,
           updated_at = now()
-      WHERE le.status = 'generating'
-        AND le.generation_attempts >= ${input.maxAttempts}
-        AND (
-          le.current_operation_id IS NULL
-          OR EXISTS (
-            SELECT 1
-            FROM operation_runs opr
-            WHERE opr.operation_id = le.current_operation_id
-              AND opr.operation_type = le.current_operation_type
-              AND le.claimed_at < ${input.staleBefore}
-              AND opr.last_progress_at < ${input.staleBefore}
-          )
-        )
+      FROM candidate
+      WHERE le.learner_expedition_id = candidate.learner_expedition_id
       RETURNING le.learner_expedition_id`;
     return rows.length;
   }
 
   async resetGeneration(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void> {
     await this.sql.begin(async (tx) => {
+      // Failed rows only: a Retry that races a completed generation must not flip a
+      // `ready` expedition back to `generating` and regenerate it.
       const target = await tx<{ learner_expedition_id: string }[]>`
         SELECT learner_expedition_id
         FROM learner_expeditions
-        WHERE learner_state_ref = ${input.learnerStateRef} AND learner_expedition_id = ${input.learnerExpeditionId}
+        WHERE learner_state_ref = ${input.learnerStateRef}
+          AND learner_expedition_id = ${input.learnerExpeditionId}
+          AND status = 'failed'
         LIMIT 1`;
       if (target.length === 0) return;
       await tx`
@@ -201,14 +221,15 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
 
   async updateProgress(input: {
     learnerExpeditionId: string;
+    expectedOperationId: string | null;
     status?: LearnerExpeditionStatus;
     currentOperationId?: string | null;
     currentOperationType?: OperationType | null;
     enrichmentId?: string | null;
     declaredDomain?: string | null;
     failureMessage?: string | null;
-  }): Promise<void> {
-    await this.sql`
+  }): Promise<number> {
+    const rows = await this.sql<{ learner_expedition_id: string }[]>`
       UPDATE learner_expeditions
       SET
         status = COALESCE(${input.status ?? null}, status),
@@ -218,7 +239,10 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
         declared_domain = ${input.declaredDomain === undefined ? this.sql`declared_domain` : input.declaredDomain},
         failure_message = ${input.failureMessage === undefined ? this.sql`failure_message` : input.failureMessage},
         updated_at = now()
-      WHERE learner_expedition_id = ${input.learnerExpeditionId}`;
+      WHERE learner_expedition_id = ${input.learnerExpeditionId}
+        AND current_operation_id IS NOT DISTINCT FROM ${input.expectedOperationId}
+      RETURNING learner_expedition_id`;
+    return rows.length;
   }
 }
 

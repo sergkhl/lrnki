@@ -24,6 +24,18 @@
 
 ## COMPLETED
 
+- **Generation queue reliability, probe routing, and queued-state UX.** Expedition generation now
+  runs bounded-parallel (cap 2) behind the DB-claim seam with a visible Queued card, a single
+  staleness predicate shared by claim and fail, operation-id fencing with a 30s heartbeat, a unified
+  transient-vs-terminal error classification (network/5xx/429/timeout release the claim to the
+  attempt budget; schema/no-concept failures fail immediately), a `failed`-only `resetGeneration`
+  guard, and a shared transport retry helper/dispatcher. Header/body timeouts are terminal at the
+  transport. The knowledge-boundary probe alias deny-lists Google (Vertex 400s on forced
+  tool_choice) and gains a LiteLLM ordered fallback to a small cross-family model
+  (`qwen/qwen3-30b-a3b-instruct-2507`) so a sustained Groq rate-limit no longer stalls generation.
+  Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) and
+  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+
 - **Expedition planning durability and entry UX.** Topic-expedition generation now starts as a
   durable learner expedition row and is completed by the Admin Lab supervisor through claimed
   `generating` work, stale-operation relaunch, bounded failure, and manual retry. `/learn` uses a
@@ -178,6 +190,24 @@
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md).
 
 ## VALIDATION
+
+- **Generation queue reliability, probe routing, and queued-state UX, 2026-07-06.** Deterministic
+  envelope: full workspace `typecheck` exit 0; recursive `test` exit 0 with `.env` loaded (0
+  failures — admin-lab 118 incl. new queued-card/progress-denominator/fence tests, application,
+  infrastructure-litellm incl. shared retry/terminal-timeout, infrastructure-postgres DB-backed
+  predicate/fence/guard tests); `lint` 0 errors (6 pre-existing warnings); `@lrnki/admin-lab`
+  production build exit 0. **Real-use gate (rule 14): PASS.** Three fresh topics (Nash Equilibrium
+  Basics, Fourier Series, Enzyme Kinetics) submitted at once under one learner: the concurrency cap
+  held at 2 (two Scouting cards + one distinct **Queued** card confirmed in a 390px browser pass —
+  "Your expedition is in line… Waiting for a scout"), a transient Groq 429 released a claim to the
+  attempt budget without failing, the `resetGeneration` failed-only guard re-queued cleanly, and
+  **all three reached `ready`** with real content (Game Theory 12 lessons/30 items, Biochemistry
+  19/43, Mathematics 8/18). The probe alias logged **0 Vertex 400s**; the added qwen3-30b fallback
+  gave 10/10 probe availability through a flaky Groq window. Defect found and fixed during the gate:
+  `require_parameters: true` over-restricted probe routing to Groq alone (frequently 429) and still
+  allowed a Vertex 400 fallback — replaced with an explicit Google provider deny-list plus the
+  ordered probe fallback. Evidence: `tmp/2026-07-06-generation-queue-gate/rule14-evidence.md` and
+  `queued-vs-scouting-390.png`.
 
 - **Expedition planning durability and entry UX, 2026-07-06.** Deterministic envelope:
   `@lrnki/infrastructure-postgres` typecheck and DB-backed test suite green (63 tests, `.env`

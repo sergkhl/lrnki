@@ -91,7 +91,7 @@ function memoryStore(initial: LearnerExpedition[] = []): LearnerExpeditionStoreP
     async claimNextGenerating() { return undefined; },
     async failExhaustedGenerating() { return 0; },
     async resetGeneration() {},
-    async updateProgress() {}
+    async updateProgress() { return 1; }
   };
 }
 

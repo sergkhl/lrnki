@@ -155,10 +155,13 @@ maybe("claimNextGenerating relaunches stale operation heartbeats and failExhaust
 
     const claimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() - 120000), maxAttempts: 3 });
     assert.equal(claimed?.generationAttempts, 3);
+    // The claim fences the row by clearing its operation id.
+    assert.equal(claimed?.currentOperationId, null);
 
+    // Age both the claim and the row's own heartbeat stand-in past the stale window.
     await sql`
       UPDATE learner_expeditions
-      SET claimed_at = now() - interval '10 minutes'
+      SET claimed_at = now() - interval '10 minutes', updated_at = now() - interval '10 minutes'
       WHERE learner_expedition_id = ${learnerExpeditionId}`;
     const failed = await store.failExhaustedGenerating({
       staleBefore: new Date(Date.now() - 120000),
@@ -241,6 +244,122 @@ maybe("resetGeneration leaves active expedition unchanged when the retry target 
     assert.equal(rows[0].learnerExpeditionId, activeExpeditionId);
     assert.equal(rows[0].active, true);
     assert.equal(rows[0].status, "generating");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a crash-window row (operation id set, no operation_runs row) is reclaimable below the budget and failable at it", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const store = new PostgresLearnerExpeditionStore(sql);
+    await removePriorClaimFixtures(sql);
+    const learnerStateRef = randomUUID();
+    const learnerExpeditionId = randomUUID();
+    await store.upsert({
+      learnerExpeditionId,
+      learnerStateRef,
+      kind: "topic",
+      title: "DB claim stale fixture",
+      declaredDomain: null,
+      status: "generating",
+      currentOperationId: randomUUID(), // no matching operation_runs row: the crash window
+      currentOperationType: "enrichment"
+    });
+    await sql`
+      UPDATE learner_expeditions
+      SET claimed_at = now() - interval '10 minutes', updated_at = now() - interval '10 minutes',
+          generation_attempts = 1, created_at = now() - interval '100 years'
+      WHERE learner_expedition_id = ${learnerExpeditionId}`;
+
+    const claimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() - 120000), maxAttempts: 3 });
+    assert.equal(claimed?.learnerExpeditionId, learnerExpeditionId);
+    assert.equal(claimed?.generationAttempts, 2);
+
+    await sql`
+      UPDATE learner_expeditions
+      SET claimed_at = now() - interval '10 minutes', updated_at = now() - interval '10 minutes',
+          generation_attempts = 3, current_operation_id = ${randomUUID()}, current_operation_type = 'enrichment'
+      WHERE learner_expedition_id = ${learnerExpeditionId}`;
+    const failed = await store.failExhaustedGenerating({
+      staleBefore: new Date(Date.now() - 120000),
+      maxAttempts: 3,
+      failureMessage: "budget spent"
+    });
+    assert.ok(failed >= 1);
+    const rows = await store.listForLearner(learnerStateRef);
+    assert.equal(rows[0].status, "failed");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("updateProgress is fenced: a write expecting a lost operation id affects 0 rows", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const store = new PostgresLearnerExpeditionStore(sql);
+    const learnerStateRef = randomUUID();
+    const learnerExpeditionId = randomUUID();
+    await store.upsert({
+      learnerExpeditionId,
+      learnerStateRef,
+      kind: "topic",
+      title: "Fenced write fixture",
+      declaredDomain: null,
+      status: "generating"
+    });
+
+    // First write installs the run's fence token (claim left the operation id null).
+    const installed = await store.updateProgress({
+      learnerExpeditionId,
+      expectedOperationId: null,
+      currentOperationId: "11111111-1111-4111-8111-111111111111",
+      currentOperationType: "enrichment"
+    });
+    assert.equal(installed, 1);
+
+    // A competing claim clears the operation id — the old worker's fenced write is a no-op.
+    await sql`
+      UPDATE learner_expeditions SET current_operation_id = null, current_operation_type = null
+      WHERE learner_expedition_id = ${learnerExpeditionId}`;
+    const stale = await store.updateProgress({
+      learnerExpeditionId,
+      expectedOperationId: "11111111-1111-4111-8111-111111111111",
+      status: "ready"
+    });
+    assert.equal(stale, 0);
+    const rows = await store.listForLearner(learnerStateRef);
+    assert.equal(rows[0].status, "generating");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("resetGeneration leaves non-failed expeditions untouched (only failed rows are retryable)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const store = new PostgresLearnerExpeditionStore(sql);
+    const learnerStateRef = randomUUID();
+    const learnerExpeditionId = randomUUID();
+    await store.upsert({
+      learnerExpeditionId,
+      learnerStateRef,
+      kind: "topic",
+      title: "Reset immune fixture",
+      declaredDomain: null,
+      status: "generating"
+    });
+    await sql`
+      UPDATE learner_expeditions
+      SET generation_attempts = 2, claimed_at = now()
+      WHERE learner_expedition_id = ${learnerExpeditionId}`;
+
+    await store.resetGeneration({ learnerStateRef, learnerExpeditionId });
+
+    const rows = await store.listForLearner(learnerStateRef);
+    assert.equal(rows[0].status, "generating");
+    assert.equal(rows[0].generationAttempts, 2);
+    assert.notEqual(rows[0].claimedAt, null);
   } finally {
     await sql.end();
   }

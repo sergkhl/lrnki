@@ -200,6 +200,18 @@ model_list:
     litellm_params:
       model: "openrouter/openai/gpt-oss-120b"
       api_key: os.environ/OPENROUTER_API_KEY
+      # Forced-tool alias backing model: OpenRouter must only route to providers that
+      # honor every request parameter (tool_choice). Without this, provider failover
+      # (e.g. Groq 429 → Google Vertex) lands on a provider that rejects forced
+      # function calling with a 400 (real failure: expedition bd89e63a, 2026-07-06).
+      # Google deny-listed too: require_parameters did not exclude Vertex in the
+      # observed llama-4-scout fallback, so trust the deny-list, not the metadata.
+      extra_body:
+        provider:
+          require_parameters: true
+          ignore:
+            - "google-vertex"
+            - "google-ai-studio"
 
   # Available cheap alternative judge (same Xiaomi family as the author, so weaker
   # triangle independence); kept for reference, not aliased.
@@ -251,9 +263,38 @@ model_list:
       api_key: os.environ/OPENROUTER_API_KEY
       input_cost_per_token: 0.00000010
       output_cost_per_token: 0.00000030
+      # Backs kg-knowledge-boundary-probe (forced tool_choice). Google (Vertex)
+      # rejects forced function calling (tool_choice mode=ANY) with 400, so it is
+      # deny-listed outright (real failure: expedition "Enzyme Kinetics",
+      # 2026-07-06). `require_parameters: true` was tried but over-restricted routing
+      # to Groq alone — which is frequently upstream-rate-limited (429) — so it is
+      # NOT set; the deny-list lets OpenRouter reach the other tool-capable providers
+      # (Fireworks, DeepInfra, …) that serve llama-4-scout.
+      extra_body:
+        provider:
+          ignore:
+            - "google-vertex"
+            - "google-ai-studio"
     model_info:
       mode: "chat"
       max_input_tokens: 10000000
+
+  # Fallback deployment for kg-knowledge-boundary-probe (see router_settings.fallbacks).
+  # llama-4-scout honors forced tool_choice ONLY via Groq on OpenRouter, and a sustained
+  # Groq 429 stalls K=5 generation (real outage 2026-07-06). Qwen3-30B-A3B is a small MoE
+  # (~3B active — preserves the "small model K-dispersion reveals the boundary" design),
+  # cross-family from the DeepSeek synthesizer (KTD4 independence holds), and is reliably
+  # served with forced tool_choice by non-Groq providers (measured 4/4 via StreamLake).
+  # Engaged only when the primary probe deployment fails.
+  - model_name: "openrouter/qwen/qwen3-30b-a3b-instruct-2507"
+    litellm_params:
+      model: "openrouter/qwen/qwen3-30b-a3b-instruct-2507"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000008
+      output_cost_per_token: 0.00000029
+    model_info:
+      mode: "chat"
+      max_input_tokens: 262144
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY # Required for API key management
@@ -302,6 +343,12 @@ router_settings:
   # allowed_fails: 1
   enable_pre_call_checks: false
   cooldown_time: 15
+  # Ordered fallback for the knowledge-boundary probe: when the primary deployment
+  # (llama-4-scout, Groq-only for forced tool_choice) fails — e.g. a sustained Groq 429
+  # that would otherwise stall K=5 source-less generation — LiteLLM retries the request
+  # against the small cross-family Qwen3-30B-A3B deployment. Keyed on the request's alias.
+  fallbacks:
+    - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5
@@ -327,6 +374,9 @@ router_settings:
     # dispersion of a small model exposes its knowledge boundary. Forced tool_choice on
     # the probe alias is empirically verified before locking (U2 verification); its
     # moderate probe temperature is set on the client the worker constructs, not here.
+    # Reliability: this deployment honors forced tool_choice only via Groq on OpenRouter,
+    # so router_settings.fallbacks routes to a small cross-family Qwen3-30B-A3B deployment
+    # when a sustained Groq 429 would otherwise stall generation.
     kg-concept-synthesis: deepseek/deepseek-v4-flash-no-thinking
     kg-knowledge-boundary-probe: openrouter/meta-llama/llama-4-scout
     # Learner generation helper: infer a Declared Domain from the learner's

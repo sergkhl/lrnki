@@ -203,7 +203,8 @@ test("a stage failure marks the operation failed with a readable timeline and pe
     async enterStage(i) { events.push(`enter:${i.stage}`); },
     async recordProgress() {},
     async completeStage(i) { events.push(`stage:${i.stage}:${i.ok ? "ok" : "fail"}`); },
-    async completeOperation(i) { events.push(`op:${i.status}`); }
+    async completeOperation(i) { events.push(`op:${i.status}`); },
+    async touch() {}
   };
   const { store, persisted } = capturingStore();
   const throwingSynthesis: ConceptSetSynthesisPort = {

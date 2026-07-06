@@ -34,8 +34,13 @@ creating a unified workflow identity.
 
 Learner topic-expedition generation is supervised by database claiming over the learner expedition
 row plus the operation heartbeat. The expedition row owns launch attempts and claim timestamps; the
-operation timeline owns liveness. A future durable orchestrator replaces this supervisor seam without
-changing the application generation activity.
+operation timeline owns liveness. Generation runs bounded-parallel (a small per-process cap) behind
+one staleness predicate shared by the claim and fail paths, with the claimed operation id fencing
+every progress write so a lost claim aborts rather than corrupts; a periodic heartbeat bumps the
+operation's last-progress timestamp so a healthy run inside a long single LLM call is not
+stale-reclaimed. Infrastructure-transient exhaustion (network, HTTP 5xx/429, timeout) releases the
+claim back to the attempt budget; deterministic failures fail immediately. A future durable
+orchestrator replaces this supervisor seam without changing the application generation activity.
 
 ## Context
 

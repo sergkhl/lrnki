@@ -149,7 +149,7 @@ test("an HTTP failure records kind:http with the status, still fails closed", as
 test("a fetch TypeError with an undici cause is classified as a network failure", async () => {
   setLiteLlmFetchForTests(async () => {
     const error = new TypeError("fetch failed");
-    Object.defineProperty(error, "cause", { value: { code: "UND_ERR_HEADERS_TIMEOUT" } });
+    Object.defineProperty(error, "cause", { value: { code: "ECONNREFUSED" } });
     throw error;
   });
   await assert.rejects(
@@ -158,7 +158,7 @@ test("a fetch TypeError with an undici cause is classified as a network failure"
       assert.ok(error instanceof ForcedToolExhaustionError);
       const attempt = error.stageErrorDetail.attempts![0];
       assert.equal(attempt.kind, "network");
-      assert.equal(attempt.code, "UND_ERR_HEADERS_TIMEOUT");
+      assert.equal(attempt.code, "ECONNREFUSED");
       return true;
     }
   );
@@ -211,4 +211,39 @@ test("HTTP-failure retry sends a byte-identical request body", async () => {
   assert.deepEqual(await client().call({ ...baseInput, maxRetries: 1 }), { ok: true });
   const bodies = capture.read().map((call) => call.body);
   assert.deepEqual(bodies[1], bodies[0]);
+});
+
+test("a headers-timeout failure is terminal: exactly one HTTP call, classified kind:timeout", async () => {
+  const capture = captureBodies([Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_HEADERS_TIMEOUT" } })]);
+  await assert.rejects(() => client().call(baseInput), (error: unknown) => {
+    assert.ok(error instanceof ForcedToolExhaustionError);
+    assert.deepEqual(error.attempts.map((a) => a.kind), ["timeout"]);
+    assert.equal(error.attempts[0].code, "UND_ERR_HEADERS_TIMEOUT");
+    return true;
+  });
+  assert.equal(capture.read().length, 1);
+});
+
+test("an AbortSignal timeout is terminal: exactly one HTTP call", async () => {
+  const timeoutError = Object.assign(new Error("The operation was aborted due to timeout"), { name: "TimeoutError" });
+  const capture = captureBodies([timeoutError]);
+  await assert.rejects(() => client().call(baseInput), (error: unknown) => {
+    assert.ok(error instanceof ForcedToolExhaustionError);
+    assert.deepEqual(error.attempts.map((a) => a.kind), ["timeout"]);
+    return true;
+  });
+  assert.equal(capture.read().length, 1);
+});
+
+test("a connection-reset failure stays retryable and succeeds on the next attempt", async () => {
+  const capture = captureBodies([
+    Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } }),
+    new Response(
+      JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: "submit_thing", arguments: JSON.stringify({ ok: true }) } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    )
+  ]);
+  const result = await client().call(baseInput);
+  assert.deepEqual(result, { ok: true });
+  assert.equal(capture.read().length, 2);
 });
