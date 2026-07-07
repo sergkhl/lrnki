@@ -29,6 +29,15 @@ export class PostgresEnrichmentInspectionRead implements EnrichmentInspectionRea
     return rows.map(toEnrichmentSummary);
   }
 
+  async derivedNodeBelongsToEnrichment(enrichmentId: string, derivedNodeId: string): Promise<boolean> {
+    const rows = await this.sql<{ exists: boolean }[]>`
+      SELECT EXISTS (
+        SELECT 1 FROM derived_graph_nodes
+        WHERE derived_node_id = ${derivedNodeId} AND enrichment_id = ${enrichmentId}
+      ) AS exists`;
+    return rows[0]?.exists ?? false;
+  }
+
   async getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined> {
     const headers = await this.sql<EnrichmentSummaryRow[]>`
       SELECT ${enrichmentSummaryColumns(this.sql)}

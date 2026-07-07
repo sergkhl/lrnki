@@ -12,7 +12,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- None. See [TODO](./TODO.md) for current work and
+- [2026-07-07-003 — fix: expedition generation latency and operation-run liveness](./2026-07-07-003-fix-expedition-generation-latency-and-operation-run-liveness-plan.md)
+  — ready. See also
   [the 2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md)
   for the open candidate backlog.
 

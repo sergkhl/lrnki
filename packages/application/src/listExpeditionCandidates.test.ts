@@ -120,6 +120,9 @@ function fakeRead(summaries: EnrichmentSummary[], details: Record<string, Derive
     },
     async getDerivedGraphDetail(enrichmentId: string) {
       return details[enrichmentId];
+    },
+    async derivedNodeBelongsToEnrichment() {
+      return true;
     }
   };
 }
@@ -194,6 +197,7 @@ function fakeStudyItemStore(items: StudyItem[]): StudyItemBankStorePort {
   return {
     async persist() {},
     async getStudyItem() { return undefined; },
+    async getStudyItemById() { return undefined; },
     async listStudyItemsForEnrichment() { return items; },
     async supportedItemTypes() { return []; }
   };

@@ -118,7 +118,8 @@ function row(input: Partial<LearnerExpedition> & Pick<LearnerExpedition, "learne
 function readWith(enrichmentDetail: DerivedGraphDetail | undefined): EnrichmentInspectionReadPort {
   return {
     async listEnrichmentSummaries() { return []; },
-    async getDerivedGraphDetail() { return enrichmentDetail; }
+    async getDerivedGraphDetail() { return enrichmentDetail; },
+    async derivedNodeBelongsToEnrichment() { return true; }
   };
 }
 

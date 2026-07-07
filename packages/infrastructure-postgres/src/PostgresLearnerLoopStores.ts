@@ -140,6 +140,15 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     return item;
   }
 
+  async getStudyItemById(studyItemId: string): Promise<StudyItem | undefined> {
+    const rows = await this.sql<StudyItemRow[]>`
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash
+      FROM study_items WHERE study_item_id = ${studyItemId} AND superseded_at IS NULL LIMIT 1`;
+    if (rows.length === 0) return undefined;
+    const [item] = await this.hydrate(rows);
+    return item;
+  }
+
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash

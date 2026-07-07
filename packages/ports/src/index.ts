@@ -576,6 +576,11 @@ export interface LearnerExpeditionStorePort {
 export interface StudyItemBankStorePort {
   persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
+  // Current-generation lookup by primary key (`superseded_at IS NULL`), feeding the same
+  // `hydrate` as the other reads. The server-side grading use-case resolves answer keys off
+  // the returned domain item (option `isCorrect`, impostor `isImpostor`, matching pairs), so
+  // one method serves all three item types and no per-type answer-key SQL survives (KTD2).
+  getStudyItemById(studyItemId: string): Promise<StudyItem | undefined>;
   listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]>;
   supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
 }
@@ -972,6 +977,12 @@ export interface DerivedGraphDetail {
 export interface EnrichmentInspectionReadPort {
   listEnrichmentSummaries(): Promise<EnrichmentSummary[]>;
   getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
+  // Finished boolean membership read over the Derived Graph Layer: does this node belong to
+  // this enrichment? The learner-grading use-case runs it alongside the active-expedition
+  // guard for verdict and lesson-read writes, which key on (learner, node) globally — the
+  // check keeps a client from marking a node in a non-active expedition (R4). A yes/no answer
+  // is a finished read (ADR-0027); loading the whole Derived Graph Detail for it would be waste.
+  derivedNodeBelongsToEnrichment(enrichmentId: string, derivedNodeId: string): Promise<boolean>;
 }
 
 // Learner Loop inspection read surface (ADR-0027, KTD7). The learner-loop history reads are

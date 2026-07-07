@@ -27,6 +27,19 @@ export {
 
 export { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 export {
+  gradeStudyResponse,
+  checkMatchingAttempt,
+  recordLearnerVerdict,
+  recordLessonRead,
+  type StudyResponseSubmission,
+  type GradeStudyResponseResult,
+  type GradeRefusalReason,
+  type NodeWriteRefusalReason,
+  type GradedResponse,
+  type MatchingAttemptCheckResult,
+  type NodeWriteResult
+} from "./gradeStudyResponse";
+export {
   listLearnerStates,
   getLearnerLoopDetail,
   type ConceptConflict,

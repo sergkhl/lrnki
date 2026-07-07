@@ -142,6 +142,29 @@ maybe("persists an option_select item; it round-trips with options + citation; s
   }
 });
 
+maybe("getStudyItemById round-trips the full domain item by primary key and scopes to the current generation", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const prior = optionSelectFor(s);
+    await bankFor(sql, s, [prior]);
+    const store = new PostgresStudyItemBankStore(sql);
+
+    const hydrated = await store.getStudyItemById(prior.studyItemId);
+    assert.ok(hydrated && hydrated.itemType === "option_select");
+    assert.equal(hydrated.studyItemId, prior.studyItemId);
+    assert.equal(hydrated.options.filter((o) => o.isCorrect).length, 1);
+
+    assert.equal(await store.getStudyItemById(randomUUID()), undefined, "an unknown id returns undefined");
+
+    // Superseding the item removes it from the current-generation lookup.
+    await bankFor(sql, s, [optionSelectFor(s)]);
+    assert.equal(await store.getStudyItemById(prior.studyItemId), undefined, "a superseded item is not returned");
+  } finally {
+    await sql.end();
+  }
+});
+
 maybe("regeneration (supersede-then-insert) retires a prior bank from current reads while keeping its options/citations as history", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {

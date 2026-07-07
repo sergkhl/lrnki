@@ -313,6 +313,7 @@ function capturingStore(): { store: StudyItemBankStorePort; persisted: StudyItem
   const store: StudyItemBankStorePort = {
     async persist(input) { persisted.push(...input.studyItems); persistedRejected.push(...input.rejected); },
     async getStudyItem() { return undefined; },
+    async getStudyItemById() { return undefined; },
     async listStudyItemsForEnrichment() { return persisted; },
     async supportedItemTypes(derivedNodeId) {
       return [...new Set(persisted.filter((item) => item.derivedNodeId === derivedNodeId).map((item) => item.itemType))].sort();

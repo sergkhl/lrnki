@@ -2,17 +2,31 @@
 
 ## TODO
 
-1. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
-   metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
-   can reduce wall-clock without changing cost ownership. The next optimization pass should start
-   from the latest ranked report, target the measured largest contributor, and record wall-clock,
-   calls, tokens, cost, and inspected real-use output before changing prompts, models, batching, or
-   cache-token reporting. Current evidence points at enrichment/prerequisite-ordering as the next
-   wall-clock candidate after Study Item Bank concurrency.
-   Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md). Validation trail:
-   `tmp/2026-06-30-generation-metering/`.
+1. **Expedition generation latency + operation-run liveness.** Ready plan:
+   [2026-07-07-003](./2026-07-07-003-fix-expedition-generation-latency-and-operation-run-liveness-plan.md)
+   (owns requirements and design; supersedes the former "use corrected bottleneck reports" item).
+   2026-07-07 measurement: learner waits ~8–9 min per expedition — study-items stages ~337s
+   (per-node concurrency still 1), prerequisite-ordering ~108s (tail latency of K=8 gpt-oss-120b
+   draws), plus unreaped phantom `running` operation rows on the Operations page.
+   Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
 
 ## COMPLETED
+
+- **Learner grading moved behind an application use-case.** The seven raw-SQL learner-grading server
+  actions in `apps/admin-lab/src/app/learn/actions.ts` are collapsed to thin mappers over one tested
+  `gradeStudyResponse` application use-case
+  (`gradeStudyResponse`/`checkMatchingAttempt`/`recordLearnerVerdict`/`recordLessonRead` + one
+  internal active-expedition/node-membership guard helper and refusal reason codes; copy stays UI-side
+  per [ADR-0033](../adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md)). Two existing
+  ports gained one read each — `StudyItemBankStorePort.getStudyItemById` and
+  `EnrichmentInspectionReadPort.derivedNodeBelongsToEnrichment` — with Postgres adapters and
+  integration tests; the former single-join guard becomes two composed reads (benign read-then-append
+  race, user-accepted). Every `sql\`` block and the duplicate `MatchingItem` rebuild under
+  `apps/admin-lab/src/app/learn/` are deleted (rule 18; AE1 verified); exported result types and
+  learner copy strings are byte-identical so `ActivitySheet`/`ConceptMarker` are untouched. Consumes
+  the read model per [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md); no CONTEXT.md term
+  added (KTD5). Accepted framing: Candidate 2 of the
+  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md).
 
 - **Operation-timeline catalog made provably complete.** The four live-but-uncatalogued LLM stage
   tags now belong to their owning operation — `concept-set-synthesis`, `knowledge-boundary-probe`,
@@ -157,6 +171,21 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner grading use-case, 2026-07-07.** Deterministic envelope: affected-package `typecheck`
+  exit 0; `@lrnki/application`, `@lrnki/infrastructure-postgres`, and `apps/admin-lab` tests pass with
+  `.env` loaded. **Real-use gate (rule 14): PASS.** Drove the real Admin Lab learner app (Next dev on
+  `localhost:3000`) as learner `13caf547-…` over the Game Theory expedition
+  (`enrichment 88721332-…`, all three graded item types). Walk covered theory/option_select/matching/
+  impostor/capstone; the four `response_log` rows the use-case appended are shape-identical to the
+  pre-refactor baseline (`attempt_seq` 1–4 store-allocated; selection rows `submitted_answer=null`,
+  `grader_identity=auto`, `response_source=human`; matching row carries the `[{promptId,chosenMatchId}]`
+  trace JSON) — AE4 satisfied. Verdict set then clear left one `calibration_verdicts` row at
+  `verdict=learn` (clear is an upsert, not a delete). Switching the active expedition to "Already
+  active" in a second tab flipped Game Theory to `active=f`; a graded submit then rendered
+  "This expedition is no longer active…" with the option ungraded and **no** row appended (stayed at
+  4 rows), and a post-switch lesson-read was silently blocked by the guard (`lesson_reads=2`, not 3) —
+  AE2/AE3 demonstrated live. Evidence + screenshots: `tmp/2026-07-07-learner-grading-use-case/`.
 
 - **Operation-timeline catalog completeness, 2026-07-07.** Deterministic envelope: workspace
   `typecheck` exit 0 (all 10 projects); `@lrnki/application` tests pass (481). The rewritten catalog

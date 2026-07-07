@@ -93,6 +93,12 @@ After:   same steps, but a completeness assertion fails the build when any
 
 ## Candidate 2 — Move learner grading composition out of the server-action seam into an application use-case
 
+**Status: ACCEPTED and IMPLEMENTED (2026-07-07)** via plan `2026-07-07-004` (now deleted); current
+status and the rule-14 real-use PASS live in [TODO.md](../plans/TODO.md). Key
+grilling outcomes: the guard reuses the existing `getByEnrichment` read (the brainstorm's combined
+keyed-item store method was rejected as aggregate-crossing), and the verdict/lesson-read
+node-membership check is preserved via a light `EnrichmentInspectionReadPort` boolean read.
+
 **Recommendation strength: Strong**
 
 **Files**
