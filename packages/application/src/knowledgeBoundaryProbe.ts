@@ -38,14 +38,16 @@ export type KnowledgeBoundaryProbeConfig = {
   agreementThreshold: number;
 };
 
-// Shipped defaults, calibrated in U8 (ADR-0013/ADR-0028). K=5 gives enough draws that a
-// single stray answer cannot dominate the mean; the threshold is deliberately generous
-// (qwen3-embedding cosine for two genuinely-same-meaning domain answers runs high) and is
-// the primary U8 knob.
+// Shipped defaults, calibrated against the 2026-07-07 real-use ladder in
+// tmp/2026-07-07-boundary-probe-calibration/evidence.md (ADR-0013/ADR-0028). K=10 is
+// required on the weaker fallback deployment; K=5 failed to route a fabricated-tier
+// majority without textbook false-boundaries. Threshold 0.92 at probe temperature 0.7
+// keeps the established-core tier core on both deployments while making the boundary
+// route fire for a fabricated majority.
 export const DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG: KnowledgeBoundaryProbeConfig = {
-  sampleCount: 5,
+  sampleCount: 10,
   probeConcurrency: 5,
-  agreementThreshold: 0.82
+  agreementThreshold: 0.92
 };
 
 export async function probeKnowledgeBoundary(input: {
