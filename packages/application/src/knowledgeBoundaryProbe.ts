@@ -40,14 +40,15 @@ export type KnowledgeBoundaryProbeConfig = {
 
 // Shipped defaults, calibrated against the 2026-07-07 real-use ladder in
 // tmp/2026-07-07-boundary-probe-calibration/evidence.md (ADR-0013/ADR-0028). K=10 is
-// required on the weaker fallback deployment; K=5 failed to route a fabricated-tier
-// majority without textbook false-boundaries. Threshold 0.92 at probe temperature 0.7
-// keeps the established-core tier core on both deployments while making the boundary
-// route fire for a fabricated majority.
+// required on the weaker fallback deployment; K=5 failed to expose enough dispersion.
+// The initial measured threshold candidate 0.92 kept the ladder's textbook tier core, but
+// the production-path Biology control false-boundaried photosynthetic electron transport
+// at 0.8951. Threshold 0.89 keeps that textbook control core while still routing the
+// fabricated Caldrin-Voss production-path concept (0.8723) to boundary.
 export const DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG: KnowledgeBoundaryProbeConfig = {
   sampleCount: 10,
   probeConcurrency: 5,
-  agreementThreshold: 0.92
+  agreementThreshold: 0.89
 };
 
 export async function probeKnowledgeBoundary(input: {
