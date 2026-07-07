@@ -556,6 +556,55 @@ export interface LearnerExpeditionStorePort {
 }
 
 // ---------------------------------------------------------------------------
+// Learner Registry + Awards ports (plan 2026-07-07-005, R1/R8). The registry is the
+// identity table every learner-state FK keys against; awards are durable flair. Real
+// humans only — simulated rivals (KTD1) never touch either store.
+// ---------------------------------------------------------------------------
+
+export interface Learner {
+  learnerRef: string;
+  displayName: string;
+  pinHash: string;
+  createdAt: string;
+}
+
+// The registry store (R1, R2). `create` enforces ref uniqueness at insert (the
+// name-taken path is a conflict, surfaced as `created: false`); `get` and `list`
+// feed the picker; `exists` is a cheap presence check. PIN verification lives in the
+// `enterLearnerSession` use-case, which reads `pinHash` off `get` — the store never
+// hashes or compares (KTD8).
+export interface LearnerStorePort {
+  create(input: { learnerRef: string; displayName: string; pinHash: string }): Promise<{ created: boolean }>;
+  get(learnerRef: string): Promise<Learner | undefined>;
+  list(): Promise<Learner[]>;
+}
+
+export interface LearnerAward {
+  awardId: string;
+  learnerRef: string;
+  awardType: "duel_win" | "weekly_podium";
+  dedupeKey: string;
+  context: Record<string, unknown>;
+  createdAt: string;
+}
+
+// Durable award store (R8). `record` is idempotent on (learner, type, dedupe_key):
+// a repeat write is a no-op (`recorded: false`), so a re-entered week never
+// duplicates a podium and a re-shown duel never doubles a win. `listForLearner` and
+// `listForLearners` feed board flair.
+export interface LearnerAwardsStorePort {
+  record(input: {
+    awardId: string;
+    learnerRef: string;
+    awardType: LearnerAward["awardType"];
+    dedupeKey: string;
+    context: Record<string, unknown>;
+  }): Promise<{ recorded: boolean }>;
+  listForLearner(learnerRef: string): Promise<LearnerAward[]>;
+  listForLearners(learnerRefs: string[]): Promise<LearnerAward[]>;
+}
+
+// ---------------------------------------------------------------------------
 // Learner Study Loop ports (R7–R16, ADR-0026). Learner-neutral typed Study Item Bank
 // plus the durable append-only Response Log. All learner structures are projection-only:
 // nothing here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
@@ -992,7 +1041,7 @@ export interface EnrichmentInspectionReadPort {
 // response rows carry the joined node label + question alongside the full append-only
 // Response Log row so a use-case can both render and re-fold from one read.
 export type LearnerLoopResponseRow = ResponseLogRow & { createdAt: string };
-export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string };
+export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string; enrichmentId: string };
 
 export interface LearnerLoopReadPort {
   listAllResponses(): Promise<LearnerLoopResponseRow[]>;

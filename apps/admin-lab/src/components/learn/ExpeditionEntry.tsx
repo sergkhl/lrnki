@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { expeditionStatusLabel, learnerTerm } from "./vocabulary";
-import { chooseCandidateExpedition, setActiveExpedition, startTopicExpedition, switchLearner } from "@/app/learn/actions";
+import { chooseCandidateExpedition, setActiveExpedition, startTopicExpedition } from "@/app/learn/actions";
 import { GenerationProgressCard } from "./GenerationProgressCard";
 import { PlanExpeditionDialog } from "./PlanExpeditionDialog";
 import { resumeLabel } from "./resumeLabel";
@@ -46,11 +46,6 @@ export function ExpeditionEntry({
             <h1 className="text-3xl font-semibold tracking-normal">Choose an expedition</h1>
             <p className="truncate text-sm text-muted-foreground">Exploring as {learnerStateRef}</p>
           </div>
-          <form action={switchLearner}>
-            <Button type="submit" variant="ghost" size="sm">
-              Switch explorer
-            </Button>
-          </form>
         </div>
       </header>
 

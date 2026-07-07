@@ -12,6 +12,7 @@ import {
   type ExtractionSourceUnit,
   generateStudyItemBank,
   synthesizeResponses,
+  hashLearnerPin,
   runGraphEnrichment,
   runSyntheticGeneration,
   bottleneckReport,
@@ -562,6 +563,14 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
+  // The four learner-state tables now FK to `learners` (plan 2026-07-07-005, R1), so a
+  // synthetic demo learner needs a registry row before any verdict is written. Idempotent
+  // insert with a fixed placeholder PIN hash (KTD8) — demo learners are legitimate
+  // learner-state holders, not leaderboard rivals (KTD1).
+  await ctx.sql`
+    INSERT INTO learners (learner_ref, display_name, pin_hash)
+    VALUES (${learnerStateRef}, ${learnerStateRef}, ${hashLearnerPin(learnerStateRef, "0000")})
+    ON CONFLICT (learner_ref) DO NOTHING`;
   console.log(`\n>> synthesizing responses for learner ${learnerStateRef} toward ${targetDerivedNodeId}`);
   const result = await synthesizeResponses({
     learnerStateRef,

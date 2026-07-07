@@ -61,6 +61,10 @@ function isOperationType(value: string | undefined): value is OperationType {
   return value === "extraction" || value === "minting" || value === "enrichment" || value === "study_items";
 }
 
+function operationEnrichmentId(operationType: OperationType, operationId: string): string | null {
+  return operationType === "enrichment" || operationType === "study_items" ? operationId : null;
+}
+
 // The redacted reason a failed stage carries (ADR-0006 fail-closed, made inspectable): the
 // forced-tool exhaustion trail (per-attempt deviation kind, HTTP status, violated schema
 // PATHS, and a bounded redacted arguments snippet) or a bounded `other` message. Read-only —
@@ -136,6 +140,7 @@ function OperationCard({
 }>) {
   const { summary, stages } = operation;
   const stale = isStale(summary.status, summary.lastProgressAt);
+  const enrichmentId = operationEnrichmentId(summary.operationType, summary.operationId);
   return (
     <Card key={summary.operationRunId}>
       <CardHeader className="border-b">
@@ -171,6 +176,11 @@ function OperationCard({
               }}
             >
               <RouteIcon className="size-4" /> journey
+            </Link>
+          ) : null}
+          {enrichmentId ? (
+            <Link className="inline-flex items-center gap-1 text-sm underline underline-offset-4" href={`/admin/lab/enrichments/${enrichmentId}`}>
+              <RouteIcon className="size-4" /> View DAG
             </Link>
           ) : null}
         </CardAction>

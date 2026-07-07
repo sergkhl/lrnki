@@ -1,5 +1,5 @@
 import type { CalibrationVerdict, JudgedOutcome, ResponseLogRow } from "@lrnki/domain-core";
-import type { LearnerLoopReadPort } from "@lrnki/ports";
+import type { LearnerLoopReadPort, LearnerStorePort } from "@lrnki/ports";
 import { foldConceptMastery } from "./responseLogLearnerState";
 
 // Pure learner-loop projection folds (ADR-0027 projection compute, KTD7). These turn a
@@ -91,6 +91,24 @@ export type LearnerStateSummary = {
   conflictCount: number;
 };
 
+export type LearnerAdminSummary = LearnerStateSummary & {
+  learnerRef: string;
+  displayName: string;
+  createdAt: string;
+};
+
+export type LearnerAdminStats = {
+  registeredLearnerCount: number;
+  activeLearnerCount: number;
+  gradedResponseCount: number;
+  conflictCount: number;
+};
+
+export type LearnerAdminRegistry = {
+  learners: LearnerAdminSummary[];
+  stats: LearnerAdminStats;
+};
+
 export type TimestampedResponseLogRow = ResponseLogRow & { createdAt: string };
 
 export function summarizeLearnerStates(rows: TimestampedResponseLogRow[], verdicts: CalibrationVerdict[]): LearnerStateSummary[] {
@@ -128,6 +146,7 @@ export type LearnerResponseView = {
   responseId: string;
   attemptSeq: number;
   derivedNodeId: string;
+  enrichmentId: string;
   nodeLabel: string;
   studyItemId: string;
   question: string;
@@ -157,6 +176,47 @@ export async function listLearnerStates(loopRead: LearnerLoopReadPort): Promise<
   return summarizeLearnerStates(rows, verdicts);
 }
 
+export async function listLearnerAdminSummaries(deps: {
+  learnerStore: LearnerStorePort;
+  loopRead: LearnerLoopReadPort;
+}): Promise<LearnerAdminRegistry> {
+  const [registeredLearners, activitySummaries] = await Promise.all([deps.learnerStore.list(), listLearnerStates(deps.loopRead)]);
+  const activityByLearnerRef = new Map(activitySummaries.map((summary) => [summary.learnerStateRef, summary] as const));
+
+  const learners = registeredLearners
+    .map((learner) => {
+      const activity = activityByLearnerRef.get(learner.learnerRef);
+      return {
+        learnerRef: learner.learnerRef,
+        learnerStateRef: learner.learnerRef,
+        displayName: learner.displayName,
+        createdAt: learner.createdAt,
+        latestResponseAt: activity?.latestResponseAt ?? null,
+        responseCount: activity?.responseCount ?? 0,
+        knownVerdictCount: activity?.knownVerdictCount ?? 0,
+        gradedCount: activity?.gradedCount ?? 0,
+        conflictCount: activity?.conflictCount ?? 0
+      };
+    })
+    .sort(
+      (a, b) =>
+        (b.latestResponseAt ?? "").localeCompare(a.latestResponseAt ?? "") ||
+        b.createdAt.localeCompare(a.createdAt) ||
+        a.displayName.localeCompare(b.displayName) ||
+        a.learnerRef.localeCompare(b.learnerRef)
+    );
+
+  return {
+    learners,
+    stats: {
+      registeredLearnerCount: learners.length,
+      activeLearnerCount: learners.filter((learner) => learner.responseCount > 0 || learner.knownVerdictCount > 0).length,
+      gradedResponseCount: learners.reduce((total, learner) => total + learner.gradedCount, 0),
+      conflictCount: learners.reduce((total, learner) => total + learner.conflictCount, 0)
+    }
+  };
+}
+
 // One learner's loop detail (ADR-0027 projection): load the joined history and verdicts
 // through the read port, then add the conflict/mastery/summary folds. No write port is
 // imported, so it structurally cannot mutate learner state (R10).
@@ -172,6 +232,7 @@ export async function getLearnerLoopDetail(loopRead: LearnerLoopReadPort, learne
       responseId: row.responseId,
       attemptSeq: row.attemptSeq,
       derivedNodeId: row.derivedNodeId,
+      enrichmentId: row.enrichmentId,
       nodeLabel: row.nodeLabel,
       studyItemId: row.studyItemId,
       question: row.question,

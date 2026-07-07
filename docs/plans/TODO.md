@@ -2,9 +2,28 @@
 
 ## TODO
 
-No active implementation plan.
+- Execute the
+  [leaderboard dialog + cohort-of-10, single login/register gate, and enriched-DAG links plan](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md)
+  — ready, not started.
 
 ## COMPLETED
+
+- **Learner registry, weekly leaderboard, and Crystal Duel shipped.** Free-text learner identity is
+  replaced by a `learners` registry with uniqueness-at-creation and a PIN-gated pick-or-create gate;
+  the four learner-state tables gained real FKs to it (`/learn/session` is the sole PIN-aware route,
+  the swap point for real auth, KTD8). A global weekly leaderboard (ISO week, cohort of 10) reads the
+  difficulty-banded weekly score off the SAME Study Session projection every surface reads — no
+  parallel mastery SQL (KTD2) — and fills the board with deterministic seeded `@faker-js/faker`
+  rivals rubber-banded around the viewer (KTD1), with a chase banner, seam-triggered splash
+  (localStorage nav memory, KTD5), and a scheduler-free idempotent `weekly_podium` recomputed from
+  timestamps (KTD6). The Crystal Duel is a five-question retrieval sprint over already-mastered
+  crystals orchestrated by a pure exhaustive `duelMachine` transition function (XState rejected,
+  KTD4); grading reuses the keyed-selection logic behind a grade-only path that persists nothing, so
+  a duel can never touch mastery state (KTD3, proven: `response_log` byte-identical across a duel).
+  Losing costs nothing; winning earns a durable `duel_win` crest (`learner_awards`). Rule-14 real-use
+  gate PASS against a really-seeded Rust-ownership graph (21 nodes, 50 study items): AE1–AE5 all
+  asserted via the real use-cases, plus UI screenshots. Evidence:
+  `tmp/2026-07-07-leaderboard-duel/`.
 
 - **Expedition generation latency and operation-run liveness fixed.** Study-item generation now
   defaults to bounded per-node concurrency 4, cutting the measured Bayesian-inference
@@ -177,6 +196,23 @@ No active implementation plan.
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner registry, weekly leaderboard, and Crystal Duel, 2026-07-07.** Deterministic envelope:
+  workspace `typecheck` exit 0; `lint` exit 0 (6 pre-existing warnings); all tests pass with `.env`
+  loaded — `@lrnki/application` 510, `@lrnki/infrastructure-postgres` 71, `apps/admin-lab` 137, plus
+  the rest of the workspace. New unit coverage: PIN/registry use-cases, ISO-week + banded-score
+  arithmetic and week-boundary edges, exhaustive `duelMachine` state×event sweep (AE6), seeded-rival
+  determinism, seam classifier, and grade-only duel grading; new integration coverage for the two
+  Postgres registry stores and the R1 FK. **Real-use gate (rule 14): PASS.** Seeded a real graph from
+  the Rust-ownership fixture through the production worker pipeline (extraction → build → enrich → 21
+  derived nodes / 26 edges → 50 study items) and drove AE1–AE5 through the real application use-cases
+  and Postgres stores: registration + name-taken + PIN switch + disjoint state (AE1); mastering a
+  band-2 crystal moved the weekly score 0→2 exactly (AE2); duel locked at 1/6, unlocked after
+  mastering 6 crystals with ≥10 pooled items (AE3); a full duel left `response_log` byte-identical
+  (15→15) and recorded one idempotent `duel_win` (AE4); the week rollover recorded an idempotent
+  `weekly_podium` and reset the new week to 0 (AE5). UI screenshots confirm the pick-or-create gate,
+  the 10-row board with the viewer highlighted, award crests, the chase banner, the unlock splash, and
+  the live duel arena. Evidence: `tmp/2026-07-07-leaderboard-duel/`.
 
 - **Expedition latency and operation-run liveness, 2026-07-07.** Deterministic envelope:
   `@lrnki/application` tests pass (497), `@lrnki/infrastructure-postgres` tests pass with `.env`

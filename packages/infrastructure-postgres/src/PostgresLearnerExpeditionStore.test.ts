@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
+import { seedLearner } from "./testSupport";
 
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
@@ -11,8 +12,8 @@ maybe("learner expeditions round-trip and stay scoped per learner", async () => 
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
-    const learnerOne = randomUUID();
-    const learnerTwo = randomUUID();
+    const learnerOne = await seedLearner(sql, randomUUID());
+    const learnerTwo = await seedLearner(sql, randomUUID());
     await store.upsert({
       learnerExpeditionId: randomUUID(),
       learnerStateRef: learnerOne,
@@ -43,7 +44,7 @@ maybe("setActive leaves one active expedition per learner", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const first = randomUUID();
     const second = randomUUID();
     await store.upsert({
@@ -95,7 +96,7 @@ maybe("claimNextGenerating claims fresh rows and increments attempts", async () 
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
     await removePriorClaimFixtures(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const learnerExpeditionId = randomUUID();
     await store.upsert({
       learnerExpeditionId,
@@ -132,7 +133,7 @@ maybe("claimNextGenerating relaunches stale operation heartbeats and failExhaust
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
     await removePriorClaimFixtures(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const learnerExpeditionId = randomUUID();
     const operationId = randomUUID();
     await store.upsert({
@@ -180,7 +181,7 @@ maybe("resetGeneration restores a manual retry budget", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const activeExpeditionId = randomUUID();
     const learnerExpeditionId = randomUUID();
     await store.upsert({
@@ -225,7 +226,7 @@ maybe("resetGeneration leaves active expedition unchanged when the retry target 
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const activeExpeditionId = randomUUID();
     await store.upsert({
       learnerExpeditionId: activeExpeditionId,
@@ -254,7 +255,7 @@ maybe("a crash-window row (operation id set, no operation_runs row) is reclaimab
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
     await removePriorClaimFixtures(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const learnerExpeditionId = randomUUID();
     await store.upsert({
       learnerExpeditionId,
@@ -298,7 +299,7 @@ maybe("updateProgress is fenced: a write expecting a lost operation id affects 0
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const learnerExpeditionId = randomUUID();
     await store.upsert({
       learnerExpeditionId,
@@ -339,7 +340,7 @@ maybe("resetGeneration leaves non-failed expeditions untouched (only failed rows
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     const learnerExpeditionId = randomUUID();
     await store.upsert({
       learnerExpeditionId,

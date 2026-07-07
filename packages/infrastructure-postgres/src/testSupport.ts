@@ -9,6 +9,18 @@ import type { Sql } from "postgres";
 // The FK operation_run_stages.operation_run_id → operation_runs is NO ACTION (no
 // cascade), so child stage rows are deleted before their parents. Scoping by
 // operation_id also cleans the shared-id case where two parents share one id.
+// The four learner-state tables FK to `learners` (plan 2026-07-07-005, R1), so an
+// integration test that writes verdicts / responses / lesson-reads / expeditions must
+// first register the learner. Idempotent placeholder insert — the PIN is irrelevant to
+// state-table tests.
+export async function seedLearner(sql: Sql, learnerRef: string): Promise<string> {
+  await sql`
+    INSERT INTO learners (learner_ref, display_name, pin_hash)
+    VALUES (${learnerRef}, ${learnerRef}, 'test-pin-hash')
+    ON CONFLICT (learner_ref) DO NOTHING`;
+  return learnerRef;
+}
+
 export async function purgeOperationRun(sql: Sql, operationId: string): Promise<void> {
   await sql`
     DELETE FROM operation_run_stages s

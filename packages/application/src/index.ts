@@ -13,6 +13,37 @@ export { generateStudyItemBank } from "./generateStudyItemBank";
 export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
 export { generateTopicExpedition } from "./generateTopicExpedition";
 export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
+export {
+  registerLearner,
+  enterLearnerSession,
+  hashLearnerPin,
+  type RegisterLearnerResult,
+  type EnterLearnerSessionResult
+} from "./learnerRegistry";
+export {
+  isoWeekKey,
+  isoWeekRange,
+  previousIsoWeekKey,
+  difficultyBand,
+  computeWeeklyPoints,
+  nodeCompletionTimeMs,
+  badgesFromAwards,
+  type MasteredNodeContribution,
+  type WeeklyLeaderboardRow,
+  type LearnerBadges
+} from "./weeklyLeaderboard";
+export { getLearnerLifetimeMasteredCrystalCount, getWeeklyLeaderboard } from "./getWeeklyLeaderboard";
+export {
+  getDuelSetup,
+  gradeDuelAnswer,
+  DUEL_REQUIRED_CRYSTALS,
+  DUEL_REQUIRED_ITEMS,
+  DUEL_QUESTION_COUNT,
+  type DuelSetup,
+  type DuelPoolItem,
+  type DuelAnswerSubmission,
+  type GradeDuelAnswerResult
+} from "./crystalDuel";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";
@@ -46,8 +77,12 @@ export {
 } from "./gradeStudyResponse";
 export {
   listLearnerStates,
+  listLearnerAdminSummaries,
   getLearnerLoopDetail,
   type ConceptConflict,
+  type LearnerAdminRegistry,
+  type LearnerAdminStats,
+  type LearnerAdminSummary,
   type LearnerLoopDetail,
   type LearnerResponseView,
   type LearnerStateSummary,

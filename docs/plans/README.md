@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-No active implementation plans.
+- [2026-07-07-006 — leaderboard dialog + cohort-of-10, single login/register gate, enriched-DAG links](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md) — ready
 
 ## Ownership rules
 

@@ -23,7 +23,6 @@ import {
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 import { wakeTopicGenerationSupervisor } from "@/lib/topicGenerationSupervisor";
-import { clearLearnerRefCookie } from "@/lib/learnerSession";
 
 export type LearnerGradingResult =
   | { kind: "selection"; graded: true; chosenId: string; keyedCorrectId: string; correct: boolean }
@@ -234,12 +233,6 @@ export async function refreshLearnerExpedition(input: {
 }): Promise<void> {
   if (!input.learnerStateRef || !input.enrichmentId) return;
   revalidatePath(expeditionPath(input.enrichmentId));
-}
-
-export async function switchLearner(): Promise<void> {
-  await clearLearnerRefCookie();
-  revalidatePath(learnerPath());
-  redirect("/learn" as Route);
 }
 
 export async function startTopicExpedition(formData: FormData): Promise<void> {

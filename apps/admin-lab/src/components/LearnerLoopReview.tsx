@@ -1,4 +1,5 @@
 import { AlertTriangleIcon } from "lucide-react";
+import Link from "next/link";
 import type { ConceptConflict, LearnerLoopDetail, ResponseSourceSummary } from "@/lib/learnerLoop";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -78,7 +79,12 @@ export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDeta
               <CardDescription>{response.question}</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 pt-4">
-              <div className="text-sm text-muted-foreground">Auto-graded option-select response.</div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm text-muted-foreground">Auto-graded option-select response.</div>
+                <Link className="text-sm underline underline-offset-4" href={`/admin/lab/enrichments/${response.enrichmentId}`}>
+                  View DAG
+                </Link>
+              </div>
             </CardContent>
           </Card>
         );

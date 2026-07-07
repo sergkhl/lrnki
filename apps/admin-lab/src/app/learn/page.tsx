@@ -3,12 +3,22 @@ import {
   PostgresEnrichmentInspectionRead,
   PostgresLessonReadStore,
   PostgresLearnerExpeditionStore,
+  PostgresLearnerStore,
   PostgresResponseLogStore,
   PostgresStudyItemBankStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
+import Link from "next/link";
+import { LogOutIcon, SwordsIcon } from "lucide-react";
 import { ExpeditionEntry } from "@/components/learn/ExpeditionEntry";
-import { LearnerNameGate } from "@/components/learn/LearnerNameGate";
+import { DuelUnlockSplash } from "@/components/learn/DuelUnlockSplash";
+import { LearnerNameGate, type GateError } from "@/components/learn/LearnerNameGate";
+import { LeaderboardDialogTrigger } from "@/components/learn/LeaderboardDialog";
+import { LeaderboardSplash } from "@/components/learn/LeaderboardSplash";
+import { learnerTerm } from "@/components/learn/vocabulary";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { loadDuelSetup } from "@/lib/duel";
+import { loadLeaderboard } from "@/lib/leaderboard";
 import { readLearnerRef } from "@/lib/learnerSession";
 
 async function loadEntry(learnerStateRef: string) {
@@ -30,16 +40,67 @@ async function loadEntry(learnerStateRef: string) {
   }
 }
 
-export default async function LearnLandingPage() {
-  const learnerStateRef = await readLearnerRef();
-  if (learnerStateRef) {
-    const entry = await loadEntry(learnerStateRef);
-    return <ExpeditionEntry learnerStateRef={learnerStateRef} entry={entry} />;
+// Whether the cookie-resumed ref is still a registered learner (a dev DB reset can orphan a
+// cookie). The full registry belongs to Admin Lab inspection, not the learner gate.
+async function cookieLearnerExists(cookieRef: string | undefined): Promise<boolean> {
+  if (!cookieRef || !process.env.DATABASE_URL) return false;
+  const sql = createDatabaseClient();
+  try {
+    return Boolean(await new PostgresLearnerStore(sql).get(cookieRef));
+  } finally {
+    await sql.end({ timeout: 5 });
   }
+}
+
+export default async function LearnLandingPage({ searchParams }: { searchParams: Promise<{ error?: string; ref?: string }> }) {
+  const learnerStateRef = await readLearnerRef();
+  const cookieValid = await cookieLearnerExists(learnerStateRef);
+
+  if (learnerStateRef && cookieValid) {
+    const [entry, board, duel] = await Promise.all([loadEntry(learnerStateRef), loadLeaderboard(learnerStateRef), loadDuelSetup(learnerStateRef)]);
+    return (
+      <>
+        {board ? (
+          <LeaderboardSplash
+            learnerRef={learnerStateRef}
+            weekKey={board.weekKey}
+            entries={board.entries}
+            chase={board.chase}
+            viewerRank={board.viewerRank}
+            viewerPoints={board.viewerPoints}
+            masteredCrystalCount={board.masteredCrystalCount}
+            podiumEarnedForPreviousWeek={board.podiumEarnedForPreviousWeek}
+          />
+        ) : null}
+        <DuelUnlockSplash learnerRef={learnerStateRef} unlocked={Boolean(duel?.unlocked)} />
+        <div className="flex justify-end gap-2 pb-2">
+          <Link href="/learn/duel" className={buttonVariants({ size: "sm", variant: "ghost" })}>
+            <SwordsIcon data-icon="inline-start" />
+            {learnerTerm("duelEntry")}
+          </Link>
+          {board ? <LeaderboardDialogTrigger view={board} /> : null}
+          <form action="/learn/session" method="post">
+            <input type="hidden" name="intent" value="logout" />
+            <Button type="submit" size="sm" variant="ghost" aria-label={learnerTerm("logoutAction")}>
+              <LogOutIcon data-icon="inline-start" />
+              {learnerTerm("logoutAction")}
+            </Button>
+          </form>
+        </div>
+        <ExpeditionEntry learnerStateRef={learnerStateRef} entry={entry} />
+      </>
+    );
+  }
+
+  const { error: errorParam, ref } = await searchParams;
+  const error: GateError | undefined =
+    errorParam === "name_taken" || errorParam === "wrong_pin" || errorParam === "invalid_pin" || errorParam === "invalid_name"
+      ? errorParam
+      : undefined;
 
   return (
     <section className="flex min-h-[calc(100svh-2rem)] items-center justify-center">
-      <LearnerNameGate />
+      <LearnerNameGate error={error} defaultName={ref} />
     </section>
   );
 }

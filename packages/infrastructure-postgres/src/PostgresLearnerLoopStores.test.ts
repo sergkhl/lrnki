@@ -5,6 +5,7 @@ import type { ConceptLesson, ImpostorItem, NewResponseLogRow, OptionSelectItem, 
 import { createDatabaseClient } from "./db";
 import { PostgresConceptLessonStore, PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
+import { seedLearner } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration
 // applied. Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
@@ -200,7 +201,7 @@ maybe("regenerating a study item bank after a learner response was logged agains
     await bankFor(sql, s, [prior]);
 
     const responseId = randomUUID();
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     await new PostgresResponseLogStore(sql).append([
       {
         responseId,
@@ -413,7 +414,7 @@ maybe("a graded row referencing a real study_item_id inserts; one referencing an
   try {
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
     const rows = await store.listForLearner(learner);
     assert.equal(rows.length, 1);
@@ -433,7 +434,7 @@ maybe("graded rows preserve attempt_seq order and grader_identity 'auto'", async
   try {
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.append([
       gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 }),
       gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "incorrect", score: 0 })
@@ -457,7 +458,7 @@ maybe("concurrent same-learner appends each get a distinct, gapless attempt_seq 
   try {
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     const fanOut = 16;
     await Promise.all(
       Array.from({ length: fanOut }, () =>
@@ -480,7 +481,7 @@ maybe("upsert writes a verdict that reads back; a second upsert OVERWRITES it (o
   try {
     const { derivedNodeId } = await seedItem(sql);
     const store = new PostgresCalibrationVerdictStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
     let verdicts = await store.listForLearner(learner);
     assert.equal(verdicts.length, 1);
@@ -501,8 +502,8 @@ maybe("delete removes one node's verdict (R7 reversal); clearLearner removes onl
   try {
     const { derivedNodeId } = await seedItem(sql);
     const store = new PostgresCalibrationVerdictStore(sql);
-    const learnerA = `learner-${randomUUID()}`;
-    const learnerB = `learner-${randomUUID()}`;
+    const learnerA = await seedLearner(sql, `learner-${randomUUID()}`);
+    const learnerB = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.upsert({ learnerStateRef: learnerA, derivedNodeId, verdict: "known" });
     await store.upsert({ learnerStateRef: learnerB, derivedNodeId, verdict: "known" });
 
@@ -521,7 +522,7 @@ maybe("the verdict CHECK rejects a value outside known/learn", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const { derivedNodeId } = await seedItem(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await assert.rejects(
       () => sql`
         INSERT INTO calibration_verdicts (learner_state_ref, derived_node_id, verdict)
@@ -539,7 +540,7 @@ maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const verdicts = new PostgresCalibrationVerdictStore(sql);
     const log = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await verdicts.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
     await log.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
 
