@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
@@ -17,7 +17,9 @@ import {
   bottleneckReport,
   rankBottleneckTargets,
   type BottleneckReport,
-  type RankedTarget
+  type RankedTarget,
+  calibrateKnowledgeBoundaryProbe,
+  parseKnowledgeBoundaryLadder
 } from "@lrnki/application";
 import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
 import { parseGenerateStudyItemsArgs } from "./workerArgs";
@@ -48,6 +50,7 @@ import {
   LiteLlmGroundingGenerationAdapter,
   LiteLlmConceptSetSynthesisAdapter,
   LiteLlmKnowledgeBoundaryProbeAdapter,
+  KNOWLEDGE_BOUNDARY_PROBE_MODEL,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
@@ -250,6 +253,12 @@ function buildContext() {
 
 type Context = ReturnType<typeof buildContext>;
 type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
+
+const DEFAULT_BOUNDARY_PROBE_CALIBRATION_DIR = "tmp/2026-07-07-boundary-probe-calibration";
+const DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS = [
+  KNOWLEDGE_BOUNDARY_PROBE_MODEL,
+  "openrouter/qwen/qwen3-30b-a3b-instruct-2507"
+];
 
 async function registerFromManifest(ctx: Context, manifestPath: string) {
   const manifest = JSON.parse(await readFile(path.resolve(REPO_ROOT, manifestPath), "utf8")) as Manifest;
@@ -467,6 +476,56 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
   }
 }
 
+async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | undefined, flags: string[]) {
+  if (!ladderFile) {
+    console.error("! calibrate-boundary-probe requires <ladder-file>.");
+    process.exitCode = 1;
+    return;
+  }
+  const args = parseCalibrationFlags(flags);
+  const ladderPath = path.resolve(REPO_ROOT, ladderFile);
+  const ladder = parseKnowledgeBoundaryLadder(await readFile(ladderPath, "utf8"));
+  const baseClient = {
+    baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
+    apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
+    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
+  };
+  const passes = args.temperatures.flatMap((temperature) =>
+    args.deployments.map((deployment) => ({
+      deployment,
+      temperature,
+      probe: new LiteLlmKnowledgeBoundaryProbeAdapter(
+        new LiteLlmForcedToolClient({ ...baseClient, temperature }),
+        deployment
+      )
+    }))
+  );
+  console.log(`\n>> boundary-probe calibration concepts=${ladder.length} deployments=${args.deployments.length} temperatures=${args.temperatures.join(",")}`);
+  const report = await calibrateKnowledgeBoundaryProbe({
+    ladder,
+    passes,
+    embedding: ctx.nodeEmbedding,
+    sampleCount: args.sampleCount,
+    drawConcurrency: args.drawConcurrency,
+    kValues: args.kValues,
+    thresholds: args.thresholds
+  });
+  const outDir = path.resolve(REPO_ROOT, args.outDir);
+  await mkdir(outDir, { recursive: true });
+  const reportPath = path.join(outDir, "report.json");
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  console.log(`   wrote ${path.relative(REPO_ROOT, reportPath)}`);
+  for (const summary of report.tierSummaries) {
+    if (summary.k !== Math.max(...report.kValues)) continue;
+    const boundaryCounts = Object.entries(summary.boundaryCountsByThreshold)
+      .map(([threshold, count]) => `${threshold}:${count}`)
+      .join(" ");
+    console.log(
+      `   ${summary.deployment} temp=${summary.temperature} tier=${summary.tier} k=${summary.k} n=${summary.count} min=${summary.min.toFixed(4)} median=${summary.median.toFixed(4)} max=${summary.max.toFixed(4)} boundary@threshold=${boundaryCounts}`
+    );
+  }
+}
+
 async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, targetDerivedNodeId?: string, learnerStateRef?: string) {
   if (!enrichmentId || !targetDerivedNodeId || !learnerStateRef) {
     console.error("! synthesize-responses requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
@@ -669,6 +728,9 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "generate-synthetic-layer":
       await generateSyntheticLayer(ctx, arg, rest[0]);
       break;
+    case "calibrate-boundary-probe":
+      await calibrateBoundaryProbeCommand(ctx, arg, rest);
+      break;
     case "generate-study-items":
       await generateStudyItemsCommand(ctx, arg, rest);
       break;
@@ -685,8 +747,69 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
+}
+
+function parseCalibrationFlags(flags: string[]) {
+  const args = {
+    outDir: DEFAULT_BOUNDARY_PROBE_CALIBRATION_DIR,
+    deployments: DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS,
+    temperatures: [0.7, 1],
+    kValues: [3, 5, 10],
+    thresholds: undefined as number[] | undefined,
+    sampleCount: 10,
+    drawConcurrency: 5
+  };
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i];
+    const next = () => {
+      const value = flags[++i];
+      if (!value) throw new Error(`${flag} requires a value.`);
+      return value;
+    };
+    switch (flag) {
+      case "--out":
+        args.outDir = next();
+        break;
+      case "--deployments":
+        args.deployments = parseCsv(next());
+        break;
+      case "--temperatures":
+        args.temperatures = parseNumberCsv(next(), "--temperatures");
+        break;
+      case "--k":
+        args.kValues = parseNumberCsv(next(), "--k").map((value) => Math.trunc(value));
+        break;
+      case "--thresholds":
+        args.thresholds = parseNumberCsv(next(), "--thresholds");
+        break;
+      case "--sample-count":
+        args.sampleCount = Math.trunc(Number(next()));
+        break;
+      case "--draw-concurrency":
+        args.drawConcurrency = Math.trunc(Number(next()));
+        break;
+      default:
+        throw new Error(`unknown calibrate-boundary-probe flag: ${flag}`);
+    }
+  }
+  if (args.deployments.length === 0) throw new Error("--deployments must name at least one deployment.");
+  if (args.temperatures.length === 0) throw new Error("--temperatures must name at least one temperature.");
+  if (args.kValues.length === 0) throw new Error("--k must name at least one K value.");
+  return args;
+}
+
+function parseCsv(value: string): string[] {
+  return value.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function parseNumberCsv(value: string, flag: string): number[] {
+  return parseCsv(value).map((part) => {
+    const number = Number(part);
+    if (!Number.isFinite(number)) throw new Error(`${flag} contains a non-numeric value: ${part}`);
+    return number;
+  });
 }
 
 async function main() {

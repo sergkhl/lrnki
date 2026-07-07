@@ -2,6 +2,13 @@ export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtrac
 export { buildGraphVersion } from "./buildGraphVersion";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichment";
 export { runSyntheticGeneration } from "./runSyntheticGeneration";
+export {
+  calibrateKnowledgeBoundaryProbe,
+  parseKnowledgeBoundaryLadder,
+  scoreKnowledgeBoundaryVectors,
+  type KnowledgeBoundaryCalibrationReport,
+  type KnowledgeBoundaryLadderConcept
+} from "./calibrateKnowledgeBoundaryProbe";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
 export { generateTopicExpedition } from "./generateTopicExpedition";
