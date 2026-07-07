@@ -7,8 +7,8 @@ Status: Accepted
 The **Learner App** keeps the learner in a **Flow Channel**: clear goals,
 not-too-easy and not-too-hard challenges, and nested tension/release pulses that make progress hard
 to ignore once a challenge is visible. The app's visible goals, rewards, feedback, and challenge
-selection must align with mastery progress toward a chosen target; the learner should not be able to
-win a game layer while bypassing the concept understanding the layer exists to build.
+selection must align with mastery progress through the current expedition trail; the learner should
+not be able to win a game layer while bypassing the concept understanding the layer exists to build.
 
 The Learner App orchestrator owns flow. Learner-neutral assets - the Derived Graph Layer, Concept
 Lesson, and Study Item Bank - expose concepts, grounding, item types, difficulty signals, and graded
