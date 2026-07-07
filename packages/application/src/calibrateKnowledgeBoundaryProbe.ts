@@ -82,6 +82,7 @@ export async function calibrateKnowledgeBoundaryProbe(input: {
   passes: KnowledgeBoundaryCalibrationPass[];
   embedding: NodeEmbeddingPort;
   sampleCount?: number;
+  conceptConcurrency?: number;
   drawConcurrency?: number;
   kValues?: number[];
   thresholds?: number[];
@@ -94,24 +95,23 @@ export async function calibrateKnowledgeBoundaryProbe(input: {
     throw new Error("knowledge-boundary calibration requires at least one probe deployment pass.");
   }
   const sampleCount = positiveInteger(input.sampleCount ?? 10, "sampleCount");
+  const conceptConcurrency = positiveInteger(input.conceptConcurrency ?? 1, "conceptConcurrency");
   const drawConcurrency = positiveInteger(input.drawConcurrency ?? 5, "drawConcurrency");
   const kValues = normalizeKValues(input.kValues ?? [3, 5, 10], sampleCount);
   const thresholds = normalizeThresholds(input.thresholds ?? thresholdSweep());
 
-  const concepts: KnowledgeBoundaryCalibrationConceptReport[] = [];
-  for (const pass of input.passes) {
-    for (const concept of input.ladder) {
-      concepts.push(await calibrateConcept({
-        concept,
-        pass,
-        embedding: input.embedding,
-        sampleCount,
-        drawConcurrency,
-        kValues,
-        thresholds
-      }));
-    }
-  }
+  const jobs = input.passes.flatMap((pass) => input.ladder.map((concept) => ({ pass, concept })));
+  const concepts = await mapWithConcurrency(jobs, conceptConcurrency, ({ pass, concept }) =>
+    calibrateConcept({
+      concept,
+      pass,
+      embedding: input.embedding,
+      sampleCount,
+      drawConcurrency,
+      kValues,
+      thresholds
+    })
+  );
 
   return {
     generatedAt: (input.now ?? new Date()).toISOString(),

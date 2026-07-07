@@ -507,6 +507,7 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
     embedding: ctx.nodeEmbedding,
     sampleCount: args.sampleCount,
     drawConcurrency: args.drawConcurrency,
+    conceptConcurrency: args.conceptConcurrency,
     kValues: args.kValues,
     thresholds: args.thresholds
   });
@@ -747,7 +748,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 
@@ -759,7 +760,8 @@ function parseCalibrationFlags(flags: string[]) {
     kValues: [3, 5, 10],
     thresholds: undefined as number[] | undefined,
     sampleCount: 10,
-    drawConcurrency: 5
+    drawConcurrency: 5,
+    conceptConcurrency: 1
   };
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
@@ -789,6 +791,9 @@ function parseCalibrationFlags(flags: string[]) {
         break;
       case "--draw-concurrency":
         args.drawConcurrency = Math.trunc(Number(next()));
+        break;
+      case "--concept-concurrency":
+        args.conceptConcurrency = Math.trunc(Number(next()));
         break;
       default:
         throw new Error(`unknown calibrate-boundary-probe flag: ${flag}`);
