@@ -238,8 +238,10 @@ model_list:
   # Candidate prerequisite judge / independent eval model.
   # Qwen3-235B-A22B-Instruct-2507 is a multilingual MoE model with 22B active
   # parameters, 262K context, strong instruction following / logical reasoning /
-  # tool-use positioning, and no thinking-mode blocks. Consider as a non-OpenAI,
-  # non-DeepSeek backing-model candidate for kg-prerequisite-ordering (U7 sweep).
+  # tool-use positioning, and no thinking-mode blocks. Measured 2026-07-07 as a
+  # kg-prerequisite-ordering candidate: forced-tool OK and faster, but failed
+  # quality parity on two layers (kept-edge recovery 33% and 0%), so it remains
+  # registered for experiments only.
   # OpenRouter list price: $0.09 input / $0.10 output per 1M tokens.
   - model_name: "openrouter/qwen/qwen3-235b-a22b-2507"
     litellm_params:
@@ -390,9 +392,9 @@ router_settings:
     # deepseek-flash-no-thinking is forced-tool-ok + fast (10s) BUT INADEQUATE for the
     # holistic ordering task — it returned 0 edges for an 11-node Rust domain where
     # gpt-oss-120b produced a correct 11-edge DAG (same node set). Whole-set ordering
-    # needs a reasoning model; flash is disproven. OPEN: test deepseek-v4-pro (reasoning,
-    # forced-tool-ok @6.7s) as a faster reasoning-grade replacement for gpt-oss-120b's
-    # high latency before the TODO #2 stability/K-sampling work.
+    # needs a reasoning model; flash is disproven. Measured 2026-07-07:
+    # openrouter/qwen/qwen3-235b-a22b-2507 was forced-tool OK and faster but failed
+    # quality parity, so the incumbent stays.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is

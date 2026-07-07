@@ -2,15 +2,21 @@
 
 ## TODO
 
-1. **Expedition generation latency + operation-run liveness.** Ready plan:
-   [2026-07-07-003](./2026-07-07-003-fix-expedition-generation-latency-and-operation-run-liveness-plan.md)
-   (owns requirements and design; supersedes the former "use corrected bottleneck reports" item).
-   2026-07-07 measurement: learner waits ~8–9 min per expedition — study-items stages ~337s
-   (per-node concurrency still 1), prerequisite-ordering ~108s (tail latency of K=8 gpt-oss-120b
-   draws), plus unreaped phantom `running` operation rows on the Operations page.
-   Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+No active implementation plan.
 
 ## COMPLETED
+
+- **Expedition generation latency and operation-run liveness fixed.** Study-item generation now
+  defaults to bounded per-node concurrency 4, cutting the measured Bayesian-inference
+  `study_items` operation from 261.5s to 94.5s on the changed tree. Operation-run liveness uses one
+  application-owned two-minute stale predicate across the supervisor and UI, and the supervisor now
+  reaps orphaned `running` operation timeline rows before claiming more expedition work. The
+  approved dev cleanup removed failed/phantom operation history while preserving succeeded reports.
+  The Qwen3-235B ordering candidate was forced-tool OK and faster but failed quality parity, so
+  `kg-prerequisite-ordering` stays on `gpt-oss-120b` and the stale DeepSeek Pro candidate note is
+  deleted. Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) and
+  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md). Evidence:
+  `tmp/2026-07-07-expedition-latency/`.
 
 - **Learner grading moved behind an application use-case.** The seven raw-SQL learner-grading server
   actions in `apps/admin-lab/src/app/learn/actions.ts` are collapsed to thin mappers over one tested
@@ -171,6 +177,21 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Expedition latency and operation-run liveness, 2026-07-07.** Deterministic envelope:
+  `@lrnki/application` tests pass (497), `@lrnki/infrastructure-postgres` tests pass with `.env`
+  loaded (68), `apps/admin-lab` tests pass (122), workspace `typecheck` exit 0, and `lint` exit 0
+  with 6 pre-existing warnings. **Real-use gate (rule 14): PASS.** Fresh Bayesian-inference
+  expedition after the change (`enrichment 47f7e898-…`) completed with `study_items` at 94.5s vs
+  the baseline same-topic run's 261.5s (`enrichment 6fe87e5d-…`); sampled output contained 9 lessons
+  and 20 study items across option-select, matching, and impostor types, with no concurrency-induced
+  ordering/content corruption observed. The operation-run reaper marked a synthetic stale row failed
+  from the supervisor tick; invoking that tick also claimed old dev `generating` rows, and later
+  polling showed externally driven rows with fresh heartbeats, so those were treated as healthy
+  active work rather than phantom operation rows.
+  Qwen3-235B ordering experiment evidence shows forced-tool OK but failed parity (kept-edge recovery
+  33% and 0%), so the incumbent stayed. Evidence:
+  `tmp/2026-07-07-expedition-latency/`.
 
 - **Learner grading use-case, 2026-07-07.** Deterministic envelope: affected-package `typecheck`
   exit 0; `@lrnki/application`, `@lrnki/infrastructure-postgres`, and `apps/admin-lab` tests pass with

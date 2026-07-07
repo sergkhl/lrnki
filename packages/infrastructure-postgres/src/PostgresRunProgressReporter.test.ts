@@ -224,6 +224,43 @@ maybe("two operations sharing one operation_id (enrichment + study_items) never 
   }
 });
 
+maybe("failStaleOperations marks only stale running operation rows failed", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const staleOperationId = randomUUID();
+  const freshOperationId = randomUUID();
+  const completedOperationId = randomUUID();
+  try {
+    await sql`
+      INSERT INTO operation_runs (operation_run_id, operation_type, operation_id, status, started_at, last_progress_at, completed_at)
+      VALUES
+        (${randomUUID()}, 'enrichment', ${staleOperationId}, 'running', now() - interval '10 minutes', now() - interval '10 minutes', null),
+        (${randomUUID()}, 'enrichment', ${freshOperationId}, 'running', now(), now(), null),
+        (${randomUUID()}, 'enrichment', ${completedOperationId}, 'succeeded', now() - interval '10 minutes', now() - interval '10 minutes', now() - interval '9 minutes')`;
+
+    const reaped = await new PostgresRunProgressReporter(sql).failStaleOperations({
+      staleBefore: new Date(Date.now() - 120000)
+    });
+
+    assert.ok(reaped >= 1);
+    const rows = await sql<{ operation_id: string; status: string; completed_at: string | null }[]>`
+      SELECT operation_id::text, status, completed_at
+      FROM operation_runs
+      WHERE operation_id IN (${staleOperationId}, ${freshOperationId}, ${completedOperationId})
+      ORDER BY operation_id::text`;
+    const byId = new Map(rows.map((row) => [row.operation_id, row]));
+    assert.equal(byId.get(staleOperationId)?.status, "failed");
+    assert.ok(byId.get(staleOperationId)?.completed_at);
+    assert.equal(byId.get(freshOperationId)?.status, "running");
+    assert.equal(byId.get(freshOperationId)?.completed_at, null);
+    assert.equal(byId.get(completedOperationId)?.status, "succeeded");
+  } finally {
+    await purgeOperationRun(sql, staleOperationId);
+    await purgeOperationRun(sql, freshOperationId);
+    await purgeOperationRun(sql, completedOperationId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
 maybe("two stages in sequence produce two child rows with independently recoverable durations (R5 join shape)", async () => {
   const sql = createDatabaseClient(databaseUrl);
   const operationId = randomUUID();

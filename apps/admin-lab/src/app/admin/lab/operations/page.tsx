@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { ActivityIcon, DatabaseZapIcon, GaugeIcon, RouteIcon, XIcon } from "lucide-react";
-import type { BottleneckReport } from "@lrnki/application";
+import { isStaleOperation, type BottleneckReport } from "@lrnki/application";
 import type { OperationType, StageErrorDetail } from "@lrnki/ports";
 import { AdminShell } from "@/components/AdminShell";
 import { AutoRefresh } from "@/components/AutoRefresh";
@@ -35,10 +35,6 @@ import { BottleneckReportView } from "./_components/BottleneckReportView";
 // journey cost reports render inline on the matching card via search params (R2a).
 export const dynamic = "force-dynamic";
 
-// A `running` operation whose last heartbeat is older than this is suspect — the
-// "hung run" signal (KTD3 risk note), not healthy progress.
-const STALE_HEARTBEAT_MS = 2 * 60 * 1000;
-
 type OperationWithStages = NonNullable<Awaited<ReturnType<typeof listOperationsWithStages>>>[number];
 
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
@@ -58,8 +54,7 @@ function formatDuration(ms: number | null): string {
 }
 
 function isStale(status: string, lastProgressAt: string | null): boolean {
-  if (status !== "running" || !lastProgressAt) return false;
-  return Date.now() - new Date(lastProgressAt).getTime() > STALE_HEARTBEAT_MS;
+  return isStaleOperation(status, lastProgressAt);
 }
 
 function isOperationType(value: string | undefined): value is OperationType {

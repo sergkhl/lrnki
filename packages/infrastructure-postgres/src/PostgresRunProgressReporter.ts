@@ -102,4 +102,19 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
       SET status = ${input.status}, completed_at = now(), last_progress_at = now()
       WHERE operation_type = ${input.operationType} AND operation_id = ${input.operationId}`;
   }
+
+  // Reap orphaned `running` rows whose heartbeat aged past the shared stale window.
+  // This only marks the operation timeline; expedition retry/claim semantics remain
+  // owned by PostgresLearnerExpeditionStore.
+  async failStaleOperations(input: { staleBefore: Date }): Promise<number> {
+    const rows = await this.sql<{ operation_run_id: string }[]>`
+      UPDATE operation_runs
+      SET status = 'failed',
+          completed_at = now(),
+          last_progress_at = now()
+      WHERE status = 'running'
+        AND COALESCE(last_progress_at, started_at) < ${input.staleBefore}
+      RETURNING operation_run_id`;
+    return rows.length;
+  }
 }

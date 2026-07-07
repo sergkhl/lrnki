@@ -21,6 +21,11 @@ export { synthesizeResponses } from "./syntheticResponses";
 export { bottleneckReport, type BottleneckReport } from "./bottleneckReport";
 export { rankBottleneckTargets, type RankedTarget } from "./rankBottleneckTargets";
 export {
+  OPERATION_HEARTBEAT_STALE_AFTER_MS,
+  isStaleOperation,
+  operationStaleBefore
+} from "./operationRunLiveness";
+export {
   NON_LLM_STAGES,
   operationTimelineLlmSpendStageTags
 } from "./operationTimelineCatalog";
