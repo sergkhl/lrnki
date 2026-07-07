@@ -87,6 +87,7 @@ export async function calibrateKnowledgeBoundaryProbe(input: {
   kValues?: number[];
   thresholds?: number[];
   now?: Date;
+  onConceptReport?: (report: KnowledgeBoundaryCalibrationConceptReport) => void | Promise<void>;
 }): Promise<KnowledgeBoundaryCalibrationReport> {
   if (input.ladder.length === 0) {
     throw new Error("knowledge-boundary calibration requires at least one ladder concept.");
@@ -101,8 +102,8 @@ export async function calibrateKnowledgeBoundaryProbe(input: {
   const thresholds = normalizeThresholds(input.thresholds ?? thresholdSweep());
 
   const jobs = input.passes.flatMap((pass) => input.ladder.map((concept) => ({ pass, concept })));
-  const concepts = await mapWithConcurrency(jobs, conceptConcurrency, ({ pass, concept }) =>
-    calibrateConcept({
+  const concepts = await mapWithConcurrency(jobs, conceptConcurrency, async ({ pass, concept }) => {
+    const report = await calibrateConcept({
       concept,
       pass,
       embedding: input.embedding,
@@ -110,8 +111,10 @@ export async function calibrateKnowledgeBoundaryProbe(input: {
       drawConcurrency,
       kValues,
       thresholds
-    })
-  );
+    });
+    await input.onConceptReport?.(report);
+    return report;
+  });
 
   return {
     generatedAt: (input.now ?? new Date()).toISOString(),

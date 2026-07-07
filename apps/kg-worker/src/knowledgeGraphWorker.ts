@@ -501,6 +501,10 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
     }))
   );
   console.log(`\n>> boundary-probe calibration concepts=${ladder.length} deployments=${args.deployments.length} temperatures=${args.temperatures.join(",")}`);
+  const outDir = path.resolve(REPO_ROOT, args.outDir);
+  await mkdir(outDir, { recursive: true });
+  const fragmentsDir = path.join(outDir, "concepts");
+  await mkdir(fragmentsDir, { recursive: true });
   const report = await calibrateKnowledgeBoundaryProbe({
     ladder,
     passes,
@@ -509,10 +513,24 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
     drawConcurrency: args.drawConcurrency,
     conceptConcurrency: args.conceptConcurrency,
     kValues: args.kValues,
-    thresholds: args.thresholds
+    thresholds: args.thresholds,
+    onConceptReport: async (conceptReport) => {
+      const fragmentName = [
+        slugify(conceptReport.deployment),
+        `temp-${conceptReport.temperature}`,
+        slugify(conceptReport.tier),
+        slugify(conceptReport.declaredDomain),
+        slugify(conceptReport.conceptLabel)
+      ].join("__");
+      const fragmentPath = path.join(fragmentsDir, `${fragmentName}.json`);
+      await writeFile(fragmentPath, `${JSON.stringify(conceptReport, null, 2)}\n`, "utf8");
+      const kMax = Math.max(...conceptReport.scores.map((score) => score.k));
+      const score = conceptReport.scores.find((candidate) => candidate.k === kMax)?.agreementScore;
+      console.log(
+        `   done ${conceptReport.deployment} temp=${conceptReport.temperature} tier=${conceptReport.tier} concept="${conceptReport.conceptLabel}" k=${kMax} score=${score?.toFixed(4) ?? "n/a"}`
+      );
+    }
   });
-  const outDir = path.resolve(REPO_ROOT, args.outDir);
-  await mkdir(outDir, { recursive: true });
   const reportPath = path.join(outDir, "report.json");
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   console.log(`   wrote ${path.relative(REPO_ROOT, reportPath)}`);
@@ -815,6 +833,11 @@ function parseNumberCsv(value: string, flag: string): number[] {
     if (!Number.isFinite(number)) throw new Error(`${flag} contains a non-numeric value: ${part}`);
     return number;
   });
+}
+
+function slugify(value: string): string {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "value";
 }
 
 async function main() {
