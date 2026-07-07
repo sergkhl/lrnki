@@ -50,7 +50,6 @@ import {
   LiteLlmGroundingGenerationAdapter,
   LiteLlmConceptSetSynthesisAdapter,
   LiteLlmKnowledgeBoundaryProbeAdapter,
-  KNOWLEDGE_BOUNDARY_PROBE_MODEL,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
   LiteLlmMissingPrerequisiteProposalAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
@@ -256,7 +255,7 @@ type Manifest = { fixtures: { path: string; contentType: string; declaredDomain:
 
 const DEFAULT_BOUNDARY_PROBE_CALIBRATION_DIR = "tmp/2026-07-07-boundary-probe-calibration";
 const DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS = [
-  KNOWLEDGE_BOUNDARY_PROBE_MODEL,
+  "openrouter/meta-llama/llama-4-scout",
   "openrouter/qwen/qwen3-30b-a3b-instruct-2507"
 ];
 
