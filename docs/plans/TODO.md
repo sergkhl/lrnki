@@ -2,17 +2,7 @@
 
 ## TODO
 
-1. **Calibrate the knowledge-boundary probe so the `boundary`/`uncertain` route actually fires.** The
-   synthetic arm's real-use gate scored **0 `boundary` verdicts across 38 concepts** spanning
-   textbook (Photosynthesis, Quantum error correction) to frontier (Mechanistic interpretability): the
-   shipped default K / temperature / agreement threshold never routed a real concept to `boundary`, so
-   the boundary disposition is exercised by unit tests only. Measure-first: probe deliberately fringe or
-   contested concepts, inspect the K-draw semantic dispersion, and tune temperature/threshold (or
-   confirm the concepts are genuinely core knowledge) before any `web_grounded` retrieval plan or
-   source-less lesson gating depends on this seam. Decision:
-   [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
-
-2. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
+1. **Use corrected bottleneck reports for the next latency/cost improvement.** The corrected
    metering pass made Study Item Bank stage cost trustworthy and showed bounded per-node concurrency
    can reduce wall-clock without changing cost ownership. The next optimization pass should start
    from the latest ranked report, target the measured largest contributor, and record wall-clock,
@@ -23,6 +13,15 @@
    `tmp/2026-06-30-generation-metering/`.
 
 ## COMPLETED
+
+- **Knowledge-boundary probe calibration.** The probe now has a repeatable `kg-worker`
+  `calibrate-boundary-probe` command and measured defaults for synthetic generation: K=10, worker
+  temperature 0.7, and mean-pairwise embedding threshold 0.89. The measurement ladder covered
+  established-core, fringe-contested, and fabricated tiers across mixed domains on both probe
+  deployments. The production-path gate now routes a fabricated Mathematics concept to `boundary`
+  / trace-only uncertain while a textbook Photosynthesis control keeps every synthesized concept
+  `core_knowledge`. Decision:
+  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 
 - **Admin run visibility and Learner App UX polish.** Operations page groups running/stalled
   operations in an always-first Active section with `N running · M stalled · K failed` header chips
@@ -142,6 +141,20 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Knowledge-boundary probe calibration, 2026-07-07.** Deterministic envelope: `@lrnki/application`
+  tests pass (479 tests), `@lrnki/application` typecheck pass, `@lrnki/kg-worker` typecheck pass.
+  **Real-use gate (rule 14): PASS.** Calibration reports under
+  `tmp/2026-07-07-boundary-probe-calibration/` measured both probe deployments at temperatures 0.7
+  and 1.0 over a 30-concept ladder. The final production-path synthetic runs used
+  `Caldrin-Voss continuity theorem` / Mathematics
+  (`24b6e5c1-5b3b-4ef2-8907-d0b427ab08aa`) and `Photosynthesis` / Biology
+  (`ae19c226-3a30-470b-86e5-2a47dd5a51d9`): the fabricated theorem persisted as `boundary` with
+  `derivedNodeId: null`, and the Biology control persisted 14/14 concepts as `core_knowledge`.
+  Evidence: `tmp/2026-07-07-boundary-probe-calibration/evidence.md` and
+  `tmp/2026-07-07-boundary-probe-calibration/gate/evidence.md`. Caveat: embedding agreement still
+  misses consistent hallucinations; this calibration proves the boundary route fires without
+  starving the textbook control, not complete fabricated-concept detection.
 
 - **Admin run visibility and Learner App UX polish, 2026-07-06.** Deterministic envelope: workspace
   `typecheck` exit 0 (stale `.next/types` cleared for the deleted routes); recursive `test` exit 0

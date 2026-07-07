@@ -12,7 +12,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-_None active._
+- [Make the operation-timeline catalog provably complete](./2026-07-07-002-operation-timeline-catalog-completeness-plan.md)
+  — ready.
 
 ## Ownership rules
 

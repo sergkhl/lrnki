@@ -50,6 +50,14 @@ The probe prompt is domain-neutral and never tuned with expected concepts. Probe
 by real-source inspection ([ADR-0013](0013-verify-quality-by-real-source-inspection.md)), not
 deterministic proxies.
 
+The accepted calibration from the 2026-07-07 measurement pass is K=10, probe temperature 0.7, and
+mean-pairwise embedding agreement threshold 0.89. The calibration harness is the `kg-worker`
+`calibrate-boundary-probe` command, which runs the production probe adapter and embedding port over a
+labeled ladder and writes reports under `tmp/`. Measurement showed the embedding-agreement signal
+does not completely reject consistent hallucinations, but the final production-path gate routes the
+fabricated `Caldrin-Voss continuity theorem` to `boundary` while a textbook Photosynthesis control
+keeps all synthesized concepts `core_knowledge`.
+
 ## Context
 
 Synthesizing long-tail concepts from parametric knowledge invites confident hallucination — the
