@@ -12,8 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [Make the operation-timeline catalog provably complete](./2026-07-07-002-operation-timeline-catalog-completeness-plan.md)
-  — ready.
+- None. See [TODO](./TODO.md) for current work and
+  [the 2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md)
+  for the open candidate backlog.
 
 ## Ownership rules
 

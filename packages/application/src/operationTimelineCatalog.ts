@@ -38,8 +38,11 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
   ],
   enrichment: [
     llm(STAGE_TAGS.declaredDomainInference),
+    llm(STAGE_TAGS.conceptSetSynthesis),
+    llm(STAGE_TAGS.knowledgeBoundaryProbe),
     llm(STAGE_TAGS.prerequisiteOrdering),
     llm(STAGE_TAGS.rescueDurability),
+    llm(STAGE_TAGS.rescuedNodeLabeling),
     llm(STAGE_TAGS.rescueDefinitionQuality),
     llm(STAGE_TAGS.mintingDurability),
     llm(STAGE_TAGS.missingPrerequisiteProposal),
@@ -58,6 +61,7 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.studyItemGeneration),
     llm(STAGE_TAGS.matchingGeneration),
     llm(STAGE_TAGS.impostorGeneration),
+    llm(STAGE_TAGS.impostorLieValidityJudgment),
     nonLlm(NON_LLM_STAGES.persist)
   ]
 } as const;
@@ -78,22 +82,12 @@ export function operationTimelineStageKind(stage: string): OperationTimelineStag
   return "unknown";
 }
 
-export function isKnownOperationTimelineStage(stage: string): boolean {
-  return operationTimelineStageKind(stage) !== "unknown";
-}
-
 export function stageBelongsToOperation(stage: string, operationType: OperationType): boolean {
   return ownedStagesByOperation.get(operationType)?.has(stage) ?? false;
 }
 
 export function spendStageBelongsToOperation(stage: string, operationType: OperationType): boolean {
   return isLlmStage(stage) && stageBelongsToOperation(stage, operationType);
-}
-
-export function operationTimelineStagesForOperation(
-  operationType: OperationType
-): readonly OperationTimelineStageDescriptor[] {
-  return OPERATION_TIMELINE_CATALOG[operationType];
 }
 
 export function operationTimelineLlmSpendStageTags(): readonly StageTag[] {

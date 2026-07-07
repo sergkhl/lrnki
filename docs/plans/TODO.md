@@ -14,6 +14,22 @@
 
 ## COMPLETED
 
+- **Operation-timeline catalog made provably complete.** The four live-but-uncatalogued LLM stage
+  tags now belong to their owning operation — `concept-set-synthesis`, `knowledge-boundary-probe`,
+  and `rescued-node-labeling` under `enrichment`, `impostor-lie-validity-judgment` under
+  `study_items` — so `spendStageBelongsToOperation` returns `true` and `bottleneckReport` stops
+  nulling their cost. The two dead measurement-mode tags (`answer-grading`, `learner-simulation`)
+  are deleted end-to-end (`STAGE_TAGS` + learner `stageCopy`; rule 18). The catalog test no longer
+  restates the stage lists by hand: a set-equality + pairwise-disjointness assertion now fails the
+  build whenever the union of catalog LLM stages differs from `Object.values(STAGE_TAGS)` in either
+  direction or two operations claim one stage — installing the machine enforcement that ADR-0029's
+  same-change registration rule previously lacked. The two test-only catalog exports
+  (`operationTimelineStagesForOperation`, `isKnownOperationTimelineStage`) are removed. No interface,
+  schema, or `OperationType` change; synthetic generation keeps reporting as `enrichment` (user
+  decision, 2026-07-07). Accepted framing: Candidate 1 of the
+  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md).
+  Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
 - **Knowledge-boundary probe calibration.** The probe now has a repeatable `kg-worker`
   `calibrate-boundary-probe` command and measured defaults for synthetic generation: K=10, worker
   temperature 0.7, and mean-pairwise embedding threshold 0.89. The measurement ladder covered
@@ -141,6 +157,20 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Operation-timeline catalog completeness, 2026-07-07.** Deterministic envelope: workspace
+  `typecheck` exit 0 (all 10 projects); `@lrnki/application` tests pass (481). The rewritten catalog
+  test's drift assertion was mutation-checked by hand: orphaning a live tag fails the set-equality
+  property, and double-claiming a stage fails naming the offender ("LLM stage admission is claimed
+  by both extraction and enrichment"); mutations discarded after. **Real-use gate (rule 14): PASS.**
+  Driving the same `bottleneckReport` use-case the Operations page renders
+  (`getBottleneckReport` → `PostgresOperationTimelineRead` + `LiteLlmSpendLogsReadAdapter`, `.env`
+  loaded) over synthetic-generation operation `ae19c226-3a30-470b-86e5-2a47dd5a51d9` recovered 141
+  formerly-dropped calls / $0.01873 / 140,565 tokens — the report had been showing ~37% of that
+  operation's true LLM cost, with the entire K-sampled `knowledge-boundary-probe` (140 calls,
+  $0.0185) invisible. Study-items operation `be06d8e3-3cc1-48a6-b568-765680ee629c` recovered
+  `impostor-lie-validity-judgment` (13 calls, $0.00296). Evidence:
+  `tmp/2026-07-07-catalog-completeness-gate/evidence.md`.
 
 - **Knowledge-boundary probe calibration, 2026-07-07.** Deterministic envelope: `@lrnki/application`
   tests pass (479 tests), `@lrnki/application` typecheck pass, `@lrnki/kg-worker` typecheck pass.

@@ -1732,9 +1732,7 @@ export const STAGE_TAGS = {
   // new operation type — but carries its own spend tag so its cost ⋈ wall-clock join stays
   // separable from option-select and lesson generation (R7, ADR-0029).
   impostorGeneration: "impostor-generation",
-  impostorLieValidityJudgment: "impostor-lie-validity-judgment",
-  answerGrading: "answer-grading",
-  learnerSimulation: "learner-simulation"
+  impostorLieValidityJudgment: "impostor-lie-validity-judgment"
 } as const;
 
 export type StageTag = (typeof STAGE_TAGS)[keyof typeof STAGE_TAGS];
