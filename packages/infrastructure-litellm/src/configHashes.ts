@@ -12,9 +12,7 @@ import { conceptLessonGenerationDescriptor } from "./conceptLessonGenerationAdap
 import { conceptLessonRedundancyJudgmentDescriptor } from "./conceptLessonRedundancyAdapters";
 import { impostorLieValidityJudgmentDescriptor, studyImpostorGenerationDescriptor, studyItemBlueprintDescriptor, studyMatchingGenerationDescriptor, studyOptionSelectGenerationDescriptor } from "./studyItemGenerationAdapters";
 import { operationConfigHash } from "./operationConfigHash";
-import type { NeuralStageDescriptor } from "./forcedToolStage";
-
-type AnyNeuralStageDescriptor = NeuralStageDescriptor<any, any, any>;
+import type { AnyNeuralStageDescriptor } from "./forcedToolStage";
 
 const EXTRACTION_CONFIG_SEED = "source-extraction";
 const GRAPH_ENRICHMENT_CONFIG_SEED = "graph-enrichment";

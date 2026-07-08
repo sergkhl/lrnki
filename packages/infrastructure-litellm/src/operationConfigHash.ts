@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { stageConfigHash, stableStringify, type NeuralStageDescriptor } from "./forcedToolStage";
-
-type AnyNeuralStageDescriptor = NeuralStageDescriptor<any, any, any>;
+import { stageConfigHash, stableStringify, type AnyNeuralStageDescriptor } from "./forcedToolStage";
 
 export function operationConfigHash(
   seed: string,

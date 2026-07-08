@@ -16,6 +16,23 @@ export type NeuralStageDescriptor<TInput, TArgs, TResult> = {
   mapResult: (args: TArgs, input: TInput) => TResult;
 };
 
+// Existential erasure of a descriptor for the heterogeneous config-hash arrays: TInput is
+// invariant (covariant in `sentinelInput`, contravariant in the builder params), so it cannot be
+// widened to `unknown` nor narrowed to `never` as a single parameter. Widening the covariant
+// positions and narrowing the contravariant ones makes every concrete descriptor assignable
+// without `any`. Only the hash-relevant surface is exercised through this type.
+export type AnyNeuralStageDescriptor = {
+  promptPath: string;
+  modelOverride?: string;
+  stageTag: StageTag;
+  schema: JsonSchema | ((input: never) => JsonSchema);
+  validator: ZodType<unknown> | ((input: never) => ZodType<unknown>);
+  sentinelInput: unknown;
+  maxRetries?: number;
+  templateData: (input: never) => Record<string, unknown>;
+  mapResult: (args: never, input: never) => unknown;
+};
+
 export async function executeForcedToolStage<TInput, TArgs, TResult>(
   client: LiteLlmForcedToolClient,
   descriptor: NeuralStageDescriptor<TInput, TArgs, TResult>,
@@ -35,9 +52,7 @@ export async function executeForcedToolStage<TInput, TArgs, TResult>(
   return descriptor.mapResult(args, input);
 }
 
-export function stageConfigHash<TInput, TArgs, TResult>(
-  descriptor: NeuralStageDescriptor<TInput, TArgs, TResult>
-): string {
+export function stageConfigHash(descriptor: AnyNeuralStageDescriptor): string {
   const prompt = readPromptFile(descriptor.promptPath);
   const hash = createHash("sha256");
   hash.update("neural-stage-descriptor/v1\n");
@@ -45,6 +60,9 @@ export function stageConfigHash<TInput, TArgs, TResult>(
     hash.update(bytes);
     hash.update("\n");
   }
+  const schema = typeof descriptor.schema === "function"
+    ? (descriptor.schema as (input: unknown) => JsonSchema)(descriptor.sentinelInput)
+    : descriptor.schema;
   hash.update(stableStringify({
     model: prompt.model,
     modelOverride: descriptor.modelOverride ?? null,
@@ -52,7 +70,7 @@ export function stageConfigHash<TInput, TArgs, TResult>(
     toolDescription: prompt.toolDescription,
     stageTag: descriptor.stageTag,
     maxRetries: descriptor.maxRetries ?? null,
-    schema: resolveSchema(descriptor, descriptor.sentinelInput)
+    schema
   }));
   return hash.digest("hex");
 }

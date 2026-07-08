@@ -2,8 +2,7 @@
 
 ## TODO
 
-- Run U8 real-use quality evaluation for the neural stage descriptor refactor:
-  [plan 2026-07-08-001](./2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md).
+- (empty)
 
 ## COMPLETED
 
@@ -16,7 +15,12 @@
   mechanically from descriptor content and app-level knobs in both composition roots; fixed
   hand-bumped strings were removed from root wiring. Descriptor stage tags are now tested against
   `OPERATION_TIMELINE_CATALOG`. Decision: [ADR-0034](../adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md).
-  U8 real-use evaluation is intentionally left to the next session per user request.
+  The U8 real-use gate (below) also fixed a lint regression from the initial landing: the
+  heterogeneous descriptor-array erasure used `NeuralStageDescriptor<any, any, any>` (6
+  `no-explicit-any` errors); `TInput` is invariant (covariant `sentinelInput`, contravariant builder
+  params), so it is now erased by a hand-encoded existential supertype `AnyNeuralStageDescriptor`
+  (covariant positions `unknown`, contravariant positions `never`) with a non-generic
+  `stageConfigHash` — behavior-preserving, all four derived hashes byte-identical before/after.
 
 - **Shared neural client-construction policy.** The LiteLLM client-construction policy — env base
   config plus the measured discovery/deterministic/probe/embedding sampling decisions and their
@@ -255,6 +259,26 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Neural stage descriptors + mechanical config hashes (U8), 2026-07-08.** Deterministic envelope:
+  workspace `typecheck` exit 0 (all 10 projects); `lint` exit 0 (6 pre-existing warnings) — this
+  gate found and fixed a lint regression the initial landing introduced (6 `no-explicit-any` errors
+  in the descriptor-array erasure), replacing `NeuralStageDescriptor<any, any, any>` with a
+  hand-encoded existential supertype and a non-generic `stageConfigHash`; the four derived hashes
+  are byte-identical before/after the fix. Full workspace `test` exit 0 (`@lrnki/infrastructure-litellm`
+  133 incl. descriptor golden/hash + catalog-congruence tests). **Real-use gate (rule 14): PASS.**
+  kg-worker (tsx) root: real Rust-ownership extraction (`21f0399f`, 45 candidates/7 core) →
+  build (`a67a8366`) → enrichment (`8defd801`, 34 nodes) → study bank (66 items) persisted
+  `source-extraction-756879d1dc76` / `graph-enrichment-1886ba82e2e5` / `study-item-bank-a9ee35d66cee`
+  — each byte-identical to the derived value. Admin Lab (Next-bundled) root: a real "Binary search"
+  topic expedition driven through the production supervisor generated in the Next runtime with no
+  prompt-file resolution error and persisted `synthetic-topic-generation-978cefbca6ed` and
+  `study-item-bank-a9ee35d66cee` — **byte-identical across roots** (the KTD10/R4 cross-root claim
+  proven, not just the tsx path). Cost & timings attributes every stage: across all real operations
+  every emitted spend tag ∈ the 26-tag catalog, **zero orphaned tags** (live counterpart of the U7
+  congruence assertion); extraction 90/90 calls costed. Output quality unchanged (coherent
+  difficulty bands, correct Rust-ownership and binary-search items). Gate learner deleted (FK
+  children first). Evidence: `tmp/2026-07-08-neural-stage-descriptors/`.
 
 - **Shared neural client-construction policy, 2026-07-08.** Deterministic envelope: workspace
   `typecheck` exit 0 (all 10 projects); `lint` 0 errors (6 pre-existing warnings);
