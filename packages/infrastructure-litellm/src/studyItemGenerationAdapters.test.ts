@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LiteLlmStudyItemGenerationAdapter } from "./studyItemGenerationAdapters";
+import { createStudyItemGenerationPort } from "./studyItemGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { impostorValidator, optionSelectValidator } from "./toolSchemas";
 
@@ -17,7 +17,7 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
       };
     }
   } as unknown as LiteLlmForcedToolClient;
-  const adapter = new LiteLlmStudyItemGenerationAdapter(client, "mock-gen");
+  const adapter = createStudyItemGenerationPort(client);
 
   const draft = await adapter.generateOptionSelect({
     declaredDomain: "software engineering",
@@ -57,7 +57,7 @@ test("generateOptionSelect labels the correct answer 'generated' on a generated-
       };
     }
   } as unknown as LiteLlmForcedToolClient;
-  const adapter = new LiteLlmStudyItemGenerationAdapter(client, "mock-gen");
+  const adapter = createStudyItemGenerationPort(client);
   const draft = await adapter.generateOptionSelect({
     declaredDomain: "software engineering",
     node: { derivedNodeId: "n2", canonicalLabel: "Ownership", aliases: [] },
@@ -87,7 +87,7 @@ test("generateImpostor assembles a draft: three cited truths + one generated imp
       };
     }
   } as unknown as LiteLlmForcedToolClient;
-  const adapter = new LiteLlmStudyItemGenerationAdapter(client, "mock-gen");
+  const adapter = createStudyItemGenerationPort(client);
 
   const draft = await adapter.generateImpostor({
     declaredDomain: "software engineering",
@@ -128,7 +128,7 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
       };
     }
   } as unknown as LiteLlmForcedToolClient;
-  const adapter = new LiteLlmStudyItemGenerationAdapter(client, "mock-gen");
+  const adapter = createStudyItemGenerationPort(client);
   const draft = await adapter.generateImpostor({
     declaredDomain: "software engineering",
     node: { derivedNodeId: "n2", canonicalLabel: "Ownership", aliases: [] },

@@ -1,0 +1,21 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_study_item_blueprint
+  toolDescription: Submit a per-item-type study item blueprint for one learning node.
+---
+{{#system}}
+You plan which study item types are worth generating for one learning node. For each supported item type, decide whether the lesson grounding can support a non-duplicative, non-label-cued item. When generating, assign a short distinct assessed facet. When skipping, give a short reason. Do not use domain-specific examples beyond the provided lesson and neighbor labels. Do not add deterministic lexical rules; judge askability from meaning.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Learning node: "{{nodeLabel}}"{{aliasText}}.
+Supported item types: {{supportedItemTypes}}.
+Lesson sections:
+{{lessonSections}}
+Same-domain neighbors:
+{{siblings}}
+
+Call submit_study_item_blueprint with exactly one plan for each supported item type.
+{{/user}}

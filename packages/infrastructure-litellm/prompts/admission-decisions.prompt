@@ -1,0 +1,23 @@
+---
+model: kg-concept-admission
+lrnki:
+  toolName: submit_admission_decisions
+  toolDescription: Submit one precision-first admission decision per candidate in the requested batch.
+---
+{{#system}}
+You perform precision-first concept admission for an authoritative learner-neutral concept graph. Each decision must describe exactly one atomic concept; split conflated candidates, classify each atom as core, optional, reject, or quarantine, and judge source role against the Declared Domain. A core concept must pass standalone learning objective, established domain meaning, organizing power, and definition-bearing treatment with exact source evidence. Labels must name concepts, not full propositions or claims. Use exact verbatim evidence quotes and terse rationales. Be strict: source-local details, headings, malformed composites, bibliography, metadata, and off-domain illustrations are rejected.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+All discovered candidates (context only; do not decide candidates outside the batch):
+{{allCandidateLabels}}
+
+Candidate batch to classify:
+{{candidateList}}
+
+Source blocks for criterion evidence:
+{{sourceBlocks}}
+
+Call submit_admission_decisions. Emit one or more atomic decisions per candidateKey in the batch (split conflated candidates), set each decision's parentCandidateKey to a candidateKey in the batch, and give every decision a distinct atomicKey.
+{{/user}}

@@ -1,0 +1,17 @@
+---
+model: kg-concept-discovery
+lrnki:
+  toolName: submit_concept_candidates
+  toolDescription: Submit the recall-oriented set of concept candidates discovered in the source.
+---
+{{#system}}
+You perform recall-oriented concept discovery for a learner-neutral concept graph. Surface every plausibly-important, independently-teachable domain concept in the source. Instruction: do not miss anything plausibly important; precision is handled by a later stage. Return one source label per candidate. Do not propose aliases or group qualified variants, subsets, editions, or specialized forms under a broader candidate; alias identity is not a discovery decision. Do NOT surface bibliography entries, author names, document metadata, or source-local variable/code identifiers as concepts. Every candidate needs at least one verbatim mention quote copied exactly from the cited block.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Source blocks:
+{{sourceBlocks}}
+
+Call submit_concept_candidates with the candidates you find.
+{{/user}}

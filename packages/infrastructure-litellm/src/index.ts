@@ -10,9 +10,9 @@ export { createNeuralClients, resolveNeuralClientBaseOptions } from "./neuralCli
 export type { NeuralClientBaseOptions, NeuralClients } from "./neuralClients";
 export {
   LiteLlmNodeEmbeddingAdapter,
-  LiteLlmNodeMergeAdjudicationAdapter,
   NODE_EMBEDDING_MODEL,
-  NODE_MERGE_ADJUDICATION_MODEL
+  createNodeMergeAdjudicationPort,
+  nodeMergeAdjudicationDescriptor
 } from "./dedupAdapters";
 export {
   conceptDiscoverySchema,
@@ -60,65 +60,80 @@ export {
   conceptLessonRedundancyJudgmentValidator
 } from "./toolSchemas";
 export {
-  LiteLlmStudyItemBlueprintAdapter,
-  LiteLlmStudyItemGenerationAdapter,
-  LiteLlmImpostorLieValidityJudgmentAdapter,
-  STUDY_ITEM_GENERATION_MODEL
+  createStudyItemBlueprintPort,
+  createStudyItemGenerationPort,
+  createImpostorLieValidityJudgmentPort,
+  studyOptionSelectGenerationDescriptor,
+  studyImpostorGenerationDescriptor,
+  studyMatchingGenerationDescriptor,
+  studyItemBlueprintDescriptor,
+  impostorLieValidityJudgmentDescriptor
 } from "./studyItemGenerationAdapters";
 export {
-  LiteLlmConceptLessonGenerationAdapter,
-  CONCEPT_LESSON_GENERATION_MODEL
+  createConceptLessonGenerationPort,
+  conceptLessonGenerationDescriptor
 } from "./conceptLessonGenerationAdapters";
 export {
-  LiteLlmConceptLessonRedundancyJudgmentAdapter,
-  CONCEPT_LESSON_REDUNDANCY_JUDGE_MODEL
+  createConceptLessonRedundancyJudgmentPort,
+  conceptLessonRedundancyJudgmentDescriptor
 } from "./conceptLessonRedundancyAdapters";
 export {
-  LiteLlmConceptDiscoveryAdapter,
-  LiteLlmConceptAdmissionAdapter,
-  LiteLlmEvidenceProfileExtractionAdapter,
-  LiteLlmAssertionEntailmentJudgmentAdapter,
-  LiteLlmAdmissionLabelJudgmentAdapter,
-  LiteLlmDefinitionPassageQualityJudgmentAdapter,
-  DISCOVERY_MODEL,
-  ADMISSION_MODEL,
-  EVIDENCE_PROFILE_MODEL,
-  ASSERTION_ENTAILMENT_JUDGE_MODEL,
-  ADMISSION_LABEL_JUDGE_MODEL,
-  DEFINITION_PASSAGE_QUALITY_JUDGE_MODEL
+  createConceptDiscoveryPort,
+  createConceptAdmissionPort,
+  createEvidenceProfileExtractionPort,
+  createAssertionEntailmentJudgmentPort,
+  createAdmissionLabelJudgmentPort,
+  createDefinitionPassageQualityJudgmentPort,
+  conceptDiscoveryDescriptor,
+  admissionDecisionsDescriptor,
+  coreSelectionDescriptor,
+  evidenceProfileExtractionDescriptor,
+  definitionEntailmentDescriptor,
+  definitionPassageQualityDescriptor,
+  admissionLabelJudgmentDescriptor
 } from "./extractionAdapters";
 export {
-  LiteLlmPrerequisiteOrderingAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter,
-  LiteLlmRescuedNodeLabelingAdapter,
-  LiteLlmMintingDurabilityJudgmentAdapter,
-  PREREQUISITE_ORDERING_MODEL,
-  RESCUE_DURABILITY_JUDGE_MODEL,
-  RESCUED_NODE_LABELING_MODEL,
-  MINTING_DURABILITY_JUDGE_MODEL
+  createPrerequisiteOrderingPort,
+  createRescueDurabilityJudgmentPort,
+  createRescuedNodeLabelingPort,
+  createMintingDurabilityJudgmentPort,
+  prerequisiteOrderingDescriptor,
+  rescueDurabilityDescriptor,
+  rescuedNodeLabelingDescriptor,
+  mintingDurabilityDescriptor
 } from "./enrichmentAdapters";
 export {
-  LiteLlmGroundingGenerationAdapter,
-  GROUNDING_GENERATION_MODEL
+  createGroundingGenerationPort,
+  groundingGenerationDescriptor
 } from "./groundingGenerationAdapters";
 export {
-  LiteLlmConceptSetSynthesisAdapter,
-  LiteLlmKnowledgeBoundaryProbeAdapter,
-  CONCEPT_SYNTHESIS_MODEL,
-  KNOWLEDGE_BOUNDARY_PROBE_MODEL
+  createConceptSetSynthesisPort,
+  createKnowledgeBoundaryProbePort,
+  conceptSetSynthesisDescriptor,
+  knowledgeBoundaryProbeDescriptor
 } from "./syntheticGenerationAdapters";
 export {
-  LiteLlmMissingPrerequisiteProposalAdapter,
-  MISSING_PREREQUISITE_PROPOSAL_MODEL
+  createMissingPrerequisiteProposalPort,
+  missingPrerequisiteProposalDescriptor
 } from "./missingPrerequisiteProposalAdapters";
 export {
-  LiteLlmIntrinsicDifficultyJudgmentAdapter,
-  INTRINSIC_DIFFICULTY_JUDGE_MODEL,
-  DIFFICULTY_BANDING_SYSTEM_PROMPT,
-  DIFFICULTY_COMPARISON_SYSTEM_PROMPT
+  createIntrinsicDifficultyJudgmentPort,
+  intrinsicDifficultyBandingDescriptor,
+  intrinsicDifficultyComparisonDescriptor
 } from "./intrinsicDifficultyAdapters";
 export {
-  LiteLlmDeclaredDomainInferenceAdapter,
-  DECLARED_DOMAIN_INFERENCE_MODEL,
-  DECLARED_DOMAIN_INFERENCE_SYSTEM_PROMPT
+  createDeclaredDomainInferencePort,
+  declaredDomainInferenceDescriptor
 } from "./domainInferenceAdapters";
+export {
+  extractionConfigHash,
+  graphEnrichmentConfigHash,
+  syntheticGenerationConfigHash,
+  studyItemBankConfigHash,
+  withGraphEnrichmentConfigHash,
+  withSyntheticGenerationConfigHash,
+  extractionNeuralStageDescriptors,
+  graphEnrichmentNeuralStageDescriptors,
+  syntheticGenerationNeuralStageDescriptors,
+  studyItemBankNeuralStageDescriptors
+} from "./configHashes";

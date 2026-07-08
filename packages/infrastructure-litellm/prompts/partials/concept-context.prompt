@@ -1,0 +1,5 @@
+{{role}}: "{{canonicalLabel}}"{{aliasesSuffix}}.
+  Definitions:
+{{definitionLines}}
+  Mentions:
+{{mentionLines}}{{assertionBlock}}

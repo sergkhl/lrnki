@@ -6,7 +6,7 @@ import {
   buildGraphVersion,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
-  STUDY_ITEM_BANK_CONFIG_HASH,
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG,
   resolveConceptIdentity,
   runExtractionOverSources,
   type ExtractionSourceUnit,
@@ -32,32 +32,36 @@ import {
   TextStructuredDocumentParser
 } from "@lrnki/infrastructure-ingestion";
 import {
-  LiteLlmAdmissionLabelJudgmentAdapter,
-  LiteLlmAssertionEntailmentJudgmentAdapter,
-  LiteLlmDefinitionPassageQualityJudgmentAdapter,
-  LiteLlmEvidenceProfileExtractionAdapter,
-  LiteLlmConceptAdmissionAdapter,
-  LiteLlmStudyItemGenerationAdapter,
-  LiteLlmConceptLessonGenerationAdapter,
-  LiteLlmConceptLessonRedundancyJudgmentAdapter,
-  LiteLlmStudyItemBlueprintAdapter,
-  LiteLlmImpostorLieValidityJudgmentAdapter,
-  LiteLlmConceptDiscoveryAdapter,
+  createAdmissionLabelJudgmentPort,
+  createAssertionEntailmentJudgmentPort,
+  createDefinitionPassageQualityJudgmentPort,
+  createEvidenceProfileExtractionPort,
+  createConceptAdmissionPort,
+  createStudyItemGenerationPort,
+  createConceptLessonGenerationPort,
+  createConceptLessonRedundancyJudgmentPort,
+  createStudyItemBlueprintPort,
+  createImpostorLieValidityJudgmentPort,
+  createConceptDiscoveryPort,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
-  LiteLlmNodeMergeAdjudicationAdapter,
-  LiteLlmGroundingGenerationAdapter,
-  LiteLlmConceptSetSynthesisAdapter,
-  LiteLlmKnowledgeBoundaryProbeAdapter,
-  LiteLlmIntrinsicDifficultyJudgmentAdapter,
-  LiteLlmMissingPrerequisiteProposalAdapter,
-  LiteLlmPrerequisiteOrderingAdapter,
-  LiteLlmMintingDurabilityJudgmentAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter,
-  LiteLlmRescuedNodeLabelingAdapter,
+  createNodeMergeAdjudicationPort,
+  createGroundingGenerationPort,
+  createConceptSetSynthesisPort,
+  createKnowledgeBoundaryProbePort,
+  createIntrinsicDifficultyJudgmentPort,
+  createMissingPrerequisiteProposalPort,
+  createMintingDurabilityJudgmentPort,
+  createRescueDurabilityJudgmentPort,
+  createRescuedNodeLabelingPort,
+  createPrerequisiteOrderingPort,
   createNeuralClients,
-  resolveNeuralClientBaseOptions
+  resolveNeuralClientBaseOptions,
+  extractionConfigHash,
+  studyItemBankConfigHash,
+  withGraphEnrichmentConfigHash,
+  withSyntheticGenerationConfigHash
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -74,10 +78,6 @@ import {
   PostgresJourneyLineageRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
-
-// Pipeline configuration identity — bump when prompts/models/schemas change so
-// runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "definition-quality-judge-v38";
 
 import { existsSync } from "node:fs";
 
@@ -144,24 +144,24 @@ function buildContext() {
     graphStore,
     artifacts,
     parsers,
-    discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
-    admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
-    evidenceProfileExtraction: new LiteLlmEvidenceProfileExtractionAdapter(deterministicClient),
+    discovery: createConceptDiscoveryPort(discoveryClient),
+    admission: createConceptAdmissionPort(deterministicClient),
+    evidenceProfileExtraction: createEvidenceProfileExtractionPort(deterministicClient),
     // Assertion-entailment judge (ADR-0007 reset). Independent production judge
     // (gpt-oss-120b via kg-independent-judge) so the judge is not the extractor
     // re-grading itself; deterministic decoding for stable re-derivation. Guards
     // only the optional typed assertions inside a Concept Evidence Profile.
-    assertionEntailmentJudge: new LiteLlmAssertionEntailmentJudgmentAdapter(deterministicClient),
+    assertionEntailmentJudge: createAssertionEntailmentJudgmentPort(deterministicClient),
     // Concept-vs-proposition admission judge (ADR-0005). Same independent
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
-    admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
+    admissionLabelJudge: createAdmissionLabelJudgmentPort(deterministicClient),
     // Definition-Passage quality judge (ADR-0007 extension). Same independent
     // production judge (kg-independent-judge) and deterministic decoding; runs after
     // the verbatim floor and drops hollow Definition Passages (bare name, heading,
     // title, citation), routing a last-passage veto into the existing demotion with a
     // distinct reason code.
-    definitionPassageQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient),
+    definitionPassageQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient),
     // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
     // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
     // the directed prerequisite DAG over the deduplicated node set; it is cross-family
@@ -169,58 +169,58 @@ function buildContext() {
     // never grades its own minted output and the per-pair routing split is gone.
     // Deterministic decoding for stable re-derivation. Difficulty is learner-neutral
     // intrinsic: a cross-family neural subscore fused with deterministic components.
-    prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
+    prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
     // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
-    missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
-    groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
+    missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient),
     // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
     // amended). Concept-set synthesis stays DeepSeek-family with deterministic decoding
     // for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
     // MODERATE-temperature cross-family client so its K draws disperse at the model's
     // knowledge boundary (KTD4).
-    conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
-    knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
+    conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
+    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     // Measured rescue durability judge (U3): cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
-    rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    rescueDurabilityJudge: createRescueDurabilityJudgmentPort(deterministicClient),
     // Measured Rescued-Node Canonical Labeling step (TODO #1): the SAME cross-family
     // independent judge (kg-independent-judge) re-names each durable rescued node — labeled
     // with the source sentence it was mentioned in — to a concept-shaped label, one whole-set
     // call per Declared Domain. Rename-only; minting owns adoption (collision guard + alias).
-    rescuedNodeLabelingJudge: new LiteLlmRescuedNodeLabelingAdapter(deterministicClient),
+    rescuedNodeLabelingJudge: createRescuedNodeLabelingPort(deterministicClient),
     // Rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). The SAME
     // independent meaning judge (kg-independent-judge) and deterministic decoding as the
     // extraction-time core gate — no new alias — but tagged `rescue-definition-quality` so
     // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
     // definitions before they reach study items; fails closed = preserve.
-    rescuedDefinitionQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient, undefined, STAGE_TAGS.rescueDefinitionQuality),
+    rescuedDefinitionQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient, STAGE_TAGS.rescueDefinitionQuality),
     // Measured minting durability judge: cross-family independent judge gates
     // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
     // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
     // judge-off baseline.
-    mintingDurabilityJudge: new LiteLlmMintingDurabilityJudgmentAdapter(deterministicClient),
+    mintingDurabilityJudge: createMintingDurabilityJudgmentPort(deterministicClient),
     // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
     // near-duplicate pairs (qwen3-embedding-8b via kg-node-embedding); a cross-family
     // adjudicator DECIDES each merge (kg-independent-judge / gpt-oss-120b, deterministic
     // decoding) so the DeepSeek family never decides its own merges. Both opt-in: enrich
     // without them for the U7 baseline.
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
+    nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
+    difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays
     // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
     // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
     // option-select, and persisted through its own store; option-select derives FROM it.
-    conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
-    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
+    conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
+    conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
-    studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
-    studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
-    impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
+    studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
+    studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
+    impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql),
     responseLogStore: new PostgresResponseLogStore(sql),
     // Mutable calibration verdict store (R10): the synthetic prefill seeds verdicts here,
@@ -280,7 +280,7 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
   }
   await runExtractionOverSources({
     units,
-    pipelineConfigHash: PIPELINE_CONFIG_HASH,
+    pipelineConfigHash: extractionConfigHash(),
     discovery: ctx.discovery,
     admission: ctx.admission,
     evidenceProfileExtraction: ctx.evidenceProfileExtraction,
@@ -391,6 +391,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
+    config: withGraphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
     // via the reporter (ADR-0029) — supersedes the old onStageTiming stdout sink.
     reporter: ctx.runProgressReporter,
@@ -440,6 +441,7 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
     prerequisiteOrdering: ctx.prerequisiteOrdering,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
+    config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
     reporter: ctx.runProgressReporter,
     // Concept/verdict + edge summary line for operator visibility: how many concepts were
     // synthesized, how many the probe kept as core vs held out as boundary, and the DAG size.
@@ -468,10 +470,7 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
     args.deployments.map((deployment) => ({
       deployment,
       temperature,
-      probe: new LiteLlmKnowledgeBoundaryProbeAdapter(
-        new LiteLlmForcedToolClient({ ...baseClient, temperature }),
-        deployment
-      )
+      probe: createKnowledgeBoundaryProbePort(new LiteLlmForcedToolClient({ ...baseClient, temperature }), deployment)
     }))
   );
   console.log(`\n>> boundary-probe calibration concepts=${ladder.length} deployments=${args.deployments.length} temperatures=${args.temperatures.join(",")}`);
@@ -674,7 +673,7 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
   if (args.concurrency !== undefined) console.log(`   concurrency=${args.concurrency}`);
   const result = await generateStudyItemBank({
     enrichmentId: args.enrichmentId,
-    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
+    configHash: studyItemBankConfigHash(),
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     conceptLessonGeneration: ctx.conceptLessonGeneration,

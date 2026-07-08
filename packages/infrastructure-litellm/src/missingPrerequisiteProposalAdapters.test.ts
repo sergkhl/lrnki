@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LiteLlmMissingPrerequisiteProposalAdapter } from "./missingPrerequisiteProposalAdapters";
+import { createMissingPrerequisiteProposalPort } from "./missingPrerequisiteProposalAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
 function adapterReturning(canned: { proposals: { proposedLabel: string; rationale: string }[] }) {
@@ -11,7 +11,7 @@ function adapterReturning(canned: { proposals: { proposedLabel: string; rational
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return { adapter: new LiteLlmMissingPrerequisiteProposalAdapter(client, "mock-proposer"), calls };
+  return { adapter: createMissingPrerequisiteProposalPort(client), calls };
 }
 
 test("proposes assumed-prior prerequisites for one anchor, conditioned on its evidence", async () => {
@@ -33,7 +33,7 @@ test("proposes assumed-prior prerequisites for one anchor, conditioned on its ev
   assert.equal(proposals[0].proposedLabel, "Stack allocation");
 
   const call = calls[0] as { model: string; toolName: string; messages: { content: string }[] };
-  assert.equal(call.model, "mock-proposer");
+  assert.equal(call.model, "kg-claim-extraction");
   assert.equal(call.toolName, "submit_missing_prerequisites");
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
   assert.ok(call.messages.some((message) => message.content.includes("Ownership")));

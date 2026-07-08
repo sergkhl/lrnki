@@ -160,12 +160,12 @@ After:   UI server action = one use-case call
 
 ## Candidate 3 — Forced-tool operation descriptors + mechanically derived config hash
 
-**Status: ACCEPTED — grilled 2026-07-08, plan ready** at
-[docs/plans/2026-07-08-001](../plans/2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md),
-which owns the design (key grilling outcomes: descriptor unit is the forced tool call, ~27 of
-them; prompts move into dotprompt `.prompt` files whose frontmatter owns the model alias; config
-hashes derive from file bytes + schema JSON, identical across both composition roots; zod schemas
-stay single-sourced per ADR-0006; ports stay).
+**Status: IMPLEMENTED 2026-07-08 except the deferred real-use gate** via
+[docs/plans/2026-07-08-001](../plans/2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md).
+The durable policy is now [ADR-0034](../adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md):
+descriptor unit is the forced tool call, prompts live in dotprompt `.prompt` files whose
+frontmatter owns the model alias, config hashes derive from file bytes + schema JSON, zod schemas
+stay single-sourced per ADR-0006, and ports stay.
 
 **Recommendation strength: Strong** (carried from 2026-07-03 Candidate 3, upgraded — the drift it
 predicts has now happened once)

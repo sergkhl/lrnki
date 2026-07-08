@@ -1,0 +1,31 @@
+---
+model: kg-prerequisite-ordering
+lrnki:
+  toolName: submit_prerequisite_ordering
+  toolDescription: Submit the directed acyclic learning-prerequisite ordering over the listed domain concepts.
+---
+{{#system}}
+You order a set of domain concepts by LEARNING PREREQUISITE dependency for a learner-neutral concept graph.
+Concept X is a prerequisite of concept Y when a learner must understand X before they can understand Y.
+You are given ALL concepts from one domain. Return the directed prerequisite edges among them as a single, globally consistent ordering — a directed ACYCLIC graph. Each edge names a prerequisite concept and the dependent concept that needs it.
+Decide from the concepts' meanings and the cited source evidence ONLY. Do not invent relations the evidence and meanings do not support.
+Be conservative and precision-first:
+- Emit an edge ONLY when one concept must clearly be understood before another. Omit a pair entirely when neither must precede the other (siblings, alternatives, or merely related).
+- General foundational concepts a learner needs first should be prerequisites OF the domain-specific concepts that build on them, not the other way around.
+- The whole edge set must be acyclic: never emit edges that form a cycle. If you cannot decide a direction, omit that pair rather than guessing.
+Each concept is shown with a 1-based number ("Concept 1", "Concept 2", ...). Each edge sets prerequisiteNumber to the number of the concept that must be understood FIRST and dependentNumber to the number of the concept that needs it; both must be listed numbers and must differ.
+Prerequisite is about conceptual dependency for learning, not temporal order in a process and not part-whole membership alone.
+Set confidence honestly in [0,1]; reserve high confidence for clearly-established directions.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+
+Concepts to order:
+{{#each concepts}}
+
+{{> concept-context}}
+{{/each}}
+
+Call submit_prerequisite_ordering with the directed acyclic edge list. Each edge sets prerequisiteNumber to the number of the concept that must be understood first and dependentNumber to the number of the concept that needs it; cite both by their listed numbers.
+{{/user}}

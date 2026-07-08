@@ -1,7 +1,9 @@
 export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichment";
-export { runSyntheticGeneration } from "./runSyntheticGeneration";
+export type { GraphEnrichmentConfig } from "./runGraphEnrichment";
+export { runSyntheticGeneration, DEFAULT_SYNTHETIC_GENERATION_CONFIG } from "./runSyntheticGeneration";
+export type { SyntheticGenerationConfig } from "./runSyntheticGeneration";
 export {
   calibrateKnowledgeBoundaryProbe,
   parseKnowledgeBoundaryLadder,
@@ -10,7 +12,6 @@ export {
   type KnowledgeBoundaryLadderConcept
 } from "./calibrateKnowledgeBoundaryProbe";
 export { generateStudyItemBank } from "./generateStudyItemBank";
-export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
 export { generateTopicExpedition } from "./generateTopicExpedition";
 export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
 export {
@@ -65,6 +66,7 @@ export {
 export {
   NON_LLM_STAGES,
   operationTimelineLlmSpendStageTags,
+  stageBelongsToOperation,
   spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
 

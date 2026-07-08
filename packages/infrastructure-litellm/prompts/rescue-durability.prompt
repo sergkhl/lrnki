@@ -1,0 +1,20 @@
+---
+model: kg-independent-judge
+lrnki:
+  toolName: submit_rescue_durability_judgment
+  toolDescription: Submit whether the rescue candidate is a durable prerequisite or an incidental artifact.
+---
+{{#system}}
+You judge whether a candidate concept is a durable learning prerequisite or an incidental artifact, for a learner-neutral concept graph. The candidate was mentioned in a source but never defined there. Decide whether a learner must genuinely understand it as its own unit of domain knowledge before the anchors, or whether it is source-local, incidental, or merely named in passing. Judge from the candidate's meaning, how this source treats it, and its relationship to the anchors. Return not_durable only on a clear, evidenced judgment; otherwise return durable.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Candidate concept: "{{candidateLabel}}"{{candidateAliases}}.
+Candidate's verbatim mention quotes (the only text a not_durable groundingSpan may be copied from):
+{{mentionQuotes}}
+Same-domain anchor concepts this node would scaffold:
+{{anchors}}
+
+Call submit_rescue_durability_judgment: is this candidate a durable prerequisite, or an incidental artifact?
+{{/user}}

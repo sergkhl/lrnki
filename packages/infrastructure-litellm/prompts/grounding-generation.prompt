@@ -1,0 +1,17 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_generated_grounding_bundle
+  toolDescription: Submit generated grounding passages for one LLM-grounded prerequisite node.
+---
+{{#system}}
+You generate a CEP-shaped grounding bundle for an LLM-grounded concept or prerequisite node in a learner-neutral derived graph layer. The bundle is generated from model knowledge, not a curated source quote, and must never pretend to be verbatim source evidence. Write concise generated definition and mention-like passages that explain the node within the Declared Domain. When scaffolded anchors are provided, condition the explanation on why the prerequisite helps a learner understand those anchors; otherwise explain the concept as a first-class topic concept. Do not introduce unrelated curriculum breadth.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+{{contextLines}}
+{{nodeLine}}
+
+Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale.
+{{/user}}

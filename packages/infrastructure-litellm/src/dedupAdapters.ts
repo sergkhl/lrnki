@@ -1,8 +1,10 @@
 import type { NodeMergeAdjudication } from "@lrnki/domain-core";
 import type { NodeEmbeddingPort, NodeMergeAdjudicationPort } from "@lrnki/ports";
 import { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
-import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
+import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { readPromptFile } from "./promptFile";
 import { nodeMergeAdjudicationSchema, nodeMergeAdjudicationValidator } from "./toolSchemas";
 
 // Semantic-deduplication adapters (plan U1/U2, ADR-0012/0019). Two SEPARATE mechanisms
@@ -38,61 +40,45 @@ export class LiteLlmNodeEmbeddingAdapter implements NodeEmbeddingPort {
   }
 }
 
-// Cross-family merge adjudicator (U2). Reuses the independent `kg-independent-judge`
-// alias (gpt-oss-120b) so the DeepSeek extraction family never decides its own merges
-// — the same cross-family discipline as the rescue-durability and admission-label
-// judges. Goes through LiteLLM, never a raw provider.
-export const NODE_MERGE_ADJUDICATION_MODEL = "kg-independent-judge";
+type NodeMergeInput = {
+  declaredDomain: string;
+  a: { label: string; aliases: string[]; evidence: string[] };
+  b: { label: string; aliases: string[]; evidence: string[] };
+};
 
-// Merge-adjudication DECISION adapter (U2). A thin forced-tool caller: it presents both
-// candidates SYMMETRICALLY (neither side privileged, A/B labels carry no ranking) with
-// label + aliases + bounded verbatim evidence, validates the tool arguments, and returns
-// the typed decision. It owns NO fail-closed policy: a transport/validation failure
-// throws and the application dedup stage (U3) treats the pair as keep_distinct, exactly
-// as applyRescueDurabilityJudge owns the fail-open grounding decision for its judge.
-export class LiteLlmNodeMergeAdjudicationAdapter implements NodeMergeAdjudicationPort {
-  readonly model: string;
-  constructor(private readonly client: LiteLlmForcedToolClient, model: string = NODE_MERGE_ADJUDICATION_MODEL) {
-    this.model = model;
-  }
+export const nodeMergeAdjudicationDescriptor: NeuralStageDescriptor<
+  NodeMergeInput,
+  NodeMergeAdjudication,
+  NodeMergeAdjudication
+> = {
+  promptPath: "node-merge-adjudication.prompt",
+  stageTag: STAGE_TAGS.nodeMergeAdjudication,
+  schema: nodeMergeAdjudicationSchema,
+  validator: nodeMergeAdjudicationValidator,
+  sentinelInput: {
+    declaredDomain: "sentinel domain",
+    a: { label: "Sentinel A", aliases: [], evidence: ["A evidence."] },
+    b: { label: "Sentinel B", aliases: [], evidence: ["B evidence."] }
+  },
+  templateData: (input) => ({
+    declaredDomain: input.declaredDomain,
+    conceptA: renderSide("Concept A", input.a),
+    conceptB: renderSide("Concept B", input.b)
+  }),
+  mapResult: (result) => ({ decision: result.decision, rationale: result.rationale })
+};
 
-  async adjudicate(input: {
-    declaredDomain: string;
-    a: { label: string; aliases: string[]; evidence: string[] };
-    b: { label: string; aliases: string[]; evidence: string[] };
-  }): Promise<NodeMergeAdjudication> {
-    const system = [
-      "You decide whether two candidate labels from the SAME domain name the SAME underlying concept, for a learner-neutral concept graph.",
-      "Two surface forms of one concept (a singular/possessive/abbreviated variant, or a paraphrase a learner would NOT study as a separate idea) should MERGE. Two genuinely distinct concepts — even closely related ones (a concept and a specialization of it, a part and its whole, two siblings, a general idea and one mechanism within it) — should stay KEEP_DISTINCT.",
-      "Decide from the concepts' MEANING and the cited evidence ONLY, never from surface wordform overlap. The two are presented as A and B with NEITHER privileged; the A/B labeling carries no ranking and must not influence the decision.",
-      "Precision-first: merging fuses two ideas in a learner's graph, so return 'merge' only on a clear judgment that they are one concept; when genuinely unsure, return 'keep_distinct'."
-    ].join("\n");
-    const renderSide = (role: string, side: { label: string; aliases: string[]; evidence: string[] }): string =>
-      [
-        `${role}: "${side.label}"${side.aliases.length ? ` (aka ${side.aliases.map((alias) => `"${alias}"`).join(", ")})` : ""}.`,
-        "  Evidence:",
-        ...(side.evidence.length ? side.evidence.map((quote, index) => `    [${index + 1}] "${quote}"`) : ["    (none)"])
-      ].join("\n");
-    const user = [
-      `Declared domain: ${input.declaredDomain}.`,
-      "",
-      renderSide("Concept A", input.a),
-      "",
-      renderSide("Concept B", input.b),
-      "",
-      "Call submit_node_merge_decision: are Concept A and Concept B the same domain concept (merge) or genuinely distinct (keep_distinct)?"
-    ].join("\n");
+export function createNodeMergeAdjudicationPort(client: LiteLlmForcedToolClient): NodeMergeAdjudicationPort {
+  return {
+    model: readPromptFile(nodeMergeAdjudicationDescriptor.promptPath).model,
+    adjudicate: (input) => executeForcedToolStage(client, nodeMergeAdjudicationDescriptor, input)
+  };
+}
 
-    const result = await this.client.call({
-      model: this.model,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_node_merge_decision",
-      toolDescription: "Submit whether the two same-domain candidate concepts are one concept (merge) or distinct (keep_distinct).",
-      parameters: nodeMergeAdjudicationSchema,
-      validator: nodeMergeAdjudicationValidator,
-      tags: [STAGE_TAGS.nodeMergeAdjudication]
-    });
-
-    return { decision: result.decision, rationale: result.rationale };
-  }
+function renderSide(role: string, side: { label: string; aliases: string[]; evidence: string[] }): string {
+  return [
+    `${role}: "${side.label}"${side.aliases.length ? ` (aka ${side.aliases.map((alias) => `"${alias}"`).join(", ")})` : ""}.`,
+    "  Evidence:",
+    ...(side.evidence.length ? side.evidence.map((quote, index) => `    [${index + 1}] "${quote}"`) : ["    (none)"])
+  ].join("\n");
 }

@@ -1,0 +1,23 @@
+---
+model: kg-concept-admission
+lrnki:
+  toolName: submit_core_selection
+  toolDescription: Select or demote every individually eligible candidate at source level.
+---
+{{#system}}
+You perform precision-first source-level Core Set Selection for a learner-neutral graph. Keep a small but explanatorily sufficient, non-redundant set of durable learning concepts.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+You are performing source-level Core Set Selection after individual eligibility review.
+Passing individual eligibility is necessary but not sufficient for core.
+Select a small but sufficient non-redundant set that preserves the source's principal explanatory structure.
+Retain established domain concepts this source teaches substantively. Demote narrow facets, incidental supporting mechanisms, examples used only for illustration, pseudo-concepts, headings, and labels whose teaching is genuinely duplicated by another selected candidate.
+For every selection return the final precise canonical label. Domain-qualify vague labels when the evidence supports the narrower meaning.
+
+Individually eligible atomic concepts (with verbatim source evidence and the heading each quote came from):
+{{eligibleConcepts}}
+
+Call submit_core_selection exactly once for every listed atomic concept.
+{{/user}}

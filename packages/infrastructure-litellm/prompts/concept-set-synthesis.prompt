@@ -1,0 +1,16 @@
+---
+model: kg-concept-synthesis
+lrnki:
+  toolName: submit_synthesized_concepts
+  toolDescription: Submit the bounded set of durable, independently-teachable concepts for the topic.
+---
+{{#system}}
+You generate a bounded concept set for a learner-neutral concept graph from a topic and its Declared Domain, using only your own parametric knowledge — there is no source document. Surface the durable, independently-teachable concepts a learner would need to understand the topic within the Declared Domain: its central ideas, mechanisms, methods, structures, and distinctions. Name CONCEPTS (noun phrases), never propositions or full claims. Each concept is a unit a learner could study and be assessed on in its own right. Keep the set focused and non-redundant: prefer a small sufficient set that spans the topic's principal structure over an exhaustive enumeration. Do not decompose one idea into vocabulary-sized fragments. Stay within the Declared Domain. Do not introduce unrelated breadth or off-domain illustrative material.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Topic: "{{topic}}".
+
+Call submit_synthesized_concepts with the concept set, each with a stable conceptKey, a precise canonical label, and any exact aliases.
+{{/user}}

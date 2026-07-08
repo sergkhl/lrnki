@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LiteLlmConceptLessonGenerationAdapter } from "./conceptLessonGenerationAdapters";
+import { createConceptLessonGenerationPort } from "./conceptLessonGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
 type Captured = { toolName: string; tags: string[]; parameters: unknown; messages: { content: string }[] };
@@ -37,7 +37,7 @@ test("generate issues one call with the lesson tool name, schema, and stage tag"
       { kind: "applications", text: "Lifetimes build on borrowing.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
     ]
   }, calls);
-  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const adapter = createConceptLessonGenerationPort(client);
 
   const draft = await adapter.generate(baseInput);
 
@@ -56,7 +56,7 @@ test("generate issues one call with the lesson tool name, schema, and stage tag"
 test("the user message renders grounding passages and directional neighbor lists", async () => {
   const calls: Captured[] = [];
   const client = fakeClient({ sections: [] }, calls);
-  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const adapter = createConceptLessonGenerationPort(client);
 
   await adapter.generate(baseInput);
   const user = calls[0].messages.map((m) => m.content).join("\n");
@@ -73,7 +73,7 @@ test("a partial citation (passage id without quote) is dropped rather than passe
       { kind: "definition", text: "A definition.", citationPassageId: "b1", citationEvidenceQuote: null, diagramCaption: null, diagramSpec: null }
     ]
   }, calls);
-  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const adapter = createConceptLessonGenerationPort(client);
   const draft = await adapter.generate(baseInput);
   assert.equal(draft.sections[0].citation, undefined);
 });
@@ -85,7 +85,7 @@ test("a diagram descriptor with both caption and spec is carried through", async
       { kind: "examples", text: "An example.", citationPassageId: null, citationEvidenceQuote: null, diagramCaption: "Owned vs borrowed", diagramSpec: "A relates to B" }
     ]
   }, calls);
-  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const adapter = createConceptLessonGenerationPort(client);
   const draft = await adapter.generate(baseInput);
   assert.deepEqual(draft.sections[0].diagram, { caption: "Owned vs borrowed", spec: "A relates to B" });
 });
@@ -93,7 +93,7 @@ test("a diagram descriptor with both caption and spec is carried through", async
 test("the system prompt names no domain and asserts no section is mandatory (R4)", async () => {
   const calls: Captured[] = [];
   const client = fakeClient({ sections: [] }, calls);
-  const adapter = new LiteLlmConceptLessonGenerationAdapter(client, "mock-gen");
+  const adapter = createConceptLessonGenerationPort(client);
   await adapter.generate(baseInput);
   const system = calls[0].messages.find((m) => (m as { role?: string }).role === "system")?.content
     ?? calls[0].messages[0].content;

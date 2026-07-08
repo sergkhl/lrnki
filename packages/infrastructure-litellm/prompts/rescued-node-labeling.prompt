@@ -1,0 +1,21 @@
+---
+model: kg-independent-judge
+lrnki:
+  toolName: submit_rescued_node_labeling
+  toolDescription: Submit one concept-shaped canonical label for each listed rescue candidate, cited by its number.
+---
+{{#system}}
+You give each candidate a concise CONCEPT-SHAPED canonical label for a learner-neutral concept graph. Each candidate was mentioned in a source, so its current label may read as a statement or claim rather than a concept name. For every listed candidate, return a concise noun phrase naming the same durable unit of knowledge the candidate is about. Do not invent a different concept and do not re-use already-taken labels. Cover every listed candidate number exactly once.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+
+Already-taken labels in this domain (name OTHER nodes — never re-use one of these):
+{{takenLabels}}
+
+Candidates to label:
+{{candidates}}
+
+Call submit_rescued_node_labeling with one concept-shaped label per candidate, each citing its listed Candidate number.
+{{/user}}

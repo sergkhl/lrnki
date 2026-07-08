@@ -3,10 +3,10 @@ import { test } from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
-  DECLARED_DOMAIN_INFERENCE_MODEL,
-  DECLARED_DOMAIN_INFERENCE_SYSTEM_PROMPT,
-  LiteLlmDeclaredDomainInferenceAdapter
+  createDeclaredDomainInferencePort,
+  declaredDomainInferenceDescriptor
 } from "./domainInferenceAdapters";
+import { readPromptFile, renderPromptFile } from "./promptFile";
 import { declaredDomainInferenceSchema, declaredDomainInferenceValidator } from "./toolSchemas";
 
 function adapterReturning(canned: { declaredDomain: string }) {
@@ -17,7 +17,7 @@ function adapterReturning(canned: { declaredDomain: string }) {
       return declaredDomainInferenceValidator.parse(canned);
     }
   } as unknown as LiteLlmForcedToolClient;
-  return { adapter: new LiteLlmDeclaredDomainInferenceAdapter(client, "mock-domain-inference"), calls };
+  return { adapter: createDeclaredDomainInferencePort(client), calls };
 }
 
 test("declared domain inference validator trims well-formed domain labels", () => {
@@ -44,7 +44,7 @@ test("adapter uses the domain inference alias and passes topic into the prompt",
   const { adapter, calls } = adapterReturning({ declaredDomain: "Learning Science" });
   await adapter.infer({ topic: " how spaced practice works " });
 
-  assert.equal(new LiteLlmDeclaredDomainInferenceAdapter({} as LiteLlmForcedToolClient).model, DECLARED_DOMAIN_INFERENCE_MODEL);
+  assert.equal(readPromptFile(declaredDomainInferenceDescriptor.promptPath).model, "kg-domain-inference");
   const call = calls[0] as {
     model: string;
     toolName: string;
@@ -53,7 +53,7 @@ test("adapter uses the domain inference alias and passes topic into the prompt",
     tags: string[];
     messages: { content: string }[];
   };
-  assert.equal(call.model, "mock-domain-inference");
+  assert.equal(call.model, "kg-domain-inference");
   assert.equal(call.toolName, "submit_declared_domain");
   assert.equal(call.toolDescription, "Submit a concise Declared Domain inferred from one learner topic.");
   assert.deepEqual(call.parameters, declaredDomainInferenceSchema);
@@ -62,8 +62,9 @@ test("adapter uses the domain inference alias and passes topic into the prompt",
 });
 
 test("domain inference prompt and schema descriptions remain domain-neutral", () => {
+  const rendered = renderPromptFile(declaredDomainInferenceDescriptor.promptPath, { topic: "neutral sentinel" });
   const modelFacingText = [
-    DECLARED_DOMAIN_INFERENCE_SYSTEM_PROMPT,
+    rendered.messages[0]?.content ?? "",
     JSON.stringify(declaredDomainInferenceSchema)
   ].join("\n").toLowerCase();
   for (const fixtureTerm of ["ownership", "rust", "market", "economics", "instructkg", "meselson", "aira"]) {

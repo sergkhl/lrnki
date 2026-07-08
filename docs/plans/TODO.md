@@ -2,14 +2,21 @@
 
 ## TODO
 
-- Implement Candidate 3 — neural stage descriptors with dotprompt files and mechanical config
-  hashes. Grilled and planned 2026-07-08:
-  [plan 2026-07-08-001](./2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md)
-  (origin: Candidate 3 of the
-  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md);
-  that doc's rejected-findings ledger records what not to re-propose).
+- Run U8 real-use quality evaluation for the neural stage descriptor refactor:
+  [plan 2026-07-08-001](./2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md).
 
 ## COMPLETED
+
+- **Neural stage descriptors with dotprompt files and mechanical config hashes.** Forced-tool LLM
+  stage knowledge now lives in Neural Stage Descriptors: `.prompt` files own model aliases, tool
+  names, tool descriptions, and prompt templates; typed rims own schemas, validators, stage tags,
+  sentinels, retry budgets, and result mapping. Adapter classes and forced-tool `*_MODEL` constants
+  were replaced by port factories, while application use-case seams stayed unchanged. Extraction,
+  graph enrichment, synthetic generation, and Study Item Bank config hashes are derived
+  mechanically from descriptor content and app-level knobs in both composition roots; fixed
+  hand-bumped strings were removed from root wiring. Descriptor stage tags are now tested against
+  `OPERATION_TIMELINE_CATALOG`. Decision: [ADR-0034](../adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md).
+  U8 real-use evaluation is intentionally left to the next session per user request.
 
 - **Shared neural client-construction policy.** The LiteLLM client-construction policy — env base
   config plus the measured discovery/deterministic/probe/embedding sampling decisions and their

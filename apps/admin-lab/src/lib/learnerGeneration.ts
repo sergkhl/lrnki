@@ -2,23 +2,25 @@ import {
   generateTopicExpedition,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
-  STUDY_ITEM_BANK_CONFIG_HASH
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG
 } from "@lrnki/application";
 import {
-  LiteLlmConceptLessonGenerationAdapter,
-  LiteLlmConceptLessonRedundancyJudgmentAdapter,
-  LiteLlmConceptSetSynthesisAdapter,
-  LiteLlmGroundingGenerationAdapter,
-  LiteLlmImpostorLieValidityJudgmentAdapter,
-  LiteLlmIntrinsicDifficultyJudgmentAdapter,
-  LiteLlmKnowledgeBoundaryProbeAdapter,
-  LiteLlmDeclaredDomainInferenceAdapter,
+  createConceptLessonGenerationPort,
+  createConceptLessonRedundancyJudgmentPort,
+  createConceptSetSynthesisPort,
+  createGroundingGenerationPort,
+  createImpostorLieValidityJudgmentPort,
+  createIntrinsicDifficultyJudgmentPort,
+  createKnowledgeBoundaryProbePort,
+  createDeclaredDomainInferencePort,
   LiteLlmNodeEmbeddingAdapter,
-  LiteLlmNodeMergeAdjudicationAdapter,
-  LiteLlmPrerequisiteOrderingAdapter,
-  LiteLlmStudyItemBlueprintAdapter,
-  LiteLlmStudyItemGenerationAdapter,
-  createNeuralClients
+  createNodeMergeAdjudicationPort,
+  createPrerequisiteOrderingPort,
+  createStudyItemBlueprintPort,
+  createStudyItemGenerationPort,
+  createNeuralClients,
+  studyItemBankConfigHash,
+  withSyntheticGenerationConfigHash
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
@@ -43,20 +45,20 @@ function buildContext(sql: DatabaseClient) {
     enrichmentStore,
     runProgressReporter,
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
-    declaredDomainInference: new LiteLlmDeclaredDomainInferenceAdapter(deterministicClient),
-    conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
-    knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
+    declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient),
+    conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
+    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
-    groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
-    prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
-    conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
-    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
+    nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
+    difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
+    conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
+    conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
-    studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
-    studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
-    impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
+    studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
+    studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
+    impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql)
   };
 }
@@ -88,7 +90,8 @@ export async function generateLearnerTopicExpedition(input: {
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
-    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
+    config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
+    configHash: studyItemBankConfigHash(),
     reporter: ctx.runProgressReporter
   });
 }
