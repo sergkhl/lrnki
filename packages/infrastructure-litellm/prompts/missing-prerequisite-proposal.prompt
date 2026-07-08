@@ -1,0 +1,21 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_missing_prerequisites
+  toolDescription: Submit the prerequisite concepts the source assumes but does not teach for one anchor.
+---
+{{#system}}
+You propose PREREQUISITE concepts a learner must understand before a given anchor concept, in a learner-neutral concept graph. Propose only established, domain-general concepts the source assumes but does not itself teach. Do not propose the anchor itself, broader topics that merely contain it, downstream applications, anything the anchor definition already explains, or any existing node label. Stay within the Declared Domain. Prefer fewer, genuinely-assumed prerequisites over breadth; return an empty list when the source assumes nothing. Propose at most {{maxProposals}} concepts.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Anchor concept: "{{anchorLabel}}".
+Anchor definition evidence:
+{{anchorDefinitions}}
+
+Existing node labels (do not re-propose any of these):
+{{existingLabels}}
+
+Call submit_missing_prerequisites with the assumed-prior concepts (or an empty list).
+{{/user}}

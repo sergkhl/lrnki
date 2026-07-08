@@ -1,4 +1,4 @@
-import type { BottleneckReport } from "@lrnki/application";
+import type { CostTimingReport } from "@lrnki/application";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -21,13 +21,13 @@ function formatUsd(usd: number | null): string {
   return usd === null ? "—" : `$${usd.toFixed(4)}`;
 }
 
-function stageKindLabel(kind: BottleneckReport["operations"][number]["stages"][number]["stageKind"]): string {
+function stageKindLabel(kind: CostTimingReport["operations"][number]["stages"][number]["stageKind"]): string {
   if (kind === "llm") return "LLM";
   if (kind === "non_llm") return "non-LLM";
   return "unknown";
 }
 
-export function BottleneckReportView({ report }: { report: BottleneckReport }) {
+export function CostTimingReportView({ report }: { report: CostTimingReport }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">

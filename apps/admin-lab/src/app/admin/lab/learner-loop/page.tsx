@@ -6,24 +6,25 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { listLearnerStates } from "@/lib/learnerLoop";
+import { listLearnerAdminSummaries } from "@/lib/learnerLoop";
 
 export const dynamic = "force-dynamic";
 
 export default async function LearnerLoopListPage() {
-  const learners = await listLearnerStates();
+  const registry = await listLearnerAdminSummaries();
+  const learners = registry?.learners;
   return (
     <AdminShell active="learner-loop">
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Learner loop</CardTitle>
+          <CardTitle>Learner registry</CardTitle>
           <CardDescription>
-            The downstream recall loop over the published graph: calibration verdicts in the mutable verdict store and
-            option-select responses in the append-only Response Log. Learner state only, never a published graph.
+            Registered learners with their downstream recall-loop activity: calibration verdicts in the mutable verdict
+            store and option-select responses in the append-only Response Log. Learner state only, never a published graph.
           </CardDescription>
           <CardAction>
             <Badge variant={learners ? "outline" : "destructive"}>
-              {learners ? `${learners.length} learners` : "Database unavailable"}
+              {registry ? `${registry.stats.registeredLearnerCount} registered` : "Database unavailable"}
             </Badge>
           </CardAction>
         </CardHeader>
@@ -34,47 +35,73 @@ export default async function LearnerLoopListPage() {
                 <EmptyMedia variant="icon">
                   <GraduationCapIcon />
                 </EmptyMedia>
-                <EmptyTitle>No learner responses yet</EmptyTitle>
+                <EmptyTitle>No registered learners yet</EmptyTitle>
                 <EmptyDescription>
-                  Run <code>worker:kg synthesize-responses</code> to seed the loop, then refresh.
+                  Create a learner from <code>/learn</code>, or run <code>worker:kg synthesize-responses</code> to seed the loop.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Learner</TableHead>
-                  <TableHead>Last response</TableHead>
-                  <TableHead className="text-right">Known</TableHead>
-                  <TableHead className="text-right">Graded</TableHead>
-                  <TableHead className="text-right">Conflicts</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {learners.map((learner) => (
-                  <TableRow key={learner.learnerStateRef}>
-                    <TableCell>
-                      <Link className="font-medium underline-offset-4 hover:underline" href={`/admin/lab/learner-loop/${encodeURIComponent(learner.learnerStateRef)}`}>
-                        {learner.learnerStateRef}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {learner.latestResponseAt ? <LocalDateTime iso={learner.latestResponseAt} /> : "—"}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{learner.knownVerdictCount}</TableCell>
-                    <TableCell className="text-right tabular-nums">{learner.gradedCount}</TableCell>
-                    <TableCell className="text-right">
-                      {learner.conflictCount > 0 ? (
-                        <Badge variant="destructive">{learner.conflictCount}</Badge>
-                      ) : (
-                        <span className="text-muted-foreground tabular-nums">0</span>
-                      )}
-                    </TableCell>
+            <div className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">Registered learners</div>
+                  <div className="text-2xl font-semibold tabular-nums">{registry.stats.registeredLearnerCount}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">Learners with activity</div>
+                  <div className="text-2xl font-semibold tabular-nums">{registry.stats.activeLearnerCount}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">Graded responses</div>
+                  <div className="text-2xl font-semibold tabular-nums">{registry.stats.gradedResponseCount}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-xs text-muted-foreground">Conflicts</div>
+                  <div className="text-2xl font-semibold tabular-nums">{registry.stats.conflictCount}</div>
+                </div>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Display name</TableHead>
+                    <TableHead>Learner ref</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Latest response</TableHead>
+                    <TableHead className="text-right">Known verdicts</TableHead>
+                    <TableHead className="text-right">Graded responses</TableHead>
+                    <TableHead className="text-right">Conflicts</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {learners.map((learner) => (
+                    <TableRow key={learner.learnerRef}>
+                      <TableCell className="font-medium">{learner.displayName}</TableCell>
+                      <TableCell>
+                        <Link className="font-mono text-xs underline-offset-4 hover:underline" href={`/admin/lab/learner-loop/${encodeURIComponent(learner.learnerRef)}`}>
+                          {learner.learnerRef}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <LocalDateTime iso={learner.createdAt} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {learner.latestResponseAt ? <LocalDateTime iso={learner.latestResponseAt} /> : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{learner.knownVerdictCount}</TableCell>
+                      <TableCell className="text-right tabular-nums">{learner.gradedCount}</TableCell>
+                      <TableCell className="text-right">
+                        {learner.conflictCount > 0 ? (
+                          <Badge variant="destructive">{learner.conflictCount}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground tabular-nums">0</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

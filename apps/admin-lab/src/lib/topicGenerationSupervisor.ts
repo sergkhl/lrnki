@@ -1,9 +1,13 @@
-import { createDatabaseClient, PostgresLearnerExpeditionStore } from "@lrnki/infrastructure-postgres";
+import { operationStaleBefore } from "@lrnki/application";
+import {
+  createDatabaseClient,
+  PostgresLearnerExpeditionStore,
+  PostgresRunProgressReporter
+} from "@lrnki/infrastructure-postgres";
 import { generateLearnerTopicExpedition } from "./learnerGeneration";
 
 export type DatabaseClient = ReturnType<typeof createDatabaseClient>;
 
-const STALE_HEARTBEAT_MS = 2 * 60 * 1000;
 const SUPERVISOR_INTERVAL_MS = 15 * 1000;
 const MAX_GENERATION_ATTEMPTS = 3;
 // Bounded parallelism per process. Multiple PROCESSES stay safe (DB claim + fencing
@@ -62,7 +66,8 @@ export async function runSupervisorOnce(): Promise<void> {
   state.claiming = true;
   try {
     const store = new PostgresLearnerExpeditionStore(supervisorSql());
-    const staleBefore = new Date(Date.now() - STALE_HEARTBEAT_MS);
+    const staleBefore = operationStaleBefore();
+    await new PostgresRunProgressReporter(supervisorSql()).failStaleOperations({ staleBefore });
     await store.failExhaustedGenerating({
       staleBefore,
       maxAttempts: MAX_GENERATION_ATTEMPTS,

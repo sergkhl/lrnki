@@ -30,11 +30,11 @@ export class PostgresLearnerLoopRead implements LearnerLoopReadPort {
   }
 
   async listResponsesForLearner(learnerStateRef: string): Promise<LearnerLoopResponseDetailRow[]> {
-    const rows = await this.sql<(ResponseRow & { concept_label: string; question: string })[]>`
+    const rows = await this.sql<(ResponseRow & { concept_label: string; question: string; enrichment_id: string })[]>`
       SELECT rl.response_id, rl.learner_state_ref, rl.study_item_id, rl.derived_node_id, rl.signal_type,
              rl.judged_outcome, rl.graded_score, rl.response_source, rl.grader_identity, rl.batch_id,
              rl.attempt_seq, rl.submitted_answer, rl.created_at,
-             n.canonical_label AS concept_label, cd.question
+             n.canonical_label AS concept_label, n.enrichment_id, cd.question
       FROM response_log rl
       JOIN derived_graph_nodes n ON n.derived_node_id = rl.derived_node_id
       -- No superseded_at filter: this must resolve the EXACT item a learner answered,
@@ -43,7 +43,7 @@ export class PostgresLearnerLoopRead implements LearnerLoopReadPort {
       JOIN study_items cd ON cd.study_item_id = rl.study_item_id
       WHERE rl.learner_state_ref = ${learnerStateRef}
       ORDER BY rl.attempt_seq`;
-    return rows.map((row) => ({ ...rowToResponseLogRow(row), nodeLabel: row.concept_label, question: row.question }));
+    return rows.map((row) => ({ ...rowToResponseLogRow(row), nodeLabel: row.concept_label, question: row.question, enrichmentId: row.enrichment_id }));
   }
 
   async listVerdictsForLearner(learnerStateRef: string): Promise<CalibrationVerdict[]> {

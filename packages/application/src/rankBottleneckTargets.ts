@@ -1,7 +1,7 @@
 import type { OperationType } from "@lrnki/ports";
-import type { BottleneckReport } from "./bottleneckReport";
+import type { CostTimingReport } from "./costTimingReport";
 
-// Ranked-target derivation (plan U3, KTD5). A pure read over a completed BottleneckReport
+// Ranked-target derivation (plan U3, KTD5). A pure read over a completed CostTimingReport
 // that names the (operation, stage) cost and time targets in descending order, each with
 // its SHARE of the journey total. It is the handoff artifact for the deferred rule-21
 // optimization pass: that pass measures before/after, and a ranked-share view is exactly
@@ -32,7 +32,7 @@ export interface RankedTargets {
   byWall: RankedTarget[];
 }
 
-export function rankBottleneckTargets(report: BottleneckReport): RankedTargets {
+export function rankBottleneckTargets(report: CostTimingReport): RankedTargets {
   const totalCost = report.total.costUsd;
   const totalWall = report.total.wallClockMs;
   // Flatten every operation's stage rows into one (operation, stage) entry list, computing

@@ -1,15 +1,20 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import test from "node:test";
+import test, { after } from "node:test";
 import type { ConceptLesson, ImpostorItem, NewResponseLogRow, OptionSelectItem, RejectedStudyItem, StructuredDocument, StudyItem } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
 import { PostgresConceptLessonStore, PostgresStudyItemBankStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 import { PostgresSourceRegistrationStore } from "./PostgresStores";
+import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration
 // applied. Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
+
+// This suite seeds `learners` rows; delete exactly those before exiting so the shared dev
+// DB's learner count is unchanged by the run (plan 2026-07-07-007, R2/AE2).
+after(() => cleanupTrackedLearners(databaseUrl));
 
 const document: StructuredDocument = {
   sourceResourceId: "pending",
@@ -142,6 +147,29 @@ maybe("persists an option_select item; it round-trips with options + citation; s
   }
 });
 
+maybe("getStudyItemById round-trips the full domain item by primary key and scopes to the current generation", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const prior = optionSelectFor(s);
+    await bankFor(sql, s, [prior]);
+    const store = new PostgresStudyItemBankStore(sql);
+
+    const hydrated = await store.getStudyItemById(prior.studyItemId);
+    assert.ok(hydrated && hydrated.itemType === "option_select");
+    assert.equal(hydrated.studyItemId, prior.studyItemId);
+    assert.equal(hydrated.options.filter((o) => o.isCorrect).length, 1);
+
+    assert.equal(await store.getStudyItemById(randomUUID()), undefined, "an unknown id returns undefined");
+
+    // Superseding the item removes it from the current-generation lookup.
+    await bankFor(sql, s, [optionSelectFor(s)]);
+    assert.equal(await store.getStudyItemById(prior.studyItemId), undefined, "a superseded item is not returned");
+  } finally {
+    await sql.end();
+  }
+});
+
 maybe("regeneration (supersede-then-insert) retires a prior bank from current reads while keeping its options/citations as history", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
@@ -177,7 +205,7 @@ maybe("regenerating a study item bank after a learner response was logged agains
     await bankFor(sql, s, [prior]);
 
     const responseId = randomUUID();
-    const learnerStateRef = randomUUID();
+    const learnerStateRef = await seedLearner(sql, randomUUID());
     await new PostgresResponseLogStore(sql).append([
       {
         responseId,
@@ -390,7 +418,7 @@ maybe("a graded row referencing a real study_item_id inserts; one referencing an
   try {
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
     const rows = await store.listForLearner(learner);
     assert.equal(rows.length, 1);
@@ -410,7 +438,7 @@ maybe("graded rows preserve attempt_seq order and grader_identity 'auto'", async
   try {
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.append([
       gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 }),
       gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "incorrect", score: 0 })
@@ -434,7 +462,7 @@ maybe("concurrent same-learner appends each get a distinct, gapless attempt_seq 
   try {
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const store = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     const fanOut = 16;
     await Promise.all(
       Array.from({ length: fanOut }, () =>
@@ -457,7 +485,7 @@ maybe("upsert writes a verdict that reads back; a second upsert OVERWRITES it (o
   try {
     const { derivedNodeId } = await seedItem(sql);
     const store = new PostgresCalibrationVerdictStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
     let verdicts = await store.listForLearner(learner);
     assert.equal(verdicts.length, 1);
@@ -478,8 +506,8 @@ maybe("delete removes one node's verdict (R7 reversal); clearLearner removes onl
   try {
     const { derivedNodeId } = await seedItem(sql);
     const store = new PostgresCalibrationVerdictStore(sql);
-    const learnerA = `learner-${randomUUID()}`;
-    const learnerB = `learner-${randomUUID()}`;
+    const learnerA = await seedLearner(sql, `learner-${randomUUID()}`);
+    const learnerB = await seedLearner(sql, `learner-${randomUUID()}`);
     await store.upsert({ learnerStateRef: learnerA, derivedNodeId, verdict: "known" });
     await store.upsert({ learnerStateRef: learnerB, derivedNodeId, verdict: "known" });
 
@@ -498,7 +526,7 @@ maybe("the verdict CHECK rejects a value outside known/learn", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const { derivedNodeId } = await seedItem(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await assert.rejects(
       () => sql`
         INSERT INTO calibration_verdicts (learner_state_ref, derived_node_id, verdict)
@@ -516,7 +544,7 @@ maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with
     const { studyItemId, derivedNodeId } = await seedItem(sql);
     const verdicts = new PostgresCalibrationVerdictStore(sql);
     const log = new PostgresResponseLogStore(sql);
-    const learner = `learner-${randomUUID()}`;
+    const learner = await seedLearner(sql, `learner-${randomUUID()}`);
     await verdicts.upsert({ learnerStateRef: learner, derivedNodeId, verdict: "known" });
     await log.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
 

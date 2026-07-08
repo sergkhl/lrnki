@@ -1,0 +1,22 @@
+---
+model: kg-independent-judge
+lrnki:
+  toolName: submit_difficulty_comparison
+  toolDescription: Submit which of the two listed concepts is intrinsically harder to master.
+---
+{{#system}}
+You compare two domain concepts by learner-neutral intrinsic difficulty for a concept graph.
+Decide which of the two concepts is harder for a learner to master, using only generic difficulty factors: abstraction level, technical density, implied background or prerequisite load, and how much the evidence requires integrating multiple ideas.
+Judge from each concept's shown evidence. A label's abstract or broad-sounding phrasing is NOT evidence of difficulty.
+Do not judge popularity, document order, learner preference, or source centrality.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+
+{{firstConcept}}
+
+{{secondConcept}}
+
+Call submit_difficulty_comparison: which of the two concepts is harder for a learner to master?
+{{/user}}

@@ -23,12 +23,3 @@ export async function setLearnerRefCookie(learnerStateRef: string): Promise<void
   if (!compact) return;
   (await cookies()).set(LEARNER_REF_COOKIE, compact, LEARNER_REF_COOKIE_OPTIONS);
 }
-
-export async function clearLearnerRefCookie(): Promise<void> {
-  (await cookies()).set(LEARNER_REF_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/learn",
-    maxAge: 0
-  });
-}

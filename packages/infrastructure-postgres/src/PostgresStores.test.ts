@@ -351,6 +351,13 @@ maybe("enrichment round-trips anchor projection nodes and derived-node edges", a
     assert.equal(detailByNode.get(ownershipId)?.difficultyContested, true);
     assert.equal(detailByNode.get(borrowingId)?.difficultyBand, null);
     assert.equal(detailByNode.get(borrowingId)?.difficultyContested, null);
+
+    // Node-membership boolean read (Candidate 2): true for a node in this enrichment,
+    // false for a foreign node or a foreign enrichment.
+    const inspection = new PostgresEnrichmentInspectionRead(sql);
+    assert.equal(await inspection.derivedNodeBelongsToEnrichment(enrichmentId, ownershipId), true);
+    assert.equal(await inspection.derivedNodeBelongsToEnrichment(enrichmentId, randomUUID()), false);
+    assert.equal(await inspection.derivedNodeBelongsToEnrichment(randomUUID(), ownershipId), false);
   } finally {
     await sql.end();
   }

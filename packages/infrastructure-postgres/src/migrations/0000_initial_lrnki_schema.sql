@@ -543,6 +543,41 @@ CREATE TABLE concept_difficulties (
 );
 
 -- ---------------------------------------------------------------------------
+-- Learner Registry (plan 2026-07-07-005, R1). The identity table the four
+-- learner-state tables key against. `learner_ref` is the compact-normalized ref
+-- (`compactLearnerRef`) produced at the gate, so it is the natural primary key and
+-- what every learner-state FK references. Real humans only — there is no `is_mock`
+-- flag and simulated rivals never get a row (KTD1). `pin_hash` is a salted SHA-256
+-- of a short numeric PIN (KTD8): a labeled placeholder for real authentication, not
+-- a security claim on an open dev database.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE learners (
+  learner_ref text PRIMARY KEY,
+  display_name text NOT NULL,
+  pin_hash text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Durable learner awards (plan 2026-07-07-005, R8). One row per earned flair. A
+-- `duel_win` is written when a learner wins a Crystal Duel; a `weekly_podium` is
+-- awarded lazily and idempotently on first entry into a new ISO week (top 3 of the
+-- prior week's final standings, KTD6). `dedupe_key` scopes idempotency: the ISO week
+-- key for a podium, a duel id for a win. The UNIQUE makes re-award a no-op. Real
+-- learners only — rivals are fiction and never earn persisted awards (KTD1).
+CREATE TABLE learner_awards (
+  award_id uuid PRIMARY KEY,
+  learner_ref text NOT NULL REFERENCES learners(learner_ref),
+  award_type text NOT NULL CHECK (award_type IN ('duel_win', 'weekly_podium')),
+  dedupe_key text NOT NULL,
+  context jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (learner_ref, award_type, dedupe_key)
+);
+
+CREATE INDEX learner_awards_learner_idx ON learner_awards (learner_ref, created_at DESC);
+
+-- ---------------------------------------------------------------------------
 -- Learner Expeditions — learner-owned route/generation state for the Learner App.
 -- This table does not persist mastery, readiness, rewards, or trail shape; those
 -- derive from the Study Session projection and the published graph. It only
@@ -552,7 +587,7 @@ CREATE TABLE concept_difficulties (
 
 CREATE TABLE learner_expeditions (
   learner_expedition_id uuid PRIMARY KEY,
-  learner_state_ref text NOT NULL,
+  learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
   kind text NOT NULL CHECK (kind IN ('topic')),
   title text NOT NULL,
   declared_domain text,
@@ -933,7 +968,7 @@ CREATE TABLE lesson_absent_nodes (
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE calibration_verdicts (
-  learner_state_ref text NOT NULL,
+  learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   verdict text NOT NULL CHECK (verdict IN ('known', 'learn')),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -941,7 +976,7 @@ CREATE TABLE calibration_verdicts (
 );
 
 CREATE TABLE lesson_reads (
-  learner_state_ref text NOT NULL,
+  learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   first_read_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (learner_state_ref, derived_node_id)
@@ -964,7 +999,7 @@ CREATE TABLE lesson_reads (
 
 CREATE TABLE response_log (
   response_id uuid PRIMARY KEY,
-  learner_state_ref text NOT NULL,
+  learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
   study_item_id uuid NOT NULL REFERENCES study_items(study_item_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   signal_type text NOT NULL CHECK (signal_type IN ('graded')),

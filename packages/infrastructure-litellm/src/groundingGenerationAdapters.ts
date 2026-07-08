@@ -1,81 +1,58 @@
 import type { GeneratedGroundingBundle } from "@lrnki/domain-core";
-import type { GroundingGenerationPort } from "@lrnki/ports";
-import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import { EVIDENCE_PROFILE_MODEL } from "./extractionAdapters";
+import type { GroundingGenerationPort } from "@lrnki/ports";
+import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
+import { readPromptFile } from "./promptFile";
 import { generatedGroundingBundleSchema, generatedGroundingBundleValidator } from "./toolSchemas";
 
-export const GROUNDING_GENERATION_MODEL = EVIDENCE_PROFILE_MODEL;
+type GroundingGenerationInput = {
+  derivedNodeId: string;
+  declaredDomain: string;
+  nodeLabel: string;
+  scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
+  topic?: string;
+};
 
-export class LiteLlmGroundingGenerationAdapter implements GroundingGenerationPort {
-  readonly model: string;
+type GroundingGenerationArgs = { definitions: { text: string }[]; mentions: { text: string }[]; rationale: string };
 
-  constructor(private readonly client: LiteLlmForcedToolClient, model: string = GROUNDING_GENERATION_MODEL) {
-    this.model = model;
-  }
-
-  async generate(input: {
-    derivedNodeId: string;
-    declaredDomain: string;
-    nodeLabel: string;
-    scaffoldedAnchors: { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[];
-    topic?: string;
-  }): Promise<GeneratedGroundingBundle> {
-    // Anchor-less synthetic case (KTD3): no scaffolded anchors, so the bundle grounds on
-    // the originating topic instead. The enrichment-minting path keeps scaffolding on its
-    // anchors unchanged.
+export const groundingGenerationDescriptor: NeuralStageDescriptor<
+  GroundingGenerationInput,
+  GroundingGenerationArgs,
+  GeneratedGroundingBundle
+> = {
+  promptPath: "grounding-generation.prompt",
+  stageTag: STAGE_TAGS.groundingGeneration,
+  schema: generatedGroundingBundleSchema,
+  validator: generatedGroundingBundleValidator,
+  sentinelInput: {
+    derivedNodeId: "sentinel_node",
+    declaredDomain: "sentinel domain",
+    nodeLabel: "Sentinel node",
+    scaffoldedAnchors: [{ conceptId: "sentinel_anchor", canonicalLabel: "Sentinel anchor", definitionQuotes: ["Sentinel definition."] }]
+  },
+  templateData: (input) => {
     const anchorLess = input.scaffoldedAnchors.length === 0;
-    const system = anchorLess
-      ? [
-          "You generate a CEP-shaped grounding bundle for an LLM-grounded concept node in a learner-neutral derived graph layer.",
-          "The bundle is generated from your own knowledge; there is no curated source, so it must never pretend to be a verbatim source quote.",
-          "Write concise generated definition and mention-like passages that explain the concept as a first-class topic concept in the Declared Domain.",
-          "Explain the concept on its own terms and how it fits the stated topic; do not invent unrelated breadth. Stay within the Declared Domain."
-        ].join(" ")
-      : [
-          "You generate a CEP-shaped grounding bundle for an LLM-grounded prerequisite node in a learner-neutral derived graph layer.",
-          "The bundle is NOT source-quoted evidence and must never pretend to be verbatim from the curated source.",
-          "Write concise generated definition and mention-like passages that explain the prerequisite concept using the vocabulary of the provided anchor concepts.",
-          "Condition the explanation on the scaffolded anchors: the generated prerequisite should be useful because it helps a learner understand those anchors.",
-          "Do not introduce unrelated curriculum breadth. Stay within the Declared Domain and the provided anchors."
-        ].join(" ");
     const anchorText = input.scaffoldedAnchors
       .map((anchor) => [
         `- ${anchor.canonicalLabel} (${anchor.conceptId})`,
         ...anchor.definitionQuotes.map((quote) => `  definition quote: "${quote}"`)
       ].join("\n"))
       .join("\n");
-    const user = anchorLess
-      ? [
-          `Declared domain: ${input.declaredDomain}.`,
-          ...(input.topic ? [`Originating topic: "${input.topic}".`] : []),
-          `Concept node: "${input.nodeLabel}".`,
-          "",
-          "Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale."
-        ].join("\n")
-      : [
-          `Declared domain: ${input.declaredDomain}.`,
-          `Generated prerequisite node: "${input.nodeLabel}".`,
-          "Scaffolded anchors:",
-          anchorText || "(none)",
-          "",
-          "Call submit_generated_grounding_bundle with at least one generated definition passage, optional mention-like passages, and a rationale."
-        ].join("\n");
-
-    const result = await this.client.call({
-      model: this.model,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      toolName: "submit_generated_grounding_bundle",
-      toolDescription: "Submit generated grounding passages for one LLM-grounded prerequisite node.",
-      parameters: generatedGroundingBundleSchema,
-      validator: generatedGroundingBundleValidator,
-      tags: [STAGE_TAGS.groundingGeneration]
-    });
-
+    return {
+      declaredDomain: input.declaredDomain,
+      contextLines: anchorLess
+        ? `${input.topic ? `Originating topic: "${input.topic}".\n` : ""}`
+        : `Generated prerequisite node: "${input.nodeLabel}".\nScaffolded anchors:\n${anchorText || "(none)"}`,
+      nodeLine: anchorLess ? `Concept node: "${input.nodeLabel}".` : ""
+    };
+  },
+  mapResult: (result, input) => {
     const notApplicable = {
       disposition: "not_applicable_by_grounding" as const,
       rationale: "llm_grounded generated passage has no cited source block"
     };
+    const model = readPromptFile(groundingGenerationDescriptor.promptPath).model;
     return {
       derivedNodeId: input.derivedNodeId,
       groundingOrigin: "llm_grounded",
@@ -96,8 +73,15 @@ export class LiteLlmGroundingGenerationAdapter implements GroundingGenerationPor
         verbatimCheck: notApplicable
       })),
       scaffoldedAnchorConceptIds: input.scaffoldedAnchors.map((anchor) => anchor.conceptId),
-      generatingModel: this.model,
+      generatingModel: model,
       rationale: result.rationale
     };
   }
+};
+
+export function createGroundingGenerationPort(client: LiteLlmForcedToolClient): GroundingGenerationPort {
+  return {
+    model: readPromptFile(groundingGenerationDescriptor.promptPath).model,
+    generate: (input) => executeForcedToolStage(client, groundingGenerationDescriptor, input)
+  };
 }

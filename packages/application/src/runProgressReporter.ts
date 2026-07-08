@@ -34,7 +34,7 @@ export { isLlmStage, NON_LLM_STAGES, type NonLlmStage };
 // LLM port calls to fine STAGE_TAGS names without knowing about the reporter or operation
 // id. Threaded into assembleEnrichmentNodes and deduplicateDerivedNodes so the per-stage
 // wall-clock bracket keys to the SAME fine names the inner calls already tag their cost
-// with, closing the bottleneck-report join.
+// with, closing the cost & timings report join.
 export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: number) => Promise<T>;
 
 // Instrumented operation wrapper shared by every operation (ADR-0029). It owns the

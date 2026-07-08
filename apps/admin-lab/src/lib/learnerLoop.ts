@@ -1,8 +1,9 @@
 import {
   getLearnerLoopDetail as loadLearnerLoopDetail,
+  listLearnerAdminSummaries as loadLearnerAdminSummaries,
   listLearnerStates as loadLearnerStates
 } from "@lrnki/application";
-import { createDatabaseClient, PostgresLearnerLoopRead } from "@lrnki/infrastructure-postgres";
+import { createDatabaseClient, PostgresLearnerLoopRead, PostgresLearnerStore } from "@lrnki/infrastructure-postgres";
 
 // Server-only thin shell over the Learner Loop read port + projection use-cases (ADR-0027,
 // KTD7). The joined-history SQL lives in `PostgresLearnerLoopRead`; the conflict/mastery/
@@ -13,6 +14,9 @@ import { createDatabaseClient, PostgresLearnerLoopRead } from "@lrnki/infrastruc
 // other inspection loaders.
 export type {
   ConceptConflict,
+  LearnerAdminRegistry,
+  LearnerAdminStats,
+  LearnerAdminSummary,
   LearnerStateSummary,
   LearnerResponseView,
   LearnerLoopDetail,
@@ -33,6 +37,15 @@ async function withClient<T>(fn: (sql: Sql) => Promise<T>): Promise<T | undefine
 
 export function listLearnerStates() {
   return withClient((sql) => loadLearnerStates(new PostgresLearnerLoopRead(sql)));
+}
+
+export function listLearnerAdminSummaries() {
+  return withClient((sql) =>
+    loadLearnerAdminSummaries({
+      learnerStore: new PostgresLearnerStore(sql),
+      loopRead: new PostgresLearnerLoopRead(sql)
+    })
+  );
 }
 
 export function getLearnerLoopDetail(learnerStateRef: string) {

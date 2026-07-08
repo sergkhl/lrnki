@@ -3,10 +3,8 @@ import { test } from "node:test";
 import type { DifficultyNodeContext } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import {
-  DIFFICULTY_BANDING_SYSTEM_PROMPT,
-  DIFFICULTY_COMPARISON_SYSTEM_PROMPT,
-  INTRINSIC_DIFFICULTY_JUDGE_MODEL,
-  LiteLlmIntrinsicDifficultyJudgmentAdapter
+  createIntrinsicDifficultyJudgmentPort,
+  intrinsicDifficultyModelFacingText
 } from "./intrinsicDifficultyAdapters";
 import {
   buildDifficultyBandsSchema,
@@ -35,7 +33,7 @@ function adapterReturning(canned: unknown) {
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return { adapter: new LiteLlmIntrinsicDifficultyJudgmentAdapter(client, "mock-difficulty-judge"), calls };
+  return { adapter: createIntrinsicDifficultyJudgmentPort(client), calls };
 }
 
 test("difficulty bands validator accepts exact coverage with in-range bands", () => {
@@ -101,7 +99,7 @@ test("bandDomainSet renders the numbered menu, bounds the call, and returns numb
     { conceptNumber: 2, band: 4, rationale: "integrates several ideas" }
   ]);
   const call = calls[0] as { model: string; toolName: string; maxRetries: number; messages: { content: string }[] };
-  assert.equal(call.model, "mock-difficulty-judge");
+  assert.equal(call.model, "kg-independent-judge");
   assert.equal(call.toolName, "submit_difficulty_bands");
   assert.equal(call.maxRetries, 2);
   assert.ok(call.messages.some((message) => message.content.includes("Concept 1: \"Example Concept\"")));
@@ -125,13 +123,12 @@ test("compareHarder presents both concepts symmetrically and returns only the di
 });
 
 test("adapter defaults to the independent judge alias", () => {
-  assert.equal(new LiteLlmIntrinsicDifficultyJudgmentAdapter({} as LiteLlmForcedToolClient).model, INTRINSIC_DIFFICULTY_JUDGE_MODEL);
+  assert.equal(createIntrinsicDifficultyJudgmentPort({} as LiteLlmForcedToolClient).model, "kg-independent-judge");
 });
 
 test("rubric prompts and schema descriptions remain domain-neutral", () => {
   const modelFacingText = [
-    DIFFICULTY_BANDING_SYSTEM_PROMPT,
-    DIFFICULTY_COMPARISON_SYSTEM_PROMPT,
+    intrinsicDifficultyModelFacingText(),
     JSON.stringify(buildDifficultyBandsSchema(3)),
     JSON.stringify(difficultyComparisonSchema)
   ].join("\n").toLowerCase();

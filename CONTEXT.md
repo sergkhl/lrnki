@@ -218,6 +218,13 @@ source evidence; generated content is labeled generated. Its study-asset contrac
 [ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md).
 _Avoid_: fake source citation, unlabeled generated quote
 
+**Neural Stage Descriptor**:
+The single home for one forced-tool LLM stage's knowledge: a dotprompt `.prompt` file owning the
+model alias, tool name, tool description, and prompt templates, plus a typed rim (zod schema,
+stage tag, result mapping) executed by one generic forced-tool executor. Per-operation
+configuration hashes derive mechanically from descriptor content.
+_Avoid_: adapter class per stage, hand-bumped config hash, prompt string in code
+
 **Inspection Read Model**:
 A finished read-only projection of persisted state returned by an inspection port. It is distinct
 from a learner-facing projection, which combines reads with adaptation compute behind an application

@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
+import type { OperationType } from "@lrnki/ports";
 import {
   NON_LLM_STAGES,
-  isKnownOperationTimelineStage,
+  OPERATION_TIMELINE_CATALOG,
   isLlmStage,
   operationTimelineLlmSpendStageTags,
   operationTimelineStageKind,
-  operationTimelineStagesForOperation,
   spendStageBelongsToOperation,
   stageBelongsToOperation
 } from "./operationTimelineCatalog";
@@ -20,51 +20,59 @@ test("classifies the closed LLM vocabulary as LLM and non-LLM stages as non-LLM"
   for (const stage of Object.values(NON_LLM_STAGES)) {
     assert.equal(isLlmStage(stage), false, `expected ${stage} to be non-LLM`);
     assert.equal(operationTimelineStageKind(stage), "non_llm");
-    assert.equal(isKnownOperationTimelineStage(stage), true);
   }
   assert.equal(operationTimelineStageKind("not-a-real-stage"), "unknown");
-  assert.equal(isKnownOperationTimelineStage("not-a-real-stage"), false);
 });
 
-test("declares reportable stages by operation type", () => {
-  assert.deepEqual(operationTimelineStagesForOperation("extraction").map((row) => row.stage), [
-    STAGE_TAGS.conceptDiscovery,
-    STAGE_TAGS.admission,
-    STAGE_TAGS.admissionLabelJudge,
-    STAGE_TAGS.cepExtraction,
-    STAGE_TAGS.definitionPassageQuality,
-    STAGE_TAGS.assertionEntailment,
-    NON_LLM_STAGES.persist
-  ]);
-  assert.deepEqual(operationTimelineStagesForOperation("minting").map((row) => row.stage), [
-    NON_LLM_STAGES.load,
-    NON_LLM_STAGES.refine,
-    NON_LLM_STAGES.persist
-  ]);
-  assert.deepEqual(operationTimelineStagesForOperation("enrichment").map((row) => row.stage), [
-    STAGE_TAGS.declaredDomainInference,
-    STAGE_TAGS.prerequisiteOrdering,
-    STAGE_TAGS.rescueDurability,
-    STAGE_TAGS.rescueDefinitionQuality,
-    STAGE_TAGS.mintingDurability,
-    STAGE_TAGS.missingPrerequisiteProposal,
-    STAGE_TAGS.groundingGeneration,
-    STAGE_TAGS.intrinsicDifficulty,
-    STAGE_TAGS.nodeEmbedding,
-    STAGE_TAGS.nodeMergeAdjudication,
-    NON_LLM_STAGES.symbolicDisposal,
-    NON_LLM_STAGES.persist
-  ]);
-  assert.deepEqual(operationTimelineStagesForOperation("study_items").map((row) => row.stage), [
-    NON_LLM_STAGES.load,
-    STAGE_TAGS.conceptLessonGeneration,
-    STAGE_TAGS.lessonRedundancyJudgment,
-    STAGE_TAGS.studyItemBlueprint,
-    STAGE_TAGS.studyItemGeneration,
-    STAGE_TAGS.matchingGeneration,
-    STAGE_TAGS.impostorGeneration,
-    NON_LLM_STAGES.persist
-  ]);
+// R2: the catalog's LLM stages must be exactly the closed STAGE_TAGS vocabulary — no
+// orphaned live tag (a tag no operation owns) and no dead tag (a tag no operation runs).
+// This set-equality property replaces the hand-copied per-operation stage lists that used
+// to restate the catalog: those could only ever re-encode the same gap, never catch it.
+test("catalog LLM stages are exactly the closed stage-tag vocabulary, each owned once", () => {
+  const ownerByStage = new Map<string, OperationType>();
+  for (const [operationType, stages] of Object.entries(OPERATION_TIMELINE_CATALOG) as [
+    OperationType,
+    readonly { stage: string; kind: "llm" | "non_llm" }[]
+  ][]) {
+    for (const { stage, kind } of stages) {
+      if (kind !== "llm") continue;
+      const priorOwner = ownerByStage.get(stage);
+      assert.equal(
+        priorOwner,
+        undefined,
+        `LLM stage ${stage} is claimed by both ${priorOwner} and ${operationType}`
+      );
+      ownerByStage.set(stage, operationType);
+    }
+  }
+
+  const catalogLlmStages = new Set(ownerByStage.keys());
+  const vocabulary = new Set<string>(Object.values(STAGE_TAGS));
+  const orphanedTags = [...vocabulary].filter((tag) => !catalogLlmStages.has(tag));
+  const unknownStages = [...catalogLlmStages].filter((stage) => !vocabulary.has(stage));
+  assert.deepEqual(orphanedTags, [], `stage tags no operation catalogs: ${orphanedTags.join(", ")}`);
+  assert.deepEqual(unknownStages, [], `catalog LLM stages absent from STAGE_TAGS: ${unknownStages.join(", ")}`);
+});
+
+test("catalog non-LLM stages are drawn from the known non-LLM vocabulary", () => {
+  const knownNonLlm = new Set<string>(Object.values(NON_LLM_STAGES));
+  for (const stages of Object.values(OPERATION_TIMELINE_CATALOG)) {
+    for (const { stage, kind } of stages) {
+      if (kind !== "non_llm") continue;
+      assert.equal(knownNonLlm.has(stage), true, `${stage} is not a known non-LLM stage`);
+    }
+  }
+});
+
+// R1 regression: the four live tags that were silently dropped from cost & timings / journey
+// reports until this change now belong to their owning operation.
+test("previously-dropped spend tags belong to their owning operation", () => {
+  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.conceptSetSynthesis, "enrichment"), true);
+  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.knowledgeBoundaryProbe, "enrichment"), true);
+  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.rescuedNodeLabeling, "enrichment"), true);
+  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.impostorLieValidityJudgment, "study_items"), true);
+  // A stage owned by enrichment must not be attributed to a different operation.
+  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.conceptSetSynthesis, "study_items"), false);
 });
 
 test("checks operation ownership without claiming unknown stages", () => {
@@ -87,16 +95,6 @@ test("checks operation ownership without claiming unknown stages", () => {
 test("spend ownership excludes non-LLM and unknown stages", () => {
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "extraction"), true);
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.admission, "enrichment"), false);
-  for (const stage of [
-    STAGE_TAGS.conceptLessonGeneration,
-    STAGE_TAGS.studyItemBlueprint,
-    STAGE_TAGS.studyItemGeneration,
-    STAGE_TAGS.matchingGeneration,
-    STAGE_TAGS.impostorGeneration
-  ]) {
-    assert.equal(spendStageBelongsToOperation(stage, "study_items"), true, `${stage} spend belongs to study_items`);
-    assert.equal(spendStageBelongsToOperation(stage, "enrichment"), false, `${stage} spend does not belong to enrichment`);
-  }
   assert.equal(spendStageBelongsToOperation(NON_LLM_STAGES.persist, "minting"), false);
   assert.equal(spendStageBelongsToOperation("not-a-real-stage", "extraction"), false);
 });

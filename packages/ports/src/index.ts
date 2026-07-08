@@ -556,6 +556,61 @@ export interface LearnerExpeditionStorePort {
 }
 
 // ---------------------------------------------------------------------------
+// Learner Registry + Awards ports (plan 2026-07-07-005, R1/R8). The registry is the
+// identity table every learner-state FK keys against; awards are durable flair. Real
+// humans only — simulated rivals (KTD1) never touch either store.
+// ---------------------------------------------------------------------------
+
+export interface Learner {
+  learnerRef: string;
+  displayName: string;
+  pinHash: string;
+  createdAt: string;
+}
+
+// The registry store (R1, R2). `create` enforces ref uniqueness at insert (the
+// name-taken path is a conflict, surfaced as `created: false`); `get` and `list`
+// feed the picker; `exists` is a cheap presence check. PIN verification lives in the
+// `enterLearnerSession` use-case, which reads `pinHash` off `get` — the store never
+// hashes or compares (KTD8).
+export interface LearnerStorePort {
+  create(input: { learnerRef: string; displayName: string; pinHash: string }): Promise<{ created: boolean }>;
+  get(learnerRef: string): Promise<Learner | undefined>;
+  list(): Promise<Learner[]>;
+  // Refs of learners with ANY study evidence — at least one response, lesson read, or
+  // calibration verdict (plan 2026-07-07-007, R4/KTD2). A cheap existence read over the
+  // projection's own inputs: a learner with none cannot score or hold a lifetime crystal,
+  // so the weekly-board pass skips the expensive per-enrichment projection for them. This is
+  // NOT a mastery predicate — it prefilters inputs the projection would otherwise read.
+  listRefsWithStudyEvidence(): Promise<string[]>;
+}
+
+export interface LearnerAward {
+  awardId: string;
+  learnerRef: string;
+  awardType: "duel_win" | "weekly_podium";
+  dedupeKey: string;
+  context: Record<string, unknown>;
+  createdAt: string;
+}
+
+// Durable award store (R8). `record` is idempotent on (learner, type, dedupe_key):
+// a repeat write is a no-op (`recorded: false`), so a re-entered week never
+// duplicates a podium and a re-shown duel never doubles a win. `listForLearner` and
+// `listForLearners` feed board flair.
+export interface LearnerAwardsStorePort {
+  record(input: {
+    awardId: string;
+    learnerRef: string;
+    awardType: LearnerAward["awardType"];
+    dedupeKey: string;
+    context: Record<string, unknown>;
+  }): Promise<{ recorded: boolean }>;
+  listForLearner(learnerRef: string): Promise<LearnerAward[]>;
+  listForLearners(learnerRefs: string[]): Promise<LearnerAward[]>;
+}
+
+// ---------------------------------------------------------------------------
 // Learner Study Loop ports (R7–R16, ADR-0026). Learner-neutral typed Study Item Bank
 // plus the durable append-only Response Log. All learner structures are projection-only:
 // nothing here mutates the asserted graph or the Derived Graph Layer (AGENTS rule 3).
@@ -576,6 +631,11 @@ export interface LearnerExpeditionStorePort {
 export interface StudyItemBankStorePort {
   persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; studyItems: StudyItem[]; rejected: RejectedStudyItem[] }): Promise<void>;
   getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined>;
+  // Current-generation lookup by primary key (`superseded_at IS NULL`), feeding the same
+  // `hydrate` as the other reads. The server-side grading use-case resolves answer keys off
+  // the returned domain item (option `isCorrect`, impostor `isImpostor`, matching pairs), so
+  // one method serves all three item types and no per-type answer-key SQL survives (KTD2).
+  getStudyItemById(studyItemId: string): Promise<StudyItem | undefined>;
   listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]>;
   supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]>;
 }
@@ -972,6 +1032,12 @@ export interface DerivedGraphDetail {
 export interface EnrichmentInspectionReadPort {
   listEnrichmentSummaries(): Promise<EnrichmentSummary[]>;
   getDerivedGraphDetail(enrichmentId: string): Promise<DerivedGraphDetail | undefined>;
+  // Finished boolean membership read over the Derived Graph Layer: does this node belong to
+  // this enrichment? The learner-grading use-case runs it alongside the active-expedition
+  // guard for verdict and lesson-read writes, which key on (learner, node) globally — the
+  // check keeps a client from marking a node in a non-active expedition (R4). A yes/no answer
+  // is a finished read (ADR-0027); loading the whole Derived Graph Detail for it would be waste.
+  derivedNodeBelongsToEnrichment(enrichmentId: string, derivedNodeId: string): Promise<boolean>;
 }
 
 // Learner Loop inspection read surface (ADR-0027, KTD7). The learner-loop history reads are
@@ -981,7 +1047,7 @@ export interface EnrichmentInspectionReadPort {
 // response rows carry the joined node label + question alongside the full append-only
 // Response Log row so a use-case can both render and re-fold from one read.
 export type LearnerLoopResponseRow = ResponseLogRow & { createdAt: string };
-export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string };
+export type LearnerLoopResponseDetailRow = LearnerLoopResponseRow & { nodeLabel: string; question: string; enrichmentId: string };
 
 export interface LearnerLoopReadPort {
   listAllResponses(): Promise<LearnerLoopResponseRow[]>;

@@ -1,0 +1,18 @@
+---
+model: kg-independent-judge
+lrnki:
+  toolName: submit_concept_lesson_redundancy_judgment
+  toolDescription: Submit per-section distinctness judgments for one concept lesson.
+---
+{{#system}}
+You judge whether learner-facing lesson sections carry distinct instructional information. Mark a non-substantive section redundant only when it merely rephrases another section and adds no new hook, mental model, example, application, or method. Never mark definition, examples, or formulas redundant; those substantive sections are preserved by the application. Judge meaning, not exact wording. Stay within the Declared Domain.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Learning node: "{{nodeLabel}}"{{aliasText}}.
+Lesson sections:
+{{sections}}
+
+Call submit_concept_lesson_redundancy_judgment with one judgment for each section.
+{{/user}}

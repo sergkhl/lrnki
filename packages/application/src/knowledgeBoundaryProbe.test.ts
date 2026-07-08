@@ -138,6 +138,32 @@ test("a mismatched embedding count fails safe to boundary", async () => {
 });
 
 test("thresholds and K are config-driven, not hard-coded", () => {
-  assert.equal(DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG.sampleCount, 5);
+  assert.equal(DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG.sampleCount, 10);
+  assert.equal(DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG.agreementThreshold, 0.89);
   assert.ok(DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG.agreementThreshold > 0 && DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG.agreementThreshold < 1);
+});
+
+test("measured defaults route a fabricated production-path score below 0.89 to boundary and a core score above it to core_knowledge", async () => {
+  const fabricatedAnswers = Array.from({ length: 10 }, (_, index) => `fabricated-${index}`);
+  const fabricatedVerdict = await probeKnowledgeBoundary({
+    conceptLabel: "Fabricated measurement analogue",
+    declaredDomain: "some domain",
+    probe: fakeProbe(fabricatedAnswers),
+    embedding: fakeEmbedding({
+      ...Object.fromEntries(fabricatedAnswers.slice(0, 9).map((answer) => [answer, [1, 0]])),
+      "fabricated-9": [0, 1]
+    }),
+    config: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG
+  });
+  assert.equal(fabricatedVerdict.disposition, "boundary");
+  assert.match(fabricatedVerdict.rationale, /threshold 0\.89/);
+
+  const coreVerdict = await probeKnowledgeBoundary({
+    conceptLabel: "Core measurement analogue",
+    declaredDomain: "some domain",
+    probe: fakeProbe(["same"]),
+    embedding: fakeEmbedding({ same: [1, 0] }),
+    config: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG
+  });
+  assert.equal(coreVerdict.disposition, "core_knowledge");
 });

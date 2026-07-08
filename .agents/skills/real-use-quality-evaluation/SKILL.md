@@ -44,6 +44,9 @@ Automated tests are necessary but not sufficient. Unit tests, schema validation,
    - Keep `EXPERIMENT_ONLY` mechanisms outside the authoritative core.
    - For `BLOCKED`, state the exact caveat and do not claim the feature is quality-verified.
    - Continue only after the current layer is useful enough for its intended consumer.
+   - Gate scripts that register `learners` against the shared dev DB must delete every learner
+     they registered (FK children first) when done, so junk never accumulates on the weekly
+     board (plan 2026-07-07-007, R2).
 
 ## Foundation failures that must block downstream work
 

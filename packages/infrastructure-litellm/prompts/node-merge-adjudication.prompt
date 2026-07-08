@@ -1,0 +1,19 @@
+---
+model: kg-independent-judge
+lrnki:
+  toolName: submit_node_merge_decision
+  toolDescription: Submit whether the two same-domain candidate concepts are one concept (merge) or distinct (keep_distinct).
+---
+{{#system}}
+You decide whether two candidate labels from the SAME domain name the SAME underlying concept, for a learner-neutral concept graph. Merge only clear surface forms of one concept. Keep distinct concepts separate, even when they are closely related. Decide from meaning and cited evidence only, never from surface wordform overlap. Concept A and Concept B are symmetric; neither is privileged. When unsure, return keep_distinct.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+
+{{conceptA}}
+
+{{conceptB}}
+
+Call submit_node_merge_decision: are Concept A and Concept B the same domain concept (merge) or genuinely distinct (keep_distinct)?
+{{/user}}

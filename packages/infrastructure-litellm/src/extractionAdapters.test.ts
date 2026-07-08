@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { SourceBlock } from "@lrnki/domain-core";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { LiteLlmAdmissionLabelJudgmentAdapter, LiteLlmAssertionEntailmentJudgmentAdapter, LiteLlmDefinitionPassageQualityJudgmentAdapter, renderBlocks } from "./extractionAdapters";
+import {
+  createAdmissionLabelJudgmentPort,
+  createAssertionEntailmentJudgmentPort,
+  createDefinitionPassageQualityJudgmentPort,
+  renderBlocks
+} from "./extractionAdapters";
 import { admissionLabelJudgmentValidator, definitionPassageQualityJudgmentValidator } from "./toolSchemas";
 
 function sourceBlock(blockId: string, text: string, headingPath: string[] = []): SourceBlock {
@@ -65,7 +70,7 @@ function adapterReturning(result: {
       return result;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmAssertionEntailmentJudgmentAdapter(client);
+  return createAssertionEntailmentJudgmentPort(client);
 }
 
 const generalizationInput = {
@@ -140,7 +145,7 @@ function admissionAdapterReturning(result: {
       return result;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmAdmissionLabelJudgmentAdapter(client);
+  return createAdmissionLabelJudgmentPort(client);
 }
 
 const operatorSetInput = {
@@ -240,7 +245,7 @@ function definitionQualityAdapterReturning(judgments: {
       return { judgments };
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmDefinitionPassageQualityJudgmentAdapter(client);
+  return createDefinitionPassageQualityJudgmentPort(client);
 }
 
 const ownershipPassages = {

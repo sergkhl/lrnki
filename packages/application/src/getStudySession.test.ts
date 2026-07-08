@@ -39,7 +39,8 @@ const optionItem: StudyItem = {
 function enrichmentRead(detailById: Record<string, DerivedGraphDetail>): EnrichmentInspectionReadPort {
   return {
     async listEnrichmentSummaries() { throw new Error("not used"); },
-    async getDerivedGraphDetail(id: string) { return detailById[id]; }
+    async getDerivedGraphDetail(id: string) { return detailById[id]; },
+    async derivedNodeBelongsToEnrichment() { return true; }
   };
 }
 
@@ -47,6 +48,7 @@ function studyItemStore(items: StudyItem[]): StudyItemBankStorePort {
   return {
     async persist() { throw new Error("not used"); },
     async getStudyItem() { throw new Error("not used"); },
+    async getStudyItemById() { throw new Error("not used"); },
     async listStudyItemsForEnrichment() { return items; },
     async supportedItemTypes() { throw new Error("not used"); }
   };

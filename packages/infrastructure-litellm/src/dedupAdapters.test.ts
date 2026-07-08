@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
-import { LiteLlmNodeMergeAdjudicationAdapter } from "./dedupAdapters";
+import { createNodeMergeAdjudicationPort } from "./dedupAdapters";
 import { resetLiteLlmFetchForTests, setLiteLlmFetchForTests, type LiteLlmFetchInit } from "./liteLlmFetch";
 
 // Deterministic-envelope tests for the merge-adjudication adapter (U2, R3/R12). The
@@ -29,7 +29,7 @@ function stubToolCall(args: unknown): { read: () => Record<string, unknown> } {
 
 function adapter() {
   const client = new LiteLlmForcedToolClient({ baseUrl: "http://localhost:4000", apiKey: "sk-local", timeoutMs: 5000, maxRetries: 0 });
-  return new LiteLlmNodeMergeAdjudicationAdapter(client);
+  return createNodeMergeAdjudicationPort(client);
 }
 
 const pair = {

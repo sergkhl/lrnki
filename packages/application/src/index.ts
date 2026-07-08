@@ -1,28 +1,97 @@
 export { runExtractionOverSources, type ExtractionSourceUnit } from "./runExtractionOverSources";
 export { buildGraphVersion } from "./buildGraphVersion";
 export { runGraphEnrichment, DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichment";
-export { runSyntheticGeneration } from "./runSyntheticGeneration";
+export type { GraphEnrichmentConfig } from "./runGraphEnrichment";
+export { runSyntheticGeneration, DEFAULT_SYNTHETIC_GENERATION_CONFIG } from "./runSyntheticGeneration";
+export type { SyntheticGenerationConfig } from "./runSyntheticGeneration";
+export {
+  calibrateKnowledgeBoundaryProbe,
+  parseKnowledgeBoundaryLadder,
+  scoreKnowledgeBoundaryVectors,
+  type KnowledgeBoundaryCalibrationReport,
+  type KnowledgeBoundaryLadderConcept
+} from "./calibrateKnowledgeBoundaryProbe";
 export { generateStudyItemBank } from "./generateStudyItemBank";
-export { STUDY_ITEM_BANK_CONFIG_HASH } from "./studyItemBankConfig";
 export { generateTopicExpedition } from "./generateTopicExpedition";
 export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
+export {
+  registerLearner,
+  enterLearnerSession,
+  hashLearnerPin,
+  type RegisterLearnerResult,
+  type EnterLearnerSessionResult
+} from "./learnerRegistry";
+export {
+  isoWeekKey,
+  isoWeekRange,
+  previousIsoWeekKey,
+  difficultyBand,
+  computeWeeklyPoints,
+  nodeCompletionTimeMs,
+  badgesFromAwards,
+  type MasteredNodeContribution,
+  type WeeklyLeaderboardRow,
+  type LearnerBadges
+} from "./weeklyLeaderboard";
+export { getWeeklyLeaderboard, lifetimeMasteredCrystalCount, type WeeklyLeaderboard } from "./getWeeklyLeaderboard";
+export {
+  getDuelSetup,
+  gradeDuelAnswer,
+  DUEL_REQUIRED_CRYSTALS,
+  DUEL_REQUIRED_ITEMS,
+  DUEL_QUESTION_COUNT,
+  type DuelSetup,
+  type DuelPoolItem,
+  type DuelAnswerSubmission,
+  type GradeDuelAnswerResult
+} from "./crystalDuel";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";
 export { synthesizeResponses } from "./syntheticResponses";
 
-export { bottleneckReport, type BottleneckReport } from "./bottleneckReport";
+export {
+  costTimingReport,
+  type CostTimingReport,
+  type CostTimingStageRow,
+  type CostTimingTotals,
+  type CostTimingOperationReport
+} from "./costTimingReport";
 export { rankBottleneckTargets, type RankedTarget } from "./rankBottleneckTargets";
 export {
+  OPERATION_HEARTBEAT_STALE_AFTER_MS,
+  isStaleOperation,
+  operationStaleBefore
+} from "./operationRunLiveness";
+export {
   NON_LLM_STAGES,
-  operationTimelineLlmSpendStageTags
+  operationTimelineLlmSpendStageTags,
+  stageBelongsToOperation,
+  spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
 
 export { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 export {
+  gradeStudyResponse,
+  checkMatchingAttempt,
+  recordLearnerVerdict,
+  recordLessonRead,
+  type StudyResponseSubmission,
+  type GradeStudyResponseResult,
+  type GradeRefusalReason,
+  type NodeWriteRefusalReason,
+  type GradedResponse,
+  type MatchingAttemptCheckResult,
+  type NodeWriteResult
+} from "./gradeStudyResponse";
+export {
   listLearnerStates,
+  listLearnerAdminSummaries,
   getLearnerLoopDetail,
   type ConceptConflict,
+  type LearnerAdminRegistry,
+  type LearnerAdminStats,
+  type LearnerAdminSummary,
   type LearnerLoopDetail,
   type LearnerResponseView,
   type LearnerStateSummary,

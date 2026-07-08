@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import test from "node:test";
+import test, { after } from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresLearnerLoopRead } from "./PostgresLearnerLoopRead";
+import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
+
+// Delete the learners this suite seeds so the shared dev DB is unchanged (R2/AE2).
+after(() => cleanupTrackedLearners(databaseUrl));
 
 // Seed an enrichment with one node, one study item, and a graded response.
 async function seed(sql: ReturnType<typeof createDatabaseClient>, learnerStateRef: string) {
@@ -13,6 +17,7 @@ async function seed(sql: ReturnType<typeof createDatabaseClient>, learnerStateRe
   const enrichmentId = randomUUID();
   const nodeA = randomUUID();
   const studyItemId = randomUUID();
+  await seedLearner(sql, learnerStateRef);
   await sql`INSERT INTO graph_versions (graph_version_id, base_graph_version_id, status, refinement_config_hash, published_at) VALUES (${graphVersionId}, NULL, 'published', 'test', now())`;
   await sql`INSERT INTO graph_enrichments (enrichment_id, graph_version_id, enrichment_config_hash, status, judge_model, difficulty_method) VALUES (${enrichmentId}, ${graphVersionId}, 'test', 'succeeded', 'test', 'test')`;
   await sql`INSERT INTO derived_graph_nodes (derived_node_id, enrichment_id, node_kind, concept_id, grounding_origin, role, canonical_label, normalized_label, declared_domain, aliases) VALUES (${nodeA}, ${enrichmentId}, 'enrichment', NULL, 'source_mentioned', 'prerequisite', 'Alpha', 'alpha', 'rust', '[]'::jsonb)`;
@@ -25,12 +30,13 @@ maybe("listResponsesForLearner joins node label + question", async () => {
   const sql = createDatabaseClient(databaseUrl);
   const learnerStateRef = `L-${randomUUID()}`;
   try {
-    const { nodeA } = await seed(sql, learnerStateRef);
+    const { enrichmentId, nodeA } = await seed(sql, learnerStateRef);
     const read = new PostgresLearnerLoopRead(sql);
 
     const responses = await read.listResponsesForLearner(learnerStateRef);
     assert.equal(responses.length, 1);
     assert.equal(responses[0].derivedNodeId, nodeA);
+    assert.equal(responses[0].enrichmentId, enrichmentId);
     assert.equal(responses[0].nodeLabel, "Alpha");
     assert.equal(responses[0].question, "What is Alpha?");
 

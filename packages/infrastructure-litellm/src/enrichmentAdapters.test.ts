@@ -2,16 +2,17 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PrerequisiteConceptContext } from "@lrnki/domain-core";
 import {
-  LiteLlmMintingDurabilityJudgmentAdapter,
-  LiteLlmPrerequisiteOrderingAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter,
-  LiteLlmRescuedNodeLabelingAdapter,
-  MINTING_DURABILITY_JUDGE_MODEL,
-  PREREQUISITE_ORDERING_MODEL,
-  RESCUE_DURABILITY_JUDGE_MODEL,
-  RESCUED_NODE_LABELING_MODEL
+  createMintingDurabilityJudgmentPort,
+  createPrerequisiteOrderingPort,
+  createRescueDurabilityJudgmentPort,
+  createRescuedNodeLabelingPort,
+  mintingDurabilityDescriptor,
+  prerequisiteOrderingDescriptor,
+  rescueDurabilityDescriptor,
+  rescuedNodeLabelingDescriptor
 } from "./enrichmentAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
+import { readPromptFile } from "./promptFile";
 import { buildPrerequisiteOrderingValidator, buildRescuedNodeLabelingValidator, mintingDurabilityJudgmentValidator } from "./toolSchemas";
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
@@ -32,7 +33,7 @@ function adapterReturning(canned: { edges: OrderingEdge[] }, capture?: { lastCal
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmPrerequisiteOrderingAdapter(client);
+  return createPrerequisiteOrderingPort(client);
 }
 
 const ownership = context("idS", "Ownership");
@@ -40,8 +41,7 @@ const moveSemantics = context("idA", "Move semantics");
 const borrowing = context("idB", "Borrowing");
 
 test("ordering adapter runs on the single non-DeepSeek ordering alias", () => {
-  assert.equal(PREREQUISITE_ORDERING_MODEL, "kg-prerequisite-ordering");
-  assert.equal(adapterReturning({ edges: [] }).model, "kg-prerequisite-ordering");
+  assert.equal(readPromptFile(prerequisiteOrderingDescriptor.promptPath).model, "kg-prerequisite-ordering");
 });
 
 // Happy path: a well-formed edges array parses to a typed WholeSetOrdering in input order.
@@ -109,7 +109,7 @@ test("validator rejects an out-of-range or self-referential number", () => {
 
 function rescueAdapterReturning(canned: { verdict: string; groundingSpan: string; rationale: string }) {
   const client = { async call() { return canned; } } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmRescueDurabilityJudgmentAdapter(client);
+  return createRescueDurabilityJudgmentPort(client);
 }
 
 const rescueInput = {
@@ -119,7 +119,7 @@ const rescueInput = {
 };
 
 test("rescue judge runs on the independent cross-family alias", () => {
-  assert.equal(RESCUE_DURABILITY_JUDGE_MODEL, "kg-independent-judge");
+  assert.equal(readPromptFile(rescueDurabilityDescriptor.promptPath).model, "kg-independent-judge");
   assert.equal(rescueAdapterReturning({ verdict: "durable", groundingSpan: "", rationale: "r" }).model, "kg-independent-judge");
 });
 
@@ -143,7 +143,7 @@ function labelingAdapterReturning(canned: { labels: LabelEntry[] }, capture?: { 
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmRescuedNodeLabelingAdapter(client);
+  return createRescuedNodeLabelingPort(client);
 }
 
 const labelingInput = {
@@ -156,7 +156,7 @@ const labelingInput = {
 };
 
 test("labeling adapter runs on the independent cross-family alias", () => {
-  assert.equal(RESCUED_NODE_LABELING_MODEL, "kg-independent-judge");
+  assert.equal(readPromptFile(rescuedNodeLabelingDescriptor.promptPath).model, "kg-independent-judge");
   assert.equal(labelingAdapterReturning({ labels: [] }).model, "kg-independent-judge");
 });
 
@@ -201,7 +201,7 @@ function mintingAdapterReturning(canned: { verdict: string; rationale: string },
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return new LiteLlmMintingDurabilityJudgmentAdapter(client);
+  return createMintingDurabilityJudgmentPort(client);
 }
 
 const mintingInput = {
@@ -211,7 +211,7 @@ const mintingInput = {
 };
 
 test("minting durability judge runs on the independent cross-family alias", () => {
-  assert.equal(MINTING_DURABILITY_JUDGE_MODEL, "kg-independent-judge");
+  assert.equal(readPromptFile(mintingDurabilityDescriptor.promptPath).model, "kg-independent-judge");
   assert.equal(mintingAdapterReturning({ verdict: "durable", rationale: "r" }).model, "kg-independent-judge");
 });
 

@@ -10,10 +10,9 @@ artifact generated alongside the Study Item Bank as a learner-neutral, regenerab
 intuition, definition, examples, applications, formulas/methods — that *teach* the concept before it
 is tested.
 
-Sections may carry generated presentation structure: up to three `keyTerms` that occur verbatim in
-the section text, and list `items` for examples/applications. These fields are learner-neutral
-display structure inside the section, not separate claims or citations; source types and the initial
-migration own their exact persisted shape.
+Sections may carry generated list `items` for examples/applications. These fields are
+learner-neutral display structure inside the section, not separate claims or citations; source types
+and the initial migration own their exact persisted shape.
 
 The Concept Lesson is the **single source of grounding** for downstream study assets. Option-select
 items derive from the lesson's source-cited sections, not from raw passages; no study-item type reads
@@ -88,8 +87,7 @@ lesson and its option-select projection are produced in the same per-node pass.
   the cost regression immediately visible at the real-use gate owned by [AGENTS.md](../../AGENTS.md).
 - Option-select quality now depends on the lesson's source citations; the assembler demotes any
   unverifiable citation before persistence, so an item can never cite a quote the lesson did not verify.
-- Key terms and list items make lessons scan-friendly for learners without changing the grounding
-  contract; invalid key terms are ignored unless they occur verbatim in their section text.
+- List items make lessons scan-friendly for learners without changing the grounding contract.
 - Lesson redundancy adds another neural judge call inside `study_items`, but prevents duplicated
   hooks from reaching the learner and fails open only by preserving the assembled lesson.
 - The substrate is game-ready but ungraded; per-learner personalization stays in downstream projections

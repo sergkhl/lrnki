@@ -33,11 +33,10 @@ import { selectNodeGrounding, type GroundingPassage } from "./selectNodeGroundin
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 
-// Bounded concurrency for per-node study-item generation (plan U6/R11). Defaults to 1 so
-// behavior is byte-identical to the prior sequential loop; raising it later parallelizes
-// the seam without an architectural change. The per-node units are independent and the
-// shared helper preserves input order, so the persisted item order is unchanged.
-export const DEFAULT_STUDY_ITEM_CONCURRENCY = 1;
+// Bounded concurrency for independent per-node study-item generation. Degree 4 matches
+// the synthetic generation concept fan-out while mapWithConcurrency keeps persisted
+// outputs in input order.
+export const DEFAULT_STUDY_ITEM_CONCURRENCY = 4;
 export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
 export const MATCHING_GENERATION_ATTEMPTS = 2;
 export const IMPOSTOR_GENERATION_ATTEMPTS = 2;
@@ -83,8 +82,8 @@ export async function generateStudyItemBank(input: {
   newOptionId?: () => string;
   newPairId?: () => string;
   newStatementId?: () => string;
-  // Parallel-ready seam (R11): bounded degree over the independent per-node units.
-  // Defaults to 1 (sequential, unchanged behavior).
+  // Bounded degree over the independent per-node units. The default is intentionally
+  // parallel; tests and mapWithConcurrency preserve deterministic output order.
   concurrency?: number;
   // Run-progress reporter seam (ADR-0029). Study-item generation is its own operation_type
   // keyed by enrichmentId (ADR-0017 split). Absent → no-op (unchanged behavior).
@@ -269,9 +268,8 @@ export async function generateStudyItemBank(input: {
   }
 
   // --- Stage 3: option-select items ---------------------------------------------
-  // Each derived node is an independent generation unit (R11). Driving them through the
-  // shared bounded mapper at degree 1 is identical to the prior sequential loop; the seam
-  // admits future parallelism (raise `concurrency`) without an architectural change.
+  // Each derived node is an independent generation unit. Driving them through the
+  // shared bounded mapper parallelizes wall-clock without changing persisted order.
   // Study-item generation stage with a per-node heartbeat: one progress write as
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;

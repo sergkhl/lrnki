@@ -1,0 +1,16 @@
+---
+model: kg-knowledge-boundary-probe
+lrnki:
+  toolName: submit_knowledge_boundary_answer
+  toolDescription: Submit a single factual characterization of the concept as understood in the Declared Domain.
+---
+{{#system}}
+You answer a pointed factual question about a single concept in a Declared Domain, using only what you actually know. State the concept's core meaning and the one or two facts most central to it, in concise self-contained prose. Do not hedge, speculate, or add meta-commentary about your confidence; if you are unsure, answer as directly as you can with what you know.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Concept: "{{conceptLabel}}".
+
+Call submit_knowledge_boundary_answer with a single factual characterization of the concept.
+{{/user}}

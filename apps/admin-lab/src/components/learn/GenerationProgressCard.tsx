@@ -1,3 +1,4 @@
+import { isStaleOperation } from "@lrnki/application";
 import type { LearnerExpedition } from "@lrnki/ports";
 import { retryTopicExpedition } from "@/app/learn/actions";
 import { getOperationTimeline } from "@/lib/operationTimeline";
@@ -10,10 +11,8 @@ import { generationProgress, isQueuedExpedition } from "./generationProgress";
 import { stageCopy } from "./stageCopy";
 import { expeditionStatusLabel, learnerTerm } from "./vocabulary";
 
-const STALE_HEARTBEAT_MS = 2 * 60 * 1000;
-
 function isStalled(status: string, lastProgressAt: string | null | undefined): boolean {
-  return status === "running" && lastProgressAt !== null && lastProgressAt !== undefined && Date.now() - new Date(lastProgressAt).getTime() > STALE_HEARTBEAT_MS;
+  return isStaleOperation(status, lastProgressAt);
 }
 
 export async function GenerationProgressCard({ expedition }: Readonly<{ expedition: LearnerExpedition }>) {

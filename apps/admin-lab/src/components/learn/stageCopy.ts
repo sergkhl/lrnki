@@ -27,8 +27,6 @@ const STAGE_COPY: Record<string, string> = {
   [STAGE_TAGS.matchingGeneration]: "Pairing field clues",
   [STAGE_TAGS.impostorGeneration]: "Hiding false trails",
   [STAGE_TAGS.impostorLieValidityJudgment]: "Checking the decoys",
-  [STAGE_TAGS.answerGrading]: "Reading the finding",
-  [STAGE_TAGS.learnerSimulation]: "Walking a practice loop",
   [NON_LLM_STAGES.documentLoad]: "Opening the satchel",
   [NON_LLM_STAGES.persist]: "Binding the journal",
   [NON_LLM_STAGES.load]: "Unrolling the map",

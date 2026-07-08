@@ -1,23 +1,26 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { STAGE_TAGS, type ConceptIdentityDecision } from "@lrnki/domain-core";
 import {
   buildGraphVersion,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
-  STUDY_ITEM_BANK_CONFIG_HASH,
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG,
   resolveConceptIdentity,
   runExtractionOverSources,
   type ExtractionSourceUnit,
   generateStudyItemBank,
   synthesizeResponses,
+  hashLearnerPin,
   runGraphEnrichment,
   runSyntheticGeneration,
-  bottleneckReport,
+  costTimingReport,
   rankBottleneckTargets,
-  type BottleneckReport,
-  type RankedTarget
+  type CostTimingReport,
+  type RankedTarget,
+  calibrateKnowledgeBoundaryProbe,
+  parseKnowledgeBoundaryLadder
 } from "@lrnki/application";
 import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
 import { parseGenerateStudyItemsArgs } from "./workerArgs";
@@ -29,31 +32,36 @@ import {
   TextStructuredDocumentParser
 } from "@lrnki/infrastructure-ingestion";
 import {
-  LiteLlmAdmissionLabelJudgmentAdapter,
-  LiteLlmAssertionEntailmentJudgmentAdapter,
-  LiteLlmDefinitionPassageQualityJudgmentAdapter,
-  LiteLlmEvidenceProfileExtractionAdapter,
-  LiteLlmConceptAdmissionAdapter,
-  LiteLlmStudyItemGenerationAdapter,
-  LiteLlmConceptLessonGenerationAdapter,
-  LiteLlmConceptLessonRedundancyJudgmentAdapter,
-  LiteLlmStudyItemBlueprintAdapter,
-  LiteLlmImpostorLieValidityJudgmentAdapter,
-  LiteLlmConceptDiscoveryAdapter,
+  createAdmissionLabelJudgmentPort,
+  createAssertionEntailmentJudgmentPort,
+  createDefinitionPassageQualityJudgmentPort,
+  createEvidenceProfileExtractionPort,
+  createConceptAdmissionPort,
+  createStudyItemGenerationPort,
+  createConceptLessonGenerationPort,
+  createConceptLessonRedundancyJudgmentPort,
+  createStudyItemBlueprintPort,
+  createImpostorLieValidityJudgmentPort,
+  createConceptDiscoveryPort,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
-  LiteLlmEmbeddingClient,
   LiteLlmNodeEmbeddingAdapter,
-  LiteLlmNodeMergeAdjudicationAdapter,
-  LiteLlmGroundingGenerationAdapter,
-  LiteLlmConceptSetSynthesisAdapter,
-  LiteLlmKnowledgeBoundaryProbeAdapter,
-  LiteLlmIntrinsicDifficultyJudgmentAdapter,
-  LiteLlmMissingPrerequisiteProposalAdapter,
-  LiteLlmPrerequisiteOrderingAdapter,
-  LiteLlmMintingDurabilityJudgmentAdapter,
-  LiteLlmRescueDurabilityJudgmentAdapter,
-  LiteLlmRescuedNodeLabelingAdapter
+  createNodeMergeAdjudicationPort,
+  createGroundingGenerationPort,
+  createConceptSetSynthesisPort,
+  createKnowledgeBoundaryProbePort,
+  createIntrinsicDifficultyJudgmentPort,
+  createMissingPrerequisiteProposalPort,
+  createMintingDurabilityJudgmentPort,
+  createRescueDurabilityJudgmentPort,
+  createRescuedNodeLabelingPort,
+  createPrerequisiteOrderingPort,
+  createNeuralClients,
+  resolveNeuralClientBaseOptions,
+  extractionConfigHash,
+  studyItemBankConfigHash,
+  withGraphEnrichmentConfigHash,
+  withSyntheticGenerationConfigHash
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -70,10 +78,6 @@ import {
   PostgresJourneyLineageRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
-
-// Pipeline configuration identity — bump when prompts/models/schemas change so
-// runs are attributable to a configuration (ADR-0017).
-const PIPELINE_CONFIG_HASH = "definition-quality-judge-v38";
 
 import { existsSync } from "node:fs";
 
@@ -98,7 +102,7 @@ function buildContext() {
   const runStore = new PostgresExtractionRunStore(sql);
   // Run-progress reporter (ADR-0029): its own autocommit writes on the shared `sql`
   // handle, never enlisted in a store's persist transaction, drive the durable
-  // timeline that the live progress view and bottleneck report read.
+  // timeline that the live progress view and cost & timings report read.
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
   const artifacts = new PostgresArtifactRepository(sql);
@@ -114,33 +118,10 @@ function buildContext() {
       imageTag: process.env.DOCLING_IMAGE_TAG ?? "docling-serve-cpu-v1.23.0+docling-2.102.1"
     })
   ]);
-  const baseClient = {
-    baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
-    apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
-  };
-  // Discovery stays at default sampling. It is the recall stage and, empirically,
-  // greedy decoding (temperature 0) makes DeepSeek emit a MORE exhaustive candidate
-  // list (~26 → ~40 candidates), which inflates downstream over-admission of generic
-  // primitives. Determinism here is also moot: discovery output is not reproducible
-  // across processes even at temperature 0 (MoE non-determinism), and the replayable
-  // unit is the graph-version build, not the extraction run (ADR-0017).
-  const discoveryClient = new LiteLlmForcedToolClient(baseClient);
-  // Determinism lever (TODO 1, ADR-0018) applied where it is both effective and
-  // beneficial: admission is the precision gate and, GIVEN a fixed candidate set,
-  // greedy decoding collapses its core-set drift (probe: spread 3→1/4→0/1→0 across
-  // the three fixtures); claims are per-subject and benefit from stable text. Not
-  // bit-exact on DeepSeek's MoE, so a small residual remains.
-  const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
-  // Knowledge-boundary probe client (plan 2026-06-30-001, KTD4). MODERATE temperature —
-  // NOT the deterministic 0 — so the K draws carry the sampling diversity that exposes a
-  // small model's knowledge boundary as answer dispersion; low temperature would mask
-  // confident hallucination behind a repeated wrong answer (ADR-0030 amended). No seed,
-  // so the K draws vary.
-  const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
-  // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
-  // options as the forced-tool clients; embeddings have no sampling knobs.
-  const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
+  // Client-construction policy (env base config + discovery/deterministic/probe/
+  // embedding sampling decisions and their rationale) lives once in createNeuralClients,
+  // shared with the Admin Lab learner generation root.
+  const { discoveryClient, deterministicClient, probeClient, embeddingClient } = createNeuralClients();
   const spendLogsRead = process.env.LITELLM_DATABASE_URL
     ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
     : undefined;
@@ -149,7 +130,7 @@ function buildContext() {
     registrationStore,
     runStore,
     runProgressReporter,
-    // Bottleneck-report read surfaces: the per-operation timeline read-model and
+    // Cost & timings read surfaces: the per-operation timeline read-model and
     // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
     // live and never stored (ADR-0029).
     operationTimelineRead: new PostgresOperationTimelineRead(sql),
@@ -163,24 +144,24 @@ function buildContext() {
     graphStore,
     artifacts,
     parsers,
-    discovery: new LiteLlmConceptDiscoveryAdapter(discoveryClient),
-    admission: new LiteLlmConceptAdmissionAdapter(deterministicClient),
-    evidenceProfileExtraction: new LiteLlmEvidenceProfileExtractionAdapter(deterministicClient),
+    discovery: createConceptDiscoveryPort(discoveryClient),
+    admission: createConceptAdmissionPort(deterministicClient),
+    evidenceProfileExtraction: createEvidenceProfileExtractionPort(deterministicClient),
     // Assertion-entailment judge (ADR-0007 reset). Independent production judge
     // (gpt-oss-120b via kg-independent-judge) so the judge is not the extractor
     // re-grading itself; deterministic decoding for stable re-derivation. Guards
     // only the optional typed assertions inside a Concept Evidence Profile.
-    assertionEntailmentJudge: new LiteLlmAssertionEntailmentJudgmentAdapter(deterministicClient),
+    assertionEntailmentJudge: createAssertionEntailmentJudgmentPort(deterministicClient),
     // Concept-vs-proposition admission judge (ADR-0005). Same independent
     // production judge (kg-independent-judge) and deterministic decoding;
     // downgrade-only stage that replaces the removed looksLikePropositionLabel veto.
-    admissionLabelJudge: new LiteLlmAdmissionLabelJudgmentAdapter(deterministicClient),
+    admissionLabelJudge: createAdmissionLabelJudgmentPort(deterministicClient),
     // Definition-Passage quality judge (ADR-0007 extension). Same independent
     // production judge (kg-independent-judge) and deterministic decoding; runs after
     // the verbatim floor and drops hollow Definition Passages (bare name, heading,
     // title, citation), routing a last-passage veto into the existing demotion with a
     // distinct reason code.
-    definitionPassageQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient),
+    definitionPassageQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient),
     // Graph Enrichment ports (ADR-0019 amended — whole-set ordering, plan U5). ONE
     // non-DeepSeek ordering call per Declared Domain (kg-prerequisite-ordering) returns
     // the directed prerequisite DAG over the deduplicated node set; it is cross-family
@@ -188,58 +169,58 @@ function buildContext() {
     // never grades its own minted output and the per-pair routing split is gone.
     // Deterministic decoding for stable re-derivation. Difficulty is learner-neutral
     // intrinsic: a cross-family neural subscore fused with deterministic components.
-    prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
+    prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
     // Node-minting ports (U5): explicit prerequisite proposal (node identity) +
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
-    missingPrerequisiteProposal: new LiteLlmMissingPrerequisiteProposalAdapter(deterministicClient),
-    groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
+    missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient),
     // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
     // amended). Concept-set synthesis stays DeepSeek-family with deterministic decoding
     // for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
     // MODERATE-temperature cross-family client so its K draws disperse at the model's
     // knowledge boundary (KTD4).
-    conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
-    knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
+    conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
+    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     // Measured rescue durability judge (U3): cross-family independent judge
     // (kg-independent-judge) decides whether each aggregated source_mentioned rescue
     // candidate is a durable prerequisite before it becomes a derived node. Drop-only,
     // fail-open-with-flag; the DeepSeek generator never grades rescue durability.
-    rescueDurabilityJudge: new LiteLlmRescueDurabilityJudgmentAdapter(deterministicClient),
+    rescueDurabilityJudge: createRescueDurabilityJudgmentPort(deterministicClient),
     // Measured Rescued-Node Canonical Labeling step (TODO #1): the SAME cross-family
     // independent judge (kg-independent-judge) re-names each durable rescued node — labeled
     // with the source sentence it was mentioned in — to a concept-shaped label, one whole-set
     // call per Declared Domain. Rename-only; minting owns adoption (collision guard + alias).
-    rescuedNodeLabelingJudge: new LiteLlmRescuedNodeLabelingAdapter(deterministicClient),
+    rescuedNodeLabelingJudge: createRescuedNodeLabelingPort(deterministicClient),
     // Rescue-seam Definition-Passage quality judge (plan 2026-06-26-001 U3). The SAME
     // independent meaning judge (kg-independent-judge) and deterministic decoding as the
     // extraction-time core gate — no new alias — but tagged `rescue-definition-quality` so
     // its spend joins the enrichment operation (ADR-0029). Drops hollow rescued optional
     // definitions before they reach study items; fails closed = preserve.
-    rescuedDefinitionQualityJudge: new LiteLlmDefinitionPassageQualityJudgmentAdapter(deterministicClient, undefined, STAGE_TAGS.rescueDefinitionQuality),
+    rescuedDefinitionQualityJudge: createDefinitionPassageQualityJudgmentPort(deterministicClient, STAGE_TAGS.rescueDefinitionQuality),
     // Measured minting durability judge: cross-family independent judge gates
     // reserved assumed-prerequisite proposals before grounding generation. Drop-only,
     // fail-open-with-flag; disable with ENRICH_DISABLE_MINTING_DURABILITY for the
     // judge-off baseline.
-    mintingDurabilityJudge: new LiteLlmMintingDurabilityJudgmentAdapter(deterministicClient),
+    mintingDurabilityJudge: createMintingDurabilityJudgmentPort(deterministicClient),
     // Semantic-dedup ports (plan U1/U2, AGENTS rule 20). Embeddings PROPOSE within-domain
     // near-duplicate pairs (qwen3-embedding-8b via kg-node-embedding); a cross-family
     // adjudicator DECIDES each merge (kg-independent-judge / gpt-oss-120b, deterministic
     // decoding) so the DeepSeek family never decides its own merges. Both opt-in: enrich
     // without them for the U7 baseline.
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
+    nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
+    difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
     enrichmentStore: new PostgresEnrichmentRunStore(sql),
     // Learner Study Loop (ADR-0026): option-select study-item generation stays
     // DeepSeek-family (AGENTS rule 5). Deterministic decoding for stable re-derivation.
     // The Concept Lesson substrate (ADR-0031) is generated in the same operation, before
     // option-select, and persisted through its own store; option-select derives FROM it.
-    conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
-    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
+    conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
+    conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
-    studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
-    studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
-    impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
+    studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
+    studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
+    impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql),
     responseLogStore: new PostgresResponseLogStore(sql),
     // Mutable calibration verdict store (R10): the synthetic prefill seeds verdicts here,
@@ -250,6 +231,12 @@ function buildContext() {
 
 type Context = ReturnType<typeof buildContext>;
 type Manifest = { fixtures: { path: string; contentType: string; declaredDomain: string; title: string; source?: string; license?: string }[] };
+
+const DEFAULT_BOUNDARY_PROBE_CALIBRATION_DIR = "tmp/2026-07-07-boundary-probe-calibration";
+const DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS = [
+  "openrouter/meta-llama/llama-4-scout",
+  "openrouter/qwen/qwen3-30b-a3b-instruct-2507"
+];
 
 async function registerFromManifest(ctx: Context, manifestPath: string) {
   const manifest = JSON.parse(await readFile(path.resolve(REPO_ROOT, manifestPath), "utf8")) as Manifest;
@@ -293,7 +280,7 @@ async function runExtraction(ctx: Context, sourceResourceId?: string) {
   }
   await runExtractionOverSources({
     units,
-    pipelineConfigHash: PIPELINE_CONFIG_HASH,
+    pipelineConfigHash: extractionConfigHash(),
     discovery: ctx.discovery,
     admission: ctx.admission,
     evidenceProfileExtraction: ctx.evidenceProfileExtraction,
@@ -404,6 +391,7 @@ async function enrichGraphVersion(ctx: Context, graphVersionId?: string) {
     nodeMergeAdjudicator: process.env.ENRICH_DISABLE_DEDUP ? undefined : ctx.nodeMergeAdjudicator,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
+    config: withGraphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG),
     // Per-sub-stage wall-clock now lands in the durable operation_run_stages timeline
     // via the reporter (ADR-0029) — supersedes the old onStageTiming stdout sink.
     reporter: ctx.runProgressReporter,
@@ -453,6 +441,7 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
     prerequisiteOrdering: ctx.prerequisiteOrdering,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,
+    config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
     reporter: ctx.runProgressReporter,
     // Concept/verdict + edge summary line for operator visibility: how many concepts were
     // synthesized, how many the probe kept as core vs held out as boundary, and the DAG size.
@@ -464,6 +453,68 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
   );
   for (const edge of layer.prerequisiteEdges.filter((e) => !e.uncertain)) {
     console.log(`   edge: ${edge.prerequisiteDerivedNodeId} -> ${edge.dependentDerivedNodeId} (conf=${edge.confidence.toFixed(2)})`);
+  }
+}
+
+async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | undefined, flags: string[]) {
+  if (!ladderFile) {
+    console.error("! calibrate-boundary-probe requires <ladder-file>.");
+    process.exitCode = 1;
+    return;
+  }
+  const args = parseCalibrationFlags(flags);
+  const ladderPath = path.resolve(REPO_ROOT, ladderFile);
+  const ladder = parseKnowledgeBoundaryLadder(await readFile(ladderPath, "utf8"));
+  const baseClient = resolveNeuralClientBaseOptions();
+  const passes = args.temperatures.flatMap((temperature) =>
+    args.deployments.map((deployment) => ({
+      deployment,
+      temperature,
+      probe: createKnowledgeBoundaryProbePort(new LiteLlmForcedToolClient({ ...baseClient, temperature }), deployment)
+    }))
+  );
+  console.log(`\n>> boundary-probe calibration concepts=${ladder.length} deployments=${args.deployments.length} temperatures=${args.temperatures.join(",")}`);
+  const outDir = path.resolve(REPO_ROOT, args.outDir);
+  await mkdir(outDir, { recursive: true });
+  const fragmentsDir = path.join(outDir, "concepts");
+  await mkdir(fragmentsDir, { recursive: true });
+  const report = await calibrateKnowledgeBoundaryProbe({
+    ladder,
+    passes,
+    embedding: ctx.nodeEmbedding,
+    sampleCount: args.sampleCount,
+    drawConcurrency: args.drawConcurrency,
+    conceptConcurrency: args.conceptConcurrency,
+    kValues: args.kValues,
+    thresholds: args.thresholds,
+    onConceptReport: async (conceptReport) => {
+      const fragmentName = [
+        slugify(conceptReport.deployment),
+        `temp-${conceptReport.temperature}`,
+        slugify(conceptReport.tier),
+        slugify(conceptReport.declaredDomain),
+        slugify(conceptReport.conceptLabel)
+      ].join("__");
+      const fragmentPath = path.join(fragmentsDir, `${fragmentName}.json`);
+      await writeFile(fragmentPath, `${JSON.stringify(conceptReport, null, 2)}\n`, "utf8");
+      const kMax = Math.max(...conceptReport.scores.map((score) => score.k));
+      const score = conceptReport.scores.find((candidate) => candidate.k === kMax)?.agreementScore;
+      console.log(
+        `   done ${conceptReport.deployment} temp=${conceptReport.temperature} tier=${conceptReport.tier} concept="${conceptReport.conceptLabel}" k=${kMax} score=${score?.toFixed(4) ?? "n/a"}`
+      );
+    }
+  });
+  const reportPath = path.join(outDir, "report.json");
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  console.log(`   wrote ${path.relative(REPO_ROOT, reportPath)}`);
+  for (const summary of report.tierSummaries) {
+    if (summary.k !== Math.max(...report.kValues)) continue;
+    const boundaryCounts = Object.entries(summary.boundaryCountsByThreshold)
+      .map(([threshold, count]) => `${threshold}:${count}`)
+      .join(" ");
+    console.log(
+      `   ${summary.deployment} temp=${summary.temperature} tier=${summary.tier} k=${summary.k} n=${summary.count} min=${summary.min.toFixed(4)} median=${summary.median.toFixed(4)} max=${summary.max.toFixed(4)} boundary@threshold=${boundaryCounts}`
+    );
   }
 }
 
@@ -485,6 +536,14 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
+  // The four learner-state tables now FK to `learners` (plan 2026-07-07-005, R1), so a
+  // synthetic demo learner needs a registry row before any verdict is written. Idempotent
+  // insert with a fixed placeholder PIN hash (KTD8) — demo learners are legitimate
+  // learner-state holders, not leaderboard rivals (KTD1).
+  await ctx.sql`
+    INSERT INTO learners (learner_ref, display_name, pin_hash)
+    VALUES (${learnerStateRef}, ${learnerStateRef}, ${hashLearnerPin(learnerStateRef, "0000")})
+    ON CONFLICT (learner_ref) DO NOTHING`;
   console.log(`\n>> synthesizing responses for learner ${learnerStateRef} toward ${targetDerivedNodeId}`);
   const result = await synthesizeResponses({
     learnerStateRef,
@@ -496,17 +555,17 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
   console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount}`);
 }
 
-// Bottleneck report renderer for code agents (ADR-0029): a per-stage table of
+// Cost & timings report renderer for code agents (ADR-0029): a per-stage table of
 // wall-clock + calls + cost for one operation, or the same structured rows as `--json`.
-// Both this CLI and the Admin Lab view call the SAME bottleneckReport use-case; neither
+// Both this CLI and the Admin Lab view call the SAME costTimingReport use-case; neither
 // re-implements the join.
-async function bottleneckReportCommand(ctx: Context, operationId: string | undefined, flags: string[]) {
+async function costTimingReportCommand(ctx: Context, operationId: string | undefined, flags: string[]) {
   if (!operationId) {
-    console.error("! bottleneck-report requires <operationId> (an extraction run / graph version / enrichment id).");
+    console.error("! cost-timing-report requires <operationId> (an extraction run / graph version / enrichment id).");
     process.exitCode = 1;
     return;
   }
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { operationId },
     timelineRead: ctx.operationTimelineRead,
     operationStageSpendRead: ctx.operationStageSpendRead,
@@ -526,7 +585,7 @@ async function journeyCostReportCommand(ctx: Context, enrichmentId: string | und
     process.exitCode = 1;
     return;
   }
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { journeyAnchorEnrichmentId: enrichmentId },
     timelineRead: ctx.operationTimelineRead,
     operationStageSpendRead: ctx.operationStageSpendRead,
@@ -543,7 +602,7 @@ async function journeyCostReportCommand(ctx: Context, enrichmentId: string | und
 // Shared flag dispatch for both report commands (U3). `--ranked` renders (or with `--json`,
 // emits) the ranked cost + time target lists; `--json` alone emits the raw report; absent
 // flags render the per-stage table. `--ranked --json` is the recording form for the baseline.
-function emitReport(report: BottleneckReport, flags: string[]) {
+function emitReport(report: CostTimingReport, flags: string[]) {
   const ranked = flags.includes("--ranked");
   const json = flags.includes("--json");
   if (ranked) {
@@ -555,10 +614,10 @@ function emitReport(report: BottleneckReport, flags: string[]) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
-  renderBottleneckTable(report);
+  renderCostTimingTable(report);
 }
 
-function renderBottleneckTable(report: BottleneckReport) {
+function renderCostTimingTable(report: CostTimingReport) {
   console.log(`\n>> ${report.scope} cost report — ${report.anchorId}`);
   if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost columns omitted, wall-clock only.");
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
@@ -578,7 +637,7 @@ function renderBottleneckTable(report: BottleneckReport) {
 
 // Ranked-target renderer (U3): a cost-ranked and a wall-ranked list of (operation, stage)
 // rows with each target's share of the journey total — the optimization-pass handoff view.
-function renderRankedTargets(report: BottleneckReport) {
+function renderRankedTargets(report: CostTimingReport) {
   const ranked = rankBottleneckTargets(report);
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
   const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
@@ -614,7 +673,7 @@ async function generateStudyItemsCommand(ctx: Context, enrichmentId: string | un
   if (args.concurrency !== undefined) console.log(`   concurrency=${args.concurrency}`);
   const result = await generateStudyItemBank({
     enrichmentId: args.enrichmentId,
-    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
+    configHash: studyItemBankConfigHash(),
     graphStore: ctx.graphStore,
     enrichmentStore: ctx.enrichmentStore,
     conceptLessonGeneration: ctx.conceptLessonGeneration,
@@ -669,6 +728,9 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "generate-synthetic-layer":
       await generateSyntheticLayer(ctx, arg, rest[0]);
       break;
+    case "calibrate-boundary-probe":
+      await calibrateBoundaryProbeCommand(ctx, arg, rest);
+      break;
     case "generate-study-items":
       await generateStudyItemsCommand(ctx, arg, rest);
       break;
@@ -678,15 +740,85 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "list-sources":
       await listSources(ctx);
       break;
-    case "bottleneck-report":
-      await bottleneckReportCommand(ctx, arg, rest);
+    case "cost-timing-report":
+      await costTimingReportCommand(ctx, arg, rest);
       break;
     case "journey-cost-report":
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
+}
+
+function parseCalibrationFlags(flags: string[]) {
+  const args = {
+    outDir: DEFAULT_BOUNDARY_PROBE_CALIBRATION_DIR,
+    deployments: DEFAULT_BOUNDARY_PROBE_DEPLOYMENTS,
+    temperatures: [0.7, 1],
+    kValues: [3, 5, 10],
+    thresholds: undefined as number[] | undefined,
+    sampleCount: 10,
+    drawConcurrency: 5,
+    conceptConcurrency: 1
+  };
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i];
+    const next = () => {
+      const value = flags[++i];
+      if (!value) throw new Error(`${flag} requires a value.`);
+      return value;
+    };
+    switch (flag) {
+      case "--out":
+        args.outDir = next();
+        break;
+      case "--deployments":
+        args.deployments = parseCsv(next());
+        break;
+      case "--temperatures":
+        args.temperatures = parseNumberCsv(next(), "--temperatures");
+        break;
+      case "--k":
+        args.kValues = parseNumberCsv(next(), "--k").map((value) => Math.trunc(value));
+        break;
+      case "--thresholds":
+        args.thresholds = parseNumberCsv(next(), "--thresholds");
+        break;
+      case "--sample-count":
+        args.sampleCount = Math.trunc(Number(next()));
+        break;
+      case "--draw-concurrency":
+        args.drawConcurrency = Math.trunc(Number(next()));
+        break;
+      case "--concept-concurrency":
+        args.conceptConcurrency = Math.trunc(Number(next()));
+        break;
+      default:
+        throw new Error(`unknown calibrate-boundary-probe flag: ${flag}`);
+    }
+  }
+  if (args.deployments.length === 0) throw new Error("--deployments must name at least one deployment.");
+  if (args.temperatures.length === 0) throw new Error("--temperatures must name at least one temperature.");
+  if (args.kValues.length === 0) throw new Error("--k must name at least one K value.");
+  return args;
+}
+
+function parseCsv(value: string): string[] {
+  return value.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function parseNumberCsv(value: string, flag: string): number[] {
+  return parseCsv(value).map((part) => {
+    const number = Number(part);
+    if (!Number.isFinite(number)) throw new Error(`${flag} contains a non-numeric value: ${part}`);
+    return number;
+  });
+}
+
+function slugify(value: string): string {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "value";
 }
 
 async function main() {

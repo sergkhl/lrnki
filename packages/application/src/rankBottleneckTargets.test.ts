@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationType } from "@lrnki/ports";
-import type { BottleneckOperationReport, BottleneckReport, BottleneckStageRow } from "./bottleneckReport";
+import type { CostTimingOperationReport, CostTimingReport, CostTimingStageRow } from "./costTimingReport";
 import { rankBottleneckTargets } from "./rankBottleneckTargets";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 
@@ -10,7 +10,7 @@ import { NON_LLM_STAGES } from "./runProgressReporter";
 // hand-built INPUT FIXTURES exercising flatten → filter → sort → share — never an assertion
 // about which stage *should* be expensive (AGENTS rule 11). No model, no DB.
 
-function stageRow(stage: string, over: Partial<BottleneckStageRow> = {}): BottleneckStageRow {
+function stageRow(stage: string, over: Partial<CostTimingStageRow> = {}): CostTimingStageRow {
   return {
     stage,
     isLlmStage: true,
@@ -26,8 +26,8 @@ function stageRow(stage: string, over: Partial<BottleneckStageRow> = {}): Bottle
 function operation(
   operationType: OperationType,
   operationId: string,
-  stages: BottleneckStageRow[]
-): BottleneckOperationReport {
+  stages: CostTimingStageRow[]
+): CostTimingOperationReport {
   const costUsd = stages.reduce((sum, row) => sum + (row.costUsd ?? 0), 0);
   const wallClockMs = stages.reduce((sum, row) => sum + (row.wallClockMs ?? 0), 0);
   return {
@@ -39,7 +39,7 @@ function operation(
   };
 }
 
-function report(operations: BottleneckOperationReport[], costAvailable = true): BottleneckReport {
+function report(operations: CostTimingOperationReport[], costAvailable = true): CostTimingReport {
   const wallClockMs = operations.reduce((sum, op) => sum + op.subtotal.wallClockMs, 0);
   const costUsd = costAvailable ? operations.reduce((sum, op) => sum + (op.subtotal.costUsd ?? 0), 0) : null;
   return {

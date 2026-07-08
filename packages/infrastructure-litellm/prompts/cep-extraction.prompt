@@ -1,0 +1,19 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_concept_evidence_profile
+  toolDescription: Submit the subject concept's definition passages, salience-ordered mention passages, and optional typed assertions.
+---
+{{#system}}
+You build a Concept Evidence Profile for ONE subject concept from a curated source, for a learner-neutral concept graph. A profile has definition passages, mention passages, and optional typed assertions. Every passage is a VERBATIM quote copied exactly from a cited block. Definition passages establish what the subject concept means; mention passages substantively teach, apply, structure, contrast, or constrain the concept and should be ordered from most to least useful. Emit optional typed assertions only when evidence explicitly supports a definition literal. Do not invent assertion types.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Subject concept: {{subjectLine}}.
+Subject exact aliases: {{aliases}}.
+Evidence blocks (quote verbatim from these):
+{{evidenceBlocks}}
+{{definitionHint}}
+Call submit_concept_evidence_profile with the subject concept's definition passages, salience-ordered mention passages, and any optional typed assertions.
+{{/user}}

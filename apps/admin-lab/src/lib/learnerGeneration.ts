@@ -2,24 +2,25 @@ import {
   generateTopicExpedition,
   createIntrinsicDifficultyPort,
   DEFAULT_ENRICHMENT_CONFIG,
-  STUDY_ITEM_BANK_CONFIG_HASH
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG
 } from "@lrnki/application";
 import {
-  LiteLlmConceptLessonGenerationAdapter,
-  LiteLlmConceptLessonRedundancyJudgmentAdapter,
-  LiteLlmConceptSetSynthesisAdapter,
-  LiteLlmEmbeddingClient,
-  LiteLlmForcedToolClient,
-  LiteLlmGroundingGenerationAdapter,
-  LiteLlmImpostorLieValidityJudgmentAdapter,
-  LiteLlmIntrinsicDifficultyJudgmentAdapter,
-  LiteLlmKnowledgeBoundaryProbeAdapter,
-  LiteLlmDeclaredDomainInferenceAdapter,
+  createConceptLessonGenerationPort,
+  createConceptLessonRedundancyJudgmentPort,
+  createConceptSetSynthesisPort,
+  createGroundingGenerationPort,
+  createImpostorLieValidityJudgmentPort,
+  createIntrinsicDifficultyJudgmentPort,
+  createKnowledgeBoundaryProbePort,
+  createDeclaredDomainInferencePort,
   LiteLlmNodeEmbeddingAdapter,
-  LiteLlmNodeMergeAdjudicationAdapter,
-  LiteLlmPrerequisiteOrderingAdapter,
-  LiteLlmStudyItemBlueprintAdapter,
-  LiteLlmStudyItemGenerationAdapter
+  createNodeMergeAdjudicationPort,
+  createPrerequisiteOrderingPort,
+  createStudyItemBlueprintPort,
+  createStudyItemGenerationPort,
+  createNeuralClients,
+  studyItemBankConfigHash,
+  withSyntheticGenerationConfigHash
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
@@ -31,19 +32,11 @@ import {
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./topicGenerationSupervisor";
 
-function baseClientConfig() {
-  return {
-    baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
-    apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
-  };
-}
-
 function buildContext(sql: DatabaseClient) {
-  const baseClient = baseClientConfig();
-  const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
-  const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
-  const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
+  // Client-construction policy (env base config + deterministic/probe/embedding
+  // sampling decisions and their rationale) lives once in createNeuralClients,
+  // shared with the kg-worker root.
+  const { deterministicClient, probeClient, embeddingClient } = createNeuralClients();
   const graphStore = new PostgresGraphVersionStore(sql);
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
   const runProgressReporter = new PostgresRunProgressReporter(sql);
@@ -52,20 +45,20 @@ function buildContext(sql: DatabaseClient) {
     enrichmentStore,
     runProgressReporter,
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
-    declaredDomainInference: new LiteLlmDeclaredDomainInferenceAdapter(deterministicClient),
-    conceptSetSynthesis: new LiteLlmConceptSetSynthesisAdapter(deterministicClient),
-    knowledgeBoundaryProbe: new LiteLlmKnowledgeBoundaryProbeAdapter(probeClient),
+    declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient),
+    conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
+    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    nodeMergeAdjudicator: new LiteLlmNodeMergeAdjudicationAdapter(deterministicClient),
-    groundingGeneration: new LiteLlmGroundingGenerationAdapter(deterministicClient),
-    prerequisiteOrdering: new LiteLlmPrerequisiteOrderingAdapter(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(new LiteLlmIntrinsicDifficultyJudgmentAdapter(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
-    conceptLessonGeneration: new LiteLlmConceptLessonGenerationAdapter(deterministicClient),
-    conceptLessonRedundancyJudge: new LiteLlmConceptLessonRedundancyJudgmentAdapter(deterministicClient),
+    nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
+    groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
+    difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
+    conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
+    conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
-    studyItemBlueprint: new LiteLlmStudyItemBlueprintAdapter(deterministicClient),
-    studyItemGeneration: new LiteLlmStudyItemGenerationAdapter(deterministicClient),
-    impostorLieValidityJudge: new LiteLlmImpostorLieValidityJudgmentAdapter(deterministicClient),
+    studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
+    studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
+    impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
     studyItemBankStore: new PostgresStudyItemBankStore(sql)
   };
 }
@@ -97,7 +90,8 @@ export async function generateLearnerTopicExpedition(input: {
     conceptLessonStore: ctx.conceptLessonStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
-    configHash: STUDY_ITEM_BANK_CONFIG_HASH,
+    config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
+    configHash: studyItemBankConfigHash(),
     reporter: ctx.runProgressReporter
   });
 }

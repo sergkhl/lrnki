@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LiteLlmGroundingGenerationAdapter } from "./groundingGenerationAdapters";
+import { createGroundingGenerationPort } from "./groundingGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
 function adapterReturning(canned: { definitions: { text: string }[]; mentions: { text: string }[]; rationale: string }) {
@@ -11,7 +11,7 @@ function adapterReturning(canned: { definitions: { text: string }[]; mentions: {
       return canned;
     }
   } as unknown as LiteLlmForcedToolClient;
-  return { adapter: new LiteLlmGroundingGenerationAdapter(client, "mock-grounding"), calls };
+  return { adapter: createGroundingGenerationPort(client), calls };
 }
 
 test("generates an llm-grounded bundle conditioned on scaffolded anchors", async () => {
@@ -30,14 +30,14 @@ test("generates an llm-grounded bundle conditioned on scaffolded anchors", async
 
   assert.equal(bundle.derivedNodeId, "dn-stack-allocation");
   assert.equal(bundle.groundingOrigin, "llm_grounded");
-  assert.equal(bundle.generatingModel, "mock-grounding");
+  assert.equal(bundle.generatingModel, "kg-claim-extraction");
   assert.deepEqual(bundle.scaffoldedAnchorConceptIds, ["copy"]);
   assert.equal(bundle.definitions[0].groundingOrigin, "llm_grounded");
   assert.equal(bundle.definitions[0].verbatimCheck.disposition, "not_applicable_by_grounding");
   assert.equal(bundle.mentions[0].passageType, "mention");
 
   const call = calls[0] as { model: string; toolName: string; messages: { content: string }[] };
-  assert.equal(call.model, "mock-grounding");
+  assert.equal(call.model, "kg-claim-extraction");
   assert.equal(call.toolName, "submit_generated_grounding_bundle");
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
   assert.ok(call.messages.some((message) => message.content.includes("Types such as integers")));
@@ -49,7 +49,7 @@ test("malformed tool arguments fail closed through the forced-tool validator", a
       throw new Error("Expected at least one definition");
     }
   } as unknown as LiteLlmForcedToolClient;
-  const adapter = new LiteLlmGroundingGenerationAdapter(client, "mock-grounding");
+  const adapter = createGroundingGenerationPort(client);
 
   await assert.rejects(
     () => adapter.generate({
