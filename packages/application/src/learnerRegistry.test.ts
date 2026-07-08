@@ -23,6 +23,9 @@ function fakeStore(): LearnerStorePort & { rows: Map<string, Learner> } {
     },
     async list() {
       return [...rows.values()];
+    },
+    async listRefsWithStudyEvidence() {
+      return [...rows.keys()];
     }
   };
 }

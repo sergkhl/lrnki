@@ -1,19 +1,24 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import test from "node:test";
+import test, { after } from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresLearnerAwardsStore, PostgresLearnerStore } from "./PostgresLearnerRegistryStores";
+import { cleanupTrackedLearners, trackLearner } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration applied.
 // Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
+// This suite creates `learners` rows via the registry `create` path; track each ref so the
+// cleanup deletes exactly those and the shared dev DB is unchanged (R2/AE2).
+after(() => cleanupTrackedLearners(databaseUrl));
+
 maybe("create is unique-at-insert: a second create for the same ref is a no-op (R1/AE1)", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerStore(sql);
-    const ref = `Alex-${randomUUID()}`;
+    const ref = trackLearner(`Alex-${randomUUID()}`);
     assert.deepEqual(await store.create({ learnerRef: ref, displayName: "Alex", pinHash: "hash-a" }), { created: true });
     assert.deepEqual(await store.create({ learnerRef: ref, displayName: "Alex", pinHash: "hash-b" }), { created: false });
     const learner = await store.get(ref);
@@ -28,7 +33,7 @@ maybe("record is idempotent on (learner, type, dedupe_key): re-award is a no-op 
   try {
     const learners = new PostgresLearnerStore(sql);
     const awards = new PostgresLearnerAwardsStore(sql);
-    const ref = `Alex-${randomUUID()}`;
+    const ref = trackLearner(`Alex-${randomUUID()}`);
     await learners.create({ learnerRef: ref, displayName: "Alex", pinHash: "hash" });
 
     const first = await awards.record({ awardId: randomUUID(), learnerRef: ref, awardType: "weekly_podium", dedupeKey: "2026-W27", context: { rank: 1 } });

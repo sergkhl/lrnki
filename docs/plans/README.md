@@ -12,7 +12,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [2026-07-07-006 — leaderboard dialog + cohort-of-10, single login/register gate, enriched-DAG links](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md) — ready
+- [2026-07-07-006 — leaderboard dialog + cohort-of-10, single login/register gate, enriched-DAG links](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md) — implemented in the committed tree; awaiting rule-14 gate + consolidation
+- [2026-07-07-007 — learner-state cleanup + /learn read path, operations cost/timing visibility](./2026-07-07-007-fix-learner-cleanup-learn-read-path-ops-cost-visibility-plan.md) — ready
 
 ## Ownership rules
 

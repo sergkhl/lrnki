@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getLearnerLifetimeMasteredCrystalCount, getWeeklyLeaderboard, isoWeekRange, previousIsoWeekKey } from "@lrnki/application";
+import { getWeeklyLeaderboard, isoWeekRange, lifetimeMasteredCrystalCount, previousIsoWeekKey } from "@lrnki/application";
 import {
   PostgresCalibrationVerdictStore,
   PostgresConceptLessonStore,
@@ -49,7 +49,10 @@ export async function loadLeaderboard(learnerStateRef: string, now: Date = new D
     };
 
     const current = await getWeeklyLeaderboard({ now, ...deps });
-    const masteredCrystalCount = await getLearnerLifetimeMasteredCrystalCount({ learnerRef: learnerStateRef, ...deps });
+    // The lifetime crystal count is derived from the SAME pass's contributions — no third full
+    // projection (R4). A viewer with no evidence has an empty/absent contribution list → 0.
+    const masteredCrystalCount = lifetimeMasteredCrystalCount(current.contributionsByLearner.get(learnerStateRef));
+    const viewerHasEvidence = current.contributionsByLearner.has(learnerStateRef) && current.rows.some((row) => row.learnerRef === learnerStateRef);
     const currentBoard = assembleWeeklyBoard({
       viewerRef: learnerStateRef,
       realRows: current.rows,
@@ -59,7 +62,7 @@ export async function loadLeaderboard(learnerStateRef: string, now: Date = new D
       weekEndMs: isoWeekRange(now).endMs
     });
 
-    const podiumEarnedForPreviousWeek = await recordPreviousWeekPodium(learnerStateRef, now, deps);
+    const podiumEarnedForPreviousWeek = await recordPreviousWeekPodium(learnerStateRef, now, deps, viewerHasEvidence);
 
     const viewerEntry = currentBoard.entries.find((entry) => entry.isViewer);
     return {
@@ -81,9 +84,16 @@ export async function loadLeaderboard(learnerStateRef: string, now: Date = new D
 // uses that to fire the celebration once; a re-entry sees `false` because the record is a no-op).
 type LeaderboardDeps = Omit<Parameters<typeof getWeeklyLeaderboard>[0], "now">;
 
-async function recordPreviousWeekPodium(learnerStateRef: string, now: Date, deps: LeaderboardDeps): Promise<boolean> {
+async function recordPreviousWeekPodium(learnerStateRef: string, now: Date, deps: LeaderboardDeps, viewerHasEvidence: boolean): Promise<boolean> {
   const prevWeekEnd = new Date(isoWeekRange(now).startMs - 1);
   const prevWeekKey = previousIsoWeekKey(now);
+  // Guard the second full board pass (KTD3): a viewer with no evidence never podiums, and once
+  // the idempotent `weekly_podium` award for this prior week exists, re-running the recompute
+  // can only be a no-op. Skipping it in both cases stops the board reading twice per navigation
+  // forever, while the FIRST entry of each week still recomputes and records.
+  if (!viewerHasEvidence) return false;
+  const viewerAwards = await deps.awardsStore.listForLearner(learnerStateRef);
+  if (viewerAwards.some((award) => award.awardType === "weekly_podium" && award.dedupeKey === prevWeekKey)) return false;
   const prev = await getWeeklyLeaderboard({ now: prevWeekEnd, ...deps });
   const prevRange = isoWeekRange(prevWeekEnd);
   const prevBoard = assembleWeeklyBoard({

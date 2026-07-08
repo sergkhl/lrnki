@@ -64,7 +64,7 @@ test("catalog non-LLM stages are drawn from the known non-LLM vocabulary", () =>
   }
 });
 
-// R1 regression: the four live tags that were silently dropped from bottleneck/journey
+// R1 regression: the four live tags that were silently dropped from cost & timings / journey
 // reports until this change now belong to their owning operation.
 test("previously-dropped spend tags belong to their owning operation", () => {
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.conceptSetSynthesis, "enrichment"), true);

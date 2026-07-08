@@ -15,9 +15,9 @@ import {
   hashLearnerPin,
   runGraphEnrichment,
   runSyntheticGeneration,
-  bottleneckReport,
+  costTimingReport,
   rankBottleneckTargets,
-  type BottleneckReport,
+  type CostTimingReport,
   type RankedTarget,
   calibrateKnowledgeBoundaryProbe,
   parseKnowledgeBoundaryLadder
@@ -101,7 +101,7 @@ function buildContext() {
   const runStore = new PostgresExtractionRunStore(sql);
   // Run-progress reporter (ADR-0029): its own autocommit writes on the shared `sql`
   // handle, never enlisted in a store's persist transaction, drive the durable
-  // timeline that the live progress view and bottleneck report read.
+  // timeline that the live progress view and cost & timings report read.
   const runProgressReporter = new PostgresRunProgressReporter(sql);
   const graphStore = new PostgresGraphVersionStore(sql);
   const artifacts = new PostgresArtifactRepository(sql);
@@ -152,7 +152,7 @@ function buildContext() {
     registrationStore,
     runStore,
     runProgressReporter,
-    // Bottleneck-report read surfaces: the per-operation timeline read-model and
+    // Cost & timings read surfaces: the per-operation timeline read-model and
     // the live LiteLLM /spend/tags reader. The report use-case joins them; cost is read
     // live and never stored (ADR-0029).
     operationTimelineRead: new PostgresOperationTimelineRead(sql),
@@ -582,17 +582,17 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
   console.log(`   verdicts: known=${result.knownCount} learn=${result.learnCount}`);
 }
 
-// Bottleneck report renderer for code agents (ADR-0029): a per-stage table of
+// Cost & timings report renderer for code agents (ADR-0029): a per-stage table of
 // wall-clock + calls + cost for one operation, or the same structured rows as `--json`.
-// Both this CLI and the Admin Lab view call the SAME bottleneckReport use-case; neither
+// Both this CLI and the Admin Lab view call the SAME costTimingReport use-case; neither
 // re-implements the join.
-async function bottleneckReportCommand(ctx: Context, operationId: string | undefined, flags: string[]) {
+async function costTimingReportCommand(ctx: Context, operationId: string | undefined, flags: string[]) {
   if (!operationId) {
-    console.error("! bottleneck-report requires <operationId> (an extraction run / graph version / enrichment id).");
+    console.error("! cost-timing-report requires <operationId> (an extraction run / graph version / enrichment id).");
     process.exitCode = 1;
     return;
   }
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { operationId },
     timelineRead: ctx.operationTimelineRead,
     operationStageSpendRead: ctx.operationStageSpendRead,
@@ -612,7 +612,7 @@ async function journeyCostReportCommand(ctx: Context, enrichmentId: string | und
     process.exitCode = 1;
     return;
   }
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { journeyAnchorEnrichmentId: enrichmentId },
     timelineRead: ctx.operationTimelineRead,
     operationStageSpendRead: ctx.operationStageSpendRead,
@@ -629,7 +629,7 @@ async function journeyCostReportCommand(ctx: Context, enrichmentId: string | und
 // Shared flag dispatch for both report commands (U3). `--ranked` renders (or with `--json`,
 // emits) the ranked cost + time target lists; `--json` alone emits the raw report; absent
 // flags render the per-stage table. `--ranked --json` is the recording form for the baseline.
-function emitReport(report: BottleneckReport, flags: string[]) {
+function emitReport(report: CostTimingReport, flags: string[]) {
   const ranked = flags.includes("--ranked");
   const json = flags.includes("--json");
   if (ranked) {
@@ -641,10 +641,10 @@ function emitReport(report: BottleneckReport, flags: string[]) {
     console.log(JSON.stringify(report, null, 2));
     return;
   }
-  renderBottleneckTable(report);
+  renderCostTimingTable(report);
 }
 
-function renderBottleneckTable(report: BottleneckReport) {
+function renderCostTimingTable(report: CostTimingReport) {
   console.log(`\n>> ${report.scope} cost report — ${report.anchorId}`);
   if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost columns omitted, wall-clock only.");
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
@@ -664,7 +664,7 @@ function renderBottleneckTable(report: BottleneckReport) {
 
 // Ranked-target renderer (U3): a cost-ranked and a wall-ranked list of (operation, stage)
 // rows with each target's share of the journey total — the optimization-pass handoff view.
-function renderRankedTargets(report: BottleneckReport) {
+function renderRankedTargets(report: CostTimingReport) {
   const ranked = rankBottleneckTargets(report);
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
   const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
@@ -767,14 +767,14 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "list-sources":
       await listSources(ctx);
       break;
-    case "bottleneck-report":
-      await bottleneckReportCommand(ctx, arg, rest);
+    case "cost-timing-report":
+      await costTimingReportCommand(ctx, arg, rest);
       break;
     case "journey-cost-report":
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | bottleneck-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

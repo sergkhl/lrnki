@@ -24,6 +24,9 @@ function fakeLearnerStore(rows: Learner[]): LearnerStorePort {
     },
     async list() {
       return rows;
+    },
+    async listRefsWithStudyEvidence() {
+      return rows.map((row) => row.learnerRef);
     }
   };
 }

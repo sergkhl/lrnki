@@ -32,7 +32,7 @@ export {
   type WeeklyLeaderboardRow,
   type LearnerBadges
 } from "./weeklyLeaderboard";
-export { getLearnerLifetimeMasteredCrystalCount, getWeeklyLeaderboard } from "./getWeeklyLeaderboard";
+export { getWeeklyLeaderboard, lifetimeMasteredCrystalCount, type WeeklyLeaderboard } from "./getWeeklyLeaderboard";
 export {
   getDuelSetup,
   gradeDuelAnswer,
@@ -49,7 +49,13 @@ export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";
 export { synthesizeResponses } from "./syntheticResponses";
 
-export { bottleneckReport, type BottleneckReport } from "./bottleneckReport";
+export {
+  costTimingReport,
+  type CostTimingReport,
+  type CostTimingStageRow,
+  type CostTimingTotals,
+  type CostTimingOperationReport
+} from "./costTimingReport";
 export { rankBottleneckTargets, type RankedTarget } from "./rankBottleneckTargets";
 export {
   OPERATION_HEARTBEAT_STALE_AFTER_MS,
@@ -58,7 +64,8 @@ export {
 } from "./operationRunLiveness";
 export {
   NON_LLM_STAGES,
-  operationTimelineLlmSpendStageTags
+  operationTimelineLlmSpendStageTags,
+  spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
 
 export { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";

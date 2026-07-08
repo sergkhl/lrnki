@@ -33,6 +33,18 @@ export class PostgresLearnerStore implements LearnerStorePort {
       FROM learners ORDER BY created_at ASC`;
     return rows.map(hydrateLearner);
   }
+
+  // The union of learner refs that appear in ANY of the three evidence tables (R4/KTD2). One
+  // indexed distinct-union read replaces the per-learner projection cost for dormant learners.
+  async listRefsWithStudyEvidence(): Promise<string[]> {
+    const rows = await this.sql<{ learner_state_ref: string }[]>`
+      SELECT learner_state_ref FROM response_log
+      UNION
+      SELECT learner_state_ref FROM lesson_reads
+      UNION
+      SELECT learner_state_ref FROM calibration_verdicts`;
+    return rows.map((row) => row.learner_state_ref);
+  }
 }
 
 // Durable award persistence (R8). `record` is idempotent on the

@@ -86,6 +86,27 @@ test("assembleWeeklyBoard fills to 10 rows, ranks them, and flags the viewer (AE
   assert.ok(chase, "a chase target exists");
 });
 
+test("assembleWeeklyBoard hides zero-point non-viewers but keeps the viewer at 0 and still fills to 10 (R3/AE3)", () => {
+  const { entries, viewerPoints } = assembleWeeklyBoard({
+    viewerRef: "Ada",
+    realRows: [
+      { learnerRef: "Ada", displayName: "Ada", points: 0, badges: { duelWins: 0, podiums: 0 } },
+      { learnerRef: "Dormant", displayName: "Dormant", points: 0, badges: { duelWins: 0, podiums: 0 } },
+      { learnerRef: "junk-11c61546", displayName: "junk-11c61546", points: 0, badges: { duelWins: 0, podiums: 0 } },
+      { learnerRef: "Bo", displayName: "Bo", points: 5, badges: { duelWins: 0, podiums: 0 } }
+    ],
+    weekKey: "2026-W28",
+    nowMs: 500,
+    weekStartMs: 0,
+    weekEndMs: 1000
+  });
+  assert.equal(entries.length, 10, "viewer + one scoring real row + rivals fill to 10");
+  assert.equal(viewerPoints, 0, "the viewer renders at 0 points");
+  assert.equal(entries.filter((entry) => entry.isViewer).length, 1, "the viewer is present at 0");
+  assert.ok(!entries.some((entry) => entry.id === "Dormant" || entry.id === "junk-11c61546"), "0-point non-viewers are hidden");
+  assert.ok(entries.some((entry) => entry.id === "Bo"), "the scoring real row stays");
+});
+
 function realRow(index: number, points: number) {
   return {
     learnerRef: `L${index}`,

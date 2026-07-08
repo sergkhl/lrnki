@@ -136,7 +136,12 @@ export function assembleWeeklyBoard(input: {
   const size = input.size ?? 10;
   const viewerPoints = input.realRows.find((row) => row.learnerRef === input.viewerRef)?.points ?? 0;
   const weekFraction = (input.nowMs - input.weekStartMs) / (input.weekEndMs - input.weekStartMs);
-  const realRows = windowRealRows({ viewerRef: input.viewerRef, realRows: input.realRows, size });
+  // Drop real rows that scored nothing this week (dormant or residual junk learners) BEFORE
+  // windowing, so the viewer-centered cohort is never padded with 0-point neighbors (R3). The
+  // viewer's own row is always kept — a viewer at 0 points still renders at 0 (AE3) — and the
+  // rival fill still tops the board up to `size`.
+  const scoringRows = input.realRows.filter((row) => row.learnerRef === input.viewerRef || row.points > 0);
+  const realRows = windowRealRows({ viewerRef: input.viewerRef, realRows: scoringRows, size });
   const rivalCount = Math.max(0, size - realRows.length);
   const rivals = simulateRivals({ learnerRef: input.viewerRef, weekKey: input.weekKey, viewerPoints, count: rivalCount, weekFraction });
 

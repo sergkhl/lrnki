@@ -2,8 +2,13 @@
 
 ## TODO
 
-- Execute the
+- Consolidate the
   [leaderboard dialog + cohort-of-10, single login/register gate, and enriched-DAG links plan](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md)
+  — implementation verified present in the committed tree on 2026-07-07 (cohort windowing,
+  division ladder, single-form gate, dialog, logout, DAG links); the rule-14 gate (U7) and
+  completed-plan consolidation are outstanding.
+- Execute the
+  [learner-state cleanup + /learn read path, and operations cost/timing visibility plan](./2026-07-07-007-fix-learner-cleanup-learn-read-path-ops-cost-visibility-plan.md)
   — ready, not started.
 
 ## COMPLETED

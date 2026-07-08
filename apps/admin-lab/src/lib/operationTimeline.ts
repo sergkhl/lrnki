@@ -1,5 +1,5 @@
-import { bottleneckReport } from "@lrnki/application";
-import type { OperationStageSpendReadPort, OperationType } from "@lrnki/ports";
+import { costTimingReport } from "@lrnki/application";
+import type { OperationStageSpend, OperationStageSpendReadPort, OperationType } from "@lrnki/ports";
 import { LiteLlmSpendLogsReadAdapter } from "@lrnki/infrastructure-litellm";
 import {
   PostgresJourneyLineageRead,
@@ -43,20 +43,41 @@ export function listOperationsWithStages() {
   });
 }
 
-// The Admin Lab renderer of the bottleneck report (R5): the SAME use-case the worker
+// The Admin Lab renderer of the cost & timings report (R5/R7): the SAME use-case the worker
 // CLI calls (KTD5) — no HTTP hop, no re-implemented join. Cost is read live from
 // LiteLLM at render time and never stored (R6); a LiteLLM outage degrades to wall-clock
 // only inside the use-case.
-export function getBottleneckReport(operationId: string, operationType?: OperationType) {
+export function getCostTimingReport(operationId: string, operationType?: OperationType) {
   return withReportReads((dependencies) =>
-    bottleneckReport({ scope: { operationId, operationType }, ...dependencies })
+    costTimingReport({ scope: { operationId, operationType }, ...dependencies })
   );
 }
 
 export function getJourneyCostReport(enrichmentId: string) {
   return withReportReads((dependencies) =>
-    bottleneckReport({ scope: { journeyAnchorEnrichmentId: enrichmentId }, ...dependencies })
+    costTimingReport({ scope: { journeyAnchorEnrichmentId: enrichmentId }, ...dependencies })
   );
+}
+
+// Preloaded live spend for the whole operations page: ONE `readOperationStageSpend` call over
+// every listed operation id feeds the at-a-glance cost/tokens/calls chips on each card (R5,
+// KTD4 — the lateral-join scan dominates, so one call for N ids costs the same as one). Cost
+// is never stored. `costAvailable` is false when LITELLM_DATABASE_URL is absent OR the read
+// fails, in which case the page degrades to wall-clock-only chips (AE6).
+export async function preloadOperationSpend(
+  operationIds: string[]
+): Promise<{ rows: OperationStageSpend[]; costAvailable: boolean }> {
+  const litellmUrl = process.env.LITELLM_DATABASE_URL;
+  if (!litellmUrl || operationIds.length === 0) return { rows: [], costAvailable: false };
+  const spendRead = new LiteLlmSpendLogsReadAdapter(litellmUrl);
+  try {
+    const rows = await spendRead.readOperationStageSpend([...new Set(operationIds)]);
+    return { rows, costAvailable: true };
+  } catch {
+    return { rows: [], costAvailable: false };
+  } finally {
+    await spendRead.end();
+  }
 }
 
 async function withReportReads<T>(

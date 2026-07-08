@@ -10,7 +10,7 @@ import type {
   OperationTimelineReadPort,
   OperationType
 } from "@lrnki/ports";
-import { bottleneckReport } from "./bottleneckReport";
+import { costTimingReport } from "./costTimingReport";
 import { NON_LLM_STAGES } from "./runProgressReporter";
 
 function detail(operationId: string, operationType: OperationType, stages: Array<[string, number | null]>): OperationTimelineDetail {
@@ -73,7 +73,7 @@ test("operation scope joins operation-scoped spend and includes tokens", async (
     details: [detail("run-1", "extraction", [[STAGE_TAGS.admission, 3000]])],
     spend: [{ operationId: "run-1", stage: STAGE_TAGS.admission, logCount: 2, totalSpend: 0.2, totalTokens: 1200 }]
   });
-  const report = await bottleneckReport({ scope: { operationId: "run-1" }, ...dependencies });
+  const report = await costTimingReport({ scope: { operationId: "run-1" }, ...dependencies });
   assert.equal(report?.scope, "operation");
   assert.deepEqual(report?.operations[0].stages[0], {
     stage: STAGE_TAGS.admission,
@@ -104,7 +104,7 @@ test("operation scope can disambiguate operation types that share one id", async
       { operationId: "enr-1", stage: STAGE_TAGS.impostorGeneration, logCount: 5, totalSpend: 0.5, totalTokens: 500 }
     ]
   });
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { operationId: "enr-1", operationType: "study_items" },
     ...dependencies
   });
@@ -141,7 +141,7 @@ test("journey scope rolls up two extraction runs, minting, enrichment, and study
       { operationId: "enr-1", stage: STAGE_TAGS.impostorGeneration, logCount: 5, totalSpend: 0.5, totalTokens: 500 }
     ]
   });
-  const report = await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
+  const report = await costTimingReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
   assert.equal(report?.operations.length, 5);
   assert.deepEqual(report?.total, { wallClockMs: 15300, calls: 16, costUsd: 1.6, tokens: 1600 });
   assert.deepEqual(report?.operations.find((row) => row.operationType === "minting")?.subtotal, {
@@ -173,7 +173,7 @@ test("cost-source failure preserves wall-clock and marks cost totals unavailable
     ],
     spend: new Error("LiteLLM down")
   });
-  const report = await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
+  const report = await costTimingReport({ scope: { journeyAnchorEnrichmentId: "enr-1" }, ...dependencies });
   assert.equal(report?.costAvailable, false);
   assert.equal(report?.total.wallClockMs, 12300);
   assert.equal(report?.total.costUsd, null);
@@ -197,7 +197,7 @@ test("non-LLM wall-clock rows and duplicate timeline rows keep current aggregati
       { operationId: "gv-1", stage: NON_LLM_STAGES.persist, logCount: 9, totalSpend: 9, totalTokens: 9000 }
     ]
   });
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { operationId: "gv-1", operationType: "minting" },
     ...dependencies
   });
@@ -217,7 +217,7 @@ test("unknown timeline stage remains visible and does not receive unrelated spen
       { operationId: "enr-1", stage: STAGE_TAGS.studyItemGeneration, logCount: 4, totalSpend: 0.4, totalTokens: 400 }
     ]
   });
-  const report = await bottleneckReport({
+  const report = await costTimingReport({
     scope: { operationId: "enr-1", operationType: "enrichment" },
     ...dependencies
   });
@@ -229,6 +229,6 @@ test("unknown timeline stage remains visible and does not receive unrelated spen
 
 test("returns undefined for unknown operation and journey anchors", async () => {
   const dependencies = ports({ details: [] });
-  assert.equal(await bottleneckReport({ scope: { operationId: "missing" }, ...dependencies }), undefined);
-  assert.equal(await bottleneckReport({ scope: { journeyAnchorEnrichmentId: "missing" }, ...dependencies }), undefined);
+  assert.equal(await costTimingReport({ scope: { operationId: "missing" }, ...dependencies }), undefined);
+  assert.equal(await costTimingReport({ scope: { journeyAnchorEnrichmentId: "missing" }, ...dependencies }), undefined);
 });

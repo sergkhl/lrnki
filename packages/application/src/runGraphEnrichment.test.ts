@@ -605,7 +605,7 @@ test("records the verbatim-floor grounding dispositions on the run", async () =>
 // --- U1/U2 integration: the enrichment timeline carries fine join-aligned stage names ----
 
 // AE1: a minting run's timeline names the fine rescue/mint stages and NO coarse `rescue-mint`.
-// Every enrichment LLM stage that fires is a STAGE_TAG, so the cost half of the bottleneck
+// Every enrichment LLM stage that fires is a STAGE_TAG, so the cost half of the cost & timings report
 // join meets it on one key — the join-alignment contract (R1).
 test("U1 integration: a minting run's timeline uses fine names, never `rescue-mint`", async () => {
   const ports = buildNodePorts({ rescue: [rescueCandidate("Pointer")], proposals: [{ proposedLabel: "Stack allocation", rationale: "r" }] });

@@ -577,6 +577,12 @@ export interface LearnerStorePort {
   create(input: { learnerRef: string; displayName: string; pinHash: string }): Promise<{ created: boolean }>;
   get(learnerRef: string): Promise<Learner | undefined>;
   list(): Promise<Learner[]>;
+  // Refs of learners with ANY study evidence — at least one response, lesson read, or
+  // calibration verdict (plan 2026-07-07-007, R4/KTD2). A cheap existence read over the
+  // projection's own inputs: a learner with none cannot score or hold a lifetime crystal,
+  // so the weekly-board pass skips the expensive per-enrichment projection for them. This is
+  // NOT a mastery predicate — it prefilters inputs the projection would otherwise read.
+  listRefsWithStudyEvidence(): Promise<string[]>;
 }
 
 export interface LearnerAward {

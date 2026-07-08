@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import test from "node:test";
+import test, { after } from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
-import { seedLearner } from "./testSupport";
+import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
 const databaseUrl = process.env.DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
+
+// Delete the learners this suite seeds so the shared dev DB is unchanged (R2/AE2).
+after(() => cleanupTrackedLearners(databaseUrl));
 
 maybe("learner expeditions round-trip and stay scoped per learner", async () => {
   const sql = createDatabaseClient(databaseUrl);

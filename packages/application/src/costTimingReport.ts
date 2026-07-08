@@ -13,11 +13,11 @@ import {
   type OperationTimelineStageKind
 } from "./operationTimelineCatalog";
 
-export type BottleneckReportScope =
+export type CostTimingReportScope =
   | { operationId: string; operationType?: OperationType }
   | { journeyAnchorEnrichmentId: string };
 
-export interface BottleneckStageRow {
+export interface CostTimingStageRow {
   stage: string;
   isLlmStage: boolean;
   stageKind: OperationTimelineStageKind;
@@ -27,37 +27,37 @@ export interface BottleneckStageRow {
   tokens: number | null;
 }
 
-export interface BottleneckTotals {
+export interface CostTimingTotals {
   wallClockMs: number;
   calls: number | null;
   costUsd: number | null;
   tokens: number | null;
 }
 
-export interface BottleneckOperationReport {
+export interface CostTimingOperationReport {
   operationId: string;
   operationType: OperationType;
   status: string;
-  stages: BottleneckStageRow[];
-  subtotal: BottleneckTotals;
+  stages: CostTimingStageRow[];
+  subtotal: CostTimingTotals;
 }
 
-export interface BottleneckReport {
+export interface CostTimingReport {
   scope: "operation" | "journey";
   anchorId: string;
   costAvailable: boolean;
-  operations: BottleneckOperationReport[];
-  total: BottleneckTotals;
+  operations: CostTimingOperationReport[];
+  total: CostTimingTotals;
 }
 
 type OperationRef = { operationId: string; operationType: OperationType };
 
-export async function bottleneckReport(input: {
-  scope: BottleneckReportScope;
+export async function costTimingReport(input: {
+  scope: CostTimingReportScope;
   timelineRead: OperationTimelineReadPort;
   operationStageSpendRead: OperationStageSpendReadPort;
   journeyLineageRead: JourneyLineageReadPort;
-}): Promise<BottleneckReport | undefined> {
+}): Promise<CostTimingReport | undefined> {
   const scope = "operationId" in input.scope ? "operation" : "journey";
   const anchorId = "operationId" in input.scope
     ? input.scope.operationId
@@ -118,7 +118,7 @@ export async function bottleneckReport(input: {
 function buildOperationReport(
   detail: OperationTimelineDetail,
   spend: OperationStageSpend[] | null
-): BottleneckOperationReport {
+): CostTimingOperationReport {
   const operationSpend = (spend ?? []).filter(
     (row) =>
       row.operationId === detail.summary.operationId &&
@@ -139,7 +139,7 @@ function buildOperationReport(
     }
   }
 
-  const stages = order.map((stage): BottleneckStageRow => {
+  const stages = order.map((stage): CostTimingStageRow => {
     const row = spendByStage.get(stage);
     return {
       stage,
@@ -160,7 +160,7 @@ function buildOperationReport(
   };
 }
 
-function sumStageRows(rows: BottleneckStageRow[], costAvailable: boolean): BottleneckTotals {
+function sumStageRows(rows: CostTimingStageRow[], costAvailable: boolean): CostTimingTotals {
   return {
     wallClockMs: rows.reduce((sum, row) => sum + (row.wallClockMs ?? 0), 0),
     calls: costAvailable ? rows.reduce((sum, row) => sum + (row.calls ?? 0), 0) : null,
@@ -169,7 +169,7 @@ function sumStageRows(rows: BottleneckStageRow[], costAvailable: boolean): Bottl
   };
 }
 
-function sumTotals(rows: BottleneckTotals[], costAvailable: boolean): BottleneckTotals {
+function sumTotals(rows: CostTimingTotals[], costAvailable: boolean): CostTimingTotals {
   return {
     wallClockMs: rows.reduce((sum, row) => sum + row.wallClockMs, 0),
     calls: costAvailable ? rows.reduce((sum, row) => sum + (row.calls ?? 0), 0) : null,
