@@ -6,9 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { expeditionStatusLabel, learnerTerm } from "./vocabulary";
 import { chooseCandidateExpedition, setActiveExpedition, startTopicExpedition } from "@/app/learn/actions";
+import { partitionExpeditionJournal } from "./expeditionJournalView";
 import { GenerationProgressCard } from "./GenerationProgressCard";
 import { PlanExpeditionDialog } from "./PlanExpeditionDialog";
 import { resumeLabel } from "./resumeLabel";
+
+type LearnerExpeditionRowModel = LearnerExpeditionEntry["learnerExpeditions"][number];
 
 const EXAMPLE_TOPICS = [
   "Game Theory",
@@ -34,6 +37,7 @@ export function ExpeditionEntry({
   entry
 }: Readonly<{ learnerStateRef: string; entry: LearnerExpeditionEntry }>) {
   const exampleTopics = pickExampleTopics(EXAMPLE_TOPICS, 4);
+  const { started, yours, shared } = partitionExpeditionJournal(entry);
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -49,11 +53,21 @@ export function ExpeditionEntry({
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        {entry.candidates.length === 0 ? <NoCandidates /> : entry.candidates.map((candidate) => (
-          <CandidateCard key={candidate.enrichmentId} learnerStateRef={learnerStateRef} candidate={candidate} />
-        ))}
-      </section>
+      {started.length > 0 ? (
+        <section className="grid gap-4">
+          <Card className="border-border bg-card">
+            <CardHeader>
+              <CardTitle>Continue</CardTitle>
+              <CardDescription>Pick up where you left off.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {started.map((expedition) => (
+                <LearnerExpeditionRow key={expedition.learnerExpeditionId} learnerStateRef={learnerStateRef} expedition={expedition} />
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="grid gap-4">
         <Card className="border-border bg-card">
@@ -69,48 +83,70 @@ export function ExpeditionEntry({
             />
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {entry.learnerExpeditions.length === 0 ? (
+            {yours.length === 0 ? (
               <p className="text-sm text-muted-foreground">No expeditions yet.</p>
-            ) : entry.learnerExpeditions.map((expedition) => expedition.status === "generating" || expedition.status === "failed" ? (
-              <GenerationProgressCard key={expedition.learnerExpeditionId} expedition={expedition} />
-            ) : (
-              <form key={expedition.learnerExpeditionId} action={async () => {
-                "use server";
-                await setActiveExpedition({
-                  learnerStateRef,
-                  learnerExpeditionId: expedition.learnerExpeditionId,
-                  enrichmentId: expedition.enrichmentId
-                });
-              }} className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
-                <MapIcon />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{expedition.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{expedition.declaredDomain}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {expedition.status === "ready" && expedition.progress
-                      ? `${expedition.progress.itemsPassed} of ${expedition.progress.itemsTotal} collected`
-                      : expeditionStatusLabel(expedition.status)}
-                    {expedition.active ? " · active" : ""}
-                  </p>
-                  {expedition.status === "ready" && expedition.progress ? (
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--journal-line)]">
-                      <div
-                        className="h-full rounded-full bg-[color:var(--journal-gem)]"
-                        style={{ width: `${expedition.progress.itemsTotal === 0 ? 0 : Math.round((expedition.progress.itemsPassed / expedition.progress.itemsTotal) * 100)}%` }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-                <Button type="submit" size="sm" variant={expedition.active ? "secondary" : "outline"} disabled={expedition.status !== "ready"}>
-                  <ArrowRightIcon data-icon="inline-start" />
-                  {resumeLabel(expedition.progress)}
-                </Button>
-              </form>
+            ) : yours.map((expedition) => (
+              <LearnerExpeditionRow key={expedition.learnerExpeditionId} learnerStateRef={learnerStateRef} expedition={expedition} />
             ))}
           </CardContent>
         </Card>
       </section>
+
+      <section className="grid gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">Explore</h2>
+          <p className="text-sm text-muted-foreground">Shared expeditions ready to begin.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {shared.length === 0 ? <NoCandidates /> : shared.map((candidate) => (
+            <CandidateCard key={candidate.enrichmentId} learnerStateRef={learnerStateRef} candidate={candidate} />
+          ))}
+        </div>
+      </section>
     </div>
+  );
+}
+
+function LearnerExpeditionRow({
+  learnerStateRef,
+  expedition
+}: Readonly<{ learnerStateRef: string; expedition: LearnerExpeditionRowModel }>) {
+  if (expedition.status === "generating" || expedition.status === "failed") {
+    return <GenerationProgressCard expedition={expedition} />;
+  }
+  return (
+    <form action={async () => {
+      "use server";
+      await setActiveExpedition({
+        learnerStateRef,
+        learnerExpeditionId: expedition.learnerExpeditionId,
+        enrichmentId: expedition.enrichmentId
+      });
+    }} className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+      <MapIcon />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{expedition.title}</p>
+        <p className="truncate text-xs text-muted-foreground">{expedition.declaredDomain}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {expedition.status === "ready" && expedition.progress
+            ? `${expedition.progress.itemsPassed} of ${expedition.progress.itemsTotal} collected`
+            : expeditionStatusLabel(expedition.status)}
+          {expedition.active ? " · active" : ""}
+        </p>
+        {expedition.status === "ready" && expedition.progress ? (
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[color:var(--journal-line)]">
+            <div
+              className="h-full rounded-full bg-[color:var(--journal-gem)]"
+              style={{ width: `${expedition.progress.itemsTotal === 0 ? 0 : Math.round((expedition.progress.itemsPassed / expedition.progress.itemsTotal) * 100)}%` }}
+            />
+          </div>
+        ) : null}
+      </div>
+      <Button type="submit" size="sm" variant={expedition.active ? "secondary" : "outline"} disabled={expedition.status !== "ready"}>
+        <ArrowRightIcon data-icon="inline-start" />
+        {resumeLabel(expedition.progress)}
+      </Button>
+    </form>
   );
 }
 

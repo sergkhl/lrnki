@@ -8,15 +8,11 @@ import {
   PostgresStudyItemBankStore,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
-import Link from "next/link";
-import { LogOutIcon, SwordsIcon } from "lucide-react";
 import { ExpeditionEntry } from "@/components/learn/ExpeditionEntry";
 import { DuelUnlockSplash } from "@/components/learn/DuelUnlockSplash";
+import { LearnerMenuDrawer } from "@/components/learn/LearnerMenuDrawer";
 import { LearnerNameGate, type GateError } from "@/components/learn/LearnerNameGate";
-import { LeaderboardDialogTrigger } from "@/components/learn/LeaderboardDialog";
 import { LeaderboardSplash } from "@/components/learn/LeaderboardSplash";
-import { learnerTerm } from "@/components/learn/vocabulary";
-import { Button, buttonVariants } from "@/components/ui/button";
 import { loadDuelSetup } from "@/lib/duel";
 import { loadLeaderboard } from "@/lib/leaderboard";
 import { readLearnerRef } from "@/lib/learnerSession";
@@ -73,19 +69,8 @@ export default async function LearnLandingPage({ searchParams }: { searchParams:
           />
         ) : null}
         <DuelUnlockSplash learnerRef={learnerStateRef} unlocked={Boolean(duel?.unlocked)} />
-        <div className="flex justify-end gap-2 pb-2">
-          <Link href="/learn/duel" className={buttonVariants({ size: "sm", variant: "ghost" })}>
-            <SwordsIcon data-icon="inline-start" />
-            {learnerTerm("duelEntry")}
-          </Link>
-          {board ? <LeaderboardDialogTrigger view={board} /> : null}
-          <form action="/learn/session" method="post">
-            <input type="hidden" name="intent" value="logout" />
-            <Button type="submit" size="sm" variant="ghost" aria-label={learnerTerm("logoutAction")}>
-              <LogOutIcon data-icon="inline-start" />
-              {learnerTerm("logoutAction")}
-            </Button>
-          </form>
+        <div className="flex justify-end pb-2">
+          <LearnerMenuDrawer board={board} />
         </div>
         <ExpeditionEntry learnerStateRef={learnerStateRef} entry={entry} />
       </>

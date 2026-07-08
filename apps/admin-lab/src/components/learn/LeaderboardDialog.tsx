@@ -51,10 +51,10 @@ export function LeaderboardDialogContent({
   );
 }
 
-export function LeaderboardDialogTrigger({ view }: { view: LeaderboardDialogView }) {
+export function LeaderboardDialogTrigger({ view, className }: { view: LeaderboardDialogView; className?: string }) {
   return (
     <Dialog>
-      <DialogTrigger render={<Button type="button" size="sm" variant="ghost" />}>
+      <DialogTrigger render={<Button type="button" size="sm" variant="ghost" className={className} />}>
         <TrophyIcon data-icon="inline-start" />
         {learnerTerm("viewBoard")}
       </DialogTrigger>
