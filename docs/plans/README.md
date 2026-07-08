@@ -12,8 +12,8 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [2026-07-07-006 — leaderboard dialog + cohort-of-10, single login/register gate, enriched-DAG links](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md) — implemented in the committed tree; awaiting rule-14 gate + consolidation
-- [2026-07-07-007 — learner-state cleanup + /learn read path, operations cost/timing visibility](./2026-07-07-007-fix-learner-cleanup-learn-read-path-ops-cost-visibility-plan.md) — ready
+- [2026-07-08-001 — neural stage descriptors with dotprompt files and mechanical config hashes](./2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md)
+  — ready. Candidate 3 of the 2026-07-07 architecture deepening review, grilled 2026-07-08.
 
 ## Ownership rules
 

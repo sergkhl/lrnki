@@ -45,7 +45,6 @@ import {
   LiteLlmConceptDiscoveryAdapter,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
-  LiteLlmEmbeddingClient,
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmGroundingGenerationAdapter,
@@ -56,7 +55,9 @@ import {
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmMintingDurabilityJudgmentAdapter,
   LiteLlmRescueDurabilityJudgmentAdapter,
-  LiteLlmRescuedNodeLabelingAdapter
+  LiteLlmRescuedNodeLabelingAdapter,
+  createNeuralClients,
+  resolveNeuralClientBaseOptions
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresArtifactRepository,
@@ -117,33 +118,10 @@ function buildContext() {
       imageTag: process.env.DOCLING_IMAGE_TAG ?? "docling-serve-cpu-v1.23.0+docling-2.102.1"
     })
   ]);
-  const baseClient = {
-    baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
-    apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
-  };
-  // Discovery stays at default sampling. It is the recall stage and, empirically,
-  // greedy decoding (temperature 0) makes DeepSeek emit a MORE exhaustive candidate
-  // list (~26 → ~40 candidates), which inflates downstream over-admission of generic
-  // primitives. Determinism here is also moot: discovery output is not reproducible
-  // across processes even at temperature 0 (MoE non-determinism), and the replayable
-  // unit is the graph-version build, not the extraction run (ADR-0017).
-  const discoveryClient = new LiteLlmForcedToolClient(baseClient);
-  // Determinism lever (TODO 1, ADR-0018) applied where it is both effective and
-  // beneficial: admission is the precision gate and, GIVEN a fixed candidate set,
-  // greedy decoding collapses its core-set drift (probe: spread 3→1/4→0/1→0 across
-  // the three fixtures); claims are per-subject and benefit from stable text. Not
-  // bit-exact on DeepSeek's MoE, so a small residual remains.
-  const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
-  // Knowledge-boundary probe client (plan 2026-06-30-001, KTD4). MODERATE temperature —
-  // NOT the deterministic 0 — so the K draws carry the sampling diversity that exposes a
-  // small model's knowledge boundary as answer dispersion; low temperature would mask
-  // confident hallucination behind a repeated wrong answer (ADR-0030 amended). No seed,
-  // so the K draws vary.
-  const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
-  // Embedding transport for the semantic-dedup PROPOSE signal (plan U1). Same base
-  // options as the forced-tool clients; embeddings have no sampling knobs.
-  const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
+  // Client-construction policy (env base config + discovery/deterministic/probe/
+  // embedding sampling decisions and their rationale) lives once in createNeuralClients,
+  // shared with the Admin Lab learner generation root.
+  const { discoveryClient, deterministicClient, probeClient, embeddingClient } = createNeuralClients();
   const spendLogsRead = process.env.LITELLM_DATABASE_URL
     ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
     : undefined;
@@ -485,11 +463,7 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
   const args = parseCalibrationFlags(flags);
   const ladderPath = path.resolve(REPO_ROOT, ladderFile);
   const ladder = parseKnowledgeBoundaryLadder(await readFile(ladderPath, "utf8"));
-  const baseClient = {
-    baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
-    apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
-  };
+  const baseClient = resolveNeuralClientBaseOptions();
   const passes = args.temperatures.flatMap((temperature) =>
     args.deployments.map((deployment) => ({
       deployment,

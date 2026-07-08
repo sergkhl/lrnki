@@ -160,6 +160,13 @@ After:   UI server action = one use-case call
 
 ## Candidate 3 — Forced-tool operation descriptors + mechanically derived config hash
 
+**Status: ACCEPTED — grilled 2026-07-08, plan ready** at
+[docs/plans/2026-07-08-001](../plans/2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md),
+which owns the design (key grilling outcomes: descriptor unit is the forced tool call, ~27 of
+them; prompts move into dotprompt `.prompt` files whose frontmatter owns the model alias; config
+hashes derive from file bytes + schema JSON, identical across both composition roots; zod schemas
+stay single-sourced per ADR-0006; ports stay).
+
 **Recommendation strength: Strong** (carried from 2026-07-03 Candidate 3, upgraded — the drift it
 predicts has now happened once)
 
@@ -201,7 +208,8 @@ neural stage), leverage (new stage = descriptor + port + catalog entry), the sta
 misattribution class disappears. ADR-0006 fully preserved (schemas stay single-sourced from zod;
 fail-closed unchanged); runtime-bounded schemas need descriptor support for schema *builders*;
 prompts dominate line count and won't shrink — the win is knowledge consolidation, not lines.
-Needs a grilling pass over the descriptor interface before it is plannable.
+The grilling pass over the descriptor interface (schema builders, per-call retries, model-alias
+ownership) completed 2026-07-08; the linked plan owns its outcomes.
 
 **Before / after**
 
@@ -215,6 +223,19 @@ After:   stage knowledge = descriptor module (+ port + catalog entry)
 ---
 
 ## Candidate 4 — Deduplicated composition: the second root made the wiring seam real
+
+**Status: client-policy half ACCEPTED and IMPLEMENTED (2026-07-08); grouping half REJECTED on a
+refuted premise.** Grilling verified the client-construction duplication verbatim and shipped
+`createNeuralClients()` / `resolveNeuralClientBaseOptions()` in
+`packages/infrastructure-litellm/src/neuralClients.ts` — env base config, the
+discovery/deterministic/probe/embedding sampling policy, and every rationale comment now live
+once; both roots (and the boundary-probe calibration sweep's env mapping) consume it, and the
+policy is pinned by request-body tests in `neuralClients.test.ts`. Deliberately NOT a CONTEXT.md
+term (user decision — infrastructure policy, not domain language). The `runGraphEnrichment`
+input-grouping half is **rejected**: its "two adapters make the grouping a real seam" premise is
+false — `runGraphEnrichment` has exactly one caller (the kg-worker); the learner path calls the
+sibling `runSyntheticGeneration` via `generateTopicExpedition`, never `runGraphEnrichment`. Do
+not re-propose the grouping unless a real second caller of `runGraphEnrichment` exists.
 
 **Recommendation strength: Worth exploring** (upgrade of 2026-07-03 Candidate 5, which was
 Speculative pending "a second composition root")
@@ -261,36 +282,45 @@ dedup group) now that two callers exist — two adapters make the grouping a rea
 
 ## Candidate 5 — One staleness rule for "a generating run is dead"
 
+**Status: ACCEPTED and IMPLEMENTED (2026-07-07)** as part of the completed
+"Expedition generation latency and operation-run liveness fixed" work recorded in
+[TODO.md](../plans/TODO.md). Current shape: `packages/application/src/operationRunLiveness.ts`
+owns the operation heartbeat window, deadline derivation, and UI stale predicate; the supervisor
+computes one `staleBefore` per tick and passes it to operation-run reaping and expedition
+claim/fail paths. The Postgres expedition store still owns the richer SQL lease predicate behind
+its port, preserving package dependency direction.
+
 **Recommendation strength: Strong** (small)
 
 **Files**
 
-- `apps/admin-lab/src/lib/topicGenerationSupervisor.ts:6` (`STALE_HEARTBEAT_MS = 2 * 60 * 1000`)
-- `apps/admin-lab/src/components/learn/GenerationProgressCard.tsx:13,16` (same constant + inline
+- `packages/application/src/operationRunLiveness.ts` (single TypeScript operation-run liveness rule)
+- `apps/admin-lab/src/lib/topicGenerationSupervisor.ts` (computes one shared `staleBefore`)
+- `apps/admin-lab/src/components/learn/GenerationProgressCard.tsx` (imports the shared stale
   predicate)
-- `apps/admin-lab/src/app/admin/lab/operations/page.tsx:40,62` (same constant + inline predicate)
+- `apps/admin-lab/src/app/admin/lab/operations/page.tsx` (imports the shared stale predicate)
 - `packages/infrastructure-postgres/src/PostgresLearnerExpeditionStore.ts:129-139`
-  (`generatingStaleness` — the authoritative SQL predicate)
+  (`generatingStaleness` — the richer SQL lease predicate)
 
 **Problem**
 
-The rule "a generating expedition is stale after 2 minutes without a heartbeat" exists four times:
-once authoritatively as SQL inside the claim/fail predicate (correctly single-sourced there — the
-2026-07-03 queue work got that right), and three more times as an independently declared TypeScript
-constant with two re-implementations of the comparison. If the reclaim window changes, the
-supervisor's relaunch behaviour and the two UI "stalled" badges silently disagree.
+Before implementation, the rule "an operation heartbeat is stale after 2 minutes" existed four
+times: once as the SQL input to the claim/fail predicate, and three more times as an independently
+declared TypeScript constant with two re-implementations of the comparison. If the reclaim window
+changed, the supervisor's relaunch behaviour and the two UI "stalled" badges could silently
+disagree.
 
 **Solution**
 
-Export one constant + one predicate (e.g. from `@lrnki/application`, next to the staleness
-contract's documentation) and import it at the three TypeScript sites; the SQL keeps its own copy
-only if it must, with a comment binding the two (or the store derives its interval from the shared
-constant).
+Implemented: export one application-owned constant plus `operationStaleBefore` and
+`isStaleOperation`; import them at the supervisor and UI sites. The SQL store keeps the lease
+predicate local and receives `staleBefore` from the supervisor instead of importing application.
 
 **Benefits**
 
-- **Locality**: one number, one comparison, one place to change the lease window. Trivial cost,
-  removes a real silent-disagreement class between the supervisor and what operators see.
+- **Locality**: one number, one comparison, one place to change the operation heartbeat window.
+  The richer expedition reclaim rule remains behind the Postgres adapter where the claim semantics
+  live.
 
 ---
 
@@ -424,5 +454,4 @@ currently under-counting, which TODO #2's next optimization pass will read. **Th
 deepening: it is bounded, it moves a security-relevant, seven-times-duplicated guard behind a
 testable interface, and it honors the Study Session contract that composition lives behind
 application use-cases. Candidate 3 remains the largest structural win — now with drift evidence in
-its favor — but still needs a grilling pass over the descriptor interface (schema builders,
-per-call retries, model-alias overrides) before it is plannable.
+its favor — grilled 2026-07-08 and planned (see its status note above).

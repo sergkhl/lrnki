@@ -8,8 +8,6 @@ import {
   LiteLlmConceptLessonGenerationAdapter,
   LiteLlmConceptLessonRedundancyJudgmentAdapter,
   LiteLlmConceptSetSynthesisAdapter,
-  LiteLlmEmbeddingClient,
-  LiteLlmForcedToolClient,
   LiteLlmGroundingGenerationAdapter,
   LiteLlmImpostorLieValidityJudgmentAdapter,
   LiteLlmIntrinsicDifficultyJudgmentAdapter,
@@ -19,7 +17,8 @@ import {
   LiteLlmNodeMergeAdjudicationAdapter,
   LiteLlmPrerequisiteOrderingAdapter,
   LiteLlmStudyItemBlueprintAdapter,
-  LiteLlmStudyItemGenerationAdapter
+  LiteLlmStudyItemGenerationAdapter,
+  createNeuralClients
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
@@ -31,19 +30,11 @@ import {
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./topicGenerationSupervisor";
 
-function baseClientConfig() {
-  return {
-    baseUrl: process.env.LITELLM_BASE_URL ?? "http://localhost:4000",
-    apiKey: process.env.LITELLM_API_KEY ?? "sk-local",
-    timeoutMs: Number(process.env.LITELLM_TIMEOUT_SECONDS ?? "600") * 1000
-  };
-}
-
 function buildContext(sql: DatabaseClient) {
-  const baseClient = baseClientConfig();
-  const deterministicClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0, seed: 7 });
-  const probeClient = new LiteLlmForcedToolClient({ ...baseClient, temperature: 0.7 });
-  const embeddingClient = new LiteLlmEmbeddingClient(baseClient);
+  // Client-construction policy (env base config + deterministic/probe/embedding
+  // sampling decisions and their rationale) lives once in createNeuralClients,
+  // shared with the kg-worker root.
+  const { deterministicClient, probeClient, embeddingClient } = createNeuralClients();
   const graphStore = new PostgresGraphVersionStore(sql);
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
   const runProgressReporter = new PostgresRunProgressReporter(sql);

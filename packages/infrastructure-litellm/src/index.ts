@@ -6,6 +6,8 @@ export {
   shapeOperationStageSpend
 } from "./LiteLlmSpendLogsReadAdapter";
 export { LiteLlmEmbeddingClient } from "./LiteLlmEmbeddingClient";
+export { createNeuralClients, resolveNeuralClientBaseOptions } from "./neuralClients";
+export type { NeuralClientBaseOptions, NeuralClients } from "./neuralClients";
 export {
   LiteLlmNodeEmbeddingAdapter,
   LiteLlmNodeMergeAdjudicationAdapter,

@@ -2,16 +2,63 @@
 
 ## TODO
 
-- Consolidate the
-  [leaderboard dialog + cohort-of-10, single login/register gate, and enriched-DAG links plan](./2026-07-07-006-feat-leaderboard-cohort-login-gate-and-dag-links-plan.md)
-  — implementation verified present in the committed tree on 2026-07-07 (cohort windowing,
-  division ladder, single-form gate, dialog, logout, DAG links); the rule-14 gate (U7) and
-  completed-plan consolidation are outstanding.
-- Execute the
-  [learner-state cleanup + /learn read path, and operations cost/timing visibility plan](./2026-07-07-007-fix-learner-cleanup-learn-read-path-ops-cost-visibility-plan.md)
-  — ready, not started.
+- Implement Candidate 3 — neural stage descriptors with dotprompt files and mechanical config
+  hashes. Grilled and planned 2026-07-08:
+  [plan 2026-07-08-001](./2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md)
+  (origin: Candidate 3 of the
+  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md);
+  that doc's rejected-findings ledger records what not to re-propose).
 
 ## COMPLETED
+
+- **Shared neural client-construction policy.** The LiteLLM client-construction policy — env base
+  config plus the measured discovery/deterministic/probe/embedding sampling decisions and their
+  rationale comments — now lives once in `createNeuralClients()`
+  (`packages/infrastructure-litellm/src/neuralClients.ts`, with `resolveNeuralClientBaseOptions()`
+  for the boundary-probe calibration sweep that varies temperature deliberately). Both composition
+  roots (`kg-worker` `buildContext`, Admin Lab `learnerGeneration`) consume it; the near-verbatim
+  duplicated blocks and the comment-less Admin Lab copy are deleted (rule 18). The policy is pinned
+  by request-body tests. Per-root adapter/store wiring stays explicit at each root. No CONTEXT.md
+  term (user decision — infrastructure policy, not domain language). Accepted framing: Candidate 4
+  (client-policy half) of the
+  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md);
+  the review records the rejection of the candidate's `runGraphEnrichment` input-grouping half
+  (premise refuted — one caller).
+
+- **Learner-state cleanup, `/learn` read-path dedup, and operations cost/timing visibility.** A
+  one-time transactional wipe cleared the accumulated test/junk learners (the five learner-state
+  tables and `learners`), and the source is closed: DB-touching integration tests and gate scripts
+  now delete exactly the learners they create (a per-suite cleanup hook keyed by tracked refs; the
+  real-use skill gained the gate-cleanup rule). The weekly board hides zero-point non-viewers
+  before windowing, so dormant learners never surround the viewer. The logged-in `/learn` read path
+  keeps its eager render but reads each distinct enrichment's projection inputs once (not per
+  learner-expedition), skips learners with no study evidence via one existence read
+  (`LearnerStorePort.listRefsWithStudyEvidence`), derives the viewer's lifetime crystal count from
+  that same pass, and guards the previous-week podium recompute — no parallel mastery SQL (KTD2 of
+  005 preserved). The operations page preloads one live LiteLLM spend read to show
+  cost/tokens/calls chips on every card (degrading to wall-clock when cost is unavailable) and
+  collapses finished cards to header + chips, server-rendering the full stage table only on
+  demand. The operator "bottleneck" surface is renamed to **Cost & timings** end-to-end
+  (`bottleneckReport` → `costTimingReport`, its types and view component, the CLI subcommand, and
+  the UI copy; `rankBottleneckTargets` keeps its name). No schema change; cost stays
+  read-live-never-stored. Decision:
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
+
+- **Leaderboard dialog, cohort-of-10, single login/register gate, and enriched-DAG links.** The
+  leaderboard renders through one base-ui Dialog for both the seam-triggered splash and an
+  on-demand header trigger (the standalone `/learn/leaderboard` route deleted, rule 18). The board
+  is always exactly 10 rows — real rows windowed to the viewer's nearest neighbors, then filled
+  with seeded rivals — with cohort-local ranks. A themed **division** ladder (Basecamp → Foothills
+  → Ridge → Summit, provisional thresholds 0/10/30/75) derives at read time from the viewer's
+  lifetime mastered-crystal count reusing the graded-outcome derivation the weekly score uses — no
+  persisted tiers, no parallel mastery SQL, accepted through the ADR-0032 flow gate as progress
+  clarity rather than a parallel objective. Rival nicknames use Faker's person-first correlated
+  derivation for realistic usernames. The login gate collapses to one form (name + PIN) with Login
+  and Register buttons plus a logout intent on `/learn/session` (the sole PIN-aware route, KTD8 of
+  005); the browser-known-refs cookie machinery, the picker, and dead vocabulary keys are deleted.
+  Admin learner-loop and enrichment-scoped operations cards link to the existing
+  `DerivedGraphExplorer` DAG. No new persistence. Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Learner registry, weekly leaderboard, and Crystal Duel shipped.** Free-text learner identity is
   replaced by a `learners` registry with uniqueness-at-creation and a PIN-gated pick-or-create gate;
@@ -201,6 +248,44 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Shared neural client-construction policy, 2026-07-08.** Deterministic envelope: workspace
+  `typecheck` exit 0 (all 10 projects); `lint` 0 errors (6 pre-existing warnings);
+  `@lrnki/infrastructure-litellm` tests pass (128, incl. 4 new `neuralClients` policy tests
+  asserting through the request body that the deterministic client sends `temperature 0, seed 7`,
+  the probe client sends `0.7` with no seed, the discovery client sends neither, and overrides win
+  over env). Behavior-identical wiring move — the constructed clients are argument-identical to
+  the deleted per-root copies — so no separate rule-14 real-use run; the next real extraction and
+  expedition runs exercise both roots through the factory.
+
+- **Learner-state cleanup, `/learn` read path, and operations cost/timing visibility, 2026-07-08.**
+  Deterministic envelope: workspace `typecheck` exit 0 (all 10 projects); `lint` 0 errors
+  (pre-existing warnings only); tests green with `.env` loaded — `@lrnki/application` 514 (new
+  `getWeeklyLeaderboard` read-dedup counting-double + zero-point board tests),
+  `apps/admin-lab` 148 (new zero-point-hiding board test), `@lrnki/infrastructure-postgres`
+  learner suites 40 with the `learners` row count unchanged before/after the run (AE2). The
+  one-time wipe transaction moved the five learner-state tables and `learners` from
+  {21,63,4,9,6,54} to all zero, leaving graphs/enrichments/study-banks/timelines untouched (AE1).
+  **Real-use gate (rule 14): PASS.** Against the post-wipe dev DB with 10 learners registered
+  through the real gate, `/learn` (logged-in, warm) loaded in **2.59 s** vs the pre-change 10.5 s
+  baseline with no UUID-shaped player names (residual UUIDs are React key props, not display
+  names) and dormant non-viewers hidden; `/admin/lab/operations` loaded in **2.17 s / 735 KB** vs
+  ~4 s / 1.5 MB, rendering 43 finished cards all collapsed (0 stage tables in the HTML) with 43
+  live cost/tokens/calls chip sets, `?expand=<id>` disclosing a card's stage table server-side and
+  `?report=<id>` the "Cost & timings" per-stage breakdown; zero literal "bottleneck" remains on
+  the surface. Timings are dev-mode warm curl (same method as the baselines); production loads are
+  lower. Gate learners were deleted afterward. Evidence:
+  `tmp/2026-07-07-learner-cleanup-ops-visibility/`.
+
+- **Leaderboard dialog, cohort-of-10, single gate, and DAG links, 2026-07-08.** Implementation
+  verified present in the committed tree (leaderboard Dialog with the standalone route removed,
+  `assembleWeeklyBoard` cohort windowing, derived division ladder, single-form gate with logout,
+  Faker person-first rivals, enrichment DAG links) and covered by the shared deterministic envelope
+  above (typecheck 10/10, `apps/admin-lab` 148 incl. the board tests, lint clean). Its changed
+  gate and board surfaces were exercised live during the cleanup gate: the single two-field
+  gate registered 10 learners and logged one in, and the cohort board rendered as a dialog on
+  `/learn` filled to 10 with no UUID-shaped names. A dedicated 006 screenshot gate (division-badge
+  thresholds, dialog `Esc`/scroll, DAG canvas render) was not separately captured.
 
 - **Learner registry, weekly leaderboard, and Crystal Duel, 2026-07-07.** Deterministic envelope:
   workspace `typecheck` exit 0; `lint` exit 0 (6 pre-existing warnings); all tests pass with `.env`
