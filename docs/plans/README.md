@@ -12,7 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- (none)
+- [2026-07-08-003 — Learner App separation: static SPA + typed learner API](./2026-07-08-003-feat-learner-app-separation-static-spa-typed-api-plan.md)
+  — ready. A follow-up deployment plan (VPS compose service, Caddy/TLS, GitHub Pages workflow) is
+  authored after this plan ships.
 
 ## Ownership rules
 

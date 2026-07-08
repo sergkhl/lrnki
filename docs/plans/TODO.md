@@ -2,7 +2,13 @@
 
 ## TODO
 
-- (empty)
+- **Learner App separation (static SPA + typed learner API).** Extract `apps/learner-api` (Hono,
+  bearer sessions, relocated generation supervisor) and `apps/learner-web` (Vite SPA on the typed
+  client); delete `/learn` from admin-lab. Status: plan ready, not started —
+  [plan](./2026-07-08-003-feat-learner-app-separation-static-spa-typed-api-plan.md).
+- **Deployment plan (after separation ships).** VPS compose service + Caddy/TLS for `learner-api`,
+  GitHub Pages workflow for `learner-web`, prod env wiring. Blocked on the separation plan; not
+  yet authored.
 
 ## COMPLETED
 

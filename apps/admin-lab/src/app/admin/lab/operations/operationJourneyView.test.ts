@@ -2,22 +2,32 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { OperationJourney } from "@lrnki/application";
 import type { OperationStageSpend, OperationTimelineDetail, OperationType } from "@lrnki/ports";
-import { parseJourneySortParams, operationCost, windowJourneys } from "./operationJourneyView";
+import {
+  initialExpandedOperationIds,
+  parseJourneySortParams,
+  operationCost,
+  sortOperationSteps,
+  windowJourneys
+} from "./operationJourneyView";
 
-function detail(operationId: string, operationType: OperationType): OperationTimelineDetail {
+function detail(
+  operationId: string,
+  operationType: OperationType,
+  input: Partial<OperationTimelineDetail["summary"]> = {}
+): OperationTimelineDetail {
   return {
     summary: {
-      operationRunId: `${operationType}-${operationId}`,
+      operationRunId: input.operationRunId ?? `${operationType}-${operationId}`,
       operationId,
       operationType,
-      status: "succeeded",
+      status: input.status ?? "succeeded",
       currentStage: null,
       progressDone: null,
       progressTotal: null,
       lastProgressAt: null,
-      startedAt: "2026-07-08T00:00:00.000Z",
-      completedAt: "2026-07-08T00:00:01.000Z",
-      elapsedMs: 1000,
+      startedAt: input.startedAt ?? "2026-07-08T00:00:00.000Z",
+      completedAt: input.completedAt ?? "2026-07-08T00:00:01.000Z",
+      elapsedMs: input.elapsedMs ?? 1000,
       stageCount: 0
     },
     stages: []
@@ -97,4 +107,119 @@ test("cost unavailable degrades to wall-clock-only operation summaries", () => {
     rows: [{ operationId: "run-1", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 }],
     costAvailable: false
   }), null);
+});
+
+test("initialExpandedOperationIds includes only running operations by run id", () => {
+  const runningExtraction = detail("same-id", "extraction", { operationRunId: "run-a", status: "running" });
+  const finishedEnrichment = detail("same-id", "enrichment", { operationRunId: "run-b", status: "succeeded" });
+  const runningUngrouped = detail("other-id", "minting", { operationRunId: "run-c", status: "running" });
+
+  assert.deepEqual(
+    initialExpandedOperationIds({
+      journeys: [
+        journey({
+          enrichmentId: "journey",
+          status: "running",
+          startedAt: "2026-07-08T00:00:00.000Z",
+          elapsedMs: 1000,
+          members: [runningExtraction, finishedEnrichment]
+        })
+      ],
+      ungrouped: [runningUngrouped]
+    }),
+    ["run-a", "run-c"]
+  );
+});
+
+test("sortOperationSteps defaults to lineage order", () => {
+  const operations = [
+    detail("later", "enrichment", { operationRunId: "run-2" }),
+    detail("earlier", "extraction", { operationRunId: "run-1" })
+  ];
+
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: [], costAvailable: false }, { sort: "lineage", dir: "desc" }).map(
+      (operation) => operation.summary.operationRunId
+    ),
+    ["run-2", "run-1"]
+  );
+});
+
+test("sortOperationSteps sorts duration asc and desc", () => {
+  const operations = [
+    detail("slow", "extraction", { elapsedMs: 5000 }),
+    detail("fast", "minting", { elapsedMs: 1000 }),
+    detail("medium", "enrichment", { elapsedMs: 3000 })
+  ];
+
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: [], costAvailable: false }, { sort: "duration", dir: "asc" }).map(
+      (operation) => operation.summary.operationId
+    ),
+    ["fast", "medium", "slow"]
+  );
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: [], costAvailable: false }, { sort: "duration", dir: "desc" }).map(
+      (operation) => operation.summary.operationId
+    ),
+    ["slow", "medium", "fast"]
+  );
+});
+
+test("sortOperationSteps sorts cost asc and desc when spend is available", () => {
+  const operations = [
+    detail("middle", "extraction"),
+    detail("cheap", "extraction"),
+    detail("expensive", "extraction")
+  ];
+  const spend: OperationStageSpend[] = [
+    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 },
+    { operationId: "middle", stage: "concept-discovery", logCount: 2, totalSpend: 0.2, totalTokens: 200 },
+    { operationId: "expensive", stage: "concept-discovery", logCount: 3, totalSpend: 0.3, totalTokens: 300 }
+  ];
+
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: spend, costAvailable: true }, { sort: "cost", dir: "asc" }).map(
+      (operation) => operation.summary.operationId
+    ),
+    ["cheap", "middle", "expensive"]
+  );
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: spend, costAvailable: true }, { sort: "cost", dir: "desc" }).map(
+      (operation) => operation.summary.operationId
+    ),
+    ["expensive", "middle", "cheap"]
+  );
+});
+
+test("sortOperationSteps keeps lineage when cost-derived sort is unavailable", () => {
+  const operations = [
+    detail("expensive", "extraction"),
+    detail("cheap", "extraction")
+  ];
+  const spend: OperationStageSpend[] = [
+    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 },
+    { operationId: "expensive", stage: "concept-discovery", logCount: 3, totalSpend: 0.3, totalTokens: 300 }
+  ];
+
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: spend, costAvailable: false }, { sort: "cost", dir: "asc" }).map(
+      (operation) => operation.summary.operationId
+    ),
+    ["expensive", "cheap"]
+  );
+});
+
+test("sortOperationSteps uses lineage then operation id as stable tie breakers", () => {
+  const operations = [
+    detail("b-id", "extraction", { operationRunId: "run-b", elapsedMs: 1000 }),
+    detail("a-id", "extraction", { operationRunId: "run-a", elapsedMs: 1000 })
+  ];
+
+  assert.deepEqual(
+    sortOperationSteps(operations, { rows: [], costAvailable: false }, { sort: "duration", dir: "asc" }).map(
+      (operation) => operation.summary.operationId
+    ),
+    ["b-id", "a-id"]
+  );
 });
