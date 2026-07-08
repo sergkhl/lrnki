@@ -610,6 +610,15 @@ export interface LearnerAwardsStorePort {
   listForLearners(learnerRefs: string[]): Promise<LearnerAward[]>;
 }
 
+// Opaque bearer sessions for the learner API (plan 2026-07-08-003, KTD3). The store
+// only ever sees the SHA-256 of the token — the raw token exists client-side only.
+// Revocation is deletion; `resolve` also bumps `last_seen_at`.
+export interface LearnerSessionStorePort {
+  create(input: { tokenHash: string; learnerRef: string }): Promise<void>;
+  resolve(tokenHash: string): Promise<{ learnerRef: string } | undefined>;
+  revoke(tokenHash: string): Promise<void>;
+}
+
 // ---------------------------------------------------------------------------
 // Learner Study Loop ports (R7–R16, ADR-0026). Learner-neutral typed Study Item Bank
 // plus the durable append-only Response Log. All learner structures are projection-only:

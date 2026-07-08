@@ -2,15 +2,22 @@
 
 ## TODO
 
-- **Learner App separation (static SPA + typed learner API).** Extract `apps/learner-api` (Hono,
-  bearer sessions, relocated generation supervisor) and `apps/learner-web` (Vite SPA on the typed
-  client); delete `/learn` from admin-lab. Status: plan ready, not started —
-  [plan](./2026-07-08-003-feat-learner-app-separation-static-spa-typed-api-plan.md).
-- **Deployment plan (after separation ships).** VPS compose service + Caddy/TLS for `learner-api`,
-  GitHub Pages workflow for `learner-web`, prod env wiring. Blocked on the separation plan; not
-  yet authored.
+- **Deployment plan (separation shipped 2026-07-08).** VPS compose service + Caddy/TLS for
+  `learner-api`, GitHub Pages workflow for `learner-web`, prod env wiring
+  ([ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md) records the target
+  topology). Not yet authored.
 
 ## COMPLETED
+
+- **Learner App separation: static SPA + typed learner API.** The learner surface moved out of
+  Admin Lab: `apps/learner-api` (Hono + zod routes as thin mappers over `@lrnki/application`,
+  opaque hashed bearer sessions in the new `learner_sessions` table, per-IP/per-name session rate
+  limit, relocated topic-generation supervisor, one shared pool) and `apps/learner-web` (Vite +
+  TanStack Router/Query SPA over the typed `hono/client`, static build with 404 SPA fallback).
+  Admin Lab lost `app/learn/**`, `components/learn/**`, the learner libs, cookie machinery,
+  `instrumentation.ts`, and the "open as learner" action (now a link to the learner web app);
+  `ensureLearnerExpedition` was deleted; the sphere-grid layout moved to `@lrnki/application`
+  (both apps render it). Decisions: [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md).
 
 - **Journey-first Operations page with one merged stage table.** Operations now render as
   Processing Journey cards resolved read-only from enrichment lineage, with active journeys first,
@@ -273,6 +280,18 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner App separation, 2026-07-08.** Deterministic envelope: workspace typecheck (12
+  packages), tests pass (learner-api 18, learner-web 75, admin-lab 62, rest unchanged), lint
+  passes with the repo's pre-existing warnings, `next build` and `vite build` (static output +
+  404 fallback) pass. **Real-use gate (rule 14): PASS** — evidence in
+  `tmp/2026-07-08-learner-app-separation/`: real registration through the SPA gate; bearer-only
+  identity (401s without token); live 429 on a 12-attempt PIN sweep; a REAL topic expedition
+  ("Tidal energy basics") generated end-to-end by the relocated supervisor with production
+  LiteLLM calls (~4.5 min, 24 study items / 2 sections) with stage progress observed through the
+  `/journal` timelines; a real graded `option_select` write; leaderboard (10 entries, W28) and
+  duel gating reads; Playwright SPA flow gate → journal → trail → section map with zero console
+  errors. Caveat: duel play-through not browser-driven (locked for the fresh learner).
 
 - **Journey-first Operations page, 2026-07-08.** Deterministic envelope:
   `@lrnki/application` tests pass (517), `PostgresJourneyLineageRead` DB-backed tests pass with

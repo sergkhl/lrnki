@@ -5,7 +5,7 @@ import cytoscape, { type Core } from "cytoscape";
 import { ChevronRightIcon, GitForkIcon, ListTreeIcon } from "lucide-react";
 import type { AdaptedNodeClassification, AdaptedNodeState } from "@lrnki/application";
 import { applySphereGridLayout, recenterOnFocus } from "@/lib/cytoscapeSphereGrid";
-import type { SphereGridFlaggedLoop } from "@/lib/sphereGridLayout";
+import type { SphereGridFlaggedLoop } from "@lrnki/application";
 import { buildDerivedGraphView, distinctDomains, filterDetailToVisible, frontierNeighborhood, nodeRenderAttrs, regionHiddenAttr, type DerivedGraphDetail, type DerivedGraphMode } from "@/lib/derivedGraph";
 import { graphNodeFillToken } from "@/lib/graphNodeStyles";
 import { Badge } from "@/components/ui/badge";

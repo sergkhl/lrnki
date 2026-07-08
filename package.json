@@ -10,7 +10,9 @@
   },
   "scripts": {
     "dev": "pnpm --filter @lrnki/admin-lab dev",
-    "build": "pnpm --filter @lrnki/admin-lab build",
+    "dev:api": "pnpm --filter @lrnki/learner-api dev",
+    "dev:web": "pnpm --filter @lrnki/learner-web dev",
+    "build": "pnpm --filter @lrnki/admin-lab build && pnpm --filter @lrnki/learner-web build",
     "start": "pnpm --filter @lrnki/admin-lab start",
     "lint": "eslint .",
     "test": "pnpm -r --sort --if-present run test",

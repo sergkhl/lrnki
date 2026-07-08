@@ -1,0 +1,15 @@
+import { serve } from "@hono/node-server";
+import { createLearnerApp } from "./app";
+import { sharedSql } from "./db";
+import { startTopicGenerationSupervisor } from "./topicGenerationSupervisor";
+
+const port = Number(process.env.LEARNER_API_PORT ?? 8787);
+const app = createLearnerApp(sharedSql());
+
+serve({ fetch: app.fetch, port }, (info) => {
+  console.log(`learner-api listening on :${info.port}`);
+});
+
+// The relocated topic-generation supervisor (R4): same claim/fencing/staleness semantics,
+// now living in the one long-lived learner process.
+startTopicGenerationSupervisor();

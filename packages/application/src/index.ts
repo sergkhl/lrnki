@@ -13,7 +13,6 @@ export {
 } from "./calibrateKnowledgeBoundaryProbe";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { generateTopicExpedition } from "./generateTopicExpedition";
-export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
 export {
   registerLearner,
   enterLearnerSession,
@@ -144,3 +143,10 @@ export {
   composeCalibrationSession,
   type CalibrationSessionProjection
 } from "./calibrationList";
+export {
+  layoutSphereGrid,
+  type SphereGridEdgeInput,
+  type SphereGridFlaggedLoop,
+  type SphereGridLayout,
+  type SphereGridNodeInput
+} from "./sphereGridLayout";

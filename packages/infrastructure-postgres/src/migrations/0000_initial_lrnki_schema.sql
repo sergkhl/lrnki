@@ -577,6 +577,18 @@ CREATE TABLE learner_awards (
 
 CREATE INDEX learner_awards_learner_idx ON learner_awards (learner_ref, created_at DESC);
 
+-- Opaque bearer sessions for the learner API (plan 2026-07-08-003, KTD3). The raw
+-- token lives only client-side; the API stores its SHA-256 and resolves it to a
+-- learner on every authenticated route. Revocation is row deletion — no JWT state.
+CREATE TABLE learner_sessions (
+  token_hash text PRIMARY KEY,
+  learner_ref text NOT NULL REFERENCES learners(learner_ref) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX learner_sessions_learner_idx ON learner_sessions (learner_ref);
+
 -- ---------------------------------------------------------------------------
 -- Learner Expeditions — learner-owned route/generation state for the Learner App.
 -- This table does not persist mastery, readiness, rewards, or trail shape; those

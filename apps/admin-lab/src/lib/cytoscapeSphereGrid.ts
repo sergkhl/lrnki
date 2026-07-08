@@ -1,5 +1,5 @@
 import type { Core } from "cytoscape";
-import { layoutSphereGrid, type SphereGridLayout, type SphereGridNodeInput } from "./sphereGridLayout";
+import { layoutSphereGrid, type SphereGridLayout, type SphereGridNodeInput } from "@lrnki/application";
 
 // The closest the focus-fit will zoom (KTD2): a sparse 1-2 node neighborhood would
 // otherwise fit-to-fill at an absurd zoom. When the fit exceeds this, clamp the level and
