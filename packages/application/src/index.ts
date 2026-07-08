@@ -52,11 +52,17 @@ export { synthesizeResponses } from "./syntheticResponses";
 
 export {
   costTimingReport,
+  mergeOperationStageRows,
   type CostTimingReport,
   type CostTimingStageRow,
   type CostTimingTotals,
   type CostTimingOperationReport
 } from "./costTimingReport";
+export {
+  listOperationJourneys,
+  type OperationJourney,
+  type OperationJourneyList
+} from "./listOperationJourneys";
 export { rankBottleneckTargets, type RankedTarget } from "./rankBottleneckTargets";
 export {
   OPERATION_HEARTBEAT_STALE_AFTER_MS,

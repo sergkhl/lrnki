@@ -12,8 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [2026-07-08-001 — neural stage descriptors with dotprompt files and mechanical config hashes](./2026-07-08-001-refactor-neural-stage-descriptors-dotprompt-plan.md)
-  — ready. Candidate 3 of the 2026-07-07 architecture deepening review, grilled 2026-07-08.
+- (none)
 
 ## Ownership rules
 

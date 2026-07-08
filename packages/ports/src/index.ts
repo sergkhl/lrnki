@@ -1212,10 +1212,17 @@ export interface OperationStageSpendReadPort {
 
 export interface JourneyLineage {
   enrichmentId: string;
-  graphVersionId: string;
+  graphVersionId: string | null;
   extractionRunIds: string[];
+}
+
+export interface JourneyDisplay {
+  enrichmentId: string;
+  kind: "synthetic" | "document";
+  title: string | null;
 }
 
 export interface JourneyLineageReadPort {
   resolveJourney(enrichmentId: string): Promise<JourneyLineage | undefined>;
+  resolveJourneyDisplay(enrichmentIds: string[]): Promise<JourneyDisplay[]>;
 }

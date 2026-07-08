@@ -1,13 +1,24 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { ActivityIcon, ChevronDownIcon, CoinsIcon, DatabaseZapIcon, GaugeIcon, RouteIcon, XIcon } from "lucide-react";
-import { isStaleOperation, spendStageBelongsToOperation, type CostTimingReport } from "@lrnki/application";
-import type { OperationStageSpend, OperationType, StageErrorDetail } from "@lrnki/ports";
+import {
+  ActivityIcon,
+  ChevronDownIcon,
+  CoinsIcon,
+  DatabaseZapIcon,
+  ExternalLinkIcon
+} from "lucide-react";
+import {
+  isStaleOperation,
+  mergeOperationStageRows,
+  type OperationJourney
+} from "@lrnki/application";
+import type { OperationTimelineDetail, StageErrorDetail } from "@lrnki/ports";
 import { AdminShell } from "@/components/AdminShell";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardAction,
@@ -25,18 +36,22 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { getCostTimingReport, getJourneyCostReport, listOperationsWithStages, preloadOperationSpend } from "@/lib/operationTimeline";
-import { CostTimingReportView } from "./_components/CostTimingReportView";
+import { listOperationJourneys, preloadOperationSpend } from "@/lib/operationTimeline";
+import {
+  journeyCost,
+  operationCost,
+  operationIdsForSpend,
+  parseJourneySortParams,
+  windowJourneys,
+  type JourneySortDir,
+  type JourneySortKey,
+  type OperationCost,
+  type OperationSpend
+} from "./operationJourneyView";
 
-// Live operator progress view (R4): for each triggered operation, "where is it, is it
-// moving". Read-only — mutates no published graph state (rule 12). force-dynamic so a
-// refresh reflects the latest incremental reporter writes (KTD3). Active operations
-// group first and the page auto-refreshes while any is running (R1). Cost/timings and
-// journey reports render inline on the matching card via search params; finished cards
-// collapse to header + cost chips and expand their stage table on demand (R5/R6).
+// Live operator progress view (ADR-0027/ADR-0029): one card per Processing Journey,
+// grouped read-only from lineage, with per-step stage timelines and live LiteLLM spend.
 export const dynamic = "force-dynamic";
-
-type OperationWithStages = NonNullable<Awaited<ReturnType<typeof listOperationsWithStages>>>[number];
 
 function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "succeeded") return "default";
@@ -46,7 +61,7 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
 }
 
 function formatDuration(ms: number | null): string {
-  if (ms === null) return "—";
+  if (ms === null) return "-";
   if (ms < 1000) return `${ms}ms`;
   const seconds = ms / 1000;
   if (seconds < 60) return `${seconds.toFixed(1)}s`;
@@ -54,46 +69,37 @@ function formatDuration(ms: number | null): string {
   return `${minutes}m ${Math.round(seconds % 60)}s`;
 }
 
-function isStale(status: string, lastProgressAt: string | null): boolean {
-  return isStaleOperation(status, lastProgressAt);
-}
-
 function formatUsd(usd: number): string {
   return `$${usd.toFixed(4)}`;
 }
 
-type OperationCost = { costUsd: number; tokens: number; calls: number };
+function shortId(id: string): string {
+  return id.length <= 8 ? id : id.slice(0, 8);
+}
 
-// Fold the preloaded LiteLLM spend rows down to one (cost, tokens, calls) total for a single
-// operation, using the SAME catalog ownership filter the report uses (KTD4). Returns null when
-// cost is unavailable, so the card degrades to its wall-clock elapsed chip only (AE6).
-function operationCost(
-  operationId: string,
-  operationType: OperationType,
-  spend: { rows: OperationStageSpend[]; costAvailable: boolean }
-): OperationCost | null {
-  if (!spend.costAvailable) return null;
-  const owned = spend.rows.filter(
-    (row) => row.operationId === operationId && spendStageBelongsToOperation(row.stage, operationType)
+function journeyTitle(journey: OperationJourney): string {
+  return journey.display.title?.trim() || shortId(journey.enrichmentId);
+}
+
+function isStale(status: string, lastProgressAt: string | null): boolean {
+  return isStaleOperation(status, lastProgressAt);
+}
+
+function operationIsOpen(operation: OperationTimelineDetail, expand: string | undefined): boolean {
+  return operation.summary.status === "running" || operation.summary.operationId === expand;
+}
+
+function CostChips({ cost }: Readonly<{ cost: OperationCost | null }>) {
+  if (!cost) return null;
+  return (
+    <>
+      <Badge variant="outline" className="gap-1"><CoinsIcon data-icon="inline-start" /> {formatUsd(cost.costUsd)}</Badge>
+      <Badge variant="outline">{cost.tokens.toLocaleString()} tok</Badge>
+      <Badge variant="outline">{cost.calls} calls</Badge>
+    </>
   );
-  return owned.reduce<OperationCost>(
-    (total, row) => ({ costUsd: total.costUsd + row.totalSpend, tokens: total.tokens + row.totalTokens, calls: total.calls + row.logCount }),
-    { costUsd: 0, tokens: 0, calls: 0 }
-  );
 }
 
-function isOperationType(value: string | undefined): value is OperationType {
-  return value === "extraction" || value === "minting" || value === "enrichment" || value === "study_items";
-}
-
-function operationEnrichmentId(operationType: OperationType, operationId: string): string | null {
-  return operationType === "enrichment" || operationType === "study_items" ? operationId : null;
-}
-
-// The redacted reason a failed stage carries (ADR-0006 fail-closed, made inspectable): the
-// forced-tool exhaustion trail (per-attempt deviation kind, HTTP status, violated schema
-// PATHS, and a bounded redacted arguments snippet) or a bounded `other` message. Read-only —
-// the snippet was already redacted at the transport boundary; this only renders it.
 function StageErrorDetailView({ detail }: Readonly<{ detail: StageErrorDetail }>) {
   return (
     <div className="flex flex-col gap-1.5 text-xs">
@@ -106,7 +112,7 @@ function StageErrorDetailView({ detail }: Readonly<{ detail: StageErrorDetail }>
         </p>
       ) : null}
       {detail.attempts?.map((attempt) => (
-        <div key={attempt.attempt} className="rounded border border-dashed px-2 py-1">
+        <div key={attempt.attempt} className="rounded-md border border-dashed px-2 py-1">
           <p>
             attempt {attempt.attempt + 1}: <span className="font-mono">{attempt.kind}</span>
             {attempt.status !== undefined ? <> · HTTP {attempt.status}</> : null}
@@ -117,7 +123,7 @@ function StageErrorDetailView({ detail }: Readonly<{ detail: StageErrorDetail }>
             </p>
           ) : null}
           {attempt.redactedSnippet ? (
-            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded bg-muted/60 p-1.5 font-mono text-[11px]">
+            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all rounded-md bg-muted/60 p-1.5 font-mono text-[11px]">
               {attempt.redactedSnippet}
             </pre>
           ) : null}
@@ -127,266 +133,359 @@ function StageErrorDetailView({ detail }: Readonly<{ detail: StageErrorDetail }>
   );
 }
 
-// One inline report panel on its owning operation card: either the operation's
-// cost & timings breakdown or (for enrichments) the whole-journey cost rollup.
-function InlineReport({
-  title,
-  report
-}: Readonly<{ title: string; report: CostTimingReport | undefined }>) {
+function OperationStepRows({
+  operations,
+  spend,
+  expand
+}: Readonly<{
+  operations: OperationTimelineDetail[];
+  spend: OperationSpend;
+  expand?: string;
+}>) {
   return (
-    <div className="mt-4 flex flex-col gap-2 rounded-md border bg-muted/30 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold">{title}</p>
-        <Link className="inline-flex items-center gap-1 text-sm underline underline-offset-4" href="/admin/lab/operations">
-          <XIcon className="size-4" /> close
-        </Link>
-      </div>
-      {report === undefined ? (
-        <Alert variant="destructive">
-          <DatabaseZapIcon />
-          <AlertTitle>Report unavailable</AlertTitle>
-          <AlertDescription>No timeline data exists for this operation, or the application database is unavailable.</AlertDescription>
-        </Alert>
-      ) : (
-        <CostTimingReportView report={report} />
-      )}
+    <div className="rounded-md border">
+        {operations.map((operation) => (
+          <div key={operation.summary.operationRunId} className="border-b last:border-b-0">
+            <OperationStepRow operation={operation} spend={spend} open={operationIsOpen(operation, expand)} />
+            {operationIsOpen(operation, expand) ? <StageTable operation={operation} spend={spend} /> : null}
+          </div>
+        ))}
     </div>
   );
 }
 
-// The at-a-glance cost/tokens/calls chips on a card, next to the wall-clock elapsed chip (R5).
-// Rendered only when cost is available; otherwise the card shows elapsed alone (AE6).
-function CostChips({ cost }: Readonly<{ cost: OperationCost | null }>) {
-  if (!cost) return null;
+function OperationStepRow({
+  operation,
+  spend,
+  open
+}: Readonly<{
+  operation: OperationTimelineDetail;
+  spend: OperationSpend;
+  open: boolean;
+}>) {
+  const { summary } = operation;
+  const cost = operationCost(summary.operationId, summary.operationType, spend);
+  const stale = isStale(summary.status, summary.lastProgressAt);
   return (
-    <>
-      <Badge variant="outline" className="gap-1"><CoinsIcon className="size-3" /> {formatUsd(cost.costUsd)}</Badge>
-      <Badge variant="outline">{cost.tokens.toLocaleString()} tok</Badge>
-      <Badge variant="outline">{cost.calls} calls</Badge>
-    </>
+    <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+      <Badge variant="outline">{summary.operationType}</Badge>
+      <span className="font-mono text-xs text-muted-foreground">{shortId(summary.operationId)}</span>
+      <Badge variant={statusVariant(summary.status)}>{summary.status}</Badge>
+      {summary.status === "running" && summary.currentStage ? <Badge variant="secondary">{summary.currentStage}</Badge> : null}
+      {stale ? <Badge variant="destructive">stalled?</Badge> : null}
+      {summary.progressTotal !== null ? <span>{summary.progressDone ?? 0} / {summary.progressTotal}</span> : null}
+      <span>{formatDuration(summary.elapsedMs)}</span>
+      {cost ? (
+        <>
+          <span>{cost.calls.toLocaleString()} calls</span>
+          <span>{cost.tokens.toLocaleString()} tok</span>
+          <span>{formatUsd(cost.costUsd)}</span>
+        </>
+      ) : null}
+      <span className="flex-1" />
+      {summary.operationType === "enrichment" || summary.operationType === "study_items" ? (
+        <Link
+          className={buttonVariants({ variant: "ghost", size: "xs" })}
+          href={`/admin/lab/enrichments/${summary.operationId}`}
+        >
+          <ExternalLinkIcon data-icon="inline-start" /> DAG
+        </Link>
+      ) : null}
+        {open ? (
+          <Badge variant="outline">stages</Badge>
+        ) : (
+          <Link
+            className={buttonVariants({ variant: "ghost", size: "xs" })}
+            href={{ pathname: "/admin/lab/operations", query: { expand: summary.operationId } }}
+          >
+            <ChevronDownIcon data-icon="inline-start" /> stages
+          </Link>
+        )}
+    </div>
   );
 }
 
-function OperationCard({
+function StageTable({
   operation,
-  cost,
-  open,
-  costTimingReport,
-  journeyReport
+  spend
 }: Readonly<{
-  operation: OperationWithStages;
-  cost: OperationCost | null;
-  // Finished cards render collapsed by default (R6): the header + chips only, no stage table,
-  // so the page HTML stays small (AE7). `open` is true for active cards and any card the
-  // operator expanded or opened a report on — those server-render their full stage table.
-  open: boolean;
-  costTimingReport: { report: CostTimingReport | undefined } | null;
-  journeyReport: { report: CostTimingReport | undefined } | null;
+  operation: OperationTimelineDetail;
+  spend: OperationSpend;
 }>) {
-  const { summary, stages } = operation;
-  const stale = isStale(summary.status, summary.lastProgressAt);
-  const enrichmentId = operationEnrichmentId(summary.operationType, summary.operationId);
+  const rows = mergeOperationStageRows(operation, spend.costAvailable ? spend.rows : null).stages;
+  const timelineByStage = new Map(operation.stages.map((stage) => [stage.stage, stage]));
   return (
-    <Card key={summary.operationRunId}>
-      <CardHeader className={open ? "border-b" : undefined}>
-        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-          <Badge variant="outline">{summary.operationType}</Badge>
-          <Badge variant={statusVariant(summary.status)}>{summary.status}</Badge>
-          {summary.status === "running" && summary.currentStage ? (
-            <Badge variant="secondary">{summary.currentStage}</Badge>
-          ) : null}
-          {stale ? <Badge variant="destructive">stalled?</Badge> : null}
-          {summary.progressTotal !== null ? (
-            <Badge variant="outline">{summary.progressDone ?? 0} / {summary.progressTotal}</Badge>
-          ) : null}
-        </CardTitle>
-        <CardDescription className="font-mono text-xs">{summary.operationId}</CardDescription>
-        <CardAction className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">elapsed {formatDuration(summary.elapsedMs)}</Badge>
-          <CostChips cost={cost} />
-          <Link
-            className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-            href={{
-              pathname: "/admin/lab/operations",
-              query: { report: summary.operationId, type: summary.operationType }
-            }}
-          >
-            <GaugeIcon className="size-4" /> cost &amp; timings
-          </Link>
-          {summary.operationType === "enrichment" ? (
-            <Link
-              className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-              href={{
-                pathname: "/admin/lab/operations",
-                query: { journey: summary.operationId }
-              }}
-            >
-              <RouteIcon className="size-4" /> journey
-            </Link>
-          ) : null}
-          {enrichmentId ? (
-            <Link className="inline-flex items-center gap-1 text-sm underline underline-offset-4" href={`/admin/lab/enrichments/${enrichmentId}`}>
-              <RouteIcon className="size-4" /> View DAG
-            </Link>
-          ) : null}
-          {open ? null : (
-            <Link
-              className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-              href={{ pathname: "/admin/lab/operations", query: { expand: summary.operationId } }}
-            >
-              <ChevronDownIcon className="size-4" /> stage table
-            </Link>
-          )}
-        </CardAction>
-      </CardHeader>
-      {open ? (
-        <CardContent>
-          <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-            <span>started <LocalDateTime iso={summary.startedAt} /></span>
-            <span>last progress {summary.lastProgressAt ? <LocalDateTime iso={summary.lastProgressAt} /> : "—"}</span>
-            <span>{summary.completedAt ? <>completed <LocalDateTime iso={summary.completedAt} /></> : "in flight"}</span>
-          </div>
-          {stages.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No stage rows yet.</p>
-          ) : (
+    <div className="bg-muted/30 p-3">
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No stage rows yet.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+              <span>started <LocalDateTime iso={operation.summary.startedAt} /></span>
+              <span>last progress {operation.summary.lastProgressAt ? <LocalDateTime iso={operation.summary.lastProgressAt} /> : "-"}</span>
+              <span>{operation.summary.completedAt ? <>completed <LocalDateTime iso={operation.summary.completedAt} /></> : "in flight"}</span>
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Stage</TableHead>
                   <TableHead>State</TableHead>
                   <TableHead>Progress</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Started</TableHead>
+                  <TableHead>Wall</TableHead>
+                  <TableHead>Calls</TableHead>
+                  <TableHead>Tokens</TableHead>
+                  <TableHead>Cost</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stages.map((stage, index) => (
-                  <Fragment key={`${stage.stage}-${index}`}>
-                    <TableRow>
-                      <TableCell className="font-medium">{stage.stage}</TableCell>
-                      <TableCell>
-                        {stage.endedAt === null ? (
-                          <Badge variant="secondary">running</Badge>
-                        ) : (
-                          <Badge variant={stage.ok ? "default" : "destructive"}>{stage.ok ? "ok" : "failed"}</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{stage.progressTotal !== null ? `${stage.progressDone ?? 0} / ${stage.progressTotal}` : "—"}</TableCell>
-                      <TableCell>{formatDuration(stage.durationMs)}</TableCell>
-                      <TableCell className="font-mono text-xs"><LocalDateTime iso={stage.startedAt} /></TableCell>
-                    </TableRow>
-                    {stage.errorDetail ? (
+                {rows.map((row) => {
+                  const timeline = timelineByStage.get(row.stage);
+                  return (
+                    <Fragment key={row.stage}>
                       <TableRow>
-                        <TableCell colSpan={5} className="bg-destructive/5">
-                          <StageErrorDetailView detail={stage.errorDetail} />
+                        <TableCell className="font-medium">{row.stage}</TableCell>
+                        <TableCell>
+                          {!timeline ? "-" : timeline.endedAt === null ? (
+                            <Badge variant="secondary">running</Badge>
+                          ) : (
+                            <Badge variant={timeline.ok ? "default" : "destructive"}>{timeline.ok ? "ok" : "failed"}</Badge>
+                          )}
                         </TableCell>
+                        <TableCell>{timeline?.progressTotal !== null && timeline?.progressTotal !== undefined ? `${timeline.progressDone ?? 0} / ${timeline.progressTotal}` : "-"}</TableCell>
+                        <TableCell>{formatDuration(row.wallClockMs)}</TableCell>
+                        <TableCell>{row.calls === null ? "-" : row.calls.toLocaleString()}</TableCell>
+                        <TableCell>{row.tokens === null ? "-" : row.tokens.toLocaleString()}</TableCell>
+                        <TableCell>{row.costUsd === null ? "-" : formatUsd(row.costUsd)}</TableCell>
                       </TableRow>
-                    ) : null}
-                  </Fragment>
-                ))}
+                      {timeline?.errorDetail ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="bg-destructive/5">
+                            <StageErrorDetailView detail={timeline.errorDetail} />
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
               </TableBody>
             </Table>
-          )}
-          {costTimingReport ? <InlineReport title="Cost & timings" report={costTimingReport.report} /> : null}
-          {journeyReport ? <InlineReport title="Journey cost report" report={journeyReport.report} /> : null}
-        </CardContent>
-      ) : null}
+          </div>
+        )}
+    </div>
+  );
+}
+
+function JourneyCard({
+  journey,
+  spend,
+  expand
+}: Readonly<{
+  journey: OperationJourney;
+  spend: OperationSpend;
+  expand?: string;
+}>) {
+  const total = journeyCost(journey, spend);
+  const stale = journey.members.some((member) => isStale(member.summary.status, member.summary.lastProgressAt));
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span className="break-words">{journeyTitle(journey)}</span>
+          <Badge variant="outline">{journey.display.kind}</Badge>
+          <Badge variant={statusVariant(journey.status)}>{journey.status}</Badge>
+          {stale ? <Badge variant="destructive">stalled?</Badge> : null}
+        </CardTitle>
+        <CardDescription>
+          {journey.members.length} step(s) · started <LocalDateTime iso={journey.startedAt} />
+        </CardDescription>
+        <CardAction className="flex flex-wrap items-center justify-end gap-2">
+          <Badge variant="outline">{formatDuration(journey.elapsedMs)}</Badge>
+          <CostChips cost={total} />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <OperationStepRows operations={journey.members} spend={spend} expand={expand} />
+      </CardContent>
     </Card>
+  );
+}
+
+function UngroupedOperationCard({
+  operation,
+  spend,
+  expand
+}: Readonly<{
+  operation: OperationTimelineDetail;
+  spend: OperationSpend;
+  expand?: string;
+}>) {
+  const { summary } = operation;
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-sm">{summary.operationId}</span>
+          <Badge variant="outline">{summary.operationType}</Badge>
+          <Badge variant={statusVariant(summary.status)}>{summary.status}</Badge>
+        </CardTitle>
+        <CardDescription>Ungrouped operation timeline</CardDescription>
+        <CardAction>
+          <Badge variant="outline">{formatDuration(summary.elapsedMs)}</Badge>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <OperationStepRows operations={[operation]} spend={spend} expand={expand} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function SortLink({
+  label,
+  sort,
+  currentSort,
+  currentDir,
+  limit
+}: Readonly<{
+  label: string;
+  sort: JourneySortKey;
+  currentSort: JourneySortKey;
+  currentDir: JourneySortDir;
+  limit: number;
+}>) {
+  const active = sort === currentSort;
+  const nextDir: JourneySortDir = active && currentDir === "desc" ? "asc" : "desc";
+  return (
+    <Link
+      className={buttonVariants({ variant: active ? "secondary" : "outline", size: "sm" })}
+      href={{ pathname: "/admin/lab/operations", query: { sort, dir: nextDir, limit } }}
+    >
+      {label}
+    </Link>
   );
 }
 
 export default async function OperationsPage({
   searchParams
-}: Readonly<{ searchParams: Promise<{ report?: string; type?: string; journey?: string; expand?: string }> }>) {
-  const { report, type, journey, expand } = await searchParams;
-  const operations = await listOperationsWithStages();
-  // Report reads stay lazy: each query runs only when its param is present.
-  const costTiming = report
-    ? { report: await getCostTimingReport(report, isOperationType(type) ? type : undefined) }
-    : null;
-  const journeyCost = journey ? { report: await getJourneyCostReport(journey) } : null;
+}: Readonly<{ searchParams: Promise<{ sort?: string; dir?: string; limit?: string; expand?: string }> }>) {
+  const params = await searchParams;
+  const sortParams = parseJourneySortParams(params);
+  const operationJourneys = await listOperationJourneys();
+  const spend = operationJourneys
+    ? await preloadOperationSpend(operationIdsForSpend(operationJourneys.journeys, operationJourneys.ungrouped))
+    : { rows: [], costAvailable: false };
 
-  const active = (operations ?? []).filter((operation) => operation.summary.status === "running");
-  const finished = (operations ?? []).filter((operation) => operation.summary.status !== "running");
-  const stalledCount = active.filter((operation) => isStale(operation.summary.status, operation.summary.lastProgressAt)).length;
-  const failedCount = finished.filter((operation) => operation.summary.status === "failed").length;
-
-  // ONE live spend read across every listed operation feeds the cost chips on all cards (KTD4).
-  const spend = await preloadOperationSpend((operations ?? []).map((operation) => operation.summary.operationId));
-
-  // A card renders its full stage table only when it is active, explicitly expanded, or the
-  // target of an open report — so finished cards collapse to header + chips and the page stays
-  // small (R6/AE7).
-  const isOpen = (operation: OperationWithStages): boolean => {
-    const id = operation.summary.operationId;
-    return operation.summary.status === "running" || id === expand || id === report || id === journey;
-  };
-
-  const cardFor = (operation: OperationWithStages) => (
-    <OperationCard
-      key={operation.summary.operationRunId}
-      operation={operation}
-      cost={operationCost(operation.summary.operationId, operation.summary.operationType, spend)}
-      open={isOpen(operation)}
-      costTimingReport={operation.summary.operationId === report ? costTiming : null}
-      journeyReport={operation.summary.operationId === journey ? journeyCost : null}
-    />
-  );
+  const window = operationJourneys ? windowJourneys(operationJourneys.journeys, spend, sortParams) : null;
+  const runningCount = operationJourneys
+    ? operationJourneys.journeys.filter((journey) => journey.status === "running").length +
+      operationJourneys.ungrouped.filter((operation) => operation.summary.status === "running").length
+    : 0;
+  const failedCount = operationJourneys
+    ? operationJourneys.journeys.filter((journey) => journey.status === "failed").length +
+      operationJourneys.ungrouped.filter((operation) => operation.summary.status === "failed").length
+    : 0;
+  const stalledCount = operationJourneys
+    ? [
+        ...operationJourneys.journeys.flatMap((journey) => journey.members),
+        ...operationJourneys.ungrouped
+      ].filter((operation) => isStale(operation.summary.status, operation.summary.lastProgressAt)).length
+    : 0;
 
   return (
     <AdminShell active="operations">
-      <AutoRefresh active={active.length > 0} />
-      <Card>
-        <CardHeader className="border-b">
-          <CardTitle>Operations</CardTitle>
-          <CardDescription>
-            Live run-stage timeline for extraction, minting, enrichment, and study-item generation — current sub-stage, heartbeat, and per-stage wall-clock.
-          </CardDescription>
-          <CardAction className="flex flex-wrap items-center gap-2">
-            {operations ? (
+      <AutoRefresh active={runningCount > 0} />
+      <div className="flex flex-col gap-6">
+        <header className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-normal">Operations</h1>
+            <p className="max-w-3xl text-sm text-muted-foreground">
+              Processing Journey timelines for extraction, graph-version build, Graph Enrichment, and Study Item Bank generation.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {operationJourneys ? (
               <>
-                <Badge variant={active.length > 0 ? "secondary" : "outline"}>{active.length} running</Badge>
+                <Badge variant={runningCount > 0 ? "secondary" : "outline"}>{runningCount} running</Badge>
                 <Badge variant={stalledCount > 0 ? "destructive" : "outline"}>{stalledCount} stalled</Badge>
                 <Badge variant={failedCount > 0 ? "destructive" : "outline"}>{failedCount} failed</Badge>
               </>
             ) : (
               <Badge variant="destructive">Database unavailable</Badge>
             )}
-          </CardAction>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {!operations ? (
-            <Alert variant="destructive">
-              <DatabaseZapIcon />
-              <AlertTitle>Database unavailable</AlertTitle>
-              <AlertDescription>
-                Set <code className="font-mono">DATABASE_URL</code> to inspect operation timelines.
-              </AlertDescription>
-            </Alert>
-          ) : operations.length === 0 ? (
-            <Empty className="min-h-72 border">
-              <EmptyHeader>
-                <EmptyMedia variant="icon"><ActivityIcon /></EmptyMedia>
-                <EmptyTitle>No operations</EmptyTitle>
-                <EmptyDescription>No triggered operations have reported a timeline yet.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <>
-              {active.length > 0 ? (
-                <section className="flex flex-col gap-4">
-                  <h2 className="text-sm font-semibold">Active ({active.length})</h2>
-                  {active.map(cardFor)}
-                </section>
-              ) : null}
+          </div>
+        </header>
+
+        {!operationJourneys ? (
+          <Alert variant="destructive">
+            <DatabaseZapIcon />
+            <AlertTitle>Database unavailable</AlertTitle>
+            <AlertDescription>
+              Set <code className="font-mono">DATABASE_URL</code> to inspect operation timelines.
+            </AlertDescription>
+          </Alert>
+        ) : operationJourneys.journeys.length === 0 && operationJourneys.ungrouped.length === 0 ? (
+          <Empty className="min-h-72 border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><ActivityIcon /></EmptyMedia>
+              <EmptyTitle>No operations</EmptyTitle>
+              <EmptyDescription>No triggered operations have reported a timeline yet.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Sort</span>
+              <SortLink label="started" sort="started" currentSort={sortParams.sort} currentDir={sortParams.dir} limit={sortParams.limit} />
+              <SortLink label="duration" sort="duration" currentSort={sortParams.sort} currentDir={sortParams.dir} limit={sortParams.limit} />
+              <SortLink label="cost" sort="cost" currentSort={sortParams.sort} currentDir={sortParams.dir} limit={sortParams.limit} />
+              {!spend.costAvailable ? <Badge variant="outline">cost unavailable</Badge> : null}
+            </div>
+
+            {window && window.active.length > 0 ? (
               <section className="flex flex-col gap-4">
-                <h2 className="text-sm font-semibold text-muted-foreground">Finished ({finished.length})</h2>
-                {finished.map(cardFor)}
+                <h2 className="text-sm font-semibold">Active journeys ({window.active.length})</h2>
+                {window.active.map((journey) => (
+                  <JourneyCard key={journey.enrichmentId} journey={journey} spend={spend} expand={params.expand} />
+                ))}
               </section>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            ) : null}
+
+            {window && window.finished.length > 0 ? (
+              <section className="flex flex-col gap-4">
+                <h2 className="text-sm font-semibold text-muted-foreground">Finished journeys</h2>
+                {window.finished.map((journey) => (
+                  <JourneyCard key={journey.enrichmentId} journey={journey} spend={spend} expand={params.expand} />
+                ))}
+                {window.hiddenFinishedCount > 0 ? (
+                  <Link
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                    href={{
+                      pathname: "/admin/lab/operations",
+                      query: { sort: sortParams.sort, dir: sortParams.dir, limit: sortParams.limit + 20 }
+                    }}
+                  >
+                    Show older ({window.hiddenFinishedCount} finished journeys hidden)
+                  </Link>
+                ) : null}
+              </section>
+            ) : null}
+
+            {operationJourneys.ungrouped.length > 0 ? (
+              <section className="flex flex-col gap-4">
+                <h2 className="text-sm font-semibold text-muted-foreground">Ungrouped operations ({operationJourneys.ungrouped.length})</h2>
+                {operationJourneys.ungrouped.map((operation) => (
+                  <UngroupedOperationCard
+                    key={operation.summary.operationRunId}
+                    operation={operation}
+                    spend={spend}
+                    expand={params.expand}
+                  />
+                ))}
+              </section>
+            ) : null}
+          </>
+        )}
+      </div>
     </AdminShell>
   );
 }
