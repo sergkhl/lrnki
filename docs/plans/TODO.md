@@ -2,11 +2,22 @@
 
 ## TODO
 
-- **Learner App deployment.** Plan ready:
-  [2026-07-08-002](./2026-07-08-002-feat-learner-app-deployment-plan.md). Execution waits on the
-  user-supplied domains and DNS/Pages setup in [BLOCKERS](./BLOCKERS.md).
+- **Learner App universal Expo app.** Plan ready:
+  [2026-07-09-001](./2026-07-09-001-feat-learner-app-universal-expo-plan.md). One Expo universal
+  app (`apps/learner-app`) replaces `learner-web` at cutover after the rule-14 and ADR-0032
+  gates; native verification needs the user's device when execution reaches it.
 
 ## COMPLETED
+
+- **Learner App deployment (live).** Shipped 2026-07-09: `learner-api` runs as a Docker Compose
+  service behind Caddy TLS at `https://api.lrnki.globesoul.com`, `learner-web` on GitHub Pages at
+  `https://lrnki.globesoul.com`, internal litellm/docling/postgres ports bound VPS-local
+  ([ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md); runbook in the
+  [README](../../README.md#deployment)). Rule-14 gate PASS: real browser-path registration → real
+  topic expedition generated on the VPS supervisor through production LiteLLM → graded study
+  response (server-keyed correct) → leaderboard read; negative checks green (`401` without bearer,
+  HTTP→HTTPS on both hosts, internal ports refused externally). Evidence:
+  `tmp/2026-07-09-learner-app-deployment/`.
 
 - **Learner App separation: static SPA + typed learner API.** The learner surface moved out of
   Admin Lab: `apps/learner-api` (Hono + zod routes as thin mappers over `@lrnki/application`,

@@ -61,7 +61,8 @@ ensure the VPS database carries the single migration (`pnpm db:migrate` against 
 
 **Web deploy** — automatic on push to `main`. The first run lands on `sergkhl.github.io/lrnki/`
 (looks broken with `base=/` — expected); attach `lrnki.globesoul.com` as the Pages custom domain
-in repo settings afterward and Pages 301s the default URL to it.
+in repo settings afterward and Pages 301s the default URL to it. Once the custom-domain cert has
+provisioned, enable **Enforce HTTPS** in Pages settings so plain-HTTP requests 301 to HTTPS.
 
 ## Scope
 

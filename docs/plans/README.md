@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- [Learner App deployment](./2026-07-08-002-feat-learner-app-deployment-plan.md) — ready.
+- [Learner App universal Expo](./2026-07-09-001-feat-learner-app-universal-expo-plan.md) — ready.
 
 ## Ownership rules
 
