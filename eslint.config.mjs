@@ -23,6 +23,11 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
+    // Expo/Metro/Tailwind config files are CommonJS by toolchain contract.
+    files: ["apps/learner-app/*.config.js"],
+    rules: { "@typescript-eslint/no-require-imports": "off" }
+  },
+  {
     settings: { next: { rootDir: "apps/admin-lab" } },
     rules: {
       "no-restricted-imports": [

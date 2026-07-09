@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { CheckCircle2Icon, Undo2Icon } from "lucide-react";
-import type { StudySession } from "@lrnki/application";
+import type { StudySession } from "@lrnki/application/projection";
 import { clearLearnerVerdict, refreshLearnerExpedition, setLearnerVerdict } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

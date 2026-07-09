@@ -1,7 +1,7 @@
 import { useTransition } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRightIcon, CompassIcon, MapIcon } from "lucide-react";
-import type { ExpeditionCandidate, LearnerExpeditionEntry } from "@lrnki/application";
+import type { ExpeditionCandidate, LearnerExpeditionEntry } from "@lrnki/application/projection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

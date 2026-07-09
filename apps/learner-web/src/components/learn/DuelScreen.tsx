@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import type { StudyItemView } from "@lrnki/application";
+import type { StudyItemView } from "@lrnki/application/projection";
 import { gradeDuelAnswerAction, recordDuelWinAction } from "@/lib/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { duelReduce, type DuelState } from "./duelMachine";

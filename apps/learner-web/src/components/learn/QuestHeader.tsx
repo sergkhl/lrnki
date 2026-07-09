@@ -1,4 +1,4 @@
-import type { StudySession } from "@lrnki/application";
+import type { StudySession } from "@lrnki/application/projection";
 import { CrystalVista } from "./CrystalVista";
 import { buildCrystalFormation } from "./crystalVistaView";
 import { SectionOverview } from "./SectionOverview";

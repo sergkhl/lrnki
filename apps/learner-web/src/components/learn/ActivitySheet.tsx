@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { CheckCircle2Icon } from "lucide-react";
-import type { StudySession } from "@lrnki/application";
+import type { StudySession } from "@lrnki/application/projection";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/lib/actions";
 import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/lib/actions";
 import { Button } from "@/components/ui/button";

@@ -19,8 +19,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": resolve(__dirname, "src"),
-      "node:crypto": resolve(__dirname, "src/lib/nodeCryptoShim.ts")
+      "@": resolve(__dirname, "src")
     }
   }
 });

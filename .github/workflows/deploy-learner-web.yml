@@ -1,14 +1,14 @@
-# Learner web deploy (U4): builds the static SPA and publishes it to GitHub Pages on every
-# push to main. The API base is hardcoded here — the one file that consumes it — because the
-# hostname is stable and public (no env indirection, per the plan).
-name: Deploy learner-web
+# Learner web deploy: builds the Expo universal app's static web export and publishes it to
+# GitHub Pages on every push to main (plan 2026-07-09-001 U5). The API base is hardcoded here —
+# the one file that consumes it — because the hostname is stable and public.
+name: Deploy learner web
 
 on:
   push:
     branches: [main]
-    # Only rebuild when something that affects the SPA changes.
+    # Only rebuild when something that affects the web export changes.
     paths:
-      - "apps/learner-web/**"
+      - "apps/learner-app/**"
       - "packages/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -47,20 +47,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Cheap correctness gate before we spend a Pages deploy on a broken build.
-      - run: pnpm --filter @lrnki/learner-web typecheck
-      - run: pnpm --filter @lrnki/learner-web test
+      - run: pnpm --filter @lrnki/learner-app typecheck
+      - run: pnpm --filter @lrnki/learner-app test
 
-      # Custom domain (lrnki.globesoul.com) serves from root, so base stays "/" — no
-      # LEARNER_WEB_BASE. The SPA reads VITE_LEARNER_API_URL at build time (apps/learner-web/src/lib/api.ts).
-      - run: pnpm --filter @lrnki/learner-web build
+      # Custom domain (lrnki.globesoul.com) serves from root. The app reads
+      # EXPO_PUBLIC_LEARNER_API_URL at build time (apps/learner-app/src/lib/api.ts).
+      - run: pnpm --filter @lrnki/learner-app export:web
         env:
-          VITE_LEARNER_API_URL: https://api.lrnki.globesoul.com
+          EXPO_PUBLIC_LEARNER_API_URL: https://api.lrnki.globesoul.com
+
+      # Pages SPA fallback: deep links like /expedition/:id resolve to the router
+      # instead of a Pages 404.
+      - run: cp apps/learner-app/dist/index.html apps/learner-app/dist/404.html
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/learner-web/dist
+          path: apps/learner-app/dist
 
       - id: deploy
         uses: actions/deploy-pages@v4

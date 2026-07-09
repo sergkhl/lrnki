@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { StudySession } from "@lrnki/application";
+import type { StudySession } from "@lrnki/application/projection";
 import { FlagIcon } from "lucide-react";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";

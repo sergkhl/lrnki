@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckIcon, XIcon } from "lucide-react";
-import type { StudyImpostorView, StudyOptionSelectView } from "@lrnki/application";
+import type { StudyImpostorView, StudyOptionSelectView } from "@lrnki/application/projection";
 import type { LearnerGradingResult } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, LockIcon } from "lucide-react";
 import { faker } from "@faker-js/faker";
-import { DUEL_QUESTION_COUNT } from "@lrnki/application";
+import { DUEL_QUESTION_COUNT } from "@lrnki/application/projection";
 import { DuelScreen, type DuelQuestion } from "@/components/learn/DuelScreen";
 import { learnerTerm } from "@/components/learn/vocabulary";
 import { buttonVariants } from "@/components/ui/button";

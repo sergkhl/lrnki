@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { CheckIcon } from "lucide-react";
 import { motion } from "motion/react";
-import type { MatchingAttemptTrace, StudyMatchingView } from "@lrnki/application";
+import type { MatchingAttemptTrace, StudyMatchingView } from "@lrnki/application/projection";
 import type { LearnerMatchingResult } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

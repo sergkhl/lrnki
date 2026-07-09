@@ -1,0 +1,45 @@
+{
+  "name": "@lrnki/learner-app",
+  "private": true,
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "expo start",
+    "web": "expo start --web",
+    "export:web": "expo export --platform web",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@lrnki/application": "workspace:*",
+    "@lrnki/domain-core": "workspace:*",
+    "@lrnki/learner-api": "workspace:*",
+    "@lrnki/ports": "workspace:*",
+    "@react-native-async-storage/async-storage": "catalog:expo",
+    "@tanstack/react-query": "catalog:",
+    "expo": "catalog:expo",
+    "expo-constants": "catalog:expo",
+    "expo-linking": "catalog:expo",
+    "expo-router": "catalog:expo",
+    "expo-secure-store": "catalog:expo",
+    "expo-status-bar": "catalog:expo",
+    "hono": "catalog:",
+    "lucide-react-native": "catalog:expo",
+    "nativewind": "catalog:expo",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-native": "catalog:expo",
+    "react-native-css-interop": "catalog:expo",
+    "react-native-safe-area-context": "catalog:expo",
+    "react-native-screens": "catalog:expo",
+    "react-native-svg": "catalog:expo",
+    "react-native-web": "catalog:expo"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:expo",
+    "tailwindcss": "catalog:expo",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

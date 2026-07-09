@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "lrnki",
+    "slug": "lrnki",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "lrnki",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "web": {
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}

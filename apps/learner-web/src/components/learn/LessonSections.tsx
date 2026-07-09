@@ -1,4 +1,4 @@
-import type { ConceptLessonView } from "@lrnki/application";
+import type { ConceptLessonView } from "@lrnki/application/projection";
 import { GroundedBadge } from "./GroundedBadge";
 import { lessonSectionHeading } from "./vocabulary";
 

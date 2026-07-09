@@ -1,4 +1,4 @@
-import type { DuelSetup, LearnerExpeditionEntry, StudySession } from "@lrnki/application";
+import type { DuelSetup, LearnerExpeditionEntry, StudySession } from "@lrnki/application/projection";
 import type { LearnerExpedition, OperationTimelineDetail } from "@lrnki/ports";
 import { queryOptions } from "@tanstack/react-query";
 import { api, readToken } from "./api";

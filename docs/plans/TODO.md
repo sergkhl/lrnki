@@ -2,10 +2,18 @@
 
 ## TODO
 
-- **Learner App universal Expo app.** Plan ready:
-  [2026-07-09-001](./2026-07-09-001-feat-learner-app-universal-expo-plan.md). One Expo universal
-  app (`apps/learner-app`) replaces `learner-web` at cutover after the rule-14 and ADR-0032
-  gates; native verification needs the user's device when execution reaches it.
+- **Learner App universal Expo app — cutover only.** Plan:
+  [2026-07-09-001](./2026-07-09-001-feat-learner-app-universal-expo-plan.md). U1–U5 are built
+  and green: `@lrnki/application` has the client-safe `./projection` subpath (nodeCryptoShim
+  deleted), `apps/learner-app` (Expo SDK 57 + Expo Router + NativeWind + react-native-svg)
+  renders the full v1 parity cut, the moved view-model tests run there, `expo export
+  --platform web` + android Hermes bundle compile, and the Pages workflow builds the Expo web
+  export. Rule-14 **web half PASSED** (real register → prod-LiteLLM expedition → lesson + all
+  three graded item types + verdict round-trip → leaderboard → deep link → 401 without bearer;
+  evidence `tmp/2026-07-09-learner-app-universal-expo/`). Remaining: the native device half +
+  ADR-0032 feel gate (see [BLOCKERS](./BLOCKERS.md)), then U6 — delete `apps/learner-web`,
+  amend ADR-0035, rescope AGENTS rule 15 to Admin Lab, repair the Admin Lab learner link
+  (`LEARNER_WEB_URL` dev default moves 5173 → 8081), and delete the plan.
 
 ## COMPLETED
 

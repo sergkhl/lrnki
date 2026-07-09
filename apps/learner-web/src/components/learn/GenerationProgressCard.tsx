@@ -1,5 +1,5 @@
 import { useTransition } from "react";
-import { isStaleOperation } from "@lrnki/application";
+import { isStaleOperation } from "@lrnki/application/projection";
 import type { LearnerExpedition, OperationTimelineDetail } from "@lrnki/ports";
 import { retryTopicExpedition } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
