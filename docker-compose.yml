@@ -26,7 +26,10 @@ services:
     networks:
       - lrnki
     ports:
-      - "4000:4000"
+      # Bound to loopback (U3): Docker's iptables rules bypass ufw, so a 0.0.0.0 publish would
+      # expose LiteLLM on the public VPS interface. Host-run admin-lab/kg-worker still reach it
+      # via localhost; containers use the `litellm` service name over the lrnki network.
+      - "127.0.0.1:4000:4000"
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
@@ -52,7 +55,8 @@ services:
     networks:
       - lrnki
     ports:
-      - "5001:5001"
+      # Loopback-only (U3): same public-exposure hazard as litellm above.
+      - "127.0.0.1:5001:5001"
     environment:
       DOCLING_SERVE_ENABLE_UI: "1"
       DOCLING_DEVICE: "cpu"
@@ -64,6 +68,51 @@ services:
       retries: 5
       start_period: 60s
 
+  # Learner HTTP API (U2 / ADR-0035). No published host port — only Caddy reaches it over the
+  # lrnki network. The relocated topic-generation supervisor runs inside this long-lived process,
+  # so these LiteLLM credentials are also its production generation credentials.
+  learner-api:
+    build:
+      context: .
+      dockerfile: apps/learner-api/Dockerfile
+    container_name: lrnki-learner-api
+    networks:
+      - lrnki
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
+      LITELLM_BASE_URL: http://litellm:4000
+      LITELLM_API_KEY: ${LITELLM_API_KEY:-sk-local}
+      LEARNER_WEB_ORIGIN: https://lrnki.globesoul.com
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Public TLS terminator (U2): owns 80/443 and reverse-proxies to learner-api. Nothing else on
+  # the VPS owns those ports, so Caddy joins this compose file directly.
+  caddy:
+    image: caddy:2-alpine
+    container_name: lrnki-caddy
+    networks:
+      - lrnki
+    restart: unless-stopped
+    depends_on:
+      - learner-api
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./scripts/docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
 networks:
   lrnki:
     name: lrnki
@@ -73,3 +122,5 @@ networks:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:

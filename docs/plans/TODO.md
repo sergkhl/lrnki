@@ -2,10 +2,9 @@
 
 ## TODO
 
-- **Deployment plan (separation shipped 2026-07-08).** VPS compose service + Caddy/TLS for
-  `learner-api`, GitHub Pages workflow for `learner-web`, prod env wiring
-  ([ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md) records the target
-  topology). Not yet authored.
+- **Learner App deployment.** Plan ready:
+  [2026-07-08-002](./2026-07-08-002-feat-learner-app-deployment-plan.md). Execution waits on the
+  user-supplied domains and DNS/Pages setup in [BLOCKERS](./BLOCKERS.md).
 
 ## COMPLETED
 

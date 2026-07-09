@@ -99,7 +99,10 @@ export function createLearnerApp(sql: DatabaseClient) {
   const app = new Hono<AuthEnv>()
     .use("*", cors({
       origin: process.env.LEARNER_WEB_ORIGIN ?? "http://localhost:5173",
-      allowHeaders: ["Authorization", "Content-Type"]
+      allowHeaders: ["Authorization", "Content-Type"],
+      // Cache preflights for a day — the only real per-request cost of the two-origin
+      // (Pages web ↔ VPS api) topology, since web and api never share an origin.
+      maxAge: 86400
     }))
 
     .get("/health", (c) => c.json({ ok: true as const }))

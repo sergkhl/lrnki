@@ -1,0 +1,66 @@
+# Learner web deploy (U4): builds the static SPA and publishes it to GitHub Pages on every
+# push to main. The API base is hardcoded here — the one file that consumes it — because the
+# hostname is stable and public (no env indirection, per the plan).
+name: Deploy learner-web
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when something that affects the SPA changes.
+    paths:
+      - "apps/learner-web/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/deploy-learner-web.yml"
+  workflow_dispatch:
+
+# Pages deploy permissions (OIDC) required by actions/deploy-pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two Pages deploys at once; let an in-flight run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Cheap correctness gate before we spend a Pages deploy on a broken build.
+      - run: pnpm --filter @lrnki/learner-web typecheck
+      - run: pnpm --filter @lrnki/learner-web test
+
+      # Custom domain (lrnki.globesoul.com) serves from root, so base stays "/" — no
+      # LEARNER_WEB_BASE. The SPA reads VITE_LEARNER_API_URL at build time (apps/learner-web/src/lib/api.ts).
+      - run: pnpm --filter @lrnki/learner-web build
+        env:
+          VITE_LEARNER_API_URL: https://api.lrnki.globesoul.com
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/learner-web/dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

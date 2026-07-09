@@ -1,0 +1,12 @@
+# Keep the learner-api build context small and force a clean in-image install.
+# node_modules is reinstalled from the frozen lockfile; the rest is never needed at runtime.
+node_modules
+**/node_modules
+tmp
+dist
+**/dist
+.next
+**/.next
+docs
+fixtures
+.git

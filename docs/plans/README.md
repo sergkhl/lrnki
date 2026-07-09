@@ -12,8 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- None. Next up: the Learner App deployment plan (VPS compose service, Caddy/TLS for
-  `learner-api`, GitHub Pages workflow for `learner-web`) — see TODO.
+- [Learner App deployment](./2026-07-08-002-feat-learner-app-deployment-plan.md) — ready.
 
 ## Ownership rules
 
