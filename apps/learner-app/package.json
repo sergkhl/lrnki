@@ -38,6 +38,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/react": "catalog:expo",
+    "babel-preset-expo": "catalog:expo",
     "tailwindcss": "catalog:expo",
     "tsx": "catalog:",
     "typescript": "catalog:"

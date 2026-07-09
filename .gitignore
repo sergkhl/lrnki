@@ -4,6 +4,7 @@ tmp/
 node_modules/
 .next/
 dist/
+.expo/
 .venv/
 .data/
 .cache/
