@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
-    "@faker-js/faker": "catalog:",
     "@lrnki/application": "workspace:*",
     "@lrnki/domain-core": "workspace:*",
     "@lrnki/infrastructure-litellm": "workspace:*",
@@ -21,7 +20,6 @@
     "clsx": "catalog:",
     "cytoscape": "catalog:",
     "lucide-react": "catalog:",
-    "motion": "catalog:",
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

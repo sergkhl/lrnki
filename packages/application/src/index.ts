@@ -13,7 +13,6 @@ export {
 } from "./calibrateKnowledgeBoundaryProbe";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { generateTopicExpedition } from "./generateTopicExpedition";
-export { ensureLearnerExpedition, type EnsureLearnerExpeditionResult } from "./ensureLearnerExpedition";
 export {
   registerLearner,
   enterLearnerSession,
@@ -52,11 +51,17 @@ export { synthesizeResponses } from "./syntheticResponses";
 
 export {
   costTimingReport,
+  mergeOperationStageRows,
   type CostTimingReport,
   type CostTimingStageRow,
   type CostTimingTotals,
   type CostTimingOperationReport
 } from "./costTimingReport";
+export {
+  listOperationJourneys,
+  type OperationJourney,
+  type OperationJourneyList
+} from "./listOperationJourneys";
 export { rankBottleneckTargets, type RankedTarget } from "./rankBottleneckTargets";
 export {
   OPERATION_HEARTBEAT_STALE_AFTER_MS,
@@ -138,3 +143,10 @@ export {
   composeCalibrationSession,
   type CalibrationSessionProjection
 } from "./calibrationList";
+export {
+  layoutSphereGrid,
+  type SphereGridEdgeInput,
+  type SphereGridFlaggedLoop,
+  type SphereGridLayout,
+  type SphereGridNodeInput
+} from "./sphereGridLayout";

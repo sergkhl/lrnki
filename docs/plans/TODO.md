@@ -2,9 +2,29 @@
 
 ## TODO
 
-- (empty)
+- **Learner App deployment.** Plan ready:
+  [2026-07-08-002](./2026-07-08-002-feat-learner-app-deployment-plan.md). Execution waits on the
+  user-supplied domains and DNS/Pages setup in [BLOCKERS](./BLOCKERS.md).
 
 ## COMPLETED
+
+- **Learner App separation: static SPA + typed learner API.** The learner surface moved out of
+  Admin Lab: `apps/learner-api` (Hono + zod routes as thin mappers over `@lrnki/application`,
+  opaque hashed bearer sessions in the new `learner_sessions` table, per-IP/per-name session rate
+  limit, relocated topic-generation supervisor, one shared pool) and `apps/learner-web` (Vite +
+  TanStack Router/Query SPA over the typed `hono/client`, static build with 404 SPA fallback).
+  Admin Lab lost `app/learn/**`, `components/learn/**`, the learner libs, cookie machinery,
+  `instrumentation.ts`, and the "open as learner" action (now a link to the learner web app);
+  `ensureLearnerExpedition` was deleted; the sphere-grid layout moved to `@lrnki/application`
+  (both apps render it). Decisions: [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md).
+
+- **Journey-first Operations page with one merged stage table.** Operations now render as
+  Processing Journey cards resolved read-only from enrichment lineage, with active journeys first,
+  finished journey sorting/windowing, titled synthetic/document labels from the inspection read model,
+  ungrouped leftovers, compact always-visible step rows, and an expanded merged stage table backed by
+  the same `mergeOperationStageRows` helper as `costTimingReport`. The old `?report`/`?type`/
+  `?journey` panels, Admin Lab report component, and lazy report loader were deleted; the kg-worker
+  cost-timing CLI path remains on the shared application report. No schema change.
 
 - **Neural stage descriptors with dotprompt files and mechanical config hashes.** Forced-tool LLM
   stage knowledge now lives in Neural Stage Descriptors: `.prompt` files own model aliases, tool
@@ -259,6 +279,35 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner App separation, 2026-07-08.** Deterministic envelope: workspace typecheck (12
+  packages), tests pass (learner-api 18, learner-web 75, admin-lab 62, rest unchanged), lint
+  passes with the repo's pre-existing warnings, `next build` and `vite build` (static output +
+  404 fallback) pass. **Real-use gate (rule 14): PASS** — evidence in
+  `tmp/2026-07-08-learner-app-separation/`: real registration through the SPA gate; bearer-only
+  identity (401s without token); live 429 on a 12-attempt PIN sweep; a REAL topic expedition
+  ("Tidal energy basics") generated end-to-end by the relocated supervisor with production
+  LiteLLM calls (~4.5 min, 24 study items / 2 sections) with stage progress observed through the
+  `/journal` timelines; a real graded `option_select` write; leaderboard (10 entries, W28) and
+  duel gating reads; Playwright SPA flow gate → journal → trail → section map with zero console
+  errors. Caveat: duel play-through not browser-driven (locked for the fresh learner).
+
+- **Journey-first Operations page, 2026-07-08.** Deterministic envelope:
+  `@lrnki/application` tests pass (517), `PostgresJourneyLineageRead` DB-backed tests pass with
+  `.env` loaded, `@lrnki/admin-lab` tests pass (152), package and workspace typecheck pass, lint
+  passes with the repo's 6 pre-existing warnings, and production `next build` passes. **Real-use gate
+  (rule 14): PASS.**
+  Read-only inspection over the existing dev DB (no fresh LLM pipeline run): production
+  `/admin/lab/operations` rendered 23 journey/ungrouped cards with synthetic and document labels,
+  an Ungrouped section, no old Cost & timings/Journey report panel text, and an expanded merged
+  stage table with Stage/Calls/Tokens/Cost columns. Spot-check operation
+  `74c37361-29b3-45d6-a46e-65b6a75ac2ce` reported the shared merge totals
+  `85,560ms / 111 calls / 152,944 tokens / $0.01582428`. Final production browser sample:
+  705,332-byte HTML, median visible-heading load 1.577s (5 samples), under the 735 KB / 2.17s
+  baseline after compacting collapsed step rows and parallelizing lineage reads. Screenshots:
+  `tmp/operations-page-final-production-desktop.png`,
+  `tmp/operations-page-final-production-expanded-desktop.png`,
+  `tmp/operations-page-final-production-mobile.png`.
 
 - **Neural stage descriptors + mechanical config hashes (U8), 2026-07-08.** Deterministic envelope:
   workspace `typecheck` exit 0 (all 10 projects); `lint` exit 0 (6 pre-existing warnings) — this

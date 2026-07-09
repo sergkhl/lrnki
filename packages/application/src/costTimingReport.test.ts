@@ -63,7 +63,8 @@ function ports(options: {
     }
   };
   const journeyLineageRead: JourneyLineageReadPort = {
-    async resolveJourney() { return options.lineage; }
+    async resolveJourney() { return options.lineage; },
+    async resolveJourneyDisplay() { return []; }
   };
   return { timelineRead, operationStageSpendRead, journeyLineageRead };
 }

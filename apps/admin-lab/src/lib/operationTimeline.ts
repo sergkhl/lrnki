@@ -1,5 +1,5 @@
-import { costTimingReport } from "@lrnki/application";
-import type { OperationStageSpend, OperationStageSpendReadPort, OperationType } from "@lrnki/ports";
+import { listOperationJourneys as listOperationJourneysUseCase } from "@lrnki/application";
+import type { OperationStageSpend, OperationType } from "@lrnki/ports";
 import { LiteLlmSpendLogsReadAdapter } from "@lrnki/infrastructure-litellm";
 import {
   PostgresJourneyLineageRead,
@@ -12,50 +12,49 @@ import {
 // module only manages the `sql` lifecycle and the DATABASE_URL-absent → undefined
 // fallback. Real DB errors propagate to the Next.js error boundary instead of being
 // silently rendered as empty (ADR-0027 decision 5). Mirrors lib/inspection.ts.
-async function withTimelineRead<T>(fn: (read: PostgresOperationTimelineRead) => Promise<T>): Promise<T | undefined> {
+async function withTimelineRead<T>(fn: (dependencies: {
+  timelineRead: PostgresOperationTimelineRead;
+  journeyLineageRead: PostgresJourneyLineageRead;
+}) => Promise<T>): Promise<T | undefined> {
   if (!process.env.DATABASE_URL) return undefined;
   const sql = createDatabaseClient();
   try {
-    return await fn(new PostgresOperationTimelineRead(sql));
+    return await fn({
+      timelineRead: new PostgresOperationTimelineRead(sql),
+      journeyLineageRead: new PostgresJourneyLineageRead(sql)
+    });
   } finally {
     await sql.end({ timeout: 5 });
   }
 }
 
 export function listOperationTimelines() {
-  return withTimelineRead((read) => read.listOperationTimelines());
+  return withTimelineRead(({ timelineRead }) => timelineRead.listOperationTimelines());
 }
 
 export function getOperationTimeline(operationId: string, operationType?: OperationType) {
-  return withTimelineRead((read) => read.getOperationTimeline(operationId, operationType));
+  return withTimelineRead(({ timelineRead }) => timelineRead.getOperationTimeline(operationId, operationType));
 }
 
 // List every operation with its stage breakdown for the live progress view (R4), all
 // on ONE connection. N+1 reads are acceptable at admin-lab operation counts; the
 // adapter still owns each query.
 export function listOperationsWithStages() {
-  return withTimelineRead(async (read) => {
-    const summaries = await read.listOperationTimelines();
+  return withTimelineRead(async ({ timelineRead }) => {
+    const summaries = await timelineRead.listOperationTimelines();
     const details = await Promise.all(
-      summaries.map((summary) => read.getOperationTimeline(summary.operationId, summary.operationType))
+      summaries.map((summary) => timelineRead.getOperationTimeline(summary.operationId, summary.operationType))
     );
     return details.flatMap((detail) => (detail ? [detail] : []));
   });
 }
 
-// The Admin Lab renderer of the cost & timings report (R5/R7): the SAME use-case the worker
-// CLI calls (KTD5) — no HTTP hop, no re-implemented join. Cost is read live from
-// LiteLLM at render time and never stored (R6); a LiteLLM outage degrades to wall-clock
-// only inside the use-case.
-export function getCostTimingReport(operationId: string, operationType?: OperationType) {
-  return withReportReads((dependencies) =>
-    costTimingReport({ scope: { operationId, operationType }, ...dependencies })
-  );
-}
-
-export function getJourneyCostReport(enrichmentId: string) {
-  return withReportReads((dependencies) =>
-    costTimingReport({ scope: { journeyAnchorEnrichmentId: enrichmentId }, ...dependencies })
+export function listOperationJourneys() {
+  return withTimelineRead(({ timelineRead, journeyLineageRead }) =>
+    listOperationJourneysUseCase({
+      timelineRead,
+      journeyLineageRead
+    })
   );
 }
 
@@ -77,33 +76,5 @@ export async function preloadOperationSpend(
     return { rows: [], costAvailable: false };
   } finally {
     await spendRead.end();
-  }
-}
-
-async function withReportReads<T>(
-  fn: (dependencies: {
-    timelineRead: PostgresOperationTimelineRead;
-    journeyLineageRead: PostgresJourneyLineageRead;
-    operationStageSpendRead: OperationStageSpendReadPort;
-  }) => Promise<T>
-): Promise<T | undefined> {
-  if (!process.env.DATABASE_URL) return undefined;
-  const sql = createDatabaseClient();
-  const spendRead = process.env.LITELLM_DATABASE_URL
-    ? new LiteLlmSpendLogsReadAdapter(process.env.LITELLM_DATABASE_URL)
-    : undefined;
-  try {
-    return await fn({
-      timelineRead: new PostgresOperationTimelineRead(sql),
-      journeyLineageRead: new PostgresJourneyLineageRead(sql),
-      operationStageSpendRead: spendRead ?? {
-        async readOperationStageSpend() {
-          throw new Error("LITELLM_DATABASE_URL is required for cost reporting.");
-        }
-      }
-    });
-  } finally {
-    await spendRead?.end();
-    await sql.end({ timeout: 5 });
   }
 }

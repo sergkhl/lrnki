@@ -3,19 +3,22 @@ import { notFound } from "next/navigation";
 import { ArrowLeftIcon, CompassIcon } from "lucide-react";
 import { AdminShell } from "@/components/AdminShell";
 import { DerivedGraphExplorer } from "@/components/DerivedGraphExplorer";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { getEnrichmentDetail } from "@/lib/enrichments";
-import { openAdminLearnerExpedition } from "../actions";
 
 export const dynamic = "force-dynamic";
 
+// The learner surface is its own app now (plan 2026-07-08-003): the door is a plain
+// link into the learner web app, which owns session and expedition state.
+function learnerWebExpeditionUrl(enrichmentId: string): string {
+  const base = process.env.LEARNER_WEB_URL ?? "http://localhost:5173";
+  return `${base.replace(/\/$/, "")}/expedition/${encodeURIComponent(enrichmentId)}`;
+}
+
 export default async function EnrichmentDetailPage({
-  params,
-  searchParams
-}: Readonly<{ params: Promise<{ enrichmentId: string }>; searchParams: Promise<{ learnDoor?: string }> }>) {
+  params
+}: Readonly<{ params: Promise<{ enrichmentId: string }> }>) {
   const { enrichmentId } = await params;
-  const { learnDoor } = await searchParams;
   const detail = await getEnrichmentDetail(enrichmentId);
   if (!detail) notFound();
   return (
@@ -25,22 +28,16 @@ export default async function EnrichmentDetailPage({
           <ArrowLeftIcon data-icon="inline-start" />
           All enrichment runs
         </Link>
-        <form action={async () => {
-          "use server";
-          await openAdminLearnerExpedition(enrichmentId);
-        }}>
-          <Button type="submit" size="sm" variant="outline">
-            <CompassIcon data-icon="inline-start" />
-            Open Learn App
-          </Button>
-        </form>
+        <a
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+          href={learnerWebExpeditionUrl(enrichmentId)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <CompassIcon data-icon="inline-start" />
+          Open Learner App
+        </a>
       </div>
-      {learnDoor === "no-target" ? (
-        <Alert className="mb-4">
-          <AlertTitle>No playable expedition</AlertTitle>
-          <AlertDescription>This enrichment does not have a target with ready study items.</AlertDescription>
-        </Alert>
-      ) : null}
       <DerivedGraphExplorer detail={detail} />
     </AdminShell>
   );

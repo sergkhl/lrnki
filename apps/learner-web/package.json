@@ -1,0 +1,43 @@
+{
+  "name": "@lrnki/learner-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "tsx --test \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "catalog:",
+    "@faker-js/faker": "catalog:",
+    "@lrnki/application": "workspace:*",
+    "@lrnki/domain-core": "workspace:*",
+    "@lrnki/learner-api": "workspace:*",
+    "@lrnki/ports": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "hono": "catalog:",
+    "lucide-react": "catalog:",
+    "motion": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "shadcn": "catalog:",
+    "tailwind-merge": "catalog:",
+    "tw-animate-css": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

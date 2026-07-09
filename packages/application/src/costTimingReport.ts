@@ -78,7 +78,7 @@ export async function costTimingReport(input: {
     if (!lineage) return undefined;
     refs = [
       ...lineage.extractionRunIds.map((operationId): OperationRef => ({ operationId, operationType: "extraction" })),
-      { operationId: lineage.graphVersionId, operationType: "minting" },
+      ...(lineage.graphVersionId ? [{ operationId: lineage.graphVersionId, operationType: "minting" } satisfies OperationRef] : []),
       { operationId: lineage.enrichmentId, operationType: "enrichment" },
       { operationId: lineage.enrichmentId, operationType: "study_items" }
     ];
@@ -104,7 +104,7 @@ export async function costTimingReport(input: {
 
   const costAvailable = spend !== null;
   const operations = details.map((detail) =>
-    buildOperationReport(detail, spend)
+    mergeOperationStageRows(detail, spend)
   );
   return {
     scope,
@@ -115,7 +115,7 @@ export async function costTimingReport(input: {
   };
 }
 
-function buildOperationReport(
+export function mergeOperationStageRows(
   detail: OperationTimelineDetail,
   spend: OperationStageSpend[] | null
 ): CostTimingOperationReport {

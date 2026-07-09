@@ -1,7 +1,31 @@
-import type { Learner, LearnerAward, LearnerAwardsStorePort, LearnerStorePort } from "@lrnki/ports";
+import type { Learner, LearnerAward, LearnerAwardsStorePort, LearnerSessionStorePort, LearnerStorePort } from "@lrnki/ports";
 import type { Sql } from "postgres";
 
 type JsonParam = Parameters<Sql["json"]>[0];
+
+// Bearer-session persistence (plan 2026-07-08-003, KTD3). Stores only token hashes;
+// `resolve` bumps `last_seen_at` in the same round trip.
+export class PostgresLearnerSessionStore implements LearnerSessionStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async create(input: { tokenHash: string; learnerRef: string }): Promise<void> {
+    await this.sql`
+      INSERT INTO learner_sessions (token_hash, learner_ref)
+      VALUES (${input.tokenHash}, ${input.learnerRef})`;
+  }
+
+  async resolve(tokenHash: string): Promise<{ learnerRef: string } | undefined> {
+    const rows = await this.sql<{ learner_ref: string }[]>`
+      UPDATE learner_sessions SET last_seen_at = now()
+      WHERE token_hash = ${tokenHash}
+      RETURNING learner_ref`;
+    return rows.length > 0 ? { learnerRef: rows[0].learner_ref } : undefined;
+  }
+
+  async revoke(tokenHash: string): Promise<void> {
+    await this.sql`DELETE FROM learner_sessions WHERE token_hash = ${tokenHash}`;
+  }
+}
 
 // Learner Registry persistence (plan 2026-07-07-005, R1/R2). `create` inserts the row
 // and reports whether it landed: `ON CONFLICT DO NOTHING` on the `learner_ref` primary
