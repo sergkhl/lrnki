@@ -450,30 +450,43 @@ export const matchingSchema: JsonSchema = toForcedToolSchema(matchingValidator);
 
 // --- Impostor generation: submit_impostor_item (U3, R3/R5/R6/R7) ----------
 // One four-statement auto-graded item per node: three TRUE statements (each cited by
-// passage id + quote, verified verbatim at the guard) and exactly ONE planted lie object.
-// The lie object is preferentially a true fact about one provided neighbor concept,
+// passage id + quote, verified verbatim at the guard) and exactly ONE planted lie.
+// The lie is preferentially a true fact about one provided neighbor concept,
 // rewritten as if it were about THIS node; when no clean neighbor lie exists, a freshly
-// minted plausible misconception. The wire schema deliberately stays shallow: real-use
-// regeneration showed deeper nested truth/lie objects caused many invalid-JSON tool calls
-// with the production generator. The adapter immediately binds these scalar lie fields into
-// the domain `lie` object, so the persisted contract still has one keyed lie source of truth.
+// minted plausible misconception. The wire schema is FULLY FLAT — numbered scalar truth
+// fields, no nested array, no nullable field. Measured 2026-07-10 against the production
+// extractor (MiMo v2.5): a nested `truths` array was intermittently emitted as a
+// stringified JSON blob, and a trailing nullable `siblingLabel` truncated generation right
+// before the literal `null` (0/8 usable); the flat non-nullable shape passed 10/10.
+// (Earlier real-use regeneration had already flattened the truth/lie OBJECTS for the same
+// invalid-JSON class on the prior generator.) The adapter immediately rebinds these scalar
+// fields into the domain truths array and `lie` object, so the persisted contract is
+// unchanged. `siblingLabel` uses the empty string when lieSource is 'generated'.
 // Domain-neutral rubric language only (AGENTS rule 17): the schema names no fixture and lists
 // no exemplars. The deterministic guard (U4) enforces structure; this schema only enforces
 // SHAPE fail-closed (rule 6) — lie validity is judged by the neural cross-family judge.
 
-const impostorTruth = z.object({
-  text: z.string().min(1).describe("One self-contained TRUE statement about the learning node, restating provided grounding."),
-  citationPassageId: z.string().min(1).describe("The exact passageId of the grounding passage this true statement restates."),
-  citationEvidenceQuote: z.string().min(1).describe("A substring copied from that grounding passage supporting this true statement. For source-grounded passages copy it verbatim.")
-}).strict();
+const impostorTruthFields = (ordinal: "first" | "second" | "third") => ({
+  text: z.string().min(1).describe(`The ${ordinal} of three self-contained TRUE statements about the learning node, restating provided grounding.`),
+  citationPassageId: z.string().min(1).describe(`The exact passageId of the grounding passage the ${ordinal} true statement restates.`),
+  citationEvidenceQuote: z.string().min(1).describe(`A substring copied from that grounding passage supporting the ${ordinal} true statement. For source-grounded passages copy it verbatim.`)
+});
 
 export const impostorValidator = z.object({
   question: z.string().min(1).describe("One self-contained prompt asking the learner to pick the false statement among the four. Do not reference 'the passage' or 'the source'."),
-  truths: z.array(impostorTruth).length(3).describe("Exactly three true statements about the learning node, each grounded in one provided passage."),
+  truth1Text: impostorTruthFields("first").text,
+  truth1PassageId: impostorTruthFields("first").citationPassageId,
+  truth1Quote: impostorTruthFields("first").citationEvidenceQuote,
+  truth2Text: impostorTruthFields("second").text,
+  truth2PassageId: impostorTruthFields("second").citationPassageId,
+  truth2Quote: impostorTruthFields("second").citationEvidenceQuote,
+  truth3Text: impostorTruthFields("third").text,
+  truth3PassageId: impostorTruthFields("third").citationPassageId,
+  truth3Quote: impostorTruthFields("third").citationEvidenceQuote,
   lieText: z.string().min(1).describe("The single planted lie: a statement that reads plausibly true of the learning node but is false for that node."),
   reveal: z.string().min(1).describe("Post-answer explanation naming why the lie is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
   lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighbor concept rewritten as if about this node. 'generated' when no clean neighbor lie existed and the lie is a freshly minted plausible misconception."),
-  siblingLabel: z.string().nullable().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; null when lieSource is 'generated'.")
+  siblingLabel: z.string().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; when lieSource is 'generated', the empty string.")
 }).strict();
 
 export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);

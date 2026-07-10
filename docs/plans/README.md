@@ -12,7 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-_None in flight._
+- [2026-07-10-003 — Learner interaction system and deferred native surfaces](./2026-07-10-003-feat-learner-interaction-system-plan.md)
+  — ready; unify every learner interaction behind an app-owned NativeWind UI boundary, restore the
+  deferred journal overlays, complete mastery motion, and gate web deployment on real Android use.
 
 ## Ownership rules
 

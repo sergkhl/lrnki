@@ -154,29 +154,32 @@ test("concept lesson validator accepts a section with and without a diagram desc
   }));
 });
 
-test("impostor schema binds three truths and scalar lie fields, and is registered", () => {
+test("impostor schema binds three flat truths and scalar lie fields, and is registered", () => {
   // Registration: membership keeps the impostor schema under the strict-invariant and
   // domain-neutral sweeps that iterate toolValidators (U3).
   assert.ok(toolValidators.includes(impostorValidator));
 
-  const truthsNode = (impostorSchema.properties as Record<string, { minItems?: number; maxItems?: number; items: { properties: Record<string, unknown> } }>).truths;
-  assert.equal(truthsNode.minItems, 3);
-  assert.equal(truthsNode.maxItems, 3);
-  assert.ok(truthsNode.items.properties.citationPassageId);
-  assert.ok(truthsNode.items.properties.citationEvidenceQuote);
+  // FULLY FLAT wire shape (measured 2026-07-10, see toolSchemas.ts): no nested array
+  // (stringified-blob failure) and no nullable field (trailing-null truncation).
   const properties = impostorSchema.properties as Record<string, Record<string, unknown>>;
+  for (const n of [1, 2, 3]) {
+    assert.equal(properties[`truth${n}Text`].type, "string");
+    assert.equal(properties[`truth${n}PassageId`].type, "string");
+    assert.equal(properties[`truth${n}Quote`].type, "string");
+  }
   assert.ok(properties.lieText);
   assert.ok(properties.reveal);
-  assert.deepEqual(properties.siblingLabel.type, ["string", "null"]);
+  assert.equal(properties.siblingLabel.type, "string");
 });
 
 test("impostorValidator rejects a non-closed lieSource enum", () => {
-  const truths = [
-    { text: "a", citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "b", citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "c", citationPassageId: "p", citationEvidenceQuote: "q" }
-  ];
-  assert.throws(() => impostorValidator.parse({ question: "Q?", truths, lieText: "d", reveal: "r", lieSource: "neighbor", siblingLabel: null }));
+  assert.throws(() => impostorValidator.parse({
+    question: "Q?",
+    truth1Text: "a", truth1PassageId: "p", truth1Quote: "q",
+    truth2Text: "b", truth2PassageId: "p", truth2Quote: "q",
+    truth3Text: "c", truth3PassageId: "p", truth3Quote: "q",
+    lieText: "d", reveal: "r", lieSource: "neighbor", siblingLabel: ""
+  }));
 });
 
 test("impostor lie-validity judgment schema is registered and fail-closed", () => {

@@ -100,10 +100,13 @@ export const studyImpostorGenerationDescriptor: NeuralStageDescriptor<
   mapResult: (args) => ({
     itemType: "impostor",
     question: args.question,
-    truths: args.truths.map((truth) => ({
-      text: truth.text,
-      citation: { passageId: truth.citationPassageId, evidenceQuote: truth.citationEvidenceQuote }
-    })) as ImpostorItemDraft["truths"],
+    // Rebind the flat wire fields (see the impostor schema note in toolSchemas.ts)
+    // into the domain truths array; the persisted contract is unchanged.
+    truths: [
+      { text: args.truth1Text, citation: { passageId: args.truth1PassageId, evidenceQuote: args.truth1Quote } },
+      { text: args.truth2Text, citation: { passageId: args.truth2PassageId, evidenceQuote: args.truth2Quote } },
+      { text: args.truth3Text, citation: { passageId: args.truth3PassageId, evidenceQuote: args.truth3Quote } }
+    ] as ImpostorItemDraft["truths"],
     lie: {
       text: args.lieText,
       reveal: args.reveal,

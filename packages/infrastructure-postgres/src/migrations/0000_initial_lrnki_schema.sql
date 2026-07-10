@@ -520,7 +520,7 @@ CREATE TABLE inferred_prerequisite_edges (
   confidence real NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
   uncertain boolean NOT NULL DEFAULT false,
   -- Which judge model ordered this pair (U4): the cross-family generated-node alias
-  -- for any pair touching an llm_grounded node, the validated DeepSeek alias otherwise.
+  -- for any pair touching an llm_grounded node, the validated extractor-family alias otherwise.
   judge_model text NOT NULL,
   provenance jsonb NOT NULL,
   UNIQUE (enrichment_id, prerequisite_derived_node_id, dependent_derived_node_id),

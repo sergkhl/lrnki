@@ -9,23 +9,30 @@
   ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
   at the leg-completion seam the duel's grade-only contract already proved.
 
-- **Native check via local development builds.** The universal-Expo cutover shipped on
-  web-only evidence (user decision 2026-07-10; the phone/Expo Go blocker was dropped). The
-  one-time EAS setup is done (2026-07-10: `eas init` + `EXPO_TOKEN` in `.env` and as the repo
-  secret): build the `preview` APK via `.github/workflows/build-learner-android.yml` (or
-  `pnpm build:android` on a machine with Java 17 + the Android SDK), sideload it, and run
-  the deferred native half on a real device against the live API — register, study a real
-  expedition (lesson + all three graded item types + verdict), read the leaderboard — plus the
-  ADR-0032 feel gate (screenshots of trail + crystals side-by-side with the web build,
-  evidence baseline `tmp/2026-07-09-learner-app-universal-expo/`).
-
-- **Re-port the remaining deferred learner surfaces to RN primitives.** Board/duel-unlock splashes
-  and the menu drawer — their pure logic already lives in `apps/learner-app` (ADR-0035 consequence).
-  The Crystal Vista and Crystal Duel shipped with plan 2026-07-10-001; the crystal growth/assembly
-  animations remain deferred (the vista's fusion celebration is a timed highlight, reduced-motion
-  safe, not programmatic motion).
+- **Unify learner interactions and finish deferred native surfaces.** Execute
+  [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md): app-owned
+  NativeWind primitives, full interaction migration, journal menu and splashes, mastery motion,
+  fresh production-expedition quality gate, post-change Android device pass, and web deployment.
 
 ## COMPLETED
+
+- **Production extraction moved to Xiaomi MiMo v2.5; DeepSeek fully retired (plan 2026-07-10-002).**
+  The six extraction aliases (`default-model`, `kg-concept-discovery`, `kg-concept-admission`,
+  `kg-claim-extraction`, `kg-concept-synthesis`, `kg-domain-inference`) now route to
+  `openrouter/xiaomi/mimo-v2.5` (single-host provider pin for prefix-cache reuse,
+  `reasoning.enabled: false`); all five DeepSeek deployments and the `DEEPSEEK_API_KEY` env
+  plumbing are deleted, and AGENTS rule 5 names MiMo with the `model_group_alias` block as the
+  source of truth. Config hashes proved alias-stable across the cutover (extraction
+  `source-extraction-756879d1dc76` and enrichment `graph-enrichment-1886ba82e2e5` byte-identical
+  to pre-switch runs — no regeneration churn). One MiMo defect found and fixed in the same
+  change: its constrained tool decoder intermittently stringifies nested array-of-object
+  arguments and truncates before a trailing literal `null`, which rejected 31/31 impostor
+  items; the impostor wire schema is now fully flat (numbered scalar truth fields,
+  non-nullable empty-string `siblingLabel`), adapter rebinds to the unchanged domain draft
+  (10/10 repro, 28/31 real bank; `studyItemBankConfigHash` moved mechanically). Rule-14 gate
+  PASS on the Rust-ownership fixture end-to-end (extraction → build → 31-node enrichment →
+  81-item bank) with spend attributed to MiMo. Evidence:
+  `tmp/2026-07-10-extraction-model-switch-mimo/`.
 
 - **Learner goal gradient, constructive Crystal Vista, and duel arena shipped (plan 2026-07-10-001).**
   Advance-visible goal hierarchy — layer-purpose Neural Stage Descriptor (`layer-purpose-generation`

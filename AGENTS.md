@@ -29,7 +29,9 @@ definitions and repair their references in the same change.
 4. Prioritize real curated source fixtures across mixed domains and formats.
 
 5. Route LLM calls through LiteLLM aliases and the owning ports. Production extraction uses
-   DeepSeek V4 Flash with thinking disabled unless an experiment states otherwise.
+   Xiaomi MiMo v2.5 with reasoning disabled unless an experiment states otherwise; the
+   alias → deployment mapping in `litellm/config.yaml` (`router_settings.model_group_alias`)
+   is the source of truth.
 
 6. Enforce [ADR-0006](docs/adr/0006-use-forced-named-tool-schemas.md).
 

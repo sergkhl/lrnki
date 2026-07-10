@@ -75,11 +75,9 @@ test("generateImpostor assembles a draft: three cited truths + one generated imp
       calls.push(input);
       return {
         question: "Which statement about the Heap is false?",
-        truths: [
-          { text: "The heap allocates at runtime.", citationPassageId: "b1", citationEvidenceQuote: "the heap allocates at runtime" },
-          { text: "The heap stores dynamically sized data.", citationPassageId: "b1", citationEvidenceQuote: "the heap allocates" },
-          { text: "The heap holds long-lived allocations.", citationPassageId: "b1", citationEvidenceQuote: "at runtime" }
-        ],
+        truth1Text: "The heap allocates at runtime.", truth1PassageId: "b1", truth1Quote: "the heap allocates at runtime",
+        truth2Text: "The heap stores dynamically sized data.", truth2PassageId: "b1", truth2Quote: "the heap allocates",
+        truth3Text: "The heap holds long-lived allocations.", truth3PassageId: "b1", truth3Quote: "at runtime",
         lieText: "The heap is a LIFO region for call frames.",
         reveal: "The LIFO statement is false; that is actually true of the Stack.",
         lieSource: "sibling",
@@ -116,15 +114,13 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
     async call() {
       return {
         question: "Which is false?",
-        truths: [
-          { text: "t1", citationPassageId: "p0", citationEvidenceQuote: "tracks which binding frees a value" },
-          { text: "t2", citationPassageId: "p0", citationEvidenceQuote: "tracks which binding" },
-          { text: "t3", citationPassageId: "p0", citationEvidenceQuote: "frees a value" }
-        ],
+        truth1Text: "t1", truth1PassageId: "p0", truth1Quote: "tracks which binding frees a value",
+        truth2Text: "t2", truth2PassageId: "p0", truth2Quote: "tracks which binding",
+        truth3Text: "t3", truth3PassageId: "p0", truth3Quote: "frees a value",
         lieText: "a fresh misconception",
         reveal: "The fourth is invented and false.",
         lieSource: "generated",
-        siblingLabel: null
+        siblingLabel: ""
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -140,21 +136,23 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
   assert.equal(draft.lie.siblingLabel, undefined);
 });
 
-test("impostorValidator rejects the wrong truth count (fail-closed, rule 6)", () => {
-  const two = [
-    { text: "a", citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "b", citationPassageId: "p", citationEvidenceQuote: "q" }
-  ];
-  assert.throws(() => impostorValidator.parse({ question: "Q?", truths: two, lieText: "c", reveal: "r", lieSource: "generated", siblingLabel: null }));
+test("impostorValidator rejects a missing third truth (fail-closed, rule 6)", () => {
+  assert.throws(() => impostorValidator.parse({
+    question: "Q?",
+    truth1Text: "a", truth1PassageId: "p", truth1Quote: "q",
+    truth2Text: "b", truth2PassageId: "p", truth2Quote: "q",
+    lieText: "c", reveal: "r", lieSource: "generated", siblingLabel: ""
+  }));
 });
 
 test("impostorValidator rejects arguments missing reveal", () => {
-  const truths = [
-    { text: "a", citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "b", citationPassageId: "p", citationEvidenceQuote: "q" },
-    { text: "c", citationPassageId: "p", citationEvidenceQuote: "q" }
-  ];
-  assert.throws(() => impostorValidator.parse({ question: "Q?", truths, lieText: "d", lieSource: "generated", siblingLabel: null }));
+  assert.throws(() => impostorValidator.parse({
+    question: "Q?",
+    truth1Text: "a", truth1PassageId: "p", truth1Quote: "q",
+    truth2Text: "b", truth2PassageId: "p", truth2Quote: "q",
+    truth3Text: "c", truth3PassageId: "p", truth3Quote: "q",
+    lieText: "d", lieSource: "generated", siblingLabel: ""
+  }));
 });
 
 test("optionSelectValidator rejects arguments missing correctAnswer", () => {

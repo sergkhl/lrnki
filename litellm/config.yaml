@@ -77,52 +77,6 @@ model_list:
       # max_tokens: 8192
 
 
-  # DeepSeek platform (first-party) models. Credits live (verified 2026-06-25).
-  # Preferred for extraction: native per-account automatic prefix caching (cache-read
-  # ~$0.003/Mtok) reuses the repeated document prefix across admission batches, which the
-  # per-host OpenRouter cache could not (see model_group_alias note below).
-  # Registered for manual experiments only. Do not alias production learner-generation
-  # traffic here while the output price is above the $0.50/M cap.
-  - model_name: "deepseek/deepseek-v4-pro"
-    litellm_params:
-      model: deepseek/deepseek-v4-pro
-      api_key: os.environ/DEEPSEEK_API_KEY
-      input_cost_per_token: 0.000000435
-      output_cost_per_token: 0.00000087
-      # max_tokens: 8192
-      # # Options: "high" (default) or "max"
-      # reasoning_effort: "max"
-      # # Alternatively, use extra_body for explicit toggle configurations
-      # extra_body:
-      #   thinking:
-      #     type: "enabled" # Set to "disabled" to turn off thinking entirely
-    model_info:
-      max_input_tokens: 1048576
-      max_output_tokens: 393216
-
-  - model_name: "deepseek/deepseek-v4-flash"
-    litellm_params:
-      model: deepseek/deepseek-v4-flash
-      api_key: os.environ/DEEPSEEK_API_KEY
-      # max_tokens: 8192
-    model_info:
-      max_input_tokens: 1048576
-      max_output_tokens: 393216
-
-  # Same provider model with thinking disabled (required for forced tool_choice in span extraction).
-  - model_name: "deepseek/deepseek-v4-flash-no-thinking"
-    litellm_params:
-      model: deepseek/deepseek-v4-flash
-      api_key: os.environ/DEEPSEEK_API_KEY
-      input_cost_per_token: 0.00000014
-      output_cost_per_token: 0.00000028
-      extra_body:
-        thinking:
-          type: "disabled"
-    model_info:
-      max_input_tokens: 1048576
-      max_output_tokens: 393216
-
   # Mistral Models
   - model_name: "mistral/mistral-small-2603"
     litellm_params:
@@ -154,47 +108,8 @@ model_list:
       input_cost_per_token: 0.0000003
       output_cost_per_token: 0.0000012
 
-  # NOTE: openrouter flash
-  # OpenRouter exposes its own unified `reasoning` knob; the Anthropic-style
-  # `thinking.type: disabled` passes through unrecognised and the upstream keeps
-  # reasoning (verified 2026-06-25: reasoning_tokens stayed >0). `reasoning.enabled:
-  # false` is the param that actually suppresses it (reasoning_tokens -> 0), which
-  # both honours rule 5 (production extraction = flash, thinking off) and removes the
-  # long-reasoning latency outliers. `reasoning.exclude` only hides the text — wrong knob.
-  - model_name: "openrouter/deepseek/deepseek-v4-flash-no-thinking"
-    litellm_params:
-      model: "openrouter/deepseek/deepseek-v4-flash"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.00000009
-      output_cost_per_token: 0.00000018
-      extra_body:
-        reasoning:
-          enabled: false
-        # Provider pinning for prefix-cache reuse was tested 2026-06-25 and PARKED: the shared
-        # OpenRouter key cannot sustain a hard single-host pin for this workload (the 23k-token
-        # discovery/admission calls 429 or time out on the pinned host). Reliable cross-call
-        # caching needs a dedicated/BYOK OpenRouter key — see docs/plans/BLOCKERS.md. When that
-        # lands, re-pin a cache-capable host (Wafer fp4 cheapest at $0.09/$0.18, cache-read $0.02;
-        # or DeepSeek first-party, cache-read $0.003) with allow_fallbacks:false and re-apply the
-        # admission prompt reorder (document-first) so the document sits in the cached prefix.
-    model_info:
-      max_input_tokens: 1048576
-      max_output_tokens: 393216
-
-  # Registered for manual experiments only. Do not alias production learner-generation
-  # traffic here while the output price is above the $0.50/M cap.
-  - model_name: "openrouter/deepseek/deepseek-v4-pro"
-    litellm_params:
-      model: "openrouter/deepseek/deepseek-v4-pro"
-      api_key: os.environ/OPENROUTER_API_KEY
-      input_cost_per_token: 0.000000435
-      output_cost_per_token: 0.00000087
-    model_info:
-      max_input_tokens: 1048576
-      max_output_tokens: 393216
-
   # Independent production judge (kg-independent-judge, ADR-0007/0005). gpt-oss-120b
-  # is cross-family independent of the DeepSeek extractor, forced tool_choice works,
+  # is cross-family independent of the MiMo extractor, forced tool_choice works,
   # and it is the cheapest option ($0.039/$0.18 per Mtok). Replaces Mistral Small (free-tier rate-limited).
   - model_name: "openrouter/openai/gpt-oss-120b"
     litellm_params:
@@ -213,7 +128,11 @@ model_list:
             - "google-vertex"
             - "google-ai-studio"
 
-  # forced tool call is available, alternative to deepseek-v4-flash
+  # Production extractor (AGENTS rule 5). Forced tool_choice verified across all six
+  # extraction roles 2026-07-10. `reasoning.enabled: false` is required: with reasoning
+  # on, MiMo double-encodes nested array-of-object tool arguments (emits them as a JSON
+  # string and swallows trailing fields inside it), which consistently broke the
+  # impostor item's `truths` array (same knob DeepSeek needed, different symptom).
   - model_name: "openrouter/xiaomi/mimo-v2.5"
     litellm_params:
       model: "openrouter/xiaomi/mimo-v2.5"
@@ -222,6 +141,8 @@ model_list:
       output_cost_per_token: 0.00000028
       cache_read_input_token_cost: 0.0000000028
       extra_body:
+        reasoning:
+          enabled: false
         provider:
           only:
             - "xiaomi"
@@ -309,7 +230,7 @@ model_list:
   # llama-4-scout honors forced tool_choice ONLY via Groq on OpenRouter, and a sustained
   # Groq 429 stalls K=5 generation (real outage 2026-07-06). Qwen3-30B-A3B is a small MoE
   # (~3B active — preserves the "small model K-dispersion reveals the boundary" design),
-  # cross-family from the DeepSeek synthesizer (KTD4 independence holds), and is reliably
+  # cross-family from the MiMo synthesizer (KTD4 independence holds), and is reliably
   # served with forced tool_choice by non-Groq providers (measured 4/4 via StreamLake).
   # Engaged only when the primary probe deployment fails.
   - model_name: "openrouter/qwen/qwen3-30b-a3b-instruct-2507"
@@ -380,35 +301,34 @@ router_settings:
   #   temperature: 0.5
 
   model_group_alias:
-    # Extraction routes to DeepSeek FIRST-PARTY (not OpenRouter). OpenRouter
-    # load-balances each request across upstream hosts and DeepSeek's prefix cache
-    # is per-host, so the ~23k-token document re-sent on every admission batch never
-    # warmed (measured cache ~0.7%); pinning one host needed a dedicated key the
-    # shared OpenRouter key could not sustain (429/timeout). DeepSeek first-party
-    # caches per-ACCOUNT and automatically: verified 2026-06-25 a repeated prefix hit
-    # 2432/2507 cached tokens on the second call (cache-read ~$0.003/Mtok). This
-    # resolves the prefix-cache reuse blocker without host pinning (see ADR / BLOCKERS history).
-    default-model: deepseek/deepseek-v4-flash-no-thinking
-    kg-concept-discovery: deepseek/deepseek-v4-flash-no-thinking
-    kg-concept-admission: deepseek/deepseek-v4-flash-no-thinking
-    kg-claim-extraction: deepseek/deepseek-v4-flash-no-thinking
+    # Extraction routes to Xiaomi MiMo v2.5 via OpenRouter, provider-pinned to the
+    # single xiaomi host (provider.only + allow_fallbacks: false on the deployment).
+    # The pin matters for prefix caching: OpenRouter load-balancing spreads requests
+    # across upstream hosts whose prefix caches are per-host, so the ~23k-token
+    # document re-sent on every admission batch never warms under load balancing.
+    # A single pinned host CAN warm it (cache_read_input_token_cost is set on the
+    # deployment). Trade-off: no failover — a xiaomi-host outage stalls extraction.
+    default-model: openrouter/xiaomi/mimo-v2.5
+    kg-concept-discovery: openrouter/xiaomi/mimo-v2.5
+    kg-concept-admission: openrouter/xiaomi/mimo-v2.5
+    kg-claim-extraction: openrouter/xiaomi/mimo-v2.5
     # Synthetic topic generation, second pipeline arm (ADR-0019 amended, plan
     # 2026-06-30-001). Concept-set synthesis is the source-less analog of Candidate
-    # Discovery, so it stays on the DeepSeek extractor family (AGENTS rule 5). The
+    # Discovery, so it stays on the production extractor family (AGENTS rule 5). The
     # knowledge-boundary probe is a SMALL cross-family alias (llama-4-scout, Meta MoE
-    # ~17B active) independent of the DeepSeek synthesizer (KTD4): the K-sampled
+    # ~17B active) independent of the MiMo synthesizer (KTD4): the K-sampled
     # dispersion of a small model exposes its knowledge boundary. Forced tool_choice on
     # the probe alias is empirically verified before locking (U2 verification); its
     # moderate probe temperature is set on the client the worker constructs, not here.
     # Reliability: this deployment honors forced tool_choice only via Groq on OpenRouter,
     # so router_settings.fallbacks routes to a small cross-family Qwen3-30B-A3B deployment
     # when a sustained Groq 429 would otherwise stall generation.
-    kg-concept-synthesis: deepseek/deepseek-v4-flash-no-thinking
+    kg-concept-synthesis: openrouter/xiaomi/mimo-v2.5
     kg-knowledge-boundary-probe: openrouter/meta-llama/llama-4-scout
     # Learner generation helper: infer a Declared Domain from the learner's
-    # topic inside source-less concept generation. Production
-    # extraction stays on DeepSeek V4 Flash with thinking disabled (AGENTS rule 5).
-    kg-domain-inference: deepseek/deepseek-v4-flash-no-thinking
+    # topic inside source-less concept generation. Stays on the production
+    # extractor (AGENTS rule 5).
+    kg-domain-inference: openrouter/xiaomi/mimo-v2.5
     # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
     # U2/U5): ONE ordering call per Declared Domain returns the directed prerequisite
     # DAG over the deduplicated node set. Backed by gpt-oss-120b (reasoning-grade,
@@ -422,7 +342,7 @@ router_settings:
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
     # Independent production judge (ADR-0007/0005): the concept-vs-proposition
     # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
-    # cross-family independent of the DeepSeek extractor, supports forced
+    # cross-family independent of the MiMo extractor, supports forced
     # tool_choice, and is cheap ($0.039/$0.18 per Mtok), so the judge is never the
     # extractor grading its own output. (The off-core oracle triangle and label
     # aligner were retired after the admission-precision fix; see ADR-0013.)
