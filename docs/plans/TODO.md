@@ -3,9 +3,10 @@
 ## TODO
 
 - **Native check via local development builds.** The universal-Expo cutover shipped on
-  web-only evidence (user decision 2026-07-10; the phone/Expo Go blocker was dropped). Once
-  the [Android build setup blocker](./BLOCKERS.md) is cleared: build the `preview` APK via
-  `.github/workflows/build-learner-android.yml` (or the local fallback), sideload it, and run
+  web-only evidence (user decision 2026-07-10; the phone/Expo Go blocker was dropped). The
+  one-time EAS setup is done (2026-07-10: `eas init` + `EXPO_TOKEN` in `.env` and as the repo
+  secret): build the `preview` APK via `.github/workflows/build-learner-android.yml` (or
+  `pnpm build:android` on a machine with Java 17 + the Android SDK), sideload it, and run
   the deferred native half on a real device against the live API — register, study a real
   expedition (lesson + all three graded item types + verdict), read the leaderboard — plus the
   ADR-0032 feel gate (screenshots of trail + crystals side-by-side with the web build,

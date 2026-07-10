@@ -1,7 +1,7 @@
 # Android APK for the learner app, built ON the GitHub runner (`eas build --local` — no EAS
 # build credits, ubuntu runners ship Java + the Android SDK) and uploaded as a workflow
-# artifact to download and sideload. Needs the one-time setup in docs/plans/BLOCKERS.md:
-# `eas init` (extra.eas.projectId in app.json) and the EXPO_TOKEN repo secret.
+# artifact to download and sideload. Auth is the EXPO_TOKEN repo secret; the EAS project
+# identity lives in apps/learner-app/app.json (extra.eas.projectId).
 name: Build learner Android APK
 
 on:
@@ -40,16 +40,13 @@ jobs:
       - run: pnpm --filter @lrnki/learner-app test
 
       # The preview profile is a standalone APK against the live API (ADR-0036 in-code
-      # default); the development profile needs `expo start` as its dev server.
+      # default); the development profile needs `expo start` as its dev server. The script
+      # is the canonical invocation (also `pnpm build:android` locally); with no .env on
+      # the runner it reads EXPO_TOKEN from the step environment.
       - name: Build APK locally on the runner
-        working-directory: apps/learner-app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: >
-          npx eas-cli build --platform android
-          --profile ${{ inputs.profile }}
-          --local --non-interactive
-          --output ./lrnki-learner-${{ inputs.profile }}.apk
+        run: scripts/build-learner-android.sh ${{ inputs.profile }}
 
       - uses: actions/upload-artifact@v4
         with:

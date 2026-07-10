@@ -13,6 +13,8 @@
     "dev:api": "pnpm --filter @lrnki/learner-api dev",
     "dev:learner": "pnpm --filter @lrnki/learner-app dev",
     "build": "pnpm --filter @lrnki/admin-lab build && pnpm --filter @lrnki/learner-app export:web",
+    "build:android": "scripts/build-learner-android.sh",
+    "build:android:dev": "scripts/build-learner-android.sh development",
     "start": "pnpm --filter @lrnki/admin-lab start",
     "lint": "eslint .",
     "test": "pnpm -r --sort --if-present run test",

@@ -94,15 +94,16 @@ in repo settings afterward and Pages 301s the default URL to it. Once the custom
 provisioned, enable **Enforce HTTPS** in Pages settings so plain-HTTP requests 301 to HTTPS.
 
 **Mobile builds (Android)** — `.github/workflows/build-learner-android.yml`
-(`workflow_dispatch`) runs `eas build --platform android --local` on a GitHub runner and uploads
-the APK as a workflow artifact; download and sideload it. Profiles come from
-`apps/learner-app/eas.json`: `preview` (default; standalone APK against the live API) and
-`development` (dev client for `expo start`). One-time setup: `eas init` (writes
-`extra.eas.projectId` to `app.json`) and an `EXPO_TOKEN` repo secret. Local fallback on a
-machine with Java 17 + the Android SDK:
+(`workflow_dispatch`) runs `scripts/build-learner-android.sh` on a GitHub runner (`eas build
+--local`, authenticated by the `EXPO_TOKEN` repo secret) and uploads the APK as a workflow
+artifact; download and sideload it. Profiles come from `apps/learner-app/eas.json`: `preview`
+(default; standalone APK against the live API) and `development` (dev client for `expo start`).
+Local fallback on a machine with Java 17 + the Android SDK (`EXPO_TOKEN` is read from the
+repo-root `.env`, else the environment):
 
 ```bash
-cd apps/learner-app && npx eas build --platform android --profile preview --local
+pnpm build:android       # preview profile
+pnpm build:android:dev   # development profile
 ```
 
 iOS local builds require macOS + Xcode — future work.
