@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
-- None.
+- [2026-07-10-001 — Learner goal gradient, constructive Crystal Vista, and duel arena](./2026-07-10-001-learner-goal-gradient.md)
 
 ## Ownership rules
 

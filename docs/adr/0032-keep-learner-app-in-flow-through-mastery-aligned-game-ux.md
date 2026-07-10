@@ -59,6 +59,13 @@ beat and then continue to the next available stop, or return to the trail only w
 has no next stop. Every learner-facing count (progress, gems) derives from the same trail scope the
 projection walks, so counts never drift from the trail.
 
+Achievement sharing is an accepted future need: a learner should eventually be able to export an
+achievement — at minimum their Crystal Vista formation — as a picture fit for posting outside the app
+(for example to Instagram). Achievement surfaces therefore keep their visual composition
+self-contained: meaningful as a static image, not only through interaction. A share export carries
+only the learner's own progress imagery and themed copy, and sharing celebrates mastery without
+becoming a parallel objective.
+
 Mechanics stay mobile-first in their interaction model. Matching uses **two-column tap-pairs** —
 clue tiles on the left, match tiles on the right, each column independently shuffled — with wrapping
 tiles so long generated text stays readable on phone viewports; the grading trace and server-side

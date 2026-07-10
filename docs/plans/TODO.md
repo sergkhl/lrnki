@@ -2,6 +2,13 @@
 
 ## TODO
 
+- **Learner goal gradient, constructive Crystal Vista, and duel arena.**
+  [Plan 2026-07-10-001](./2026-07-10-001-learner-goal-gradient.md) (ready): advance-visible goal
+  hierarchy (layer purpose, leg banners, summit push, trail terminus), leg-cluster vista with fusion
+  celebrations and the memory door, and the duel arena re-port — gated by a measure-first flow
+  evaluation. Framing:
+  [2026-07-10 brainstorm](../brainstorms/2026-07-10-learner-goal-gradient-requirements.md).
+
 - **Native check via local development builds.** The universal-Expo cutover shipped on
   web-only evidence (user decision 2026-07-10; the phone/Expo Go blocker was dropped). The
   one-time EAS setup is done (2026-07-10: `eas init` + `EXPO_TOKEN` in `.env` and as the repo
@@ -12,9 +19,10 @@
   ADR-0032 feel gate (screenshots of trail + crystals side-by-side with the web build,
   evidence baseline `tmp/2026-07-09-learner-app-universal-expo/`).
 
-- **Re-port the deferred learner surfaces to RN primitives.** Crystal Duel, board/duel-unlock
-  splashes, Crystal Vista, the menu drawer, and crystal growth/assembly animations (Reanimated)
-  — their pure logic already lives in `apps/learner-app` (ADR-0035 consequence).
+- **Re-port the remaining deferred learner surfaces to RN primitives.** Board/duel-unlock splashes
+  and the menu drawer — their pure logic already lives in `apps/learner-app` (ADR-0035 consequence).
+  Crystal Vista, Crystal Duel, and the crystal growth/assembly animations moved to
+  [plan 2026-07-10-001](./2026-07-10-001-learner-goal-gradient.md).
 
 ## COMPLETED
 
@@ -255,7 +263,9 @@
   mastered activity segments, skipped-known ghost crystals, section-divider and overview strips, and
   mastery reveal animation. The Crystal Vista gives a view-only bedrock-up formation for the
   expedition and opens from the header tally or section-completion celebration. Accepted framing:
-  [2026-07-06 brainstorm](../brainstorms/2026-07-06-growing-crystals-and-vista-requirements.md).
+  the 2026-07-06 growing-crystals brainstorm (completed and deleted; its view-only-vista clause is
+  superseded by the
+  [2026-07-10 brainstorm](../brainstorms/2026-07-10-learner-goal-gradient-requirements.md)).
   Decision: [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Learner App UX polish pass.** The learner entry and expedition flow now use static `/learn` and
