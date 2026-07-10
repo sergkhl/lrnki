@@ -534,7 +534,16 @@ export const conceptLessonValidator = z.object({
 
 export const conceptLessonSchema: JsonSchema = toForcedToolSchema(conceptLessonValidator);
 
+// --- Layer purpose: submit_layer_purpose ------------------------------------
+
+export const layerPurposeValidator = z.object({
+  purpose: z.string().min(1).describe("1-2 plain sentences stating what mastering this layer's concepts together enables a learner to do or understand. Under 240 characters. Plain register — no game or journey metaphors.")
+}).strict();
+
+export const layerPurposeSchema: JsonSchema = toForcedToolSchema(layerPurposeValidator);
+
 export const toolValidators = [
+  layerPurposeValidator,
   conceptDiscoveryValidator,
   conceptAdmissionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),

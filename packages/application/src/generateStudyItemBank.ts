@@ -15,9 +15,11 @@ import type {
   ConceptLessonGenerationPort,
   ConceptLessonRedundancyJudgmentPort,
   ConceptLessonStorePort,
+  EnrichmentLayerPurposeStorePort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
   ImpostorLieValidityJudgmentPort,
+  LayerPurposeGenerationPort,
   RunProgressReporterPort,
   StudyItemBlueprintPort,
   StudyItemBankStorePort,
@@ -73,6 +75,12 @@ export async function generateStudyItemBank(input: {
   enrichmentStore: EnrichmentRunStorePort;
   conceptLessonGeneration: ConceptLessonGenerationPort;
   conceptLessonRedundancyJudge?: ConceptLessonRedundancyJudgmentPort;
+  // Layer-purpose generation (plan 2026-07-10-001 U1): one call per bank producing the
+  // enrichment's plain-register capability statement. Both optional so existing callers
+  // compose an unchanged bank; absent either, the stage is skipped and surfaces fall back
+  // to the mechanical template.
+  layerPurposeGeneration?: LayerPurposeGenerationPort;
+  layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   studyItemBlueprint?: StudyItemBlueprintPort;
   impostorLieValidityJudge: ImpostorLieValidityJudgmentPort;
   conceptLessonStore: ConceptLessonStorePort;
@@ -111,6 +119,26 @@ export async function generateStudyItemBank(input: {
       if (!snapshot) throw new Error(`generateStudyItemBank: graph version ${graphVersionId} is not published.`);
       return { layer, graphVersionId, snapshot };
   });
+
+  // --- Layer-purpose stage (plan 2026-07-10-001 U1) ------------------------------
+  // One call per bank; a failure closes the stage ok:false (operator-visible outcome via
+  // the bracket's error detail) and writes no row, but NEVER fails the bank — every
+  // surface renders the mechanical template for an enrichment without a purpose row.
+  if (input.layerPurposeGeneration && input.layerPurposeStore) {
+    const purposeGeneration = input.layerPurposeGeneration;
+    const purposeStore = input.layerPurposeStore;
+    try {
+      await studyStage(STAGE_TAGS.layerPurposeGeneration, async () => {
+        const purpose = await purposeGeneration.generate({
+          declaredDomain: layer.derivedNodes[0]?.declaredDomain ?? "",
+          conceptLabels: layer.derivedNodes.map((node) => node.canonicalLabel)
+        });
+        await purposeStore.persist({ enrichmentId: layer.enrichmentId, purpose });
+      });
+    } catch {
+      // Stage outcome already recorded by the bracket; the bank continues purpose-less.
+    }
+  }
 
   const profileByConcept = new Map(snapshot.evidenceProfiles.map((profile) => [profile.conceptId, profile] as const));
   const studyItems: StudyItem[] = [];

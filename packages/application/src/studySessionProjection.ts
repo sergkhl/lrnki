@@ -285,6 +285,10 @@ export type StudySession = {
   // The DERIVED summit — the last section's milestone (ADR-0032). No longer a learner-chosen
   // target; the whole floored layer is the trail. `derivedNodeId` is empty on an empty layer.
   target: { derivedNodeId: string; label: string };
+  // The enrichment's plain-register capability statement (plan 2026-07-10-001 U1), themed
+  // only at render (ADR-0033). Null when no purpose row exists — surfaces render the
+  // mechanical template (fail-open).
+  layerPurpose: string | null;
   // How many study items this enrichment carries. 0 means a dead-end session — the surface
   // renders a remedy rather than dropping the learner into a cardless graph.
   studyItemCount: number;
@@ -351,6 +355,7 @@ export function composeStudySession(input: {
   lessons?: ConceptLesson[];
   lessonReads?: string[];
   lessonAbsent?: LessonAbsentNode[];
+  layerPurpose?: string | null;
 }): StudySession {
   const { detail } = input;
 
@@ -492,6 +497,7 @@ export function composeStudySession(input: {
     enrichmentId: input.enrichmentId,
     learnerStateRef: input.learnerStateRef,
     target: expedition.summit ?? { derivedNodeId: "", label: "" },
+    layerPurpose: input.layerPurpose ?? null,
     studyItemCount: input.studyItems.length,
     detail,
     classification,

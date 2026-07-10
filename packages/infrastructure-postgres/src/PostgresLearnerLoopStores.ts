@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ArtifactEnvelope, CalibrationVerdict, ConceptLesson, ConceptLessonSection, ImpostorItem, ImpostorStatement, LessonAbsentNode, MatchingItem, MatchingPair, NewResponseLogRow, RejectedStudyItem, ResponseLogRow, StudyItem, StudyItemCitation, StudyItemOption, StudyItemType } from "@lrnki/domain-core";
-import type { CalibrationVerdictStorePort, ConceptLessonStorePort, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { CalibrationVerdictStorePort, ConceptLessonStorePort, EnrichmentLayerPurposeStorePort, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 import { writeArtifactEnvelope } from "./PostgresArtifactRepository";
 
@@ -407,6 +407,25 @@ const CONCEPT_LESSON_PRODUCER_VERSION = "0.1.0";
 // relational state without its artifact (mirrors PostgresStudyItemBankStore). Lessons are
 // a learner-NEUTRAL derived asset: regeneration is replace-by-enrichment (delete-then-
 // insert), never a mutation of learner state and never a write to the asserted graph (R9).
+// Layer-purpose persistence (plan 2026-07-10-001 U1): one plain-register row per
+// enrichment; regeneration upserts, absence is the fail-open template state.
+export class PostgresEnrichmentLayerPurposeStore implements EnrichmentLayerPurposeStorePort {
+  constructor(private readonly sql: Sql) {}
+
+  async persist(input: { enrichmentId: string; purpose: string }): Promise<void> {
+    await this.sql`
+      INSERT INTO enrichment_layer_purposes (enrichment_id, purpose)
+      VALUES (${input.enrichmentId}, ${input.purpose})
+      ON CONFLICT (enrichment_id) DO UPDATE SET purpose = EXCLUDED.purpose, created_at = now()`;
+  }
+
+  async get(enrichmentId: string): Promise<string | undefined> {
+    const rows = await this.sql<{ purpose: string }[]>`
+      SELECT purpose FROM enrichment_layer_purposes WHERE enrichment_id = ${enrichmentId}`;
+    return rows[0]?.purpose;
+  }
+}
+
 export class PostgresConceptLessonStore implements ConceptLessonStorePort {
   constructor(private readonly sql: Sql) {}
 

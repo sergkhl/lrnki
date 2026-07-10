@@ -154,6 +154,7 @@ function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; lates
   return {
     enrichmentId: "e1",
     learnerStateRef: "learner",
+    layerPurpose: null,
     target: { derivedNodeId: "n1", label: "Ownership" },
     studyItemCount: 2,
     flooredNodeIds: [],

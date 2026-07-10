@@ -74,6 +74,10 @@ export {
   conceptLessonGenerationDescriptor
 } from "./conceptLessonGenerationAdapters";
 export {
+  createLayerPurposeGenerationPort,
+  layerPurposeGenerationDescriptor
+} from "./layerPurposeGenerationAdapters";
+export {
   createConceptLessonRedundancyJudgmentPort,
   conceptLessonRedundancyJudgmentDescriptor
 } from "./conceptLessonRedundancyAdapters";

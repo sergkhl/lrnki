@@ -14,6 +14,13 @@ export type CrystalFormationNode = {
   growthFraction: number;
   sectionIndex: number;
   isKnownSkipped: boolean;
+  // Memory-door payload (plan 2026-07-10-001 U3): the lesson gist shown on a revealed
+  // crystal's card; null when the node has no lesson.
+  gist: string | null;
+  // Announced-goal flags (design decision 3): a milestone or summit crystal stays
+  // nameable even in fog — it IS the announced goal.
+  isMilestone: boolean;
+  isSummit: boolean;
 };
 
 export type CrystalFormation = {
@@ -44,6 +51,7 @@ const MARGIN_BOTTOM = 40;
 // growth here can never drift from its trail capstone (one completion rule).
 export function buildCrystalFormation(session: StudySession, trail: TrailView): CrystalFormation {
   const domainByNode = new Map(session.detail.nodes.map((node) => [node.derivedNodeId, node.declaredDomain] as const));
+  const stepByNode = new Map(session.expeditionPath.map((step) => [step.derivedNodeId, step] as const));
   const onTrail = new Set(trail.concepts.map((concept) => concept.derivedNodeId));
   return {
     title: session.target.label,
@@ -55,7 +63,10 @@ export function buildCrystalFormation(session: StudySession, trail: TrailView): 
       state: concept.isKnownSkipped ? "locked" : concept.state,
       growthFraction: concept.isKnownSkipped ? 0 : concept.growthFraction,
       sectionIndex: concept.sectionIndex,
-      isKnownSkipped: concept.isKnownSkipped
+      isKnownSkipped: concept.isKnownSkipped,
+      gist: lessonGist(session, concept.derivedNodeId),
+      isMilestone: stepByNode.get(concept.derivedNodeId)?.isMilestone ?? false,
+      isSummit: stepByNode.get(concept.derivedNodeId)?.isSummit ?? false
     })),
     edges: session.detail.edges
       .filter((edge) => onTrail.has(edge.prerequisiteDerivedNodeId) && onTrail.has(edge.dependentDerivedNodeId))
@@ -107,32 +118,42 @@ export function placeFormation(formation: CrystalFormation): PlacedFormation {
   };
 }
 
-// Tap-to-name (task 8): mastered crystals and known-ghosts answer "which concept is
-// that?"; fogged/frontier crystals stay unnamed mystery shapes. View-only holds
-// (ADR-0032) — naming navigates nowhere.
-export function isNameableCrystal(crystal: Pick<CrystalFormationNode, "state" | "isKnownSkipped">): boolean {
-  return crystal.state === "mastered" || crystal.isKnownSkipped;
+// Tiered fog-naming rule (plan 2026-07-10-001 design decision 3): a crystal is nameable
+// while fogged EXACTLY when it is an announced goal — the summit and leg milestones.
+// Mastered crystals, known-ghosts, and the frontier are always nameable; ordinary locked
+// crystals stay unnamed mystery shapes.
+export function isNameableCrystal(
+  crystal: Pick<CrystalFormationNode, "state" | "isKnownSkipped" | "isMilestone" | "isSummit">
+): boolean {
+  if (crystal.state === "mastered" || crystal.isKnownSkipped || crystal.state === "frontier") return true;
+  return crystal.isMilestone || crystal.isSummit;
 }
 
-export type CrystalLabelChip = { derivedNodeId: string; label: string; x: number; y: number; width: number };
+// The memory door's card model (U3, R4): a revealed crystal opens name + gist + Examine
+// (review navigation back to that trail stop); a fogged announced-goal crystal opens the
+// guarded variant — name + the leg guarding it, no gist. Null when nothing is selected or
+// the crystal is an unnamed mystery shape.
+export type MemoryDoorCard =
+  | { kind: "reveal"; derivedNodeId: string; label: string; gist: string | null }
+  | { kind: "guarded"; derivedNodeId: string; label: string; legNumber: number };
 
-// One floating label chip anchored above the selected crystal, in formation
-// coordinates so it pans and scales with the canvas. Returns null when nothing is
-// selected or the selected crystal is not nameable.
-export function labelChipFor(formation: PlacedFormation, selectedNodeId: string | null): CrystalLabelChip | null {
+export function memoryDoorFor(formation: CrystalFormation, selectedNodeId: string | null): MemoryDoorCard | null {
   if (selectedNodeId === null) return null;
-  const crystal = formation.crystals.find((candidate) => candidate.derivedNodeId === selectedNodeId);
+  const crystal = formation.nodes.find((candidate) => candidate.derivedNodeId === selectedNodeId);
   if (!crystal || !isNameableCrystal(crystal)) return null;
-  return {
-    derivedNodeId: crystal.derivedNodeId,
-    label: crystal.label,
-    x: crystal.x,
-    // Float just above the crystal's box (the glyph's top sits VISTA_CRYSTAL_SIZE
-    // above the bedrock anchor at 95% of the box).
-    y: crystal.y - VISTA_CRYSTAL_SIZE * 0.95 - 14,
-    // SVG has no auto-sized rects; a monospace-ish estimate keeps the chip snug.
-    width: crystal.label.length * 7.5 + 20
-  };
+  if (crystal.state === "locked" && !crystal.isKnownSkipped) {
+    return { kind: "guarded", derivedNodeId: crystal.derivedNodeId, label: crystal.label, legNumber: crystal.sectionIndex + 1 };
+  }
+  return { kind: "reveal", derivedNodeId: crystal.derivedNodeId, label: crystal.label, gist: crystal.gist };
+}
+
+// The lesson gist for a node's memory-door card: the gist section when the lesson has
+// one, else its first section's text. Null when no lesson rode down.
+function lessonGist(session: StudySession, derivedNodeId: string): string | null {
+  const lesson = session.lessonByNode[derivedNodeId];
+  if (!lesson || lesson.sections.length === 0) return null;
+  const gist = lesson.sections.find((section) => section.kind === "gist") ?? lesson.sections[0];
+  return gist.text;
 }
 
 // The sections whose every concept is mastered — the vista celebrates when this set

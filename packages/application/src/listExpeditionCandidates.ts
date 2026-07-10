@@ -1,6 +1,7 @@
 import type {
   DerivedGraphDetail,
   EnrichmentInspectionReadPort,
+  EnrichmentLayerPurposeStorePort,
   EnrichmentSummary,
   LearnerExpedition,
   LearnerExpeditionStorePort,
@@ -30,7 +31,9 @@ export type ExpeditionCandidate = {
 
 export type LearnerExpeditionEntry = {
   candidates: ExpeditionCandidate[];
-  learnerExpeditions: (LearnerExpedition & { progress?: { itemsPassed: number; itemsAttempted: number; lessonsRead: number; itemsTotal: number } })[];
+  // `layerPurpose` is the enrichment's plain-register capability statement (plan
+  // 2026-07-10-001 U1); null/absent renders the mechanical template (fail-open).
+  learnerExpeditions: (LearnerExpedition & { progress?: { itemsPassed: number; itemsAttempted: number; lessonsRead: number; itemsTotal: number }; layerPurpose?: string | null })[];
 };
 
 export async function listExpeditionCandidates(input: {
@@ -40,6 +43,7 @@ export async function listExpeditionCandidates(input: {
   studyItemStore?: StudyItemBankStorePort;
   responseLog?: ResponseLogStorePort;
   lessonReadStore?: LessonReadStorePort;
+  layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   limit?: number;
 }): Promise<LearnerExpeditionEntry> {
   const [summaries, learnerExpeditions] = await Promise.all([
@@ -74,7 +78,8 @@ export async function listExpeditionCandidates(input: {
       enrichmentRead: input.enrichmentRead,
       studyItemStore: input.studyItemStore,
       responseLog: input.responseLog,
-      lessonReadStore: input.lessonReadStore
+      lessonReadStore: input.lessonReadStore,
+      layerPurposeStore: input.layerPurposeStore
     })
   };
 }
@@ -86,6 +91,7 @@ async function withExpeditionProgress(input: {
   studyItemStore?: StudyItemBankStorePort;
   responseLog?: ResponseLogStorePort;
   lessonReadStore?: LessonReadStorePort;
+  layerPurposeStore?: EnrichmentLayerPurposeStorePort;
 }): Promise<LearnerExpeditionEntry["learnerExpeditions"]> {
   if (!input.studyItemStore || !input.responseLog) return input.expeditions;
   const [rows, lessonReads] = await Promise.all([
@@ -103,9 +109,10 @@ async function withExpeditionProgress(input: {
   }
   return Promise.all(input.expeditions.map(async (expedition) => {
     if (expedition.status !== "ready" || !expedition.enrichmentId) return expedition;
-    const [items, detail] = await Promise.all([
+    const [items, detail, layerPurpose] = await Promise.all([
       input.studyItemStore!.listStudyItemsForEnrichment(expedition.enrichmentId),
-      input.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId)
+      input.enrichmentRead.getDerivedGraphDetail(expedition.enrichmentId),
+      input.layerPurposeStore ? input.layerPurposeStore.get(expedition.enrichmentId) : Promise.resolve(undefined)
     ]);
     // U4/AE3: count only items on TRAIL-reachable (non-floored) nodes, so the total matches the
     // stop math the trail walks. A missing detail falls back to the whole bank.
@@ -117,7 +124,7 @@ async function withExpeditionProgress(input: {
     const lessonsRead = trailNodeIds
       ? lessonReads.filter((read) => trailNodeIds.has(read.derivedNodeId)).length
       : lessonReads.length;
-    return { ...expedition, progress: { itemsPassed, itemsAttempted, lessonsRead, itemsTotal: itemIds.size } };
+    return { ...expedition, progress: { itemsPassed, itemsAttempted, lessonsRead, itemsTotal: itemIds.size }, layerPurpose: layerPurpose ?? null };
   }));
 }
 

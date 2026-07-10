@@ -20,6 +20,7 @@ import {
   PostgresCalibrationVerdictStore,
   PostgresConceptLessonStore,
   PostgresEnrichmentInspectionRead,
+  PostgresEnrichmentLayerPurposeStore,
   PostgresLearnerAwardsStore,
   PostgresLearnerExpeditionStore,
   PostgresLearnerSessionStore,
@@ -157,7 +158,8 @@ export function createLearnerApp(sql: DatabaseClient) {
         expeditionStore,
         studyItemStore: new PostgresStudyItemBankStore(sql),
         responseLog: new PostgresResponseLogStore(sql),
-        lessonReadStore: new PostgresLessonReadStore(sql)
+        lessonReadStore: new PostgresLessonReadStore(sql),
+        layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql)
       });
       // Generation-progress timelines ride along for the in-flight cards (the SSR page
       // fetched these per-card; the SPA polls this one composed read instead).
@@ -208,6 +210,7 @@ export function createLearnerApp(sql: DatabaseClient) {
           studyItemStore: new PostgresStudyItemBankStore(sql),
           conceptLessonStore: new PostgresConceptLessonStore(sql),
           lessonReadStore: new PostgresLessonReadStore(sql),
+          layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
           responseLog: new PostgresResponseLogStore(sql),
           verdictStore: new PostgresCalibrationVerdictStore(sql)
         }),

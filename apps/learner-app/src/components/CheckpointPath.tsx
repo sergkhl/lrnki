@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ScrollView, Text, View } from "react-native";
-import { Flag } from "lucide-react-native";
+import { Flag, Mountain } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
+import { legBannerLine, terminusLine } from "@/learn/goalCopy";
 import { learnerTerm } from "@/learn/vocabulary";
 import type { TrailCluster, TrailStop, TrailView } from "@/learn/trailView";
 
 const WINDING_OFFSETS = [0, 1, 2, 1, 0, -1, -2, -1] as const;
 const WINDING_STEP_PX = 28;
 
-export type TrailScrollHandle = { scrollToSection: (sectionIndex: number) => void };
+export type TrailScrollHandle = {
+  scrollToSection: (sectionIndex: number) => void;
+  // The memory door's Examine (plan 2026-07-10-001 U3): land on the concept's first stop.
+  scrollToNode: (derivedNodeId: string) => void;
+};
 
 export function CheckpointPath({
   view,
@@ -32,9 +37,14 @@ export function CheckpointPath({
       scrollToSection: (sectionIndex: number) => {
         const y = sectionYRef.current[sectionIndex];
         if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 12), animated: true });
+      },
+      scrollToNode: (derivedNodeId: string) => {
+        const stopId = view.concepts.find((concept) => concept.derivedNodeId === derivedNodeId)?.stops[0]?.stopId;
+        const y = stopId !== undefined ? stopYRef.current[stopId] : undefined;
+        if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 220), animated: true });
       }
     };
-  }, [scrollHandleRef]);
+  }, [scrollHandleRef, view.concepts]);
 
   // Landing auto-scrolls to the next stop so the guided "continue" is always in view (F1).
   // Deferred a tick so onLayout has reported; re-runs when the next stop changes after a refresh.
@@ -84,6 +94,7 @@ export function CheckpointPath({
               </View>
             </View>
           ))}
+          {view.concepts.length > 0 ? <TrailTerminus view={view} summitLabel={session.target.label} /> : null}
         </View>
       </ScrollView>
       <ActivitySheet
@@ -98,16 +109,40 @@ export function CheckpointPath({
   );
 }
 
-// A section boundary marker (R5 display). Its crystal strip previews the section's
-// formation growing as concepts complete.
+// The leg banner (plan 2026-07-10-001 U2): a section boundary that ANNOUNCES the leg's
+// goal in advance — how many crystals guard the milestone — and flips to the secured
+// state once every concept in the leg is mastered. Its crystal strip previews the
+// section's formation growing as concepts complete.
 function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailCluster; sectionConcepts: TrailCluster[] }>) {
+  const masteredCount = sectionConcepts.filter((candidate) => candidate.state === "mastered").length;
+  const secured = masteredCount >= sectionConcepts.length;
   return (
     <View className="flex-row items-center gap-2 rounded-xl border border-line bg-card px-3 py-2">
-      <Flag size={16} color="#9c5f2b" />
-      <Text className="min-w-0 flex-1 text-sm font-semibold text-ink" numberOfLines={1}>
-        <Text className="text-muted">{learnerTerm("section")} {concept.sectionIndex + 1}</Text> · {concept.milestoneLabel}
+      <Flag size={16} color={secured ? "#3f7d4e" : "#9c5f2b"} />
+      <Text className="min-w-0 flex-1 text-sm font-semibold text-ink" numberOfLines={2}>
+        {legBannerLine({
+          sectionIndex: concept.sectionIndex,
+          conceptCount: sectionConcepts.length,
+          masteredCount,
+          milestoneLabel: concept.milestoneLabel
+        })}
       </Text>
       <SectionCrystalStrip concepts={sectionConcepts} className="shrink-0 justify-end" />
+    </View>
+  );
+}
+
+// The trail terminus (U2): the summit made visible from anywhere on the trail — a fixed
+// end-of-trail marker with the remaining-crystal count, flipping to the reached state.
+function TrailTerminus({ view, summitLabel }: Readonly<{ view: TrailView; summitLabel: string }>) {
+  const reached = view.masteredCount >= view.totalClusters;
+  return (
+    <View className="items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-4">
+      <Mountain size={28} color={reached ? "#3f7d4e" : "#9c5f2b"} />
+      <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
+        {reached ? learnerTerm("summit") : `${learnerTerm("summitPrefix")}: ${summitLabel}`}
+      </Text>
+      <Text className="text-xs text-muted text-center" numberOfLines={2}>{terminusLine(view)}</Text>
     </View>
   );
 }

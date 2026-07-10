@@ -129,6 +129,12 @@ function LearnerExpeditionRow({
       <View className="min-w-0 flex-1">
         <Text className="text-sm font-medium text-ink" numberOfLines={1}>{expedition.title}</Text>
         <Text className="text-xs text-muted" numberOfLines={1}>{expedition.declaredDomain}</Text>
+        {/* Purpose teaser (plan 2026-07-10-001 U2): the layer's capability statement makes
+            the mid-horizon goal visible before opening the trail. Absent row → no teaser;
+            the progress line below is the mechanical fallback. */}
+        {expedition.layerPurpose ? (
+          <Text className="text-xs italic text-muted" numberOfLines={2}>{expedition.layerPurpose}</Text>
+        ) : null}
         <Text className="text-xs text-muted" numberOfLines={1}>
           {expedition.status === "ready" && expedition.progress
             ? `${expedition.progress.itemsPassed} of ${expedition.progress.itemsTotal} collected`

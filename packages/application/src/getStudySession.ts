@@ -2,6 +2,7 @@ import type {
   CalibrationVerdictStorePort,
   ConceptLessonStorePort,
   EnrichmentInspectionReadPort,
+  EnrichmentLayerPurposeStorePort,
   LessonReadStorePort,
   ResponseLogStorePort,
   StudyItemBankStorePort
@@ -23,19 +24,21 @@ export async function getStudySession(input: {
   studyItemStore: StudyItemBankStorePort;
   conceptLessonStore: ConceptLessonStorePort;
   lessonReadStore?: LessonReadStorePort;
+  layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   responseLog: ResponseLogStorePort;
   verdictStore: CalibrationVerdictStorePort;
 }): Promise<StudySession | undefined> {
   const detail = await input.enrichmentRead.getDerivedGraphDetail(input.enrichmentId);
   if (!detail) return undefined;
 
-  const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts] = await Promise.all([
+  const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts, layerPurpose] = await Promise.all([
     input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
     input.conceptLessonStore.listLessonsForEnrichment(input.enrichmentId),
     input.conceptLessonStore.listAbsentForEnrichment(input.enrichmentId),
     input.lessonReadStore ? input.lessonReadStore.listForLearner(input.learnerStateRef) : Promise.resolve([]),
     input.responseLog.listForLearner(input.learnerStateRef),
-    input.verdictStore.listForLearner(input.learnerStateRef)
+    input.verdictStore.listForLearner(input.learnerStateRef),
+    input.layerPurposeStore ? input.layerPurposeStore.get(input.enrichmentId) : Promise.resolve(undefined)
   ]);
 
   return composeStudySession({
@@ -47,6 +50,7 @@ export async function getStudySession(input: {
     lessonAbsent,
     lessonReads: lessonReads.map((read) => read.derivedNodeId),
     rows,
-    verdicts
+    verdicts,
+    layerPurpose: layerPurpose ?? null
   });
 }

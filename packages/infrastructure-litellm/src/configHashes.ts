@@ -9,6 +9,7 @@ import { intrinsicDifficultyBandingDescriptor, intrinsicDifficultyComparisonDesc
 import { conceptSetSynthesisDescriptor, knowledgeBoundaryProbeDescriptor } from "./syntheticGenerationAdapters";
 import { declaredDomainInferenceDescriptor } from "./domainInferenceAdapters";
 import { conceptLessonGenerationDescriptor } from "./conceptLessonGenerationAdapters";
+import { layerPurposeGenerationDescriptor } from "./layerPurposeGenerationAdapters";
 import { conceptLessonRedundancyJudgmentDescriptor } from "./conceptLessonRedundancyAdapters";
 import { impostorLieValidityJudgmentDescriptor, studyImpostorGenerationDescriptor, studyItemBlueprintDescriptor, studyMatchingGenerationDescriptor, studyOptionSelectGenerationDescriptor } from "./studyItemGenerationAdapters";
 import { operationConfigHash } from "./operationConfigHash";
@@ -53,6 +54,7 @@ export const syntheticGenerationNeuralStageDescriptors = [
 ] as const;
 
 export const studyItemBankNeuralStageDescriptors = [
+  layerPurposeGenerationDescriptor,
   conceptLessonGenerationDescriptor,
   conceptLessonRedundancyJudgmentDescriptor,
   studyItemBlueprintDescriptor,

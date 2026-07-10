@@ -2,12 +2,12 @@
 
 ## TODO
 
-- **Learner goal gradient, constructive Crystal Vista, and duel arena.**
-  [Plan 2026-07-10-001](./2026-07-10-001-learner-goal-gradient.md) (ready): advance-visible goal
-  hierarchy (layer purpose, leg banners, summit push, trail terminus), leg-cluster vista with fusion
-  celebrations and the memory door, and the duel arena re-port — gated by a measure-first flow
-  evaluation. Framing:
-  [2026-07-10 brainstorm](../brainstorms/2026-07-10-learner-goal-gradient-requirements.md).
+- **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
+  2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
+  attempt-order, retry depth per item, activity gaps. Run it over real learner traffic (not the
+  gate driver's perfect play), then decide the support ladder and the deferred Leg Trial
+  ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
+  at the leg-completion seam the duel's grade-only contract already proved.
 
 - **Native check via local development builds.** The universal-Expo cutover shipped on
   web-only evidence (user decision 2026-07-10; the phone/Expo Go blocker was dropped). The
@@ -21,10 +21,27 @@
 
 - **Re-port the remaining deferred learner surfaces to RN primitives.** Board/duel-unlock splashes
   and the menu drawer — their pure logic already lives in `apps/learner-app` (ADR-0035 consequence).
-  Crystal Vista, Crystal Duel, and the crystal growth/assembly animations moved to
-  [plan 2026-07-10-001](./2026-07-10-001-learner-goal-gradient.md).
+  The Crystal Vista and Crystal Duel shipped with plan 2026-07-10-001; the crystal growth/assembly
+  animations remain deferred (the vista's fusion celebration is a timed highlight, reduced-motion
+  safe, not programmatic motion).
 
 ## COMPLETED
+
+- **Learner goal gradient, constructive Crystal Vista, and duel arena shipped (plan 2026-07-10-001).**
+  Advance-visible goal hierarchy — layer-purpose Neural Stage Descriptor (`layer-purpose-generation`
+  stage under `study_items`, plain register per ADR-0033/0034, fail-open to a mechanical template,
+  one `enrichment_layer_purposes` row per enrichment), merged summit header line, leg banners
+  ("N crystals guard {milestone}" → "{milestone} secured"), summit-push eyebrow, and trail terminus.
+  Constructive Crystal Vista on RN primitives (react-native-svg): leg-cluster fusion auras, the
+  summit keystone, and the memory door (name + lesson gist + Examine review-nav) replacing the bare
+  `labelChipFor` chip; tiered fog-naming (nameable-in-fog ⇔ announced goal). Duel arena re-port
+  (`/duel` route + journal entry card) over the pure `duelMachine`. Rule-14 web-first gate PASSED
+  (real Photosynthesis expedition through production LiteLLM incl. the purpose stage, 7/7 nodes
+  mastered via server-keyed grading, fused vista + secured legs screenshotted, KTD3 re-asserted:
+  `response_log` byte-identical across 5 duel grades, idempotent `duel_win`); flow-evaluation method
+  established as the difficulty follow-up baseline; evidence `tmp/2026-07-10-goal-gradient/`. Zero
+  new persistence beyond the one purpose row. Framing brainstorm
+  `docs/brainstorms/2026-07-10-learner-goal-gradient-requirements.md` deleted (completed).
 
 - **Universal Expo learner app shipped and cut over (plan 2026-07-09-001, deleted).** One Expo
   universal app `apps/learner-app` (Expo Router + NativeWind + react-native-svg) renders the
@@ -263,9 +280,8 @@
   mastered activity segments, skipped-known ghost crystals, section-divider and overview strips, and
   mastery reveal animation. The Crystal Vista gives a view-only bedrock-up formation for the
   expedition and opens from the header tally or section-completion celebration. Accepted framing:
-  the 2026-07-06 growing-crystals brainstorm (completed and deleted; its view-only-vista clause is
-  superseded by the
-  [2026-07-10 brainstorm](../brainstorms/2026-07-10-learner-goal-gradient-requirements.md)).
+  the 2026-07-06 growing-crystals brainstorm (completed and deleted; its view-only-vista clause was
+  superseded by the constructive vista shipped in plan 2026-07-10-001, above).
   Decision: [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Learner App UX polish pass.** The learner entry and expedition flow now use static `/learn` and

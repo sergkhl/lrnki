@@ -9,7 +9,7 @@ export { PostgresInspectionRead } from "./PostgresInspectionRead";
 export { PostgresEnrichmentInspectionRead } from "./PostgresEnrichmentInspectionRead";
 export { PostgresLearnerLoopRead } from "./PostgresLearnerLoopRead";
 export { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
-export { PostgresStudyItemBankStore, PostgresConceptLessonStore, PostgresLessonReadStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
+export { PostgresStudyItemBankStore, PostgresConceptLessonStore, PostgresEnrichmentLayerPurposeStore, PostgresLessonReadStore, PostgresResponseLogStore, PostgresCalibrationVerdictStore } from "./PostgresLearnerLoopStores";
 export { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
 export { PostgresLearnerStore, PostgresLearnerAwardsStore, PostgresLearnerSessionStore } from "./PostgresLearnerRegistryStores";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";

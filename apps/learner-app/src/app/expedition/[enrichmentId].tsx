@@ -1,10 +1,11 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import { CheckpointPath, type TrailScrollHandle } from "@/components/CheckpointPath";
+import { CrystalVista } from "@/components/CrystalVista";
 import { QuestHeader } from "@/components/QuestHeader";
 import { buildTrailView } from "@/learn/trailView";
 import { expeditionQuery } from "@/lib/queries";
@@ -17,6 +18,7 @@ export default function ExpeditionPage() {
   const { enrichmentId } = useLocalSearchParams<{ enrichmentId: string }>();
   const expedition = useQuery(expeditionQuery(enrichmentId));
   const scrollHandleRef = useRef<TrailScrollHandle | null>(null);
+  const [vistaOpen, setVistaOpen] = useState(false);
 
   const goHome = () => {
     if (router.canGoBack()) router.back();
@@ -46,8 +48,21 @@ export default function ExpeditionPage() {
         trail={trail}
         expeditionTitle={row?.title ?? null}
         onJumpToSection={(sectionIndex) => scrollHandleRef.current?.scrollToSection(sectionIndex)}
+        onOpenVista={() => setVistaOpen(true)}
       />
       <CheckpointPath view={trail} session={session} scrollHandleRef={scrollHandleRef} />
+      {vistaOpen ? (
+        <CrystalVista
+          session={session}
+          trail={trail}
+          onClose={() => setVistaOpen(false)}
+          onExamine={(derivedNodeId) => {
+            setVistaOpen(false);
+            // Defer one tick so the trail is back on screen before scrolling to the stop.
+            setTimeout(() => scrollHandleRef.current?.scrollToNode(derivedNodeId), 60);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

@@ -11,6 +11,7 @@ import {
   createGroundingGenerationPort,
   createImpostorLieValidityJudgmentPort,
   createIntrinsicDifficultyJudgmentPort,
+  createLayerPurposeGenerationPort,
   createKnowledgeBoundaryProbePort,
   createDeclaredDomainInferencePort,
   LiteLlmNodeEmbeddingAdapter,
@@ -24,6 +25,7 @@ import {
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
+  PostgresEnrichmentLayerPurposeStore,
   PostgresEnrichmentRunStore,
   PostgresGraphVersionStore,
   PostgresLearnerExpeditionStore,
@@ -56,6 +58,8 @@ function buildContext(sql: DatabaseClient) {
     conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
     conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
     conceptLessonStore: new PostgresConceptLessonStore(sql),
+    layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient),
+    layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
     studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
     studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
     impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
@@ -88,6 +92,8 @@ export async function generateLearnerTopicExpedition(input: {
     studyItemBlueprint: ctx.studyItemBlueprint,
     impostorLieValidityJudge: ctx.impostorLieValidityJudge,
     conceptLessonStore: ctx.conceptLessonStore,
+    layerPurposeGeneration: ctx.layerPurposeGeneration,
+    layerPurposeStore: ctx.layerPurposeStore,
     studyItemGeneration: ctx.studyItemGeneration,
     studyItemBankStore: ctx.studyItemBankStore,
     config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),

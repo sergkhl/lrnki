@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCrystalFormation, completeSectionIndexes, isNameableCrystal, labelChipFor, placeFormation, type CrystalFormation } from "./crystalVistaView";
+import { buildCrystalFormation, completeSectionIndexes, isNameableCrystal, memoryDoorFor, placeFormation, type CrystalFormation } from "./crystalVistaView";
 import { buildTrailView } from "./trailView";
 import type { StudySession } from "@lrnki/application/projection";
 
@@ -48,9 +48,9 @@ test("completeSectionIndexes reports only sections whose every concept is master
     title: "t",
     edges: [],
     nodes: [
-      { derivedNodeId: "a", label: "a", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false },
-      { derivedNodeId: "b", label: "b", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false },
-      { derivedNodeId: "c", label: "c", domain: "d", difficulty: 0, state: "frontier", growthFraction: 0.5, sectionIndex: 1, isKnownSkipped: false }
+      { derivedNodeId: "a", label: "a", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false, gist: null, isMilestone: false, isSummit: false },
+      { derivedNodeId: "b", label: "b", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false, gist: null, isMilestone: true, isSummit: false },
+      { derivedNodeId: "c", label: "c", domain: "d", difficulty: 0, state: "frontier", growthFraction: 0.5, sectionIndex: 1, isKnownSkipped: false, gist: null, isMilestone: true, isSummit: true }
     ]
   };
   assert.deepEqual(completeSectionIndexes(formation), [0]);
@@ -73,6 +73,7 @@ function session(): StudySession {
   return {
     enrichmentId: "e1",
     learnerStateRef: "learner",
+    layerPurpose: null,
     target: { derivedNodeId: "n2", label: "Borrowing" },
     studyItemCount: 0,
     flooredNodeIds: [],
@@ -122,33 +123,48 @@ function session(): StudySession {
   };
 }
 
-test("labelChipFor names mastered and known-ghost crystals only, anchored above the crystal", () => {
+test("memoryDoorFor reveals mastered and frontier crystals with gist + review navigation", () => {
   const s = session();
-  const placed = placeFormation(buildCrystalFormation(s, buildTrailView(s)));
-  const mastered = placed.crystals.find((crystal) => crystal.derivedNodeId === "n1")!;
+  s.lessonByNode = { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [{ kind: "gist", text: "Every value has one owner.", groundingProvenance: "generated", isSourceCited: false }] } };
+  const formation = buildCrystalFormation(s, buildTrailView(s));
+  const mastered = formation.nodes.find((node) => node.derivedNodeId === "n1")!;
   assert.equal(isNameableCrystal(mastered), true);
+  assert.deepEqual(memoryDoorFor(formation, "n1"), { kind: "reveal", derivedNodeId: "n1", label: "Ownership", gist: "Every value has one owner." });
 
-  const chip = labelChipFor(placed, "n1")!;
-  assert.equal(chip.label, mastered.label);
-  assert.equal(chip.x, mastered.x);
-  assert.ok(chip.y < mastered.y, "chip floats above the crystal");
-
-  // Frontier crystals stay unnamed: no chip even when selected.
-  const frontier = placed.crystals.find((crystal) => crystal.derivedNodeId === "n2")!;
-  assert.equal(isNameableCrystal(frontier), false);
-  assert.equal(labelChipFor(placed, "n2"), null);
-  assert.equal(labelChipFor(placed, null), null);
+  // Frontier crystals are nameable (tiered rule) and open the reveal card.
+  const frontier = formation.nodes.find((node) => node.derivedNodeId === "n2")!;
+  assert.equal(isNameableCrystal(frontier), true);
+  assert.deepEqual(memoryDoorFor(formation, "n2"), { kind: "reveal", derivedNodeId: "n2", label: "Borrowing", gist: null });
+  assert.equal(memoryDoorFor(formation, null), null);
 });
 
-test("labelChipFor names a known-ghost crystal", () => {
+test("memoryDoorFor keeps ordinary fogged crystals mystery shapes but names fogged announced goals", () => {
+  const base = session();
+  const s: StudySession = {
+    ...base,
+    classification: { stateByNode: { n1: "locked", n2: "locked" }, selectedFrontierTarget: null },
+    expeditionPath: [
+      { ...base.expeditionPath[0], state: "locked" },
+      { ...base.expeditionPath[1], state: "locked" }
+    ]
+  };
+  const formation = buildCrystalFormation(s, buildTrailView(s));
+  const ordinary = formation.nodes.find((node) => node.derivedNodeId === "n1")!;
+  assert.equal(isNameableCrystal(ordinary), false);
+  assert.equal(memoryDoorFor(formation, "n1"), null);
+  // n2 is the milestone AND summit: fogged yet nameable, guarded variant with no gist.
+  assert.deepEqual(memoryDoorFor(formation, "n2"), { kind: "guarded", derivedNodeId: "n2", label: "Borrowing", legNumber: 1 });
+});
+
+test("memoryDoorFor reveals a known-ghost crystal", () => {
   const base = session();
   const s: StudySession = {
     ...base,
     verdictByNode: { n1: "known" },
     expeditionPath: [{ ...base.expeditionPath[0], state: "mastered" }, base.expeditionPath[1]]
   };
-  const placed = placeFormation(buildCrystalFormation(s, buildTrailView(s)));
-  const ghost = placed.crystals.find((crystal) => crystal.derivedNodeId === "n1")!;
+  const formation = buildCrystalFormation(s, buildTrailView(s));
+  const ghost = formation.nodes.find((node) => node.derivedNodeId === "n1")!;
   assert.equal(isNameableCrystal(ghost), true);
-  assert.equal(labelChipFor(placed, "n1")!.label, ghost.label);
+  assert.equal(memoryDoorFor(formation, "n1")!.kind, "reveal");
 });

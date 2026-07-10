@@ -26,6 +26,34 @@ export function CrystalGlyph({
   ghost?: boolean;
   ariaLabel?: string;
 }>) {
+  return (
+    <Svg
+      accessibilityRole="image"
+      accessibilityLabel={ariaLabel ?? defaultLabel(state)}
+      viewBox={CRYSTAL_VIEWBOX}
+      width={size}
+      height={size}
+    >
+      <CrystalShardsGroup derivedNodeId={derivedNodeId} difficulty={difficulty} growthFraction={growthFraction} state={state} ghost={ghost} />
+    </Svg>
+  );
+}
+
+// The shard geometry as an embeddable <G> (no own <Svg> root), so the Crystal Vista can
+// place many crystals inside ONE canvas — react-native-svg does not nest Svg roots.
+export function CrystalShardsGroup({
+  derivedNodeId,
+  difficulty,
+  growthFraction,
+  state,
+  ghost = false
+}: Readonly<{
+  derivedNodeId: string;
+  difficulty: number;
+  growthFraction: number;
+  state: CrystalGlyphState;
+  ghost?: boolean;
+}>) {
   const spec = crystalSpec(derivedNodeId, difficulty);
   const grown = ghost ? visibleShards(spec, 1) : state === "mastered" ? visibleShards(spec, 1) : state === "locked" ? [] : visibleShards(spec, growthFraction);
   const grownIndexes = new Set(grown.map((shard) => shard.revealIndex));
@@ -36,13 +64,7 @@ export function CrystalGlyph({
   const strokeFor = (shard: CrystalShard) => `hsl(${spec.hue}, ${CRYSTAL_SATURATION}%, ${Math.max(0, shard.lightness - 18)}%)`;
 
   return (
-    <Svg
-      accessibilityRole="image"
-      accessibilityLabel={ariaLabel ?? defaultLabel(state)}
-      viewBox={CRYSTAL_VIEWBOX}
-      width={size}
-      height={size}
-    >
+    <G>
       {/* The full formation always shows as a silhouette: fogged for locked territory,
           a faint ghost behind a growing frontier crystal — the eventual shape teases
           what mastery will finish. */}
@@ -68,7 +90,7 @@ export function CrystalGlyph({
         />
       ))}
       {state === "mastered" && !ghost ? <Glint shard={tallestShard(spec.shards)} /> : null}
-    </Svg>
+    </G>
   );
 }
 

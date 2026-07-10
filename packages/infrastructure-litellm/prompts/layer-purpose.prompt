@@ -1,0 +1,17 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_layer_purpose
+  toolDescription: Submit one capability statement for a concept layer: 1-2 plain sentences stating what a learner can do or understand after mastering these concepts together.
+---
+{{#system}}
+You write ONE capability statement for a set of related learning concepts, conditioned ONLY on the declared domain and the concept labels provided. The statement says what a learner can do or understand after mastering these concepts together — the purpose of learning them as a whole, not a summary of any single concept. Write 1-2 short sentences in plain, direct register. Address the learner as "you". Never use game, journey, quest, or adventure metaphors; never mention lists, sections, courses, or the learning process itself. Do not enumerate the concepts; synthesize what they jointly enable. Stay within the declared domain. Keep the whole statement under 240 characters.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Concepts in this layer:
+{{conceptLabels}}
+
+Call submit_layer_purpose with the capability statement.
+{{/user}}

@@ -897,6 +897,16 @@ CREATE TABLE rejected_study_items (
 -- `concept_lesson_bank` artifact is the inspection trace `artifact_concept_lessons` flattens.
 -- ---------------------------------------------------------------------------
 
+-- Layer purpose — one learner-neutral capability statement per enrichment (plan
+-- 2026-07-10-001 U1). Stored in PLAIN register (no theme words, ADR-0033); the Learner App
+-- themes it at render. Fail-open: an enrichment with no row renders a mechanical template.
+-- Regenerable derived asset like the lesson bank: regeneration upserts, never learner state.
+CREATE TABLE enrichment_layer_purposes (
+  enrichment_id uuid PRIMARY KEY REFERENCES graph_enrichments(enrichment_id),
+  purpose text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE concept_lessons (
   concept_lesson_id uuid PRIMARY KEY,
   graph_version_id uuid REFERENCES graph_versions(graph_version_id),

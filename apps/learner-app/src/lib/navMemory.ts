@@ -40,3 +40,25 @@ export async function markDuelUnlockSeen(learnerRef: string): Promise<void> {
     // Non-fatal: the splash may re-fire.
   }
 }
+
+const VISTA_FUSED_KEY_PREFIX = "lrnki_vista_fused_";
+
+// Fused-cluster memory for the Crystal Vista (plan 2026-07-10-001 U3): which section
+// indexes this device has already celebrated, per learner+enrichment. Same seam pattern
+// as the board memory — client-local, lossable, worst case one replayed fusion.
+export async function readFusedSections(learnerRef: string, enrichmentId: string): Promise<number[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(VISTA_FUSED_KEY_PREFIX + learnerRef + "_" + enrichmentId);
+    return raw ? (JSON.parse(raw) as number[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeFusedSections(learnerRef: string, enrichmentId: string, sections: number[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(VISTA_FUSED_KEY_PREFIX + learnerRef + "_" + enrichmentId, JSON.stringify(sections));
+  } catch {
+    // Non-fatal: the fusion celebration may re-fire.
+  }
+}

@@ -1732,7 +1732,11 @@ export const STAGE_TAGS = {
   // new operation type — but carries its own spend tag so its cost ⋈ wall-clock join stays
   // separable from option-select and lesson generation (R7, ADR-0029).
   impostorGeneration: "impostor-generation",
-  impostorLieValidityJudgment: "impostor-lie-validity-judgment"
+  impostorLieValidityJudgment: "impostor-lie-validity-judgment",
+  // Layer-purpose generation runs ONCE per bank inside the `study_items` operation: a
+  // learner-neutral capability statement for the enrichment, stored in plain register and
+  // themed only at render (ADR-0033). Fail-open: a stage failure writes no row.
+  layerPurposeGeneration: "layer-purpose-generation"
 } as const;
 
 export type StageTag = (typeof STAGE_TAGS)[keyof typeof STAGE_TAGS];

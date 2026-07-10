@@ -664,6 +664,26 @@ export interface ConceptLessonStorePort {
   listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
 }
 
+// Layer-purpose persistence (plan 2026-07-10-001 U1). One plain-register capability
+// statement per enrichment; `persist` upserts (regeneration replaces), `get` returns
+// undefined for an enrichment without a row (fail-open — surfaces render a template).
+export interface EnrichmentLayerPurposeStorePort {
+  persist(input: { enrichmentId: string; purpose: string }): Promise<void>;
+  get(enrichmentId: string): Promise<string | undefined>;
+}
+
+// Layer-purpose generation (ADR-0034 Neural Stage Descriptor). One forced-tool call per
+// enrichment producing a learner-neutral 1–2 sentence capability statement connecting the
+// topic to its concepts. Keys only to the enrichment and concepts — never to Expedition
+// Sections, which are read-time derivations. Domain-neutral prompt (AGENTS rule 17).
+export interface LayerPurposeGenerationPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    conceptLabels: string[];
+  }): Promise<string>;
+}
+
 export type LessonRead = {
   learnerStateRef: string;
   derivedNodeId: string;

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { LogOut, Trophy } from "lucide-react-native";
+import { DuelEntryCard } from "@/components/DuelEntryCard";
 import { ExpeditionEntry } from "@/components/ExpeditionEntry";
 import { LearnerNameGate } from "@/components/LearnerNameGate";
 import { readToken } from "@/lib/api";
@@ -73,6 +74,7 @@ export default function JournalPage() {
           </Pressable>
         </View>
         <ExpeditionEntry learnerStateRef={learnerStateRef} entry={journal.data} />
+        <DuelEntryCard />
       </ScrollView>
     </View>
   );
