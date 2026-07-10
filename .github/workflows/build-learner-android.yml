@@ -1,0 +1,58 @@
+# Android APK for the learner app, built ON the GitHub runner (`eas build --local` — no EAS
+# build credits, ubuntu runners ship Java + the Android SDK) and uploaded as a workflow
+# artifact to download and sideload. Needs the one-time setup in docs/plans/BLOCKERS.md:
+# `eas init` (extra.eas.projectId in app.json) and the EXPO_TOKEN repo secret.
+name: Build learner Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "eas.json build profile"
+        type: choice
+        default: preview
+        options: [preview, development]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: pnpm install --frozen-lockfile
+
+      # Cheap correctness gate before spending ~15 min of Gradle on a broken tree.
+      - run: pnpm --filter @lrnki/learner-app typecheck
+      - run: pnpm --filter @lrnki/learner-app test
+
+      # The preview profile is a standalone APK against the live API (ADR-0036 in-code
+      # default); the development profile needs `expo start` as its dev server.
+      - name: Build APK locally on the runner
+        working-directory: apps/learner-app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: >
+          npx eas-cli build --platform android
+          --profile ${{ inputs.profile }}
+          --local --non-interactive
+          --output ./lrnki-learner-${{ inputs.profile }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lrnki-learner-${{ inputs.profile }}-apk
+          path: apps/learner-app/lrnki-learner-${{ inputs.profile }}.apk
+          retention-days: 14

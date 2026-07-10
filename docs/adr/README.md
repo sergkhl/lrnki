@@ -39,3 +39,6 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0031 — Concept Lesson teaching substrate](./0031-concept-lesson-teaching-substrate.md)
 - [0032 — Mastery-aligned Game UX for the Learner App](./0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)
 - [0033 — Plain identifiers with themed learner vocabulary](./0033-plain-identifiers-single-themed-vocabulary-mapping.md)
+- [0034 — Neural learner-facing stage descriptors](./0034-neural-stage-descriptors-dotprompt-config-hashes.md)
+- [0035 — Separate Learner App: universal Expo app over a typed learner API](./0035-separate-learner-app-static-spa-typed-api.md)
+- [0036 — Single shared learner environment during testing](./0036-run-single-shared-learner-environment-during-testing.md)

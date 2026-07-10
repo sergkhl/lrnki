@@ -7,6 +7,9 @@
     "scheme": "lrnki",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "android": {
+      "package": "com.globesoul.lrnki"
+    },
     "web": {
       "output": "static"
     },

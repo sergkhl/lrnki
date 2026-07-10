@@ -98,7 +98,17 @@ export function createLearnerApp(sql: DatabaseClient) {
 
   const app = new Hono<AuthEnv>()
     .use("*", cors({
-      origin: process.env.LEARNER_WEB_ORIGIN ?? "http://localhost:5173",
+      // One shared environment (ADR-0036): the same process may serve the Pages origin
+      // (prod, or a host-run dev process behind Caddy's dev-first upstream) and the local
+      // Expo web server (8081). Echo back any allowed origin so both topologies work
+      // without widening to "*", which the credentialed Authorization flow forbids.
+      origin: (origin) => {
+        const allowed = new Set([
+          process.env.LEARNER_WEB_ORIGIN ?? "https://lrnki.globesoul.com",
+          "http://localhost:8081"
+        ]);
+        return allowed.has(origin) ? origin : null;
+      },
       allowHeaders: ["Authorization", "Content-Type"],
       // Cache preflights for a day — the only real per-request cost of the two-origin
       // (Pages web ↔ VPS api) topology, since web and api never share an origin.

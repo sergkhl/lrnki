@@ -55,8 +55,9 @@ definitions and repair their references in the same change.
     (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer
     a real-use gate by claiming `DATABASE_URL` is unavailable.
 
-15. Web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph visualization
-    uses Cytoscape.
+15. Admin Lab web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph
+    visualization uses Cytoscape. The learner surface is React Native primitives styled with
+    NativeWind ([ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md)).
 
 16. A deterministic gate over neural output may hard-veto only a provable guarantee. Heuristic
     lexical or surface-pattern gates require an explicit measured module and must be removed when

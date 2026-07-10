@@ -1,10 +1,12 @@
 # Blockers
 
-- **Learner App universal Expo cutover (plan
-  [2026-07-09-001](./2026-07-09-001-feat-learner-app-universal-expo-plan.md) U6).** The rule-14
-  native half and the ADR-0032 feel gate need the user's phone: run `pnpm --filter
-  @lrnki/learner-app start` and open the app in Expo Go (set `EXPO_PUBLIC_LEARNER_API_URL` to a
-  reachable API), register, study a real expedition, and capture screenshots of the trail +
-  crystals to compare side-by-side with the web export (web evidence already in
-  `tmp/2026-07-09-learner-app-universal-expo/`). Until both pass, `apps/learner-web` stays
-  frozen and is not deleted.
+- **Android build pipeline one-time setup.** The
+  `.github/workflows/build-learner-android.yml` workflow builds the learner APK on a GitHub
+  runner with `eas build --local`, which needs an Expo project identity and token:
+  1. From `apps/learner-app`, run `npx eas init` with your Expo account (writes
+     `extra.eas.projectId` into `app.json`; commit it).
+  2. Create an access token at <https://expo.dev/settings/access-tokens> and add it as the
+     `EXPO_TOKEN` repository secret.
+  Until both are done, the workflow fails at authentication. The local fallback
+  (`npx eas build --platform android --profile preview --local` on a machine with Java 17 +
+  Android SDK) needs step 1 plus `eas login`.

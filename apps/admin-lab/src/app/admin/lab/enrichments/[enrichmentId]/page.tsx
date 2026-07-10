@@ -8,10 +8,11 @@ import { getEnrichmentDetail } from "@/lib/enrichments";
 
 export const dynamic = "force-dynamic";
 
-// The learner surface is its own app now (plan 2026-07-08-003): the door is a plain
-// link into the learner web app, which owns session and expedition state.
+// The learner surface is its own app now (ADR-0035): the door is a plain link into the
+// Expo universal app's web build, which owns session and expedition state. The default is
+// the local Expo web dev server; set LEARNER_WEB_URL to link elsewhere (e.g. the Pages site).
 function learnerWebExpeditionUrl(enrichmentId: string): string {
-  const base = process.env.LEARNER_WEB_URL ?? "http://localhost:5173";
+  const base = process.env.LEARNER_WEB_URL ?? "http://localhost:8081";
   return `${base.replace(/\/$/, "")}/expedition/${encodeURIComponent(enrichmentId)}`;
 }
 

@@ -86,7 +86,6 @@ services:
       DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_API_KEY: ${LITELLM_API_KEY:-sk-local}
-      LEARNER_WEB_ORIGIN: https://lrnki.globesoul.com
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -94,13 +93,19 @@ services:
       retries: 5
       start_period: 20s
 
-  # Public TLS terminator (U2): owns 80/443 and reverse-proxies to learner-api. Nothing else on
-  # the VPS owns those ports, so Caddy joins this compose file directly.
+  # Public TLS terminator (U2): owns 80/443 and reverse-proxies to the learner API. Nothing else
+  # on the VPS owns those ports, so Caddy joins this compose file directly. The Caddyfile is baked
+  # into a built image (not bind-mounted — the daemon's FS view diverges from the checkout, so
+  # file binds break); config change => `docker compose up -d --build caddy`. host.docker.internal
+  # lets the Caddyfile's first upstream reach a host-run dev learner-api (ADR-0036 dev loop).
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: ./scripts/docker/caddy
     container_name: lrnki-caddy
     networks:
       - lrnki
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     depends_on:
       - learner-api
@@ -109,7 +114,6 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./scripts/docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
 

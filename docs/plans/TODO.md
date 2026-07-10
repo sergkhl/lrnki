@@ -2,20 +2,48 @@
 
 ## TODO
 
-- **Learner App universal Expo app — cutover only.** Plan:
-  [2026-07-09-001](./2026-07-09-001-feat-learner-app-universal-expo-plan.md). U1–U5 are built
-  and green: `@lrnki/application` has the client-safe `./projection` subpath (nodeCryptoShim
-  deleted), `apps/learner-app` (Expo SDK 57 + Expo Router + NativeWind + react-native-svg)
-  renders the full v1 parity cut, the moved view-model tests run there, `expo export
-  --platform web` + android Hermes bundle compile, and the Pages workflow builds the Expo web
-  export. Rule-14 **web half PASSED** (real register → prod-LiteLLM expedition → lesson + all
-  three graded item types + verdict round-trip → leaderboard → deep link → 401 without bearer;
-  evidence `tmp/2026-07-09-learner-app-universal-expo/`). Remaining: the native device half +
-  ADR-0032 feel gate (see [BLOCKERS](./BLOCKERS.md)), then U6 — delete `apps/learner-web`,
-  amend ADR-0035, rescope AGENTS rule 15 to Admin Lab, repair the Admin Lab learner link
-  (`LEARNER_WEB_URL` dev default moves 5173 → 8081), and delete the plan.
+- **Native check via local development builds.** The universal-Expo cutover shipped on
+  web-only evidence (user decision 2026-07-10; the phone/Expo Go blocker was dropped). Once
+  the [Android build setup blocker](./BLOCKERS.md) is cleared: build the `preview` APK via
+  `.github/workflows/build-learner-android.yml` (or the local fallback), sideload it, and run
+  the deferred native half on a real device against the live API — register, study a real
+  expedition (lesson + all three graded item types + verdict), read the leaderboard — plus the
+  ADR-0032 feel gate (screenshots of trail + crystals side-by-side with the web build,
+  evidence baseline `tmp/2026-07-09-learner-app-universal-expo/`).
+
+- **Re-port the deferred learner surfaces to RN primitives.** Crystal Duel, board/duel-unlock
+  splashes, Crystal Vista, the menu drawer, and crystal growth/assembly animations (Reanimated)
+  — their pure logic already lives in `apps/learner-app` (ADR-0035 consequence).
 
 ## COMPLETED
+
+- **Universal Expo learner app shipped and cut over (plan 2026-07-09-001, deleted).** One Expo
+  universal app `apps/learner-app` (Expo Router + NativeWind + react-native-svg) renders the
+  full v1 parity cut — gate, journal, plan-topic entry, generation progress, study trail with
+  lesson/option-select/matching/impostor/verdict/capstone, static crystals, read-only
+  leaderboard — over the unchanged typed learner API; `@lrnki/application` gained the
+  client-safe `./projection` subpath (nodeCryptoShim deleted). Rule-14 web half PASSED (real
+  register → prod-LiteLLM expedition → all graded item types + verdict → leaderboard → deep
+  link → 401 without bearer; evidence `tmp/2026-07-09-learner-app-universal-expo/`). Cutover
+  executed 2026-07-10 on web-only evidence (user decision; native check is a TODO above):
+  `apps/learner-web` deleted with references repaired, AGENTS rule 15 rescoped to Admin Lab,
+  the Admin Lab learner link defaults to the Expo web dev server (8081). Decisions:
+  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md) (amended) and
+  [ADR-0036](../adr/0036-run-single-shared-learner-environment-during-testing.md). An Android
+  local-build pipeline (`apps/learner-app/eas.json` +
+  `.github/workflows/build-learner-android.yml`, `eas build --local` on a GitHub runner with a
+  documented local-machine fallback) backs the deferred native check.
+
+- **learner-api dev loop without image rebuilds.** Caddy now routes
+  `api.lrnki.globesoul.com` to a host-run `pnpm --filter @lrnki/learner-api dev` (tsx watch)
+  process when its `/health` passes, falling back to the `learner-api` container otherwise
+  (`lb_policy first` + active health checks). The Caddyfile is baked into a built caddy image —
+  the root-cause fix for this VPS's daemon/checkout filesystem divergence that broke file bind
+  mounts — and the per-edit `docker compose up -d --build learner-api` PostToolUse hook is
+  deleted. The learner-api CORS default is the Pages origin in code (compose override removed);
+  concurrent supervisors are safe under
+  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) claim fencing. Runbook in
+  the [README](../../README.md#deployment).
 
 - **Learner App deployment (live).** Shipped 2026-07-09: `learner-api` runs as a Docker Compose
   service behind Caddy TLS at `https://api.lrnki.globesoul.com`, `learner-web` on GitHub Pages at
@@ -298,6 +326,22 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Universal-Expo cutover + learner-api dev loop, 2026-07-10.** Deterministic envelope after
+  deleting `apps/learner-web`: workspace `typecheck` exit 0, workspace `test` exit 0 (learner-app
+  68), `lint` 0 errors (8 pre-existing warnings), `expo export --platform web` all 5 routes.
+  Dev-loop live checks against the real public host: with no dev process,
+  `https://api.lrnki.globesoul.com/health` served by the container (incl. correct
+  `access-control-allow-origin: https://lrnki.globesoul.com` from the rebuilt image); starting
+  `pnpm --filter @lrnki/learner-api dev` took over the hostname (proven by stopping the
+  container while public health stayed OK); a `tsx watch` restart triggered by a source touch
+  kept the public URL healthy with no image rebuild; killing the dev process fell traffic back
+  to the container within ~15s. The container→host hop required the documented one-time
+  `ufw allow in on br-lrnki to any port 8787` (default-DROP timed out both bridge gateways;
+  host loopback was reachable). The Android workflow is structurally complete but unexercised
+  until the `EXPO_TOKEN`/`eas init` blocker is cleared; the web export re-check is a smoke pass,
+  not a re-run of the rule-14 gate (evidence unchanged in
+  `tmp/2026-07-09-learner-app-universal-expo/`).
 
 - **Learner App separation, 2026-07-08.** Deterministic envelope: workspace typecheck (12
   packages), tests pass (learner-api 18, learner-web 75, admin-lab 62, rest unchanged), lint

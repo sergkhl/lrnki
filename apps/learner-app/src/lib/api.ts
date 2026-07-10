@@ -12,7 +12,9 @@ export const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5_000 } }
 });
 
-export const API_URL: string = process.env.EXPO_PUBLIC_LEARNER_API_URL ?? "http://localhost:8787";
+// Single working environment during testing (ADR-0036): the app defaults to the deployed
+// learner-api. Set EXPO_PUBLIC_LEARNER_API_URL to point at a local API instead.
+export const API_URL: string = process.env.EXPO_PUBLIC_LEARNER_API_URL ?? "https://api.lrnki.globesoul.com";
 
 // The typed RPC client (R1): plain fetch underneath, identical on web and native. The
 // headers callback is synchronous against the token mirror hydrated at app boot.

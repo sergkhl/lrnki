@@ -1,8 +1,17 @@
 # Public TLS terminator for the learner API (U2). Caddy auto-provisions a Let's Encrypt
-# certificate for this hostname (A record → VPS IP) and reverse-proxies to the learner-api
-# container over the internal `lrnki` network. Caddy overwrites any incoming X-Forwarded-For
-# with the real client IP by default, so the session rate limiter's first-XFF read is not
-# spoofable — no application change needed.
+# certificate for this hostname (A record → VPS IP). Caddy overwrites any incoming
+# X-Forwarded-For with the real client IP by default, so the session rate limiter's
+# first-XFF read is not spoofable — no application change needed.
+#
+# Dev-first fallback (single shared environment, ADR-0036): the first upstream is a host-run
+# `pnpm --filter @lrnki/learner-api dev` (tsx watch) process; when its /health check fails,
+# traffic falls back to the learner-api container. Starting the dev process takes over the
+# public hostname; stopping it hands traffic back within fail_duration.
 api.lrnki.globesoul.com {
-	reverse_proxy learner-api:8787
+	reverse_proxy host.docker.internal:8787 learner-api:8787 {
+		lb_policy first
+		health_uri /health
+		health_interval 5s
+		fail_duration 10s
+	}
 }

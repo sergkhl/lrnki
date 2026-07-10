@@ -19,6 +19,7 @@
     "@tanstack/react-query": "catalog:",
     "expo": "catalog:expo",
     "expo-constants": "catalog:expo",
+    "expo-dev-client": "catalog:expo",
     "expo-linking": "catalog:expo",
     "expo-router": "catalog:expo",
     "expo-secure-store": "catalog:expo",
