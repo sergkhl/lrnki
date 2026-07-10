@@ -4,8 +4,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "dev": "BROWSER=none expo start --web",
     "start": "expo start",
-    "web": "expo start --web",
     "export:web": "expo export --platform web",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"

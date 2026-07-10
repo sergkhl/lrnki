@@ -9,9 +9,9 @@
     "pnpm": "11.4.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @lrnki/admin-lab dev",
+    "dev:admin": "pnpm --filter @lrnki/admin-lab dev",
     "dev:api": "pnpm --filter @lrnki/learner-api dev",
-    "dev:web": "pnpm --filter @lrnki/learner-app web",
+    "dev:learner": "pnpm --filter @lrnki/learner-app dev",
     "build": "pnpm --filter @lrnki/admin-lab build && pnpm --filter @lrnki/learner-app export:web",
     "start": "pnpm --filter @lrnki/admin-lab start",
     "lint": "eslint .",

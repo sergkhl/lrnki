@@ -22,7 +22,9 @@ cp .env.example .env
 docker compose up -d postgres litellm
 pnpm install
 pnpm db:migrate
-pnpm dev
+pnpm dev:admin      # Admin Lab (Next.js)
+pnpm dev:api        # Learner API (tsx watch)
+pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
 
 The generated scaffold intentionally does not include a lockfile. Generate it with `pnpm install` in a network-enabled environment.
