@@ -2,6 +2,11 @@
 
 ## TODO
 
+- **Consolidate Derived Graph Layer completion.** Execute
+  [plan 2026-07-11-001](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md): one deep
+  completion module for Graph Enrichment and Synthetic Topic Generation, lifecycle-aware structural
+  guarantees, stable config identities, and production real-use inspection of both variants.
+
 - **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
   2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
   attempt-order, retry depth per item, activity gaps. Run it over real learner traffic (not the
@@ -16,18 +21,18 @@
   trailing-nullable descriptor-shape test. Cache-pin payoff already measured during planning
   (59% cached tokens, spend discount verified) — recorded in the plan, no implementation.
 
-- **Unify learner interactions and finish deferred native surfaces — IN PROGRESS (U1–U5 done,
-  U6 remains).** Execute [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md);
-  its "Execution Status" section is the authoritative handoff. Landed and deterministically
-  verified (148 learner-app tests, workspace typecheck/test/lint, static web export): app-owned
-  `src/ui/` system with CSS-variable tokens + Jest/RNTL harness, full learner migration behind an
-  ESLint boundary, semantic overlays, the restored journal menu/Board dialog/prioritized splash
-  coordinator, and now U5 event-bound motion + semantic haptics (facet-from-bedrock mastery
-  assembly + glint, one-shot growth-shard reveal, next-stop halo emphasis, wrong-match nudge,
-  Vista fusion swell + fusion haptic, overlay entrances, grading/mastery haptics — all behind the
-  one shared reduced-motion policy). Still owed: U6 browser/real-use/Android/deploy gates and
-  ADR-0032/0035 + doc consolidation. No browser or device validation has run yet — do not treat
-  the green suites as quality evidence (rule 14).
+- **Unify learner interactions and finish deferred native surfaces — IN PROGRESS (U1–U5 landed,
+  U6 remains; VISUAL REGRESSIONS reported).** Execute
+  [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md); its
+  "Execution Status" section is the authoritative handoff. U1–U5 are in tree and
+  deterministically green (app-owned `src/ui/` system + lint boundary, semantic overlays,
+  restored menu/Board/splashes, U5 event-bound motion + semantic haptics; 148 learner-app
+  tests, workspace typecheck/test/lint, static web export). **Next session must START with a
+  visual browser pass and fix the user-reported UI regressions** listed in the plan's
+  Execution Status (invisible expedition-map stops, broken context-header layout, dialog
+  positioning/sizing, menu drawer side, always-on focus/selection boxes) before running the U6
+  browser/real-use/Android/deploy gates and ADR-0032/0035 doc consolidation. No browser or
+  device validation has run yet — the green suites are not quality evidence (rule 14).
 
 - **Fix expedition discoverability (curated Explore + Browse all).** Execute
   [plan 2026-07-10-005](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md): the journal's
@@ -37,347 +42,108 @@
 
 ## COMPLETED
 
-- **Production extraction moved to Xiaomi MiMo v2.5; DeepSeek fully retired (plan 2026-07-10-002).**
-  The six extraction aliases (`default-model`, `kg-concept-discovery`, `kg-concept-admission`,
-  `kg-claim-extraction`, `kg-concept-synthesis`, `kg-domain-inference`) now route to
-  `openrouter/xiaomi/mimo-v2.5` (single-host provider pin for prefix-cache reuse,
-  `reasoning.enabled: false`); all five DeepSeek deployments and the `DEEPSEEK_API_KEY` env
-  plumbing are deleted, and AGENTS rule 5 names MiMo with the `model_group_alias` block as the
-  source of truth. Config hashes proved alias-stable across the cutover (extraction
-  `source-extraction-756879d1dc76` and enrichment `graph-enrichment-1886ba82e2e5` byte-identical
-  to pre-switch runs — no regeneration churn). One MiMo defect found and fixed in the same
-  change: its constrained tool decoder intermittently stringifies nested array-of-object
-  arguments and truncates before a trailing literal `null`, which rejected 31/31 impostor
-  items; the impostor wire schema is now fully flat (numbered scalar truth fields,
-  non-nullable empty-string `siblingLabel`), adapter rebinds to the unchanged domain draft
-  (10/10 repro, 28/31 real bank; `studyItemBankConfigHash` moved mechanically). Rule-14 gate
-  PASS on the Rust-ownership fixture end-to-end (extraction → build → 31-node enrichment →
-  81-item bank) with spend attributed to MiMo. Evidence:
+- **Production extraction moved to Xiaomi MiMo v2.5; DeepSeek fully retired (2026-07-10, plan
+  2026-07-10-002).** The six extraction aliases route to `openrouter/xiaomi/mimo-v2.5`
+  (single-host provider pin for prefix-cache reuse, reasoning disabled); all DeepSeek deployments
+  and `DEEPSEEK_API_KEY` plumbing deleted; AGENTS rule 5 names the `model_group_alias` block as
+  the source of truth. Config hashes proved alias-stable across the cutover. One MiMo defect fixed
+  in the same change: its constrained tool decoder intermittently stringifies nested
+  array-of-object arguments and truncates before a trailing literal `null`, so the impostor wire
+  schema is now fully flat (adapter rebinds to the unchanged domain draft). Rule-14 gate PASS on
+  the Rust-ownership fixture end-to-end with spend attributed to MiMo. Follow-up caveats live in
+  [plan 2026-07-10-004](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md). Evidence:
   `tmp/2026-07-10-extraction-model-switch-mimo/`.
 
-- **Learner goal gradient, constructive Crystal Vista, and duel arena shipped (plan 2026-07-10-001).**
-  Advance-visible goal hierarchy — layer-purpose Neural Stage Descriptor (`layer-purpose-generation`
-  stage under `study_items`, plain register per ADR-0033/0034, fail-open to a mechanical template,
-  one `enrichment_layer_purposes` row per enrichment), merged summit header line, leg banners
-  ("N crystals guard {milestone}" → "{milestone} secured"), summit-push eyebrow, and trail terminus.
-  Constructive Crystal Vista on RN primitives (react-native-svg): leg-cluster fusion auras, the
-  summit keystone, and the memory door (name + lesson gist + Examine review-nav) replacing the bare
-  `labelChipFor` chip; tiered fog-naming (nameable-in-fog ⇔ announced goal). Duel arena re-port
-  (`/duel` route + journal entry card) over the pure `duelMachine`. Rule-14 web-first gate PASSED
-  (real Photosynthesis expedition through production LiteLLM incl. the purpose stage, 7/7 nodes
-  mastered via server-keyed grading, fused vista + secured legs screenshotted, KTD3 re-asserted:
-  `response_log` byte-identical across 5 duel grades, idempotent `duel_win`); flow-evaluation method
-  established as the difficulty follow-up baseline; evidence `tmp/2026-07-10-goal-gradient/`. Zero
-  new persistence beyond the one purpose row. Framing brainstorm
-  `docs/brainstorms/2026-07-10-learner-goal-gradient-requirements.md` deleted (completed).
+- **Learner goal gradient, constructive Crystal Vista, and duel arena (2026-07-10, plan
+  2026-07-10-001).** Advance-visible goal hierarchy: layer-purpose Neural Stage Descriptor
+  (`layer-purpose-generation` under `study_items`, fail-open to a mechanical template, one
+  `enrichment_layer_purposes` row per enrichment), merged summit header, leg banners, summit-push
+  eyebrow, and trail terminus. Constructive Crystal Vista on RN primitives (leg-cluster fusion
+  auras, summit keystone, memory door replacing the bare label chip), tiered fog-naming, and the
+  `/duel` re-port over the pure `duelMachine`. Rule-14 web-first gate PASS (7/7 nodes mastered via
+  server-keyed grading; `response_log` byte-identical across 5 duel grades); flow-evaluation
+  method established as the difficulty follow-up baseline. Zero new persistence beyond the one
+  purpose row. Evidence: `tmp/2026-07-10-goal-gradient/`.
 
-- **Universal Expo learner app shipped and cut over (plan 2026-07-09-001, deleted).** One Expo
-  universal app `apps/learner-app` (Expo Router + NativeWind + react-native-svg) renders the
-  full v1 parity cut — gate, journal, plan-topic entry, generation progress, study trail with
-  lesson/option-select/matching/impostor/verdict/capstone, static crystals, read-only
-  leaderboard — over the unchanged typed learner API; `@lrnki/application` gained the
-  client-safe `./projection` subpath (nodeCryptoShim deleted). Rule-14 web half PASSED (real
-  register → prod-LiteLLM expedition → all graded item types + verdict → leaderboard → deep
-  link → 401 without bearer; evidence `tmp/2026-07-09-learner-app-universal-expo/`). Cutover
-  executed 2026-07-10 on web-only evidence (user decision; native check is a TODO above):
-  `apps/learner-web` deleted with references repaired, AGENTS rule 15 rescoped to Admin Lab,
-  the Admin Lab learner link defaults to the Expo web dev server (8081). Decisions:
+- **Universal Expo learner app shipped and cut over; learner-api dev loop without rebuilds
+  (2026-07-09/10, plan 2026-07-09-001).** One Expo universal app `apps/learner-app` (Expo Router +
+  NativeWind + react-native-svg) renders the full v1 parity cut over the unchanged typed learner
+  API; `@lrnki/application` gained the client-safe `./projection` subpath. Cutover executed on
+  web-only evidence (user decision; the native check is backed by the Android local-build
+  pipeline): `apps/learner-web` deleted, AGENTS rule 15 rescoped to Admin Lab. Caddy routes
+  `api.lrnki.globesoul.com` dev-first to a host-run tsx watch process with container fallback, and
+  the Caddyfile is baked into a built caddy image (root-cause fix for the VPS daemon/checkout
+  filesystem divergence). Decisions:
   [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md) (amended) and
-  [ADR-0036](../adr/0036-run-single-shared-learner-environment-during-testing.md). An Android
-  local-build pipeline (`apps/learner-app/eas.json` +
-  `.github/workflows/build-learner-android.yml`, `eas build --local` on a GitHub runner with a
-  documented local-machine fallback) backs the deferred native check.
+  [ADR-0036](../adr/0036-run-single-shared-learner-environment-during-testing.md). Rule-14 web
+  half PASS; evidence `tmp/2026-07-09-learner-app-universal-expo/`; runbook in the
+  [README](../../README.md#deployment).
 
-- **learner-api dev loop without image rebuilds.** Caddy now routes
-  `api.lrnki.globesoul.com` to a host-run `pnpm --filter @lrnki/learner-api dev` (tsx watch)
-  process when its `/health` passes, falling back to the `learner-api` container otherwise
-  (`lb_policy first` + active health checks). The Caddyfile is baked into a built caddy image —
-  the root-cause fix for this VPS's daemon/checkout filesystem divergence that broke file bind
-  mounts — and the per-edit `docker compose up -d --build learner-api` PostToolUse hook is
-  deleted. The learner-api CORS default is the Pages origin in code (compose override removed);
-  concurrent supervisors are safe under
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) claim fencing. Runbook in
-  the [README](../../README.md#deployment).
-
-- **Learner App deployment (live).** Shipped 2026-07-09: `learner-api` runs as a Docker Compose
-  service behind Caddy TLS at `https://api.lrnki.globesoul.com`, `learner-web` on GitHub Pages at
-  `https://lrnki.globesoul.com`, internal litellm/docling/postgres ports bound VPS-local
-  ([ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md); runbook in the
-  [README](../../README.md#deployment)). Rule-14 gate PASS: real browser-path registration → real
-  topic expedition generated on the VPS supervisor through production LiteLLM → graded study
-  response (server-keyed correct) → leaderboard read; negative checks green (`401` without bearer,
-  HTTP→HTTPS on both hosts, internal ports refused externally). Evidence:
+- **Learner App separation and live deployment (2026-07-08/09).** The learner surface moved out of
+  Admin Lab: `apps/learner-api` (Hono + zod thin mappers over `@lrnki/application`, opaque hashed
+  bearer sessions in the new `learner_sessions` table, PIN + rate limit, relocated
+  topic-generation supervisor, one shared pool) behind Caddy TLS at
+  `https://api.lrnki.globesoul.com`, static learner web at `https://lrnki.globesoul.com` (GitHub
+  Pages), internal litellm/docling/postgres ports bound VPS-local; Admin Lab lost every learner
+  route and stays SSH-tunnel-private. Decision:
+  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md). Rule-14 gates PASS
+  (separation and deployment); evidence `tmp/2026-07-08-learner-app-separation/` and
   `tmp/2026-07-09-learner-app-deployment/`.
 
-- **Learner App separation: static SPA + typed learner API.** The learner surface moved out of
-  Admin Lab: `apps/learner-api` (Hono + zod routes as thin mappers over `@lrnki/application`,
-  opaque hashed bearer sessions in the new `learner_sessions` table, per-IP/per-name session rate
-  limit, relocated topic-generation supervisor, one shared pool) and `apps/learner-web` (Vite +
-  TanStack Router/Query SPA over the typed `hono/client`, static build with 404 SPA fallback).
-  Admin Lab lost `app/learn/**`, `components/learn/**`, the learner libs, cookie machinery,
-  `instrumentation.ts`, and the "open as learner" action (now a link to the learner web app);
-  `ensureLearnerExpedition` was deleted; the sphere-grid layout moved to `@lrnki/application`
-  (both apps render it). Decisions: [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md).
+- **Operations, observability, and architecture deepening (2026-07-07/08).** Journey-first
+  Operations page with one merged stage table (`mergeOperationStageRows`), live cost/tokens/calls
+  chips, collapsed finished cards, and the operator "bottleneck" surface renamed **Cost &
+  timings**; the operation-timeline catalog made provably complete via a set-equality +
+  disjointness assertion ([ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md));
+  Neural Stage Descriptors with dotprompt files and mechanical config hashes replacing adapter
+  classes and hand-bumped hashes
+  ([ADR-0034](../adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md)), proven
+  byte-identical across both composition roots; the shared neural client-construction policy in
+  `createNeuralClients()`; learner grading collapsed behind one tested `gradeStudyResponse`
+  application use-case consuming the read model per
+  [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md); and the one-time
+  learner-state wipe + `/learn` read-path dedup (10.5s → 2.59s warm). Accepted framings: the
+  2026-07-07 architecture deepening review (completed and deleted; its rejected-findings ledger is
+  preserved by the [2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md)).
+  Rule-14 gates PASS per change; evidence under `tmp/2026-07-07-*/` and `tmp/2026-07-08-*/`.
 
-- **Journey-first Operations page with one merged stage table.** Operations now render as
-  Processing Journey cards resolved read-only from enrichment lineage, with active journeys first,
-  finished journey sorting/windowing, titled synthetic/document labels from the inspection read model,
-  ungrouped leftovers, compact always-visible step rows, and an expanded merged stage table backed by
-  the same `mergeOperationStageRows` helper as `costTimingReport`. The old `?report`/`?type`/
-  `?journey` panels, Admin Lab report component, and lazy report loader were deleted; the kg-worker
-  cost-timing CLI path remains on the shared application report. No schema change.
+- **Learner registry, weekly leaderboard, Crystal Duel, and board UX (2026-07-07/08).** Free-text
+  identity replaced by a `learners` registry with PIN gate and real FKs on the learner-state
+  tables (`/learn/session` is the sole PIN-aware route, the swap point for real auth). Weekly
+  ISO-week banded score reads off the SAME Study Session projection every surface reads (no
+  parallel mastery SQL), rendered as a cohort-of-10 Dialog with seeded Faker rivals, a derived
+  division ladder (0/10/30/75), chase banner, seam-triggered splash, and idempotent
+  `weekly_podium`. The Crystal Duel is a five-question grade-only retrieval sprint over a pure
+  exhaustive `duelMachine`: it persists nothing (`response_log` byte-identical across a duel) and
+  winning earns a durable `duel_win` crest. Decision:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Rule-14
+  gate PASS; evidence `tmp/2026-07-07-leaderboard-duel/`.
 
-- **Neural stage descriptors with dotprompt files and mechanical config hashes.** Forced-tool LLM
-  stage knowledge now lives in Neural Stage Descriptors: `.prompt` files own model aliases, tool
-  names, tool descriptions, and prompt templates; typed rims own schemas, validators, stage tags,
-  sentinels, retry budgets, and result mapping. Adapter classes and forced-tool `*_MODEL` constants
-  were replaced by port factories, while application use-case seams stayed unchanged. Extraction,
-  graph enrichment, synthetic generation, and Study Item Bank config hashes are derived
-  mechanically from descriptor content and app-level knobs in both composition roots; fixed
-  hand-bumped strings were removed from root wiring. Descriptor stage tags are now tested against
-  `OPERATION_TIMELINE_CATALOG`. Decision: [ADR-0034](../adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md).
-  The U8 real-use gate (below) also fixed a lint regression from the initial landing: the
-  heterogeneous descriptor-array erasure used `NeuralStageDescriptor<any, any, any>` (6
-  `no-explicit-any` errors); `TInput` is invariant (covariant `sentinelInput`, contravariant builder
-  params), so it is now erased by a hand-encoded existential supertype `AnyNeuralStageDescriptor`
-  (covariant positions `unknown`, contravariant positions `never`) with a non-generic
-  `stageConfigHash` — behavior-preserving, all four derived hashes byte-identical before/after.
+- **Expedition generation durability, queue reliability, latency, and probe calibration
+  (2026-07-05→07).** Topic-expedition generation is a durable claimed row completed by the
+  supervisor: bounded-parallel (cap 2), one staleness predicate shared by claim and fail,
+  operation-id fencing with heartbeat, transient-vs-terminal error classification, an orphaned-row
+  reaper, and a two-minute liveness predicate shared with the UI
+  ([ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md)). Study-item generation
+  runs bounded per-node concurrency 4 (measured 261.5s → 94.5s). The Knowledge-Boundary Probe has
+  a repeatable `calibrate-boundary-probe` command and measured defaults (K=10, temperature 0.7,
+  threshold 0.89), plus a deny-listed alias with a cross-family ordered fallback
+  ([ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md)).
 
-- **Shared neural client-construction policy.** The LiteLLM client-construction policy — env base
-  config plus the measured discovery/deterministic/probe/embedding sampling decisions and their
-  rationale comments — now lives once in `createNeuralClients()`
-  (`packages/infrastructure-litellm/src/neuralClients.ts`, with `resolveNeuralClientBaseOptions()`
-  for the boundary-probe calibration sweep that varies temperature deliberately). Both composition
-  roots (`kg-worker` `buildContext`, Admin Lab `learnerGeneration`) consume it; the near-verbatim
-  duplicated blocks and the comment-less Admin Lab copy are deleted (rule 18). The policy is pinned
-  by request-body tests. Per-root adapter/store wiring stays explicit at each root. No CONTEXT.md
-  term (user decision — infrastructure policy, not domain language). Accepted framing: Candidate 4
-  (client-policy half) of the
-  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md);
-  the review records the rejection of the candidate's `runGraphEnrichment` input-grouping half
-  (premise refuted — one caller).
-
-- **Learner-state cleanup, `/learn` read-path dedup, and operations cost/timing visibility.** A
-  one-time transactional wipe cleared the accumulated test/junk learners (the five learner-state
-  tables and `learners`), and the source is closed: DB-touching integration tests and gate scripts
-  now delete exactly the learners they create (a per-suite cleanup hook keyed by tracked refs; the
-  real-use skill gained the gate-cleanup rule). The weekly board hides zero-point non-viewers
-  before windowing, so dormant learners never surround the viewer. The logged-in `/learn` read path
-  keeps its eager render but reads each distinct enrichment's projection inputs once (not per
-  learner-expedition), skips learners with no study evidence via one existence read
-  (`LearnerStorePort.listRefsWithStudyEvidence`), derives the viewer's lifetime crystal count from
-  that same pass, and guards the previous-week podium recompute — no parallel mastery SQL (KTD2 of
-  005 preserved). The operations page preloads one live LiteLLM spend read to show
-  cost/tokens/calls chips on every card (degrading to wall-clock when cost is unavailable) and
-  collapses finished cards to header + chips, server-rendering the full stage table only on
-  demand. The operator "bottleneck" surface is renamed to **Cost & timings** end-to-end
-  (`bottleneckReport` → `costTimingReport`, its types and view component, the CLI subcommand, and
-  the UI copy; `rankBottleneckTargets` keeps its name). No schema change; cost stays
-  read-live-never-stored. Decision:
-  [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
-
-- **Leaderboard dialog, cohort-of-10, single login/register gate, and enriched-DAG links.** The
-  leaderboard renders through one base-ui Dialog for both the seam-triggered splash and an
-  on-demand header trigger (the standalone `/learn/leaderboard` route deleted, rule 18). The board
-  is always exactly 10 rows — real rows windowed to the viewer's nearest neighbors, then filled
-  with seeded rivals — with cohort-local ranks. A themed **division** ladder (Basecamp → Foothills
-  → Ridge → Summit, provisional thresholds 0/10/30/75) derives at read time from the viewer's
-  lifetime mastered-crystal count reusing the graded-outcome derivation the weekly score uses — no
-  persisted tiers, no parallel mastery SQL, accepted through the ADR-0032 flow gate as progress
-  clarity rather than a parallel objective. Rival nicknames use Faker's person-first correlated
-  derivation for realistic usernames. The login gate collapses to one form (name + PIN) with Login
-  and Register buttons plus a logout intent on `/learn/session` (the sole PIN-aware route, KTD8 of
-  005); the browser-known-refs cookie machinery, the picker, and dead vocabulary keys are deleted.
-  Admin learner-loop and enrichment-scoped operations cards link to the existing
-  `DerivedGraphExplorer` DAG. No new persistence. Decision:
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-- **Learner registry, weekly leaderboard, and Crystal Duel shipped.** Free-text learner identity is
-  replaced by a `learners` registry with uniqueness-at-creation and a PIN-gated pick-or-create gate;
-  the four learner-state tables gained real FKs to it (`/learn/session` is the sole PIN-aware route,
-  the swap point for real auth, KTD8). A global weekly leaderboard (ISO week, cohort of 10) reads the
-  difficulty-banded weekly score off the SAME Study Session projection every surface reads — no
-  parallel mastery SQL (KTD2) — and fills the board with deterministic seeded `@faker-js/faker`
-  rivals rubber-banded around the viewer (KTD1), with a chase banner, seam-triggered splash
-  (localStorage nav memory, KTD5), and a scheduler-free idempotent `weekly_podium` recomputed from
-  timestamps (KTD6). The Crystal Duel is a five-question retrieval sprint over already-mastered
-  crystals orchestrated by a pure exhaustive `duelMachine` transition function (XState rejected,
-  KTD4); grading reuses the keyed-selection logic behind a grade-only path that persists nothing, so
-  a duel can never touch mastery state (KTD3, proven: `response_log` byte-identical across a duel).
-  Losing costs nothing; winning earns a durable `duel_win` crest (`learner_awards`). Rule-14 real-use
-  gate PASS against a really-seeded Rust-ownership graph (21 nodes, 50 study items): AE1–AE5 all
-  asserted via the real use-cases, plus UI screenshots. Evidence:
-  `tmp/2026-07-07-leaderboard-duel/`.
-
-- **Expedition generation latency and operation-run liveness fixed.** Study-item generation now
-  defaults to bounded per-node concurrency 4, cutting the measured Bayesian-inference
-  `study_items` operation from 261.5s to 94.5s on the changed tree. Operation-run liveness uses one
-  application-owned two-minute stale predicate across the supervisor and UI, and the supervisor now
-  reaps orphaned `running` operation timeline rows before claiming more expedition work. The
-  approved dev cleanup removed failed/phantom operation history while preserving succeeded reports.
-  The Qwen3-235B ordering candidate was forced-tool OK and faster but failed quality parity, so
-  `kg-prerequisite-ordering` stays on `gpt-oss-120b` and the stale DeepSeek Pro candidate note is
-  deleted. Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) and
-  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md). Evidence:
-  `tmp/2026-07-07-expedition-latency/`.
-
-- **Learner grading moved behind an application use-case.** The seven raw-SQL learner-grading server
-  actions in `apps/admin-lab/src/app/learn/actions.ts` are collapsed to thin mappers over one tested
-  `gradeStudyResponse` application use-case
-  (`gradeStudyResponse`/`checkMatchingAttempt`/`recordLearnerVerdict`/`recordLessonRead` + one
-  internal active-expedition/node-membership guard helper and refusal reason codes; copy stays UI-side
-  per [ADR-0033](../adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md)). Two existing
-  ports gained one read each — `StudyItemBankStorePort.getStudyItemById` and
-  `EnrichmentInspectionReadPort.derivedNodeBelongsToEnrichment` — with Postgres adapters and
-  integration tests; the former single-join guard becomes two composed reads (benign read-then-append
-  race, user-accepted). Every `sql\`` block and the duplicate `MatchingItem` rebuild under
-  `apps/admin-lab/src/app/learn/` are deleted (rule 18; AE1 verified); exported result types and
-  learner copy strings are byte-identical so `ActivitySheet`/`ConceptMarker` are untouched. Consumes
-  the read model per [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md); no CONTEXT.md term
-  added (KTD5). Accepted framing: Candidate 2 of the
-  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md).
-
-- **Operation-timeline catalog made provably complete.** The four live-but-uncatalogued LLM stage
-  tags now belong to their owning operation — `concept-set-synthesis`, `knowledge-boundary-probe`,
-  and `rescued-node-labeling` under `enrichment`, `impostor-lie-validity-judgment` under
-  `study_items` — so `spendStageBelongsToOperation` returns `true` and `bottleneckReport` stops
-  nulling their cost. The two dead measurement-mode tags (`answer-grading`, `learner-simulation`)
-  are deleted end-to-end (`STAGE_TAGS` + learner `stageCopy`; rule 18). The catalog test no longer
-  restates the stage lists by hand: a set-equality + pairwise-disjointness assertion now fails the
-  build whenever the union of catalog LLM stages differs from `Object.values(STAGE_TAGS)` in either
-  direction or two operations claim one stage — installing the machine enforcement that ADR-0029's
-  same-change registration rule previously lacked. The two test-only catalog exports
-  (`operationTimelineStagesForOperation`, `isKnownOperationTimelineStage`) are removed. No interface,
-  schema, or `OperationType` change; synthetic generation keeps reporting as `enrichment` (user
-  decision, 2026-07-07). Accepted framing: Candidate 1 of the
-  [2026-07-07 architecture deepening review](../brainstorms/2026-07-07-architecture-deepening-review.md).
-  Decision: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md).
-
-- **Knowledge-boundary probe calibration.** The probe now has a repeatable `kg-worker`
-  `calibrate-boundary-probe` command and measured defaults for synthetic generation: K=10, worker
-  temperature 0.7, and mean-pairwise embedding threshold 0.89. The measurement ladder covered
-  established-core, fringe-contested, and fabricated tiers across mixed domains on both probe
-  deployments. The production-path gate now routes a fabricated Mathematics concept to `boundary`
-  / trace-only uncertain while a textbook Photosynthesis control keeps every synthesized concept
-  `core_knowledge`. Decision:
-  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
-
-- **Admin run visibility and Learner App UX polish.** Operations page groups running/stalled
-  operations in an always-first Active section with `N running · M stalled · K failed` header chips
-  and auto-refreshes while any run is active (shared `AutoRefresh` replaces the learner-only
-  component). The journey and bottleneck report routes are folded into the Operations page as inline
-  per-card panels driven by `?report`/`?type`/`?journey` search params (both standalone routes
-  deleted); the Run Inspector list is merged into Source Explorer as a per-source "Extraction runs"
-  table (run *detail* retained under the Sources sidebar section, list route + sidebar entry
-  deleted, `SourceInspection` gained a `runs` field, `listRunSummaries` port method removed).
-  Learner fixes: `ActivitySheet` clears its in-sheet advance memory on close (extracted to a tested
-  `advanceMemory` helper) so re-opening an earlier stop opens that stop; generating card reads
-  "Planning progress" (dead `progress` vocabulary key deleted); the expedition H1 is the learner's
-  topic with the derived summit demoted to a secondary line; crystal contrast raised via same-hue
-  hairlines, higher silhouette opacity, and a dark vista rock-face panel (geometry untouched); the
-  journal palette maps onto the shadcn semantic tokens inside the learner scope (portaled
-  sheets/dialogs/popovers carry `learn-theme`), admin lab stays stock; and Crystal Vista crystals
-  are tappable to reveal a floating concept-name chip (mastered/known-ghost only, view-only per
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)).
-
-- **Generation queue reliability, probe routing, and queued-state UX.** Expedition generation now
-  runs bounded-parallel (cap 2) behind the DB-claim seam with a visible Queued card, a single
-  staleness predicate shared by claim and fail, operation-id fencing with a 30s heartbeat, a unified
-  transient-vs-terminal error classification (network/5xx/429/timeout release the claim to the
-  attempt budget; schema/no-concept failures fail immediately), a `failed`-only `resetGeneration`
-  guard, and a shared transport retry helper/dispatcher. Header/body timeouts are terminal at the
-  transport. The knowledge-boundary probe alias deny-lists Google (Vertex 400s on forced
-  tool_choice) and gains a LiteLLM ordered fallback to a small cross-family model
-  (`qwen/qwen3-30b-a3b-instruct-2507`) so a sustained Groq rate-limit no longer stalls generation.
-  Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) and
-  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
-
-- **Expedition planning durability and entry UX.** Topic-expedition generation now starts as a
-  durable learner expedition row and is completed by the Admin Lab supervisor through claimed
-  `generating` work, stale-operation relaunch, bounded failure, and manual retry. `/learn` uses a
-  one-step Plan expedition dialog with example chips, one themed Scouting progress surface, immediate
-  return after submit, and Begin/Resume labels that account for lesson reads as well as answered
-  items. LiteLLM transport now uses an undici dispatcher with the production 300s header timeout, and
-  synthetic generation infers Declared Domain during generation instead of requiring it at entry.
-  Decisions: [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md),
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md), and
-  [ADR-0033](../adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md).
-
-- **Growing crystals and Crystal Vista.** Per-concept procedural growing crystals now replace the
-  gem icon across the learner trail, with deterministic crystal geometry, facet-by-facet growth for
-  mastered activity segments, skipped-known ghost crystals, section-divider and overview strips, and
-  mastery reveal animation. The Crystal Vista gives a view-only bedrock-up formation for the
-  expedition and opens from the header tally or section-completion celebration. Accepted framing:
-  the 2026-07-06 growing-crystals brainstorm (completed and deleted; its view-only-vista clause was
-  superseded by the constructive vista shipped in plan 2026-07-10-001, above).
-  Decision: [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-- **Learner App UX polish pass.** The learner entry and expedition flow now use static `/learn` and
-  `/learn/expedition/{enrichmentId}` URLs with an httpOnly learner-ref cookie set by
-  `/learn/session`, plus a Switch explorer control. The expedition entry uses Begin/Resume labels,
-  domain-eyebrow candidate cards, and a shadcn Dialog for one-step "Plan expedition" topic creation
-  with server-side Declared Domain inference. Generation cards show fixed-denominator `k / N`
-  Surveying progress. Known-skipped concepts can be unmarked, render as "Known ground" ghost
-  crystals, stay complete for gating, and are excluded from collected-crystal tallies and Crystal
-  Vista growth. Matching activities now keep 3/4 matched pairs locked and incomplete until the final
-  pair, with completed pair styling distinct from ordinary primary buttons. Decision:
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-- **Dedicated Rescued-Node Canonical Labeling step.** The rescued-node concept re-label is now a
-  dedicated measured step instead of an under-attended optional field on the rescue durability
-  judge. A new `RescuedNodeLabelingPort` runs one whole-set forced-tool call per Declared Domain
-  (on `kg-independent-judge`, `rescued-node-labeling` stage tag) over the domain's *durable*
-  rescued nodes, unconditionally returning a concept-shaped label for each (which may equal the
-  current one), number-cited and position-mapped fail-open. The durability judge's
-  `canonicalLabelProposal` field is deleted end-to-end (type, validator, prompt, application
-  surfacing, tests). Minting keeps the single adoption authority — the collision guard against the
-  domain's taken labels, alias demotion, reservation, and `relabeledFrom` recording are unchanged.
-  No migration and no `litellm` config change. Decision:
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-- **Adaptive sectioned expedition trail and game-honesty pass.** The Study Session projection is now
-  layer-wide and sectioned: milestone-anchored sections over the whole floored Derived Graph Layer,
-  ordered easiest-first, with the summit derived at read time (the last section's milestone). The
-  persisted expedition target column and its ready CHECK are deleted; expeditions generate/ensure and
-  offer one Begin candidate per enrichment, and every learner-facing count derives from the shared
-  trail scope. A node masters only when its lesson is read and every activity segment is
-  latest-correct (one rule for gating, gem, and per-stop visuals). The learner trail renders sections
-  with a non-blocking on-demand overview (prerequisite-gated jumping), matching is two-column
-  tap-pairs, key terms are deleted end-to-end (generation, schema, types, render), and rescued
-  `source_mentioned` nodes adopt a concept-shaped canonical label from the durability judge (original
-  demoted to an alias, fail-open on collision). Terminology folded into
-  [CONTEXT.md](../../CONTEXT.md) (Study Session, Expedition Section). Decisions:
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) and
-  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md) (target exemption removed).
-
-- **Learner theory quality, sparse item blueprint, and game-flow polish.** Concept Lessons carry
-  list-structured examples/applications (key-term highlighting was later deleted end-to-end); a
-  cross-family redundancy judge retries then
-  drops redundant non-substantive sections; the lesson minimum is one substantive section; Study
-  Item Blueprint generation has a structural sparse pre-gate; itemless lesson nodes master through
-  lesson reads; and the Learner App remembers the learner name, uses a mobile-first matching layout,
-  and routes through the capstone reward before advancing. Decisions:
+- **Learner study experience: sectioned trail, crystals, lessons, and study-item quality
+  (2026-07-02→06).** The Study Session projection is layer-wide and sectioned with a derived
+  summit and the single completion rule (terminology in [CONTEXT.md](../../CONTEXT.md); the
+  persisted expedition target was deleted). Per-concept procedural growing crystals and the
+  Crystal Vista replaced the gem icon; the trail gained opaque portals, one-tap grading with
+  explanations, known-ground ghost crystals, two-column tap-pair matching, Begin/Resume entry with
+  one-step topic planning, and journal theming on shadcn semantic tokens. Concept Lessons carry
+  list-structured examples/applications with a cross-family redundancy judge and a
+  one-substantive-section minimum; Study Item Blueprints have a structural sparse pre-gate; a
+  dedicated Rescued-Node Canonical Labeling step replaced the durability-judge field. Intrinsic
+  difficulty became a comparative in-set banded prior with a confident-floor trail floor
+  ([ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), amended). Decisions:
   [ADR-0026](../adr/0026-typed-study-item-bank.md),
   [ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md), and
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-- **Comparative banded intrinsic difficulty and trail floor.** Intrinsic difficulty is now a
-  K-sampled comparative in-set banded prior: one forced-tool call per Declared Domain bands every
-  concept 1–5 relative to that domain's set, dispersion marks contested bands, and a bounded
-  pairwise bracket against uncontested anchors calibrates them. The pointwise absolute judge, the
-  neural+structural fusion, and `dagDepthDifficulty` were deleted; the persisted score is
-  `(band − 1)/4`, the exact inverse of the diamond mapping, so the learner UI is unchanged. The
-  Study Session projection now floors confident band-1 non-target nodes out of the trail via edge
-  contraction (gating preserved), exposing `flooredNodeIds` for inspection. Decision:
-  [ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md) (amended).
-
-- **Learner trail polish.** The learner trail now uses opaque portal surfaces, one-tap option-select
-  grading with generated explanations, persisted lesson-read completion, a linear next-pointer,
-  type-stable stop icons, gem-only capstone state, expedition domain/progress rows, and no Journal
-  route. Study-item generation and validation require option-select explanations, Study Session
-  projections expose lesson-read and explanation state, and learner expedition rows compute live
-  item progress from the study bank and latest responses. Requirements:
-  [brainstorm](../brainstorms/2026-07-04-learner-trail-polish-requirements.md). Decision:
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
@@ -393,191 +159,11 @@
   kept the public URL healthy with no image rebuild; killing the dev process fell traffic back
   to the container within ~15s. The container→host hop required the documented one-time
   `ufw allow in on br-lrnki to any port 8787` (default-DROP timed out both bridge gateways;
-  host loopback was reachable). The Android workflow is structurally complete but unexercised
-  until the `EXPO_TOKEN`/`eas init` blocker is cleared; the web export re-check is a smoke pass,
-  not a re-run of the rule-14 gate (evidence unchanged in
-  `tmp/2026-07-09-learner-app-universal-expo/`).
+  host loopback was reachable). The web export re-check is a smoke pass, not a re-run of the
+  rule-14 gate (evidence unchanged in `tmp/2026-07-09-learner-app-universal-expo/`).
 
-- **Learner App separation, 2026-07-08.** Deterministic envelope: workspace typecheck (12
-  packages), tests pass (learner-api 18, learner-web 75, admin-lab 62, rest unchanged), lint
-  passes with the repo's pre-existing warnings, `next build` and `vite build` (static output +
-  404 fallback) pass. **Real-use gate (rule 14): PASS** — evidence in
-  `tmp/2026-07-08-learner-app-separation/`: real registration through the SPA gate; bearer-only
-  identity (401s without token); live 429 on a 12-attempt PIN sweep; a REAL topic expedition
-  ("Tidal energy basics") generated end-to-end by the relocated supervisor with production
-  LiteLLM calls (~4.5 min, 24 study items / 2 sections) with stage progress observed through the
-  `/journal` timelines; a real graded `option_select` write; leaderboard (10 entries, W28) and
-  duel gating reads; Playwright SPA flow gate → journal → trail → section map with zero console
-  errors. Caveat: duel play-through not browser-driven (locked for the fresh learner).
-
-- **Journey-first Operations page, 2026-07-08.** Deterministic envelope:
-  `@lrnki/application` tests pass (517), `PostgresJourneyLineageRead` DB-backed tests pass with
-  `.env` loaded, `@lrnki/admin-lab` tests pass (152), package and workspace typecheck pass, lint
-  passes with the repo's 6 pre-existing warnings, and production `next build` passes. **Real-use gate
-  (rule 14): PASS.**
-  Read-only inspection over the existing dev DB (no fresh LLM pipeline run): production
-  `/admin/lab/operations` rendered 23 journey/ungrouped cards with synthetic and document labels,
-  an Ungrouped section, no old Cost & timings/Journey report panel text, and an expanded merged
-  stage table with Stage/Calls/Tokens/Cost columns. Spot-check operation
-  `74c37361-29b3-45d6-a46e-65b6a75ac2ce` reported the shared merge totals
-  `85,560ms / 111 calls / 152,944 tokens / $0.01582428`. Final production browser sample:
-  705,332-byte HTML, median visible-heading load 1.577s (5 samples), under the 735 KB / 2.17s
-  baseline after compacting collapsed step rows and parallelizing lineage reads. Screenshots:
-  `tmp/operations-page-final-production-desktop.png`,
-  `tmp/operations-page-final-production-expanded-desktop.png`,
-  `tmp/operations-page-final-production-mobile.png`.
-
-- **Neural stage descriptors + mechanical config hashes (U8), 2026-07-08.** Deterministic envelope:
-  workspace `typecheck` exit 0 (all 10 projects); `lint` exit 0 (6 pre-existing warnings) — this
-  gate found and fixed a lint regression the initial landing introduced (6 `no-explicit-any` errors
-  in the descriptor-array erasure), replacing `NeuralStageDescriptor<any, any, any>` with a
-  hand-encoded existential supertype and a non-generic `stageConfigHash`; the four derived hashes
-  are byte-identical before/after the fix. Full workspace `test` exit 0 (`@lrnki/infrastructure-litellm`
-  133 incl. descriptor golden/hash + catalog-congruence tests). **Real-use gate (rule 14): PASS.**
-  kg-worker (tsx) root: real Rust-ownership extraction (`21f0399f`, 45 candidates/7 core) →
-  build (`a67a8366`) → enrichment (`8defd801`, 34 nodes) → study bank (66 items) persisted
-  `source-extraction-756879d1dc76` / `graph-enrichment-1886ba82e2e5` / `study-item-bank-a9ee35d66cee`
-  — each byte-identical to the derived value. Admin Lab (Next-bundled) root: a real "Binary search"
-  topic expedition driven through the production supervisor generated in the Next runtime with no
-  prompt-file resolution error and persisted `synthetic-topic-generation-978cefbca6ed` and
-  `study-item-bank-a9ee35d66cee` — **byte-identical across roots** (the KTD10/R4 cross-root claim
-  proven, not just the tsx path). Cost & timings attributes every stage: across all real operations
-  every emitted spend tag ∈ the 26-tag catalog, **zero orphaned tags** (live counterpart of the U7
-  congruence assertion); extraction 90/90 calls costed. Output quality unchanged (coherent
-  difficulty bands, correct Rust-ownership and binary-search items). Gate learner deleted (FK
-  children first). Evidence: `tmp/2026-07-08-neural-stage-descriptors/`.
-
-- **Shared neural client-construction policy, 2026-07-08.** Deterministic envelope: workspace
-  `typecheck` exit 0 (all 10 projects); `lint` 0 errors (6 pre-existing warnings);
-  `@lrnki/infrastructure-litellm` tests pass (128, incl. 4 new `neuralClients` policy tests
-  asserting through the request body that the deterministic client sends `temperature 0, seed 7`,
-  the probe client sends `0.7` with no seed, the discovery client sends neither, and overrides win
-  over env). Behavior-identical wiring move — the constructed clients are argument-identical to
-  the deleted per-root copies — so no separate rule-14 real-use run; the next real extraction and
-  expedition runs exercise both roots through the factory.
-
-- **Learner-state cleanup, `/learn` read path, and operations cost/timing visibility, 2026-07-08.**
-  Deterministic envelope: workspace `typecheck` exit 0 (all 10 projects); `lint` 0 errors
-  (pre-existing warnings only); tests green with `.env` loaded — `@lrnki/application` 514 (new
-  `getWeeklyLeaderboard` read-dedup counting-double + zero-point board tests),
-  `apps/admin-lab` 148 (new zero-point-hiding board test), `@lrnki/infrastructure-postgres`
-  learner suites 40 with the `learners` row count unchanged before/after the run (AE2). The
-  one-time wipe transaction moved the five learner-state tables and `learners` from
-  {21,63,4,9,6,54} to all zero, leaving graphs/enrichments/study-banks/timelines untouched (AE1).
-  **Real-use gate (rule 14): PASS.** Against the post-wipe dev DB with 10 learners registered
-  through the real gate, `/learn` (logged-in, warm) loaded in **2.59 s** vs the pre-change 10.5 s
-  baseline with no UUID-shaped player names (residual UUIDs are React key props, not display
-  names) and dormant non-viewers hidden; `/admin/lab/operations` loaded in **2.17 s / 735 KB** vs
-  ~4 s / 1.5 MB, rendering 43 finished cards all collapsed (0 stage tables in the HTML) with 43
-  live cost/tokens/calls chip sets, `?expand=<id>` disclosing a card's stage table server-side and
-  `?report=<id>` the "Cost & timings" per-stage breakdown; zero literal "bottleneck" remains on
-  the surface. Timings are dev-mode warm curl (same method as the baselines); production loads are
-  lower. Gate learners were deleted afterward. Evidence:
-  `tmp/2026-07-07-learner-cleanup-ops-visibility/`.
-
-- **Leaderboard dialog, cohort-of-10, single gate, and DAG links, 2026-07-08.** Implementation
-  verified present in the committed tree (leaderboard Dialog with the standalone route removed,
-  `assembleWeeklyBoard` cohort windowing, derived division ladder, single-form gate with logout,
-  Faker person-first rivals, enrichment DAG links) and covered by the shared deterministic envelope
-  above (typecheck 10/10, `apps/admin-lab` 148 incl. the board tests, lint clean). Its changed
-  gate and board surfaces were exercised live during the cleanup gate: the single two-field
-  gate registered 10 learners and logged one in, and the cohort board rendered as a dialog on
-  `/learn` filled to 10 with no UUID-shaped names. A dedicated 006 screenshot gate (division-badge
-  thresholds, dialog `Esc`/scroll, DAG canvas render) was not separately captured.
-
-- **Learner registry, weekly leaderboard, and Crystal Duel, 2026-07-07.** Deterministic envelope:
-  workspace `typecheck` exit 0; `lint` exit 0 (6 pre-existing warnings); all tests pass with `.env`
-  loaded — `@lrnki/application` 510, `@lrnki/infrastructure-postgres` 71, `apps/admin-lab` 137, plus
-  the rest of the workspace. New unit coverage: PIN/registry use-cases, ISO-week + banded-score
-  arithmetic and week-boundary edges, exhaustive `duelMachine` state×event sweep (AE6), seeded-rival
-  determinism, seam classifier, and grade-only duel grading; new integration coverage for the two
-  Postgres registry stores and the R1 FK. **Real-use gate (rule 14): PASS.** Seeded a real graph from
-  the Rust-ownership fixture through the production worker pipeline (extraction → build → enrich → 21
-  derived nodes / 26 edges → 50 study items) and drove AE1–AE5 through the real application use-cases
-  and Postgres stores: registration + name-taken + PIN switch + disjoint state (AE1); mastering a
-  band-2 crystal moved the weekly score 0→2 exactly (AE2); duel locked at 1/6, unlocked after
-  mastering 6 crystals with ≥10 pooled items (AE3); a full duel left `response_log` byte-identical
-  (15→15) and recorded one idempotent `duel_win` (AE4); the week rollover recorded an idempotent
-  `weekly_podium` and reset the new week to 0 (AE5). UI screenshots confirm the pick-or-create gate,
-  the 10-row board with the viewer highlighted, award crests, the chase banner, the unlock splash, and
-  the live duel arena. Evidence: `tmp/2026-07-07-leaderboard-duel/`.
-
-- **Expedition latency and operation-run liveness, 2026-07-07.** Deterministic envelope:
-  `@lrnki/application` tests pass (497), `@lrnki/infrastructure-postgres` tests pass with `.env`
-  loaded (68), `apps/admin-lab` tests pass (122), workspace `typecheck` exit 0, and `lint` exit 0
-  with 6 pre-existing warnings. **Real-use gate (rule 14): PASS.** Fresh Bayesian-inference
-  expedition after the change (`enrichment 47f7e898-…`) completed with `study_items` at 94.5s vs
-  the baseline same-topic run's 261.5s (`enrichment 6fe87e5d-…`); sampled output contained 9 lessons
-  and 20 study items across option-select, matching, and impostor types, with no concurrency-induced
-  ordering/content corruption observed. The operation-run reaper marked a synthetic stale row failed
-  from the supervisor tick; invoking that tick also claimed old dev `generating` rows, and later
-  polling showed externally driven rows with fresh heartbeats, so those were treated as healthy
-  active work rather than phantom operation rows.
-  Qwen3-235B ordering experiment evidence shows forced-tool OK but failed parity (kept-edge recovery
-  33% and 0%), so the incumbent stayed. Evidence:
-  `tmp/2026-07-07-expedition-latency/`.
-
-- **Learner grading use-case, 2026-07-07.** Deterministic envelope: affected-package `typecheck`
-  exit 0; `@lrnki/application`, `@lrnki/infrastructure-postgres`, and `apps/admin-lab` tests pass with
-  `.env` loaded. **Real-use gate (rule 14): PASS.** Drove the real Admin Lab learner app (Next dev on
-  `localhost:3000`) as learner `13caf547-…` over the Game Theory expedition
-  (`enrichment 88721332-…`, all three graded item types). Walk covered theory/option_select/matching/
-  impostor/capstone; the four `response_log` rows the use-case appended are shape-identical to the
-  pre-refactor baseline (`attempt_seq` 1–4 store-allocated; selection rows `submitted_answer=null`,
-  `grader_identity=auto`, `response_source=human`; matching row carries the `[{promptId,chosenMatchId}]`
-  trace JSON) — AE4 satisfied. Verdict set then clear left one `calibration_verdicts` row at
-  `verdict=learn` (clear is an upsert, not a delete). Switching the active expedition to "Already
-  active" in a second tab flipped Game Theory to `active=f`; a graded submit then rendered
-  "This expedition is no longer active…" with the option ungraded and **no** row appended (stayed at
-  4 rows), and a post-switch lesson-read was silently blocked by the guard (`lesson_reads=2`, not 3) —
-  AE2/AE3 demonstrated live. Evidence + screenshots: `tmp/2026-07-07-learner-grading-use-case/`.
-
-- **Operation-timeline catalog completeness, 2026-07-07.** Deterministic envelope: workspace
-  `typecheck` exit 0 (all 10 projects); `@lrnki/application` tests pass (481). The rewritten catalog
-  test's drift assertion was mutation-checked by hand: orphaning a live tag fails the set-equality
-  property, and double-claiming a stage fails naming the offender ("LLM stage admission is claimed
-  by both extraction and enrichment"); mutations discarded after. **Real-use gate (rule 14): PASS.**
-  Driving the same `bottleneckReport` use-case the Operations page renders
-  (`getBottleneckReport` → `PostgresOperationTimelineRead` + `LiteLlmSpendLogsReadAdapter`, `.env`
-  loaded) over synthetic-generation operation `ae19c226-3a30-470b-86e5-2a47dd5a51d9` recovered 141
-  formerly-dropped calls / $0.01873 / 140,565 tokens — the report had been showing ~37% of that
-  operation's true LLM cost, with the entire K-sampled `knowledge-boundary-probe` (140 calls,
-  $0.0185) invisible. Study-items operation `be06d8e3-3cc1-48a6-b568-765680ee629c` recovered
-  `impostor-lie-validity-judgment` (13 calls, $0.00296). Evidence:
-  `tmp/2026-07-07-catalog-completeness-gate/evidence.md`.
-
-- **Knowledge-boundary probe calibration, 2026-07-07.** Deterministic envelope: `@lrnki/application`
-  tests pass (479 tests), `@lrnki/application` typecheck pass, `@lrnki/kg-worker` typecheck pass.
-  **Real-use gate (rule 14): PASS.** Calibration reports under
-  `tmp/2026-07-07-boundary-probe-calibration/` measured both probe deployments at temperatures 0.7
-  and 1.0 over a 30-concept ladder. The final production-path synthetic runs used
-  `Caldrin-Voss continuity theorem` / Mathematics
-  (`24b6e5c1-5b3b-4ef2-8907-d0b427ab08aa`) and `Photosynthesis` / Biology
-  (`ae19c226-3a30-470b-86e5-2a47dd5a51d9`): the fabricated theorem persisted as `boundary` with
-  `derivedNodeId: null`, and the Biology control persisted 14/14 concepts as `core_knowledge`.
-  Evidence: `tmp/2026-07-07-boundary-probe-calibration/evidence.md` and
-  `tmp/2026-07-07-boundary-probe-calibration/gate/evidence.md`. Caveat: embedding agreement still
-  misses consistent hallucinations; this calibration proves the boundary route fires without
-  starving the textbook control, not complete fabricated-concept detection.
-
-- **Admin run visibility and Learner App UX polish, 2026-07-06.** Deterministic envelope: workspace
-  `typecheck` exit 0 (stale `.next/types` cleared for the deleted routes); recursive `test` exit 0
-  with `.env` loaded (admin-lab 122, incl. new `advanceMemory` stale-stop regression + vista
-  `labelChipFor`/`isNameableCrystal` tests); `lint` 0 errors (6 pre-existing warnings); production
-  build exit 0 with `/admin/lab/runs`, `/operations/bottleneck`, `/operations/journey` gone from the
-  route list. **Real-use gate (rule 14): PASS.** 390px + desktop browser pass: Operations page shows
-  Active (5) first with "5 running · 3 stalled · 137 failed" chips and a `stalled?` badge, re-polls
-  live without reload, and renders bottleneck/journey reports inline on their card; deleted routes
-  404; Sources shows a per-source Extraction runs table opening the retained run detail; re-clicking
-  an advanced-from stop reopens that stop; a live generating card reads "Planning progress 8 / 11";
-  the header H1 is "Bayesian statistics" with "Summit: Markov chain Monte Carlo" demoted; crystals
-  render on a dark vista rock face with hairline-outlined shards; learner buttons are trail-green
-  (themed tokens); tapping the known-ghost "Ownership" crystal shows its name chip and toggles off.
-  Evidence: `tmp/2026-07-06-admin-learner-polish-gate/` (screenshots + `evidence.md`). Caveat: the
-  vista chip check used a DB-seeded `known` verdict because the automated skip-known click did not
-  persist for that node; the skip-known flow itself is unchanged by this pass.
-
-- Tests remain deterministic-envelope evidence only under
+- Each COMPLETED outcome above names its rule-14 real-use gate result and `tmp/` evidence
+  directory; the full per-change validation transcripts live in git history. Tests remain
+  deterministic-envelope evidence only under
   [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md); quality claims come from
-  inspected real model output. Older validation trails live in git history and generated artifacts
-  under `tmp/`.
+  inspected real model output.

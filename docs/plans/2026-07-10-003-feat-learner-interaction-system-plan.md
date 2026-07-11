@@ -14,7 +14,35 @@ execution: code
 ## Execution Status (updated 2026-07-11, session 2)
 
 **U1, U2, U7, U3, U4, and U5 are IMPLEMENTED and deterministically verified. Only U6 (browser +
-real-use + Android + deploy gates, ADR/doc consolidation) remains.**
+real-use + Android + deploy gates, ADR/doc consolidation) remains — but the user has already
+reported VISUAL REGRESSIONS from the U1–U5 migration, so U6 must begin with a visual browser
+pass that reproduces (screenshots), fixes, and re-verifies each item below before any gate is
+claimed.**
+
+User-reported visual regressions (2026-07-11, from real use — fix first, then rerun the pass):
+
+1. **Expedition map stops are not visible.** Trail checkpoint circles do not render on the
+   expedition screen. Suspects: the U5 `NextStopHalo`/checkpoint changes, the 72px fixed halo
+   box, or CSS-variable token classes not resolving on web.
+2. **Incorrect layout for the context header.** The expedition/quest header (eyebrow + title +
+   summit line + overview/vista controls) lays out wrong. Suspect: the U5 `Animated.View`
+   wrapper added around the vista tally in `QuestHeader`, or flex/shrink changes from the U2
+   migration.
+3. **Incorrect positioning or sizing of dialogs.** Centered dialogs and/or full-screen dialogs
+   are misplaced or mis-sized. Suspects: the U5 `OverlayEntrance` wrapper inside
+   `DialogPrimitive.Content` (it may break the flex/max-height chain), the web
+   `position: fixed` overlay style, or `max-h-[85%]` on web.
+4. **Menu drawer should open from the RIGHT side.** The journal menu (LearnerMenuSheet /
+   bottom sheet) opens from the wrong edge for its trigger; the user expects a right-side
+   drawer. Decide surface accordingly (right-anchored sheet on web/tablet widths).
+5. **Do not highlight active elements with boxes.** The always-on focus/selection outlines
+   (the 2px `outlineColor` frontier box in `PressableSurface`, and selected-state borders)
+   are too loud. Keyboard-focus visibility must remain accessible, but only under
+   focus-visible-style interaction (keyboard), not for pointer/touch presses or persistent
+   selection — make the boxed treatment conditional, not default.
+
+These are exactly the class of defect the deterministic suites cannot see (NativeWind classes
+are inert in Jest; overlays are faked) — reinforcing rule 14: no green suite claims quality.
 
 U5 (landed 2026-07-11, session 2 — 36 suites / 148 tests green, workspace typecheck + test green,
 lint 0 errors / 8 pre-existing warnings, static web export green with the 5-route set):
