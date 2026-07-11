@@ -1,9 +1,11 @@
+import { useEffect, useRef } from "react";
 import { View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { BookOpen, Lock, MapPin, Rows3, Search } from "lucide-react-native";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import type { TrailCluster, TrailStop } from "@/learn/trailView";
-import { PressableSurface, Text, colors } from "@/ui";
+import { MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
 const CIRCLE_ICONS: Record<Exclude<CheckpointIcon, "crystal">, typeof Lock> = {
   lock: Lock,
@@ -38,7 +40,7 @@ export function CheckpointCircle({
       {/* The fixed halo layer marks the guided next stop (its one-shot emphasis lives in
           the motion pass); it sits behind the circle and never moves the trail. */}
       <View className="h-[72px] w-[72px] items-center justify-center">
-        {stop.isNext ? <View className="absolute h-20 w-20 rounded-full bg-frontier opacity-25" /> : null}
+        {stop.isNext ? <NextStopHalo stopId={stop.stopId} /> : null}
         <PressableSurface
           accessibilityLabel={`${presentation.label}: ${stop.label}`}
           disabled={disabled}
@@ -56,6 +58,32 @@ export function CheckpointCircle({
       ) : null}
     </View>
   );
+}
+
+// The guided-next halo (U5, R14): one finite swell when a stop BECOMES the next stop,
+// settling into the static ring. It never replays on an unchanged render — the played
+// stop id is remembered — and reduced motion renders the static ring immediately.
+function NextStopHalo({ stopId }: Readonly<{ stopId: string }>) {
+  const reduceMotion = useReducedMotion();
+  const swell = useSharedValue(0);
+  const playedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (playedForRef.current === stopId) return;
+    playedForRef.current = stopId;
+    if (reduceMotion) return;
+    swell.set(0);
+    swell.set(
+      withSequence(
+        withTiming(1, { duration: MOTION.emphasis / 2 }),
+        withTiming(0, { duration: MOTION.emphasis / 2 })
+      )
+    );
+  }, [stopId, reduceMotion, swell]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.25 + 0.3 * swell.get(),
+    transform: [{ scale: 1 + 0.18 * swell.get() }]
+  }));
+  return <Animated.View className="absolute h-20 w-20 rounded-full bg-frontier" style={style} />;
 }
 
 function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIcon) {

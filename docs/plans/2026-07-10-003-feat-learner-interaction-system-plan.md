@@ -11,10 +11,46 @@ execution: code
 
 # Learner Interaction System and Deferred Native Surfaces - Plan
 
-## Execution Status (updated 2026-07-10, session 1)
+## Execution Status (updated 2026-07-11, session 2)
 
-**U1, U2, U7, U3, and U4 are IMPLEMENTED and deterministically verified. U5 (motion/haptics
-completion) and U6 (browser + real-use + Android + deploy gates, ADR/doc consolidation) remain.**
+**U1, U2, U7, U3, U4, and U5 are IMPLEMENTED and deterministically verified. Only U6 (browser +
+real-use + Android + deploy gates, ADR/doc consolidation) remains.**
+
+U5 (landed 2026-07-11, session 2 — 36 suites / 148 tests green, workspace typecheck + test green,
+lint 0 errors / 8 pre-existing warnings, static web export green with the 5-route set):
+
+- **CrystalGlyph:** `assemble` prop re-ports the deleted web facet-from-bedrock assembly on
+  Reanimated (`useAnimatedProps` over an animated `G` with bedrock `origin`, 80 ms stagger,
+  back-out easing) plus a one-shot glint flare; a growthFraction RISE while mounted reveals only
+  the newly earned shards once (`revealFrom` batch keyed off the previous fraction in a ref —
+  fresh mounts and unchanged re-renders render statically, so growth never replays). Ghost and
+  reduced-motion always render final states statically. Observable via
+  `shard-assembling`/`shard-static`/`glint-flare`/`glint-static` testIDs (new
+  `CrystalGlyph.test.tsx`, scenarios 2/5/6/7).
+- **ActivitySheet:** `justAdvanced` now gates the capstone `CapstoneReveal` — assembly + ONE
+  mastery haptic only for a just-mastered, non-known capstone reached by advancing in-sheet;
+  grading outcomes fire success/warning haptics once per fresh grade inside the submit path
+  (never on cached results or re-renders).
+- **MatchingBoard:** wrong pair = one warning haptic + brief translateX nudge on the two flashed
+  tiles (reduced motion keeps the destructive boundary only); board completion = one success
+  haptic at the submit transition, never per locked pair.
+- **CheckpointCircle:** `NextStopHalo` plays one finite swell when a stop BECOMES next (played
+  stop id remembered in a ref), settling into the static ring; reduced motion renders the static
+  ring immediately.
+- **QuestHeader:** the Vista tally door pulses once when the completed-section count rises while
+  mounted — visual only, Vista never auto-opens (R15).
+- **CrystalVista:** the fresh-fusion celebration now fires ONE fusion haptic and swells the
+  newest aura (`CelebratingAura`, animated ellipse opacity 0.16→0.55→0.4; static-bright under
+  reduced motion); the retained highlight and fused-section memory semantics are unchanged.
+- **Overlays:** `OverlayEntrance` gives Dialog and FullScreenDialog content a mount-once fade +
+  12 px rise (`MOTION.overlay`); dismissal stays instant and nothing waits on the animation.
+  BottomSheet keeps its platform-native entrance.
+- Haptic ownership stayed at semantic transitions only: selection (existing press surfaces),
+  success/warning (grading), mastery (capstone reveal), fusion (Vista first-sight), unlock
+  (existing duel-start button). Generic back/menu/close remain silent.
+
+U5 still owed to U6: browser recordings of event timing (normal + reduced motion) — no browser,
+real-use, Android, or deployment gate has run for this plan yet.
 
 Deterministic evidence at handoff: 35 learner-app Jest suites / 141 tests green, learner-app
 typecheck green, workspace `pnpm typecheck` + `pnpm test` green, `pnpm lint` 0 errors, static web
@@ -63,15 +99,8 @@ Toolchain facts the next session must not rediscover:
 - New deps live in the `expo` catalog in `pnpm-workspace.yaml`; `react-native-css-interop` direct
   dep and the learner-app `tsx` devDep were removed.
 
-Known open items feeding U5/U6:
+Known open items feeding U6:
 
-- `ActivitySheet`'s `justAdvanced` prop is currently unused (one lint warning) — it is the U5 hook
-  for the capstone assembly-once beat.
-- U5 motion is entirely outstanding: next-stop halo one-shot emphasis (currently a static ring),
-  wrong-match nudge (currently a 420 ms class flash), facet-by-facet mastery assembly + glint,
-  single-shard reveal at the grading seam, one-time Vista fusion assembly, overlay entrances.
-  `MOTION`/`PRESS_SCALE`/`useReducedMotion` in `src/ui/motion.ts` are the tokens to use; press
-  scale and disclosure chevron rotation already honor reduced motion.
 - No browser (Playwright), real-use, Android, or deployment gate has run for this plan yet; no
   `tmp/2026-07-10-learner-interaction-system/` evidence exists yet. ADR-0032/0035 amendments and
   final plan/TODO consolidation are U6 work.

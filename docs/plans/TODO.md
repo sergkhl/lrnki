@@ -16,17 +16,18 @@
   trailing-nullable descriptor-shape test. Cache-pin payoff already measured during planning
   (59% cached tokens, spend discount verified) — recorded in the plan, no implementation.
 
-- **Unify learner interactions and finish deferred native surfaces — IN PROGRESS (U1–U4 done,
-  U5–U6 remain).** Execute [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md);
+- **Unify learner interactions and finish deferred native surfaces — IN PROGRESS (U1–U5 done,
+  U6 remains).** Execute [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md);
   its "Execution Status" section is the authoritative handoff. Landed and deterministically
-  verified (141 learner-app tests, workspace typecheck/test/lint, web export without the Board
-  route): app-owned `src/ui/` system with CSS-variable tokens + Jest/RNTL harness, full learner
-  migration behind an ESLint boundary, semantic overlays (full-screen activities/Vista with
-  native Vista hit targets, bottom sheets, dialogs), and the restored journal menu, Board dialog,
-  and prioritized splash coordinator. Still owed: U5 event-bound mastery motion + haptic
-  completion, then U6 browser/real-use/Android/deploy gates and ADR-0032/0035 + doc
-  consolidation. No browser or device validation has run yet — do not treat the green suites as
-  quality evidence (rule 14).
+  verified (148 learner-app tests, workspace typecheck/test/lint, static web export): app-owned
+  `src/ui/` system with CSS-variable tokens + Jest/RNTL harness, full learner migration behind an
+  ESLint boundary, semantic overlays, the restored journal menu/Board dialog/prioritized splash
+  coordinator, and now U5 event-bound motion + semantic haptics (facet-from-bedrock mastery
+  assembly + glint, one-shot growth-shard reveal, next-stop halo emphasis, wrong-match nudge,
+  Vista fusion swell + fusion haptic, overlay entrances, grading/mastery haptics — all behind the
+  one shared reduced-motion policy). Still owed: U6 browser/real-use/Android/deploy gates and
+  ADR-0032/0035 + doc consolidation. No browser or device validation has run yet — do not treat
+  the green suites as quality evidence (rule 14).
 
 - **Fix expedition discoverability (curated Explore + Browse all).** Execute
   [plan 2026-07-10-005](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md): the journal's

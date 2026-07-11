@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookOpen, CheckCircle2, HelpCircle, MapPin, Rows3, Search } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/lib/api";
 import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/lib/actions";
-import { Button, FullScreenDialog, OverlayHeader, Text, colors } from "@/ui";
+import { Button, FullScreenDialog, OverlayHeader, Text, colors, triggerHaptic } from "@/ui";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { LessonSections } from "./LessonSections";
@@ -166,20 +166,26 @@ function ActivityController({
     if (pending || graded) return;
     setSelectedId(id);
     run(async () => {
+      let graded: ActivityResult = null;
       if (activity.kind === "option_select") {
-        setResult(await submitLearnerOptionSelect({
+        graded = await submitLearnerOptionSelect({
           enrichmentId: session.enrichmentId,
           studyItemId: activity.item.studyItemId,
           chosenOptionId: id
-        }));
+        });
       }
       if (activity.kind === "impostor") {
-        setResult(await submitLearnerImpostor({
+        graded = await submitLearnerImpostor({
           enrichmentId: session.enrichmentId,
           studyItemId: activity.item.studyItemId,
           chosenStatementId: id
-        }));
+        });
       }
+      if (graded === null) return;
+      setResult(graded);
+      // The grading outcome is the semantic transition (R7): one haptic per fresh
+      // grade — never on re-render or a cached correct result.
+      if (graded.graded) triggerHaptic(graded.correct ? "success" : "warning");
     });
   };
 
@@ -251,37 +257,54 @@ function ActivityBody({
   if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
   if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
-    // The mastery reveal, static here: the finished crystal shows immediately
-    // (facet-by-facet assembly arrives with the motion unit).
-    return (
-      <View className="gap-3 rounded-card border border-line bg-card p-4">
-        <View className="flex-row items-center gap-3">
-          <CrystalGlyph
-            derivedNodeId={activity.derivedNodeId}
-            difficulty={activity.difficulty}
-            growthFraction={activity.growthFraction}
-            state={activity.mastered ? "mastered" : "frontier"}
-            ghost={activity.isKnownSkipped}
-            size={72}
-          />
-          <View className="min-w-0 flex-1">
-            <Text variant="title" className="text-lg">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</Text>
-            <Text variant="label" color="muted" className="font-normal">
-              {activity.isKnownSkipped
-                ? "Known ground is complete, but no crystal is collected."
-                : activity.mastered
-                  ? "This crystal is collected."
-                  : "Complete the earlier stops to finish growing this crystal."}
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
+    return <CapstoneReveal activity={activity} justAdvanced={justAdvanced} />;
   }
   if (activity.lesson?.sections.length) return <LessonSections lesson={activity.lesson} />;
   return (
     <View className="rounded-card border border-line bg-card p-4">
       <Text variant="label" color="muted" className="font-normal">No field notes are available for this stop.</Text>
+    </View>
+  );
+}
+
+// The mastery reveal (U5, R14-R15): a capstone reached by advancing IN this sheet
+// assembles its crystal facet-by-facet once, with one mastery haptic at that same
+// transition. Reopening a mastered capstone — and any known-skipped capstone — renders
+// the complete crystal statically with no haptic (AE7).
+function CapstoneReveal({
+  activity,
+  justAdvanced
+}: Readonly<{ activity: Extract<Activity, { kind: "capstone" }>; justAdvanced: boolean }>) {
+  const assemble = justAdvanced && activity.mastered && !activity.isKnownSkipped;
+  useEffect(() => {
+    if (assemble) triggerHaptic("mastery");
+    // The haptic belongs to the one just-mastered reveal; deps stay mount-scoped so a
+    // re-render can never repeat it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <View className="gap-3 rounded-card border border-line bg-card p-4">
+      <View className="flex-row items-center gap-3">
+        <CrystalGlyph
+          derivedNodeId={activity.derivedNodeId}
+          difficulty={activity.difficulty}
+          growthFraction={activity.growthFraction}
+          state={activity.mastered ? "mastered" : "frontier"}
+          ghost={activity.isKnownSkipped}
+          assemble={assemble}
+          size={72}
+        />
+        <View className="min-w-0 flex-1">
+          <Text variant="title" className="text-lg">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</Text>
+          <Text variant="label" color="muted" className="font-normal">
+            {activity.isKnownSkipped
+              ? "Known ground is complete, but no crystal is collected."
+              : activity.mastered
+                ? "This crystal is collected."
+                : "Complete the earlier stops to finish growing this crystal."}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }

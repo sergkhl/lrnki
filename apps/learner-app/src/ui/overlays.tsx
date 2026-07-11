@@ -4,10 +4,12 @@
 // mutation blocks every dismissal input via `dismissBlocked`.
 import { useEffect, type ComponentType, type ReactNode } from "react";
 import { BackHandler, Platform, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import * as DialogPrimitive from "@rn-primitives/dialog";
 import { X } from "lucide-react-native";
 import { AppText } from "./foundation";
 import { IconButton } from "./actions";
+import { MOTION, useReducedMotion } from "./motion";
 import { colors } from "./tokens";
 
 type IconComponent = ComponentType<{ size?: number; color?: string }>;
@@ -71,6 +73,28 @@ function useHardwareBack(open: boolean, blocked: boolean, close: () => void) {
   }, [open, blocked, close]);
 }
 
+/** Overlay entrance (R14): a restrained fade + short rise played once when the overlay
+ * content mounts. Reduced motion renders the settled state immediately; dismissal stays
+ * instant, so no state or callback ever waits on this. */
+function OverlayEntrance({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
+  const reduceMotion = useReducedMotion();
+  const progress = useSharedValue(reduceMotion ? 1 : 0);
+  useEffect(() => {
+    if (!reduceMotion) progress.set(withTiming(1, { duration: MOTION.overlay }));
+    // Mount-only entrance by design.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ translateY: (1 - progress.get()) * 12 }]
+  }));
+  return (
+    <Animated.View className={className} style={style}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export type OverlayProps = Readonly<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -96,7 +120,7 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
           <DialogPrimitive.Content className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card">
-            {children}
+            <OverlayEntrance>{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>
@@ -120,7 +144,9 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
           className="absolute inset-0"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
-          <DialogPrimitive.Content className="flex-1 bg-background">{children}</DialogPrimitive.Content>
+          <DialogPrimitive.Content className="flex-1 bg-background">
+            <OverlayEntrance className="flex-1">{children}</OverlayEntrance>
+          </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

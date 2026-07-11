@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Check } from "lucide-react-native";
 import type { MatchingAttemptTrace, StudyMatchingView } from "@lrnki/application/projection";
 import type { LearnerMatchingResult } from "@/lib/api";
 import { GroundedBadge } from "./GroundedBadge";
 import { canTryMatchingPair, matchingProgress } from "@/learn/matchingProgress";
 import { useShuffledLookup } from "@/learn/useShuffledLookup";
-import { Card, PressableSurface, Text, colors } from "@/ui";
+import { Card, MOTION, PressableSurface, Text, colors, triggerHaptic, useReducedMotion } from "@/ui";
 
 type SelectedTile = { column: "prompt" | "match"; id: string } | null;
 
@@ -58,10 +59,14 @@ export function MatchingBoard({
           if (matchingProgress(nextMatchedPairs, item.prompts.length).complete && !submittedRef.current) {
             submittedRef.current = true;
             setSubmitted(true);
+            // The board completing is the graded success transition — one haptic here,
+            // never per locked pair (R7).
+            triggerHaptic("success");
             await onComplete(traceRef.current);
           }
           return;
         }
+        triggerHaptic("warning");
         setWrong(new Set([promptId, matchId]));
         setSelected(null);
         if (wrongTimeoutRef.current !== null) clearTimeout(wrongTimeoutRef.current);
@@ -153,6 +158,22 @@ function TileButton({
   disabled,
   onPress
 }: Readonly<{ text: string; selected: boolean; locked: boolean; wrong: boolean; disabled: boolean; onPress: () => void }>) {
+  const reduceMotion = useReducedMotion();
+  const shake = useSharedValue(0);
+  // The wrong-pair nudge (U5, R14): one brief horizontal shake when this tile enters the
+  // wrong flash, resetting to rest. Reduced motion keeps the destructive boundary only.
+  useEffect(() => {
+    if (!wrong || reduceMotion) return;
+    shake.set(
+      withSequence(
+        withTiming(-4, { duration: MOTION.nudge }),
+        withTiming(4, { duration: MOTION.nudge }),
+        withTiming(-2, { duration: MOTION.nudge }),
+        withTiming(0, { duration: MOTION.nudge })
+      )
+    );
+  }, [wrong, reduceMotion, shake]);
+  const nudgeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.get() }] }));
   const box = locked
     ? "border-gem bg-gem-soft"
     : wrong
@@ -161,17 +182,19 @@ function TileButton({
         ? "border-frontier bg-gem-soft"
         : "border-line-strong bg-card";
   return (
-    <PressableSurface
-      accessibilityLabel={text}
-      disabled={disabled || locked}
-      selected={selected}
-      haptic="selection"
-      onPress={onPress}
-      className={`min-h-target flex-row items-start gap-2 rounded-control border px-3 py-2.5 ${box}`}
-      pressedClassName="bg-muted-panel"
-    >
-      {locked ? <Check size={16} color={colors.ink} style={{ marginTop: 2 }} /> : null}
-      <Text variant="label" className="flex-1">{text}</Text>
-    </PressableSurface>
+    <Animated.View style={nudgeStyle}>
+      <PressableSurface
+        accessibilityLabel={text}
+        disabled={disabled || locked}
+        selected={selected}
+        haptic="selection"
+        onPress={onPress}
+        className={`min-h-target flex-row items-start gap-2 rounded-control border px-3 py-2.5 ${box}`}
+        pressedClassName="bg-muted-panel"
+      >
+        {locked ? <Check size={16} color={colors.ink} style={{ marginTop: 2 }} /> : null}
+        <Text variant="label" className="flex-1">{text}</Text>
+      </PressableSurface>
+    </Animated.View>
   );
 }

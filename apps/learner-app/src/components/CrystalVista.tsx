@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, View, useWindowDimensions } from "react-native";
+import Animated, { useAnimatedProps, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import Svg, { Ellipse, G, Polygon, Polyline, Rect } from "react-native-svg";
 import { ArrowRight, Gem } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
@@ -16,7 +17,7 @@ import {
 import type { TrailView } from "@/learn/trailView";
 import { readFusedSections, writeFusedSections } from "@/lib/navMemory";
 import { CrystalShardsGroup } from "./CrystalGlyph";
-import { Button, FullScreenDialog, OverlayHeader, PressableSurface, Text, colors } from "@/ui";
+import { Button, FullScreenDialog, MOTION, OverlayHeader, PressableSurface, Text, colors, triggerHaptic, useReducedMotion } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The constructive Crystal Vista (plan 2026-07-10-001 U3): the formation the learner is
@@ -59,8 +60,10 @@ export function CrystalVista({
       if (cancelled) return;
       await writeFusedSections(session.learnerStateRef, session.enrichmentId, fused);
       if (fresh.length === 0) return;
-      // A timed highlight (banner + brightened aura) rather than programmatic motion, so
-      // the celebration is identical under reduced-motion settings.
+      // Seeing the new fusion assembled for the first time IS the fusion transition (R7):
+      // one haptic, then the timed highlight (banner + aura swell, static-bright under
+      // reduced motion) plays once and settles into the retained fusion highlight.
+      triggerHaptic("fusion");
       setCelebratingSection(fresh[fresh.length - 1]);
       setTimeout(() => { if (!cancelled) setCelebratingSection(null); }, 2200);
     })();
@@ -229,6 +232,9 @@ function FusionAuras({
         const members = placed.crystals.filter((crystal) => crystal.sectionIndex === sectionIndex);
         if (members.length === 0) return null;
         const bounds = clusterBounds(members);
+        if (celebratingSection === sectionIndex) {
+          return <CelebratingAura key={sectionIndex} bounds={bounds} />;
+        }
         return (
           <Ellipse
             key={sectionIndex}
@@ -237,12 +243,35 @@ function FusionAuras({
             rx={bounds.rx}
             ry={bounds.ry}
             fill={colors.gold}
-            opacity={celebratingSection === sectionIndex ? 0.4 : 0.16}
+            opacity={0.16}
           />
         );
       })}
     </>
   );
+}
+
+const AnimatedEllipse = Animated.createAnimatedComponent(Ellipse);
+
+// The newest fusion's one-time assembly swell (U5, R15): the aura brightens from the
+// resting 0.16 up past the celebration level and settles at 0.4 for the highlight
+// window. Reduced motion renders the bright celebration opacity statically.
+function CelebratingAura({ bounds }: Readonly<{ bounds: { cx: number; cy: number; rx: number; ry: number } }>) {
+  const reduceMotion = useReducedMotion();
+  const glow = useSharedValue(reduceMotion ? 0.4 : 0.16);
+  useEffect(() => {
+    if (reduceMotion) return;
+    glow.set(
+      withSequence(
+        withTiming(0.55, { duration: MOTION.celebration }),
+        withTiming(0.4, { duration: MOTION.celebration })
+      )
+    );
+    // Mount-only celebration by design.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const animatedProps = useAnimatedProps(() => ({ opacity: glow.get() }));
+  return <AnimatedEllipse cx={bounds.cx} cy={bounds.cy} rx={bounds.rx} ry={bounds.ry} fill={colors.gold} animatedProps={animatedProps} />;
 }
 
 function clusterBounds(members: PlacedCrystal[]): { cx: number; cy: number; rx: number; ry: number } {

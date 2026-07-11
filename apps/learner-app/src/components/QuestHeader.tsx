@@ -1,11 +1,13 @@
+import { useEffect, useRef } from "react";
 import { View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import type { StudySession } from "@lrnki/application/projection";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { SectionOverview } from "./SectionOverview";
 import { isSummitPush, summitLine } from "@/learn/goalCopy";
 import type { TrailView } from "@/learn/trailView";
 import { learnerTerm } from "@/learn/vocabulary";
-import { PressableSurface, Text } from "@/ui";
+import { MOTION, PressableSurface, Text, useReducedMotion } from "@/ui";
 
 export function QuestHeader({
   session,
@@ -19,6 +21,25 @@ export function QuestHeader({
   // mid-horizon goal, template fallback when no purpose row exists.
   const title = expeditionTitle ?? session.target.label;
   const mastered = trail.concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped);
+  // Vista-trigger emphasis (U5, R15): when a section completes WHILE the trail is open,
+  // pulse the tally door once instead of auto-opening the Vista. Visual only — the
+  // fusion haptic fires when the learner actually sees the new fusion inside the Vista.
+  const reduceMotion = useReducedMotion();
+  const completeSections = trail.sections.filter((section) => section.state === "complete").length;
+  const previousCompleteRef = useRef(completeSections);
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    const previous = previousCompleteRef.current;
+    previousCompleteRef.current = completeSections;
+    if (reduceMotion || completeSections <= previous) return;
+    pulse.set(
+      withSequence(
+        withTiming(1, { duration: MOTION.emphasis / 2 }),
+        withTiming(0, { duration: MOTION.emphasis / 2 })
+      )
+    );
+  }, [completeSections, reduceMotion, pulse]);
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.12 * pulse.get() }] }));
   return (
     <View className="border-b border-line bg-card px-4 py-3">
       <View className="mx-auto w-full max-w-3xl flex-row items-center justify-between gap-3">
@@ -47,6 +68,7 @@ export function QuestHeader({
           />
           {/* The crystal tally IS the vista door (plan 2026-07-10-001 U3): the most
               recently collected crystal plus the running count opens the formation. */}
+          <Animated.View style={pulseStyle}>
           <PressableSurface
             accessibilityLabel={learnerTerm("vistaOpen")}
             onPress={onOpenVista}
@@ -66,6 +88,7 @@ export function QuestHeader({
               {mastered.length}/{trail.concepts.length}
             </Text>
           </PressableSurface>
+          </Animated.View>
         </View>
       </View>
     </View>
