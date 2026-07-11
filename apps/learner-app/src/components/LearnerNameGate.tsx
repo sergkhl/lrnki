@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 import { Compass, UserPlus } from "lucide-react-native";
 import { enterSession } from "@/lib/session";
-import { Btn, Card, CardDescription, CardTitle } from "./ui";
+import { Button, Card, Input, Text, buttonIconColor } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 export type GateError = "name_taken" | "wrong_pin" | "invalid_pin" | "invalid_name";
@@ -25,14 +25,17 @@ export function gateErrorMessage(error: GateError | "rate_limited"): string {
 
 // The registry gate: one identifier + secret form with two intents. Both branches call
 // POST /session, the single PIN-aware route; a wrong PIN never swaps the stored token.
+// `pending` remembers WHICH intent is in flight so only that button shows busy while
+// both stay locked (single-flight, U2 scenario 2).
 export function LearnerNameGate({ onEntered }: { onEntered: () => void }) {
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<GateError | "rate_limited" | null>(null);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<"enter" | "create" | null>(null);
 
   const submit = (intent: "enter" | "create") => {
-    setPending(true);
+    if (pending) return;
+    setPending(intent);
     void (async () => {
       try {
         const result = await enterSession({ intent, learnerStateRef: name, pin });
@@ -43,7 +46,7 @@ export function LearnerNameGate({ onEntered }: { onEntered: () => void }) {
         }
         setError(result.error);
       } finally {
-        setPending(false);
+        setPending(null);
       }
     })();
   };
@@ -51,53 +54,47 @@ export function LearnerNameGate({ onEntered }: { onEntered: () => void }) {
   return (
     <Card className="w-full max-w-md gap-4">
       <View className="gap-1">
-        <CardTitle>{learnerTerm("gateTitle")}</CardTitle>
-        <CardDescription>{learnerTerm("gateDescription")}</CardDescription>
+        <Text variant="heading">{learnerTerm("gateTitle")}</Text>
+        <Text variant="caption" color="muted">{learnerTerm("gateDescription")}</Text>
       </View>
       {error ? (
-        <View className="rounded-xl border border-destructive bg-card px-3 py-2">
-          <Text className="text-sm text-destructive">{gateErrorMessage(error)}</Text>
+        <View accessibilityLiveRegion="polite" className="rounded-card border border-destructive bg-card px-3 py-2">
+          <Text variant="label" color="destructive">{gateErrorMessage(error)}</Text>
         </View>
       ) : null}
-      <View className="gap-1.5">
-        <Text className="text-sm font-medium text-ink">{learnerTerm("learnerRefLabel")}</Text>
-        <TextInput
-          autoComplete="username"
-          autoCapitalize="none"
-          placeholder={learnerTerm("learnerRefPlaceholder")}
-          placeholderTextColor="#6d6152"
-          value={name}
-          onChangeText={setName}
-          className="rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-ink"
-        />
-        <Text className="text-xs text-muted">{learnerTerm("gateNameHint")}</Text>
-      </View>
-      <View className="gap-1.5">
-        <Text className="text-sm font-medium text-ink">{learnerTerm("pinLabel")}</Text>
-        <TextInput
-          inputMode="numeric"
-          secureTextEntry
-          autoComplete="current-password"
-          placeholder={learnerTerm("pinPlaceholder")}
-          placeholderTextColor="#6d6152"
-          value={pin}
-          onChangeText={setPin}
-          className="rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-ink"
-        />
-        <Text className="text-xs text-muted">{learnerTerm("gatePinHint")}</Text>
-      </View>
+      <Input
+        label={learnerTerm("learnerRefLabel")}
+        hint={learnerTerm("gateNameHint")}
+        autoComplete="username"
+        autoCapitalize="none"
+        placeholder={learnerTerm("learnerRefPlaceholder")}
+        value={name}
+        onChangeText={setName}
+      />
+      <Input
+        label={learnerTerm("pinLabel")}
+        hint={learnerTerm("gatePinHint")}
+        inputMode="numeric"
+        secureTextEntry
+        autoComplete="current-password"
+        placeholder={learnerTerm("pinPlaceholder")}
+        value={pin}
+        onChangeText={setPin}
+      />
       <View className="gap-2">
-        <Btn
+        <Button
           variant="secondary"
-          disabled={pending}
+          disabled={pending === "create"}
+          busy={pending === "enter"}
           onPress={() => submit("enter")}
-          icon={<Compass size={16} color="#241f18" />}
+          icon={<Compass size={16} color={buttonIconColor("secondary")} />}
           label={learnerTerm("enterExplorerAction")}
         />
-        <Btn
-          disabled={pending}
+        <Button
+          disabled={pending === "enter"}
+          busy={pending === "create"}
           onPress={() => submit("create")}
-          icon={<UserPlus size={16} color="#fdfaf2" />}
+          icon={<UserPlus size={16} color={buttonIconColor("primary")} />}
           label={learnerTerm("createAction")}
         />
       </View>

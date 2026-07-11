@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { test } from "@jest/globals";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import { NON_LLM_STAGES } from "@lrnki/application/projection";
 import { stageCopy } from "./stageCopy";

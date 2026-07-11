@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { isStaleOperation } from "@lrnki/application/projection";
 import type { LearnerExpedition, OperationTimelineDetail } from "@lrnki/ports";
 import { retryTopicExpedition } from "@/lib/actions";
-import { BadgeLabel, Btn, Card, CardDescription, CardTitle, ProgressBar } from "./ui";
+import { Badge, Button, Card, Progress, Text } from "@/ui";
 import { generationProgress, isQueuedExpedition } from "@/learn/generationProgress";
 import { stageCopy } from "@/learn/stageCopy";
 import { expeditionStatusLabel, learnerTerm } from "@/learn/vocabulary";
@@ -18,10 +18,10 @@ export function GenerationProgressCard({
   if (isQueuedExpedition(expedition)) {
     return (
       <Card className="gap-3">
-        <CardTitle>{expedition.title}</CardTitle>
-        <CardDescription>{learnerTerm("queuedDescription")}</CardDescription>
-        <Text className="text-sm font-medium text-ink">{learnerTerm("queued")}</Text>
-        <ProgressBar fraction={null} />
+        <Text variant="title">{expedition.title}</Text>
+        <Text variant="caption" color="muted">{learnerTerm("queuedDescription")}</Text>
+        <Text variant="label">{learnerTerm("queued")}</Text>
+        <Progress fraction={null} accessibilityLabel={learnerTerm("queued")} />
       </Card>
     );
   }
@@ -30,25 +30,27 @@ export function GenerationProgressCard({
   const progress = generationProgress(timeline ?? undefined);
   return (
     <Card className="gap-3">
-      <CardTitle>{expedition.title}</CardTitle>
-      <CardDescription>
+      <Text variant="title">{expedition.title}</Text>
+      <Text variant="caption" color="muted">
         {expedition.status === "failed" ? expedition.failureMessage ?? learnerTerm("generatingFailedDescription") : stalled ? learnerTerm("generatingStoppedDescription") : stageCopy(currentStage)}
-      </CardDescription>
+      </Text>
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="text-sm font-medium text-ink">{progress.indeterminate ? learnerTerm("generating") : learnerTerm("generatingProgress")}</Text>
-        <Text className="text-sm tabular-nums text-muted">{progress.completed} / {progress.total}</Text>
+        <Text variant="label">{progress.indeterminate ? learnerTerm("generating") : learnerTerm("generatingProgress")}</Text>
+        <Text variant="label" color="muted" className="tabular-nums">{progress.completed} / {progress.total}</Text>
       </View>
-      <ProgressBar fraction={progress.fraction} />
+      <Progress fraction={progress.fraction} accessibilityLabel={learnerTerm("generatingProgress")} />
       {expedition.status === "failed" || stalled ? (
         <View className="flex-row flex-wrap items-center gap-2">
-          <BadgeLabel className="border-destructive bg-destructive" textClassName="text-[#fdfaf2]">
+          <Badge className="border-destructive bg-destructive" textClassName="text-on-accent">
             {stalled ? learnerTerm("generatingStopped") : expeditionStatusLabel(expedition.status)}
-          </BadgeLabel>
-          <Btn
+          </Badge>
+          <Button
             variant="outline"
-            disabled={pending}
+            size="compact"
+            busy={pending}
             label={learnerTerm("retryGeneration")}
             onPress={() => {
+              if (pending) return;
               setPending(true);
               void retryTopicExpedition({ learnerExpeditionId: expedition.learnerExpeditionId }).finally(() => setPending(false));
             }}

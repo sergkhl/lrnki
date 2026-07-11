@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "@jest/globals";
 import { classifySeam } from "./seamClassifier";
 
 test("classifySeam: a new ISO week always shows final standings (R3)", () => {

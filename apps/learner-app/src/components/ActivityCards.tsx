@@ -1,14 +1,16 @@
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { Check, X } from "lucide-react-native";
 import type { StudyImpostorView, StudyOptionSelectView } from "@lrnki/application/projection";
 import type { LearnerGradingResult } from "@/lib/api";
 import { GroundedBadge } from "./GroundedBadge";
 import { useShuffledLookup } from "@/learn/useShuffledLookup";
+import { Card, PressableSurface, Text, colors } from "@/ui";
 
 type ActivityResult = LearnerGradingResult | null;
 
 // One-tap graded choice tile shared by option-select and impostor: outline before
-// grading, gem-filled for the keyed answer, destructive for a wrong pick.
+// grading, gem-filled for the keyed answer, destructive for a wrong pick. State is
+// never color-alone: the keyed answer gets a check, a wrong pick gets an X (U7.3).
 function ChoiceTile({
   text,
   chosen,
@@ -20,24 +22,28 @@ function ChoiceTile({
   const box = !graded
     ? chosen
       ? "border-frontier bg-gem-soft"
-      : "border-line bg-card"
+      : "border-line-strong bg-card"
     : keyed
       ? "border-trail bg-trail"
       : chosen
         ? "border-destructive bg-destructive"
         : "border-line bg-card";
-  const ink = graded && (keyed || chosen) ? "text-[#fdfaf2]" : "text-ink";
+  const onFill = graded && (keyed || chosen);
   return (
-    <Pressable
-      accessibilityRole="button"
+    <PressableSurface
+      accessibilityLabel={text}
       disabled={disabled || graded}
+      selected={chosen}
+      busy={disabled && chosen && !graded}
+      haptic="selection"
       onPress={onPress}
-      className={`min-h-12 flex-row items-start gap-2 rounded-xl border px-3 py-2.5 ${box} ${disabled && !graded ? "opacity-50" : ""}`}
+      className={`min-h-target flex-row items-start gap-2 rounded-control border px-3 py-2.5 ${box} ${disabled && !graded ? "opacity-50" : ""}`}
+      pressedClassName="bg-muted-panel"
     >
-      {graded && keyed ? <Check size={16} color="#fdfaf2" style={{ marginTop: 2 }} /> : null}
-      {graded && chosen && !keyed ? <X size={16} color="#fdfaf2" style={{ marginTop: 2 }} /> : null}
-      <Text className={`flex-1 text-sm font-medium ${ink}`}>{text}</Text>
-    </Pressable>
+      {graded && keyed ? <Check size={16} color={colors["on-accent"]} style={{ marginTop: 2 }} /> : null}
+      {graded && chosen && !keyed ? <X size={16} color={colors["on-accent"]} style={{ marginTop: 2 }} /> : null}
+      <Text variant="label" color={onFill ? "on-accent" : "ink"} className="flex-1">{text}</Text>
+    </PressableSurface>
   );
 }
 
@@ -57,9 +63,9 @@ export function OptionSelectBody({
   const { orderedIds, byId: optionById } = useShuffledLookup(item.options, (option) => option.optionId);
   const graded = result?.graded === true;
   return (
-    <View className="gap-4 rounded-xl border border-line bg-card p-4">
+    <Card className="gap-4">
       <View className="flex-row items-start gap-2">
-        <Text className="flex-1 text-lg font-semibold leading-7 text-ink">{item.question}</Text>
+        <Text variant="heading" className="flex-1 leading-7">{item.question}</Text>
         <GroundedBadge provenance={item.groundingProvenance} />
       </View>
       <View className="gap-2">
@@ -80,12 +86,12 @@ export function OptionSelectBody({
         })}
       </View>
       {result?.graded ? (
-        <View className="rounded-xl border border-line bg-card p-3">
-          <Text className="text-sm font-medium text-ink">{result.correct ? "Correct." : "Not quite."}</Text>
-          <Text className="mt-1 text-sm text-muted">{item.explanation}</Text>
+        <View className="rounded-card border border-line bg-card p-3">
+          <Text variant="label">{result.correct ? "Correct." : "Not quite."}</Text>
+          <Text variant="label" color="muted" className="mt-1 font-normal">{item.explanation}</Text>
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
@@ -105,9 +111,9 @@ export function ImpostorBody({
   const { orderedIds, byId: statementById } = useShuffledLookup(item.statements, (statement) => statement.statementId);
   const graded = result?.graded === true;
   return (
-    <View className="gap-4 rounded-xl border border-line bg-card p-4">
+    <Card className="gap-4">
       <View className="flex-row items-start gap-2">
-        <Text className="flex-1 text-lg font-semibold leading-7 text-ink">{item.question}</Text>
+        <Text variant="heading" className="flex-1 leading-7">{item.question}</Text>
         <GroundedBadge provenance={item.groundingProvenance} />
       </View>
       <View className="gap-2">
@@ -128,18 +134,18 @@ export function ImpostorBody({
         })}
       </View>
       {result?.graded ? (
-        <View className="rounded-xl border border-line bg-card p-3">
-          <Text className="text-sm font-medium text-ink">
+        <View className="rounded-card border border-line bg-card p-3">
+          <Text variant="label">
             {result.correct ? "Correct. You spotted the fake." : "Not quite. That statement is true."}
           </Text>
-          <Text className="mt-1 text-sm text-muted">{item.reveal}</Text>
+          <Text variant="label" color="muted" className="mt-1 font-normal">{item.reveal}</Text>
           {item.lieSource === "sibling" && item.siblingLabel ? (
-            <Text className="mt-1 text-xs text-muted">
-              Actually true of <Text className="font-medium text-ink">{item.siblingLabel}</Text>.
+            <Text variant="caption" color="muted" className="mt-1">
+              Actually true of <Text variant="caption" className="font-medium">{item.siblingLabel}</Text>.
             </Text>
           ) : null}
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }

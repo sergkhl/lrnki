@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { Check } from "lucide-react-native";
 import type { MatchingAttemptTrace, StudyMatchingView } from "@lrnki/application/projection";
 import type { LearnerMatchingResult } from "@/lib/api";
 import { GroundedBadge } from "./GroundedBadge";
 import { canTryMatchingPair, matchingProgress } from "@/learn/matchingProgress";
 import { useShuffledLookup } from "@/learn/useShuffledLookup";
+import { Card, PressableSurface, Text, colors } from "@/ui";
 
 type SelectedTile = { column: "prompt" | "match"; id: string } | null;
 
@@ -82,19 +83,19 @@ export function MatchingBoard({
   };
 
   return (
-    <View className="gap-4 rounded-xl border border-line bg-card p-4">
+    <Card className="gap-4">
       <View className="flex-row items-start gap-2">
-        <Text className="flex-1 text-lg font-semibold leading-7 text-ink">{item.question}</Text>
+        <Text variant="heading" className="flex-1 leading-7">{item.question}</Text>
         <GroundedBadge provenance={item.groundingProvenance} />
       </View>
-      <Text className="text-sm text-muted">
+      <Text variant="label" color="muted" className="font-normal">
         {matchedPairs.length} of {item.prompts.length} matched. Tap a clue on the left, then its match on the right.
       </Text>
       {/* Two-column tap-pairs (R10): clues left, matches right, each independently shuffled.
           Tapping a tile in either column selects it; tapping one in the other column pairs them. */}
       <View className="flex-row gap-3">
         <View className="flex-1 gap-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-muted">Clues</Text>
+          <Text variant="caption" color="muted" className="font-semibold uppercase tracking-wide">Clues</Text>
           {promptIds.map((id) => {
             const prompt = promptById.get(id);
             if (!prompt) return null;
@@ -112,7 +113,7 @@ export function MatchingBoard({
           })}
         </View>
         <View className="flex-1 gap-2">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-muted">Matches</Text>
+          <Text variant="caption" color="muted" className="font-semibold uppercase tracking-wide">Matches</Text>
           {matchIds.map((id) => {
             const match = matchById.get(id);
             if (!match) return null;
@@ -131,17 +132,19 @@ export function MatchingBoard({
         </View>
       </View>
       {result?.graded ? (
-        <View className="rounded-xl border border-line bg-card p-3">
-          <Text className="text-sm font-medium text-ink">{result.correct ? "Clean sweep." : "Partly matched."}</Text>
-          <Text className="mt-1 text-sm text-muted">
+        <View className="rounded-card border border-line bg-card p-3">
+          <Text variant="label">{result.correct ? "Clean sweep." : "Partly matched."}</Text>
+          <Text variant="label" color="muted" className="mt-1 font-normal">
             {result.correctFirstTry} of {result.pairCount} matched on the first try.
           </Text>
         </View>
       ) : null}
-    </View>
+    </Card>
   );
 }
 
+// A matching tile: selection state is announced, a locked (matched) pair keeps its
+// check icon, and a wrong pair shows a destructive boundary — never color alone.
 function TileButton({
   text,
   selected,
@@ -156,16 +159,19 @@ function TileButton({
       ? "border-destructive bg-card"
       : selected
         ? "border-frontier bg-gem-soft"
-        : "border-line bg-card";
+        : "border-line-strong bg-card";
   return (
-    <Pressable
-      accessibilityRole="button"
+    <PressableSurface
+      accessibilityLabel={text}
       disabled={disabled || locked}
+      selected={selected}
+      haptic="selection"
       onPress={onPress}
-      className={`min-h-12 flex-row items-start gap-2 rounded-xl border px-3 py-2.5 ${box}`}
+      className={`min-h-target flex-row items-start gap-2 rounded-control border px-3 py-2.5 ${box}`}
+      pressedClassName="bg-muted-panel"
     >
-      {locked ? <Check size={16} color="#241f18" style={{ marginTop: 2 }} /> : null}
-      <Text className="flex-1 text-sm font-medium text-ink">{text}</Text>
-    </Pressable>
+      {locked ? <Check size={16} color={colors.ink} style={{ marginTop: 2 }} /> : null}
+      <Text variant="label" className="flex-1">{text}</Text>
+    </PressableSurface>
   );
 }

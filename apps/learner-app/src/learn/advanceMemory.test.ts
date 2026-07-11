@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "@jest/globals";
 import { activeStopFor, type AdvanceMemory } from "./advanceMemory";
 
 test("re-opening a stop after advance + close opens that stop, not the advanced one", () => {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "@jest/globals";
 import { crystalSpec, visibleShards } from "./crystalGeometry";
 
 test("crystalSpec is deterministic: same seed and difficulty produce identical geometry", () => {

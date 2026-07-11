@@ -11,6 +11,71 @@ execution: code
 
 # Learner Interaction System and Deferred Native Surfaces - Plan
 
+## Execution Status (updated 2026-07-10, session 1)
+
+**U1, U2, U7, U3, and U4 are IMPLEMENTED and deterministically verified. U5 (motion/haptics
+completion) and U6 (browser + real-use + Android + deploy gates, ADR/doc consolidation) remain.**
+
+Deterministic evidence at handoff: 35 learner-app Jest suites / 141 tests green, learner-app
+typecheck green, workspace `pnpm typecheck` + `pnpm test` green, `pnpm lint` 0 errors, static web
+export green with the final 5-route set (no `/leaderboard`). The lint-boundary probe (raw
+`Pressable`/`Text` import in a learner surface) is rejected by ESLint.
+
+What landed per unit:
+
+- **U1:** `src/ui/` module (tokens.js single source → CSS vars via tailwind plugin; actions/
+  foundation/overlays/sheets/motion/feedback/index), PortalHost in `_layout`, Jest via `jest-expo`
+  + RNTL 14 (async `render`/`fireEvent` — always `await`), all 16 `learn/*.test.ts` migrated by
+  swapping `node:test` → `@jest/globals` with assertions untouched. Token contrast test asserts
+  the WCAG pairs; `line-strong` (#8d8064) was added for interactive boundaries (old `line` fails
+  3:1) and `on-accent`/`gold`/`award`/`secured` absorb previously hard-coded hexes.
+- **U2:** All shells/forms/journal on the UI module; `components/ui.tsx` DELETED; journal is
+  unframed sections (`JournalSection`) with separated rows; `PlanExpeditionModal` replaced by
+  `PlanExpeditionSheet` (pulled forward from U3); gate uses `Input` + per-intent busy buttons.
+- **U7:** `learn/checkpointPresentation.ts` single-sources stop icon/label for trail circle AND
+  activity header; CheckpointCircle (stable 72px outer box + fixed halo layer), ConceptMarker
+  (chevron disclosure with `expanded` a11y state), ActivityCards/MatchingBoard/DuelScreen/
+  GroundedBadge on PressableSurface; ESLint learner override live in root `eslint.config.mjs`.
+- **U3:** ActivitySheet → FullScreenDialog with OverlayHeader mirroring the opening checkpoint
+  (grading blocks close via `dismissBlocked` + disabled close control); SectionOverview + plan
+  sheet → BottomSheet; CrystalVista → FullScreenDialog with a positioned native hit layer (KTD7)
+  over the untouched SVG formation — only `isNameableCrystal` nodes get targets (≥44px), mystery
+  fog shapes expose no semantics; Vista API is now `open`/`onOpenChange`.
+- **U4:** `learn/splashPriority.ts` (pure duel>podium>new-week>rank order; only the shown event's
+  memory is written — duel dismissal leaves the board snapshot untouched), LearnerMenuSheet
+  (close-before-handoff), LeaderboardDialog (Board title moved to the dialog header; board body
+  keeps week+division row), DuelUnlockDialog, JournalSplashCoordinator (decides once per mount
+  after board+duel reads AND nav memory settle; silent zero-point first visit refreshes the
+  snapshot); journal header pills replaced by one Menu IconButton; `app/leaderboard.tsx` DELETED.
+
+Toolchain facts the next session must not rediscover:
+
+- `babel.config.js` disables the NativeWind preset under `api.env("test")` — its interop rewrite
+  breaks `jest.mock` factories; className props are inert strings in tests by design.
+- Reanimated's official Jest mock boots `react-native-worklets` native init and cannot load;
+  `jest.setup.js` carries a minimal hand-rolled reanimated mock (extend it there if U5 needs more
+  of the API, e.g. `useAnimatedProps` variants or entering animations).
+- `@expo/ui/community/bottom-sheet` is the gorhom-compatible drop-in (vaul on web, SwiftUI/M3
+  native); `jest.setup.js` fakes it, so its REAL web/native behavior is still unverified — that
+  is U6 browser/device work, deliberately not claimed here.
+- Shared values must use `.set()`/`.get()` (the repo's react-hooks lint rejects `.value =`), and
+  refs must not be read during render (same lint).
+- New deps live in the `expo` catalog in `pnpm-workspace.yaml`; `react-native-css-interop` direct
+  dep and the learner-app `tsx` devDep were removed.
+
+Known open items feeding U5/U6:
+
+- `ActivitySheet`'s `justAdvanced` prop is currently unused (one lint warning) — it is the U5 hook
+  for the capstone assembly-once beat.
+- U5 motion is entirely outstanding: next-stop halo one-shot emphasis (currently a static ring),
+  wrong-match nudge (currently a 420 ms class flash), facet-by-facet mastery assembly + glint,
+  single-shard reveal at the grading seam, one-time Vista fusion assembly, overlay entrances.
+  `MOTION`/`PRESS_SCALE`/`useReducedMotion` in `src/ui/motion.ts` are the tokens to use; press
+  scale and disclosure chevron rotation already honor reduced motion.
+- No browser (Playwright), real-use, Android, or deployment gate has run for this plan yet; no
+  `tmp/2026-07-10-learner-interaction-system/` evidence exists yet. ADR-0032/0035 amendments and
+  final plan/TODO consolidation are U6 work.
+
 ## Goal Capsule
 
 - **Objective:** Hard-cut the Learner App to one app-owned NativeWind interaction system, restore

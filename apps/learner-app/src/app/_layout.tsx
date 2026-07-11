@@ -5,7 +5,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { PortalHost } from "@rn-primitives/portal";
 import { hydrateToken, queryClient } from "@/lib/api";
+import { colors } from "@/ui";
 
 export default function RootLayout() {
   // SecureStore reads are async; the token mirror hydrates once before any screen can
@@ -22,9 +24,11 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: "#f7f0de" }
+            contentStyle: { backgroundColor: colors.background }
           }}
         />
+        {/* Native overlay layer for Dialog/FullScreenDialog portals (KTD4). */}
+        <PortalHost />
       </QueryClientProvider>
     </SafeAreaProvider>
   );

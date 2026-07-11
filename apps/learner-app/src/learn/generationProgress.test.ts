@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "@jest/globals";
 import { STAGE_TAGS } from "@lrnki/domain-core";
 import type { OperationTimelineDetail } from "@lrnki/ports";
 import { EXPECTED_TOPIC_GENERATION_STAGES, generationProgress, isQueuedExpedition } from "./generationProgress";

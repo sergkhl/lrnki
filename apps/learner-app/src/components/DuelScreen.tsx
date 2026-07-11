@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import type { StudySession } from "@lrnki/application/projection";
 import { rivalDuelAnswer, rivalSeed } from "@lrnki/learner-api/rival-simulation";
 import { gradeDuelAnswerAction, recordDuelWinAction } from "@/lib/actions";
 import { duelReduce, type DuelState } from "@/learn/duelMachine";
 import { learnerTerm } from "@/learn/vocabulary";
-import { Btn } from "./ui";
+import { Button, Card, PressableSurface, Text } from "@/ui";
 
 type StudyItemView = StudySession["studySegmentsByNode"][string][number];
 
@@ -103,9 +103,9 @@ export function DuelScreen({ duelId, rivalName, questions }: Readonly<{ duelId: 
 
   const scoreLine = (
     <View className="flex-row items-center justify-center gap-4">
-      <Text className="text-sm font-medium text-ink">{learnerTerm("duelYouLabel")}: {state.learnerCorrect}</Text>
-      <Text className="text-sm text-muted">{learnerTerm("duelVersus")}</Text>
-      <Text className="text-sm font-medium text-ink">{rivalName}: {state.rivalCorrect}</Text>
+      <Text variant="label">{learnerTerm("duelYouLabel")}: {state.learnerCorrect}</Text>
+      <Text variant="label" color="muted" className="font-normal">{learnerTerm("duelVersus")}</Text>
+      <Text variant="label">{rivalName}: {state.rivalCorrect}</Text>
     </View>
   );
 
@@ -113,12 +113,12 @@ export function DuelScreen({ duelId, rivalName, questions }: Readonly<{ duelId: 
     const title = state.outcome === "win" ? learnerTerm("duelWinTitle") : state.outcome === "loss" ? learnerTerm("duelLossTitle") : learnerTerm("duelDrawTitle");
     const body = state.outcome === "win" ? learnerTerm("duelWinBody") : state.outcome === "loss" ? learnerTerm("duelLossBody") : learnerTerm("duelDrawBody");
     return (
-      <View className="items-center gap-4 rounded-xl border border-line bg-card p-8">
-        <Text className="text-2xl font-semibold text-ink">{title}</Text>
+      <Card className="items-center gap-4 p-8">
+        <Text variant="heading">{title}</Text>
         {scoreLine}
-        <Text className="max-w-sm text-center text-sm text-muted">{body}</Text>
-        <Btn onPress={() => router.replace("/")} label={learnerTerm("duelAgain")} />
-      </View>
+        <Text variant="label" color="muted" className="max-w-sm text-center font-normal">{body}</Text>
+        <Button onPress={() => router.replace("/")} label={learnerTerm("duelAgain")} />
+      </Card>
     );
   }
 
@@ -126,10 +126,10 @@ export function DuelScreen({ duelId, rivalName, questions }: Readonly<{ duelId: 
   const header = (
     <View className="gap-2">
       <View className="flex-row items-center justify-between">
-        <Text className="text-sm text-muted">
+        <Text variant="label" color="muted" className="font-normal">
           {learnerTerm("duelQuestionProgress").replace("{index}", String(index + 1)).replace("{total}", String(questions.length))}
         </Text>
-        <Text className="text-sm font-medium tabular-nums text-ink">
+        <Text variant="label" className="tabular-nums">
           {state.status === "question" ? secondsLeft : 0}
           {learnerTerm("duelTimeLeft")}
         </Text>
@@ -140,23 +140,23 @@ export function DuelScreen({ duelId, rivalName, questions }: Readonly<{ duelId: 
 
   if (state.status === "reveal") {
     return (
-      <View className="gap-4 rounded-xl border border-line bg-card p-5">
+      <Card className="gap-4 p-5">
         {header}
         <View className="items-center gap-2 py-4">
-          <Text className={`text-lg font-semibold ${state.lastLearnerCorrect ? "text-trail" : "text-destructive"}`}>
+          <Text variant="title" color={state.lastLearnerCorrect ? "trail" : "destructive"} className="text-lg">
             {state.lastLearnerCorrect ? learnerTerm("duelCorrect") : learnerTerm("duelIncorrect")}
           </Text>
-          <Text className="text-sm text-muted">
+          <Text variant="label" color="muted" className="font-normal">
             {state.lastRivalCorrect ? learnerTerm("duelRivalCorrect") : learnerTerm("duelRivalMissed")}
           </Text>
         </View>
-        <Btn onPress={next} label={learnerTerm("duelNext")} className="self-center" />
-      </View>
+        <Button onPress={next} label={learnerTerm("duelNext")} className="self-center" />
+      </Card>
     );
   }
 
   return (
-    <View className="gap-4 rounded-xl border border-line bg-card p-5">
+    <Card className="gap-4 p-5">
       {header}
       <QuestionBody
         question={question}
@@ -164,7 +164,7 @@ export function DuelScreen({ duelId, rivalName, questions }: Readonly<{ duelId: 
         onOptionSelect={(optionId) => void submit(question.view.item.studyItemId, { itemType: "option_select", chosenOptionId: optionId }, question.band, learnerLead)}
         onImpostorSelect={(statementId) => void submit(question.view.item.studyItemId, { itemType: "impostor", chosenStatementId: statementId }, question.band, learnerLead)}
       />
-    </View>
+    </Card>
   );
 }
 
@@ -178,7 +178,7 @@ function QuestionBody({
   if (view.kind === "option_select") {
     return (
       <View className="gap-3">
-        <Text className="text-base font-medium text-ink">{view.item.question}</Text>
+        <Text variant="title">{view.item.question}</Text>
         <View className="gap-2">
           {view.item.options.map((option) => (
             <AnswerButton key={option.optionId} text={option.text} disabled={disabled} onPress={() => onOptionSelect(option.optionId)} />
@@ -190,7 +190,7 @@ function QuestionBody({
   if (view.kind !== "impostor") return null; // matching is excluded from the duel pool (R7)
   return (
     <View className="gap-3">
-      <Text className="text-base font-medium text-ink">{view.item.question}</Text>
+      <Text variant="title">{view.item.question}</Text>
       <View className="gap-2">
         {view.item.statements.map((statement) => (
           <AnswerButton key={statement.statementId} text={statement.text} disabled={disabled} onPress={() => onImpostorSelect(statement.statementId)} />
@@ -202,13 +202,15 @@ function QuestionBody({
 
 function AnswerButton({ text, disabled, onPress }: Readonly<{ text: string; disabled: boolean; onPress: () => void }>) {
   return (
-    <Pressable
-      accessibilityRole="button"
+    <PressableSurface
+      accessibilityLabel={text}
       disabled={disabled}
+      haptic="selection"
       onPress={onPress}
-      className={`rounded-xl border border-line bg-card px-4 py-3 ${disabled ? "opacity-50" : "active:opacity-80"}`}
+      className={`min-h-target justify-center rounded-control border border-line-strong bg-card px-4 py-3 ${disabled ? "opacity-50" : ""}`}
+      pressedClassName="bg-muted-panel"
     >
-      <Text className="text-sm text-ink">{text}</Text>
-    </Pressable>
+      <Text variant="label" className="font-normal">{text}</Text>
+    </PressableSurface>
   );
 }

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ScrollView, View, useWindowDimensions } from "react-native";
 import Svg, { Ellipse, G, Polygon, Polyline, Rect } from "react-native-svg";
-import { ArrowRight, X } from "lucide-react-native";
+import { ArrowRight, Gem } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import {
   buildCrystalFormation,
   completeSectionIndexes,
+  isNameableCrystal,
   memoryDoorFor,
   placeFormation,
   VISTA_CRYSTAL_SIZE,
@@ -15,21 +16,27 @@ import {
 import type { TrailView } from "@/learn/trailView";
 import { readFusedSections, writeFusedSections } from "@/lib/navMemory";
 import { CrystalShardsGroup } from "./CrystalGlyph";
-import { Btn } from "./ui";
+import { Button, FullScreenDialog, OverlayHeader, PressableSurface, Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The constructive Crystal Vista (plan 2026-07-10-001 U3): the formation the learner is
-// BUILDING. Leg clusters fuse when their section completes (one celebration per fusion,
-// deduped by local nav memory — the same seam pattern as the board splash); the final
-// fusion crowns the summit keystone. Tapping a nameable crystal opens the memory door —
-// review navigation back to that trail stop, never a collection game. All state derives
-// from the Study Session projection; the vista persists nothing but the celebration memo.
+// BUILDING. Interaction moved off the SVG scene graph (KTD7): nameable crystals get
+// positioned native touch targets with labels, focus, and selection state, while the
+// pure formation geometry — placement, veins, auras, keystone — renders untouched
+// beneath them. Ordinary fogged mystery shapes expose no interactive semantics.
 export function CrystalVista({
   session,
   trail,
-  onClose,
+  open,
+  onOpenChange,
   onExamine
-}: Readonly<{ session: StudySession; trail: TrailView; onClose: () => void; onExamine: (derivedNodeId: string) => void }>) {
+}: Readonly<{
+  session: StudySession;
+  trail: TrailView;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onExamine: (derivedNodeId: string) => void;
+}>) {
   const { width } = useWindowDimensions();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [celebratingSection, setCelebratingSection] = useState<number | null>(null);
@@ -39,10 +46,12 @@ export function CrystalVista({
   const fused = useMemo(() => completeSectionIndexes(formation), [formation]);
   const lastSectionIndex = Math.max(-1, ...formation.nodes.map((node) => node.sectionIndex));
   const keystone = lastSectionIndex >= 0 && fused.includes(lastSectionIndex);
+  const mastered = trail.concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped);
 
   // Fusion celebration, once per newly fused leg: compare against the device memo, play
-  // the pulse for the newest fusion, then remember the whole fused set.
+  // the highlight for the newest fusion, then remember the whole fused set.
   useEffect(() => {
+    if (!open) return;
     let cancelled = false;
     void (async () => {
       const seen = (await readFusedSections(session.learnerStateRef, session.enrichmentId)) ?? [];
@@ -56,107 +65,154 @@ export function CrystalVista({
       setTimeout(() => { if (!cancelled) setCelebratingSection(null); }, 2200);
     })();
     return () => { cancelled = true; };
-  }, [fused, session.learnerStateRef, session.enrichmentId]);
+  }, [open, fused, session.learnerStateRef, session.enrichmentId]);
 
   const door = memoryDoorFor(formation, selectedNodeId);
   const canvasWidth = Math.min(width - 32, 720);
-  const canvasHeight = placed.viewBox.width > 0 ? canvasWidth * (placed.viewBox.height / placed.viewBox.width) : 0;
+  const scale = placed.viewBox.width > 0 ? canvasWidth / placed.viewBox.width : 0;
+  const canvasHeight = canvasWidth * (placed.viewBox.width > 0 ? placed.viewBox.height / placed.viewBox.width : 0);
+
+  const close = () => {
+    setSelectedNodeId(null);
+    onOpenChange(false);
+  };
 
   return (
-    <View className="absolute inset-0 z-50 bg-background">
-      <View className="border-b border-line bg-card px-4 py-3">
-        <View className="mx-auto w-full max-w-3xl flex-row items-center justify-between gap-3">
-          <View className="min-w-0 flex-1">
-            <Text className="text-xs text-muted">{learnerTerm("vistaTitle")}</Text>
-            <Text className="text-base font-semibold text-ink" numberOfLines={1}>{formation.title}</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={learnerTerm("returnToTrail")}
-            onPress={onClose}
-            className="flex-row items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-1.5 active:opacity-80"
-          >
-            <X size={14} color="#241f18" />
-            <Text className="text-xs font-medium text-ink">{learnerTerm("returnToTrail")}</Text>
-          </Pressable>
-        </View>
-      </View>
-      <ScrollView className="flex-1" contentContainerClassName="items-center gap-3 p-4">
-        <Text className="max-w-md text-center text-xs text-muted">{learnerTerm("vistaHint")}</Text>
-        {celebratingSection !== null ? (
-          <View className="rounded-xl border border-gem-soft bg-gem-soft px-3 py-1.5">
-            <Text className="text-xs font-semibold text-ink">
-              {learnerTerm("vistaFusedTemplate").replace("{n}", String(celebratingSection + 1))}
-            </Text>
+    <FullScreenDialog open={open} onOpenChange={(next) => { if (!next) close(); }}>
+      <View className="flex-1 bg-background">
+        <OverlayHeader
+          icon={
+            mastered.length > 0 ? (
+              <CrystalShardsGroupIcon crystal={mastered[mastered.length - 1]} />
+            ) : (
+              <Gem size={20} color={colors.ink} />
+            )
+          }
+          title={formation.title}
+          description={learnerTerm("vistaTitle")}
+          onClose={close}
+          closeLabel={learnerTerm("returnToTrail")}
+        />
+        <ScrollView className="flex-1" contentContainerClassName="items-center gap-3 p-4">
+          <Text variant="caption" color="muted" className="max-w-md text-center">{learnerTerm("vistaHint")}</Text>
+          {celebratingSection !== null ? (
+            <View accessibilityLiveRegion="polite" className="rounded-card border border-gem-soft bg-gem-soft px-3 py-1.5">
+              <Text variant="caption" className="font-semibold">
+                {learnerTerm("vistaFusedTemplate").replace("{n}", String(celebratingSection + 1))}
+              </Text>
+            </View>
+          ) : null}
+          {placed.crystals.length > 0 ? (
+            <View style={{ width: canvasWidth, height: canvasHeight }}>
+              <Svg width={canvasWidth} height={canvasHeight} viewBox={`${placed.viewBox.x} ${placed.viewBox.y} ${placed.viewBox.width} ${placed.viewBox.height}`}>
+                {/* Bedrock line the formation grows from. */}
+                <Rect
+                  x={placed.viewBox.x}
+                  y={Math.max(...placed.crystals.map((crystal) => crystal.y)) + 4}
+                  width={placed.viewBox.width}
+                  height={8}
+                  fill={colors.fog}
+                  opacity={0.35}
+                />
+                <FusionAuras placed={placed} fused={fused} celebratingSection={celebratingSection} />
+                {placed.veins.map((vein) => (
+                  <Polyline
+                    key={vein.key}
+                    points={vein.points.map((point) => `${point.x},${point.y}`).join(" ")}
+                    fill="none"
+                    stroke={colors.fog}
+                    strokeWidth={2.5}
+                    strokeDasharray={vein.uncertain ? "6 6" : undefined}
+                    opacity={0.5}
+                  />
+                ))}
+                {placed.crystals.map((crystal) => (
+                  <G
+                    key={crystal.derivedNodeId}
+                    transform={`translate(${crystal.x - (VISTA_CRYSTAL_SIZE / 100) * 50}, ${crystal.y - (VISTA_CRYSTAL_SIZE / 100) * 95}) scale(${VISTA_CRYSTAL_SIZE / 100})`}
+                    opacity={selectedNodeId === null || selectedNodeId === crystal.derivedNodeId ? 1 : 0.55}
+                  >
+                    <CrystalShardsGroup
+                      derivedNodeId={crystal.derivedNodeId}
+                      difficulty={crystal.difficulty}
+                      growthFraction={crystal.growthFraction}
+                      state={crystal.state}
+                      ghost={crystal.isKnownSkipped}
+                    />
+                  </G>
+                ))}
+                {keystone ? <SummitKeystone placed={placed} /> : null}
+              </Svg>
+              {/* Native hit layer (KTD7): one positioned target per NAMEABLE crystal. */}
+              {placed.crystals.filter(isNameableCrystal).map((crystal) => {
+                const target = targetBox(crystal, placed, scale);
+                return (
+                  <PressableSurface
+                    key={`target-${crystal.derivedNodeId}`}
+                    accessibilityLabel={crystal.label}
+                    selected={selectedNodeId === crystal.derivedNodeId}
+                    onPress={() =>
+                      setSelectedNodeId((current) => (current === crystal.derivedNodeId ? null : crystal.derivedNodeId))
+                    }
+                    className={`absolute items-center justify-center rounded-control ${selectedNodeId === crystal.derivedNodeId ? "border-2 border-frontier" : ""}`}
+                    style={{ left: target.left, top: target.top, width: target.size, height: target.size }}
+                  >
+                    <View />
+                  </PressableSurface>
+                );
+              })}
+            </View>
+          ) : (
+            <Text variant="label" color="muted" className="font-normal">{learnerTerm("vistaEmpty")}</Text>
+          )}
+        </ScrollView>
+        {door ? (
+          <View className="border-t border-line bg-card px-4 py-3">
+            <View className="mx-auto w-full max-w-3xl gap-1.5">
+              <Text variant="label" className="font-semibold" numberOfLines={1}>{door.label}</Text>
+              {door.kind === "reveal" ? (
+                <>
+                  {door.gist ? <Text variant="caption" color="muted" numberOfLines={3}>{door.gist}</Text> : null}
+                  <Button
+                    onPress={() => onExamine(door.derivedNodeId)}
+                    icon={<ArrowRight size={14} color={colors["on-accent"]} />}
+                    label={learnerTerm("examine")}
+                  />
+                </>
+              ) : (
+                <Text variant="caption" color="muted">
+                  {learnerTerm("vistaGuardedTemplate").replace("{n}", String(door.legNumber))}
+                </Text>
+              )}
+            </View>
           </View>
         ) : null}
-        {placed.crystals.length > 0 ? (
-          <Svg width={canvasWidth} height={canvasHeight} viewBox={`${placed.viewBox.x} ${placed.viewBox.y} ${placed.viewBox.width} ${placed.viewBox.height}`}>
-            {/* Bedrock line the formation grows from. */}
-            <Rect
-              x={placed.viewBox.x}
-              y={Math.max(...placed.crystals.map((crystal) => crystal.y)) + 4}
-              width={placed.viewBox.width}
-              height={8}
-              fill="#8d887c"
-              opacity={0.35}
-            />
-            <FusionAuras placed={placed} fused={fused} celebratingSection={celebratingSection} />
-            {placed.veins.map((vein) => (
-              <Polyline
-                key={vein.key}
-                points={vein.points.map((point) => `${point.x},${point.y}`).join(" ")}
-                fill="none"
-                stroke="#8d887c"
-                strokeWidth={2.5}
-                strokeDasharray={vein.uncertain ? "6 6" : undefined}
-                opacity={0.5}
-              />
-            ))}
-            {placed.crystals.map((crystal) => (
-              <G
-                key={crystal.derivedNodeId}
-                onPress={() => setSelectedNodeId((current) => (current === crystal.derivedNodeId ? null : crystal.derivedNodeId))}
-                transform={`translate(${crystal.x - (VISTA_CRYSTAL_SIZE / 100) * 50}, ${crystal.y - (VISTA_CRYSTAL_SIZE / 100) * 95}) scale(${VISTA_CRYSTAL_SIZE / 100})`}
-                opacity={selectedNodeId === null || selectedNodeId === crystal.derivedNodeId ? 1 : 0.55}
-              >
-                <CrystalShardsGroup
-                  derivedNodeId={crystal.derivedNodeId}
-                  difficulty={crystal.difficulty}
-                  growthFraction={crystal.growthFraction}
-                  state={crystal.state}
-                  ghost={crystal.isKnownSkipped}
-                />
-              </G>
-            ))}
-            {keystone ? <SummitKeystone placed={placed} /> : null}
-          </Svg>
-        ) : (
-          <Text className="text-sm text-muted">{learnerTerm("vistaEmpty")}</Text>
-        )}
-      </ScrollView>
-      {door ? (
-        <View className="border-t border-line bg-card px-4 py-3">
-          <View className="mx-auto w-full max-w-3xl gap-1.5">
-            <Text className="text-sm font-semibold text-ink" numberOfLines={1}>{door.label}</Text>
-            {door.kind === "reveal" ? (
-              <>
-                {door.gist ? <Text className="text-xs text-muted" numberOfLines={3}>{door.gist}</Text> : null}
-                <Btn
-                  onPress={() => onExamine(door.derivedNodeId)}
-                  icon={<ArrowRight size={14} color="#fdfaf2" />}
-                  label={learnerTerm("examine")}
-                />
-              </>
-            ) : (
-              <Text className="text-xs text-muted">
-                {learnerTerm("vistaGuardedTemplate").replace("{n}", String(door.legNumber))}
-              </Text>
-            )}
-          </View>
-        </View>
-      ) : null}
-    </View>
+      </View>
+    </FullScreenDialog>
+  );
+}
+
+// A stable square touch target over a crystal's body: at least 44px regardless of the
+// canvas scale, centered on the crystal's visual center.
+function targetBox(crystal: PlacedCrystal, placed: PlacedFormation, scale: number): { left: number; top: number; size: number } {
+  const size = Math.max(44, VISTA_CRYSTAL_SIZE * scale * 0.7);
+  const centerX = (crystal.x - placed.viewBox.x) * scale;
+  const centerY = (crystal.y - VISTA_CRYSTAL_SIZE * 0.45 - placed.viewBox.y) * scale;
+  return { left: centerX - size / 2, top: centerY - size / 2, size };
+}
+
+// The header's tally crystal rendered inside its own tiny canvas (the OverlayHeader
+// circle), mirroring the trail tally door the learner pressed to get here.
+function CrystalShardsGroupIcon({ crystal }: Readonly<{ crystal: { derivedNodeId: string; difficulty: number } }>) {
+  return (
+    <Svg width={26} height={26} viewBox="0 0 100 100">
+      <CrystalShardsGroup
+        derivedNodeId={crystal.derivedNodeId}
+        difficulty={crystal.difficulty}
+        growthFraction={1}
+        state="mastered"
+      />
+    </Svg>
   );
 }
 
@@ -180,7 +236,7 @@ function FusionAuras({
             cy={bounds.cy}
             rx={bounds.rx}
             ry={bounds.ry}
-            fill="#d8b64c"
+            fill={colors.gold}
             opacity={celebratingSection === sectionIndex ? 0.4 : 0.16}
           />
         );
@@ -213,7 +269,7 @@ function SummitKeystone({ placed }: Readonly<{ placed: PlacedFormation }>) {
   const r = 22;
   return (
     <G>
-      <Polygon points={`${cx},${cy - r} ${cx + r * 0.7},${cy} ${cx},${cy + r} ${cx - r * 0.7},${cy}`} fill="#d8b64c" stroke="#9c5f2b" strokeWidth={2} />
+      <Polygon points={`${cx},${cy - r} ${cx + r * 0.7},${cy} ${cx},${cy + r} ${cx - r * 0.7},${cy}`} fill={colors.gold} stroke={colors.frontier} strokeWidth={2} />
       <Polygon points={`${cx},${cy - r * 0.5} ${cx + r * 0.35},${cy} ${cx},${cy + r * 0.5} ${cx - r * 0.35},${cy}`} fill="white" opacity={0.5} />
     </G>
   );

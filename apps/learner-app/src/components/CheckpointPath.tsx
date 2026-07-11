@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { Flag, Mountain } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
@@ -7,6 +7,7 @@ import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
 import { legBannerLine, terminusLine } from "@/learn/goalCopy";
+import { Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 import type { TrailCluster, TrailStop, TrailView } from "@/learn/trailView";
 
@@ -117,9 +118,9 @@ function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailC
   const masteredCount = sectionConcepts.filter((candidate) => candidate.state === "mastered").length;
   const secured = masteredCount >= sectionConcepts.length;
   return (
-    <View className="flex-row items-center gap-2 rounded-xl border border-line bg-card px-3 py-2">
-      <Flag size={16} color={secured ? "#3f7d4e" : "#9c5f2b"} />
-      <Text className="min-w-0 flex-1 text-sm font-semibold text-ink" numberOfLines={2}>
+    <View className="flex-row items-center gap-2 rounded-card border border-line bg-card px-3 py-2">
+      <Flag size={16} color={secured ? colors.secured : colors.frontier} />
+      <Text variant="label" className="min-w-0 flex-1 font-semibold" numberOfLines={2}>
         {legBannerLine({
           sectionIndex: concept.sectionIndex,
           conceptCount: sectionConcepts.length,
@@ -137,12 +138,12 @@ function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailC
 function TrailTerminus({ view, summitLabel }: Readonly<{ view: TrailView; summitLabel: string }>) {
   const reached = view.masteredCount >= view.totalClusters;
   return (
-    <View className="items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-4">
-      <Mountain size={28} color={reached ? "#3f7d4e" : "#9c5f2b"} />
-      <Text className="text-sm font-semibold text-ink" numberOfLines={2}>
+    <View className="items-center gap-1.5 rounded-card border border-line bg-card px-3 py-4">
+      <Mountain size={28} color={reached ? colors.secured : colors.frontier} />
+      <Text variant="label" className="font-semibold" numberOfLines={2}>
         {reached ? learnerTerm("summit") : `${learnerTerm("summitPrefix")}: ${summitLabel}`}
       </Text>
-      <Text className="text-xs text-muted text-center" numberOfLines={2}>{terminusLine(view)}</Text>
+      <Text variant="caption" color="muted" className="text-center" numberOfLines={2}>{terminusLine(view)}</Text>
     </View>
   );
 }

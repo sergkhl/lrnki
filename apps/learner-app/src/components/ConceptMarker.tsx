@@ -1,27 +1,42 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { ChevronDown } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { clearLearnerVerdict, refreshLearnerExpedition, setLearnerVerdict } from "@/lib/actions";
-import { Btn } from "./ui";
 import { CrystalGlyph } from "./CrystalGlyph";
 import type { TrailCluster } from "@/learn/trailView";
 import { learnerTerm } from "@/learn/vocabulary";
+import { Button, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
-// The concept row above its stops. Tapping expands the verdict panel inline (the web
-// popover becomes an accordion — no portal layer on native): skip-as-known or unmark.
+// The concept row above its stops, an explicit disclosure (R6/AE2): rotating chevron,
+// pressed treatment, announced expanded state, and the existing skip-known / unmark
+// verdict actions inside the panel. Mutations are unchanged.
 export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailCluster; session: StudySession }>) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const rotation = useSharedValue(0);
   const isMastered = concept.state === "mastered";
   const isKnownVerdict = session.verdictByNode[concept.derivedNodeId] === "known";
 
+  const chevronStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${rotation.value}deg` }] }));
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    rotation.value = reduceMotion ? (next ? 180 : 0) : withTiming(next ? 180 : 0, { duration: MOTION.standard });
+  };
+
   const runVerdict = (action: () => Promise<void>) => {
+    if (pending) return;
     setPending(true);
     void (async () => {
       try {
         await action();
         await refreshLearnerExpedition({ enrichmentId: session.enrichmentId });
         setOpen(false);
+        rotation.value = 0;
       } finally {
         setPending(false);
       }
@@ -29,13 +44,15 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
   };
 
   return (
-    <View className="rounded-xl border border-line bg-card shadow-sm">
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => setOpen((current) => !current)}
-        className="w-full flex-row items-center justify-between gap-3 px-3 py-2"
+    <View className="rounded-card border border-line bg-card shadow-sm">
+      <PressableSurface
+        accessibilityLabel={concept.label}
+        expanded={open}
+        onPress={toggle}
+        className="min-h-target w-full flex-row items-center justify-between gap-3 px-3 py-2"
+        pressedClassName="bg-muted-panel"
       >
-        <Text className="min-w-0 flex-1 text-sm font-semibold text-ink" numberOfLines={1}>{concept.label}</Text>
+        <Text variant="label" className="min-w-0 flex-1 font-semibold" numberOfLines={1}>{concept.label}</Text>
         <CrystalGlyph
           derivedNodeId={concept.derivedNodeId}
           difficulty={concept.difficulty}
@@ -45,23 +62,26 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
           size={26}
           ariaLabel={concept.isKnownSkipped ? learnerTerm("known") : isMastered ? "Collected" : "Not collected"}
         />
-      </Pressable>
+        <Animated.View style={chevronStyle}>
+          <ChevronDown size={18} color={colors.muted} />
+        </Animated.View>
+      </PressableSurface>
       {open ? (
         <View className="gap-3 border-t border-line px-3 py-3">
-          <Text className="text-sm text-muted">
+          <Text variant="label" color="muted" className="font-normal">
             {concept.isKnownSkipped ? learnerTerm("known") : stateLabel(concept.state)} · {concept.stops.length} stops · {difficultyDiamonds(concept.difficulty)}
           </Text>
           {isKnownVerdict ? (
-            <Btn
+            <Button
               variant="outline"
-              disabled={pending}
+              busy={pending}
               label={learnerTerm("unskipKnown")}
               onPress={() => runVerdict(() => clearLearnerVerdict({ enrichmentId: session.enrichmentId, derivedNodeId: concept.derivedNodeId }))}
             />
           ) : !isMastered ? (
-            <Btn
+            <Button
               variant="outline"
-              disabled={pending}
+              busy={pending}
               label={learnerTerm("skipKnown")}
               onPress={() => runVerdict(() => setLearnerVerdict({ enrichmentId: session.enrichmentId, derivedNodeId: concept.derivedNodeId, verdict: "known" }))}
             />

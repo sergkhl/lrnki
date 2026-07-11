@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "@jest/globals";
 import { shuffleIds } from "./shuffle";
 
 test("shuffleIds returns every id exactly once without mutating the input", () => {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "@jest/globals";
 import { canTryMatchingPair, matchingProgress } from "./matchingProgress";
 
 test("matchingProgress keeps three of four pairs locked but incomplete", () => {

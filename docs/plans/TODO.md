@@ -9,10 +9,30 @@
   ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
   at the leg-completion seam the duel's grade-only contract already proved.
 
-- **Unify learner interactions and finish deferred native surfaces.** Execute
-  [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md): app-owned
-  NativeWind primitives, full interaction migration, journal menu and splashes, mastery motion,
-  fresh production-expedition quality gate, post-change Android device pass, and web deployment.
+- **MiMo extraction follow-ups (measure-first).** Execute
+  [plan 2026-07-10-004](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md): durable
+  discovery-coverage audit over all 5 fixture domains resolving the cutover's "recall variance
+  worth watching" caveat (conditional sampling tune per its decision rule), plus the
+  trailing-nullable descriptor-shape test. Cache-pin payoff already measured during planning
+  (59% cached tokens, spend discount verified) — recorded in the plan, no implementation.
+
+- **Unify learner interactions and finish deferred native surfaces — IN PROGRESS (U1–U4 done,
+  U5–U6 remain).** Execute [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md);
+  its "Execution Status" section is the authoritative handoff. Landed and deterministically
+  verified (141 learner-app tests, workspace typecheck/test/lint, web export without the Board
+  route): app-owned `src/ui/` system with CSS-variable tokens + Jest/RNTL harness, full learner
+  migration behind an ESLint boundary, semantic overlays (full-screen activities/Vista with
+  native Vista hit targets, bottom sheets, dialogs), and the restored journal menu, Board dialog,
+  and prioritized splash coordinator. Still owed: U5 event-bound mastery motion + haptic
+  completion, then U6 browser/real-use/Android/deploy gates and ADR-0032/0035 + doc
+  consolidation. No browser or device validation has run yet — do not treat the green suites as
+  quality evidence (rule 14).
+
+- **Fix expedition discoverability (curated Explore + Browse all).** Execute
+  [plan 2026-07-10-005](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md): the journal's
+  top-3 readiness slice hides ready trails (reproduced: `jackie chan` cannot reach the photosynthesis
+  trail). Curated top-5 Explore + searchable Browse all `/catalog` screen, ≥2-stop structural floor,
+  one-time cleanup of degenerate/`test`-domain enrichments; rule-14 gate = search "photo" → Begin.
 
 ## COMPLETED
 

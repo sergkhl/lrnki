@@ -1,19 +1,28 @@
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { BookOpen, Lock, MapPin, Rows3, Search } from "lucide-react-native";
 import { CrystalGlyph } from "./CrystalGlyph";
+import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import type { TrailCluster, TrailStop } from "@/learn/trailView";
-import { learnerTerm } from "@/learn/vocabulary";
+import { PressableSurface, Text, colors } from "@/ui";
 
-const INK = "#241f18";
-const WHITE = "#ffffff";
+const CIRCLE_ICONS: Record<Exclude<CheckpointIcon, "crystal">, typeof Lock> = {
+  lock: Lock,
+  book: BookOpen,
+  "map-pin": MapPin,
+  rows: Rows3,
+  search: Search
+};
 
+// A trail checkpoint: stable 72px outer box for every stop (the circle grows for the
+// guided next stop WITHIN that box, so the trail never reflows), a fixed halo layer
+// behind the next stop, and a selection haptic on open.
 export function CheckpointCircle({
   stop,
   concept,
   onSelect
 }: Readonly<{ stop: TrailStop; concept: TrailCluster; onSelect: (stopId: string) => void }>) {
+  const presentation = checkpointPresentation(stop);
   const disabled = stop.state === "locked";
-  const label = `${labelForStop(stop)}: ${stop.label}`;
   const size = stop.isNext ? 72 : 64;
   const box = stop.isNext
     ? "border-frontier bg-card"
@@ -22,55 +31,50 @@ export function CheckpointCircle({
         ? "border-gem bg-gem-soft"
         : "border-gem bg-gem"
       : stop.state === "available"
-        ? "border-line bg-card"
+        ? "border-line-strong bg-card"
         : "border-fog bg-fog opacity-75";
   return (
     <View className="w-24 items-center gap-2">
-      {/* The static halo ring marks the guided next stop (pulse returns with Reanimated). */}
-      {stop.isNext ? <View className="absolute -top-1 size-20 rounded-full bg-frontier opacity-25" /> : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        disabled={disabled}
-        onPress={() => onSelect(stop.stopId)}
-        className={`items-center justify-center rounded-full border-2 shadow-sm ${box}`}
-        style={{ width: size, height: size }}
-      >
-        {iconForStop(stop, concept)}
-      </Pressable>
+      {/* The fixed halo layer marks the guided next stop (its one-shot emphasis lives in
+          the motion pass); it sits behind the circle and never moves the trail. */}
+      <View className="h-[72px] w-[72px] items-center justify-center">
+        {stop.isNext ? <View className="absolute h-20 w-20 rounded-full bg-frontier opacity-25" /> : null}
+        <PressableSurface
+          accessibilityLabel={`${presentation.label}: ${stop.label}`}
+          disabled={disabled}
+          haptic="selection"
+          onPress={() => onSelect(stop.stopId)}
+          className={`items-center justify-center rounded-full border-2 shadow-sm ${box}`}
+          pressedClassName="shadow-none opacity-90"
+          style={{ width: size, height: size }}
+        >
+          {iconForStop(stop, concept, presentation.icon)}
+        </PressableSurface>
+      </View>
       {stop.isNext ? (
-        <Text className="max-w-24 text-center text-xs font-medium leading-tight text-ink">{labelForStop(stop)}</Text>
+        <Text variant="caption" className="max-w-24 text-center font-medium leading-tight">{presentation.label}</Text>
       ) : null}
     </View>
   );
 }
 
-function iconForStop(stop: TrailStop, concept: TrailCluster) {
+function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIcon) {
+  if (icon === "crystal") {
+    // The capstone is the concept's own crystal, mid-growth until the completion rule
+    // masters the node — the same formation the marker, header, and vista show.
+    return (
+      <CrystalGlyph
+        derivedNodeId={concept.derivedNodeId}
+        difficulty={concept.difficulty}
+        growthFraction={concept.growthFraction}
+        state={stop.state === "complete" ? "mastered" : "frontier"}
+        ghost={concept.isKnownSkipped && stop.state === "complete"}
+        size={40}
+      />
+    );
+  }
   const solidComplete = stop.state === "complete" && stop.kind !== "capstone";
-  const color = stop.state === "locked" || solidComplete ? WHITE : INK;
-  if (stop.state === "locked") return <Lock size={22} color={color} />;
-  if (stop.kind === "theory") return <BookOpen size={22} color={color} />;
-  if (stop.kind === "option_select") return <MapPin size={22} color={color} />;
-  if (stop.kind === "matching") return <Rows3 size={22} color={color} />;
-  if (stop.kind === "impostor") return <Search size={22} color={color} />;
-  // The capstone is the concept's own crystal, mid-growth until the completion rule
-  // masters the node — the same formation the marker, header, and vista show.
-  return (
-    <CrystalGlyph
-      derivedNodeId={concept.derivedNodeId}
-      difficulty={concept.difficulty}
-      growthFraction={concept.growthFraction}
-      state={stop.state === "complete" ? "mastered" : "frontier"}
-      ghost={concept.isKnownSkipped && stop.state === "complete"}
-      size={40}
-    />
-  );
-}
-
-function labelForStop(stop: TrailStop): string {
-  if (stop.kind === "theory") return learnerTerm("theoryStop");
-  if (stop.kind === "option_select") return learnerTerm("question");
-  if (stop.kind === "matching") return learnerTerm("matching");
-  if (stop.kind === "impostor") return learnerTerm("spotTheFake");
-  return learnerTerm("capstone");
+  const color = stop.state === "locked" || solidComplete ? colors["on-accent"] : colors.ink;
+  const Icon = CIRCLE_ICONS[icon];
+  return <Icon size={22} color={color} />;
 }

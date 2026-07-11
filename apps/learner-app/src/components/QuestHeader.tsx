@@ -1,10 +1,11 @@
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { SectionOverview } from "./SectionOverview";
 import { isSummitPush, summitLine } from "@/learn/goalCopy";
 import type { TrailView } from "@/learn/trailView";
 import { learnerTerm } from "@/learn/vocabulary";
+import { PressableSurface, Text } from "@/ui";
 
 export function QuestHeader({
   session,
@@ -22,10 +23,10 @@ export function QuestHeader({
     <View className="border-b border-line bg-card px-4 py-3">
       <View className="mx-auto w-full max-w-3xl flex-row items-center justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <Text className="text-xs text-muted">{isSummitPush(trail) ? learnerTerm("summitPushEyebrow") : "Expedition"}</Text>
-          <Text className="text-base font-semibold text-ink" numberOfLines={1}>{title}</Text>
+          <Text variant="caption" color="muted">{isSummitPush(trail) ? learnerTerm("summitPushEyebrow") : "Expedition"}</Text>
+          <Text variant="title" numberOfLines={1}>{title}</Text>
           {session.target.label ? (
-            <Text className="text-xs text-muted" numberOfLines={2}>
+            <Text variant="caption" color="muted" numberOfLines={2}>
               {summitLine({
                 summitLabel: session.target.label,
                 layerPurpose: session.layerPurpose,
@@ -46,11 +47,11 @@ export function QuestHeader({
           />
           {/* The crystal tally IS the vista door (plan 2026-07-10-001 U3): the most
               recently collected crystal plus the running count opens the formation. */}
-          <Pressable
-            accessibilityRole="button"
+          <PressableSurface
             accessibilityLabel={learnerTerm("vistaOpen")}
             onPress={onOpenVista}
-            className="flex-row items-center gap-1.5 rounded-xl border border-line bg-card px-2.5 py-1.5 active:opacity-80"
+            className="h-target flex-row items-center gap-1.5 rounded-control border border-line-strong bg-card px-2.5"
+            pressedClassName="bg-muted-panel"
           >
             {mastered.length > 0 ? (
               <CrystalGlyph
@@ -61,10 +62,10 @@ export function QuestHeader({
                 size={18}
               />
             ) : null}
-            <Text className="text-xs font-medium tabular-nums text-ink">
+            <Text variant="caption" className="font-medium tabular-nums">
               {mastered.length}/{trail.concepts.length}
             </Text>
-          </Pressable>
+          </PressableSurface>
         </View>
       </View>
     </View>

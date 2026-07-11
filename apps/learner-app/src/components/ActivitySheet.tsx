@@ -1,25 +1,27 @@
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CheckCircle2, X } from "lucide-react-native";
+import { BookOpen, CheckCircle2, HelpCircle, MapPin, Rows3, Search } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/lib/api";
 import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/lib/actions";
-import { Btn } from "./ui";
+import { Button, FullScreenDialog, OverlayHeader, Text, colors } from "@/ui";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { LessonSections } from "./LessonSections";
 import { MatchingBoard } from "./MatchingBoard";
 import { activeStopFor, type AdvanceMemory } from "@/learn/advanceMemory";
 import { resolveStopActivity } from "@/learn/activityProgress";
+import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import { buildTrailView } from "@/learn/trailView";
 import { learnerTerm } from "@/learn/vocabulary";
 
 type Activity = ReturnType<typeof resolveStopActivity>;
 type ActivityResult = LearnerGradingResult | LearnerMatchingResult | null;
 
-// The activity surface: the web's full-screen Sheet becomes a full-screen Modal, same
-// in-sheet advance memory so "Continue" walks stop to stop without touching the trail.
+// The activity surface (R9): a full-screen dialog with the SAME circular icon the
+// opening checkpoint used (AE3), in-sheet advance memory so "Continue" walks stop to
+// stop without touching the trail, and dismissal blocked while grading is pending (AE4).
 export function ActivitySheet({
   session,
   stopId,
@@ -33,6 +35,7 @@ export function ActivitySheet({
 }>) {
   const insets = useSafeAreaInsets();
   const [localStop, setLocalStop] = useState<AdvanceMemory>(null);
+  const [mutationPending, setMutationPending] = useState(false);
   const activeStopId = activeStopFor(localStop, stopId);
   const activity = activeStopId ? resolveStopActivity(session, activeStopId) : null;
   const title = activity && activity.kind !== "missing" ? activity.label : "Trail stop";
@@ -43,17 +46,22 @@ export function ActivitySheet({
     onOpenChange(false);
   };
   return (
-    <Modal visible={open} animationType="slide" onRequestClose={close}>
+    <FullScreenDialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) close();
+      }}
+      dismissBlocked={mutationPending}
+    >
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        <View className="flex-row items-start justify-between gap-3 border-b border-line bg-card px-4 py-3">
-          <View className="min-w-0 flex-1">
-            <Text className="text-base font-semibold text-ink" numberOfLines={2}>{title}</Text>
-            <Text className="text-sm text-muted">{activity ? descriptionFor(activity.kind) : learnerTerm("nextStop")}</Text>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} className="p-1">
-            <X size={20} color="#6d6152" />
-          </Pressable>
-        </View>
+        <OverlayHeader
+          icon={activity ? <ActivityHeaderIcon session={session} activity={activity} /> : <HelpCircle size={20} color={colors.ink} />}
+          title={title}
+          description={activity ? descriptionFor(activity.kind) : learnerTerm("nextStop")}
+          onClose={close}
+          closeDisabled={mutationPending}
+          closeLabel="Close"
+        />
         {activity ? (
           <ActivityController
             key={activeStopId}
@@ -63,12 +71,42 @@ export function ActivitySheet({
             justAdvanced={localStop?.sourceStopId === stopId && activeStopId !== stopId}
             onAdvance={(nextStopId) => setLocalStop({ sourceStopId: stopId, activeStopId: nextStopId })}
             onDone={close}
+            onPendingChange={setMutationPending}
           />
         ) : null}
       </View>
-    </Modal>
+    </FullScreenDialog>
   );
 }
+
+// The header circle mirrors the checkpoint that opened the activity: same icon set,
+// same crystal for a capstone (KTD4 single mapping via checkpointPresentation).
+function ActivityHeaderIcon({ session, activity }: Readonly<{ session: StudySession; activity: Activity }>) {
+  if (activity.kind === "missing") return <HelpCircle size={20} color={colors.ink} />;
+  if (activity.kind === "capstone") {
+    return (
+      <CrystalGlyph
+        derivedNodeId={activity.derivedNodeId}
+        difficulty={activity.difficulty}
+        growthFraction={activity.growthFraction}
+        state={activity.mastered ? "mastered" : "frontier"}
+        ghost={activity.isKnownSkipped}
+        size={28}
+      />
+    );
+  }
+  const icon = checkpointPresentation({ kind: activity.kind, state: "available" }).icon;
+  const Icon = HEADER_ICONS[icon as Exclude<CheckpointIcon, "crystal">] ?? HelpCircle;
+  return <Icon size={20} color={colors.ink} />;
+}
+
+const HEADER_ICONS: Record<Exclude<CheckpointIcon, "crystal">, typeof BookOpen> = {
+  lock: HelpCircle,
+  book: BookOpen,
+  "map-pin": MapPin,
+  rows: Rows3,
+  search: Search
+};
 
 function ActivityController({
   session,
@@ -76,8 +114,17 @@ function ActivityController({
   stopId,
   justAdvanced,
   onAdvance,
-  onDone
-}: Readonly<{ session: StudySession; activity: Activity; stopId: string | null; justAdvanced: boolean; onAdvance: (stopId: string) => void; onDone: () => void }>) {
+  onDone,
+  onPendingChange
+}: Readonly<{
+  session: StudySession;
+  activity: Activity;
+  stopId: string | null;
+  justAdvanced: boolean;
+  onAdvance: (stopId: string) => void;
+  onDone: () => void;
+  onPendingChange: (pending: boolean) => void;
+}>) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [result, setResult] = useState<ActivityResult>(null);
   const [pending, setPending] = useState(false);
@@ -85,7 +132,11 @@ function ActivityController({
 
   const run = (work: () => Promise<void>) => {
     setPending(true);
-    void work().finally(() => setPending(false));
+    onPendingChange(true);
+    void work().finally(() => {
+      setPending(false);
+      onPendingChange(false);
+    });
   };
 
   const nextStopId = () => {
@@ -158,7 +209,7 @@ function ActivityController({
         <View className="mx-auto w-full max-w-3xl gap-4 p-4">
           <CompletedIndicator session={session} activity={activity} result={result} />
           <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} justAdvanced={justAdvanced} onSelect={submitSelection} onMatchingAttempt={validateMatching} onMatchingComplete={submitMatching} />
-          {result && !result.graded ? <Text className="text-sm text-destructive">{result.message}</Text> : null}
+          {result && !result.graded ? <Text variant="label" color="destructive" className="font-normal">{result.message}</Text> : null}
         </View>
       </ScrollView>
       <View className="border-t border-line bg-card p-4">
@@ -195,15 +246,15 @@ function ActivityBody({
   onMatchingAttempt: (promptId: string, matchId: string) => Promise<boolean>;
   onMatchingComplete: (trace: { promptId: string; chosenMatchId: string }[]) => Promise<void>;
 }>) {
-  if (activity.kind === "missing") return <Text className="text-sm text-muted">{activity.message}</Text>;
+  if (activity.kind === "missing") return <Text variant="label" color="muted" className="font-normal">{activity.message}</Text>;
   if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
   if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
   if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
-    // The mastery reveal, static for v1: the finished crystal shows immediately
-    // (facet-by-facet assembly returns with Reanimated in the follow-up pass).
+    // The mastery reveal, static here: the finished crystal shows immediately
+    // (facet-by-facet assembly arrives with the motion unit).
     return (
-      <View className="gap-3 rounded-xl border border-line bg-card p-4">
+      <View className="gap-3 rounded-card border border-line bg-card p-4">
         <View className="flex-row items-center gap-3">
           <CrystalGlyph
             derivedNodeId={activity.derivedNodeId}
@@ -214,8 +265,8 @@ function ActivityBody({
             size={72}
           />
           <View className="min-w-0 flex-1">
-            <Text className="text-lg font-semibold text-ink">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</Text>
-            <Text className="text-sm text-muted">
+            <Text variant="title" className="text-lg">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</Text>
+            <Text variant="label" color="muted" className="font-normal">
               {activity.isKnownSkipped
                 ? "Known ground is complete, but no crystal is collected."
                 : activity.mastered
@@ -229,8 +280,8 @@ function ActivityBody({
   }
   if (activity.lesson?.sections.length) return <LessonSections lesson={activity.lesson} />;
   return (
-    <View className="rounded-xl border border-line bg-card p-4">
-      <Text className="text-sm text-muted">No field notes are available for this stop.</Text>
+    <View className="rounded-card border border-line bg-card p-4">
+      <Text variant="label" color="muted" className="font-normal">No field notes are available for this stop.</Text>
     </View>
   );
 }
@@ -250,22 +301,22 @@ function FooterButton({
 }>) {
   if (activity.kind === "option_select" || activity.kind === "impostor" || activity.kind === "matching") {
     if (graded) {
-      return <Btn disabled={pending} onPress={onContinue} label={learnerTerm("continueAction")} />;
+      return <Button busy={pending} onPress={onContinue} label={learnerTerm("continueAction")} />;
     }
     return null;
   }
   if (activity.kind === "capstone") {
     return (
-      <Btn
-        disabled={pending}
+      <Button
+        busy={pending}
         onPress={activity.mastered ? onContinue : onDone}
         label={activity.mastered ? learnerTerm("continueAction") : learnerTerm("returnToTrail")}
       />
     );
   }
   return (
-    <Btn
-      disabled={pending}
+    <Button
+      busy={pending}
       onPress={activity.kind === "missing" ? onDone : onContinue}
       label={learnerTerm("continueAction")}
     />
@@ -285,9 +336,9 @@ function CompletedIndicator({
       : false;
   if (!complete) return null;
   return (
-    <View className="flex-row items-center gap-2 self-start rounded-xl border border-line bg-gem-soft px-3 py-2">
-      <CheckCircle2 size={16} color="#241f18" />
-      <Text className="text-sm font-medium text-ink">
+    <View className="flex-row items-center gap-2 self-start rounded-card border border-line bg-gem-soft px-3 py-2">
+      <CheckCircle2 size={16} color={colors.ink} />
+      <Text variant="label">
         {activity.kind === "capstone" && activity.isKnownSkipped ? learnerTerm("known") : learnerTerm("mastered")}
       </Text>
     </View>
