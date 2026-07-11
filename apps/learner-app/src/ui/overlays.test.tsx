@@ -4,7 +4,7 @@ import { PortalHost } from "@rn-primitives/portal";
 import { Text as RNText } from "react-native";
 import { Map as MapIcon } from "lucide-react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Dialog, FullScreenDialog, OverlayHeader } from "./overlays";
+import { Dialog, FullScreenDialog, OverlayHeader, SideSheet } from "./overlays";
 import { BottomSheet } from "./sheets";
 
 const SAFE_AREA_METRICS = {
@@ -67,6 +67,21 @@ test("FullScreenDialog renders full-surface content without a backdrop close", a
     )
   );
   expect(screen.getByText("activity body")).toBeTruthy();
+  await fireEvent.press(screen.getByLabelText("Close"));
+  expect(onOpenChange).toHaveBeenCalledWith(false);
+});
+
+test("SideSheet mounts its menu content and closes through the shared header", async () => {
+  const onOpenChange = jest.fn();
+  await render(
+    withHost(
+      <SideSheet open onOpenChange={onOpenChange}>
+        <OverlayHeader icon={<MapIcon size={20} />} title="Menu" onClose={() => onOpenChange(false)} />
+        <RNText>menu body</RNText>
+      </SideSheet>
+    )
+  );
+  expect(screen.getByText("menu body")).toBeTruthy();
   await fireEvent.press(screen.getByLabelText("Close"));
   expect(onOpenChange).toHaveBeenCalledWith(false);
 });
