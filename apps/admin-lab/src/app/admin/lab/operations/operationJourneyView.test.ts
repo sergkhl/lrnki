@@ -83,9 +83,9 @@ test("windowJourneys keeps running journeys unwindowed and sorts finished journe
 
 test("windowJourneys sorts by cost using the operation ownership catalog", () => {
   const spend: OperationStageSpend[] = [
-    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 },
-    { operationId: "expensive", stage: "concept-discovery", logCount: 2, totalSpend: 0.3, totalTokens: 200 },
-    { operationId: "expensive", stage: "study-item-generation", logCount: 99, totalSpend: 9, totalTokens: 9000 }
+    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, estimatedSpend: 0, totalTokens: 100 },
+    { operationId: "expensive", stage: "concept-discovery", logCount: 2, totalSpend: 0.3, estimatedSpend: 0, totalTokens: 200 },
+    { operationId: "expensive", stage: "study-item-generation", logCount: 99, totalSpend: 9, estimatedSpend: 0, totalTokens: 9000 }
   ];
   const journeys = [
     journey({ enrichmentId: "cheap", startedAt: "2026-07-08T00:00:00.000Z", elapsedMs: 1000, members: [detail("cheap", "extraction")] }),
@@ -98,13 +98,14 @@ test("windowJourneys sorts by cost using the operation ownership catalog", () =>
   assert.deepEqual(operationCost("expensive", "extraction", { rows: spend, costAvailable: true }), {
     calls: 2,
     costUsd: 0.3,
-    tokens: 200
+    tokens: 200,
+    estimated: false
   });
 });
 
 test("cost unavailable degrades to wall-clock-only operation summaries", () => {
   assert.equal(operationCost("run-1", "extraction", {
-    rows: [{ operationId: "run-1", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 }],
+    rows: [{ operationId: "run-1", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, estimatedSpend: 0, totalTokens: 100 }],
     costAvailable: false
   }), null);
 });
@@ -173,9 +174,9 @@ test("sortOperationSteps sorts cost asc and desc when spend is available", () =>
     detail("expensive", "extraction")
   ];
   const spend: OperationStageSpend[] = [
-    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 },
-    { operationId: "middle", stage: "concept-discovery", logCount: 2, totalSpend: 0.2, totalTokens: 200 },
-    { operationId: "expensive", stage: "concept-discovery", logCount: 3, totalSpend: 0.3, totalTokens: 300 }
+    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, estimatedSpend: 0, totalTokens: 100 },
+    { operationId: "middle", stage: "concept-discovery", logCount: 2, totalSpend: 0.2, estimatedSpend: 0, totalTokens: 200 },
+    { operationId: "expensive", stage: "concept-discovery", logCount: 3, totalSpend: 0.3, estimatedSpend: 0, totalTokens: 300 }
   ];
 
   assert.deepEqual(
@@ -198,8 +199,8 @@ test("sortOperationSteps keeps lineage when cost-derived sort is unavailable", (
     detail("cheap", "extraction")
   ];
   const spend: OperationStageSpend[] = [
-    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, totalTokens: 100 },
-    { operationId: "expensive", stage: "concept-discovery", logCount: 3, totalSpend: 0.3, totalTokens: 300 }
+    { operationId: "cheap", stage: "concept-discovery", logCount: 1, totalSpend: 0.1, estimatedSpend: 0, totalTokens: 100 },
+    { operationId: "expensive", stage: "concept-discovery", logCount: 3, totalSpend: 0.3, estimatedSpend: 0, totalTokens: 300 }
   ];
 
   assert.deepEqual(

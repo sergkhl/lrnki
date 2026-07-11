@@ -29,6 +29,10 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.cepExtraction),
     llm(STAGE_TAGS.definitionPassageQuality),
     llm(STAGE_TAGS.assertionEntailment),
+    // Measurement-mode stage (plan 2026-07-10-004 KTD2): claimed here only to satisfy
+    // the stage-tag set-equality test and name the owning pipeline arm. Audit calls
+    // carry no operation_id, so no operation's cost report ever aggregates this row.
+    llm(STAGE_TAGS.discoveryCoverageAudit),
     nonLlm(NON_LLM_STAGES.persist)
   ],
   minting: [

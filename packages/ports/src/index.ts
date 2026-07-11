@@ -27,6 +27,7 @@ import type {
   DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
+  DiscoveryCoverageMiss,
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
   ExtractionQualityIssue,
@@ -65,6 +66,28 @@ export interface ConceptDiscoveryPort {
 export interface ConceptAdmissionPort {
   // Precision-first; a separate stage from discovery, never collapsed into one prompt.
   admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionProposal[]>;
+}
+
+// One admitted concept as the discovery-coverage audit presents it to the judge
+// (plan 2026-07-10-004 R1): the proposed canonical label plus a short evidence gist
+// so the judge sees what the admitted set already covers without re-reading CEPs.
+export interface DiscoveryCoverageAuditConcept {
+  label: string;
+  gist: string;
+}
+
+// Discovery-coverage audit judgment (plan 2026-07-10-004, KTD1/KTD2): ONE sample of
+// the cross-family judge over the source's teachable blocks plus the run's admitted
+// (core + optional) set. Returns the standalone learning objectives the admitted set
+// fails to preserve (empty = full coverage). K-sample orchestration and recurrence
+// aggregation live in the application use-case, not this transport.
+export interface DiscoveryCoverageAuditPort {
+  model: string;
+  audit(input: {
+    declaredDomain: string;
+    blocks: { blockType: string; headingPath: string[]; text: string }[];
+    admittedConcepts: DiscoveryCoverageAuditConcept[];
+  }): Promise<DiscoveryCoverageMiss[]>;
 }
 
 // Concept-conditioned Concept Evidence Profile extraction (ADR-0007 reset). For
@@ -817,6 +840,7 @@ export interface CalibrationVerdictStorePort {
 
 export interface RunSummary {
   runId: string;
+  sourceResourceId: string;
   sourceTitle: string;
   declaredDomain: string;
   status: string;
@@ -1231,7 +1255,15 @@ export interface OperationStageSpend {
   operationId: string;
   stage: string;
   logCount: number;
+  // Raw provider-billed spend as LiteLLM recorded it. OpenRouter BYOK rows report
+  // response cost 0.0 (provider-account billing), so this alone under-attributes
+  // BYOK stages (plan 2026-07-10-004 U4/KTD6).
   totalSpend: number;
+  // Usage-derived estimate for the zero-spend BYOK rows only: retained token/cache
+  // usage priced by the versioned deployment prices in `litellm/config.yaml`. Kept
+  // DISTINGUISHABLE from `totalSpend` so an estimated figure is never misrepresented
+  // as provider-billed spend; a stage's display cost is the sum of both.
+  estimatedSpend: number;
   totalTokens: number;
 }
 

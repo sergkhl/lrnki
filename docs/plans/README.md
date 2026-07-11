@@ -16,9 +16,6 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
   — ready; stop the top-3 readiness slice from hiding ready trails: keep a curated top-5 Explore,
   add a searchable Browse all screen over the full shared catalog via a new `/catalog` endpoint,
   add a ≥2-stop structural floor, and clean degenerate/placeholder test enrichments from the data.
-- [2026-07-10-004 — MiMo extraction follow-ups](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md)
-  — ready; measure discovery coverage across all fixture domains, lock the fatal trailing-nullable
-  MiMo schema shape, and restore honest per-journey cost attribution for OpenRouter Xiaomi BYOK.
 - [2026-07-11-001 — Derived Graph Layer completion](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md)
   — ready; consolidate the duplicated Graph Enrichment and Synthetic Topic Generation completion
   back halves behind one lifecycle-aware, atomically persisted application module.

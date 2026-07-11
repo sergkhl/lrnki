@@ -15,7 +15,9 @@ export type OperationStepSortKey =
   | "cost";
 export type OperationStepSortDir = "asc" | "desc";
 
-export type OperationCost = { costUsd: number; tokens: number; calls: number };
+// `estimated` marks a figure that includes a usage-derived component for zero-spend
+// OpenRouter BYOK rows (plan 2026-07-10-004 U4) — labeled, never presented as billed.
+export type OperationCost = { costUsd: number; tokens: number; calls: number; estimated: boolean };
 
 export type OperationSpend = { rows: OperationStageSpend[]; costAvailable: boolean };
 
@@ -51,11 +53,12 @@ export function operationCost(
   );
   return owned.reduce<OperationCost>(
     (total, row) => ({
-      costUsd: total.costUsd + row.totalSpend,
+      costUsd: total.costUsd + row.totalSpend + row.estimatedSpend,
       tokens: total.tokens + row.totalTokens,
-      calls: total.calls + row.logCount
+      calls: total.calls + row.logCount,
+      estimated: total.estimated || row.estimatedSpend > 0
     }),
-    { costUsd: 0, tokens: 0, calls: 0 }
+    { costUsd: 0, tokens: 0, calls: 0, estimated: false }
   );
 }
 
@@ -67,10 +70,11 @@ export function journeyCost(journey: OperationJourney, spend: OperationSpend): O
       return {
         costUsd: total.costUsd + (cost?.costUsd ?? 0),
         tokens: total.tokens + (cost?.tokens ?? 0),
-        calls: total.calls + (cost?.calls ?? 0)
+        calls: total.calls + (cost?.calls ?? 0),
+        estimated: total.estimated || (cost?.estimated ?? false)
       };
     },
-    { costUsd: 0, tokens: 0, calls: 0 }
+    { costUsd: 0, tokens: 0, calls: 0, estimated: false }
   );
 }
 

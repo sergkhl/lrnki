@@ -377,6 +377,17 @@ export type RunEvidenceProfile = {
   complete: boolean;
 };
 
+// One judged discovery-coverage miss (plan 2026-07-10-004, KTD1): a standalone
+// learning objective the source teaches that the run's ADMITTED (core + optional)
+// set does not preserve. Judged by the cross-family independent judge against the
+// source in hand — never against expected fixture concepts (AGENTS rule 17). A miss
+// is a candidate for human inspection (ADR-0013), not an auto-verdict.
+export type DiscoveryCoverageMiss = {
+  missedObjective: string;
+  sourceGrounding: string;
+  whyStandalone: string;
+};
+
 export type ExtractionQualityIssue = {
   stage: string;
   candidateKey?: string;
@@ -1736,7 +1747,14 @@ export const STAGE_TAGS = {
   // Layer-purpose generation runs ONCE per bank inside the `study_items` operation: a
   // learner-neutral capability statement for the enrichment, stored in plain register and
   // themed only at render (ADR-0033). Fail-open: a stage failure writes no row.
-  layerPurposeGeneration: "layer-purpose-generation"
+  layerPurposeGeneration: "layer-purpose-generation",
+  // Discovery-coverage audit (plan 2026-07-10-004, KTD2): a MEASUREMENT stage, not a
+  // pipeline stage. K-sampled cross-family judgments over an extraction run's admitted
+  // set, invoked by the durable `kg-worker audit-discovery-coverage` command. Audit
+  // calls carry NO operation_id, so they can never pollute an operation's cost report;
+  // the catalog claim under `extraction` only satisfies stage-tag set-equality and
+  // names the owning pipeline arm.
+  discoveryCoverageAudit: "discovery-coverage-audit"
 } as const;
 
 export type StageTag = (typeof STAGE_TAGS)[keyof typeof STAGE_TAGS];

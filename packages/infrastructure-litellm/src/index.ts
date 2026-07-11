@@ -57,8 +57,14 @@ export {
   matchingSchema,
   matchingValidator,
   conceptLessonRedundancyJudgmentSchema,
-  conceptLessonRedundancyJudgmentValidator
+  conceptLessonRedundancyJudgmentValidator,
+  discoveryCoverageAuditSchema,
+  discoveryCoverageAuditValidator
 } from "./toolSchemas";
+export {
+  createDiscoveryCoverageAuditPort,
+  discoveryCoverageAuditDescriptor
+} from "./discoveryCoverageAuditAdapters";
 export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,

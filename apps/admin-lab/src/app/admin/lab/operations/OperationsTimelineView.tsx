@@ -246,7 +246,9 @@ function CostChips({ cost }: Readonly<{ cost: OperationCost | null }>) {
   if (!cost) return null;
   return (
     <>
-      <Badge variant="outline" className="gap-1"><CoinsIcon data-icon="inline-start" /> {formatUsd(cost.costUsd)}</Badge>
+      {/* "≈ … est." marks a figure with a usage-derived component (OpenRouter BYOK
+          reports provider-billed cost 0.0); never presented as billed spend. */}
+      <Badge variant="outline" className="gap-1"><CoinsIcon data-icon="inline-start" /> {cost.estimated ? `≈${formatUsd(cost.costUsd)} est.` : formatUsd(cost.costUsd)}</Badge>
       <Badge variant="outline">{cost.tokens.toLocaleString()} tok</Badge>
       <Badge variant="outline">{cost.calls} calls</Badge>
     </>
@@ -482,7 +484,7 @@ function OperationStepRow({
       <TableCell>{formatDuration(summary.elapsedMs)}</TableCell>
       <TableCell>{cost ? cost.calls.toLocaleString() : "-"}</TableCell>
       <TableCell>{cost ? cost.tokens.toLocaleString() : "-"}</TableCell>
-      <TableCell>{cost ? formatUsd(cost.costUsd) : "-"}</TableCell>
+      <TableCell>{cost ? (cost.estimated ? `≈${formatUsd(cost.costUsd)} est.` : formatUsd(cost.costUsd)) : "-"}</TableCell>
       <TableCell className="text-right">
         {summary.operationType === "enrichment" || summary.operationType === "study_items" ? (
           <Link
@@ -547,7 +549,7 @@ function StageTable({
                       <TableCell>{formatDuration(row.wallClockMs)}</TableCell>
                       <TableCell>{row.calls === null ? "-" : row.calls.toLocaleString()}</TableCell>
                       <TableCell>{row.tokens === null ? "-" : row.tokens.toLocaleString()}</TableCell>
-                      <TableCell>{row.costUsd === null ? "-" : formatUsd(row.costUsd)}</TableCell>
+                      <TableCell>{row.costUsd === null ? "-" : row.costEstimated ? `≈${formatUsd(row.costUsd)} est.` : formatUsd(row.costUsd)}</TableCell>
                     </TableRow>
                     {timeline?.errorDetail ? (
                       <TableRow>

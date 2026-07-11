@@ -424,12 +424,14 @@ export const optionSelectValidator = z.object({
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
 
+// The required `generate` boolean closes the plan object so neither nullable is the
+// final property (the MiMo trailing-nullable fatal shape, plan 2026-07-10-004 U3).
 export const studyItemBlueprintValidator = z.object({
   typePlans: z.array(z.object({
     itemType: z.enum(["option_select", "matching", "impostor"]),
-    generate: z.boolean(),
     facet: z.string().nullable().describe("When generate=true, the distinct assessed facet this item type should test. Null when generate=false."),
-    reason: z.string().nullable().describe("When generate=false, a short reason this type should be skipped. Null when generate=true.")
+    reason: z.string().nullable().describe("When generate=false, a short reason this type should be skipped. Null when generate=true."),
+    generate: z.boolean()
   }).strict()).length(3).describe("Exactly one plan for each supported item type.")
 }).strict();
 
@@ -531,14 +533,18 @@ export const conceptLessonRedundancyJudgmentSchema: JsonSchema = toForcedToolSch
 
 export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
 
+// Property order matters on MiMo: its constrained decoder truncates arguments before
+// a trailing literal null (the proven-fatal shape, plan 2026-07-10-004 U3), so the
+// required `items` array closes the object and every nullable sits mid-object. The
+// mimoDescriptorShape congruence test enforces this mechanically.
 const conceptLessonSection = z.object({
   kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
   text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
-  items: z.array(z.string().min(1).max(280)).max(4).describe("List items for examples/applications sections only. Use 2-4 items for examples or applications; otherwise use an empty array."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
   diagramCaption: z.string().nullable().describe("Optional one-line caption for a simple explanatory diagram for this section; null when there is none."),
-  diagramSpec: z.string().nullable().describe("Optional terse, renderer-neutral description of that diagram's structure (nodes and relationships); null when there is none.")
+  diagramSpec: z.string().nullable().describe("Optional terse, renderer-neutral description of that diagram's structure (nodes and relationships); null when there is none."),
+  items: z.array(z.string().min(1).max(280)).max(4).describe("List items for examples/applications sections only. Use 2-4 items for examples or applications; otherwise use an empty array.")
 }).strict();
 
 export const conceptLessonValidator = z.object({
@@ -555,8 +561,26 @@ export const layerPurposeValidator = z.object({
 
 export const layerPurposeSchema: JsonSchema = toForcedToolSchema(layerPurposeValidator);
 
+// --- Discovery-coverage audit: submit_discovery_coverage_audit ---------------
+// Measurement stage (plan 2026-07-10-004 U1): the cross-family judge reports the
+// standalone learning objectives an extraction run's admitted set fails to preserve.
+// An empty `misses` list is the well-formed "coverage is sufficient" answer. Runs on
+// gpt-oss-120b, not MiMo, so a trailing nullable would be harmless — but every field
+// is required prose anyway.
+
+export const discoveryCoverageAuditValidator = z.object({
+  misses: z.array(z.object({
+    missedObjective: z.string().min(1).describe("Concise concept-shaped name of the standalone learning objective the admitted set fails to preserve."),
+    sourceGrounding: z.string().min(1).describe("Short verbatim quote or tight paraphrase of the source passage that teaches this objective substantively."),
+    whyStandalone: z.string().min(1).describe("One sentence on why this is a durable standalone learning objective rather than a facet, illustration, or rephrasing of an admitted concept.")
+  }).strict()).describe("Every principal standalone learning objective the admitted set misses; empty when coverage is sufficient.")
+}).strict();
+
+export const discoveryCoverageAuditSchema: JsonSchema = toForcedToolSchema(discoveryCoverageAuditValidator);
+
 export const toolValidators = [
   layerPurposeValidator,
+  discoveryCoverageAuditValidator,
   conceptDiscoveryValidator,
   conceptAdmissionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),

@@ -18,6 +18,7 @@ function stageRow(stage: string, over: Partial<CostTimingStageRow> = {}): CostTi
     wallClockMs: null,
     calls: null,
     costUsd: null,
+    costEstimated: false,
     tokens: null,
     ...over
   };
@@ -35,7 +36,7 @@ function operation(
     operationType,
     status: "succeeded",
     stages,
-    subtotal: { wallClockMs, calls: null, costUsd, tokens: null }
+    subtotal: { wallClockMs, calls: null, costUsd, costEstimated: false, tokens: null }
   };
 }
 
@@ -47,7 +48,7 @@ function report(operations: CostTimingOperationReport[], costAvailable = true): 
     anchorId: "anchor-1",
     costAvailable,
     operations,
-    total: { wallClockMs, calls: null, costUsd, tokens: null }
+    total: { wallClockMs, calls: null, costUsd, costEstimated: false, tokens: null }
   };
 }
 

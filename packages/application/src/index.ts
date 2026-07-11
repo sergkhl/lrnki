@@ -11,6 +11,15 @@ export {
   type KnowledgeBoundaryCalibrationReport,
   type KnowledgeBoundaryLadderConcept
 } from "./calibrateKnowledgeBoundaryProbe";
+export {
+  auditDiscoveryCoverage,
+  aggregateDiscoveryCoverageMisses,
+  normalizeObjectiveLabel,
+  DISCOVERY_COVERAGE_RECURRENCE_THRESHOLD,
+  type DiscoveryCoverageAuditReport,
+  type DiscoveryCoverageAggregatedMiss,
+  type DiscoveryCoverageSample
+} from "./auditDiscoveryCoverage";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export { generateTopicExpedition } from "./generateTopicExpedition";
 export {

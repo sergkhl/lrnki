@@ -4,14 +4,6 @@
 
 ### Execution order
 
-- **MiMo extraction follow-ups (measure-first).** Execute
-  [plan 2026-07-10-004](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md): durable
-  discovery-coverage audit over all 5 fixture domains resolving the cutover's "recall variance
-  worth watching" caveat (conditional sampling tune per its decision rule), trailing-nullable
-  descriptor-shape protection, and restoration of honest per-journey cost attribution after
-  OpenRouter Xiaomi BYOK made provider-reported response cost zero. The production route stays on
-  forced-tool-compliant OpenRouter BYOK; native Xiaomi remains experiments-only.
-
 - **Consolidate Derived Graph Layer completion.** Execute
   [plan 2026-07-11-001](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md): one deep
   completion module for Graph Enrichment and Synthetic Topic Generation, lifecycle-aware structural
@@ -27,6 +19,27 @@
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **MiMo extraction follow-ups: discovery-coverage audit, trailing-nullable protection, BYOK cost
+  attribution (2026-07-11, plan 2026-07-10-004).** A durable `kg-worker audit-discovery-coverage`
+  command runs the cross-family independent judge (gpt-oss-120b) K-sampled over an extraction run's
+  admitted set and the source's teachable blocks, aggregating recurrence by normalized objective
+  OR shared source grounding. A config-derived congruence test locks the one proven-fatal MiMo
+  wire-schema shape (an object whose final property admits `null`) by parsing the MiMo-routed
+  aliases from `litellm/config.yaml`; it caught two LIVE offenders (`concept-lesson` sections,
+  `study-item-blueprint` plans), both reordered so a required property closes the object. BYOK cost
+  attribution is restored in the ADR-0029 read path: the spend adapter derives an explicitly
+  labeled `estimatedSpend` for zero-spend OpenRouter BYOK rows from the versioned deployment prices
+  in `litellm/config.yaml` (reconciled exactly against OpenRouter's retained
+  `upstream_inference_cost`), kept distinguishable from provider-billed spend and rendered `≈…est.`
+  Rule-14 gate PASS: fresh MiMo extraction of all five `fixtures/manifest.json` sources (5 domains,
+  mixed formats), audited at K=3. R5 decision: **U2 tuning SKIPPED** — zero domains with a
+  human-confirmed principal-concept miss (economics/InstructKG/AIRA clean; the two recurring Rust
+  and biology misses verified NOT losses — one retained as a mention, one a source Learning-Objective
+  integration prompt). The Rust cross-family diff vs DeepSeek `21f0399f` confirmed the candidate-count
+  drop lived entirely in the optional discard pile, not the core. Production stays on OpenRouter
+  Xiaomi BYOK; native Xiaomi remains experiments-only. Evidence:
+  `tmp/2026-07-10-mimo-extraction-follow-ups/`.
 
 - **Expedition discoverability — curated Explore + Browse all catalog (2026-07-11, plan
   2026-07-10-005).** Explore is explicitly curated to its top five candidates, while the lazy
@@ -165,6 +178,18 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **MiMo extraction follow-ups gate, 2026-07-11.** Deterministic envelope: workspace `typecheck`
+  exit 0 (repaired one stale pre-existing `expeditionJournalView.test.ts` fixture missing the new
+  `ExpeditionCandidate.searchTerms` field), workspace `test` green (application 533,
+  infrastructure-litellm 144, learner-app 150, admin-lab 62), `lint` 0 errors (9 pre-existing
+  warnings). Real-use: five fresh production MiMo extractions (Rust 9 core / biology 4 / economics 4
+  / InstructKG 5 / AIRA 7), each audited at K=3 by gpt-oss-120b — recurring misses 1/1/0/0/0, all
+  surviving human inspection as non-losses; the trailing-nullable test caught and fixed two live
+  fatal-shape schemas; a fresh extraction operation's Cost & timings rendered `≈$0.0890` with BYOK
+  stages estimated and judge stages billed, distinguishable. Disposable state: none (real-source
+  extraction runs retained; no learner state created). Evidence:
+  `tmp/2026-07-10-mimo-extraction-follow-ups/`.
 
 - **Learner interaction system fresh-generation + motion gate, 2026-07-11 (session 4).**
   Deterministic envelope after the CrystalGlyph DOM fix: workspace `typecheck` exit 0, `lint` 0
