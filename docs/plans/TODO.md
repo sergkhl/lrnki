@@ -4,21 +4,43 @@
 
 ### Execution order
 
-- **Consolidate Derived Graph Layer completion.** Execute
-  [plan 2026-07-11-001](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md): one deep
-  completion module for Graph Enrichment and Synthetic Topic Generation, lifecycle-aware structural
-  guarantees, stable config identities, and production real-use inspection of both variants.
+- **Pick the next architecture-deepening candidate.** The
+  [2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md) has Candidates 2–4
+  remaining (Learner Journal projection, Topic Expedition lifecycle, Study Session stop completion);
+  Candidate 2 is its current top recommendation.
 
 ### Evidence-triggered follow-up
 
 - **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
   2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
   attempt-order, retry depth per item, activity gaps. Wait for representative real learner traffic
-  (not the g≥ate driver's perfect play), then decide the support ladder and the deferred Leg Trial
+  (not the gate driver's perfect play), then decide the support ladder and the deferred Leg Trial
   ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **Derived Graph Layer completion consolidated into one deep module (2026-07-11, plan
+  2026-07-11-001).** The duplicated Graph Enrichment / Synthetic Topic Generation back halves
+  (judgment-context construction, evidence-free exclusions, K-sampled consensus ordering, symbolic
+  transitive reduction, intrinsic difficulty, common trace dispositions, layer/artifact assembly,
+  atomic persistence) now live in one internal `completeDerivedGraphLayer` application module with
+  a factory-bound `complete` operation over a discriminated source-grounded/synthetic contribution.
+  Shared completion config has one type and one default authority composed into both producer
+  configs with byte-stable identities (`graph-enrichment-1886ba82e2e5`,
+  `synthetic-topic-generation-978cefbca6ed`, locked by an exact-hash regression test). The one
+  intentional behavior change: provable lifecycle-aware structural violations (duplicate node IDs,
+  contribution/version mismatch, unproven trace references, unknown edge endpoints, inexact
+  difficulty coverage) now fail closed with zero persistence; well-formed neural output is never
+  normalized or reinterpreted. The completion suite is the shared-policy test surface; producer
+  suites keep their front halves plus one handoff contract each. Rule-14 gates PASS for both
+  variants (fresh production enrichment over the curated Rust ownership source and a fresh
+  synthetic "Rust ownership and borrowing" layer, persisted artifacts inspected). Evidence:
+  `tmp/2026-07-11-derived-graph-layer-completion/`.
+
+- **Expedition discoverability plan file consolidated (2026-07-11).** The completed plan
+  2026-07-10-005 file was deleted (its outcome is recorded below, 2026-07-11 entry); the
+  2026-07-11 architecture review's stale references were repaired in the same change.
 
 - **MiMo extraction follow-ups: discovery-coverage audit, trailing-nullable protection, BYOK cost
   attribution (2026-07-11, plan 2026-07-10-004).** A durable `kg-worker audit-discovery-coverage`
@@ -178,6 +200,24 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Derived Graph Layer completion gate, 2026-07-11.** Deterministic envelope: workspace
+  `typecheck` exit 0, workspace `test` green (application 551 — including 26 new focused
+  completion tests proving every structural guarantee persists zero times on rejection —
+  infrastructure-litellm 145 with the new exact default-hash regression, infrastructure-postgres
+  72 unchanged, learner-app 150, admin-lab 62), `lint` 0 errors (9 pre-existing warnings),
+  `build` green. Real-use (both production variants over the migrated seam): source-grounded —
+  fresh publication `db72cac4` of the production MiMo Rust-ownership extraction, then full
+  enrichment `e0dc556d` (9 anchors + 6 rescued + 9 minted; rescue correctly vetoed
+  "Garbage Collection"; k=8 ordering with 21 kept / 12 uncertain / 49 weak-cut / 3 reduced,
+  hook counts reconciling exactly against the persisted trace; difficulty covers all 24 exactly
+  once; config hash `graph-enrichment-1886ba82e2e5` unchanged) — PASS; synthetic — fresh
+  `a80ad72d` "Rust ownership and borrowing" (11 core concepts, pedagogically correct DAG with the
+  one genuinely contested pair routed `uncertain`, null provenance intact incl. the artifact
+  envelope omitting the version key, probe dispositions present, config hash
+  `synthetic-topic-generation-978cefbca6ed` unchanged) — PASS. Disposable state: none removed
+  (real-source runs retained; no learners created). Evidence:
+  `tmp/2026-07-11-derived-graph-layer-completion/`.
 
 - **MiMo extraction follow-ups gate, 2026-07-11.** Deterministic envelope: workspace `typecheck`
   exit 0 (repaired one stale pre-existing `expeditionJournalView.test.ts` fixture missing the new

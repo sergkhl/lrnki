@@ -13,158 +13,18 @@ project language in [CONTEXT.md](../../CONTEXT.md). It does not propose interfac
 The completed 2026-07-07 review was checked through git history. This review does not re-propose its
 implemented operation-catalog, learner-grading, Neural Stage Descriptor, neural-client policy, or
 operation-liveness work. It also preserves the prior rejection of grouping `runGraphEnrichment`
-inputs: that operation still has one caller. Candidate 1 below is different—the duplicated
-Derived Graph Layer completion behavior has two real callers.
+inputs: that operation still has one caller. Candidate 1 was different—the duplicated Derived
+Graph Layer completion behavior had two real callers—and has since been completed (2026-07-11).
 
 ---
 
 ## Candidate 1 — Collapse Derived Graph Layer completion into one deep module
 
-**Recommendation strength: Strong**  
-**Dependency category: ports & adapters**
-
-**Files**
-
-- [`runGraphEnrichment.ts`](../../packages/application/src/runGraphEnrichment.ts), especially the
-  ordering, symbolic disposal, intrinsic difficulty, trace, and persistence implementation
-  (currently lines 330–450)
-- [`runSyntheticGeneration.ts`](../../packages/application/src/runSyntheticGeneration.ts), the
-  parallel implementation (currently lines 195–292)
-- [`deriveConsensusOrdering.ts`](../../packages/application/src/deriveConsensusOrdering.ts) and
-  [`prerequisiteDag.ts`](../../packages/application/src/prerequisiteDag.ts), which are already shared
-  one level lower
-- [`runGraphEnrichment.test.ts`](../../packages/application/src/runGraphEnrichment.test.ts) and
-  [`runSyntheticGeneration.test.ts`](../../packages/application/src/runSyntheticGeneration.test.ts)
-
-**Problem**
-
-Graph Enrichment and Synthetic Topic Generation each implement the same ordering → consensus →
-transitive reduction → intrinsic difficulty → Derived Graph Layer persistence behavior, so the
-high-level policy and trace assembly have two homes even though ADR-0019 defines one artifact and
-both implementations already call the same low-level functions.
-
-The duplication includes the ordering configuration fields, edge-disposition assembly, stage
-brackets, difficulty invocation, artifact metadata, and terminal persistence. The source comment in
-`runSyntheticGeneration.ts` describes this as an “identical reused back half,” but only the
-individual algorithms are reused; the orchestration remains copied. The **deletion test** is
-positive: deleting either copy makes the complete behavior reappear in that producer.
-
-**Solution**
-
-Deepen one Derived Graph Layer completion module that accepts already-prepared nodes and
-provenance-appropriate judgment contexts, then owns ordering, reduction, difficulty, trace
-dispositions, artifact assembly, and persistence for both producers while their distinct front
-halves remain local.
-
-**Benefits**
-
-- **Locality:** ordering policy lives once
-- **Leverage:** two producers, one interface
-- Tests hit one completion seam
-- Trace dispositions cannot drift
-- Shared configuration has one home
-- Future producers reuse the guarantee
-
-**Before / after**
-
-```mermaid
-flowchart LR
-  subgraph before[Before]
-    GE[Graph Enrichment] --> GO[ordering]
-    GO --> GR[reduction]
-    GR --> GD[difficulty]
-    GD --> GP[persist layer + trace]
-    SG[Synthetic Topic Generation] --> SO[ordering]
-    SO --> SR[reduction]
-    SR --> SD[difficulty]
-    SD --> SP[persist layer + trace]
-  end
-
-  subgraph after[After]
-    GE2[Graph Enrichment front half] -. prepared nodes + contexts .-> DC[Deep Derived Graph Layer completion module]
-    SG2[Synthetic Topic Generation front half] -. prepared nodes + contexts .-> DC
-    DC --> OUT[immutable layer + trace]
-  end
-
-  style DC fill:#172033,color:#fff,stroke:#172033,stroke-width:4px
-```
-
-**ADR fit:** This deepens the shared implementation of
-[ADR-0019](../adr/0019-graph-enrichment-derived-layer.md),
-[ADR-0024](../adr/0024-learner-neutral-intrinsic-difficulty.md), and
-[ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md); it does
-not merge the two producers or their lifecycles.
-
-### Grilling decisions
-
-1. **The deep module owns completion through persistence.** Graph Enrichment and Synthetic Topic
-   Generation keep their distinct front halves and existing operation-timeline shells. After a
-   producer prepares its nodes and producer-specific trace facts, the deep module owns the shared
-   ordering, symbolic reduction, intrinsic difficulty, common edge dispositions, Derived Graph
-   Layer and artifact assembly, and atomic persistence. A compute-only module was rejected because
-   it would leave trace and persistence policy duplicated; moving the whole operation shell was
-   rejected because it would invert control over the distinct producer front halves.
-2. **The deep module owns judgment-context construction.** Producers supply completed nodes and the
-   source-specific evidence facts already available from their front halves. The module derives the
-   provenance-appropriate prerequisite-ordering and intrinsic-difficulty contexts, applies the
-   mention cap, records evidence-free ordering exclusions, and verifies node/context coverage. Having
-   producers supply finished contexts was rejected because it would expose alignment invariants and
-   preserve duplicated provenance rules; a separate context module was rejected as a shallow seam
-   whose output exists only for completion.
-3. **Completion configuration has one shape and one default authority.** The shared ordering sample
-   count, direction-contest threshold, edge-confidence floor, prompt budget, and mention cap remain
-   flat fields embedded in both producer configurations, but their type and current defaults are
-   defined once. Each producer still hashes its complete configuration with its own Neural Stage
-   Descriptor set. Separate defaults were rejected because they could drift without intent; hidden
-   module defaults were rejected because configuration identity would become less transparent. The
-   flat runtime shape is preserved so a behavior-preserving refactor does not cause false config-hash
-   churn.
-4. **Producer trace facts cross the seam as a discriminated contribution.** A source-grounded
-   contribution carries Graph Enrichment's grounding, rescue, rescued-definition, minting, and merge
-   dispositions; a synthetic contribution carries Synthetic Topic Generation's grounding and
-   Knowledge-Boundary Probe dispositions. The deep module owns every common trace field and assembles
-   the complete `EnrichmentRunTrace`, making invalid producer/fact combinations unrepresentable.
-   Partial traces and trace-builder callbacks were rejected because they would leave producers
-   coupled to common trace assembly and its invariants.
-5. **Use one constructed completion module with one operation.** The composition point binds the
-   existing prerequisite-ordering, intrinsic-difficulty, and Enrichment Run store ports once; the
-   module exposes one `complete` operation whose request is discriminated by the trace-contribution
-   variant and carries the current operation's stage bracket. Stateful construction was rejected
-   because it exposes invalid partial states, two producer-specific operations were rejected because
-   their interfaces could drift, and a new injected completion port was rejected as a hypothetical
-   seam with one production adapter. The single operation keeps the leverage of one interface while
-   retaining source-grounded/synthetic caller clarity in its request type.
-6. **The completion interface enforces provable structural guarantees.** Before persistence it
-   rejects duplicate node identities, a trace variant inconsistent with `graphVersionId`, invalid
-   references under each trace field's lifecycle contract, invalid prerequisite endpoints, and
-   difficulty output that does not cover every surviving node exactly once. Surviving-node fields
-   must name surviving nodes; historical trace fields may name a deliberately dropped or absorbed
-   node only when their disposition or merge record proves that lifecycle. Any violation fails the
-   operation and persists nothing. Trusting callers was rejected because these are module invariants;
-   normalizing or dropping malformed data was rejected because it would hide programming defects and
-   silently alter authoritative output. These checks judge structure only, never neural semantics.
-7. **The completion interface becomes the shared test surface.** Ordering, evidence exclusions,
-   symbolic reduction, intrinsic-difficulty coverage, trace assembly, validation failures, and atomic
-   persistence move to focused completion-module tests. Each producer keeps tests for its distinct
-   front half plus one handoff test proving it supplies the correct contribution and returns the
-   persisted layer. Redundant producer-level assertions of shared policy are deleted; the Postgres
-   adapter's persistence integration tests remain. Keeping both old suites was rejected as a second
-   test representation; testing only through producers was rejected because the new interface would
-   not become the test surface.
-8. **Real-use verification covers both producers.** After deterministic verification, execute one
-   curated-source Graph Enrichment and one Synthetic Topic Generation through production LiteLLM,
-   then inspect nodes, prerequisite edges, intrinsic difficulties, exclusions, producer-specific
-   trace facts, and persisted artifacts. Record each result as `PASS` or `FIX_FIRST` with concrete
-   evidence under `tmp/`; a foundational defect blocks completion. A Graph-Enrichment-only gate was
-   rejected because it would leave the synthetic contribution and null-`graphVersionId` path
-   unverified, and deterministic-only verification was rejected under the project's real-use quality
-   discipline.
-9. **Preserve producer behavior except for the new structural guarantees.** Prompts, model aliases,
-   sampling, operation stages, public producer return types, summary hooks, persistence shapes, and
-   configuration hashes remain unchanged. The only intentional behavior change is that a provable
-   structural violation now fails before persistence. Broader producer-interface cleanup was rejected
-   as scope expansion; a move-only refactor was rejected because it would omit the selected module
-   guarantees.
+**COMPLETED 2026-07-11** via plan 2026-07-11-001 (plan deleted after both rule-14 gates passed).
+One internal `completeDerivedGraphLayer` module in `@lrnki/application` now owns judgment-context
+construction through atomic persistence for both Graph Enrichment and Synthetic Topic Generation;
+current status lives in [TODO.md](../plans/TODO.md), and its nine grilling decisions are realized
+in the module and its focused test suite.
 
 ---
 
@@ -183,8 +43,6 @@ not merge the two producers or their lifecycles.
   application and port types and every response passes through an unchecked generic cast
 - [`generationProgress.ts`](../../apps/learner-app/src/learn/generationProgress.ts), where the
   Learner App imports `STAGE_TAGS` and `OperationTimelineDetail` to derive learner-visible progress
-- [`2026-07-10-005-fix-expedition-catalog-discovery-plan.md`](../plans/2026-07-10-005-fix-expedition-catalog-discovery-plan.md),
-  which currently owns journal/catalog edits
 
 **Problem**
 
@@ -241,10 +99,9 @@ flowchart LR
 > learner-facing read-and-compute composition to application use-cases rather than Inspection Read
 > Models consumed by UI code.
 
-**Active-plan coordination:** Candidate 2 touches the exact journal route and projection being
-changed by [plan 2026-07-10-005](../plans/2026-07-10-005-fix-expedition-catalog-discovery-plan.md).
-Explore it through that plan or after the plan lands; do not create a competing definition of
-catalog scope.
+**Active-plan coordination:** the expedition-discoverability work (plan 2026-07-10-005, completed
+2026-07-11 — see [TODO.md](../plans/TODO.md)) landed the curated Explore + `/catalog` route this
+candidate builds on; do not create a competing definition of catalog scope.
 
 ---
 
@@ -422,8 +279,6 @@ interface rather than leave them reading raw maps.
 
 ## Top recommendation
 
-Start with **Candidate 1 — Collapse Derived Graph Layer completion into one deep module**. It is the
-clearest real seam: two producers already promise the same Derived Graph Layer semantics, already
-share the low-level algorithms, and still duplicate the policy that turns those algorithms into an
-immutable layer and trace. Deepening it improves correctness locality without colliding with any
-active implementation plan.
+Candidate 1 (the original top recommendation) is completed. Of the remaining candidates,
+**Candidate 2 — Make the Learner Journal a finished application projection** is the strongest
+next seam; Candidates 3 and 4 stay behind it per their dependency notes above.
