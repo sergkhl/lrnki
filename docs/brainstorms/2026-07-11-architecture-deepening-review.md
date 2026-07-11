@@ -340,8 +340,9 @@ hypothetical adapters.
   whole trail to resolve one capstone
 - [`ActivitySheet.tsx`](../../apps/learner-app/src/components/ActivitySheet.tsx), which checks the
   same completion primitives again for its indicator (currently lines 326–345)
-- [`2026-07-10-003-feat-learner-interaction-system-plan.md`](../plans/2026-07-10-003-feat-learner-interaction-system-plan.md),
-  whose U5 will add event-bound mastery motion to these values
+- the shipped event-bound mastery motion (plan 2026-07-10-003, completed 2026-07-11) now reads these
+  same derived values in `CrystalGlyph.tsx` / `ActivitySheet.tsx`, so any de-duplication here must
+  keep those motion triggers intact
 
 **Problem**
 
@@ -394,9 +395,10 @@ flowchart LR
 learner projection required by [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md)
 and [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-**Active-plan coordination:** Candidate 4 should shape or follow U5 of
-[plan 2026-07-10-003](../plans/2026-07-10-003-feat-learner-interaction-system-plan.md). Adding more
-motion consumers to the raw maps first will increase the later interface migration.
+**Active-plan coordination:** the learner-interaction system (plan 2026-07-10-003, completed
+2026-07-11) already added event-bound motion consumers of the raw projection maps, so Candidate 4
+now inherits those consumers — a de-duplication here must migrate them behind the Study Session
+interface rather than leave them reading raw maps.
 
 ---
 

@@ -12,10 +12,6 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-10-003 — Learner interaction system and deferred native surfaces](./2026-07-10-003-feat-learner-interaction-system-plan.md)
-  — in progress; the interaction migration, visual-regression fixes, and web real-use gate are
-  complete and Xiaomi BYOK resolved the generation block; finish fresh generation, recordings,
-  Android physical-device validation, durable ADR updates, deployment, and live smoke testing.
 - [2026-07-10-005 — Fix expedition discoverability: curated Explore + Browse all catalog](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md)
   — ready; stop the top-3 readiness slice from hiding ready trails: keep a curated top-5 Explore,
   add a searchable Browse all screen over the full shared catalog via a new `/catalog` endpoint,

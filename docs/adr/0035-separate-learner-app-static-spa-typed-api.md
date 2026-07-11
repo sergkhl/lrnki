@@ -1,7 +1,8 @@
 # 0035 — Separate the Learner App into a universal Expo app over a typed learner API
 
-Date: 2026-07-08, amended 2026-07-10 (universal Expo cutover). Status: accepted. Origin: plan
-2026-07-08-003; amended by plan 2026-07-09-001.
+Date: 2026-07-08, amended 2026-07-10 (universal Expo cutover) and 2026-07-11 (app-owned interaction
+system). Status: accepted. Origin: plan 2026-07-08-003; amended by plans 2026-07-09-001 and
+2026-07-10-003.
 
 ## Decision
 
@@ -57,3 +58,12 @@ runbook; the single shared environment during testing is
   plugins materialized.
 - Per-request `createDatabaseClient()/end()` churn on the learner path is gone (one pool per
   process).
+- The single rendering layer renders through the app-owned NativeWind component system and motion
+  contract defined in
+  [ADR-0032](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md); the learner-surface
+  boundary is lint-enforced in the root ESLint config.
+- Reanimated-wrapped components (`Animated.View`, animated pressables) are **not** auto-registered
+  with NativeWind, so their `className` is silently dropped on every platform unless registered via
+  `cssInterop`. This is invisible to Jest (className props are inert in tests by design), so it is
+  catchable only in a browser pass — one more reason the rule-14 web gate, not the test suite, is
+  the styling-correctness authority for this app.

@@ -4,14 +4,6 @@
 
 ### Execution order
 
-- **Finish learner-interaction platform gates — IN PROGRESS (U1–U5 landed; U6 remains).** Execute
-  [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md); its
-  "Execution Status" section is the authoritative handoff. The visual regressions are fixed and
-  re-verified in Playwright, and the web real-use gate passed with 51 server-keyed grades across all
-  three item types. OpenRouter Xiaomi BYOK resolved the production-generation provider block.
-  Remaining U6 work is the fresh-generation rerun, normal/reduced-motion recording, Android build
-  plus physical-device validation, ADR-0032/0035 consolidation, deployment, and live smoke testing.
-
 - **Fix expedition discoverability (curated Explore + Browse all).** Execute
   [plan 2026-07-10-005](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md): the journal's
   top-3 readiness slice hides ready trails (reproduced: `jackie chan` cannot reach the photosynthesis
@@ -41,6 +33,29 @@
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **Learner interaction system and deferred native surfaces (2026-07-10/11, plan 2026-07-10-003).**
+  Hard-cut the Learner App to one app-owned NativeWind component system (`src/ui/`: Screen, Text,
+  PressableSurface, Button, IconButton, Card, Input, Progress, Dialog, BottomSheet, SideSheet,
+  FullScreenDialog, OverlayHeader; single token source; lint-enforced boundary), restored the
+  deferred journal overlays (right SideSheet menu, self-contained Board dialog, splash coordinator),
+  gave every overlay a circular semantic icon header and one dismissal contract, and added
+  restrained event-bound Reanimated motion with a single reduced-motion policy and selective
+  semantic haptics. Root-cause fix for the reported visual regressions: Reanimated-wrapped
+  components are not auto-registered with NativeWind, so their `className` was silently dropped —
+  fixed with `cssInterop`; a second web-only leak (react-native-svg `origin` → raw `transform-origin`
+  DOM attribute on the crystal-assembly path) was found on the fresh-generation gate and fixed with
+  an explicit pivot-decomposition transform. Decisions:
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) (amended) and
+  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md) (amended). Rule-14 web gates
+  PASS: session-3 migrated-UI gate (51 server-keyed grades, evidence
+  `tmp/2026-07-10-learner-interaction-system/`) and session-4 fresh-production-generation gate
+  (cold topic → 137s → 8 nodes / 19 study items / 8 lessons → 16/16 server-keyed correct grades,
+  plus normal/reduced-motion recordings, evidence
+  `tmp/2026-07-11-learner-interaction-fresh-gen/`), resolving the earlier MiMo `441 risk_control`
+  block via OpenRouter Xiaomi BYOK. The Android preview build + physical-device pass is a manual
+  step in [BLOCKERS.md](./BLOCKERS.md) (web correctness is the completion bar); iOS runtime
+  validation is deferred.
 
 - **Production extraction moved to Xiaomi MiMo v2.5; DeepSeek fully retired (2026-07-10, plan
   2026-07-10-002).** The six extraction aliases route to `openrouter/xiaomi/mimo-v2.5`
@@ -147,6 +162,17 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner interaction system fresh-generation + motion gate, 2026-07-11 (session 4).**
+  Deterministic envelope after the CrystalGlyph DOM fix: workspace `typecheck` exit 0, `lint` 0
+  errors (8 pre-existing warnings), learner-app `test` 36 suites / 148 tests green,
+  `CrystalGlyph.test.tsx` 6/6. Real-use: the `kg-domain-inference` alias returned HTTP 200 with
+  valid forced-tool output (no `441 risk_control`); a cold "ocean tides" topic generated in 137s
+  (8 nodes / 19 study items across all three types / 8 lessons); 16 server-keyed `auto` grades, all
+  correct, across option-select/impostor/matching through the migrated overlays; the assembly-path
+  console error was reproduced, fixed, and re-verified clean (14 assembly actions, 0 errors);
+  normal and reduced-motion recordings captured console-error-clean. Disposable learners deleted;
+  the generated enrichment left intact. Evidence: `tmp/2026-07-11-learner-interaction-fresh-gen/`.
 
 - **Universal-Expo cutover + learner-api dev loop, 2026-07-10.** Deterministic envelope after
   deleting `apps/learner-web`: workspace `typecheck` exit 0, workspace `test` exit 0 (learner-app

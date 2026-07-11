@@ -137,12 +137,19 @@ function AssemblingShard({ shard, fill, stroke, delayMs }: Readonly<{ shard: Cry
     // Mount-only by design: re-renders must not replay the assembly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const animatedProps = useAnimatedProps(() => ({
-    opacity: progress.get(),
-    scale: 0.2 + 0.8 * progress.get()
-  }));
+  // Scale about the bedrock anchor via an explicit pivot decomposition
+  // (translate → scale → translate back) instead of react-native-svg's `origin`
+  // helper, which leaks a raw `transform-origin` attribute to the DOM on web.
+  const animatedProps = useAnimatedProps(() => {
+    const p = progress.get();
+    const s = 0.2 + 0.8 * p;
+    return {
+      opacity: p,
+      transform: `translate(${CRYSTAL_BASE.x}, ${CRYSTAL_BASE.y}) scale(${s}) translate(${-CRYSTAL_BASE.x}, ${-CRYSTAL_BASE.y})`
+    };
+  });
   return (
-    <AnimatedG testID="shard-assembling" origin={`${CRYSTAL_BASE.x}, ${CRYSTAL_BASE.y}`} animatedProps={animatedProps}>
+    <AnimatedG testID="shard-assembling" animatedProps={animatedProps}>
       <Polygon points={toPoints(shard)} fill={fill} stroke={stroke} strokeWidth={1} />
     </AnimatedG>
   );

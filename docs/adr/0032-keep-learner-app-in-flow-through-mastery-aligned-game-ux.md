@@ -1,6 +1,7 @@
 # Keep the Learner App in flow through mastery-aligned game UX
 
-Status: Accepted
+Status: Accepted. Amended 2026-07-11 (plan 2026-07-10-003) with the app-owned interaction system,
+overlay, motion, and haptic contract.
 
 ## Decision
 
@@ -80,6 +81,38 @@ the challenge curve and expected skill growth, state which pleasures it prioriti
 focused runtime signals needed to inspect flow. The minimum focused signals are segment
 completion/abandonment, correctness, retries, hint use, response time, and calibration changes;
 invasive affective or fine-grained behavioral telemetry is not part of the baseline.
+
+## Interaction system, overlays, motion, and haptics
+
+The Learner App renders through **one app-owned component boundary** over NativeWind: `Screen`,
+`Text`, `PressableSurface`, `Button`, `IconButton`, `Card`, `Input`, `Progress`, `Dialog`,
+`BottomSheet`, `SideSheet`, `FullScreenDialog`, and `OverlayHeader`. Semantic colors, spacing,
+typography, radii, touch sizes, interaction states, haptic intents, and motion durations have a
+single token source (no duplicate values). The boundary is lint-enforced: learner surfaces import
+the app-owned `Text` and press surfaces, never raw React Native `Pressable`/`Text`.
+
+Every overlay carries a **circular semantic icon header**; an activity header reuses the exact icon
+and state language of the checkpoint that opened it, so the overlay reads as a continuation of the
+trail stop. Surface kinds are fixed by role: full-screen dialogs for study and Crystal Vista, bottom
+sheets for section overview / expedition planning / the journal menu, adaptive dialogs for the Board
+and celebration splashes. One **dismissal contract** applies everywhere — dialogs support close,
+system back or Escape, and backdrop; bottom sheets add pan-down; full-screen surfaces use explicit
+and system back — and a pending mutation temporarily blocks dismissal.
+
+Motion is **Reanimated and event-bound only**: presses, disclosures, overlay entrances,
+indeterminate progress, next-stop attention, matching feedback, crystal growth, mastery assembly,
+fusion, and unlock moments. Every enabled press gives a restrained physical response (slight scale,
+reduced elevation, surface-color change) with no layout movement; disabled and busy states stay
+still and prevent duplicate actions. Completed crystals and Vista formations stay still — no ambient
+crystal motion, no audio. Crystal Vista is **never auto-opened**: mastery assembly plays in flow,
+the Vista trigger is emphasized, and a newly fused cluster is preserved for one-time assembly when
+the learner opens Vista.
+
+One shared **reduced-motion policy** honors the OS or browser preference (there is no app-specific
+motion setting): transform and assembly motion are replaced by immediate state and static emphasis,
+and assistive-preference users receive equivalent state and progress information. Haptics are
+**selective and semantic** — checkpoint and answer selection, grading outcomes, mastery, fusion, and
+unlock — fired once at the transition; generic navigation never vibrates.
 
 ## Context
 
