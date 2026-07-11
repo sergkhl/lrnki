@@ -179,7 +179,8 @@ function TileButton({
     : wrong
       ? "border-destructive bg-card"
       : selected
-        ? "border-frontier bg-gem-soft"
+        ? // Tint, not a frontier box — selection stays announced via accessibilityState.
+          "border-line-strong bg-gem-soft"
         : "border-line-strong bg-card";
   return (
     <Animated.View style={nudgeStyle}>

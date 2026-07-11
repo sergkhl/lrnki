@@ -1,5 +1,6 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
+import { PortalHost } from "@rn-primitives/portal";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LearnerMenuSheet } from "./LearnerMenuSheet";
 import { learnerTerm } from "@/learn/vocabulary";
@@ -31,6 +32,7 @@ function renderMenu(boardAvailable = true) {
         onEnterDuel={handlers.onEnterDuel}
         onLogout={handlers.onLogout}
       />
+      <PortalHost />
     </SafeAreaProvider>
   );
 }

@@ -2,7 +2,13 @@
 // duration here, and every animated surface consults the SAME reduced-motion source.
 // Reduced motion swaps presentation only — state transitions and completion callbacks
 // never ride on an animation finishing.
-import { useReducedMotion as useReanimatedReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion as useReanimatedReducedMotion } from "react-native-reanimated";
+import { cssInterop } from "nativewind";
+
+// Reanimated components are NOT covered by NativeWind's automatic core-component
+// registration: without this, every className on an Animated.View is silently dropped
+// on all platforms (Jest can't see it — classNames are inert there by design).
+cssInterop(Animated.View, { className: "style" });
 
 /** Durations in ms. `press` is the press-in acknowledgement; `standard` covers
  * disclosures and small layout reveals; `overlay` is dialog/sheet entrance;

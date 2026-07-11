@@ -73,10 +73,14 @@ function useHardwareBack(open: boolean, blocked: boolean, close: () => void) {
   }, [open, blocked, close]);
 }
 
-/** Overlay entrance (R14): a restrained fade + short rise played once when the overlay
+/** Overlay entrance (R14): a restrained fade + short slide played once when the overlay
  * content mounts. Reduced motion renders the settled state immediately; dismissal stays
  * instant, so no state or callback ever waits on this. */
-function OverlayEntrance({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
+function OverlayEntrance({
+  children,
+  className,
+  slideFrom = "bottom"
+}: Readonly<{ children: ReactNode; className?: string; slideFrom?: "bottom" | "right" }>) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(reduceMotion ? 1 : 0);
   useEffect(() => {
@@ -86,7 +90,10 @@ function OverlayEntrance({ children, className }: Readonly<{ children: ReactNode
   }, []);
   const style = useAnimatedStyle(() => ({
     opacity: progress.get(),
-    transform: [{ translateY: (1 - progress.get()) * 12 }]
+    transform:
+      slideFrom === "right"
+        ? [{ translateX: (1 - progress.get()) * 24 }]
+        : [{ translateY: (1 - progress.get()) * 12 }]
   }));
   return (
     <Animated.View className={className} style={style}>
@@ -120,7 +127,7 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
           <DialogPrimitive.Content className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card">
-            <OverlayEntrance>{children}</OverlayEntrance>
+            <OverlayEntrance className="max-h-full">{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>
@@ -144,8 +151,38 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
           className="absolute inset-0"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
-          <DialogPrimitive.Content className="flex-1 bg-background">
+          {/* absolute, not flex-1: the web primitive inserts an unstyled focus wrapper
+              between Overlay and Content, so stretch-based sizing collapses there. */}
+          <DialogPrimitive.Content className="absolute inset-0 bg-background">
             <OverlayEntrance className="flex-1">{children}</OverlayEntrance>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Overlay>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+/** Right-anchored drawer (journal menu): same primitive dismissal contract as Dialog —
+ * close control, Escape / system back, and backdrop press all honor `dismissBlocked` —
+ * anchored to the edge its top-right trigger lives on. */
+export function SideSheet({ open, onOpenChange, dismissBlocked = false, children }: OverlayProps) {
+  const requestClose = (next: boolean) => {
+    if (!next && dismissBlocked) return;
+    onOpenChange(next);
+  };
+  useHardwareBack(open, dismissBlocked, () => onOpenChange(false));
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={requestClose}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay
+          closeOnPress={!dismissBlocked}
+          className="absolute inset-0 flex-row justify-end bg-black/40"
+          style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
+        >
+          <DialogPrimitive.Content className="h-full w-80 max-w-[85%] border-l border-line bg-card">
+            <OverlayEntrance className="flex-1" slideFrom="right">
+              {children}
+            </OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>

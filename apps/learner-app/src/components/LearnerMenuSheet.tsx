@@ -1,11 +1,12 @@
 import { View } from "react-native";
 import { LogOut, Menu as MenuIcon, Swords, Trophy } from "lucide-react-native";
-import { BottomSheet, OverlayHeader, PressableSurface, Text, colors } from "@/ui";
+import { OverlayHeader, PressableSurface, SideSheet, Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The journal-only menu (R11): Duel, Board, and logout as full-width action rows in a
-// bottom sheet. Every action first closes the sheet, so the journal never stacks a
-// sheet under a dialog; the parent owns the handoff.
+// right-anchored drawer (it opens from the edge its top-right trigger lives on). Every
+// action first closes the drawer, so the journal never stacks a sheet under a dialog;
+// the parent owns the handoff.
 export function LearnerMenuSheet({
   open,
   onOpenChange,
@@ -26,7 +27,7 @@ export function LearnerMenuSheet({
     action();
   };
   return (
-    <BottomSheet open={open} onOpenChange={onOpenChange}>
+    <SideSheet open={open} onOpenChange={onOpenChange}>
       <OverlayHeader
         icon={<MenuIcon size={20} color={colors.ink} />}
         title="Menu"
@@ -50,7 +51,7 @@ export function LearnerMenuSheet({
           onPress={() => handoff(onLogout)}
         />
       </View>
-    </BottomSheet>
+    </SideSheet>
   );
 }
 

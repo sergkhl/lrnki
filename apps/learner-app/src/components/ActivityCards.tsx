@@ -19,9 +19,11 @@ function ChoiceTile({
   disabled,
   onPress
 }: Readonly<{ text: string; chosen: boolean; keyed: boolean; graded: boolean; disabled: boolean; onPress: () => void }>) {
+  // Selection reads as a surface tint, not a boxed frontier border (U6 visual pass):
+  // the announced `selected` state plus the fill keeps it accessible without shouting.
   const box = !graded
     ? chosen
-      ? "border-frontier bg-gem-soft"
+      ? "border-line-strong bg-gem-soft"
       : "border-line-strong bg-card"
     : keyed
       ? "border-trail bg-trail"

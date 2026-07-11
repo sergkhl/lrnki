@@ -3,7 +3,7 @@
 // this module.
 export { Button, IconButton, PressableSurface, buttonIconColor, type ButtonVariant, type PressableSurfaceProps } from "./actions";
 export { AppText as Text, Badge, Card, Input, Progress, Screen, type TextColor, type TextVariant } from "./foundation";
-export { Dialog, FullScreenDialog, OverlayHeader, type OverlayProps } from "./overlays";
+export { Dialog, FullScreenDialog, OverlayHeader, SideSheet, type OverlayProps } from "./overlays";
 export { BottomSheet } from "./sheets";
 export { triggerHaptic, type HapticIntent } from "./feedback";
 export { MOTION, PRESS_SCALE, useReducedMotion } from "./motion";

@@ -4,7 +4,6 @@
 import { forwardRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   View,
   type AccessibilityRole,
@@ -14,12 +13,16 @@ import {
   type ViewStyle
 } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { cssInterop } from "nativewind";
 import { triggerHaptic, type HapticIntent } from "./feedback";
 import { MOTION, PRESS_SCALE, useReducedMotion } from "./motion";
 import { colors } from "./tokens";
 import { AppText, type TextVariant } from "./foundation";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Custom animated components need explicit NativeWind registration or their className
+// is dropped entirely (see the note in motion.ts).
+cssInterop(AnimatedPressable, { className: "style" });
 
 export type PressableSurfaceProps = Readonly<{
   onPress: () => void;
@@ -63,7 +66,6 @@ export const PressableSurface = forwardRef<ViewType, PressableSurfaceProps>(func
 ) {
   const reduceMotion = useReducedMotion();
   const [pressed, setPressed] = useState(false);
-  const [focused, setFocused] = useState(false);
   const scale = useSharedValue(1);
   const interactive = !disabled && !busy;
 
@@ -98,17 +100,10 @@ export const PressableSurface = forwardRef<ViewType, PressableSurfaceProps>(func
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={handlePress}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
-      className={`${className ?? ""} ${pressed && pressedClassName ? pressedClassName : ""}`}
-      style={[
-        animatedStyle,
-        // Visible keyboard focus on web (R4): an offset frontier outline, no layout shift.
-        Platform.OS === "web" && focused
-          ? ({ outlineColor: colors.frontier, outlineStyle: "solid", outlineWidth: 2, outlineOffset: 2 } as ViewStyle)
-          : null,
-        style
-      ]}
+      // Visible keyboard focus on web (R4) via :focus-visible only — pointer/touch
+      // presses and persistent selection never draw the outline box.
+      className={`web:focus-visible:outline web:focus-visible:outline-2 web:focus-visible:outline-offset-2 web:focus-visible:outline-frontier ${className ?? ""} ${pressed && pressedClassName ? pressedClassName : ""}`}
+      style={[animatedStyle, style]}
     >
       {typeof children === "function" ? children({ pressed }) : children}
     </AnimatedPressable>

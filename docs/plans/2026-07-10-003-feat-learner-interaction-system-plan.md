@@ -11,38 +11,41 @@ execution: code
 
 # Learner Interaction System and Deferred Native Surfaces - Plan
 
-## Execution Status (updated 2026-07-11, session 2)
+## Execution Status (updated 2026-07-11, session 3)
 
-**U1, U2, U7, U3, U4, and U5 are IMPLEMENTED and deterministically verified. Only U6 (browser +
-real-use + Android + deploy gates, ADR/doc consolidation) remains — but the user has already
-reported VISUAL REGRESSIONS from the U1–U5 migration, so U6 must begin with a visual browser
-pass that reproduces (screenshots), fixes, and re-verifies each item below before any gate is
-claimed.**
+**U1, U2, U7, U3, U4, and U5 are IMPLEMENTED and deterministically verified. The user-reported
+visual regressions are FIXED and re-verified in a Playwright browser pass (2026-07-11, session
+3; screenshots in `tmp/2026-07-10-learner-interaction-system/`, driver `repro.mjs` there).
+Remaining U6 work: the full real-use gate (fresh production expedition + complete study flow +
+cleanup), normal/reduced-motion recordings, Android build + device pass, ADR-0032/0035 doc
+consolidation, deploy + live smoke.**
 
-User-reported visual regressions (2026-07-11, from real use — fix first, then rerun the pass):
+Visual regression fix pass (all 5 reported items reproduced at 390x844 and 1440x900, fixed,
+re-verified; zero console errors):
 
-1. **Expedition map stops are not visible.** Trail checkpoint circles do not render on the
-   expedition screen. Suspects: the U5 `NextStopHalo`/checkpoint changes, the 72px fixed halo
-   box, or CSS-variable token classes not resolving on web.
-2. **Incorrect layout for the context header.** The expedition/quest header (eyebrow + title +
-   summit line + overview/vista controls) lays out wrong. Suspect: the U5 `Animated.View`
-   wrapper added around the vista tally in `QuestHeader`, or flex/shrink changes from the U2
-   migration.
-3. **Incorrect positioning or sizing of dialogs.** Centered dialogs and/or full-screen dialogs
-   are misplaced or mis-sized. Suspects: the U5 `OverlayEntrance` wrapper inside
-   `DialogPrimitive.Content` (it may break the flex/max-height chain), the web
-   `position: fixed` overlay style, or `max-h-[85%]` on web.
-4. **Menu drawer should open from the RIGHT side.** The journal menu (LearnerMenuSheet /
-   bottom sheet) opens from the wrong edge for its trigger; the user expects a right-side
-   drawer. Decide surface accordingly (right-anchored sheet on web/tablet widths).
-5. **Do not highlight active elements with boxes.** The always-on focus/selection outlines
-   (the 2px `outlineColor` frontier box in `PressableSurface`, and selected-state borders)
-   are too loud. Keyboard-focus visibility must remain accessible, but only under
-   focus-visible-style interaction (keyboard), not for pointer/touch presses or persistent
-   selection — make the boxed treatment conditional, not default.
+1. **Root cause of items 1–3 and an unreported one (the gate's primary "Set out" button was
+   fully invisible): Reanimated-wrapped components are NOT auto-registered with NativeWind, so
+   every `className` on `AnimatedPressable`/`Animated.View` was silently dropped on every
+   platform.** Fixed with `cssInterop(...)` registration in `src/ui/motion.ts` (Animated.View)
+   and `src/ui/actions.tsx` (AnimatedPressable); `jest.setup.js` mocks `nativewind` so tests
+   stay class-inert. This is invisible to Jest by design — browser passes are the only gate
+   that can see this class of defect (rule 14).
+2. **Full-screen dialogs collapsed to content height on web:** the web dialog primitive inserts
+   an unstyled focus wrapper between Overlay and Content, so `flex-1` stretch dies there.
+   Content is now `absolute inset-0` (overlays.tsx). Centered Dialog got `max-h-full` on its
+   entrance wrapper.
+3. **Focus boxes are now keyboard-only:** the JS `focused`-state outline in PressableSurface is
+   replaced by `web:focus-visible:*` classes (pointer/touch presses draw nothing; Tab draws the
+   frontier outline — verified both ways). Selected choice/matching tiles dropped the loud
+   `border-frontier` box for the `bg-gem-soft` tint (accessibilityState.selected unchanged).
+4. **Journal menu is a right-anchored drawer:** new `SideSheet` in `ui/overlays.tsx` (same
+   dismissal contract as Dialog, slide-from-right entrance); `LearnerMenuSheet` uses it.
+   BottomSheet remains for SectionOverview / PlanExpeditionSheet.
+5. Checkpoint circles, context header, and board dialog verified correct at both widths after
+   the interop fix (they were all downstream of the dropped classes).
 
-These are exactly the class of defect the deterministic suites cannot see (NativeWind classes
-are inert in Jest; overlays are faked) — reinforcing rule 14: no green suite claims quality.
+Post-fix deterministic envelope: 36 suites / 148 tests green, workspace typecheck green, lint
+0 errors (8 pre-existing warnings), static web export green (5 routes).
 
 U5 (landed 2026-07-11, session 2 — 36 suites / 148 tests green, workspace typecheck + test green,
 lint 0 errors / 8 pre-existing warnings, static web export green with the 5-route set):

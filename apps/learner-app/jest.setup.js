@@ -44,6 +44,15 @@ jest.mock("react-native-reanimated", () => {
   };
 });
 
+// NativeWind's runtime only matters for real rendering; in tests className props are
+// inert strings (babel keeps the interop transform off), so registration is a no-op.
+jest.mock("nativewind", () => ({
+  __esModule: true,
+  cssInterop: jest.fn(),
+  remapProps: jest.fn(),
+  useColorScheme: () => ({ colorScheme: "light" })
+}));
+
 // Haptics are asserted by call, never executed, in tests.
 jest.mock("expo-haptics", () => ({
   selectionAsync: jest.fn(() => Promise.resolve()),
