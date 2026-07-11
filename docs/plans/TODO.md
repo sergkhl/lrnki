@@ -14,7 +14,7 @@
 - **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
   2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
   attempt-order, retry depth per item, activity gaps. Wait for representative real learner traffic
-  (not the gate driver's perfect play), then decide the support ladder and the deferred Leg Trial
+  (not the g≥ate driver's perfect play), then decide the support ladder and the deferred Leg Trial
   ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
   at the leg-completion seam the duel's grade-only contract already proved.
 

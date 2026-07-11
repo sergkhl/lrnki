@@ -3,16 +3,10 @@ import type {
   DefinitionPassageDisposition,
   DerivedGraphLayer,
   DerivedGraphNode,
-  DifficultyNodeContext,
   EnrichmentNode,
-  EnrichmentRunTrace,
   GroundingVerbatimDisposition,
-  InferredPrerequisiteEdge,
   MintingDisposition,
-  NodeEvidenceExclusion,
   NodeMergeRecord,
-  PrerequisiteConceptContext,
-  PublishedConceptEvidenceProfile,
   RescueDisposition
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
@@ -32,52 +26,27 @@ import type {
   GraphVersionStorePort
 } from "@lrnki/ports";
 import { createHash, randomUUID } from "node:crypto";
-import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
+import { noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
+import {
+  createDerivedGraphLayerCompletion,
+  DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
+  derivedNodeJudgmentContext,
+  type DerivedGraphCompletionConfig
+} from "./completeDerivedGraphLayer";
 import { deduplicateDerivedNodes, DEFAULT_DEDUP_CONFIG, type DedupConfig, type DedupNodeContext } from "./deduplicateDerivedNodes";
 import { assembleEnrichmentNodes, DEFAULT_MINTING_BOUNDS, type EnrichmentMintingBounds, type MintingAnchor } from "./enrichmentNodeMinting";
-import { transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 import { applyRescuedDefinitionQualityJudge } from "./applyRescuedDefinitionQualityJudge";
-import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
 
-const PRODUCER = "@lrnki/application";
-const PRODUCER_VERSION = "0.8.0";
-
-export type GraphEnrichmentConfig = {
-  // Part of enrichment identity (ADR-0019): changing a knob re-derives the layer.
-  enrichmentConfigHash: string;
-  // K — the number of independent ordering DRAWS per Declared Domain (D1/D8). MoE
-  // inference is non-deterministic (ADR-0028), so one draw is one sample from a
-  // distribution; the boundary draws K times on the SAME input and tallies a per-pair
-  // directional vote. Calibrated in the U6 rule-14 pass, never assumed (D8).
-  orderingSampleCount: number;
+// The shared completion fields (config authority in completeDerivedGraphLayer.ts) plus
+// Graph Enrichment's producer-specific knobs. The flat runtime shape and field names are
+// unchanged, so the operation's config-hash identity is stable (plan 2026-07-11-001 AE6).
+export type GraphEnrichmentConfig = DerivedGraphCompletionConfig & {
   // K for the comparative difficulty BANDING draws per Declared Domain (ADR-0024).
   // Band consensus needs fewer draws than per-edge direction votes: bands are 5
   // coarse buckets, not O(n²) directed decisions. Consumed at composition time —
   // the wired DifficultyPort is created with this knob.
   difficultySampleCount: number;
-  // The minority-vote fraction at which a pair's prerequisite DIRECTION is judged
-  // genuinely contested and routed to `uncertain` (D3/D6). A pair is contested when
-  // `min(forward, reverse) / K >= directionContestMinorityFraction`. A FRACTION of K (not a
-  // binary "any reverse") so a single stray flip at large K does not route a robust pair to
-  // `uncertain` (risk note). Calibrated in U6 (D8).
-  directionContestMinorityFraction: number;
-  // Weak-edge cut floor applied to the consensus certain candidates. Because consensus
-  // confidence is `max(f,r)/K` (an agreement fraction, D4/KTD2), this floor doubles as the
-  // PRESENCE QUORUM (D5): an edge present in too few draws scores below it and becomes
-  // `weak_cut`. Recalibrated in U6 against agreement-scale confidence (KTD2).
-  minEdgeConfidence: number;
-  // Bound on mention passages passed per node into the ordering prompt (R11). The
-  // published CEP is already mention-bounded at extraction; this is a further
-  // deterministic cap so the prompt cannot grow unbounded per concept.
-  maxMentionsPerConceptInPair: number;
-  // Token-budget guard for the ONE whole-set ordering call per domain (KTD6, R16). A
-  // deterministic character-count proxy for the assembled prompt; if a single domain's
-  // rendered node set + evidence exceeds this, the run FAILS CLOSED without persisting a
-  // partial layer (no chunking, no DAG merging). The proxy is intentionally coarse — the
-  // fail-LOUD behavior is the contract; the concrete threshold is tuned against the
-  // chosen model's context window in U7.
-  maxDomainPromptChars: number;
   // Bounds on the anchor-driven node-minting pass (KTD6, R7).
   mintingBounds: EnrichmentMintingBounds;
   // Semantic-dedup knobs (plan U3). Only consulted when both dedup ports are provided;
@@ -91,22 +60,8 @@ export const DEFAULT_ENRICHMENT_CONFIG: GraphEnrichmentConfig = {
   // convention (KTD7) — comparative banded difficulty supersedes the fused pointwise
   // judge, which itself superseded single-draw whole-set ordering ("k-sample-ordering").
   enrichmentConfigHash: "banded-difficulty",
-  // CALIBRATED in the U6 rule-14 pass against real K=8 gpt-oss-120b draws over the Rust +
-  // economics fixtures (D8; tmp/2026-06-24-k-sample-ordering-rule14/). K=8 is the
-  // probe-validated draw count. The contest fraction 0.1 catches a genuine 7:1 directional
-  // flip at K=8 (min/K = 0.125 ≥ 0.1 → `uncertain`) while scaling with K — a single stray
-  // reverse at K≥16 (≤0.0625) stays committed, so a robust pair is not routed to `uncertain`.
-  orderingSampleCount: 8,
+  ...DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
   difficultySampleCount: 5,
-  directionContestMinorityFraction: 0.1,
-  // Now gates an AGREEMENT fraction (max(f,r)/K), not a 0.85-scale self-report — so 0.5
-  // means "present in at least half the draws". Recalibrated in U6 (KTD2).
-  minEdgeConfidence: 0.5,
-  maxMentionsPerConceptInPair: 6,
-  // ~100k tokens at a coarse 4-chars/token proxy: comfortably inside the non-DeepSeek
-  // ordering candidates' context windows, while small same-domain sets (rule 3) stay far
-  // below it. Re-tuned against the committed model in U7.
-  maxDomainPromptChars: 400000,
   mintingBounds: DEFAULT_MINTING_BOUNDS,
   dedup: DEFAULT_DEDUP_CONFIG
 };
@@ -297,7 +252,7 @@ export async function runGraphEnrichment(input: {
       // is deterministic and LLM-free — no stage row.
       const dedupContext = new Map<string, DedupNodeContext>(
         assembledNodes.map((node) => {
-          const context = contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair);
+          const context = derivedNodeJudgmentContext(node, profileByConcept, config.maxMentionsPerConceptInPair);
           return [node.derivedNodeId, { label: context.canonicalLabel, aliases: context.aliases, evidence: [...context.definitions, ...context.mentions] }];
         })
       );
@@ -319,147 +274,35 @@ export async function runGraphEnrichment(input: {
       input.onDedupSummary?.({ merges: nodeMerges.length, unavailable });
     }
 
-    // Each derived node reduced to the prerequisite judge's context (R11). Anchors use
-    // their published CEP; enrichment nodes use their grounding (generated text for
-    // llm_grounded, verbatim mention quotes for source_mentioned). The bare label is
-    // never the evidence — an empty context is treated as insufficient upstream. A
-    // canonical node also carries its absorbed nodes' evidence (R6).
-    const pairingNodes = allNodes.map((node) => ({
-      derivedNodeId: node.derivedNodeId,
-      declaredDomain: node.declaredDomain,
-      groundingOrigin: node.groundingOrigin,
-      context: contextOf(node, profileByConcept, config.maxMentionsPerConceptInPair, absorbedGroundingByCanonical.get(node.derivedNodeId))
-    }));
-    const difficultyNodes: DifficultyNodeContext[] = pairingNodes.map((node) => ({
-      derivedNodeId: node.derivedNodeId,
-      canonicalLabel: node.context.canonicalLabel,
-      aliases: node.context.aliases,
-      declaredDomain: node.declaredDomain,
-      groundingOrigin: node.groundingOrigin,
-      definitions: node.context.definitions,
-      mentions: node.context.mentions
-    }));
-    // Step 1 — group EVIDENCED nodes by Declared Domain (ADR-0015 keeps ordering
-    // same-domain). A node with no definition/mention evidence cannot ground a judgment, so
-    // it is EXCLUDED from the ordering input and recorded ONCE (R4) — not once per pair.
-    const nodeExclusions: NodeEvidenceExclusion[] = [];
-    const byDomain = new Map<string, typeof pairingNodes>();
-    for (const node of pairingNodes) {
-      if (!hasEvidence(node.context)) {
-        nodeExclusions.push({ derivedNodeId: node.derivedNodeId, declaredDomain: node.declaredDomain, reason: "insufficient_evidence" });
-        continue;
-      }
-      const existing = byDomain.get(node.declaredDomain);
-      if (existing) existing.push(node);
-      else byDomain.set(node.declaredDomain, [node]);
-    }
-
-    const K = Math.max(1, Math.trunc(config.orderingSampleCount));
-    const {
-      orderings: orderingTraces,
-      certainEdges,
-      uncertainEdges,
-      weakEdges
-    } = await runStage(STAGE_TAGS.prerequisiteOrdering, () =>
-      deriveConsensusOrdering({
-        domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({
-          declaredDomain,
-          nodes: members.map((node) => node.context)
-        })),
-        prerequisiteOrdering: input.prerequisiteOrdering,
-        orderingSampleCount: config.orderingSampleCount,
-        directionContestMinorityFraction: config.directionContestMinorityFraction,
-        minEdgeConfidence: config.minEdgeConfidence,
-        maxDomainPromptChars: config.maxDomainPromptChars
-      })
-    );
-
-    // Step 3 — symbolic reduction over the acyclic CERTAIN edges (symbolic constrains). Pure
-    // and fast, but bracketed so its share of the run is visible in the timing split (U2). The
-    // weak-edge cut already ran per domain BEFORE cycle-routing (KTD5); no cycle removal here —
-    // acyclicity is enforced upstream by cycle-routing (KTD3).
-    const disposal = await runStage(NON_LLM_STAGES.symbolicDisposal, async () => {
-      const { edges: reducedEdges, removed: transitiveEdges } = transitiveReduction(certainEdges);
-      return { reducedEdges, transitiveEdges };
-  });
-  const { reducedEdges, transitiveEdges } = disposal;
-
-  // Ordering summary (U5): committed certain edges (post-reduction DAG), direction-contested
-  // and cycle-routed counts from the per-domain traces, and the weak-cut count — for operator
-  // visibility. The application only reports; the worker formats the structured log line.
-  input.onOrderingSummary?.({
-    k: K,
-    committed: reducedEdges.length,
-    contested: orderingTraces.reduce((sum, trace) => sum + trace.pairVotes.filter((vote) => vote.classification === "direction_contested").length, 0),
-    weakCut: weakEdges.length,
-    cycleRouted: orderingTraces.reduce((sum, trace) => sum + trace.cycleRoutedEdges.length, 0)
-  });
-  const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
-
-  // Step 5 — comparative banded intrinsic difficulty from node evidence contexts only
-  // (ADR-0024). Scores ALL derived node ids — anchors AND enrichment nodes (R12,
-  // handoff constraint); the DAG is not an input (structural fusion deleted).
-  const difficulties = await runStage(STAGE_TAGS.intrinsicDifficulty, () =>
-    input.difficulty.score({ nodes: difficultyNodes })
-  );
-
-  const layer: DerivedGraphLayer = {
-    enrichmentId: input.enrichmentId,
-    graphVersionId: input.graphVersionId,
-    enrichmentConfigHash: config.enrichmentConfigHash,
-    judgeModel: input.prerequisiteOrdering.model,
-    derivedNodes: allNodes,
-    prerequisiteEdges,
-    difficulties
-  };
-
-  const trace: EnrichmentRunTrace = {
-    enrichmentId: input.enrichmentId,
-    graphVersionId: input.graphVersionId,
-    enrichmentConfigHash: config.enrichmentConfigHash,
-    derivedNodes: allNodes,
-    orderings: orderingTraces,
-    nodeExclusions,
-    dispositions: [
-      ...uncertainEdges.map((edge) => disposition(edge, "uncertain")),
-      ...weakEdges.map((edge) => disposition(edge, "weak_cut")),
-      ...transitiveEdges.map((edge) => disposition(edge, "transitive_reduction")),
-      ...reducedEdges.map((edge) => disposition(edge, "kept"))
-    ],
-    groundingDispositions,
-    rescueDispositions,
-    rescuedDefinitionDispositions,
-    mintingDispositions,
-    nodeMerges
-  };
-  await runStage(NON_LLM_STAGES.persist, () =>
-    input.enrichmentStore.persist({
-      layer,
-      artifact: {
-        artifactId: `${input.enrichmentId}:enrichment-run`,
-        artifactType: "enrichment_run",
+    // The shared Derived Graph Layer completion owns the back half from here (plan
+    // 2026-07-11-001, KTD1/KTD2): judgment contexts, evidence-free exclusions, K-sampled
+    // consensus ordering, transitive reduction, intrinsic difficulty, common trace
+    // dispositions, structural validation, and the single atomic persistence — bracketed
+    // onto THIS operation's timeline via runStage (KTD6).
+    const completion = createDerivedGraphLayerCompletion({
+      prerequisiteOrdering: input.prerequisiteOrdering,
+      difficulty: input.difficulty,
+      enrichmentStore: input.enrichmentStore
+    });
+    return completion.complete({
+      enrichmentId: input.enrichmentId,
+      nodes: allNodes,
+      config,
+      stage: runStage,
+      contribution: {
+        kind: "source_grounded",
         graphVersionId: input.graphVersionId,
-        producer: PRODUCER,
-        producerVersion: PRODUCER_VERSION,
-        configHash: config.enrichmentConfigHash,
-        createdAt: new Date().toISOString(),
-        payload: trace
+        evidenceProfiles: snapshot.evidenceProfiles,
+        absorbedGroundingByCanonical,
+        groundingDispositions,
+        rescueDispositions,
+        rescuedDefinitionDispositions,
+        mintingDispositions,
+        nodeMerges,
+        onOrderingSummary: input.onOrderingSummary
       }
-    })
-  );
-  return layer;
+    });
   });
-}
-
-function disposition(
-  edge: InferredPrerequisiteEdge,
-  value: EnrichmentRunTrace["dispositions"][number]["disposition"]
-): EnrichmentRunTrace["dispositions"][number] {
-  return {
-    prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId,
-    dependentDerivedNodeId: edge.dependentDerivedNodeId,
-    disposition: value
-  };
 }
 
 // --- Deterministic, model-free helpers -----------------------------------------
@@ -471,58 +314,3 @@ function deterministicUuid(...parts: string[]): string {
   return `${hash.slice(0, 8).join("")}-${hash.slice(8, 12).join("")}-${hash.slice(12, 16).join("")}-${hash.slice(16, 20).join("")}-${hash.slice(20, 32).join("")}`;
 }
 
-// A node carries evidence to ground a judgment when it has at least one definition or
-// mention quote (R11). The bare label is never the evidence — an evidence-free node is
-// excluded from the ordering input and recorded once (R4).
-const hasEvidence = (context: PrerequisiteConceptContext): boolean =>
-  context.definitions.length > 0 || context.mentions.length > 0;
-
-// Reduce a derived node to exactly what the prerequisite judge needs (R11). An anchor
-// uses its published CEP (verbatim definition + bounded mention quotes + LABELED
-// `defines` assertions). A `source_mentioned` node has
-// no definition — only verbatim mention quotes. A `llm_grounded` node uses its
-// generated definition/mention text (exempt from the verbatim floor, U6). The bare
-// label is never the evidence — an empty context is treated as insufficient upstream.
-function contextOf(
-  node: DerivedGraphNode,
-  profileByConcept: Map<string, PublishedConceptEvidenceProfile>,
-  maxMentions: number,
-  // Absorbed nodes' evidence (R6, KTD5): when this canonical node absorbed near-duplicate
-  // nodes during dedup, their verbatim quotes are appended to its mentions so the judge
-  // sees the unioned evidence. Undefined for a node that absorbed nothing (or when dedup
-  // did not run).
-  absorbedGrounding?: string[]
-): PrerequisiteConceptContext {
-  const withAbsorbed = (mentions: string[]): string[] =>
-    absorbedGrounding && absorbedGrounding.length ? [...mentions, ...absorbedGrounding] : mentions;
-  if (node.nodeKind === "anchor") {
-    const profile = profileByConcept.get(node.conceptId);
-    const publishedAssertions = profile?.assertions ?? [];
-    return {
-      derivedNodeId: node.derivedNodeId,
-      canonicalLabel: node.canonicalLabel,
-      aliases: node.aliases,
-      definitions: (profile?.definitions ?? []).map((passage) => passage.evidenceQuote),
-      mentions: withAbsorbed((profile?.mentions ?? []).slice(0, maxMentions).map((passage) => passage.evidenceQuote)),
-      assertions: publishedAssertions.map((assertion) => ({ type: assertion.type, detail: assertion.literalValue }))
-    };
-  }
-  if (node.groundingOrigin === "source_mentioned") {
-    return {
-      derivedNodeId: node.derivedNodeId,
-      canonicalLabel: node.canonicalLabel,
-      aliases: node.aliases,
-      definitions: [],
-      mentions: withAbsorbed(node.groundingPassages.slice(0, maxMentions).map((passage) => passage.evidenceQuote)),
-      assertions: []
-    };
-  }
-  return {
-    derivedNodeId: node.derivedNodeId,
-    canonicalLabel: node.canonicalLabel,
-    aliases: node.aliases,
-    definitions: node.groundingBundle.definitions.map((passage) => passage.text),
-    mentions: withAbsorbed(node.groundingBundle.mentions.slice(0, maxMentions).map((passage) => passage.text)),
-    assertions: []
-  };
-}

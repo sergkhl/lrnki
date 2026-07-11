@@ -23,6 +23,7 @@ import type {
 } from "@lrnki/ports";
 import { randomUUID } from "node:crypto";
 import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
+import { DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG, type DerivedGraphCompletionConfig } from "./completeDerivedGraphLayer";
 import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
 import { transitiveReduction } from "./prerequisiteDag";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
@@ -36,35 +37,26 @@ import {
 const PRODUCER = "@lrnki/application";
 const PRODUCER_VERSION = "0.8.0";
 
-export type SyntheticGenerationConfig = {
-  // Part of the derived-layer identity, like enrichmentConfigHash for Graph Enrichment.
-  enrichmentConfigHash: string;
+// The shared completion fields (config authority in completeDerivedGraphLayer.ts) plus
+// the synthetic front half's producer-specific knobs. The flat runtime shape and field
+// names are unchanged, so the operation's config-hash identity is stable (plan
+// 2026-07-11-001 AE6).
+export type SyntheticGenerationConfig = DerivedGraphCompletionConfig & {
   // The knowledge-boundary probe knobs (K, per-concept draw concurrency, agreement
   // threshold). Calibrated by real-use inspection in U8, never assumed (ADR-0013).
   probe: KnowledgeBoundaryProbeConfig;
   // Bounded fan-out ACROSS concepts for the probe stage (each concept itself fans K
   // draws inside probeKnowledgeBoundary) and for the grounding stage.
   conceptConcurrency: number;
-  // Ordering knobs — reused from Graph Enrichment (deriveConsensusOrdering). Synthetic
-  // sets are small and single-domain, so the ordering budget is generous.
-  orderingSampleCount: number;
-  directionContestMinorityFraction: number;
-  minEdgeConfidence: number;
-  maxDomainPromptChars: number;
-  // Deterministic cap on mention passages fed per node into the ordering prompt.
-  maxMentionsPerConceptInPair: number;
 };
 
 export const DEFAULT_SYNTHETIC_GENERATION_CONFIG: SyntheticGenerationConfig = {
   enrichmentConfigHash: "synthetic-topic-generation",
+  // The shared calibrated completion defaults (K=8 gpt-oss-120b ordering draws).
+  // Synthetic sets are small and single-domain, so the ordering budget is generous.
+  ...DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
   probe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
-  conceptConcurrency: 4,
-  // Reuse the calibrated Graph Enrichment ordering defaults (K=8 gpt-oss-120b draws).
-  orderingSampleCount: 8,
-  directionContestMinorityFraction: 0.1,
-  minEdgeConfidence: 0.5,
-  maxDomainPromptChars: 400000,
-  maxMentionsPerConceptInPair: 6
+  conceptConcurrency: 4
 };
 
 // Synthetic topic generation — the SECOND pipeline arm (ADR-0019 amended, plan
