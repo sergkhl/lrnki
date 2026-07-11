@@ -4,12 +4,6 @@
 
 ### Execution order
 
-- **Fix expedition discoverability (curated Explore + Browse all).** Execute
-  [plan 2026-07-10-005](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md): the journal's
-  top-3 readiness slice hides ready trails (reproduced: `jackie chan` cannot reach the photosynthesis
-  trail). Curated top-5 Explore + searchable Browse all `/catalog` screen, ≥2-stop structural floor,
-  one-time cleanup of degenerate/`test`-domain enrichments; rule-14 gate = search "photo" → Begin.
-
 - **MiMo extraction follow-ups (measure-first).** Execute
   [plan 2026-07-10-004](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md): durable
   discovery-coverage audit over all 5 fixture domains resolving the cutover's "recall variance
@@ -33,6 +27,15 @@
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **Expedition discoverability — curated Explore + Browse all catalog (2026-07-11, plan
+  2026-07-10-005).** Explore is explicitly curated to its top five candidates, while the lazy
+  `/catalog` route exposes every shared, beginnable ≥2-stop expedition with case-insensitive
+  search across the persisted trail vocabulary. Degenerate and placeholder development data was
+  removed. Rule-14 PASS: Playwright authenticated as `jackie chan`, opened Browse all from Explore,
+  searched `photo`, found both Plant Biology trails, and Began Carbon-fixation into its populated
+  seven-crystal study session with no console errors. Evidence:
+  `tmp/2026-07-10-expedition-catalog-cleanup/`.
 
 - **Learner interaction system and deferred native surfaces (2026-07-10/11, plan 2026-07-10-003).**
   Hard-cut the Learner App to one app-owned NativeWind component system (`src/ui/`: Screen, Text,

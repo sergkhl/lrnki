@@ -37,6 +37,13 @@ export const journalQuery = queryOptions({
   queryFn: () => api.journal.$get().then((res) => unwrap<JournalView>(res))
 });
 
+// The catalog is deliberately not part of the journal's generation-poll payload.
+// It is fetched only after a learner opens Browse all.
+export const catalogQuery = queryOptions({
+  queryKey: ["catalog"],
+  queryFn: () => api.catalog.$get().then((res) => unwrap<LearnerExpeditionEntry>(res))
+});
+
 export const leaderboardQuery = queryOptions({
   queryKey: ["leaderboard"],
   queryFn: () => api.leaderboard.$get().then((res) => unwrap<LeaderboardView>(res)),

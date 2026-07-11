@@ -159,7 +159,8 @@ export function createLearnerApp(sql: DatabaseClient) {
         studyItemStore: new PostgresStudyItemBankStore(sql),
         responseLog: new PostgresResponseLogStore(sql),
         lessonReadStore: new PostgresLessonReadStore(sql),
-        layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql)
+        layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
+        limit: 5
       });
       // Generation-progress timelines ride along for the in-flight cards (the SSR page
       // fetched these per-card; the SPA polls this one composed read instead).
@@ -177,6 +178,20 @@ export function createLearnerApp(sql: DatabaseClient) {
         })
       );
       return c.json({ ...entry, timelinesByOperationId: Object.fromEntries(timelinePairs) });
+    })
+
+    // Browse all is intentionally independent from the polled journal payload: it has no
+    // timelines and is fetched only after the learner opens the catalog.
+    .get("/catalog", auth, async (c) => {
+      return c.json(await listExpeditionCandidates({
+        learnerStateRef: c.get("learnerStateRef"),
+        enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+        expeditionStore,
+        studyItemStore: new PostgresStudyItemBankStore(sql),
+        responseLog: new PostgresResponseLogStore(sql),
+        lessonReadStore: new PostgresLessonReadStore(sql),
+        layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql)
+      }));
     })
 
     .get("/leaderboard", auth, async (c) => {

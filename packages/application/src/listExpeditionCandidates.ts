@@ -19,6 +19,10 @@ export type ExpeditionCandidate = {
   graphVersionId: string | null;
   title: string;
   declaredDomain: string;
+  // Search-only trail vocabulary keeps Browse all discoverable when a learner's broad
+  // topic word differs from the derived summit title (for example, photosynthesis →
+  // carbon fixation). It is sourced from the already-visible trail, never inferred.
+  searchTerms: string[];
   startedAt: string;
   summitDerivedNodeId: string;
   // Trail-scoped stop readiness: non-floored nodes that carry a study item over all non-floored
@@ -71,7 +75,8 @@ export async function listExpeditionCandidates(input: {
   candidates.sort(compareExpeditionCandidates);
 
   return {
-    candidates: candidates.slice(0, input.limit ?? 3).map((candidate, index) => ({ ...candidate, readinessRank: index + 1 })),
+    candidates: (input.limit === undefined ? candidates : candidates.slice(0, input.limit))
+      .map((candidate, index) => ({ ...candidate, readinessRank: index + 1 })),
     learnerExpeditions: await withExpeditionProgress({
       learnerStateRef: input.learnerStateRef,
       expeditions: learnerExpeditions,
@@ -132,12 +137,16 @@ function candidateForSummary(summary: EnrichmentSummary, detail: DerivedGraphDet
   const { summit, trailNodeIds } = deriveFlooredExpedition(detail);
   if (!summit) return [];
   const trailNodes = detail.nodes.filter((node) => trailNodeIds.has(node.derivedNodeId));
+  // A one-node layer is a summit without a trail. This is a structural property of an
+  // expedition, shared by Explore and Browse all, rather than a heuristic content gate.
+  if (trailNodes.length < 2) return [];
   const declaredDomain = detail.nodes.find((node) => node.derivedNodeId === summit.derivedNodeId)?.declaredDomain ?? detail.nodes[0]?.declaredDomain ?? "";
   return [{
     enrichmentId: summary.enrichmentId,
     graphVersionId: summary.graphVersionId,
     title: summit.label,
     declaredDomain,
+    searchTerms: [...new Set(trailNodes.flatMap((node) => [node.label, ...node.aliases]))],
     startedAt: summary.startedAt,
     summitDerivedNodeId: summit.derivedNodeId,
     readyStopCount: trailNodes.filter((node) => node.hasStudyItem).length,

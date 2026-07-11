@@ -31,6 +31,36 @@ test("listExpeditionCandidates ranks fully ready targets above larger unready ta
   assert.equal(result.candidates[0].readinessRank, 1);
 });
 
+test("returns the full ranked catalog without an explicit limit and excludes one-stop trails", async () => {
+  const read = fakeRead([
+    summary("later", "2026-01-02T00:00:00.000Z"),
+    summary("earlier", "2026-01-01T00:00:00.000Z"),
+    summary("oldest", "2025-12-31T00:00:00.000Z"),
+    summary("ancient", "2025-12-30T00:00:00.000Z"),
+    summary("summit-only", "2026-01-03T00:00:00.000Z")
+  ], {
+    later: detail("later", [node("later-start", "Photosynthetic start", true), node("later-summit", "Later summit", true)], [edge("later-start", "later-summit")]),
+    earlier: detail("earlier", [node("earlier-start", "Earlier start", true), node("earlier-summit", "Earlier summit", true)], [edge("earlier-start", "earlier-summit")]),
+    oldest: detail("oldest", [node("oldest-start", "Oldest start", true), node("oldest-summit", "Oldest summit", true)], [edge("oldest-start", "oldest-summit")]),
+    ancient: detail("ancient", [node("ancient-start", "Ancient start", true), node("ancient-summit", "Ancient summit", true)], [edge("ancient-start", "ancient-summit")]),
+    "summit-only": detail("summit-only", [node("only", "Only summit", true)], [])
+  });
+
+  const result = await listExpeditionCandidates({
+    learnerStateRef: "learner-one",
+    enrichmentRead: read,
+    expeditionStore: fakeStore([])
+  });
+
+  assert.deepEqual(result.candidates.map((candidate) => [candidate.enrichmentId, candidate.readinessRank]), [
+    ["later", 1],
+    ["earlier", 2],
+    ["oldest", 3],
+    ["ancient", 4]
+  ]);
+  assert.deepEqual(result.candidates[0].searchTerms, ["Photosynthetic start", "Later summit"]);
+});
+
 test("Covers AE3: progress counts only items on trail-reachable (non-floored) nodes", async () => {
   // Layer: easy(band-1 confident, floored) -> mid -> summit. `easy` carries an item that must
   // NOT count toward the trail total; mid and summit items do.
@@ -68,7 +98,7 @@ test("progress captures wrong-answer-only activity for Resume", async () => {
   const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
   const result = await listExpeditionCandidates({
     learnerStateRef: "learner-one",
-    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("mid", "Middle", true)], []) }),
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("start", "Start", true), node("mid", "Middle", true)], [edge("start", "mid")] ) }),
     expeditionStore: fakeStore([ready]),
     studyItemStore: fakeStudyItemStore([studyItem("i-mid", "mid")]),
     responseLog: fakeResponseLog([gradedIncorrect("i-mid")])
@@ -81,7 +111,7 @@ test("progress captures lesson-read-only activity for Resume", async () => {
   const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
   const result = await listExpeditionCandidates({
     learnerStateRef: "learner-one",
-    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("mid", "Middle", true)], []) }),
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("start", "Start", true), node("mid", "Middle", true)], [edge("start", "mid")] ) }),
     expeditionStore: fakeStore([ready]),
     studyItemStore: fakeStudyItemStore([studyItem("i-mid", "mid")]),
     responseLog: fakeResponseLog([]),
@@ -95,7 +125,7 @@ test("candidates expose an existing learner expedition for Resume routing", asyn
   const ready: LearnerExpedition = { ...expedition("learner-one", "row-1"), status: "ready", enrichmentId: "exp" };
   const result = await listExpeditionCandidates({
     learnerStateRef: "learner-one",
-    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("mid", "Middle", true)], []) }),
+    enrichmentRead: fakeRead([summary("exp", "2026-01-01T00:00:00.000Z")], { exp: detail("exp", [node("start", "Start", true), node("mid", "Middle", true)], [edge("start", "mid")] ) }),
     expeditionStore: fakeStore([ready])
   });
 
@@ -191,6 +221,10 @@ function node(derivedNodeId: string, label: string, hasStudyItem: boolean): Deri
     hasStudyItem,
     grounding: null
   };
+}
+
+function edge(prerequisiteDerivedNodeId: string, dependentDerivedNodeId: string): DerivedGraphDetail["edges"][number] {
+  return { prerequisiteDerivedNodeId, dependentDerivedNodeId, confidence: 0.9, uncertain: false, judgeModel: "test" };
 }
 
 function fakeStudyItemStore(items: StudyItem[]): StudyItemBankStorePort {

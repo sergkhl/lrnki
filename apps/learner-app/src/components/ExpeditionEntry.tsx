@@ -40,6 +40,7 @@ export function ExpeditionEntry({
   learnerStateRef,
   entry
 }: Readonly<{ learnerStateRef: string; entry: JournalView }>) {
+  const router = useRouter();
   const exampleTopics = pickExampleTopics(EXAMPLE_TOPICS, 4);
   const { started, yours, shared } = partitionExpeditionJournal(entry);
   return (
@@ -72,7 +73,11 @@ export function ExpeditionEntry({
         ))}
       </JournalSection>
 
-      <JournalSection title="Explore" description="Shared expeditions ready to begin.">
+      <JournalSection
+        title="Explore"
+        description="Shared expeditions ready to begin."
+        action={<Button variant="outline" size="compact" onPress={() => router.push("/catalog")} label="Browse all →" />}
+      >
         {shared.length === 0 ? <NoCandidates /> : shared.map((candidate) => (
           <CandidateCard key={candidate.enrichmentId} candidate={candidate} />
         ))}
@@ -84,13 +89,17 @@ export function ExpeditionEntry({
 function JournalSection({
   title,
   description,
+  action,
   children
-}: Readonly<{ title: string; description: string; children: React.ReactNode }>) {
+}: Readonly<{ title: string; description: string; action?: React.ReactNode; children: React.ReactNode }>) {
   return (
     <View className="gap-3">
-      <View className="min-w-0 border-b border-line pb-2">
-        <Text variant="heading">{title}</Text>
-        <Text variant="caption" color="muted">{description}</Text>
+      <View className="flex-row items-start justify-between gap-2 border-b border-line pb-2">
+        <View className="min-w-0 flex-1">
+          <Text variant="heading">{title}</Text>
+          <Text variant="caption" color="muted">{description}</Text>
+        </View>
+        {action}
       </View>
       {children}
     </View>
@@ -162,7 +171,7 @@ function LearnerExpeditionRow({
   );
 }
 
-function CandidateCard({ candidate }: Readonly<{ candidate: ExpeditionCandidate }>) {
+export function CandidateCard({ candidate }: Readonly<{ candidate: ExpeditionCandidate }>) {
   const existingLearnerExpeditionId = candidate.existingLearnerExpeditionId;
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -213,10 +222,12 @@ function titleCase(value: string): string {
 }
 
 function NoCandidates() {
+  const router = useRouter();
   return (
-    <Card>
+    <Card className="gap-3">
       <Text variant="title" className="text-center">No ready expeditions</Text>
-      <Text variant="caption" color="muted" className="text-center">Paste course data to create the first trail.</Text>
+      <Text variant="caption" color="muted" className="text-center">Browse all expeditions, or plan a new trail.</Text>
+      <Button variant="outline" onPress={() => router.push("/catalog")} label="Browse all →" />
     </Card>
   );
 }

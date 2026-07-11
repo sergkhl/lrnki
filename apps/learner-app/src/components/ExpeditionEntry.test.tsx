@@ -69,6 +69,7 @@ test("journal sections render Continue, Your expeditions, Explore in order", asy
   await renderEntry(journal());
   const headings = ["Continue", "Your expeditions", "Explore"].map((title) => screen.getByText(title));
   expect(headings).toHaveLength(3);
+  expect(screen.getByLabelText("Browse all →")).toBeTruthy();
   expect(screen.getByText("Exploring as scout")).toBeTruthy();
   // The started expedition surfaces its purpose teaser and progress.
   expect(screen.getAllByText("Rust ownership").length).toBeGreaterThan(0);
