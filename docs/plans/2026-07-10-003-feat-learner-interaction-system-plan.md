@@ -14,11 +14,26 @@ execution: code
 ## Execution Status (updated 2026-07-11, session 3)
 
 **U1, U2, U7, U3, U4, and U5 are IMPLEMENTED and deterministically verified. The user-reported
-visual regressions are FIXED and re-verified in a Playwright browser pass (2026-07-11, session
-3; screenshots in `tmp/2026-07-10-learner-interaction-system/`, driver `repro.mjs` there).
-Remaining U6 work: the full real-use gate (fresh production expedition + complete study flow +
-cleanup), normal/reduced-motion recordings, Android build + device pass, ADR-0032/0035 doc
-consolidation, deploy + live smoke.**
+visual regressions are FIXED and re-verified in a Playwright browser pass, and the web real-use
+gate is a PASS (2026-07-11, session 3; screenshots + `rule14-evidence.md` in
+`tmp/2026-07-10-learner-interaction-system/`, drivers `repro.mjs` / `gate2-study.mjs` there).
+Remaining U6 work: normal/reduced-motion recordings, Android build + physical-device pass,
+ADR-0032/0035 doc consolidation, deploy + live smoke.**
+
+Web real-use gate (rule 14) — PASS with two named non-app caveats:
+
+- **51 server-keyed grades** (`response_log`, all `judged_outcome='correct'`,
+  `grader_identity='auto'`) across option-select, impostor, and matching, all played through the
+  migrated `FullScreenDialog` overlays; every overlay presentation (BottomSheet plan sheet,
+  right SideSheet menu, centered Board Dialog, four activity dialogs, Crystal Vista) verified
+  visually with zero console errors. Tracked learner `u6-gate-07-11` and all FK children deleted
+  afterward (board left clean).
+- **Caveat 1 (BLOCKED, external):** fresh production generation could not run — MiMo provider
+  returns `441 risk_control` for `kg-domain-inference` this session; the generation path
+  surfaced it correctly as a "Scouting stopped / Retry" card. Not a code defect.
+- **Caveat 2 (driver limit, not app):** the automation stalls advancing across all 11 legs to
+  the summit terminus (capstone-reveal Continue intercept); full-summit mastery of this trail
+  class was already proven in the 2026-07-10 goal-gradient gate.
 
 Visual regression fix pass (all 5 reported items reproduced at 390x844 and 1440x900, fixed,
 re-verified; zero console errors):
