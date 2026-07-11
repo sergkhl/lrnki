@@ -2,43 +2,43 @@
 
 ## TODO
 
-- **Consolidate Derived Graph Layer completion.** Execute
-  [plan 2026-07-11-001](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md): one deep
-  completion module for Graph Enrichment and Synthetic Topic Generation, lifecycle-aware structural
-  guarantees, stable config identities, and production real-use inspection of both variants.
+### Execution order
 
-- **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
-  2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
-  attempt-order, retry depth per item, activity gaps. Run it over real learner traffic (not the
-  gate driver's perfect play), then decide the support ladder and the deferred Leg Trial
-  ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
-  at the leg-completion seam the duel's grade-only contract already proved.
-
-- **MiMo extraction follow-ups (measure-first).** Execute
-  [plan 2026-07-10-004](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md): durable
-  discovery-coverage audit over all 5 fixture domains resolving the cutover's "recall variance
-  worth watching" caveat (conditional sampling tune per its decision rule), plus the
-  trailing-nullable descriptor-shape test. Cache-pin payoff already measured during planning
-  (59% cached tokens, spend discount verified) — recorded in the plan, no implementation.
-
-- **Unify learner interactions and finish deferred native surfaces — IN PROGRESS (U1–U5 landed,
-  U6 remains; VISUAL REGRESSIONS reported).** Execute
+- **Finish learner-interaction platform gates — IN PROGRESS (U1–U5 landed; U6 remains).** Execute
   [plan 2026-07-10-003](./2026-07-10-003-feat-learner-interaction-system-plan.md); its
-  "Execution Status" section is the authoritative handoff. U1–U5 are in tree and
-  deterministically green (app-owned `src/ui/` system + lint boundary, semantic overlays,
-  restored menu/Board/splashes, U5 event-bound motion + semantic haptics; 148 learner-app
-  tests, workspace typecheck/test/lint, static web export). **Next session must START with a
-  visual browser pass and fix the user-reported UI regressions** listed in the plan's
-  Execution Status (invisible expedition-map stops, broken context-header layout, dialog
-  positioning/sizing, menu drawer side, always-on focus/selection boxes) before running the U6
-  browser/real-use/Android/deploy gates and ADR-0032/0035 doc consolidation. No browser or
-  device validation has run yet — the green suites are not quality evidence (rule 14).
+  "Execution Status" section is the authoritative handoff. The visual regressions are fixed and
+  re-verified in Playwright, and the web real-use gate passed with 51 server-keyed grades across all
+  three item types. OpenRouter Xiaomi BYOK resolved the production-generation provider block.
+  Remaining U6 work is the fresh-generation rerun, normal/reduced-motion recording, Android build
+  plus physical-device validation, ADR-0032/0035 consolidation, deployment, and live smoke testing.
 
 - **Fix expedition discoverability (curated Explore + Browse all).** Execute
   [plan 2026-07-10-005](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md): the journal's
   top-3 readiness slice hides ready trails (reproduced: `jackie chan` cannot reach the photosynthesis
   trail). Curated top-5 Explore + searchable Browse all `/catalog` screen, ≥2-stop structural floor,
   one-time cleanup of degenerate/`test`-domain enrichments; rule-14 gate = search "photo" → Begin.
+
+- **MiMo extraction follow-ups (measure-first).** Execute
+  [plan 2026-07-10-004](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md): durable
+  discovery-coverage audit over all 5 fixture domains resolving the cutover's "recall variance
+  worth watching" caveat (conditional sampling tune per its decision rule), trailing-nullable
+  descriptor-shape protection, and restoration of honest per-journey cost attribution after
+  OpenRouter Xiaomi BYOK made provider-reported response cost zero. The production route stays on
+  forced-tool-compliant OpenRouter BYOK; native Xiaomi remains experiments-only.
+
+- **Consolidate Derived Graph Layer completion.** Execute
+  [plan 2026-07-11-001](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md): one deep
+  completion module for Graph Enrichment and Synthetic Topic Generation, lifecycle-aware structural
+  guarantees, stable config identities, and production real-use inspection of both variants.
+
+### Evidence-triggered follow-up
+
+- **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
+  2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
+  attempt-order, retry depth per item, activity gaps. Wait for representative real learner traffic
+  (not the gate driver's perfect play), then decide the support ladder and the deferred Leg Trial
+  ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
+  at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
 

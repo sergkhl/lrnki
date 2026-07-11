@@ -17,8 +17,8 @@ execution: code
 visual regressions are FIXED and re-verified in a Playwright browser pass, and the web real-use
 gate is a PASS (2026-07-11, session 3; screenshots + `rule14-evidence.md` in
 `tmp/2026-07-10-learner-interaction-system/`, drivers `repro.mjs` / `gate2-study.mjs` there).
-Remaining U6 work: normal/reduced-motion recordings, Android build + physical-device pass,
-ADR-0032/0035 doc consolidation, deploy + live smoke.**
+Remaining U6 work: rerun fresh production generation, capture normal/reduced-motion recordings,
+Android build + physical-device pass, ADR-0032/0035 doc consolidation, deploy + live smoke.**
 
 Web real-use gate (rule 14) — PASS with two named non-app caveats:
 
@@ -28,9 +28,18 @@ Web real-use gate (rule 14) — PASS with two named non-app caveats:
   right SideSheet menu, centered Board Dialog, four activity dialogs, Crystal Vista) verified
   visually with zero console errors. Tracked learner `u6-gate-07-11` and all FK children deleted
   afterward (board left clean).
-- **Caveat 1 (BLOCKED, external):** fresh production generation could not run — MiMo provider
-  returns `441 risk_control` for `kg-domain-inference` this session; the generation path
-  surfaced it correctly as a "Scouting stopped / Retry" card. Not a code defect.
+- **Caveat 1 (RESOLVED 2026-07-11):** the `441 risk_control` on `kg-domain-inference` was
+  Xiaomi's shared-credential abuse/frequency heuristic (`is_byok: false`), not a content or code
+  defect. Fixed by wiring OpenRouter BYOK for Xiaomi: the same production-shaped forced-tool +
+  reasoning-off call now returns `is_byok: true`, HTTP 200, valid forced tool output, and clears
+  an 8-way concurrent burst with no risk-control. Extraction stays on the OpenRouter path
+  (`openrouter/xiaomi/mimo-v2.5`). A native direct deployment (`xiaomi_mimo/mimo-v2.5`) was
+  measured as an alternative and REJECTED for production: faster (~0.9s vs ~1.1-1.9s warm) and the
+  only path with real LiteLLM cost, but it enforces forced `tool_choice` only non-deterministically
+  (ADR-0006 / rule 6 violation); kept experiments-only, annotated in `litellm/config.yaml`. Known
+  follow-up: BYOK makes LiteLLM record MiMo response-cost `0.0`, so the ADR-0029 per-journey cost
+  lens reads `$0` for extraction until addressed. The fresh-generation real-use gate is now
+  unblocked and can be run.
 - **Caveat 2 (driver limit, not app):** the automation stalls advancing across all 11 legs to
   the summit terminus (capstone-reveal Continue intercept); full-summit mastery of this trail
   class was already proven in the 2026-07-10 goal-gradient gate.

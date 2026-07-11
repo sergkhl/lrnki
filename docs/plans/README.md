@@ -10,22 +10,22 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 - [TODO](./TODO.md) — 3–7 current tasks, 5–10 grouped completed outcomes, and latest validation.
 - [BLOCKERS](./BLOCKERS.md) — unresolved manual actions required from the user only.
 
-## Active implementation plans
+## Active implementation plans (execution order)
 
-- [2026-07-11-001 — Derived Graph Layer completion](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md)
-  — ready; consolidate the duplicated Graph Enrichment and Synthetic Topic Generation completion
-  back halves behind one lifecycle-aware, atomically persisted application module.
 - [2026-07-10-003 — Learner interaction system and deferred native surfaces](./2026-07-10-003-feat-learner-interaction-system-plan.md)
-  — ready; unify every learner interaction behind an app-owned NativeWind UI boundary, restore the
-  deferred journal overlays, complete mastery motion, and gate web deployment on real Android use.
-- [2026-07-10-004 — MiMo extraction follow-ups](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md)
-  — ready; measure MiMo discovery coverage across all fixture domains with a durable judge-based
-  audit command (tuning only if the decision rule triggers) and lock the fatal trailing-nullable
-  MiMo schema shape behind a config-derived congruence test.
+  — in progress; the interaction migration, visual-regression fixes, and web real-use gate are
+  complete and Xiaomi BYOK resolved the generation block; finish fresh generation, recordings,
+  Android physical-device validation, durable ADR updates, deployment, and live smoke testing.
 - [2026-07-10-005 — Fix expedition discoverability: curated Explore + Browse all catalog](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md)
   — ready; stop the top-3 readiness slice from hiding ready trails: keep a curated top-5 Explore,
   add a searchable Browse all screen over the full shared catalog via a new `/catalog` endpoint,
   add a ≥2-stop structural floor, and clean degenerate/placeholder test enrichments from the data.
+- [2026-07-10-004 — MiMo extraction follow-ups](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md)
+  — ready; measure discovery coverage across all fixture domains, lock the fatal trailing-nullable
+  MiMo schema shape, and restore honest per-journey cost attribution for OpenRouter Xiaomi BYOK.
+- [2026-07-11-001 — Derived Graph Layer completion](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md)
+  — ready; consolidate the duplicated Graph Enrichment and Synthetic Topic Generation completion
+  back halves behind one lifecycle-aware, atomically persisted application module.
 
 ## Ownership rules
 

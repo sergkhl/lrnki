@@ -175,6 +175,39 @@ model_list:
       max_input_tokens: 1048576
       max_output_tokens: 393216
 
+  # Native Xiaomi MiMo deployment (LiteLLM first-class `xiaomi_mimo/` provider),
+  # direct to api.xiaomimimo.com instead of the OpenRouter middle-hop. The provider
+  # defaults api_base to https://api.xiaomimimo.com/v1 and normally reads
+  # XIAOMI_MIMO_API_KEY, but api_key is pinned to XIAOMI_API_KEY here. Reasoning is
+  # disabled via the NATIVE dialect (`thinking.type: "disabled"`), which is the
+  # api.xiaomimimo.com analog of OpenRouter's `reasoning.enabled: false` — required
+  # by AGENTS rule 5 (production extraction runs MiMo v2.5 with reasoning off).
+  # Single upstream host means prefix caching warms inherently (no provider-pin
+  # needed) but there is no failover — a xiaomi outage stalls extraction.
+  # EXPERIMENTS ONLY — do NOT alias production traffic here. Measured 2026-07-11
+  # against the BYOK OpenRouter path (same underlying model): native is faster
+  # (~0.9s vs ~1.1-1.9s warm, less jitter), warms prefix cache to full prefix, and
+  # is the only path LiteLLM records a real per-token cost for (BYOK reports
+  # response-cost 0.0, blinding the ADR-0029 cost lens). BUT it enforces forced
+  # tool_choice only NON-DETERMINISTICALLY (same run: one call returned plain text
+  # "Biology", the next returned the tool call; a third free-formed JSON with the
+  # wrong key). That violates ADR-0006 / AGENTS rule 6, so the production extractor
+  # stays on openrouter/xiaomi/mimo-v2.5. Same failure class as minimax-m3 above.
+  - model_name: "xiaomi_mimo/mimo-v2.5"
+    litellm_params:
+      model: "xiaomi_mimo/mimo-v2.5"
+      api_key: os.environ/XIAOMI_API_KEY
+      input_cost_per_token: 0.00000014
+      output_cost_per_token: 0.00000028
+      cache_read_input_token_cost: 0.0000000028
+      extra_body:
+        thinking:
+          type: "disabled"
+    model_info:
+      mode: "chat"
+      max_input_tokens: 1048576
+      max_output_tokens: 131072
+
   # - model_name: "openrouter/mistralai/mistral-small-2603"
   #   litellm_params:
   #     model: "openrouter/mistralai/mistral-small-2603"
