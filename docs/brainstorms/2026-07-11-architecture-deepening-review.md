@@ -95,6 +95,77 @@ flowchart LR
 [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md); it does
 not merge the two producers or their lifecycles.
 
+### Grilling decisions
+
+1. **The deep module owns completion through persistence.** Graph Enrichment and Synthetic Topic
+   Generation keep their distinct front halves and existing operation-timeline shells. After a
+   producer prepares its nodes and producer-specific trace facts, the deep module owns the shared
+   ordering, symbolic reduction, intrinsic difficulty, common edge dispositions, Derived Graph
+   Layer and artifact assembly, and atomic persistence. A compute-only module was rejected because
+   it would leave trace and persistence policy duplicated; moving the whole operation shell was
+   rejected because it would invert control over the distinct producer front halves.
+2. **The deep module owns judgment-context construction.** Producers supply completed nodes and the
+   source-specific evidence facts already available from their front halves. The module derives the
+   provenance-appropriate prerequisite-ordering and intrinsic-difficulty contexts, applies the
+   mention cap, records evidence-free ordering exclusions, and verifies node/context coverage. Having
+   producers supply finished contexts was rejected because it would expose alignment invariants and
+   preserve duplicated provenance rules; a separate context module was rejected as a shallow seam
+   whose output exists only for completion.
+3. **Completion configuration has one shape and one default authority.** The shared ordering sample
+   count, direction-contest threshold, edge-confidence floor, prompt budget, and mention cap remain
+   flat fields embedded in both producer configurations, but their type and current defaults are
+   defined once. Each producer still hashes its complete configuration with its own Neural Stage
+   Descriptor set. Separate defaults were rejected because they could drift without intent; hidden
+   module defaults were rejected because configuration identity would become less transparent. The
+   flat runtime shape is preserved so a behavior-preserving refactor does not cause false config-hash
+   churn.
+4. **Producer trace facts cross the seam as a discriminated contribution.** A source-grounded
+   contribution carries Graph Enrichment's grounding, rescue, rescued-definition, minting, and merge
+   dispositions; a synthetic contribution carries Synthetic Topic Generation's grounding and
+   Knowledge-Boundary Probe dispositions. The deep module owns every common trace field and assembles
+   the complete `EnrichmentRunTrace`, making invalid producer/fact combinations unrepresentable.
+   Partial traces and trace-builder callbacks were rejected because they would leave producers
+   coupled to common trace assembly and its invariants.
+5. **Use one constructed completion module with one operation.** The composition point binds the
+   existing prerequisite-ordering, intrinsic-difficulty, and Enrichment Run store ports once; the
+   module exposes one `complete` operation whose request is discriminated by the trace-contribution
+   variant and carries the current operation's stage bracket. Stateful construction was rejected
+   because it exposes invalid partial states, two producer-specific operations were rejected because
+   their interfaces could drift, and a new injected completion port was rejected as a hypothetical
+   seam with one production adapter. The single operation keeps the leverage of one interface while
+   retaining source-grounded/synthetic caller clarity in its request type.
+6. **The completion interface enforces provable structural guarantees.** Before persistence it
+   rejects duplicate node identities, a trace variant inconsistent with `graphVersionId`, invalid
+   references under each trace field's lifecycle contract, invalid prerequisite endpoints, and
+   difficulty output that does not cover every surviving node exactly once. Surviving-node fields
+   must name surviving nodes; historical trace fields may name a deliberately dropped or absorbed
+   node only when their disposition or merge record proves that lifecycle. Any violation fails the
+   operation and persists nothing. Trusting callers was rejected because these are module invariants;
+   normalizing or dropping malformed data was rejected because it would hide programming defects and
+   silently alter authoritative output. These checks judge structure only, never neural semantics.
+7. **The completion interface becomes the shared test surface.** Ordering, evidence exclusions,
+   symbolic reduction, intrinsic-difficulty coverage, trace assembly, validation failures, and atomic
+   persistence move to focused completion-module tests. Each producer keeps tests for its distinct
+   front half plus one handoff test proving it supplies the correct contribution and returns the
+   persisted layer. Redundant producer-level assertions of shared policy are deleted; the Postgres
+   adapter's persistence integration tests remain. Keeping both old suites was rejected as a second
+   test representation; testing only through producers was rejected because the new interface would
+   not become the test surface.
+8. **Real-use verification covers both producers.** After deterministic verification, execute one
+   curated-source Graph Enrichment and one Synthetic Topic Generation through production LiteLLM,
+   then inspect nodes, prerequisite edges, intrinsic difficulties, exclusions, producer-specific
+   trace facts, and persisted artifacts. Record each result as `PASS` or `FIX_FIRST` with concrete
+   evidence under `tmp/`; a foundational defect blocks completion. A Graph-Enrichment-only gate was
+   rejected because it would leave the synthetic contribution and null-`graphVersionId` path
+   unverified, and deterministic-only verification was rejected under the project's real-use quality
+   discipline.
+9. **Preserve producer behavior except for the new structural guarantees.** Prompts, model aliases,
+   sampling, operation stages, public producer return types, summary hooks, persistence shapes, and
+   configuration hashes remain unchanged. The only intentional behavior change is that a provable
+   structural violation now fails before persistence. Broader producer-interface cleanup was rejected
+   as scope expansion; a move-only refactor was rejected because it would omit the selected module
+   guarantees.
+
 ---
 
 ## Candidate 2 — Make the Learner Journal a finished application projection

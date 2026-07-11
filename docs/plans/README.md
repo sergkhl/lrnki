@@ -12,6 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans
 
+- [2026-07-11-001 — Derived Graph Layer completion](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md)
+  — ready; consolidate the duplicated Graph Enrichment and Synthetic Topic Generation completion
+  back halves behind one lifecycle-aware, atomically persisted application module.
 - [2026-07-10-003 — Learner interaction system and deferred native surfaces](./2026-07-10-003-feat-learner-interaction-system-plan.md)
   — ready; unify every learner interaction behind an app-owned NativeWind UI boundary, restore the
   deferred journal overlays, complete mastery motion, and gate web deployment on real Android use.

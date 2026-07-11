@@ -222,7 +222,8 @@ _Avoid_: fake source citation, unlabeled generated quote
 The single home for one forced-tool LLM stage's knowledge: a dotprompt `.prompt` file owning the
 model alias, tool name, tool description, and prompt templates, plus a typed rim (zod schema,
 stage tag, result mapping) executed by one generic forced-tool executor. Per-operation
-configuration hashes derive mechanically from descriptor content.
+configuration hashes derive mechanically from descriptor content; the descriptor split and hash
+mechanics are owned by [ADR-0034](docs/adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md).
 _Avoid_: adapter class per stage, hand-bumped config hash, prompt string in code
 
 **Inspection Read Model**:

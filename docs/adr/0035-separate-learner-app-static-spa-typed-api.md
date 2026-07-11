@@ -55,8 +55,5 @@ runbook; the single shared environment during testing is
 - The interim Vite + TanStack Router web SPA (`apps/learner-web`) was deleted at cutover; the
   monorepo uses pnpm's hoisted node linker because Metro's resolution needs transitive Babel
   plugins materialized.
-- Crystal Duel, splashes, Crystal Vista, the menu drawer, and growth/assembly animations are
-  not yet re-rendered in RN primitives; their pure logic (duelMachine, seam classifier,
-  crystalVistaView, geometry) already lives in `apps/learner-app` for the follow-up pass.
 - Per-request `createDatabaseClient()/end()` churn on the learner path is gone (one pool per
   process).

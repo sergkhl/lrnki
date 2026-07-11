@@ -20,11 +20,9 @@ and no persistence adapters, so extracting a standalone Learner App later is an 
 move, not a rewrite.
 Version 1 starts orchestrated-first: the learner chooses an **expedition** (one Derived Graph Layer),
 and the app chooses the next mechanic or segment to preserve flow instead of asking the learner to
-pick a mechanic cold. The expedition is **layer-wide with a derived summit**: the trail covers the
-whole layer as one continuous **Expedition Trail** broken into milestone-anchored **Expedition
-Sections** ("graph as engine, line as interface"), and the summit is derived at read time as the last
-section's milestone rather than a learner-chosen target. There is no persisted expedition target;
-readiness is enrichment + study bank present. Returning to the Learner App should resume the same
+pick a mechanic cold. The expedition is layer-wide with a derived summit per the **Study Session**
+and **Expedition Section** definitions in [CONTEXT.md](../../CONTEXT.md) ("graph as engine, line as
+interface"). There is no persisted expedition target; readiness is enrichment + study bank present. Returning to the Learner App should resume the same
 learner-owned path with minimum friction; the client may remember the learner's name-ref locally
 because it is navigation state, not authentication or learner-neutral content.
 
@@ -51,10 +49,9 @@ Learner-facing theme language follows
 [ADR-0033](0033-plain-identifiers-single-themed-vocabulary-mapping.md): durable identifiers stay
 plain, and themed copy is rendered through the Learner App vocabulary and stage-copy mappings.
 
-Completion rewards are part of the mastery flow, not decoration. A concept is mastered by a
-**completion rule** — its lesson (if any) read AND every activity segment latest-correct — so
-finishing the *last* remaining activity advances into the capstone reward (gem) state; a single
-correct answer never collects the gem for a multi-segment concept. The learner should see the mastery
+Completion rewards are part of the mastery flow, not decoration. Mastery follows the Study Session
+**completion rule** defined in [CONTEXT.md](../../CONTEXT.md), so finishing the *last* remaining
+activity advances into the capstone reward (gem) state. The learner should see the mastery
 beat and then continue to the next available stop, or return to the trail only when the expedition
 has no next stop. Every learner-facing count (progress, gems) derives from the same trail scope the
 projection walks, so counts never drift from the trail.
