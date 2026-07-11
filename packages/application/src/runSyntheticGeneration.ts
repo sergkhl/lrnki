@@ -1,11 +1,8 @@
 import type {
   DerivedGraphLayer,
   DerivedGraphNode,
-  DifficultyNodeContext,
-  EnrichmentRunTrace,
   GroundingVerbatimDisposition,
   LlmGroundedEnrichmentNode,
-  PrerequisiteConceptContext,
   SynthesizedConcept,
   SyntheticProbeDisposition
 } from "@lrnki/domain-core";
@@ -22,10 +19,12 @@ import type {
   RunProgressReporterPort
 } from "@lrnki/ports";
 import { randomUUID } from "node:crypto";
-import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
-import { DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG, type DerivedGraphCompletionConfig } from "./completeDerivedGraphLayer";
-import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
-import { transitiveReduction } from "./prerequisiteDag";
+import { noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
+import {
+  createDerivedGraphLayerCompletion,
+  DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
+  type DerivedGraphCompletionConfig
+} from "./completeDerivedGraphLayer";
 import { applyVerbatimFloorByGrounding } from "./verbatimFloorByGrounding";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import {
@@ -33,9 +32,6 @@ import {
   probeKnowledgeBoundary,
   type KnowledgeBoundaryProbeConfig
 } from "./knowledgeBoundaryProbe";
-
-const PRODUCER = "@lrnki/application";
-const PRODUCER_VERSION = "0.8.0";
 
 // The shared completion fields (config authority in completeDerivedGraphLayer.ts) plus
 // the synthetic front half's producer-specific knobs. The flat runtime shape and field
@@ -184,104 +180,36 @@ export async function runSyntheticGeneration(input: {
         : null
     }));
 
-    // Stage 4 — prerequisite ordering over the assembled trusted node set (R5). Reuses the
-    // K-sampled consensus envelope; a synthetic layer is single-domain by construction.
-    const orderingContexts: PrerequisiteConceptContext[] = derivedNodes.map((node) => contextOf(node, config.maxMentionsPerConceptInPair));
-    const {
-      orderings: orderingTraces,
-      certainEdges,
-      uncertainEdges,
-      weakEdges
-    } = await runStage(STAGE_TAGS.prerequisiteOrdering, () =>
-      deriveConsensusOrdering({
-        domains: orderingContexts.length > 0 ? [{ declaredDomain, nodes: orderingContexts }] : [],
-        prerequisiteOrdering: input.prerequisiteOrdering,
-        orderingSampleCount: config.orderingSampleCount,
-        directionContestMinorityFraction: config.directionContestMinorityFraction,
-        minEdgeConfidence: config.minEdgeConfidence,
-        maxDomainPromptChars: config.maxDomainPromptChars
-      })
-    );
-
-    const { reducedEdges, transitiveEdges } = await runStage(NON_LLM_STAGES.symbolicDisposal, async () => {
-      const { edges, removed } = transitiveReduction(certainEdges);
-      return { reducedEdges: edges, transitiveEdges: removed };
+    // The shared Derived Graph Layer completion owns the back half from here (plan
+    // 2026-07-11-001, KTD1/KTD2): judgment contexts from the generated bundles, K-sampled
+    // consensus ordering (a synthetic layer is single-domain by construction), transitive
+    // reduction, intrinsic difficulty, common trace dispositions, structural validation,
+    // and the single atomic persistence — bracketed onto THIS operation's timeline via
+    // runStage (KTD6). The combined summary hook keeps its post-difficulty,
+    // pre-persistence position.
+    const completion = createDerivedGraphLayerCompletion({
+      prerequisiteOrdering: input.prerequisiteOrdering,
+      difficulty: input.difficulty,
+      enrichmentStore: input.enrichmentStore
     });
-    const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
-
-    // Stage 5 — intrinsic difficulty over every synthetic node (R5), from the same grounding
-    // contexts the ordering used.
-    const difficultyNodes: DifficultyNodeContext[] = derivedNodes.map((node) => {
-      const context = contextOf(node, config.maxMentionsPerConceptInPair);
-      return {
-        derivedNodeId: node.derivedNodeId,
-        canonicalLabel: context.canonicalLabel,
-        aliases: context.aliases,
-        declaredDomain,
-        groundingOrigin: node.groundingOrigin,
-        definitions: context.definitions,
-        mentions: context.mentions
-      };
-    });
-    const difficulties = await runStage(STAGE_TAGS.intrinsicDifficulty, () =>
-      input.difficulty.score({ nodes: difficultyNodes })
-    );
-
-    input.onSummary?.({
-      concepts: concepts.length,
-      core: coreVerdicts.length,
-      boundary: verdicts.length - coreVerdicts.length,
-      nodes: derivedNodes.length,
-      committedEdges: reducedEdges.length,
-      uncertainEdges: uncertainEdges.length
-    });
-
-    const layer: DerivedGraphLayer = {
+    return completion.complete({
       enrichmentId: input.enrichmentId,
-      graphVersionId: null,
-      enrichmentConfigHash: config.enrichmentConfigHash,
-      judgeModel: input.prerequisiteOrdering.model,
-      derivedNodes,
-      prerequisiteEdges,
-      difficulties
-    };
-
-    const trace: EnrichmentRunTrace = {
-      enrichmentId: input.enrichmentId,
-      graphVersionId: null,
-      enrichmentConfigHash: config.enrichmentConfigHash,
-      derivedNodes,
-      orderings: orderingTraces,
-      nodeExclusions: [],
-      dispositions: [
-        ...uncertainEdges.map((edge) => ({ prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId, dependentDerivedNodeId: edge.dependentDerivedNodeId, disposition: "uncertain" as const })),
-        ...weakEdges.map((edge) => ({ prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId, dependentDerivedNodeId: edge.dependentDerivedNodeId, disposition: "weak_cut" as const })),
-        ...transitiveEdges.map((edge) => ({ prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId, dependentDerivedNodeId: edge.dependentDerivedNodeId, disposition: "transitive_reduction" as const })),
-        ...reducedEdges.map((edge) => ({ prerequisiteDerivedNodeId: edge.prerequisiteDerivedNodeId, dependentDerivedNodeId: edge.dependentDerivedNodeId, disposition: "kept" as const }))
-      ],
-      groundingDispositions,
-      rescueDispositions: [],
-      rescuedDefinitionDispositions: [],
-      mintingDispositions: [],
-      nodeMerges: [],
-      syntheticProbeDispositions
-    };
-
-    await runStage(NON_LLM_STAGES.persist, () =>
-      input.enrichmentStore.persist({
-        layer,
-        artifact: {
-          artifactId: `${input.enrichmentId}:enrichment-run`,
-          artifactType: "enrichment_run",
-          producer: PRODUCER,
-          producerVersion: PRODUCER_VERSION,
-          configHash: config.enrichmentConfigHash,
-          createdAt: new Date().toISOString(),
-          payload: trace
-        }
-      })
-    );
-    return layer;
+      nodes: derivedNodes,
+      config,
+      stage: runStage,
+      contribution: {
+        kind: "synthetic",
+        graphVersionId: null,
+        groundingDispositions,
+        syntheticProbeDispositions,
+        frontHalfCounts: {
+          concepts: concepts.length,
+          core: coreVerdicts.length,
+          boundary: verdicts.length - coreVerdicts.length
+        },
+        onSummary: input.onSummary
+      }
+    });
   });
 }
 
@@ -320,21 +248,3 @@ function dedupeConcepts(concepts: SynthesizedConcept[]): SynthesizedConcept[] {
   return kept;
 }
 
-// Reduce a synthetic node to the ordering/difficulty context. Every synthetic node is
-// `llm_grounded`, so its evidence is the generated bundle's definition/mention text (the
-// bare label is never the evidence).
-function contextOf(node: DerivedGraphNode, maxMentions: number): PrerequisiteConceptContext {
-  if (node.nodeKind !== "enrichment" || node.groundingOrigin !== "llm_grounded") {
-    // A synthetic layer holds only llm_grounded enrichment nodes; anything else is a
-    // programming error upstream.
-    return { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases, definitions: [], mentions: [], assertions: [] };
-  }
-  return {
-    derivedNodeId: node.derivedNodeId,
-    canonicalLabel: node.canonicalLabel,
-    aliases: node.aliases,
-    definitions: node.groundingBundle.definitions.map((passage) => passage.text),
-    mentions: node.groundingBundle.mentions.slice(0, maxMentions).map((passage) => passage.text),
-    assertions: []
-  };
-}

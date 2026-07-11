@@ -189,11 +189,26 @@ test("no node carries a source citation; every node carries a Grounding Bundle (
   }
 });
 
-test("prerequisite ordering and difficulty populate over the synthetic node set (R5)", async () => {
-  const layer = await runSyntheticGeneration(baseInput());
+// The one handoff contract (plan 2026-07-11-001 U4/R11): the synthetic facts the front
+// half prepares — grounded nodes, null version, probe dispositions, and the combined
+// summary hook — reach the completion seam, and the producer returns the layer completion
+// persisted. The shared back-half policy matrix itself is proved once in
+// completeDerivedGraphLayer.test.ts, never re-asserted here.
+test("hands the synthetic contribution to the completion seam and returns its layer", async () => {
+  const { store, persisted } = capturingStore();
+  let summary: unknown;
+  const layer = await runSyntheticGeneration(baseInput({
+    enrichmentStore: store,
+    knowledgeBoundaryProbe: fakeProbe(new Set(["Concept B"])),
+    onSummary: (value) => {
+      summary = value;
+    }
+  }));
+  assert.deepEqual(summary, { concepts: 2, core: 1, boundary: 1, nodes: 1, committedEdges: 0, uncertainEdges: 0 });
+  assert.equal(persisted.length, 1);
+  assert.equal(layer, persisted[0].layer, "the producer returns the layer completion persisted");
   assert.equal(layer.difficulties.length, layer.derivedNodes.length);
-  const committed = layer.prerequisiteEdges.filter((edge) => !edge.uncertain);
-  assert.equal(committed.length, 1);
+  assert.equal(persisted[0].artifact.payload.syntheticProbeDispositions?.length, 2);
 });
 
 test("a stage failure marks the operation failed with a readable timeline and persists no partial layer", async () => {
