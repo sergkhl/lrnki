@@ -4,10 +4,11 @@
 
 ### Execution order
 
-- **Pick the next architecture-deepening candidate.** The
-  [2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md) has Candidates 2–4
-  remaining (Learner Journal projection, Topic Expedition lifecycle, Study Session stop completion);
-  Candidate 2 is its current top recommendation.
+- **Architecture deepening review Candidates 3–4
+  ([2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md)).** Candidate 3
+  (Topic Expedition generation behind its lifecycle interface) and Candidate 4 (Study Session
+  stop-completion projection) remain unplanned. Grill and plan when picked up; Candidate 2 shipped
+  2026-07-12.
 
 ### Evidence-triggered follow-up
 
@@ -19,6 +20,29 @@
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **Expedition Journal is one finished application projection (2026-07-12, plan 2026-07-12-001).**
+  A single `@lrnki/application` module (`expeditionJournal.ts`) owns candidate derivation,
+  trail-scoped progress, generation facts, the tier partition, and Explore curation behind two
+  entry points (`getExpeditionJournal`, `getExpeditionCatalog`). Owned rows cross the HTTP seam as a
+  status-discriminated finished union (ready carries `progress`/`layerPurpose`; generating/failed
+  carries `failureMessage` and a finished `generation` block); raw `LearnerExpedition` rows, fencing
+  fields, and `OperationTimelineDetail` no longer reach the wire. The `/journal` and `/catalog`
+  routes became thin bearer/adapter mappers; the absorbed `listExpeditionCandidates` use-case and
+  the Learner App's `generationProgress.ts` + `expeditionJournalView.ts` policy modules were
+  deleted. The app now derives its journal/catalog types mechanically from the hono `AppType` via
+  `InferResponseType` (no hand-built `JournalView` alias, no per-call `unwrap<T>` generic for these
+  reads), has zero `@lrnki/ports` imports, and uses `STAGE_TAGS` only as `stageCopy` keys. Two
+  accepted learner-visible changes: the topic-generation progress denominator is the full 14-stage
+  plan (adds `layerPurposeGeneration`, `lessonRedundancyJudgment`, `impostorLieValidityJudgment`, so
+  the bar no longer blanks during layer-purpose generation — [ADR-0027](../adr/0027-serve-inspection-through-read-model-ports.md)
+  seam), and Explore curation filters adopted candidates before taking its top five. Rule-14 PASS:
+  a fresh production "Enzyme kinetics" generation polled every 5s stayed determinate across the
+  enrichment→study_items boundary (`indet=False` on all 34 generating snapshots, `n/14` counter),
+  reached READY at 22 items, moved `yours`→`started` on one server-keyed correct grade, Explore
+  excluded the adopted expedition, `/catalog` returned all 19 candidates with trail-vocabulary
+  search, and `response_log` stayed 0 across reads (1 only after the graded answer). Evidence:
+  `tmp/2026-07-12-expedition-journal-projection/`.
 
 - **Derived Graph Layer completion consolidated into one deep module (2026-07-11, plan
   2026-07-11-001).** The duplicated Graph Enrichment / Synthetic Topic Generation back halves
@@ -200,6 +224,20 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Expedition Journal projection gate, 2026-07-12.** Deterministic envelope: workspace `typecheck`
+  exit 0, workspace `test` green (application 568 including the new `expeditionJournal.test.ts`
+  suite — stage-plan catalog lock, queued/stalled facts, offset/clamp/indeterminate folds, AE1
+  layer-purpose determinacy, tiers, curation, candidate narrowing; learner-app 137 after deleting
+  the two client policy suites), `lint` 0 errors (8 pre-existing warnings), `build` green (Expo web
+  export all routes; projection barrel stayed client-safe after dropping `isStaleOperation`/
+  `ExpeditionCandidate` from it). AE7 negative check: renaming a projection field failed the
+  learner-app typecheck, then reverted. Real-use: fresh production "Enzyme kinetics" +
+  "Coral reef symbiosis" generations over production LiteLLM, journal polled at the app's 5s
+  cadence; determinate bar across the phase boundary, `yours`→`started` transition on one
+  server-keyed grade, adopted-expedition curation, `/catalog` search, and read-write purity all
+  inspected; disposable learner deleted (0 rows remaining), enrichments retained. Evidence and the
+  required evaluation note: `tmp/2026-07-12-expedition-journal-projection/`.
 
 - **Derived Graph Layer completion gate, 2026-07-11.** Deterministic envelope: workspace
   `typecheck` exit 0, workspace `test` green (application 551 — including 26 new focused

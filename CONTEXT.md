@@ -178,6 +178,13 @@ ordered easiest-first (ascending mean difficulty); their concatenation is a topo
 whole floored layer. Sections are derived during generation, never persisted.
 _Avoid_: quest, goal cone, chapter, persisted section
 
+**Expedition Journal**:
+The Learner App's entry projection: one application use-case composes expedition candidates, the
+learner's owned expeditions with study progress and layer purpose, and topic-generation progress
+into finished tiers — started, yours, and shared — plus a separate full browse catalog. Composition
+never lives in HTTP adapters or UI code; consuming surfaces apply themed vocabulary only.
+_Avoid_: route-stitched journal payload, client-side stage math, raw persistence rows on the wire
+
 **Learner App**:
 The downstream learner-facing application that turns Derived Graph Layers and Learner State into
 playable study experiences. Its game UX policy is defined by

@@ -119,10 +119,19 @@ export {
   type TargetCandidate
 } from "./targetCandidates";
 export {
-  listExpeditionCandidates,
-  type ExpeditionCandidate,
-  type LearnerExpeditionEntry
-} from "./listExpeditionCandidates";
+  getExpeditionCatalog,
+  getExpeditionJournal,
+  type ExpeditionCandidateCard,
+  type ExpeditionCatalog,
+  type ExpeditionCatalogDeps,
+  type ExpeditionGenerationFacts,
+  type ExpeditionJournal,
+  type ExpeditionJournalDeps,
+  type ExpeditionJournalRow,
+  type ExpeditionProgress,
+  type GeneratingExpeditionRow,
+  type ReadyExpeditionRow
+} from "./expeditionJournal";
 
 export {
   labelFor,

@@ -30,19 +30,29 @@ in the module and its focused test suite.
 
 ## Candidate 2 — Make the Learner Journal a finished application projection
 
+**SHIPPED 2026-07-12** (plan deleted after consolidation; outcome in
+[TODO.md](../plans/TODO.md)). One `@lrnki/application` module (`expeditionJournal.ts`) returns the
+finished journal/catalog projections behind `getExpeditionJournal`/`getExpeditionCatalog`; owned
+rows cross the seam as a status-discriminated finished union; the routes are thin mappers; the
+Learner App derives its types from `AppType` via `InferResponseType` and dropped every port import
+and stage-policy module. The accepted grilling decisions all landed (14-stage progress denominator
+fixing the layer-purpose blank, projection-owned tiers, Explore curation tightening, mechanical wire
+carry). `CONTEXT.md` defines **Expedition Journal**. Rule-14 gate PASS (evidence
+`tmp/2026-07-12-expedition-journal-projection/`).
+
 **Recommendation strength: Strong**  
 **Dependency category: ports & adapters**
 
-**Files**
+**Files (at framing time; all resolved by the shipped work)**
 
-- [`listExpeditionCandidates.ts`](../../packages/application/src/listExpeditionCandidates.ts), which
-  returns candidates plus partly enriched `LearnerExpedition` port types
-- [`app.ts`](../../apps/learner-api/src/app.ts), where `/journal` appends raw operation timelines
-  after the application call (currently lines 154–179)
-- [`queries.ts`](../../apps/learner-app/src/lib/queries.ts), where `JournalView` is reconstructed from
-  application and port types and every response passes through an unchecked generic cast
-- [`generationProgress.ts`](../../apps/learner-app/src/learn/generationProgress.ts), where the
-  Learner App imports `STAGE_TAGS` and `OperationTimelineDetail` to derive learner-visible progress
+- `packages/application/src/listExpeditionCandidates.ts` (deleted), which returned candidates plus
+  partly enriched `LearnerExpedition` port types
+- [`app.ts`](../../apps/learner-api/src/app.ts), where `/journal` appended raw operation timelines
+  after the application call
+- [`queries.ts`](../../apps/learner-app/src/lib/queries.ts), where `JournalView` was reconstructed
+  from application and port types and every response passed through an unchecked generic cast
+- `apps/learner-app/src/learn/generationProgress.ts` (deleted), where the Learner App imported
+  `STAGE_TAGS` and `OperationTimelineDetail` to derive learner-visible progress
 
 **Problem**
 

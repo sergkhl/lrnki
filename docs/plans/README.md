@@ -12,7 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- None currently. See [TODO.md](./TODO.md) for current work and the latest completed outcomes.
+- None. Candidates 3–4 of the
+  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md) are
+  unplanned; see [TODO.md](./TODO.md).
 
 ## Ownership rules
 

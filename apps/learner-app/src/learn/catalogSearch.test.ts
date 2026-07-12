@@ -1,11 +1,11 @@
 import { expect, test } from "@jest/globals";
-import type { ExpeditionCandidate } from "@lrnki/application/projection";
+import type { CatalogView } from "@/lib/queries";
 import { filterCatalogCandidates } from "./catalogSearch";
 
-const candidates = [
-  { enrichmentId: "carbon", title: "Carbon fixation and carbohydrate synthesis", declaredDomain: "Plant Biology", searchTerms: ["Photosynthetic pigments"] },
-  { enrichmentId: "tides", title: "Tidal harmonics", declaredDomain: "Oceanography", searchTerms: [] }
-] as unknown as ExpeditionCandidate[];
+const candidates: CatalogView["candidates"] = [
+  { enrichmentId: "carbon", title: "Carbon fixation and carbohydrate synthesis", declaredDomain: "Plant Biology", totalStopCount: 3, searchTerms: ["Photosynthetic pigments"] },
+  { enrichmentId: "tides", title: "Tidal harmonics", declaredDomain: "Oceanography", totalStopCount: 2, searchTerms: [] }
+];
 
 test("catalog search matches title and declared domain case-insensitively", () => {
   expect(filterCatalogCandidates(candidates, "PHOTO").map((candidate) => candidate.enrichmentId)).toEqual(["carbon"]);

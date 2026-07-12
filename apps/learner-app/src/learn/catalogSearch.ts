@@ -1,7 +1,9 @@
-import type { ExpeditionCandidate } from "@lrnki/application/projection";
+import type { CatalogView } from "@/lib/queries";
+
+type CatalogCandidate = CatalogView["candidates"][number];
 
 // Browse-all is intentionally a small client-side filter over the lazy catalog response.
-export function filterCatalogCandidates(candidates: ExpeditionCandidate[], query: string): ExpeditionCandidate[] {
+export function filterCatalogCandidates(candidates: CatalogCandidate[], query: string): CatalogCandidate[] {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return candidates;
   return candidates.filter((candidate) =>

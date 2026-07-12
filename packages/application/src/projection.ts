@@ -4,11 +4,6 @@
 // here means its transitive runtime imports must stay Node-builtin-free — a reachable
 // `node:` import fails the Expo web export.
 export {
-  OPERATION_HEARTBEAT_STALE_AFTER_MS,
-  isStaleOperation,
-  operationStaleBefore
-} from "./operationRunLiveness";
-export {
   NON_LLM_STAGES,
   operationTimelineLlmSpendStageTags,
   stageBelongsToOperation,
@@ -30,7 +25,6 @@ export {
   type DuelAnswerSubmission,
   type GradeDuelAnswerResult
 } from "./crystalDuel";
-export type { ExpeditionCandidate, LearnerExpeditionEntry } from "./listExpeditionCandidates";
 export {
   labelFor,
   type ConceptLessonSectionView,

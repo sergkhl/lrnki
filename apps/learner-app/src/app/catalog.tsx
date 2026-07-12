@@ -5,7 +5,6 @@ import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import { CandidateCard } from "@/components/ExpeditionEntry";
 import { filterCatalogCandidates } from "@/learn/catalogSearch";
-import { partitionExpeditionJournal } from "@/learn/expeditionJournalView";
 import { catalogQuery } from "@/lib/queries";
 import { Button, Card, Input, Screen, Text, buttonIconColor } from "@/ui";
 
@@ -13,8 +12,7 @@ export default function CatalogPage() {
   const router = useRouter();
   const catalog = useQuery(catalogQuery);
   const [search, setSearch] = useState("");
-  const shared = catalog.data ? partitionExpeditionJournal(catalog.data).shared : [];
-  const results = useMemo(() => filterCatalogCandidates(shared, search), [shared, search]);
+  const results = useMemo(() => filterCatalogCandidates(catalog.data?.candidates ?? [], search), [catalog.data, search]);
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace("/");
