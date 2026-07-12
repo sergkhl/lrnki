@@ -4,11 +4,17 @@
 
 ### Execution order
 
-- **Architecture deepening review Candidates 3–4
+- **Adaptive Learner Scaffold Detours
+  ([implementation plan](./2026-07-12-002-feat-adaptive-scaffold-detours-plan.md)).** Add quiet
+  generated term actions and durable learner-scoped one-level support detours without mutating
+  neutral graph assets. The plan absorbs architecture review Candidate 4 by making Study Session
+  the finished trail/completion projection before composing scaffold support.
+
+- **Architecture deepening review Candidate 3
   ([2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md)).** Candidate 3
-  (Topic Expedition generation behind its lifecycle interface) and Candidate 4 (Study Session
-  stop-completion projection) remain unplanned. Grill and plan when picked up; Candidate 2 shipped
-  2026-07-12.
+  (Topic Expedition generation behind its lifecycle interface) remains unplanned. Grill and plan
+  when picked up; Candidates 2 shipped 2026-07-12 and Candidate 4 is owned by the active scaffold
+  plan.
 
 ### Evidence-triggered follow-up
 

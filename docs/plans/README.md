@@ -12,9 +12,10 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- None. Candidates 3–4 of the
-  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md) are
-  unplanned; see [TODO.md](./TODO.md).
+- [Adaptive Learner Scaffold Detours](./2026-07-12-002-feat-adaptive-scaffold-detours-plan.md) —
+  ready; includes Candidate 4 of the
+  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md).
+- Candidate 3 of the architecture review remains unplanned; see [TODO.md](./TODO.md).
 
 ## Ownership rules
 

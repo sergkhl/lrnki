@@ -218,6 +218,26 @@ Learner/session-scoped generated support content that restores a Learner App's F
 becoming neutral graph or Study Item Bank content.
 _Avoid_: generated prerequisite, personalized Concept Lesson, Study Item Bank item
 
+**Scaffold Detour**:
+A durable learner-owned support branch under one parent node of a Derived Graph Layer, identified by
+learner, enrichment, parent node, and normalized term. It holds one to three ordered Support Steps,
+moves through exactly four lifecycle states (`generating`, `ready`, `failed`, `hidden`), and never
+feeds neutral mastery, prerequisite gating, or rewards.
+_Avoid_: sub-expedition, generated prerequisite edge, second trail
+
+**Support Step**:
+One ordered element of a Scaffold Detour: either a reference to an existing node in the parent's own
+layer and Declared Domain, or a generated learner-scoped node carrying a citation-free micro-lesson
+and one option-select item. Reference steps record normal neutral evidence; generated steps record
+learner-scoped evidence that never enters neutral mastery.
+_Avoid_: cloned concept, Study Item Bank item, locked stop
+
+**Explorable Term**:
+Generation-time metadata on a Concept Lesson section or Study Item question: a specialized word or
+short phrase, verified as an exact substring of the final rendered text, that a learner may turn
+into a Scaffold Detour. At most three per lesson and per question; zero terms render no affordance.
+_Avoid_: keyword, inline highlight, Candidate
+
 **Grounding Provenance**:
 The citation/provenance language shared by learner-facing study assets. Source-grounded content cites
 source evidence; generated content is labeled generated. Its study-asset contracts are owned by
