@@ -80,6 +80,12 @@ export {
   conceptLessonGenerationDescriptor
 } from "./conceptLessonGenerationAdapters";
 export {
+  createScaffoldOutlinePort,
+  createScaffoldContentPort,
+  scaffoldOutlineGenerationDescriptor,
+  scaffoldContentGenerationDescriptor
+} from "./learnerScaffoldGenerationAdapters";
+export {
   createLayerPurposeGenerationPort,
   layerPurposeGenerationDescriptor
 } from "./layerPurposeGenerationAdapters";

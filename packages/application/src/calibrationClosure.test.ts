@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ResponseLogRow } from "@lrnki/domain-core";
+import type { NeutralResponseLogRow, ResponseLogRow } from "@lrnki/domain-core";
 import type { ReadinessEdge } from "./adaptivePathProjection";
 import { pruneClosure, composeMastery, struggledNodes, suggestRestorations } from "./calibrationClosure";
 
@@ -12,8 +12,8 @@ function edge(prerequisite: string, dependent: string, uncertain = false): Readi
 const dag: ReadinessEdge[] = [edge("A", "B"), edge("B", "D"), edge("C", "D"), edge("E", "D")];
 
 let seq = 0;
-function graded(derivedNodeId: string, outcome: "correct" | "partial" | "incorrect"): ResponseLogRow {
-  return { responseId: `r${++seq}`, learnerStateRef: "L1", studyItemId: `s-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, responseSource: "synthetic", graderIdentity: "auto", batchId: null, attemptSeq: seq, submittedAnswer: null, createdAt: new Date().toISOString() };
+function graded(derivedNodeId: string, outcome: "correct" | "partial" | "incorrect"): NeutralResponseLogRow {
+  return { responseId: `r${++seq}`, learnerStateRef: "L1", scope: "neutral", studyItemId: `s-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, responseSource: "synthetic", graderIdentity: "auto", batchId: null, attemptSeq: seq, submittedAnswer: null, createdAt: new Date().toISOString() };
 }
 
 // --- pruneClosure (R8, R11) -------------------------------------------------

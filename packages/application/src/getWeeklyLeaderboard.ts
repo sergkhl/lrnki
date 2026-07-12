@@ -1,4 +1,4 @@
-import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import { neutralResponses, type CalibrationVerdict, type ConceptLesson, type LessonAbsentNode, type ResponseLogRow, type StudyItem } from "@lrnki/domain-core";
 import type {
   CalibrationVerdictStorePort,
   ConceptLessonStorePort,
@@ -156,8 +156,9 @@ function computeLearnerContributions(input: {
 }): MasteredNodeContribution[] {
   // The learner's own evidence timestamps (KTD2): the latest CORRECT answer per study item
   // and the first read per lesson. These, not a new mastery predicate, decide completion time.
+  // Leaderboard points fold NEUTRAL responses only — scaffold work earns no points (R19, KTD4).
   const latestCorrectAtByItem = new Map<string, number>();
-  for (const row of input.responses) {
+  for (const row of neutralResponses(input.responses)) {
     if (row.judgedOutcome !== "correct" || !row.createdAt) continue;
     const at = new Date(row.createdAt).getTime();
     const prior = latestCorrectAtByItem.get(row.studyItemId);

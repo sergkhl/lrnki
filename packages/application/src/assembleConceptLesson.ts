@@ -11,6 +11,7 @@ import {
   type StudyItemGroundingProvenance
 } from "@lrnki/domain-core";
 import type { GroundingPassage, NodeGrounding } from "./selectNodeGrounding";
+import { validateLessonExplorableTerms } from "./explorableTerms";
 
 // Concept Lesson assembly (U6, R1/R3/R6/R7/R8/R9/R11, ADR-0031). PURE: it never trusts the
 // generator's claimed provenance. For each draft section it RE-DERIVES provenance
@@ -136,6 +137,11 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
     };
   }
 
+  // Validate the advertised Explorable Terms against the FINAL assembled section bodies
+  // (R1-R3, KTD1). A term anchored to a dropped section, or that is not an exact substring of
+  // its section body, or that repeats the parent label, is discarded here — never trusted.
+  const explorableTerms = validateLessonExplorableTerms(draft.explorableTerms ?? [], sections, node.canonicalLabel);
+
   return {
     kind: "lesson",
     lesson: {
@@ -145,7 +151,8 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
       generatingModel: input.generatingModel,
       configHash: input.configHash,
       canonicalLabel: node.canonicalLabel,
-      sections
+      sections,
+      explorableTerms
     }
   };
 }

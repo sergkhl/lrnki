@@ -17,6 +17,7 @@ function sourceGrounding(): ImpostorGrounding {
     graphVersionId: "gv-1",
     enrichmentId: "en-1",
     derivedNodeId: "dn-1",
+    canonicalLabel: "Heap",
     groundingProvenance: "source_cep",
     generatingModel: "test-model",
     configHash: "cfg-1",
@@ -37,6 +38,7 @@ function generatedGrounding(): ImpostorGrounding {
     graphVersionId: "gv-1",
     enrichmentId: "en-1",
     derivedNodeId: "dn-2",
+    canonicalLabel: "Ownership",
     groundingProvenance: "generated",
     generatingModel: "test-model",
     configHash: "cfg-1",
@@ -59,6 +61,7 @@ function draftOf(truths: ImpostorTruthDraft[], overrides: Partial<ImpostorItemDr
       lieSource: "sibling",
       siblingLabel: "Stack"
     },
+    explorableTerms: [],
     ...overrides
   };
 }

@@ -15,6 +15,7 @@ function optionItem(): OptionSelectItem {
     generatingModel: "m",
     configHash: "c",
     question: "Q?",
+    explorableTerms: [],
     explanation: "because",
     options: [
       { optionId: "a", text: "right", isCorrect: true, provenance: "generated", citation: { provenance: "generated", derivedNodeId: "n", passageText: "p" } },
@@ -60,6 +61,7 @@ test("gradeDuelAnswer keys the impostor statement", async () => {
     generatingModel: "m",
     configHash: "c",
     question: "Which is the lie?",
+    explorableTerms: [],
     statements: [
       { statementId: "s1", ordinal: 0, text: "truth", isImpostor: false, provenance: "generated", citation: { provenance: "generated", derivedNodeId: "n", passageText: "p" } },
       { statementId: "s2", ordinal: 1, text: "lie", isImpostor: true, provenance: "generated", reveal: "nope", lieSource: "generated" },

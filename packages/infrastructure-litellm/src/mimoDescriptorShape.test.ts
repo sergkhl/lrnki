@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   extractionNeuralStageDescriptors,
   graphEnrichmentNeuralStageDescriptors,
+  scaffoldGenerationNeuralStageDescriptors,
   studyItemBankNeuralStageDescriptors,
   syntheticGenerationNeuralStageDescriptors
 } from "./configHashes";
@@ -26,6 +27,7 @@ const allDescriptors: readonly AnyNeuralStageDescriptor[] = [
   ...graphEnrichmentNeuralStageDescriptors,
   ...syntheticGenerationNeuralStageDescriptors,
   ...studyItemBankNeuralStageDescriptors,
+  ...scaffoldGenerationNeuralStageDescriptors,
   discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor
 ];
 

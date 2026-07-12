@@ -1,4 +1,4 @@
-import { STAGE_TAGS } from "@lrnki/domain-core";
+import { neutralResponses, STAGE_TAGS } from "@lrnki/domain-core";
 import type {
   DerivedGraphDetail,
   EnrichmentInspectionReadPort,
@@ -275,7 +275,9 @@ type GradedAttempts = {
 function foldGradedAttempts(rows: Awaited<ReturnType<ResponseLogStorePort["listForLearner"]>>): GradedAttempts {
   const latest = new Map<string, { attemptSeq: number; correct: boolean }>();
   const attempted = new Set<string>();
-  for (const row of rows) {
+  // Journal progress folds NEUTRAL study-item evidence only — scaffold responses never move a
+  // journal bar (R19, KTD4).
+  for (const row of neutralResponses(rows)) {
     if (row.signalType !== "graded" || !row.judgedOutcome) continue;
     attempted.add(row.studyItemId);
     const prior = latest.get(row.studyItemId);

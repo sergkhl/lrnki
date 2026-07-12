@@ -40,6 +40,9 @@ export function trackLearner(learnerRef: string): string {
 export async function deleteLearner(sql: Sql, learnerRef: string): Promise<void> {
   await sql`DELETE FROM learner_expeditions WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM response_log WHERE learner_state_ref = ${learnerRef}`;
+  // Scaffold detours reference the learner; steps cascade on detour delete. Must run after
+  // response_log (whose scaffold_step_id rows reference the steps).
+  await sql`DELETE FROM learner_scaffold_detours WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM calibration_verdicts WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM lesson_reads WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM learner_awards WHERE learner_ref = ${learnerRef}`;

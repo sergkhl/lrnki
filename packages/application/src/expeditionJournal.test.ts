@@ -14,7 +14,7 @@ import type {
   ResponseLogStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
-import type { ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { NeutralResponseLogRow, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
 import {
   EXPECTED_TOPIC_GENERATION_STAGE_PLAN,
   getExpeditionCatalog,
@@ -451,21 +451,21 @@ function edge(prerequisiteDerivedNodeId: string, dependentDerivedNodeId: string)
 function studyItem(studyItemId: string, derivedNodeId: string): StudyItem {
   return {
     studyItemId, graphVersionId: null, enrichmentId: "exp", derivedNodeId,
-    groundingProvenance: "source_cep", generatingModel: "deepseek", configHash: "cfg",
+    groundingProvenance: "source_cep", generatingModel: "deepseek", configHash: "cfg", explorableTerms: [],
     itemType: "option_select", question: "Q", explanation: "E",
     options: [{ optionId: "o1", text: "One", isCorrect: true, provenance: "source" }, { optionId: "o2", text: "Two", isCorrect: false, provenance: "generated" }]
   };
 }
 
-function gradedCorrect(studyItemId: string): ResponseLogRow {
+function gradedCorrect(studyItemId: string): NeutralResponseLogRow {
   return {
-    responseId: `r-${studyItemId}`, learnerStateRef: "learner-one", studyItemId, derivedNodeId: "mid",
+    responseId: `r-${studyItemId}`, learnerStateRef: "learner-one", scope: "neutral", studyItemId, derivedNodeId: "mid",
     signalType: "graded", judgedOutcome: "correct", gradedScore: 1, responseSource: "synthetic",
     graderIdentity: "kg-independent-judge", batchId: null, attemptSeq: 1, submittedAnswer: "x"
   };
 }
 
-function gradedIncorrect(studyItemId: string): ResponseLogRow {
+function gradedIncorrect(studyItemId: string): NeutralResponseLogRow {
   return { ...gradedCorrect(studyItemId), judgedOutcome: "incorrect", gradedScore: 0 };
 }
 

@@ -12,9 +12,11 @@ import { conceptLessonGenerationDescriptor } from "./conceptLessonGenerationAdap
 import { layerPurposeGenerationDescriptor } from "./layerPurposeGenerationAdapters";
 import { conceptLessonRedundancyJudgmentDescriptor } from "./conceptLessonRedundancyAdapters";
 import { impostorLieValidityJudgmentDescriptor, studyImpostorGenerationDescriptor, studyItemBlueprintDescriptor, studyMatchingGenerationDescriptor, studyOptionSelectGenerationDescriptor } from "./studyItemGenerationAdapters";
+import { scaffoldContentGenerationDescriptor, scaffoldOutlineGenerationDescriptor } from "./learnerScaffoldGenerationAdapters";
 import { operationConfigHash } from "./operationConfigHash";
 import type { AnyNeuralStageDescriptor } from "./forcedToolStage";
 
+const SCAFFOLD_GENERATION_CONFIG_SEED = "learner-scaffold-generation";
 const EXTRACTION_CONFIG_SEED = "source-extraction";
 const GRAPH_ENRICHMENT_CONFIG_SEED = "graph-enrichment";
 const SYNTHETIC_GENERATION_CONFIG_SEED = "synthetic-topic-generation";
@@ -63,6 +65,15 @@ export const studyItemBankNeuralStageDescriptors = [
   studyMatchingGenerationDescriptor,
   impostorLieValidityJudgmentDescriptor
 ] as const;
+
+export const scaffoldGenerationNeuralStageDescriptors = [
+  scaffoldOutlineGenerationDescriptor,
+  scaffoldContentGenerationDescriptor
+] as const;
+
+export function scaffoldGenerationConfigHash(): string {
+  return operationConfigHash(SCAFFOLD_GENERATION_CONFIG_SEED, descriptors(scaffoldGenerationNeuralStageDescriptors));
+}
 
 export function extractionConfigHash(): string {
   return operationConfigHash(EXTRACTION_CONFIG_SEED, descriptors(extractionNeuralStageDescriptors));

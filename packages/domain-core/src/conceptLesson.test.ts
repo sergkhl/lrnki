@@ -82,7 +82,8 @@ test("a minimal valid lesson carries gist + application + one substantive sectio
         }
       },
       { kind: "applications", text: "Move semantics build on ownership.", groundingProvenance: "generated" }
-    ]
+    ],
+    explorableTerms: []
   };
   const kinds = lesson.sections.map((section) => section.kind);
   assert.ok(kinds.includes("gist"));

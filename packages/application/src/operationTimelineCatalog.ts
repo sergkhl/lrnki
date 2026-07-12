@@ -68,8 +68,27 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.impostorGeneration),
     llm(STAGE_TAGS.impostorLieValidityJudgment),
     nonLlm(NON_LLM_STAGES.persist)
+  ],
+  // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3, KTD7). Two OWNED stages plus
+  // the two SHARED_STAGES it reuses unchanged (knowledge-boundary-probe, grounding-generation).
+  // Sharing relaxes the catalog invariant from owned-exactly-once to owned-at-least-once over
+  // SHARED_STAGES; spend attribution stays exact through the (operation_id, stage) join, since
+  // each request carries the claiming operation's id.
+  scaffold: [
+    llm(STAGE_TAGS.scaffoldOutlineGeneration),
+    llm(STAGE_TAGS.scaffoldContentGeneration),
+    llm(STAGE_TAGS.knowledgeBoundaryProbe),
+    llm(STAGE_TAGS.groundingGeneration),
+    nonLlm(NON_LLM_STAGES.persist)
   ]
 } as const;
+
+// The LLM stages deliberately claimed by more than one operation (KTD7). Exactly the two
+// descriptors scaffold reuses from enrichment; every other LLM stage keeps a single owner.
+export const SHARED_STAGES: ReadonlySet<string> = new Set<string>([
+  STAGE_TAGS.knowledgeBoundaryProbe,
+  STAGE_TAGS.groundingGeneration
+]);
 
 const knownNonLlmStages = new Set<string>(Object.values(NON_LLM_STAGES));
 const ownedStagesByOperation = new Map<OperationType, ReadonlySet<string>>(

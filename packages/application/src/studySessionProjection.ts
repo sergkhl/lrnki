@@ -1,4 +1,4 @@
-import type { CalibrationVerdict, ConceptLesson, ConceptLessonSectionKind, LessonAbsentNode, ResponseLogRow, StudyItem, StudyItemGroundingProvenance, Verdict } from "@lrnki/domain-core";
+import { neutralResponses, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
 import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -398,9 +398,11 @@ export function composeStudySession(input: {
   const knownNodes = input.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
   const knownClosure = pruneClosure(knownNodes, trailEdges);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(input.rows)));
+  // The neutral trail's per-item latest-outcome map folds NEUTRAL responses only; scaffold
+  // step evidence is composed separately in the U4 detour projection (KTD4).
   const latestOutcomeByStudyItemId: Record<string, StudyItemOutcome> = {};
   const latestAttemptByStudyItemId = new Map<string, number>();
-  for (const row of input.rows) {
+  for (const row of neutralResponses(input.rows)) {
     if (row.signalType !== "graded" || !row.judgedOutcome) continue;
     const currentAttempt = latestAttemptByStudyItemId.get(row.studyItemId);
     if (currentAttempt !== undefined && row.attemptSeq <= currentAttempt) continue;

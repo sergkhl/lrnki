@@ -27,7 +27,7 @@ function detail(): DerivedGraphDetail {
 
 const optionItem: StudyItem = {
   studyItemId: "os-scope", graphVersionId: "g", enrichmentId: "e", derivedNodeId: "scope",
-  groundingProvenance: "source_cep", generatingModel: "deepseek", configHash: "cfg",
+  groundingProvenance: "source_cep", generatingModel: "deepseek", configHash: "cfg", explorableTerms: [],
   itemType: "option_select", question: "Q", explanation: "One is correct because the grounding says so.", options: [
     { optionId: "o1", text: "One", isCorrect: true, provenance: "source" },
     { optionId: "o2", text: "Two", isCorrect: false, provenance: "generated" }
@@ -96,7 +96,8 @@ const scopeLesson: ConceptLesson = {
     { kind: "gist", text: "A name is valid within a region.", groundingProvenance: "generated" },
     { kind: "definition", text: "Scope is the region where a binding is valid.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "Scope is the region where a binding is valid.", matchKind: "exact" } },
     { kind: "applications", text: "Ownership builds on scope.", groundingProvenance: "generated" }
-  ]
+  ],
+  explorableTerms: []
 };
 
 function callGetStudySession(args: { enrichmentId?: string; items?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; absent?: LessonAbsentNode[] }) {

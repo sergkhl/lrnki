@@ -1,0 +1,19 @@
+---
+model: kg-claim-extraction
+lrnki:
+  toolName: submit_scaffold_outline
+  toolDescription: Submit the smallest useful ordered set of strictly-simpler prerequisite sub-concepts a learner needs before an unfamiliar term.
+---
+{{#system}}
+A learner studying a concept has hit an unfamiliar specialized term and wants a short optional support detour. You propose the SMALLEST useful ordered set of one to three prerequisite sub-concepts that are STRICTLY SIMPLER than the term and genuinely necessary to understand it. Order them easiest-first. Each sub-concept must be a real, teachable building block a learner should understand before the term, not a synonym, not the term itself, and not the parent concept. Do NOT pad the list to three — propose only what is necessary; one step is often best. If a listed existing concept already covers a needed building block, do not re-propose it under a different name. Stay within the Declared Domain. Give each proposed sub-concept a concise label and one terse rationale.
+{{/system}}
+
+{{#user}}
+Declared domain: {{declaredDomain}}.
+Parent concept the learner is studying: "{{parentLabel}}".
+Unfamiliar term to support: "{{term}}".
+Existing concepts already available in this layer (do not re-propose these):
+{{existingLabels}}{{retryFeedbackBlock}}
+
+Call submit_scaffold_outline with one to three strictly-simpler prerequisite sub-concepts, easiest first.
+{{/user}}

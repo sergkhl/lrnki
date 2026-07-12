@@ -5,10 +5,76 @@
 ### Execution order
 
 - **Adaptive Learner Scaffold Detours
-  ([implementation plan](./2026-07-12-002-feat-adaptive-scaffold-detours-plan.md)).** Add quiet
-  generated term actions and durable learner-scoped one-level support detours without mutating
-  neutral graph assets. The plan absorbs architecture review Candidate 4 by making Study Session
-  the finished trail/completion projection before composing scaffold support.
+  ([implementation plan](./2026-07-12-002-feat-adaptive-scaffold-detours-plan.md)) — IN PROGRESS,
+  U1-U4 code landed 2026-07-12, deterministic gates green; U3 supervisor + U4 client refactor +
+  U5-U7 remain.** Add quiet generated term actions and durable learner-scoped one-level support
+  detours without mutating neutral graph assets.
+
+  **DONE (code + deterministic tests green; NOT yet committed — working tree carries the diff):**
+  - **U1 (fully done).** Explorable Term metadata: `ExplorableTerm` on `ConceptLesson` + `string[]`
+    on `StudyItemBase` (both required), shared pure validator `application/src/explorableTerms.ts`
+    (1-80 code points, exact-substring, distinct, parent-label exclusion, cap 3), forced-tool
+    schema fields on all four generators (required arrays → no trailing-nullable), 4 prompt edits,
+    adapters map them through, `study_items.explorable_terms` + `concept_lessons.explorable_terms`
+    jsonb columns with persist/hydrate. Tests: `explorableTerms.test.ts` (11) + adapter/guard/schema
+    round-trips + Postgres round-trip (all green).
+  - **U2 (fully done).** KTD4 Response Log identity is now a discriminated union
+    `{scope:"neutral",studyItemId,derivedNodeId} | {scope:"scaffold",scaffoldStepId}` with a
+    `neutralResponses()` narrowing helper; EVERY neutral fold (mastery, calibration, leaderboard,
+    journal, conflict, study-session trail) routes through it. `learner_scaffold_detours` +
+    `learner_scaffold_steps` (payload-on-step jsonb, `lesson_read_at`, `referenced_derived_node_id`,
+    exactly-one-of CHECK), `response_log.scaffold_step_id` FK + mutually-exclusive CHECK, admin read
+    path switched INNER→LEFT JOINs (scope-aware). New `PostgresLearnerScaffoldStore` +
+    `ScaffoldDetourStorePort` (upsertPending idempotent restore, claim single-winner, publishReady
+    fenced, markFailed/restartGenerating/hide, getStep/markLessonRead). Domain module
+    `learnerScaffold.ts`. Tests: domain (3) + `PostgresLearnerScaffoldStore.test.ts` (idempotency,
+    hide/restore, mixed-shape CHECK, competing claim, shared attempt-seq) all green vs a fresh
+    migration.
+  - **U3 (CORE done; supervisor + real-use gate REMAIN).** Two forced-tool descriptors
+    (`scaffold-outline` + `scaffold-content`) on the `kg-claim-extraction` alias (no config.yaml
+    change), prompts, `scaffoldGenerationConfigHash`, mimoDescriptorShape + toolValidators sweeps
+    include them. Operation-timeline catalog gained the `scaffold` arm + `SHARED_STAGES`
+    (knowledge-boundary-probe + grounding-generation, owned by enrichment AND scaffold); the
+    "owned-once" test relaxed to owned-at-least-once over SHARED_STAGES with an exactness test.
+    Deep application module `learnerScaffoldGeneration.ts` (`runScaffoldGeneration`): direct
+    selected-term reuse (pure `resolveExactMatch`), minimal outline, per-label reuse, injected
+    `groundConcept` (probe+grounding seam), content gen, `buildScaffoldNodePayload` option-shape
+    validation, atomic fenced publish / markFailed. Tests: `learnerScaffoldGeneration.test.ts` (12,
+    incl. AE3 reuse-bypasses-LLM, AE4 collision-not-cloned, boundary-drop, mixed publish, lost
+    fence) + adapter test all green. **STILL TO DO in U3:** `apps/learner-api/generationSupervisor.ts`
+    (extract shared process-level claim/top-up from `topicGenerationSupervisor`) +
+    `scaffoldGenerationSupervisor.ts` + `learnerScaffoldGeneration.ts` (api composition wiring
+    `groundConcept` from real `KnowledgeBoundaryProbePort`+`GroundingGenerationPort`, minting a fresh
+    op id per claim, recording operation stages via `PostgresRunProgressReporter`); and the **U3
+    rule-14 real-use gate** (disposable tsx under `tmp/` calling `runScaffoldGeneration` with
+    production adapters + a disposable learner, ≥6 difficult terms across ≥3 domains, human quality
+    inspection — see below).
+  - **U4 (CORE done; Candidate-4 client refactor REMAINS).** Pure detour-composition projection
+    `application/src/studySessionTrail.ts` (`composeScaffoldDetours`): per-step completion
+    (generated = lessonRead && latest-scaffold-correct; reference = neutral lesson-read +
+    option-select subset via injected `referencedNodeCompletion`), whole-detour completion, R20
+    grouping (`support_explored` vs `support_available` vs `active`/`generating`/`failed`), broad
+    `preparing/building/checking` phase (KTD8). Tests: `studySessionTrail.test.ts` (8, incl. R20 +
+    latest-incorrect-reopens). **STILL TO DO in U4:** delete `apps/learner-app/src/learn/trailView.ts`
+    + `activityProgress.ts` and migrate their **13 non-test importers** to the projection-owned trail
+    (the plan's Candidate-4 deepening); wire `composeScaffoldDetours` into `getStudySession`'s output
+    (load active detours + operation facts, map phases) so the finished session carries detours.
+
+  **NOT STARTED:** U5 (typed API create/restore/retry/hide + generalized neutral/scaffold grading +
+  polling), U6 (TermExplorationMenu + ScaffoldDetour + ScaffoldProgressDialog + ActivitySheet More
+  button + motion), U7 (CONTEXT verify, ADR-0026/0032 amend, new ADR-0037, docs consolidation,
+  delete plan).
+
+  **Verification status:** workspace `typecheck` exit 0, `lint` 0 errors / 9 pre-existing warnings,
+  full `test` green (domain-core 39, application 591, infrastructure-litellm 148, admin-lab 62,
+  learner-api 18, kg-worker 8). Postgres integration (76) verified against a FRESH migration applied
+  to a scratch DB `lrnki_scaffold_validate` (created + dropped; **the dev `lrnki` DB was deliberately
+  NOT reset**, preserving prior real-source graphs — the next session must `scripts/reset-db.sh`
+  before running the app end-to-end since the dev DB still lacks the new columns/tables).
+  **Three rule-14 real-use gates are still OWED** (code agent runs them, inspects quality, reports
+  findings + fixes obvious ones to the human): U1 term-metadata quality across mixed domains, U3
+  scaffold-generation quality (≥6 terms / ≥3 domains), U6 learner-flow browser gate. A green suite is
+  not quality evidence (rule 14).
 
 - **Architecture deepening review Candidate 3
   ([2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md)).** Candidate 3

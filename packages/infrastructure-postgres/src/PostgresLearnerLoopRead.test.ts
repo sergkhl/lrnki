@@ -35,7 +35,7 @@ maybe("listResponsesForLearner joins node label + question", async () => {
 
     const responses = await read.listResponsesForLearner(learnerStateRef);
     assert.equal(responses.length, 1);
-    assert.equal(responses[0].derivedNodeId, nodeA);
+    assert.equal(responses[0].scope === "neutral" && responses[0].derivedNodeId, nodeA);
     assert.equal(responses[0].enrichmentId, enrichmentId);
     assert.equal(responses[0].nodeLabel, "Alpha");
     assert.equal(responses[0].question, "What is Alpha?");

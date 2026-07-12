@@ -68,7 +68,10 @@ export const conceptLessonGenerationDescriptor: NeuralStageDescriptor<
       }
       return draft;
     });
-    return { sections };
+    return {
+      sections,
+      explorableTerms: args.explorableTerms.map((term) => ({ term: term.term, sectionKind: term.sectionKind }))
+    };
   }
 };
 

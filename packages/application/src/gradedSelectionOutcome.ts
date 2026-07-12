@@ -26,6 +26,7 @@ function buildResponseLogRow(
   return {
     responseId: randomUUID(),
     learnerStateRef: common.learnerStateRef,
+    scope: "neutral",
     studyItemId: common.studyItemId,
     derivedNodeId: common.derivedNodeId,
     signalType: "graded",

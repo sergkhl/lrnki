@@ -21,6 +21,25 @@ export {
   type DiscoveryCoverageSample
 } from "./auditDiscoveryCoverage";
 export { generateStudyItemBank } from "./generateStudyItemBank";
+export {
+  composeScaffoldDetours,
+  type ScaffoldDetourView,
+  type ScaffoldStepView,
+  type ScaffoldDetourGroup,
+  type ScaffoldGeneratingPhase,
+  type ComposeScaffoldDetoursInput,
+  type ReferencedNodeCompletion
+} from "./studySessionTrail";
+export {
+  runScaffoldGeneration,
+  resolveExactMatch,
+  buildScaffoldNodePayload,
+  type ScaffoldGenerationDeps,
+  type ScaffoldReuseCandidate,
+  type ScaffoldParentContext,
+  type ScaffoldGroundResult,
+  type ScaffoldGenerationOutcome
+} from "./learnerScaffoldGeneration";
 export { generateTopicExpedition } from "./generateTopicExpedition";
 export {
   registerLearner,

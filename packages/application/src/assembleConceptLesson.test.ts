@@ -35,6 +35,7 @@ function assemble(draft: ConceptLessonDraft, grounding: NodeGrounding) {
 // becomes a source-cited section; a synthesized intuition stays generated with no source id.
 test("a verbatim-verifying definition is source-cited; the intuition is generated", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Each value has a single owner." },
       { kind: "intuition", text: "Think of it as a one-way handoff." },
@@ -67,6 +68,7 @@ test("a definition matching only after normalization records matchKind: normaliz
     definesLiteral: "the rules governing memory"
   };
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Each value has a single owner." },
       { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." } },
@@ -85,6 +87,7 @@ test("a definition matching only after normalization records matchKind: normaliz
 // even if the model forgot the draft citation fields. This remains a provable match.
 test("an uncited substantive section is source-cited when its text verifies against grounding", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Each value has a single owner." },
       { kind: "definition", text: "Ownership is a set of rules that govern memory." },
@@ -103,6 +106,7 @@ test("an uncited substantive section is source-cited when its text verifies agai
 // definition, examples, applications and NO formulas section — no placeholder.
 test("a node with no formula grounding produces no formulas section and no placeholder", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "intuition", text: "Intuition." },
@@ -122,6 +126,7 @@ test("a node with no formula grounding produces no formulas section and no place
 // lesson-absent with a reason — not a thin or all-synthesized lesson.
 test("a draft missing every substantive section is recorded lesson-absent", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "applications", text: "Applications." }
@@ -138,6 +143,7 @@ test("a draft missing every substantive section is recorded lesson-absent", () =
 // generated from its bundle and the whole lesson is generated-labeled; it meets the minimum.
 test("a minted node's generated substantive section satisfies the minimum (whole lesson generated)", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "definition", text: "A minted explanation of the concept.", citation: { passageId: "node-1:definition:0", evidenceQuote: "A minted explanation of the concept." } },
@@ -156,6 +162,7 @@ test("a minted node's generated substantive section satisfies the minimum (whole
 // generated (citation dropped), never persisted as a source quote.
 test("an unverifiable citation is demoted to generated and never persisted as a source quote", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "definition", text: "A claim the source never makes.", citation: { passageId: "b1", evidenceQuote: "this quote is nowhere in the passage" } },
@@ -173,6 +180,7 @@ test("an unverifiable citation is demoted to generated and never persisted as a 
 // A diagram descriptor on a section is carried through to the assembled section.
 test("a diagram descriptor is carried through assembly", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." } },
@@ -188,6 +196,7 @@ test("a diagram descriptor is carried through assembly", () => {
 // Duplicate kinds are de-duplicated (first wins) and sections are ordered canonically.
 test("duplicate kinds collapse to the first and sections order canonically", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "applications", text: "Applications." },
       { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." } },
@@ -204,6 +213,7 @@ test("duplicate kinds collapse to the first and sections order canonically", () 
 
 test("list items survive assembly only for list-kind sections", () => {
   const draft: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist about ownership." },
       { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: "Ownership is a set of rules that govern memory." } },

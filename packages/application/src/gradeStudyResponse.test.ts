@@ -55,7 +55,7 @@ function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogR
     store: {
       async append(appended) { rows.push(...appended); },
       async listForLearner(ref) { return rows.filter((r) => r.learnerStateRef === ref).map(hydrate); },
-      async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.derivedNodeId === nodeId).map(hydrate); }
+      async listForLearnerNode(ref, nodeId) { return rows.filter((r) => r.learnerStateRef === ref && r.scope === "neutral" && r.derivedNodeId === nodeId).map(hydrate); }
     }
   };
 }
@@ -94,6 +94,7 @@ function fakeEnrichmentRead(belongs: boolean): EnrichmentInspectionReadPort {
 
 const optionItem: OptionSelectItem = {
   itemType: "option_select", studyItemId: "os-1", graphVersionId: null, enrichmentId: EN, derivedNodeId: "node-1",
+  explorableTerms: [],
   groundingProvenance: "source_cep", generatingModel: "m", configHash: "c", question: "?", explanation: "e",
   options: [
     { optionId: "o-correct", text: "right", isCorrect: true, provenance: "source" },
@@ -103,6 +104,7 @@ const optionItem: OptionSelectItem = {
 
 const impostorItem: ImpostorItem = {
   itemType: "impostor", studyItemId: "imp-1", graphVersionId: null, enrichmentId: EN, derivedNodeId: "node-1",
+  explorableTerms: [],
   groundingProvenance: "source_cep", generatingModel: "m", configHash: "c", question: "?",
   statements: [
     { statementId: "s-truth", ordinal: 0, text: "true", isImpostor: false, provenance: "generated", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "p" } },
@@ -112,6 +114,7 @@ const impostorItem: ImpostorItem = {
 
 const matchingItem: MatchingItem = {
   itemType: "matching", studyItemId: "mt-1", graphVersionId: null, enrichmentId: EN, derivedNodeId: "node-1",
+  explorableTerms: [],
   groundingProvenance: "source_cep", generatingModel: "m", configHash: "c", question: "?",
   pairs: [
     { pairId: "p-1", matchId: "m-1", promptText: "a", matchText: "A", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "p" } },

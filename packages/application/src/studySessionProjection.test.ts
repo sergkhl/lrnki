@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, MatchingItem, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, MatchingItem, NeutralResponseLogRow, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
 import type { DerivedGraphDetail } from "@lrnki/ports";
 import {
   adaptedHiddenNodeIds,
@@ -59,6 +59,7 @@ function optionItem(derivedNodeId: string): StudyItem {
     configHash: "cfg",
     itemType: "option_select",
     question: `Q ${derivedNodeId}`,
+    explorableTerms: [],
     explanation: "The correct option follows from the grounded lesson.",
     options: [
       { optionId: `o-${derivedNodeId}-2`, text: "Two", isCorrect: false, provenance: "generated" },
@@ -79,6 +80,7 @@ function impostorItem(derivedNodeId: string): StudyItem {
     configHash: "cfg",
     itemType: "impostor",
     question: `Spot the lie about ${derivedNodeId}`,
+    explorableTerms: [],
     statements: [
       { statementId: `s-${derivedNodeId}-2`, ordinal: 0, text: "Truth A", isImpostor: false, provenance: "source", citation: sourceCitation },
       { statementId: `s-${derivedNodeId}-1`, ordinal: 1, text: "Truth B", isImpostor: false, provenance: "source", citation: sourceCitation },
@@ -109,6 +111,7 @@ function matchingItem(derivedNodeId: string): MatchingItem {
     configHash: "cfg",
     itemType: "matching",
     question: `Match pairs for ${derivedNodeId}`,
+    explorableTerms: [],
     pairs: [
       { pairId: `p-${derivedNodeId}-2`, matchId: `m-${derivedNodeId}-3`, promptText: "Second prompt", matchText: "Third match", citation },
       { pairId: `p-${derivedNodeId}-1`, matchId: `m-${derivedNodeId}-1`, promptText: "First prompt", matchText: "First match", citation },
@@ -117,10 +120,11 @@ function matchingItem(derivedNodeId: string): MatchingItem {
   };
 }
 
-function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"], attemptSeq: number): ResponseLogRow {
+function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"], attemptSeq: number): NeutralResponseLogRow {
   return {
     responseId: `r-${derivedNodeId}-${attemptSeq}`,
     learnerStateRef: "L1",
+    scope: "neutral",
     studyItemId: `os-${derivedNodeId}`,
     derivedNodeId,
     signalType: "graded",
@@ -152,6 +156,7 @@ function lessonFor(derivedNodeId: string): ConceptLesson {
   return {
     derivedNodeId, graphVersionId: "g", enrichmentId: "e", generatingModel: "deepseek", configHash: "cfg",
     canonicalLabel: labelByNode[derivedNodeId],
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "A short gist.", groundingProvenance: "generated" },
       { kind: "definition", text: "A grounded definition.", groundingProvenance: "source_cep", citation: { provenance: "source", sourceResourceId: "r", sourceBlockId: "b", evidenceQuote: "A grounded definition.", matchKind: "exact" } },
