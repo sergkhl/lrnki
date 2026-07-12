@@ -119,7 +119,9 @@ function session(): StudySession {
     studySegmentsByNode: {},
     lessonByNode: {},
     lessonReadByNode: {},
-    lessonAbsent: []
+    lessonAbsent: [],
+    detours: [],
+    generatingDetours: false
   };
 }
 

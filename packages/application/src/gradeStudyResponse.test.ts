@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ImpostorItem, MatchingItem, NewResponseLogRow, OptionSelectItem, ResponseLogRow, StudyItem, Verdict } from "@lrnki/domain-core";
 import type { CalibrationVerdictStorePort, EnrichmentInspectionReadPort, LearnerExpedition, LearnerExpeditionStorePort, LessonRead, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
-import { checkMatchingAttempt, gradeStudyResponse, recordLearnerVerdict, recordLessonRead } from "./gradeStudyResponse";
+import type { ScaffoldDetourStorePort } from "@lrnki/ports";
+import type { ScaffoldStep } from "@lrnki/domain-core";
+import { checkMatchingAttempt, gradeScaffoldOptionSelect, gradeStudyResponse, recordLearnerVerdict, recordLessonRead, recordScaffoldLessonRead } from "./gradeStudyResponse";
 
 const EN = "en-1";
 const LEARNER = "L1";
@@ -261,4 +263,59 @@ test("the use-case imports no graph or enrichment write port", async () => {
   const { readFileSync } = await import("node:fs");
   const source = readFileSync(new URL("./gradeStudyResponse.ts", import.meta.url), "utf8");
   assert.equal(/GraphVersionStorePort|EnrichmentRunStorePort/.test(source), false);
+});
+
+// --- Scaffold-scoped grading (plan 2026-07-12-002 U5, KTD4) --------------------------------
+function generatedStep(): ScaffoldStep {
+  return {
+    scaffoldStepId: "step-1", ordinal: 0, kind: "generated", lessonReadAt: null,
+    payload: {
+      scaffoldNodeId: "sn-1", label: "Affine types",
+      lesson: [{ kind: "definition", text: "def", groundingProvenance: "generated" }],
+      item: {
+        scaffoldItemId: "si-1", question: "Q?", explanation: "E",
+        options: [
+          { optionId: "so-1", text: "right", isCorrect: true },
+          { optionId: "so-2", text: "wrong", isCorrect: false }
+        ]
+      }
+    }
+  };
+}
+
+function fakeScaffoldStore(step: ScaffoldStep | undefined): { store: ScaffoldDetourStorePort; reads: string[] } {
+  const reads: string[] = [];
+  const store = {
+    getStep: async (i: { scaffoldStepId: string; learnerStateRef: string }) => (step && i.learnerStateRef === "owner" ? { step, detourId: "d1" } : undefined),
+    markLessonRead: async (i: { scaffoldStepId: string }) => { reads.push(i.scaffoldStepId); }
+  } as unknown as ScaffoldDetourStorePort;
+  return { store, reads };
+}
+
+test("gradeScaffoldOptionSelect grades against the step's embedded key and appends a scaffold-scoped row", async () => {
+  const log = fakeResponseLog();
+  const { store } = fakeScaffoldStore(generatedStep());
+  const result = await gradeScaffoldOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "step-1", chosenOptionId: "so-1" }, { scaffoldStore: store, responseLog: log.store });
+  assert.deepEqual(result, { graded: true, chosenId: "so-1", keyedCorrectId: "so-1", correct: true });
+  assert.equal(log.rows.length, 1);
+  assert.equal(log.rows[0].scope, "scaffold");
+  assert.equal(log.rows[0].scope === "scaffold" && log.rows[0].scaffoldStepId, "step-1");
+});
+
+test("gradeScaffoldOptionSelect refuses a reference step and another learner's step (no row)", async () => {
+  const log = fakeResponseLog();
+  const referenceStep: ScaffoldStep = { scaffoldStepId: "ref-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n1" };
+  const notGradable = await gradeScaffoldOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "ref-1", chosenOptionId: "x" }, { scaffoldStore: fakeScaffoldStore(referenceStep).store, responseLog: log.store });
+  assert.deepEqual(notGradable, { graded: false, refused: "step_not_gradable" });
+  const notOwned = await gradeScaffoldOptionSelect({ learnerStateRef: "intruder", scaffoldStepId: "step-1", chosenOptionId: "so-1" }, { scaffoldStore: fakeScaffoldStore(generatedStep()).store, responseLog: log.store });
+  assert.deepEqual(notOwned, { graded: false, refused: "step_not_found" });
+  assert.equal(log.rows.length, 0);
+});
+
+test("recordScaffoldLessonRead marks only a learner-owned generated step", async () => {
+  const owned = fakeScaffoldStore(generatedStep());
+  assert.deepEqual(await recordScaffoldLessonRead({ learnerStateRef: "owner", scaffoldStepId: "step-1" }, { scaffoldStore: owned.store }), { recorded: true });
+  assert.deepEqual(owned.reads, ["step-1"]);
+  const missing = fakeScaffoldStore(undefined);
+  assert.deepEqual(await recordScaffoldLessonRead({ learnerStateRef: "owner", scaffoldStepId: "nope" }, { scaffoldStore: missing.store }), { recorded: false, refused: "step_not_found" });
 });

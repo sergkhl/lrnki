@@ -1052,6 +1052,11 @@ CREATE TABLE learner_scaffold_detours (
   latest_operation_id uuid,
   -- The fencing token that guards the terminal publish (KTD9). Null when not being generated.
   claim_token uuid,
+  -- Bounded generation attempts + claim timestamp for the process-level supervisor (KTD7): the
+  -- shared claim/top-up scheduler claims a stale-or-unclaimed generating detour up to a maximum
+  -- attempt budget, then fails an exhausted one. Mirrors the topic expedition's claim columns.
+  generation_attempts integer NOT NULL DEFAULT 0,
+  claimed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   -- One detour per (learner, enrichment, parent, normalized term) — the idempotency key

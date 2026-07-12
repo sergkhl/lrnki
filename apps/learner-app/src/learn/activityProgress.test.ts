@@ -95,6 +95,8 @@ function session(opts: { mastered?: boolean; knownSkipped?: boolean } = {}): Stu
     },
     lessonByNode: { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [] } },
     lessonReadByNode: {},
-    lessonAbsent: []
+    lessonAbsent: [],
+    detours: [],
+    generatingDetours: false
   };
 }

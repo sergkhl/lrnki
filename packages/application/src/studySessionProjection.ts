@@ -1,5 +1,6 @@
-import { neutralResponses, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
+import { neutralResponses, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type ScaffoldDetour, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
 import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
+import { composeScaffoldDetours, type ScaffoldDetourView } from "./studySessionTrail";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
   classifyAdaptedNodes,
@@ -331,6 +332,12 @@ export type StudySession = {
   lessonByNode: Record<string, ConceptLessonView>;
   lessonReadByNode: Record<string, boolean>;
   lessonAbsent: LessonAbsentView[];
+  // Composed learner-scoped Scaffold Detours under their parent Concept Marker (plan
+  // 2026-07-12-002 U4): per-step + whole-detour completion, R20 grouping, and the broad
+  // generating phase. `generatingDetours` is the polling flag — a finished session with a
+  // generating detour tells the client to keep polling (U5).
+  detours: ScaffoldDetourView[];
+  generatingDetours: boolean;
   // Nodes excluded as trail stops by the minimal difficulty floor (ADR-0024 consumer):
   // confident band-1, non-target. Their prerequisite gating survives by edge contraction
   // inside the projection; this list exists for inspection — no surface renders it.
@@ -356,6 +363,11 @@ export function composeStudySession(input: {
   lessonReads?: string[];
   lessonAbsent?: LessonAbsentNode[];
   layerPurpose?: string | null;
+  // The learner's ACTIVE (non-hidden) Scaffold Detours for this enrichment (plan 2026-07-12-002
+  // U4, KTD5). The projection owns detour composition so Study Session is the single trail
+  // authority; absent/empty leaves `detours` empty and `generatingDetours` false (unchanged
+  // behavior for callers that do not wire the scaffold store).
+  detours?: readonly ScaffoldDetour[];
 }): StudySession {
   const { detail } = input;
 
@@ -495,6 +507,31 @@ export function composeStudySession(input: {
     .map((node) => ({ derivedNodeId: node.derivedNodeId, label: labelByNode.get(node.derivedNodeId) ?? node.canonicalLabel, reason: node.reason }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
+  // Learner-scoped Scaffold Detour composition (plan 2026-07-12-002 U4, KTD5). The projection is
+  // the single trail authority, so it composes detours from the SAME neutral evidence the trail
+  // uses: `masteredParentNodeIds` drives the R20 collapse, and a reference step's completion is
+  // the referenced node's neutral lesson-read + option-select subset (in lockstep with that
+  // node's own stop). Generated-step evidence is scoped inside `composeScaffoldDetours`.
+  const masteredParentNodeIds = new Set(
+    Object.entries(classification.stateByNode).filter(([, state]) => state === "mastered").map(([nodeId]) => nodeId)
+  );
+  const referencedNodeCompletion = (derivedNodeId: string) => {
+    const lessonRead = lessonReadByNode[derivedNodeId] === true || lessonAbsentNodeIds.has(derivedNodeId);
+    const optionSelect = (studySegmentsByNode[derivedNodeId] ?? []).find((segment) => segment.kind === "option_select");
+    const optionSelectCorrect = optionSelect ? latestOutcomeByStudyItemId[optionSelect.item.studyItemId] === "correct" : false;
+    return { lessonRead, optionSelectCorrect };
+  };
+  const detours = composeScaffoldDetours({
+    detours: input.detours ?? [],
+    responses: input.rows,
+    masteredParentNodeIds,
+    referencedNodeCompletion,
+    // The broad, honest phase at the projection level (KTD8); the fine stage→phase refinement is
+    // a U6 progress-dialog concern. The client renders one indeterminate bar and a phase sentence.
+    generatingPhase: () => "preparing"
+  });
+  const generatingDetours = detours.some((detour) => detour.status === "generating");
+
   return {
     enrichmentId: input.enrichmentId,
     learnerStateRef: input.learnerStateRef,
@@ -516,6 +553,8 @@ export function composeStudySession(input: {
     lessonByNode,
     lessonReadByNode,
     lessonAbsent,
+    detours,
+    generatingDetours,
     flooredNodeIds: floor.flooredNodeIds
   };
 }

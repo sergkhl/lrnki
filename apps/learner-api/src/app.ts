@@ -11,10 +11,15 @@ import {
   getExpeditionJournal,
   getStudySession,
   gradeDuelAnswer,
+  gradeScaffoldOptionSelect,
   gradeStudyResponse,
+  hideLearnerScaffold,
   recordLearnerVerdict,
   recordLessonRead,
+  recordScaffoldLessonRead,
   registerLearner,
+  requestLearnerScaffold,
+  retryLearnerScaffold,
   type GradeRefusalReason
 } from "@lrnki/application";
 import {
@@ -24,6 +29,7 @@ import {
   PostgresEnrichmentLayerPurposeStore,
   PostgresLearnerAwardsStore,
   PostgresLearnerExpeditionStore,
+  PostgresLearnerScaffoldStore,
   PostgresLearnerSessionStore,
   PostgresLearnerStore,
   PostgresLessonReadStore,
@@ -34,6 +40,7 @@ import {
 import { FixedWindowRateLimiter, bearerAuth, compactLearnerRef, hashSessionToken, mintSessionToken, type AuthEnv } from "./auth";
 import type { DatabaseClient } from "./db";
 import { loadLeaderboard } from "./leaderboard";
+import { wakeScaffoldGenerationSupervisor } from "./scaffoldGenerationSupervisor";
 import { wakeTopicGenerationSupervisor } from "./topicGenerationSupervisor";
 
 export type LearnerGradingResult =
@@ -96,6 +103,17 @@ export function createLearnerApp(sql: DatabaseClient) {
     expeditionStore,
     enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
     verdictStore: new PostgresCalibrationVerdictStore(sql)
+  });
+  const scaffoldRequestDeps = () => ({
+    expeditionStore,
+    studyItemStore: new PostgresStudyItemBankStore(sql),
+    conceptLessonStore: new PostgresConceptLessonStore(sql),
+    enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
+    scaffoldStore: new PostgresLearnerScaffoldStore(sql)
+  });
+  const scaffoldGradeDeps = () => ({
+    scaffoldStore: new PostgresLearnerScaffoldStore(sql),
+    responseLog: new PostgresResponseLogStore(sql)
   });
 
   const app = new Hono<AuthEnv>()
@@ -209,7 +227,8 @@ export function createLearnerApp(sql: DatabaseClient) {
           lessonReadStore: new PostgresLessonReadStore(sql),
           layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
           responseLog: new PostgresResponseLogStore(sql),
-          verdictStore: new PostgresCalibrationVerdictStore(sql)
+          verdictStore: new PostgresCalibrationVerdictStore(sql),
+          scaffoldStore: new PostgresLearnerScaffoldStore(sql)
         }),
         expeditionStore.getByEnrichment({ learnerStateRef, enrichmentId })
       ]);
@@ -377,6 +396,68 @@ export function createLearnerApp(sql: DatabaseClient) {
         }
       );
       return c.json({ ok: true as const });
+    })
+
+    // --- Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U5) --------------------------
+    // Request-or-restore a detour for an advertised term. The use-case verifies the active
+    // expedition, the source block, parent membership, and the exact advertised term from
+    // server-owned neutral content before upserting; a determinate create wakes the supervisor.
+    .post("/scaffold/request", auth, zValidator("json", z.object({
+      enrichmentId: z.string(),
+      source: z.discriminatedUnion("kind", [
+        z.object({ kind: z.literal("lesson"), derivedNodeId: z.string() }),
+        z.object({ kind: z.literal("study_item"), studyItemId: z.string() })
+      ]),
+      term: z.string()
+    })), async (c) => {
+      const result = await requestLearnerScaffold(
+        { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
+        scaffoldRequestDeps()
+      );
+      if (!result.created) return c.json({ created: false as const, reason: result.refused }, 422);
+      wakeScaffoldGenerationSupervisor();
+      return c.json({ created: true as const, detourId: result.detourId, status: result.status });
+    })
+
+    // Retry a failed detour: reuse its identity, return it to generating, wake the supervisor.
+    .post("/scaffold/retry", auth, zValidator("json", z.object({ detourId: z.string() })), async (c) => {
+      const result = await retryLearnerScaffold(
+        { learnerStateRef: c.get("learnerStateRef"), detourId: c.req.valid("json").detourId },
+        { scaffoldStore: new PostgresLearnerScaffoldStore(sql) }
+      );
+      if (result.retried) wakeScaffoldGenerationSupervisor();
+      return c.json({ retried: result.retried });
+    })
+
+    // Hide a ready detour or dismiss a failed one (content + evidence preserved).
+    .post("/scaffold/hide", auth, zValidator("json", z.object({ detourId: z.string() })), async (c) => {
+      const result = await hideLearnerScaffold(
+        { learnerStateRef: c.get("learnerStateRef"), detourId: c.req.valid("json").detourId },
+        { scaffoldStore: new PostgresLearnerScaffoldStore(sql) }
+      );
+      return c.json({ hidden: result.hidden });
+    })
+
+    // Grade a generated Scaffold Step's option-select. Scaffold-scoped; never touches base mastery.
+    .post("/scaffold/option-select", auth, zValidator("json", z.object({
+      scaffoldStepId: z.string(),
+      chosenOptionId: z.string()
+    })), async (c) => {
+      const result = await gradeScaffoldOptionSelect(
+        { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
+        scaffoldGradeDeps()
+      );
+      if (!result.graded) return c.json<LearnerGradingResult>({ kind: "selection", graded: false, message: "This answer could not be recorded." });
+      return c.json<LearnerGradingResult>({ kind: "selection", graded: true, chosenId: result.chosenId, keyedCorrectId: result.keyedCorrectId, correct: result.correct });
+    })
+
+    // Mark a generated Scaffold Step's micro-lesson read (R12).
+    .post("/scaffold/lesson-read", auth, zValidator("json", z.object({ scaffoldStepId: z.string() })), async (c) => {
+      const result = await recordScaffoldLessonRead(
+        { learnerStateRef: c.get("learnerStateRef"), scaffoldStepId: c.req.valid("json").scaffoldStepId },
+        { scaffoldStore: new PostgresLearnerScaffoldStore(sql) }
+      );
+      return c.json({ recorded: result.recorded });
     })
 
     // Grade one duel answer (KTD3): resolves the key server-side and returns correctness only —

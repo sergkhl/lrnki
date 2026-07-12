@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, MatchingItem, NeutralResponseLogRow, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, MatchingItem, NeutralResponseLogRow, ResponseLogRow, ScaffoldDetour, StudyItem } from "@lrnki/domain-core";
 import type { DerivedGraphDetail } from "@lrnki/ports";
 import {
   adaptedHiddenNodeIds,
@@ -138,7 +138,7 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
-function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[] } = {}) {
+function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[]; detours?: ScaffoldDetour[] } = {}) {
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
@@ -148,7 +148,8 @@ function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verd
     verdicts: args.verdicts ?? [],
     lessons: args.lessons,
     lessonReads: args.lessonReads,
-    lessonAbsent: args.lessonAbsent
+    lessonAbsent: args.lessonAbsent,
+    detours: args.detours
   });
 }
 
@@ -562,4 +563,49 @@ test("contested and band-less nodes are never floored; a band-less detail is a n
   assert.deepEqual(bandless.flooredNodeIds, []);
   assert.deepEqual(bandless.expeditionPath, baseline.expeditionPath);
   assert.deepEqual(Object.keys(bandless.sheetByNode).sort(), Object.keys(baseline.sheetByNode).sort());
+});
+
+// Plan 2026-07-12-002 U4: the projection composes learner-scoped detours from the same neutral
+// evidence the trail uses, exposes them on the session, and sets the `generatingDetours` polling
+// flag. composeScaffoldDetours owns the per-step/grouping policy (studySessionTrail.test.ts); this
+// proves the integration seam and the flag.
+function generatingDetour(parent: string, term: string): ScaffoldDetour {
+  return { detourId: `d-${term}`, learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: parent, term, normalizedTerm: term.toLowerCase(), status: "generating", latestOperationId: "op", claimToken: "tok", steps: [] };
+}
+
+test("composeStudySession — a default session has no detours and does not ask the client to poll", () => {
+  const session = compose();
+  assert.deepEqual(session.detours, []);
+  assert.equal(session.generatingDetours, false);
+});
+
+test("composeStudySession — a generating detour rides on the session and raises the polling flag", () => {
+  const session = compose({ detours: [generatingDetour("ownership", "Borrow checker")] });
+  assert.equal(session.detours.length, 1);
+  assert.equal(session.detours[0].status, "generating");
+  assert.equal(session.detours[0].group, "generating");
+  assert.equal(session.detours[0].parentDerivedNodeId, "ownership");
+  assert.equal(session.generatingDetours, true);
+});
+
+test("composeStudySession — a ready reference detour completes in lockstep with the referenced node's neutral evidence", () => {
+  // A reference step pointing at `scope`, whose lesson is read and option-select is latest-correct,
+  // reads complete; the parent (`move`) is not mastered, so it stays an active (expandable) detour.
+  const detour: ScaffoldDetour = {
+    detourId: "d-ref", learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: "move", term: "Scope", normalizedTerm: "scope",
+    status: "ready", latestOperationId: null, claimToken: null,
+    steps: [{ scaffoldStepId: "s-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope" }]
+  };
+  const session = compose({
+    studyItems: [optionItem("scope")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    rows: [graded("scope", "correct", 1)],
+    detours: [detour]
+  });
+  const composed = session.detours[0];
+  assert.equal(composed.status, "ready");
+  assert.equal(composed.complete, true, "reference step complete from the referenced node's neutral evidence");
+  assert.equal(composed.group, "active");
+  assert.equal(session.generatingDetours, false);
 });

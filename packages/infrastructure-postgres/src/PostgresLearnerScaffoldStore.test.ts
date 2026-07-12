@@ -122,6 +122,46 @@ maybe("the schema rejects a mixed step shape and an invalid lifecycle value", as
   }
 });
 
+// Covers U3 supervisor claim path (KTD7): claim-next claims one generating detour with a fresh
+// operation id that equals the fencing token, increments the attempt budget, skips an
+// already-claimed fresh detour, and fails an exhausted stale one.
+maybe("claimNextGenerating claims within the attempt budget; failExhaustedGenerating fails a stale exhausted detour", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, parentNodeId } = await seedSubstrate(sql);
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const store = new PostgresLearnerScaffoldStore(sql);
+    // claimNextGenerating is process-global (it drains every learner's queue), so isolate this
+    // test from generating rows earlier tests left behind before asserting on a specific detour.
+    await sql`DELETE FROM learner_scaffold_detours`;
+    const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "z", normalizedTerm: "z" });
+
+    const future = new Date(Date.now() + 60_000);
+    const claimed = await store.claimNextGenerating({ staleBefore: future, maxAttempts: 3 });
+    assert.ok(claimed, "a generating detour is claimed");
+    assert.equal(claimed.detourId, detour.detourId);
+    assert.equal(claimed.claimToken, claimed.latestOperationId, "the op id IS the fencing token (KTD7)");
+    assert.ok(claimed.claimToken, "a fencing token was installed");
+
+    // The freshly-claimed detour is not immediately reclaimable (claimed_at just set).
+    assert.equal(await store.claimNextGenerating({ staleBefore: new Date(Date.now() - 60_000), maxAttempts: 3 }), undefined, "a fresh claim is not stale");
+
+    // With a future staleBefore it looks stale; the token still fences a publish.
+    assert.equal(await store.publishReady({ detourId: detour.detourId, claimToken: randomUUID(), steps: [generatedStep(0)] }), false, "a wrong token cannot publish");
+
+    // Exhaust the budget: with maxAttempts=1 the already-attempted (attempts=1) stale detour fails.
+    const failed = await store.failExhaustedGenerating({ staleBefore: future, maxAttempts: 1 });
+    assert.equal(failed, 1, "the exhausted stale detour is failed once");
+    assert.equal((await store.getById(detour.detourId))?.status, "failed");
+    // A retry resets the attempt budget so the detour can be claimed again.
+    const retried = await store.restartGenerating({ detourId: detour.detourId, learnerStateRef: learner });
+    assert.equal(retried?.status, "generating");
+    assert.ok(await store.claimNextGenerating({ staleBefore: future, maxAttempts: 1 }), "a retried detour claims again on a fresh budget");
+  } finally {
+    await sql.end();
+  }
+});
+
 // Covers U2 scenario 4 + 6: a scaffold response appends through the same monotonic sequence as
 // neutral rows and hydrates to the scaffold scope; a competing claim yields one active token.
 maybe("scaffold and neutral responses share one attempt sequence; a claimed detour rejects a second claim", async () => {

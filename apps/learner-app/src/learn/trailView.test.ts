@@ -202,6 +202,8 @@ function session(opts: { withoutLesson?: boolean; includeLocked?: boolean; lates
     },
     lessonByNode: opts.withoutLesson ? {} : { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [] } },
     lessonReadByNode: {},
-    lessonAbsent: []
+    lessonAbsent: [],
+    detours: [],
+    generatingDetours: false
   };
 }

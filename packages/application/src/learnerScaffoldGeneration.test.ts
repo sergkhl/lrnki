@@ -74,6 +74,8 @@ function makeDeps(context: ScaffoldParentContext, overrides: Partial<ScaffoldGen
       upsertPending: async () => { throw new Error("unused"); },
       listActiveForLearnerEnrichment: async () => [],
       claim: async () => true,
+      claimNextGenerating: async () => undefined,
+      failExhaustedGenerating: async () => 0,
       restartGenerating: async () => undefined,
       hide: async () => true,
       getStep: async () => undefined,

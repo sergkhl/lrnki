@@ -880,6 +880,15 @@ export interface ScaffoldDetourStorePort {
   // and clear any prior failed pointer (R14, KTD7). Returns false when the detour is not
   // claimable (already ready/hidden or mismatched). The claim token fences the terminal write.
   claim(input: { detourId: string; operationId: string; claimToken: string }): Promise<boolean>;
+  // Process-level supervisor claim (KTD7): atomically select ONE stale-or-unclaimed `generating`
+  // detour under the attempt budget and claim it, minting a fresh operation id that also acts as
+  // the fencing token (KTD7). Returns the claimed aggregate (its `latestOperationId` ==
+  // `claimToken`) or undefined when the queue is empty. `SKIP LOCKED` keeps competing processes
+  // single-winner per row.
+  claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<ScaffoldDetour | undefined>;
+  // Fail a stale `generating` detour whose attempts are exhausted (R16/AE5). Returns the count
+  // failed. Shares the staleness predicate with `claimNextGenerating`.
+  failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<number>;
   // Atomic publish (R16, KTD9): write the ordered steps + generated payloads and transition to
   // `ready`, guarded by the claim token. A stale token is rejected and nothing is written.
   publishReady(input: { detourId: string; claimToken: string; steps: ScaffoldStep[] }): Promise<boolean>;

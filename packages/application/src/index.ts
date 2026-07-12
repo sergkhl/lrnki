@@ -102,21 +102,46 @@ export {
   stageBelongsToOperation,
   spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
+export {
+  runInstrumentedOperation,
+  noopRunProgressReporter,
+  passthroughStageBracket,
+  type StageBracket
+} from "./runProgressReporter";
+export {
+  probeKnowledgeBoundary,
+  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  type KnowledgeBoundaryVerdict,
+  type KnowledgeBoundaryProbeConfig
+} from "./knowledgeBoundaryProbe";
 
-export { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+export { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 export {
   gradeStudyResponse,
   checkMatchingAttempt,
   recordLearnerVerdict,
   recordLessonRead,
+  gradeScaffoldOptionSelect,
+  recordScaffoldLessonRead,
   type StudyResponseSubmission,
   type GradeStudyResponseResult,
   type GradeRefusalReason,
   type NodeWriteRefusalReason,
   type GradedResponse,
   type MatchingAttemptCheckResult,
-  type NodeWriteResult
+  type NodeWriteResult,
+  type GradeScaffoldOptionSelectResult,
+  type ScaffoldGradeRefusal,
+  type RecordScaffoldLessonReadResult
 } from "./gradeStudyResponse";
+export {
+  requestLearnerScaffold,
+  retryLearnerScaffold,
+  hideLearnerScaffold,
+  type ScaffoldTermSource,
+  type RequestScaffoldRefusal,
+  type RequestLearnerScaffoldResult
+} from "./requestLearnerScaffold";
 export {
   listLearnerStates,
   listLearnerAdminSummaries,

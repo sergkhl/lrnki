@@ -62,6 +62,13 @@ export function expeditionQuery(enrichmentId: string) {
       const res = await api.expedition[":enrichmentId"].$get({ param: { enrichmentId } });
       if (res.status === 404) return null;
       return unwrap(res);
+    },
+    // Poll ONLY while the finished Study Session reports a generating Scaffold Detour (plan
+    // 2026-07-12-002 U5): a ready/failed/hidden-only session stops polling. The topic-expedition
+    // generation poll is driven by the journal; this cadence is the detour's own.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return data && "session" in data && data.session?.generatingDetours ? 5_000 : false;
     }
   });
 }

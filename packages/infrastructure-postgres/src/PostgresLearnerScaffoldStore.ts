@@ -136,6 +136,75 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
     return rows.length === 1;
   }
 
+  // ONE staleness predicate, shared by claim-next and fail-exhausted (only the attempts
+  // comparison differs), mirroring the topic expedition store. A `generating` detour is dead —
+  // reclaimable or failable — when it was never claimed, or its claim aged past the window AND
+  // its operation heartbeat did too. COALESCE covers the crash window where a fresh op id is
+  // installed but the operation_runs row was never inserted: the detour's own updated_at stands
+  // in for the missing heartbeat, so no row is permanently untouchable.
+  private generatingStaleness(staleBefore: Date) {
+    return this.sql`
+      d.status = 'generating'
+      AND (
+        d.claimed_at IS NULL
+        OR (
+          d.claimed_at < ${staleBefore}
+          AND COALESCE(opr.last_progress_at, d.updated_at) < ${staleBefore}
+        )
+      )`;
+  }
+
+  async claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<ScaffoldDetour | undefined> {
+    // A fresh UUID is BOTH the operation id (stage/spend attribution) and the fencing token
+    // (KTD7): the terminal publish compares claim_token, and the operation records stages under
+    // latest_operation_id — the same value.
+    const token = randomUUID();
+    const [row] = await this.sql<DetourRow[]>`
+      WITH candidate AS (
+        SELECT d.detour_id
+        FROM learner_scaffold_detours d
+        LEFT JOIN operation_runs opr
+          ON opr.operation_id = d.latest_operation_id
+         AND opr.operation_type = 'scaffold'
+        WHERE ${this.generatingStaleness(input.staleBefore)}
+          AND d.generation_attempts < ${input.maxAttempts}
+        ORDER BY d.created_at ASC
+        LIMIT 1
+        FOR UPDATE OF d SKIP LOCKED
+      )
+      UPDATE learner_scaffold_detours d
+      SET latest_operation_id = ${token},
+          claim_token = ${token},
+          claimed_at = now(),
+          generation_attempts = d.generation_attempts + 1,
+          updated_at = now()
+      FROM candidate
+      WHERE d.detour_id = candidate.detour_id
+      RETURNING d.detour_id, d.learner_state_ref, d.enrichment_id, d.parent_derived_node_id, d.term, d.normalized_term, d.status, d.latest_operation_id, d.claim_token, d.created_at, d.updated_at`;
+    if (!row) return undefined;
+    return toDetour(row, await this.stepsFor(this.sql, row.detour_id));
+  }
+
+  async failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<number> {
+    const rows = await this.sql<{ detour_id: string }[]>`
+      WITH candidate AS (
+        SELECT d.detour_id
+        FROM learner_scaffold_detours d
+        LEFT JOIN operation_runs opr
+          ON opr.operation_id = d.latest_operation_id
+         AND opr.operation_type = 'scaffold'
+        WHERE ${this.generatingStaleness(input.staleBefore)}
+          AND d.generation_attempts >= ${input.maxAttempts}
+        FOR UPDATE OF d SKIP LOCKED
+      )
+      UPDATE learner_scaffold_detours d
+      SET status = 'failed', claim_token = null, claimed_at = null, updated_at = now()
+      FROM candidate
+      WHERE d.detour_id = candidate.detour_id
+      RETURNING d.detour_id`;
+    return rows.length;
+  }
+
   async publishReady(input: { detourId: string; claimToken: string; steps: ScaffoldStep[] }): Promise<boolean> {
     return this.sql.begin(async (tx) => {
       const [row] = await tx<{ claim_token: string | null; status: ScaffoldDetour["status"] }[]>`
@@ -168,7 +237,8 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
 
   async restartGenerating(input: { detourId: string; learnerStateRef: string }): Promise<ScaffoldDetour | undefined> {
     const rows = await this.sql`
-      UPDATE learner_scaffold_detours SET status = 'generating', latest_operation_id = NULL, claim_token = NULL, updated_at = now()
+      UPDATE learner_scaffold_detours
+      SET status = 'generating', latest_operation_id = NULL, claim_token = NULL, claimed_at = NULL, generation_attempts = 0, updated_at = now()
       WHERE detour_id = ${input.detourId} AND learner_state_ref = ${input.learnerStateRef} AND status = 'failed'
       RETURNING detour_id`;
     if (rows.length !== 1) return undefined;

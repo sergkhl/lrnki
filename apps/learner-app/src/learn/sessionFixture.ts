@@ -115,7 +115,9 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
     },
     lessonByNode: { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [] } },
     lessonReadByNode: {},
-    lessonAbsent: []
+    lessonAbsent: [],
+    detours: [],
+    generatingDetours: false
   };
   return { ...base, ...overrides };
 }

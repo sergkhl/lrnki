@@ -85,3 +85,43 @@ export async function gradeDuelAnswerAction(input: {
 export async function recordDuelWinAction(input: { duelId: string }): Promise<void> {
   await api.duel.win.$post({ json: input });
 }
+
+// --- Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U5) ----------------------------
+// A term source is a lesson section (keyed by its node) or a question stem (keyed by the item);
+// both resolve to the parent Concept Marker server-side. Identity comes from the bearer token.
+export type ScaffoldTermSource =
+  | { kind: "lesson"; derivedNodeId: string }
+  | { kind: "study_item"; studyItemId: string };
+
+export type RequestScaffoldOutcome =
+  | { created: true; detourId: string; status: "generating" | "ready" | "failed" | "hidden" }
+  | { created: false; reason: string };
+
+export async function requestScaffoldDetour(input: { enrichmentId: string; source: ScaffoldTermSource; term: string }): Promise<RequestScaffoldOutcome> {
+  const res = await api.scaffold.request.$post({ json: input });
+  const body = (await res.json()) as RequestScaffoldOutcome;
+  if (res.ok && body.created) await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+  return body;
+}
+
+export async function retryScaffoldDetour(input: { enrichmentId: string; detourId: string }): Promise<void> {
+  await api.scaffold.retry.$post({ json: { detourId: input.detourId } });
+  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+}
+
+export async function hideScaffoldDetour(input: { enrichmentId: string; detourId: string }): Promise<void> {
+  await api.scaffold.hide.$post({ json: { detourId: input.detourId } });
+  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+}
+
+export async function submitScaffoldOptionSelect(input: { enrichmentId: string; scaffoldStepId: string; chosenOptionId: string }): Promise<LearnerGradingResult> {
+  const res = await api.scaffold["option-select"].$post({ json: { scaffoldStepId: input.scaffoldStepId, chosenOptionId: input.chosenOptionId } });
+  const result = (await res.json()) as LearnerGradingResult;
+  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+  return result;
+}
+
+export async function markScaffoldLessonRead(input: { enrichmentId: string; scaffoldStepId: string }): Promise<void> {
+  await api.scaffold["lesson-read"].$post({ json: { scaffoldStepId: input.scaffoldStepId } });
+  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+}
