@@ -2,6 +2,20 @@
 
 ## TODO
 
+### Active implementation
+
+- **Learner App native parity fix (ready, first).** The 2026-07-13 Android device pass reported
+  four rendering defects absent on web (no checkpoint circles, no motion, empty dialogs, stacked
+  concept headers); diagnose and fix them through the
+  [ready plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) before Guardian builds new
+  native surfaces on the same UI kit.
+
+- **Crystal Guardian Challenges (ready).** Implement the accepted
+  [requirements](../brainstorms/2026-07-13-crystal-guardian-challenges-requirements.md) through the
+  [ready plan](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md): durable Leg and Expedition
+  retrieval challenges earn permanent crystal formations, preserve neutral mastery, and hard-replace
+  the redundant Crystal Duel path.
+
 ### Evidence-triggered follow-up
 
 - **Scaffold step content polish (measure-first).** Two model-variance observations from the
@@ -10,12 +24,10 @@
   its own (accurate, easier) lesson/question. If real use shows these recur, address them in the
   scaffold generation prompt or an ADR-0028-style congruence judge — not a lexical gate (rule 16).
 
-- **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
-  2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
-  attempt-order, retry depth per item, activity gaps. Wait for representative real learner traffic
-  (not the gate driver's perfect play), then decide the support ladder and the deferred Leg Trial
-  ("boss fight") + retention mechanic (incl. resonance dimming, the mastery-revocation decision)
-  at the leg-completion seam the duel's grade-only contract already proved.
+- **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a
+  richer learner-scoped typed Study Item set and passed-item semantics for Support Steps, then extend
+  fixed-budget Guardian coverage to completed visible Support Paths as anticipated by ADR-0037. Do
+  not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
 
