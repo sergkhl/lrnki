@@ -2,93 +2,13 @@
 
 ## TODO
 
-### In-progress implementation plan
-
-- **Learner Support Path UX — U1-U5 DONE, resume at U6.** Execute the remaining unit of the
-  linked [implementation plan](./2026-07-13-002-feat-learner-support-path-ux-plan.md); the plan
-  file stays canonical for requirements, KTDs, and gates until completion. Session handoff state
-  (2026-07-13):
-  - **U1 complete, rule-14 gate PASS.** Explorable Term capacity is five everywhere it is
-    authoritative (validator `MAX_TERMS`, both forced-tool `.max(5)` arrays, four prompts,
-    `CONTEXT.md`, domain-core + migration comments); Scaffold outline stays `.min(1).max(3)`.
-    Production gate: three fresh mixed-domain synthetic expeditions (Macroeconomics /
-    Volcanology / Computer Science), 89/89 emitted terms exact-anchored, distribution 0–4 per
-    lesson and 0–2 per item (no padding to the new cap). Evidence + evaluation note:
-    `tmp/2026-07-13-learner-support-path-ux/EVALUATION.md`. One recorded pre-existing caveat
-    for U6: sub-phrases of a compound parent label pass the exact parent-label exclusion
-    (e.g. "magma viscosity" on the "Magma viscosity and its controls…" node) — inspect in the
-    whole-flow gate before deciding anything (rule 16 forbids a lexical veto).
-  - **U2 complete (application projection).** `ExplorableTermView`/`ExplorableTermSupport`
-    (`available`/`generating`/`failed`/`ready+complete`) now ride on every projected lesson and
-    item term with the lesson `sectionKind` anchor preserved (`null` for item terms);
-    `composeStudySession` composes detours FIRST and correlates support by
-    (parent node, `normalizeConceptLabel(term)`). `ScaffoldDetourGroup`, the `group` field, and
-    `masteredParentNodeIds` are DELETED; `ScaffoldDetourView` carries `completedStepCount`,
-    `totalStepCount`, `firstIncompleteStepId` instead. New `resolveReferenceStopId(session,
-    nodeId)` (exported from `@lrnki/application/projection`) returns the referenced node's first
-    incomplete ordinary stop, capstone when complete, `null` off-trail. `requestLearnerScaffold`
-    unchanged + concurrent-idempotency regression test. Deterministic envelope green: workspace
-    typecheck, application 634, litellm 149, learner-app 136, learner-api 18, lint 0 errors,
-    Expo web export.
-  - **U3 complete (contextual discovery + state-aware dialog + shared dialog anatomy).**
-    Shared centered-dialog anatomy per KTD9: `DialogBody` (`shrink min-h-0` scroll region,
-    testID `dialog-body`) + `DialogFooter` in `ui/overlays.tsx`, `Dialog`'s entrance wrapper
-    now `min-h-0 shrink`; LeaderboardDialog (former clipping `max-h-96` wrapper DELETED) and
-    DuelUnlockDialog migrated. New components: `ExplorableTheoryText` (pure exported
-    `buildTermRuns` — longest-range-first reservation, first non-overlapping occurrence per
-    term, byte-exact slices; nested `Text` runs with dotted underline + button semantics,
-    testID `theory-term-<term>`), `SupportPathsPanel` (available-only rows, 44px
-    `GitBranchPlus` `IconButton`, accessible names via new `termSupportActionLabel()`, testIDs
-    `support-paths-panel`/`support-path-add-<term>`, renders nothing when empty), and
-    `SupportPathDialog` (ONE state machine: available/requesting/generating/failed/ready +
-    exported `dialogStateForDetour(detour|undefined)` for the root instance — restored-ready
-    maps straight to ready, no generating flash; ready offers `Open support path` +
-    `Keep exploring`, never lesson content). Wiring: `LessonSections` gains optional
-    `onPressTerm` (prose-only highlights filtered by `sectionKind`; list items and scaffold
-    step lessons stay plain); `OptionSelectBody`/`ImpostorBody`/`MatchingBoard` gain a
-    `supportSlot` rendered between stem and answer controls (R7); `ActivitySheet` owns the
-    nested dialog + staged handoff (`termContextFor` replaces `termMenuFor`; request success
-    closes dialog+activity then calls `onScaffoldRequested`; ready-term `Open support path`
-    calls new `onOpenDetour`); `CheckpointPath` root replaced `ScaffoldProgressDialog` with
-    `SupportPathDialog` (retry/hide wired; `onOpenPath` interim-expands the trail disclosure).
-    DELETED: `TermExplorationMenu`(+test), `ScaffoldProgressDialog`(+test),
-    `termMenuLabel`/`termMenuHint` vocabulary; added `supportPanelTitle`/`supportAddAction`/
-    `supportOpenAction`/`supportAvailableBody`/`supportGeneratingBody`. Envelope green:
-    learner-app 148/38 suites, workspace typecheck, lint 0 errors (9 pre-existing warnings),
-    Expo web export all 6 routes.
-  - **U4 complete (visual Support Path nodes).** New `SupportPathNode` renders every active
-    detour as ONE always-visible compact side-branch node under its parent (connector elbow,
-    term title wrapping to two lines, icon-shape state cues — Compass/TriangleAlert/Route/
-    CheckCircle2 — plus phase or `n of m steps done` caption, filled step dots + visible
-    `n/m`, testID `support-path-node-<id>`); the one-shot generating→ready reveal with
-    reduced-motion/live-region equivalence carried over. Tapping delegates the WHOLE detour
-    to the root: ready → path flow, generating/failed → the state-aware dialog (retry/hide
-    already wired there). `ScaffoldDetour`(+test) DELETED; vocabulary lost
-    `exploreTermAction`/`supportViewProgress`, gained `supportPathNode`/`supportPathComplete`
-    + `supportStepsDoneCopy()`.
-  - **U5 complete (full-screen Support Path flow).** New `SupportPathSheet` (keyed
-    `PathController` per detour) opens incomplete paths at the projected
-    `firstIncompleteStepId` and complete paths at the step overview; a fixed progress row
-    (step dots + spelled-out progress + `support-path-overview` button) always reaches the
-    overview. Generated steps keep the exact lesson-read → key-free option-select →
-    scaffold-scoped grading behavior, with local `locallyDone` advancement to the next
-    incomplete step (`support-path-continue`; last step → Return to trail). Reference steps
-    render a map-transition card ONLY (`support-path-reference-go`, no copied neutral
-    content) and route through root `openReferenceStep` → `resolveReferenceStopId` + scroll
-    to the resolved stop. Hide lives in the overview (`support-path-hide-<id>`).
-    `ScaffoldStepSheet`(+test) DELETED; `CheckpointPath` replaced
-    `expandedDetourId`/`scaffoldStep` with `pathDetourId`; ActivitySheet `onOpenDetour` and
-    root dialog `onOpenPath` now enter the sheet. Envelope green: learner-app 149/38 suites,
-    application 634, learner-api 18, workspace typecheck, lint 0 errors (9 pre-existing
-    warnings), Expo web export all 6 routes.
-  - **Remaining: U6 only (whole-flow real-use gate + consolidation).** Hard-reset dev data,
-    fresh mixed-domain production generation, Playwright whole-flow at 320x568/390x844 +
-    200% zoom (AE3-AE9), inspect the U1 recorded caveat (compound-parent sub-phrase terms),
-    AE5 dialog behavior against the NEW shared anatomy, accumulated always-visible nodes at
-    320x568 (five-detour parent), persistence-neutrality queries, then amend ADR-0037's
-    inline-highlighting claim, consolidate docs, and DELETE the plan file per policy.
-
 ### Evidence-triggered follow-up
+
+- **Scaffold step content polish (measure-first).** Two model-variance observations from the
+  2026-07-13 U6 gate, in the scaffold content generator (not the Support Path UX contract): a
+  micro-lesson emitted literal `**bold**` markdown rendered raw, and one step's label mismatched
+  its own (accurate, easier) lesson/question. If real use shows these recur, address them in the
+  scaffold generation prompt or an ADR-0028-style congruence judge — not a lexical gate (rule 16).
 
 - **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan
   2026-07-10-001 R7) established the measurement path over `response_log` — correctness by
@@ -98,6 +18,30 @@
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **Learner Support Path UX shipped (2026-07-13, plan 2026-07-13-002; plan DELETED).** Unfamiliar
+  terms are now discoverable in context and each Scaffold Detour reads as one compact, playable
+  Support Path. Explorable Term capacity is five everywhere it is authoritative (validator,
+  forced-tool schemas, prompts, `CONTEXT.md`) while Support Steps stay one-to-three; the Study
+  Session projection is the single authority for term support state (`ExplorableTermView` with
+  `available`/`generating`/`failed`/`ready+complete`, correlated by parent node + normalized term,
+  lesson `sectionKind` preserved) and for path navigation (`completedStepCount`/`totalStepCount`/
+  `firstIncompleteStepId` replacing the deleted `ScaffoldDetourGroup`/`masteredParentNodeIds`
+  grouping; new `resolveReferenceStopId`). The Learner App renders first-occurrence dotted-underline
+  theory highlights (pure `buildTermRuns`, byte-exact slices), a compact available-only Support
+  Paths panel (post-content in theory, between stem and answers in graded activities), ONE
+  state-aware `SupportPathDialog` (restored-ready never flashes generating; ready offers
+  `Open support path`/`Keep exploring`, never lesson content), one always-visible `SupportPathNode`
+  side branch per active detour, and a full-screen `SupportPathSheet` owning resume/overview/
+  generated study/reference routing/hide. Shared centered-dialog anatomy per KTD9 (`DialogBody`
+  shrinkable scroll region + `DialogFooter`) replaced per-consumer bounded wrappers, and the U6
+  gate found and fixed a web-only defect in it: the dialog primitive's unstyled focus wrapper made
+  `max-h-[85%]` resolve against the dialog's own natural height, always clipping ~15% — fixed with
+  a web `maxHeight: "85vh"` inline cap in `ui/overlays.tsx`. DELETED in the same change:
+  `TermExplorationMenu`, `ScaffoldDetour`, `ScaffoldProgressDialog`, `ScaffoldStepSheet` (+tests,
+  vocabulary, exports). Persisted shapes unchanged; ADR-0037's discovery/presentation context and
+  the `CONTEXT.md` Explorable Term definition updated. Both rule-14 gates PASS (U1 term contract,
+  U6 whole flow); evidence `tmp/2026-07-13-learner-support-path-ux/`.
 
 - **Topic Expedition generation is one deep process-lived module (2026-07-13, plan
   2026-07-13-001; plan DELETED; architecture review Candidate 3 complete).**
@@ -314,6 +258,23 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner Support Path UX whole-flow gate, 2026-07-13 (U6).** Hard DB reset, three fresh
+  mixed-domain synthetic expeditions over production LiteLLM (Macroeconomics / Volcanology /
+  Computer Science): 131 emitted Explorable Terms, 0 anchor failures, 0–5 distribution with no
+  padding; 8 real detours (16 steps, all 4-option/1-correct, key-free client). Playwright at
+  390×844, 320×568, and a 160×284 200%-zoom-equivalent viewport drove create→suppress→ready→
+  study→complete→overview→hide→restore (same detour id), reference routing to the canonical
+  checkpoint with no copied content, a six-node accumulation with the main trail still navigable,
+  zero-term activities rendering no panel, and a reduced-motion pass — zero console/page errors
+  in every flow. One launch-blocking defect found by the gate and fixed in-session (the shared
+  dialog anatomy's web percentage-cap clip; re-proven unclipped at all viewports). U1's
+  compound-parent sub-phrase caveat inspected live: it generated genuinely easier prerequisite
+  steps, no action needed. Neutrality queries after all support work: `response_log` 2 rows both
+  scaffold-scoped, 0 neutral `lesson_reads`, 0 awards, no generated label in the neutral graph,
+  Study Item Bank untouched. Gate learner removed via post-gate hard reset; deployed container
+  restarted. Evidence and the required evaluation note:
+  `tmp/2026-07-13-learner-support-path-ux/EVALUATION.md`.
 
 - **Adaptive Learner Scaffold Detours gate, 2026-07-12.** Deterministic envelope (post-fix, fresh
   migration): workspace `typecheck` all packages Done; `lint` 0 errors / 9 pre-existing warnings;

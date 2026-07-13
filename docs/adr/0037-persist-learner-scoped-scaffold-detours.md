@@ -65,9 +65,15 @@ gating, crystals, leaderboard points, or base expedition progress
 Concept Lessons and questions sometimes introduce a specialized term necessary to understand the
 current stop but unfamiliar to the learner. The learner needs a durable way to study the missing
 sub-concept as part of the expedition, on demand, without turning personalization into neutral graph
-knowledge and without a second graph UI. Text selection is not a portable cross-platform trigger and
-permanent inline highlighting makes dense study content noisier, so support is discovered through a
-quiet **Explorable Term** overflow action and stays optional.
+knowledge and without a second graph UI. Text selection is not a portable cross-platform trigger, so
+support is discovered through server-advertised **Explorable Term** metadata rendered as a quiet
+first-occurrence cue in theory prose plus a compact post-content Support Paths panel (below the
+question stem in graded activities); both open one state-aware dialog, the request stays optional,
+and an active detour's term is suppressed from the panel while a hidden detour's term returns and
+restores the same durable detour (plan 2026-07-13-002). On the trail each active detour is one
+always-visible compact side-branch node under its parent, and its ordered Support Steps play inside
+one full-screen Support Path flow; reference steps route back to the canonical neutral checkpoint
+rather than rendering copied content.
 
 The tension this ADR resolves is keeping learner-scoped generated support fully replayable and
 studyable while the Learner-Neutral Core Concept Graph and neutral Study Item Bank remain untouched.

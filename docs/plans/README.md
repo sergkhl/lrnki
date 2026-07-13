@@ -12,9 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [Learner Support Path UX](./2026-07-13-002-feat-learner-support-path-ux-plan.md) — ready for
-  implementation; improves contextual term discovery, adaptive dialogs, and the learner-scoped
-  Support Path presentation without changing the neutral graph or persisted detour shapes.
+- None.
 
 ## Ownership rules
 

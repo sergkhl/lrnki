@@ -150,8 +150,14 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
         >
           {/* The bounded dialog column (KTD9): Content caps the height; the entrance
               wrapper and DialogBody carry `shrink min-h-0` so the BODY shrinks and
-              scrolls while the header and DialogFooter actions stay reachable. */}
-          <DialogPrimitive.Content className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card">
+              scrolls while the header and DialogFooter actions stay reachable. On web
+              the primitive inserts an unstyled auto-height focus wrapper between
+              Overlay and Content, so a percentage max-height resolves against the
+              dialog's own natural height and always clips it — cap by viewport there. */}
+          <DialogPrimitive.Content
+            className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card"
+            style={Platform.OS === "web" ? ({ maxHeight: "85vh" } as object) : undefined}
+          >
             <OverlayEntrance className="min-h-0 shrink">{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>

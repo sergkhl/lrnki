@@ -246,7 +246,10 @@ _Avoid_: cloned concept, Study Item Bank item, locked stop
 Generation-time metadata on a Concept Lesson section or Study Item question: a specialized word or
 short phrase, verified as an exact substring of the final rendered text, that a learner may turn
 into a Scaffold Detour. At most five per lesson and per question; zero terms render no affordance.
-_Avoid_: keyword, inline highlight, Candidate
+Discovered in place: theory prose cues each term's first occurrence and a compact Support Paths
+panel lists the terms still available, both opening one state-aware dialog
+([ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md)).
+_Avoid_: keyword, Candidate
 
 **Grounding Provenance**:
 The citation/provenance language shared by learner-facing study assets. Source-grounded content cites
