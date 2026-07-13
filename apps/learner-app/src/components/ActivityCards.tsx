@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Check, X } from "lucide-react-native";
 import type { StudyImpostorView, StudyOptionSelectView } from "@lrnki/application/projection";
@@ -54,12 +55,16 @@ export function OptionSelectBody({
   selectedId,
   result,
   disabled,
+  supportSlot,
   onSelect
 }: Readonly<{
   item: StudyOptionSelectView;
   selectedId: string | null;
   result: ActivityResult;
   disabled: boolean;
+  // The Support Paths panel rendered between the question stem and the answer controls
+  // (plan 2026-07-13-002 U3, R7): support is reachable before the learner commits.
+  supportSlot?: ReactNode;
   onSelect: (optionId: string) => void;
 }>) {
   const { orderedIds, byId: optionById } = useShuffledLookup(item.options, (option) => option.optionId);
@@ -70,6 +75,7 @@ export function OptionSelectBody({
         <Text variant="heading" className="flex-1 leading-7">{item.question}</Text>
         <GroundedBadge provenance={item.groundingProvenance} />
       </View>
+      {supportSlot}
       <View className="gap-2">
         {orderedIds.map((optionId) => {
           const option = optionById.get(optionId);
@@ -102,12 +108,15 @@ export function ImpostorBody({
   selectedId,
   result,
   disabled,
+  supportSlot,
   onSelect
 }: Readonly<{
   item: StudyImpostorView;
   selectedId: string | null;
   result: ActivityResult;
   disabled: boolean;
+  // See OptionSelectBody: the stem-adjacent Support Paths slot (R7).
+  supportSlot?: ReactNode;
   onSelect: (statementId: string) => void;
 }>) {
   const { orderedIds, byId: statementById } = useShuffledLookup(item.statements, (statement) => statement.statementId);
@@ -118,6 +127,7 @@ export function ImpostorBody({
         <Text variant="heading" className="flex-1 leading-7">{item.question}</Text>
         <GroundedBadge provenance={item.groundingProvenance} />
       </View>
+      {supportSlot}
       <View className="gap-2">
         {orderedIds.map((statementId) => {
           const statement = statementById.get(statementId);

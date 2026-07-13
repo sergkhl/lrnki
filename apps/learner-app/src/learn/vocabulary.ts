@@ -119,9 +119,13 @@ export const LEARNER_VOCABULARY = {
   // requests for an unfamiliar term. The three broad phases theme the projection's stable ids
   // (KTD8, ADR-0033); the UI never shows counts or raw stage names.
   exploreTermAction: "Explore",
-  termMenuLabel: "Explore a term",
-  termMenuHint: "Turn an unfamiliar term into a short support detour.",
   termRequestFailed: "Couldn’t start that support. Try again.",
+  // Contextual discovery + the state-aware Support Path dialog (plan 2026-07-13-002 U3).
+  supportPanelTitle: "Support paths",
+  supportAddAction: "Add support path",
+  supportOpenAction: "Open support path",
+  supportAvailableBody: "Build a short side path of easier steps for this term. Your trail and crystals stay untouched.",
+  supportGeneratingBody: "You can keep exploring — the path lands on your trail when it’s ready.",
   supportPreparingTitle: "Building support",
   supportPhasePreparing: "Finding the right footing…",
   supportPhaseBuilding: "Building your support steps…",
@@ -144,6 +148,12 @@ export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;
 
 export function learnerTerm(key: LearnerVocabularyKey): string {
   return LEARNER_VOCABULARY[key];
+}
+
+// The accessible name every term-support affordance announces (R6/R8): button semantics
+// plus the EXACT term, shared by inline theory highlights and the panel's icon actions.
+export function termSupportActionLabel(term: string): string {
+  return `${learnerTerm("supportPanelTitle")}: “${term}”`;
 }
 
 // Theme the projection's broad Scaffold Detour phase ids into learner copy (KTD8, ADR-0033).

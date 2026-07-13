@@ -1,6 +1,5 @@
-import { View } from "react-native";
 import { Swords } from "lucide-react-native";
-import { Button, Dialog, OverlayHeader, Text, colors } from "@/ui";
+import { Button, Dialog, DialogBody, DialogFooter, OverlayHeader, Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The one-time Crystal Duel unlock celebration (R13): entering the arena and dismissing
@@ -17,13 +16,13 @@ export function DuelUnlockDialog({
         title={learnerTerm("duelUnlockTitle")}
         onClose={() => onOpenChange(false)}
       />
-      <View className="gap-4 p-4">
+      <DialogBody>
         <Text variant="label" color="muted" className="font-normal">{learnerTerm("duelUnlockBody")}</Text>
-        <View className="gap-2">
-          <Button label={learnerTerm("duelStart")} haptic="unlock" onPress={onEnterDuel} />
-          <Button variant="outline" label={learnerTerm("splashDismiss")} onPress={() => onOpenChange(false)} />
-        </View>
-      </View>
+      </DialogBody>
+      <DialogFooter>
+        <Button label={learnerTerm("duelStart")} haptic="unlock" onPress={onEnterDuel} />
+        <Button variant="outline" label={learnerTerm("splashDismiss")} onPress={() => onOpenChange(false)} />
+      </DialogFooter>
     </Dialog>
   );
 }

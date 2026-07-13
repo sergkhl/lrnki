@@ -14,7 +14,9 @@ jest.mock("@/lib/actions", () => ({
   submitLearnerImpostor: jest.fn(),
   submitLearnerMatching: jest.fn(),
   validateLearnerMatchingAttempt: jest.fn(),
-  requestScaffoldDetour: jest.fn()
+  requestScaffoldDetour: jest.fn(),
+  retryScaffoldDetour: jest.fn(() => Promise.resolve()),
+  hideScaffoldDetour: jest.fn(() => Promise.resolve())
 }));
 
 const submitMock = submitLearnerOptionSelect as jest.Mock;
@@ -67,7 +69,7 @@ test("a theory stop shows lesson content and its continue action", async () => {
   expect(screen.getByLabelText(learnerTerm("continueAction"))).toBeTruthy();
 });
 
-test("Covers AE1: a question's Explore term closes the activity into the progress dialog", async () => {
+test("Covers F1: the panel action opens the dialog; Add support path stages the root handoff (KTD5)", async () => {
   requestScaffoldMock.mockImplementation(() => Promise.resolve({ created: true, detourId: "d9", status: "generating" }));
   const onOpenChange = jest.fn();
   const onScaffoldRequested = jest.fn();
@@ -77,10 +79,57 @@ test("Covers AE1: a question's Explore term closes the activity into the progres
       <PortalHost />
     </SafeAreaProvider>
   );
-  // The fixture's option-select advertises "ownership" and "move semantics".
-  await fireEvent.press(screen.getByTestId("term-menu-toggle"));
-  await fireEvent.press(screen.getByTestId("explore-term-ownership"));
+  // The fixture's option-select advertises "ownership" and "move semantics" — its panel sits
+  // between the stem and the answers (R7) and its action opens the state-aware dialog (R9).
+  await fireEvent.press(screen.getByTestId("support-path-add-ownership"));
+  expect(screen.getByText(learnerTerm("supportAvailableBody"))).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("support-path-request"));
   await waitFor(() => expect(requestScaffoldMock).toHaveBeenCalledWith({ enrichmentId: "e1", source: { kind: "study_item", studyItemId: "i1" }, term: "ownership" }));
+  // Staged handoff: the nested dialog and the activity close BEFORE the root opens state.
   await waitFor(() => expect(onScaffoldRequested).toHaveBeenCalledWith("d9"));
   expect(onOpenChange).toHaveBeenCalledWith(false);
+  expect(screen.queryByTestId("support-path-request")).toBeNull();
+});
+
+test("Covers AE3: an active term is absent from the panel but its dialog reflects the detour state", async () => {
+  const session = sessionFixture();
+  const segments = session.studySegmentsByNode.n1;
+  if (segments[0].kind !== "option_select") throw new Error("fixture shape changed");
+  segments[0].item.explorableTerms = [
+    { term: "ownership", sectionKind: null, support: { kind: "generating", detourId: "d1", phase: "building" } },
+    { term: "move semantics", sectionKind: null, support: { kind: "available" } }
+  ];
+  await render(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <ActivitySheet session={session} stopId="n1:option_select:i1" open onOpenChange={jest.fn()} />
+      <PortalHost />
+    </SafeAreaProvider>
+  );
+  expect(screen.queryByTestId("support-path-add-ownership")).toBeNull();
+  expect(screen.getByTestId("support-path-add-move semantics")).toBeTruthy();
+});
+
+test("Covers AE2/R5-R7: theory prose highlights a term, the panel follows the content, and both open the dialog", async () => {
+  const session = sessionFixture();
+  session.lessonByNode.n1 = {
+    derivedNodeId: "n1",
+    canonicalLabel: "Ownership",
+    sections: [
+      { kind: "gist", text: "Ownership transfers on assignment via move semantics.", groundingProvenance: "generated", isSourceCited: false }
+    ],
+    explorableTerms: [{ term: "move semantics", sectionKind: "gist", support: { kind: "available" } }]
+  };
+  await render(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <ActivitySheet session={session} stopId="n1:theory:main" open onOpenChange={jest.fn()} />
+      <PortalHost />
+    </SafeAreaProvider>
+  );
+  expect(screen.getByTestId("support-paths-panel")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("theory-term-move semantics"));
+  expect(screen.getByText(learnerTerm("supportAvailableBody"))).toBeTruthy();
+  // Cancel restores reading focus: the dialog closes, the sheet stays open (KTD5).
+  await fireEvent.press(screen.getByLabelText(learnerTerm("supportProgressClose")));
+  await waitFor(() => expect(screen.queryByText(learnerTerm("supportAvailableBody"))).toBeNull());
+  expect(screen.getByText(learnerTerm("theoryStop"))).toBeTruthy();
 });

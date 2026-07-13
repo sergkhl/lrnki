@@ -1,8 +1,7 @@
-import { ScrollView } from "react-native";
 import { Trophy } from "lucide-react-native";
 import type { LeaderboardView } from "@/lib/api";
 import { ChaseBanner, LeaderboardBoard } from "./LeaderboardBoard";
-import { Dialog, OverlayHeader, colors } from "@/ui";
+import { Dialog, DialogBody, OverlayHeader, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The Board as a self-contained adaptive dialog (R12): opened from the journal menu or
@@ -29,14 +28,16 @@ export function LeaderboardDialog({
         description={description ?? learnerTerm("leaderboardHint")}
         onClose={() => onOpenChange(false)}
       />
-      <ScrollView contentContainerClassName="gap-3 p-4" className="max-h-96">
+      {/* The shared shrinkable body (KTD9) replaces the former fixed max-h-96 wrapper,
+          which clipped at constrained heights instead of shrinking to the viewport. */}
+      <DialogBody>
         <ChaseBanner chase={board.chase} />
         <LeaderboardBoard
           entries={board.entries}
           weekKey={board.weekKey}
           masteredCrystalCount={board.masteredCrystalCount}
         />
-      </ScrollView>
+      </DialogBody>
     </Dialog>
   );
 }

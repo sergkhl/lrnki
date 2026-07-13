@@ -1,10 +1,18 @@
 import { View } from "react-native";
 import type { ConceptLessonView } from "@lrnki/application/projection";
 import { Card, Text } from "@/ui";
+import { ExplorableTheoryText } from "./ExplorableTheoryText";
 import { GroundedBadge } from "./GroundedBadge";
 import { lessonSectionHeading } from "@/learn/vocabulary";
 
-export function LessonSections({ lesson }: Readonly<{ lesson: ConceptLessonView }>) {
+// Lesson theory sections. When the caller wires `onPressTerm` (the neutral Activity Sheet),
+// each section's PROSE gains first-occurrence Explorable Term highlights for the terms
+// anchored to that section's kind (plan 2026-07-13-002 U3, KTD2/KTD3; R5). List items and
+// generated Support Step lessons (which pass no handler) render plain text.
+export function LessonSections({
+  lesson,
+  onPressTerm
+}: Readonly<{ lesson: ConceptLessonView; onPressTerm?: (term: string) => void }>) {
   return (
     <Card className="gap-5">
       {lesson.sections.map((section, index) => (
@@ -13,7 +21,15 @@ export function LessonSections({ lesson }: Readonly<{ lesson: ConceptLessonView 
             <Text variant="title">{lessonSectionHeading(section.kind)}</Text>
             <GroundedBadge provenance={section.groundingProvenance} isSourceCited={section.isSourceCited} />
           </View>
-          <Text variant="body">{section.text}</Text>
+          {onPressTerm ? (
+            <ExplorableTheoryText
+              text={section.text}
+              terms={lesson.explorableTerms.filter((entry) => entry.sectionKind === section.kind).map((entry) => entry.term)}
+              onPressTerm={onPressTerm}
+            />
+          ) : (
+            <Text variant="body">{section.text}</Text>
+          )}
           {section.items?.length ? (
             <View className="gap-2 pl-2">
               {section.items.map((item, itemIndex) => (

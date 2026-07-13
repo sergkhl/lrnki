@@ -6,8 +6,8 @@ import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
 import { ScaffoldDetour } from "./ScaffoldDetour";
-import { ScaffoldProgressDialog } from "./ScaffoldProgressDialog";
 import { ScaffoldStepSheet } from "./ScaffoldStepSheet";
+import { SupportPathDialog, dialogStateForDetour } from "./SupportPathDialog";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
 import { hideScaffoldDetour, retryScaffoldDetour } from "@/lib/actions";
 import { legBannerLine, terminusLine } from "@/learn/goalCopy";
@@ -145,6 +145,7 @@ export function CheckpointPath({
           if (!open) setSelectedStopId(null);
         }}
         onScaffoldRequested={(detourId) => setProgressDetourId(detourId)}
+        onOpenDetour={(detourId) => setExpandedDetourId(detourId)}
       />
       <ScaffoldStepSheet
         enrichmentId={session.enrichmentId}
@@ -154,13 +155,35 @@ export function CheckpointPath({
           if (!open) setScaffoldStep(null);
         }}
       />
-      <ScaffoldProgressDialog
-        detour={session.detours.find((detour) => detour.detourId === progressDetourId)}
-        open={progressDetourId !== null}
-        onOpenChange={(open) => {
-          if (!open) setProgressDetourId(null);
-        }}
-      />
+      {(() => {
+        // The root-owned state-aware dialog (plan 2026-07-13-002 U3, KTD5): opened by the
+        // staged handoff after a request. It branches on the DURABLE detour's projected
+        // status — a restored already-ready detour shows ready actions immediately, with no
+        // generating flash. `Open support path` lands on the detour's trail surface (interim:
+        // the ready disclosure; U5 replaces it with the full-screen Support Path flow).
+        const progressDetour = session.detours.find((detour) => detour.detourId === progressDetourId);
+        return (
+          <SupportPathDialog
+            open={progressDetourId !== null}
+            onOpenChange={(open) => {
+              if (!open) setProgressDetourId(null);
+            }}
+            term={progressDetour?.term ?? ""}
+            state={dialogStateForDetour(progressDetour)}
+            onRetry={() => {
+              if (progressDetourId !== null) void retryScaffoldDetour({ enrichmentId: session.enrichmentId, detourId: progressDetourId });
+            }}
+            onDismiss={() => {
+              if (progressDetourId !== null) void hideScaffoldDetour({ enrichmentId: session.enrichmentId, detourId: progressDetourId });
+              setProgressDetourId(null);
+            }}
+            onOpenPath={() => {
+              if (progressDetourId !== null) setExpandedDetourId(progressDetourId);
+              setProgressDetourId(null);
+            }}
+          />
+        );
+      })()}
     </>
   );
 }

@@ -4,7 +4,7 @@ import { PortalHost } from "@rn-primitives/portal";
 import { Text as RNText } from "react-native";
 import { Map as MapIcon } from "lucide-react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Dialog, FullScreenDialog, OverlayHeader, SideSheet } from "./overlays";
+import { Dialog, DialogBody, DialogFooter, FullScreenDialog, OverlayHeader, SideSheet } from "./overlays";
 import { BottomSheet } from "./sheets";
 
 const SAFE_AREA_METRICS = {
@@ -84,6 +84,27 @@ test("SideSheet mounts its menu content and closes through the shared header", a
   expect(screen.getByText("menu body")).toBeTruthy();
   await fireEvent.press(screen.getByLabelText("Close"));
   expect(onOpenChange).toHaveBeenCalledWith(false);
+});
+
+test("Covers AE5 anatomy (KTD9): the dialog body scrolls while the footer stays outside it", async () => {
+  await render(
+    withHost(
+      <Dialog open onOpenChange={() => {}}>
+        <OverlayHeader icon={<MapIcon size={20} />} title="Support" onClose={() => {}} />
+        <DialogBody>
+          <RNText>long body</RNText>
+        </DialogBody>
+        <DialogFooter>
+          <RNText>actions</RNText>
+        </DialogFooter>
+      </Dialog>
+    )
+  );
+  // The body is the ONE scrollable region; the actions render as a sibling after it, so a
+  // tall body can never push them out of the bounded column (the former progress-dialog crop).
+  expect(screen.getAllByTestId("dialog-body").length).toBe(1);
+  expect(screen.getByText("long body")).toBeTruthy();
+  expect(screen.getByText("actions")).toBeTruthy();
 });
 
 test("closed overlays mount nothing", async () => {

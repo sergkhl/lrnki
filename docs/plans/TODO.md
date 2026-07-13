@@ -4,7 +4,7 @@
 
 ### In-progress implementation plan
 
-- **Learner Support Path UX — U1+U2 DONE, resume at U3.** Execute the remaining units of the
+- **Learner Support Path UX — U1+U2+U3 DONE, resume at U4.** Execute the remaining units of the
   linked [implementation plan](./2026-07-13-002-feat-learner-support-path-ux-plan.md); the plan
   file stays canonical for requirements, KTDs, and gates until completion. Session handoff state
   (2026-07-13):
@@ -30,14 +30,44 @@
     unchanged + concurrent-idempotency regression test. Deterministic envelope green: workspace
     typecheck, application 634, litellm 149, learner-app 136, learner-api 18, lint 0 errors,
     Expo web export.
-  - **Interim shims the next session must REPLACE, not keep:** `ScaffoldDetour.tsx` renders
-    every ready detour as the former "active" disclosure (grouping copy deleted from
-    `vocabulary.ts`), `ActivitySheet.termMenuFor` maps term views back to strings for the old
-    overflow menu, and `sessionFixture.ts` carries the new term-view shape. U3–U5 delete these
-    components per the plan's file lists.
-  - **Remaining: U3 (inline highlights + Support Paths panel + state-aware dialog + shared
-    dialog anatomy), U4 (visual Support Path nodes), U5 (full-screen Support Path flow),
-    U6 (whole-flow browser gate + ADR-0037/CONTEXT/docs consolidation + plan deletion).**
+  - **U3 complete (contextual discovery + state-aware dialog + shared dialog anatomy).**
+    Shared centered-dialog anatomy per KTD9: `DialogBody` (`shrink min-h-0` scroll region,
+    testID `dialog-body`) + `DialogFooter` in `ui/overlays.tsx`, `Dialog`'s entrance wrapper
+    now `min-h-0 shrink`; LeaderboardDialog (former clipping `max-h-96` wrapper DELETED) and
+    DuelUnlockDialog migrated. New components: `ExplorableTheoryText` (pure exported
+    `buildTermRuns` — longest-range-first reservation, first non-overlapping occurrence per
+    term, byte-exact slices; nested `Text` runs with dotted underline + button semantics,
+    testID `theory-term-<term>`), `SupportPathsPanel` (available-only rows, 44px
+    `GitBranchPlus` `IconButton`, accessible names via new `termSupportActionLabel()`, testIDs
+    `support-paths-panel`/`support-path-add-<term>`, renders nothing when empty), and
+    `SupportPathDialog` (ONE state machine: available/requesting/generating/failed/ready +
+    exported `dialogStateForDetour(detour|undefined)` for the root instance — restored-ready
+    maps straight to ready, no generating flash; ready offers `Open support path` +
+    `Keep exploring`, never lesson content). Wiring: `LessonSections` gains optional
+    `onPressTerm` (prose-only highlights filtered by `sectionKind`; list items and scaffold
+    step lessons stay plain); `OptionSelectBody`/`ImpostorBody`/`MatchingBoard` gain a
+    `supportSlot` rendered between stem and answer controls (R7); `ActivitySheet` owns the
+    nested dialog + staged handoff (`termContextFor` replaces `termMenuFor`; request success
+    closes dialog+activity then calls `onScaffoldRequested`; ready-term `Open support path`
+    calls new `onOpenDetour`); `CheckpointPath` root replaced `ScaffoldProgressDialog` with
+    `SupportPathDialog` (retry/hide wired; `onOpenPath` interim-expands the trail disclosure).
+    DELETED: `TermExplorationMenu`(+test), `ScaffoldProgressDialog`(+test),
+    `termMenuLabel`/`termMenuHint` vocabulary; added `supportPanelTitle`/`supportAddAction`/
+    `supportOpenAction`/`supportAvailableBody`/`supportGeneratingBody`. Envelope green:
+    learner-app 148/38 suites, workspace typecheck, lint 0 errors (9 pre-existing warnings),
+    Expo web export all 6 routes.
+  - **Interim shims the next session must REPLACE, not keep:** `ScaffoldDetour.tsx` still
+    renders each ready detour as the expandable disclosure row on the trail (U4 replaces it
+    with the visual `SupportPathNode`); `onOpenDetour`/root `onOpenPath` currently just expand
+    that disclosure (`setExpandedDetourId`) — U5 must route them into the full-screen
+    `SupportPathSheet` resume flow; `ScaffoldStepSheet` remains the generated-step surface
+    until U5 deletes it; `sessionFixture.ts` carries the term-view shape (kept).
+  - **Remaining: U4 (visual Support Path nodes; delete ScaffoldDetour + grouping copy),
+    U5 (full-screen Support Path flow; delete ScaffoldStepSheet; route reference steps via
+    `resolveReferenceStopId`), U6 (whole-flow browser gate at 320x568/390x844 + 200% zoom +
+    ADR-0037/CONTEXT/docs consolidation + plan deletion).** U6 must also inspect the U1
+    recorded caveat (compound-parent sub-phrase terms) and AE5 dialog behavior at constrained
+    heights against the NEW anatomy.
 
 ### Evidence-triggered follow-up
 

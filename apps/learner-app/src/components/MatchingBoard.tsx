@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { Check } from "lucide-react-native";
@@ -15,12 +15,16 @@ export function MatchingBoard({
   item,
   result,
   disabled,
+  supportSlot,
   onAttempt,
   onComplete
 }: Readonly<{
   item: StudyMatchingView;
   result: LearnerMatchingResult | null;
   disabled: boolean;
+  // The Support Paths panel rendered between the question stem and the answer controls
+  // (plan 2026-07-13-002 U3, R7): support is reachable before the learner commits.
+  supportSlot?: ReactNode;
   onAttempt: (promptId: string, matchId: string) => Promise<boolean>;
   onComplete: (trace: MatchingAttemptTrace) => Promise<void>;
 }>) {
@@ -93,6 +97,7 @@ export function MatchingBoard({
         <Text variant="heading" className="flex-1 leading-7">{item.question}</Text>
         <GroundedBadge provenance={item.groundingProvenance} />
       </View>
+      {supportSlot}
       <Text variant="label" color="muted" className="font-normal">
         {matchedPairs.length} of {item.prompts.length} matched. Tap a clue on the left, then its match on the right.
       </Text>

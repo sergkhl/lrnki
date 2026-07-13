@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookOpen, CheckCircle2, HelpCircle, MapPin, Rows3, Search } from "lucide-react-native";
-import type { StudySession } from "@lrnki/application/projection";
+import type { ExplorableTermView, StudySession } from "@lrnki/application/projection";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/lib/api";
-import { markLearnerLessonRead, refreshLearnerExpedition, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/lib/actions";
+import { hideScaffoldDetour, markLearnerLessonRead, refreshLearnerExpedition, requestScaffoldDetour, retryScaffoldDetour, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/lib/actions";
 import { Button, FullScreenDialog, OverlayHeader, Text, colors, triggerHaptic } from "@/ui";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { LessonSections } from "./LessonSections";
 import { MatchingBoard } from "./MatchingBoard";
-import { TermExplorationMenu } from "./TermExplorationMenu";
+import { SupportPathDialog, type SupportPathDialogState } from "./SupportPathDialog";
+import { SupportPathsPanel } from "./SupportPathsPanel";
 import type { ScaffoldTermSource } from "@/lib/actions";
 import { activeStopFor, type AdvanceMemory } from "@/learn/advanceMemory";
 import { resolveStopActivity } from "@lrnki/application/projection";
@@ -29,19 +30,29 @@ export function ActivitySheet({
   stopId,
   open,
   onOpenChange,
-  onScaffoldRequested
+  onScaffoldRequested,
+  onOpenDetour
 }: Readonly<{
   session: StudySession;
   stopId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // A successful Explorable Term request (plan 2026-07-12-002 U6): the sheet closes into the
-  // root-owned progress dialog the parent opens for the returned detour id (KTD11, F1).
+  // A successful Explorable Term request (KTD5, F1): the sheet and its nested dialog close
+  // first, then the parent opens root-owned progress/ready state for the returned detour id.
   onScaffoldRequested?: (detourId: string) => void;
+  // `Open support path` on an already-ready term (R13): the sheet closes and the parent
+  // opens the detour's own surface on the trail.
+  onOpenDetour?: (detourId: string) => void;
 }>) {
   const insets = useSafeAreaInsets();
   const [localStop, setLocalStop] = useState<AdvanceMemory>(null);
   const [mutationPending, setMutationPending] = useState(false);
+  // The nested state-aware Support Path dialog (KTD4/KTD5): one dialog for taps from BOTH
+  // inline theory terms and the panel. It sits above this Activity Sheet only for contextual
+  // inspection and cancellation; request acceptance stages the root handoff.
+  const [dialogTerm, setDialogTerm] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const activeStopId = activeStopFor(localStop, stopId);
   const activity = activeStopId ? resolveStopActivity(session, activeStopId) : null;
   const title = activity && activity.kind !== "missing" ? activity.label : "Trail stop";
@@ -49,8 +60,39 @@ export function ActivitySheet({
     // Closing drops the in-sheet advance memory, so re-opening an earlier stop
     // opens that stop's own activity instead of the one it advanced to.
     setLocalStop(null);
+    setDialogTerm(null);
+    setRequestError(null);
     onOpenChange(false);
   };
+
+  const termContext = activity ? termContextFor(activity) : null;
+  // The dialog derives its state from the LIVE projected support of the tapped term, so
+  // polling refreshes (generating → ready) flow into an open dialog with no local machine.
+  const dialogTermView = dialogTerm !== null ? termContext?.terms.find((entry) => entry.term === dialogTerm) ?? null : null;
+  const openTermDialog = (term: string) => {
+    setRequestError(null);
+    setDialogTerm(term);
+  };
+  const requestSupport = () => {
+    if (!termContext || dialogTerm === null || requesting) return;
+    setRequesting(true);
+    setRequestError(null);
+    void requestScaffoldDetour({ enrichmentId: session.enrichmentId, source: termContext.source, term: dialogTerm })
+      .then((outcome) => {
+        if (outcome.created) {
+          // Staged handoff (KTD5): close the nested dialog and this activity, THEN the root
+          // opens progress or ready state from the returned durable detour.
+          setDialogTerm(null);
+          close();
+          onScaffoldRequested?.(outcome.detourId);
+        } else {
+          setRequestError(learnerTerm("termRequestFailed"));
+        }
+      })
+      .catch(() => setRequestError(learnerTerm("termRequestFailed")))
+      .finally(() => setRequesting(false));
+  };
+
   return (
     <FullScreenDialog
       open={open}
@@ -68,21 +110,6 @@ export function ActivitySheet({
           closeDisabled={mutationPending}
           closeLabel="Close"
         />
-        {activity ? (() => {
-          const menu = termMenuFor(activity);
-          if (!menu) return null;
-          return (
-            <TermExplorationMenu
-              enrichmentId={session.enrichmentId}
-              source={menu.source}
-              terms={menu.terms}
-              onRequested={(detourId) => {
-                close();
-                onScaffoldRequested?.(detourId);
-              }}
-            />
-          );
-        })() : null}
         {activity ? (
           <ActivityController
             key={activeStopId}
@@ -90,14 +117,69 @@ export function ActivitySheet({
             activity={activity}
             stopId={activeStopId}
             justAdvanced={localStop?.sourceStopId === stopId && activeStopId !== stopId}
+            supportSlot={
+              termContext ? (
+                <SupportPathsPanel
+                  terms={termContext.terms}
+                  busyTerm={requesting ? dialogTerm : null}
+                  onSelect={openTermDialog}
+                />
+              ) : null
+            }
+            onPressTerm={openTermDialog}
             onAdvance={(nextStopId) => setLocalStop({ sourceStopId: stopId, activeStopId: nextStopId })}
             onDone={close}
             onPendingChange={setMutationPending}
           />
         ) : null}
       </View>
+      {dialogTerm !== null ? (
+        <SupportPathDialog
+          open
+          onOpenChange={(next) => {
+            // Cancel restores reading focus in this sheet (KTD5); the term stays highlighted.
+            if (!next && !requesting) setDialogTerm(null);
+          }}
+          term={dialogTerm}
+          state={dialogStateFor(dialogTermView, requesting)}
+          error={requestError}
+          onRequest={requestSupport}
+          onRetry={() => {
+            if (dialogTermView?.support.kind === "failed") {
+              void retryScaffoldDetour({ enrichmentId: session.enrichmentId, detourId: dialogTermView.support.detourId });
+            }
+          }}
+          onDismiss={() => {
+            // Dismissing a failed path hides the preserved detour; its term returns to the
+            // panels as available (F4) and the open dialog follows the projection there.
+            if (dialogTermView?.support.kind === "failed") {
+              void hideScaffoldDetour({ enrichmentId: session.enrichmentId, detourId: dialogTermView.support.detourId });
+            }
+          }}
+          onOpenPath={() => {
+            if (dialogTermView?.support.kind === "ready") {
+              const detourId = dialogTermView.support.detourId;
+              setDialogTerm(null);
+              close();
+              onOpenDetour?.(detourId);
+            }
+          }}
+        />
+      ) : null}
     </FullScreenDialog>
   );
+}
+
+// Map a projected term's live support state (plus the in-flight request) onto the dialog's
+// presentation state. A term that vanished from the context (activity changed) renders as
+// available; the dialog is closed by then anyway.
+function dialogStateFor(view: ExplorableTermView | null, requesting: boolean): SupportPathDialogState {
+  if (requesting) return { kind: "requesting" };
+  const support = view?.support;
+  if (!support || support.kind === "available") return { kind: "available" };
+  if (support.kind === "generating") return { kind: "generating", phase: support.phase };
+  if (support.kind === "failed") return { kind: "failed" };
+  return { kind: "ready", complete: support.complete };
 }
 
 // The header circle mirrors the checkpoint that opened the activity: same icon set,
@@ -134,6 +216,8 @@ function ActivityController({
   activity,
   stopId,
   justAdvanced,
+  supportSlot,
+  onPressTerm,
   onAdvance,
   onDone,
   onPendingChange
@@ -142,6 +226,8 @@ function ActivityController({
   activity: Activity;
   stopId: string | null;
   justAdvanced: boolean;
+  supportSlot: ReactNode;
+  onPressTerm: (term: string) => void;
   onAdvance: (stopId: string) => void;
   onDone: () => void;
   onPendingChange: (pending: boolean) => void;
@@ -235,7 +321,7 @@ function ActivityController({
       <ScrollView className="flex-1">
         <View className="mx-auto w-full max-w-3xl gap-4 p-4">
           <CompletedIndicator session={session} activity={activity} result={result} />
-          <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} justAdvanced={justAdvanced} onSelect={submitSelection} onMatchingAttempt={validateMatching} onMatchingComplete={submitMatching} />
+          <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} justAdvanced={justAdvanced} supportSlot={supportSlot} onPressTerm={onPressTerm} onSelect={submitSelection} onMatchingAttempt={validateMatching} onMatchingComplete={submitMatching} />
           {result && !result.graded ? <Text variant="label" color="destructive" className="font-normal">{result.message}</Text> : null}
         </View>
       </ScrollView>
@@ -260,6 +346,8 @@ function ActivityBody({
   result,
   pending,
   justAdvanced,
+  supportSlot,
+  onPressTerm,
   onSelect,
   onMatchingAttempt,
   onMatchingComplete
@@ -269,18 +357,32 @@ function ActivityBody({
   result: ActivityResult;
   pending: boolean;
   justAdvanced: boolean;
+  supportSlot: ReactNode;
+  onPressTerm: (term: string) => void;
   onSelect: (id: string) => void;
   onMatchingAttempt: (promptId: string, matchId: string) => Promise<boolean>;
   onMatchingComplete: (trace: { promptId: string; chosenMatchId: string }[]) => Promise<void>;
 }>) {
   if (activity.kind === "missing") return <Text variant="label" color="muted" className="font-normal">{activity.message}</Text>;
-  if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
-  if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
-  if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} onSelect={onSelect} />;
+  // Graded activities place the panel between the question stem and the answer controls
+  // (R7): support is discoverable before the learner commits an answer. Question stems get
+  // no inline highlighting.
+  if (activity.kind === "option_select") return <OptionSelectBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} supportSlot={supportSlot} onSelect={onSelect} />;
+  if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} supportSlot={supportSlot} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
+  if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} supportSlot={supportSlot} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
     return <CapstoneReveal activity={activity} justAdvanced={justAdvanced} />;
   }
-  if (activity.lesson?.sections.length) return <LessonSections lesson={activity.lesson} />;
+  // Theory: inline first-occurrence highlights in the prose (R5-R6) with the persistent
+  // panel FOLLOWING the content as the large-target inventory (R7).
+  if (activity.lesson?.sections.length) {
+    return (
+      <>
+        <LessonSections lesson={activity.lesson} onPressTerm={onPressTerm} />
+        {supportSlot}
+      </>
+    );
+  }
   return (
     <View className="rounded-card border border-line bg-card p-4">
       <Text variant="label" color="muted" className="font-normal">No field notes are available for this stop.</Text>
@@ -389,16 +491,18 @@ function CompletedIndicator({
   );
 }
 
-// The Explorable Term source + advertised terms for the current activity (R1-R4). A theory stop's
-// terms are its lesson's flattened terms (keyed by node); a question stop's terms are the item's
-// (keyed by the study item). Capstone, missing, and term-less activities show no menu (AE2).
-function termMenuFor(activity: Activity): { source: ScaffoldTermSource; terms: string[] } | null {
+// The Explorable Term source + advertised term views for the current activity (R1-R4). A
+// theory stop's terms are its lesson's anchored term views (keyed by node); a question
+// stop's terms are the item's (keyed by the study item). Each view carries its finished
+// support state (KTD1), so the panel and the dialog never rebuild detour policy. Capstone,
+// missing, and term-less activities expose no support surface (AE8).
+function termContextFor(activity: Activity): { source: ScaffoldTermSource; terms: ExplorableTermView[] } | null {
   if (activity.kind === "theory") {
-    const terms = (activity.lesson?.explorableTerms ?? []).map((entry) => entry.term);
+    const terms = activity.lesson?.explorableTerms ?? [];
     return terms.length ? { source: { kind: "lesson", derivedNodeId: activity.derivedNodeId }, terms } : null;
   }
   if (activity.kind === "option_select" || activity.kind === "impostor" || activity.kind === "matching") {
-    const terms = activity.item.explorableTerms.map((entry) => entry.term);
+    const terms = activity.item.explorableTerms;
     return terms.length ? { source: { kind: "study_item", studyItemId: activity.item.studyItemId }, terms } : null;
   }
   return null;

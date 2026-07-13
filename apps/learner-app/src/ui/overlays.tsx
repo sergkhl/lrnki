@@ -3,7 +3,7 @@
 // OverlayHeader with a circular semantic icon, and one dismissal contract. A pending
 // mutation blocks every dismissal input via `dismissBlocked`.
 import { useEffect, type ComponentType, type ReactNode } from "react";
-import { BackHandler, Platform, View } from "react-native";
+import { BackHandler, Platform, ScrollView, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import * as DialogPrimitive from "@rn-primitives/dialog";
 import { X } from "lucide-react-native";
@@ -59,6 +59,28 @@ export function OverlayHeader({
       ) : null}
     </View>
   );
+}
+
+/** The centered dialog's shrinkable middle region (plan 2026-07-13-002 U3, KTD9). The
+ * anatomy is FIXED header (OverlayHeader), THIS scrollable body, then DialogFooter: the
+ * body carries `shrink min-h-0` so at constrained heights it — never the actions — gives
+ * up space and scrolls. Consumers must not add their own bounded wrapper (the former
+ * `max-h-96` reflow-clipping problem class). */
+export function DialogBody({
+  children,
+  contentClassName
+}: Readonly<{ children: ReactNode; contentClassName?: string }>) {
+  return (
+    <ScrollView testID="dialog-body" className="min-h-0 shrink" contentContainerClassName={contentClassName ?? "gap-3 p-4"}>
+      {children}
+    </ScrollView>
+  );
+}
+
+/** The centered dialog's always-reachable action region (KTD9): fixed below the body,
+ * so no action can be pushed off-screen by long content. */
+export function DialogFooter({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
+  return <View className={`shrink-0 gap-2 border-t border-line bg-card p-4 ${className ?? ""}`}>{children}</View>;
 }
 
 /** Android hardware back inside an open overlay: close unless a mutation blocks it. */
@@ -126,8 +148,11 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
           className="absolute inset-0 items-center justify-center bg-black/40 p-4"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
+          {/* The bounded dialog column (KTD9): Content caps the height; the entrance
+              wrapper and DialogBody carry `shrink min-h-0` so the BODY shrinks and
+              scrolls while the header and DialogFooter actions stay reachable. */}
           <DialogPrimitive.Content className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card">
-            <OverlayEntrance className="max-h-full">{children}</OverlayEntrance>
+            <OverlayEntrance className="min-h-0 shrink">{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>
