@@ -4,7 +4,8 @@ import { validateItemExplorableTerms, validateLessonExplorableTerms } from "./ex
 
 // U1 test scenario 3/4 (R2/R3, KTD1): the deterministic Explorable Term validator keeps only
 // distinct 1-80-code-point exact substrings of the authoritative body that are not the parent
-// label, caps at three, and drops the rest WITHOUT vetoing otherwise-valid neural output.
+// label, caps at five (plan 2026-07-13-002 U1, AE1), and drops the rest WITHOUT vetoing
+// otherwise-valid neural output.
 
 test("item terms: keeps only exact substrings of the question stem, in order", () => {
   const question = "How does the borrow checker enforce the ownership invariant at compile time?";
@@ -33,10 +34,10 @@ test("item terms: enforces the 1-80 code-point envelope on the trimmed term", ()
   assert.deepEqual(kept, [ok]);
 });
 
-test("item terms: caps at three, dropping anything past the first three valid terms", () => {
-  const question = "alpha beta gamma delta epsilon";
-  const kept = validateItemExplorableTerms(["alpha", "beta", "gamma", "delta", "epsilon"], question, "Parent");
-  assert.deepEqual(kept, ["alpha", "beta", "gamma"]);
+test("item terms: caps at five, dropping anything past the first five valid terms (AE1)", () => {
+  const question = "alpha beta gamma delta epsilon zeta";
+  const kept = validateItemExplorableTerms(["alpha", "beta", "gamma", "delta", "epsilon", "zeta"], question, "Parent");
+  assert.deepEqual(kept, ["alpha", "beta", "gamma", "delta", "epsilon"]);
 });
 
 test("item terms: trims surrounding whitespace but stores an exact substring", () => {
@@ -92,9 +93,9 @@ test("lesson terms: does not match against a section's list items, only its pros
   assert.deepEqual(kept, []);
 });
 
-test("lesson terms: distinctness holds across sections and the cap is three", () => {
+test("lesson terms: distinctness holds across sections and the cap is five (AE1)", () => {
   const many = [
-    { kind: "definition" as const, text: "a b c d" },
+    { kind: "definition" as const, text: "a b c d h" },
     { kind: "examples" as const, text: "a e f g" }
   ];
   const kept = validateLessonExplorableTerms(
@@ -103,10 +104,12 @@ test("lesson terms: distinctness holds across sections and the cap is three", ()
       { term: "a", sectionKind: "examples" },
       { term: "b", sectionKind: "definition" },
       { term: "c", sectionKind: "definition" },
-      { term: "d", sectionKind: "definition" }
+      { term: "d", sectionKind: "definition" },
+      { term: "e", sectionKind: "examples" },
+      { term: "h", sectionKind: "definition" }
     ],
     many,
     "Parent"
   );
-  assert.deepEqual(kept.map((t) => t.term), ["a", "b", "c"]);
+  assert.deepEqual(kept.map((t) => t.term), ["a", "b", "c", "d", "e"]);
 });

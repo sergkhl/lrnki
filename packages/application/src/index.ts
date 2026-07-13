@@ -23,9 +23,9 @@ export {
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export {
   composeScaffoldDetours,
+  resolveReferenceStopId,
   type ScaffoldDetourView,
   type ScaffoldStepView,
-  type ScaffoldDetourGroup,
   type ScaffoldGeneratingPhase,
   type ComposeScaffoldDetoursInput,
   type ReferencedNodeCompletion
@@ -185,6 +185,9 @@ export {
   labelFor,
   type ConceptLessonSectionView,
   type ConceptLessonView,
+  type ExplorableTermSupport,
+  type ExplorableTermSupportLookup,
+  type ExplorableTermView,
   type SheetContent,
   type StudyImpostorView,
   type StudyItemView,

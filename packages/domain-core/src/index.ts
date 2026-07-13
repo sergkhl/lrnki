@@ -1401,7 +1401,7 @@ type StudyItemBase = {
   generatingModel: string;
   configHash: string;
   facet?: string;
-  // Zero-to-three validated Explorable Terms from this item's question stem (plan
+  // Zero-to-five validated Explorable Terms from this item's question stem (plan
   // 2026-07-12-002 U1, R1-R3). Plain strings — item terms carry no section anchor.
   explorableTerms: string[];
 };
@@ -1604,7 +1604,7 @@ export type ExplorableTerm = {
 // A persisted lesson, keyed like the Study Item Bank so a regeneration replaces the
 // prior asset cleanly (replace-by-enrichment). `sections` is ordered and meets the R3
 // minimum (a gist, ≥1 application, and ≥1 substantive section). `explorableTerms` is the
-// zero-to-three validated affordance list (may be empty).
+// zero-to-five validated affordance list (may be empty).
 export type ConceptLesson = {
   derivedNodeId: string;
   // NULL for a synthetic (source-less) layer's lessons; non-null for source-derived layers.

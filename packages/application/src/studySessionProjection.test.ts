@@ -583,7 +583,6 @@ test("composeStudySession — a generating detour rides on the session and raise
   const session = compose({ detours: [generatingDetour("ownership", "Borrow checker")] });
   assert.equal(session.detours.length, 1);
   assert.equal(session.detours[0].status, "generating");
-  assert.equal(session.detours[0].group, "generating");
   assert.equal(session.detours[0].parentDerivedNodeId, "ownership");
   assert.equal(session.generatingDetours, true);
 });
@@ -606,6 +605,88 @@ test("composeStudySession — a ready reference detour completes in lockstep wit
   const composed = session.detours[0];
   assert.equal(composed.status, "ready");
   assert.equal(composed.complete, true, "reference step complete from the referenced node's neutral evidence");
-  assert.equal(composed.group, "active");
+  assert.equal(composed.completedStepCount, 1);
+  assert.equal(composed.firstIncompleteStepId, null);
   assert.equal(session.generatingDetours, false);
+});
+
+// --- Explorable Term support state (plan 2026-07-13-002 U2, KTD1/KTD2; R3, AE3/AE8) ---------
+
+import { resolveReferenceStopId } from "./studySessionTrail";
+
+function readyDetour(parent: string, term: string): ScaffoldDetour {
+  return {
+    detourId: `d-${parent}-${term}`, learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: parent,
+    term, normalizedTerm: term.toLowerCase(), status: "ready", latestOperationId: null, claimToken: null,
+    steps: [{ scaffoldStepId: `s-${term}`, ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope" }]
+  };
+}
+
+function itemWithTerms(derivedNodeId: string, terms: string[]): StudyItem {
+  return { ...optionItem(derivedNodeId), explorableTerms: terms };
+}
+
+function lessonWithTerms(derivedNodeId: string, terms: string[]): ConceptLesson {
+  const lesson = lessonFor(derivedNodeId);
+  return { ...lesson, explorableTerms: terms.map((term) => ({ term, sectionKind: "gist" as const })) };
+}
+
+test("AE3 — an active same-parent detour attaches its state to lesson AND item term views after normalization; other parents/terms stay available", () => {
+  const session = compose({
+    studyItems: [itemWithTerms("ownership", ["Borrow Checker", "heap allocation"]), itemWithTerms("move", ["Borrow Checker"])],
+    lessons: [lessonWithTerms("ownership", ["Borrow Checker"])],
+    // The detour's stored term differs in case; correlation is on the NORMALIZED term.
+    detours: [readyDetour("ownership", "borrow checker")]
+  });
+  const itemTerms = session.studySegmentsByNode.ownership[0].item.explorableTerms;
+  assert.equal(itemTerms[0].term, "Borrow Checker");
+  assert.equal(itemTerms[0].sectionKind, null);
+  assert.equal(itemTerms[0].support.kind, "ready");
+  // A different normalized term under the same parent stays available.
+  assert.deepEqual(itemTerms[1].support, { kind: "available" });
+  // The SAME normalized term under a DIFFERENT parent stays available.
+  assert.deepEqual(session.studySegmentsByNode.move[0].item.explorableTerms[0].support, { kind: "available" });
+  // The lesson view carries the same support state, keeping its section anchor.
+  const lessonTerms = session.lessonByNode.ownership.explorableTerms;
+  assert.equal(lessonTerms[0].sectionKind, "gist");
+  assert.equal(lessonTerms[0].support.kind, "ready");
+});
+
+test("support state projects each lifecycle state deterministically (generating carries phase; ready carries completeness)", () => {
+  const generating: ScaffoldDetour = { ...readyDetour("ownership", "alpha"), status: "generating", steps: [], latestOperationId: "op", claimToken: "tok" };
+  const failed: ScaffoldDetour = { ...readyDetour("ownership", "beta"), detourId: "d-beta", status: "failed", steps: [] };
+  const session = compose({
+    studyItems: [itemWithTerms("ownership", ["alpha", "beta", "gamma"]), optionItem("scope")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    rows: [graded("scope", "correct", 1)],
+    detours: [failed, generating, readyDetour("ownership", "gamma")]
+  });
+  const terms = session.studySegmentsByNode.ownership[0].item.explorableTerms;
+  assert.deepEqual(terms[0].support, { kind: "generating", detourId: "d-ownership-alpha", phase: "preparing" });
+  assert.deepEqual(terms[1].support, { kind: "failed", detourId: "d-beta" });
+  // scope's lesson is read and its option-select latest-correct ⇒ reference step complete ⇒ ready+complete.
+  assert.deepEqual(terms[2].support, { kind: "ready", detourId: "d-ownership-gamma", complete: true });
+});
+
+test("AE4 — a hidden detour is absent from the active read, so its term projects available again", () => {
+  // Hidden detours never reach `input.detours` (the store's active read excludes them); the
+  // projection therefore falls back to `available`, which the idempotent request restores.
+  const session = compose({ studyItems: [itemWithTerms("ownership", ["borrow checker"])], detours: [] });
+  assert.deepEqual(session.studySegmentsByNode.ownership[0].item.explorableTerms[0].support, { kind: "available" });
+});
+
+// --- Reference-step destination (plan 2026-07-13-002 U2, KTD8; R15, AE7) --------------------
+
+test("AE7 — resolveReferenceStopId picks the referenced node's first incomplete ordinary stop, then falls back to the capstone review", () => {
+  const fresh = compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")] });
+  assert.equal(resolveReferenceStopId(fresh, "scope"), "scope:theory:main");
+
+  const lessonReadOnly = compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], lessonReads: ["scope"] });
+  assert.equal(resolveReferenceStopId(lessonReadOnly, "scope"), "scope:option_select:os-scope");
+
+  const complete = compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], lessonReads: ["scope"], rows: [graded("scope", "correct", 1)] });
+  assert.equal(resolveReferenceStopId(complete, "scope"), "scope:capstone:main");
+
+  assert.equal(resolveReferenceStopId(fresh, "not-on-trail"), null);
 });

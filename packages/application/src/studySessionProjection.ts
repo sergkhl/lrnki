@@ -1,6 +1,6 @@
-import { neutralResponses, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type ScaffoldDetour, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
+import { neutralResponses, normalizeConceptLabel, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type ScaffoldDetour, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
 import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
-import { composeScaffoldDetours, type ScaffoldDetourView } from "./studySessionTrail";
+import { composeScaffoldDetours, type ScaffoldDetourView, type ScaffoldGeneratingPhase } from "./studySessionTrail";
 import { conceptLessonSectionToView } from "./conceptLessonSectionView";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -26,6 +26,33 @@ import { projectExpeditionSections, type ExpeditionSection, type ExpeditionSecti
 
 // --- View contract (rides down with the projection, KTD6) ------------------
 
+// Learner support state attached to every projected Explorable Term (plan 2026-07-13-002 U2,
+// KTD1/KTD2; R3). The projection is the single authority: it correlates the learner's ACTIVE
+// detours by (parent node, normalized term) so the surface renders finished state instead of
+// rebuilding detour policy. `available` includes hidden detours by design (KTD10) — hiding a
+// path returns its term to the panels, and the idempotent request restores the same detour.
+export type ExplorableTermSupport =
+  | { kind: "available" }
+  | { kind: "generating"; detourId: string; phase: ScaffoldGeneratingPhase }
+  | { kind: "failed"; detourId: string }
+  | { kind: "ready"; detourId: string; complete: boolean };
+
+// A projected Explorable Term (KTD2): the exact stored term text plus its section anchor.
+// Lesson terms keep the `sectionKind` the validator anchored them to (theory highlights only
+// that section); Study Item terms carry no anchor (`sectionKind: null`).
+export type ExplorableTermView = {
+  term: string;
+  sectionKind: ConceptLessonSectionKind | null;
+  support: ExplorableTermSupport;
+};
+
+// The (parent node, term) → support lookup the composition threads into the view mappers.
+// Defaults to `available` so callers without learner detour state (Admin Lab inspection,
+// tests) compose unchanged.
+export type ExplorableTermSupportLookup = (parentDerivedNodeId: string, term: string) => ExplorableTermSupport;
+
+const alwaysAvailable: ExplorableTermSupportLookup = () => ({ kind: "available" });
+
 export type StudyOptionSelectView = {
   studyItemId: string;
   derivedNodeId: string;
@@ -38,9 +65,9 @@ export type StudyOptionSelectView = {
     provenance: "source" | "generated";
   }[];
   // Server-owned Explorable Term affordances advertised by this question stem (plan
-  // 2026-07-12-002 U1/U6, R1-R4). Zero-to-three validated exact substrings the learner may turn
-  // into a Scaffold Detour; the surface renders a quiet overflow action, never inline highlights.
-  explorableTerms: string[];
+  // 2026-07-13-002 U2, R2-R4). Zero-to-five validated exact substrings the learner may turn
+  // into a Scaffold Detour, each carrying its finished support state (KTD1).
+  explorableTerms: ExplorableTermView[];
 };
 
 // The serializable Impostor view that rides down the projection (R10/R11). Four statements
@@ -61,7 +88,7 @@ export type StudyImpostorView = {
   lieSource: "sibling" | "generated";
   siblingLabel?: string;
   // Explorable Term affordances advertised by this question stem (see StudyOptionSelectView).
-  explorableTerms: string[];
+  explorableTerms: ExplorableTermView[];
 };
 
 export type StudyMatchingView = {
@@ -72,7 +99,7 @@ export type StudyMatchingView = {
   prompts: { promptId: string; text: string }[];
   matches: { matchId: string; text: string }[];
   // Explorable Term affordances advertised by this question stem (see StudyOptionSelectView).
-  explorableTerms: string[];
+  explorableTerms: ExplorableTermView[];
 };
 
 // The Concept Lesson view that rides down the projection (ADR-0031, KTD5). A serializable
@@ -97,10 +124,10 @@ export type ConceptLessonView = {
   derivedNodeId: string;
   canonicalLabel: string;
   sections: ConceptLessonSectionView[];
-  // Lesson-wide Explorable Term affordances (plan 2026-07-12-002 U1/U6, R1-R4). The persisted
-  // terms are anchored to a section kind server-side (used only to verify the request); the
-  // theory activity renders the flattened distinct term text as at most three overflow actions.
-  explorableTerms: string[];
+  // Lesson-wide Explorable Term affordances (plan 2026-07-13-002 U2, R2-R6). Each term keeps
+  // its persisted section anchor (KTD2) so theory highlights the term only in its own section,
+  // plus its finished support state (KTD1). Distinct by term text, order-preserving.
+  explorableTerms: ExplorableTermView[];
 };
 
 // A thin lesson-absent record for the operator quality surface (U8): which nodes produced no
@@ -111,14 +138,22 @@ export type LessonAbsentView = {
   reason: string;
 };
 
-// Map a persisted Concept Lesson to its serializable view, flattening its Explorable Term text
-// (distinct, order-preserving) for the theory activity's overflow actions.
-export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
+// Map a persisted Concept Lesson to its serializable view. Terms keep their section anchor
+// (KTD2) and gain their support state; distinct by term text, first anchor wins (the persisted
+// validator already guarantees normalized distinctness).
+export function conceptLessonToView(lesson: ConceptLesson, supportFor: ExplorableTermSupportLookup = alwaysAvailable): ConceptLessonView {
+  const seen = new Set<string>();
+  const explorableTerms: ExplorableTermView[] = [];
+  for (const entry of lesson.explorableTerms) {
+    if (seen.has(entry.term)) continue;
+    seen.add(entry.term);
+    explorableTerms.push({ term: entry.term, sectionKind: entry.sectionKind, support: supportFor(lesson.derivedNodeId, entry.term) });
+  }
   return {
     derivedNodeId: lesson.derivedNodeId,
     canonicalLabel: lesson.canonicalLabel,
     sections: lesson.sections.map(conceptLessonSectionToView),
-    explorableTerms: [...new Set(lesson.explorableTerms.map((entry) => entry.term))]
+    explorableTerms
   };
 }
 
@@ -149,8 +184,11 @@ export type SheetContent =
   | { kind: "mastered_review"; verdict: Verdict | null };
 
 // Map a persisted study item to its per-node view (KTD4). Dispatches on `itemType`; a new
-// item type adds one arm. The options are sorted by id for a deterministic render.
-export function studyItemToView(item: StudyItem): StudyItemView {
+// item type adds one arm. The options are sorted by id for a deterministic render. Item
+// terms carry no section anchor (`sectionKind: null`, KTD2).
+export function studyItemToView(item: StudyItem, supportFor: ExplorableTermSupportLookup = alwaysAvailable): StudyItemView {
+  const itemTerms = (): ExplorableTermView[] =>
+    item.explorableTerms.map((term) => ({ term, sectionKind: null, support: supportFor(item.derivedNodeId, term) }));
   switch (item.itemType) {
     case "option_select":
       return {
@@ -164,7 +202,7 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           options: [...item.options]
             .sort((a, b) => a.optionId.localeCompare(b.optionId))
             .map((option) => ({ optionId: option.optionId, text: option.text, provenance: option.provenance })),
-          explorableTerms: item.explorableTerms
+          explorableTerms: itemTerms()
         }
       };
     case "impostor": {
@@ -185,7 +223,7 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           reveal: lie.reveal,
           lieSource: lie.lieSource,
           ...(lie.siblingLabel ? { siblingLabel: lie.siblingLabel } : {}),
-          explorableTerms: item.explorableTerms
+          explorableTerms: itemTerms()
         }
       };
     }
@@ -203,7 +241,7 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           matches: [...item.pairs]
             .sort((a, b) => a.matchId.localeCompare(b.matchId))
             .map((pair) => ({ matchId: pair.matchId, text: pair.matchText })),
-          explorableTerms: item.explorableTerms
+          explorableTerms: itemTerms()
         }
       };
   }
@@ -342,7 +380,7 @@ export type StudySession = {
   lessonReadByNode: Record<string, boolean>;
   lessonAbsent: LessonAbsentView[];
   // Composed learner-scoped Scaffold Detours under their parent Concept Marker (plan
-  // 2026-07-12-002 U4): per-step + whole-detour completion, R20 grouping, and the broad
+  // 2026-07-13-002 U2): per-step + whole-detour completion, step counts, resume target, and the broad
   // generating phase. `generatingDetours` is the polling flag — a finished session with a
   // generating detour tells the client to keep polling (U5).
   detours: ScaffoldDetourView[];
@@ -396,7 +434,62 @@ export function composeStudySession(input: {
   const trailNodes = detail.nodes.filter((node) => floor.includedNodeIds.has(node.derivedNodeId));
   const trailEdges = floor.contractedEdges;
 
-  const itemViews = input.studyItems.map(studyItemToView);
+  const lessonReadByNode = Object.fromEntries((input.lessonReads ?? []).map((derivedNodeId) => [derivedNodeId, true]));
+  const lessonAbsentNodeIds = new Set((input.lessonAbsent ?? []).map((node) => node.derivedNodeId));
+
+  // The neutral trail's per-item latest-outcome map folds NEUTRAL responses only; scaffold
+  // step evidence is composed separately inside `composeScaffoldDetours` (KTD4).
+  const latestOutcomeByStudyItemId: Record<string, StudyItemOutcome> = {};
+  const latestAttemptByStudyItemId = new Map<string, number>();
+  for (const row of neutralResponses(input.rows)) {
+    if (row.signalType !== "graded" || !row.judgedOutcome) continue;
+    const currentAttempt = latestAttemptByStudyItemId.get(row.studyItemId);
+    if (currentAttempt !== undefined && row.attemptSeq <= currentAttempt) continue;
+    latestAttemptByStudyItemId.set(row.studyItemId, row.attemptSeq);
+    latestOutcomeByStudyItemId[row.studyItemId] = row.judgedOutcome === "correct" ? "correct" : "incorrect";
+  }
+
+  // Learner-scoped Scaffold Detour composition (plan 2026-07-13-002 U2, KTD1/KTD6). Composed
+  // BEFORE the lesson/item view conversion so every projected Explorable Term can carry its
+  // finished support state. A reference step's completion is the referenced node's neutral
+  // lesson-read + option-select subset (in lockstep with that node's own stop, from the raw
+  // study items so no view ordering is required); generated-step evidence is scoped inside
+  // `composeScaffoldDetours`.
+  const referencedNodeCompletion = (derivedNodeId: string) => {
+    const lessonRead = lessonReadByNode[derivedNodeId] === true || lessonAbsentNodeIds.has(derivedNodeId);
+    const optionSelect = floor.includedNodeIds.has(derivedNodeId)
+      ? input.studyItems.find((item) => item.itemType === "option_select" && item.derivedNodeId === derivedNodeId)
+      : undefined;
+    const optionSelectCorrect = optionSelect ? latestOutcomeByStudyItemId[optionSelect.studyItemId] === "correct" : false;
+    return { lessonRead, optionSelectCorrect };
+  };
+  const detours = composeScaffoldDetours({
+    detours: input.detours ?? [],
+    responses: input.rows,
+    referencedNodeCompletion,
+    // The broad, honest phase at the projection level; the fine stage→phase refinement is a
+    // progress-dialog concern. The client renders one indeterminate bar and a phase sentence.
+    generatingPhase: () => "preparing"
+  });
+  const generatingDetours = detours.some((detour) => detour.status === "generating");
+
+  // The (parent node, normalized term) support index (KTD1, R3): an ACTIVE detour in any
+  // lifecycle state claims its term; everything else projects `available`. Hidden detours are
+  // absent from the active read, so their terms fall back to `available` (restorable, R3/AE4).
+  const supportByTermKey = new Map<string, ExplorableTermSupport>();
+  for (const detour of detours) {
+    const support: ExplorableTermSupport =
+      detour.status === "generating"
+        ? { kind: "generating", detourId: detour.detourId, phase: detour.phase ?? "preparing" }
+        : detour.status === "failed"
+          ? { kind: "failed", detourId: detour.detourId }
+          : { kind: "ready", detourId: detour.detourId, complete: detour.complete };
+    supportByTermKey.set(`${detour.parentDerivedNodeId}\u0000${normalizeConceptLabel(detour.term)}`, support);
+  }
+  const supportFor: ExplorableTermSupportLookup = (parentDerivedNodeId, term) =>
+    supportByTermKey.get(`${parentDerivedNodeId}\u0000${normalizeConceptLabel(term)}`) ?? { kind: "available" };
+
+  const itemViews = input.studyItems.map((item) => studyItemToView(item, supportFor));
   // Group a node's items into its ordered segment list (R10, KTD7): option_select, then
   // impostor. A node with one type lists one segment. A floored node contributes no
   // activity segments (R5).
@@ -408,10 +501,8 @@ export function composeStudySession(input: {
   for (const segments of Object.values(studySegmentsByNode)) {
     segments.sort((a, b) => STUDY_ITEM_TYPE_ORDER[a.kind] - STUDY_ITEM_TYPE_ORDER[b.kind]);
   }
-  const lessonReadByNode = Object.fromEntries((input.lessonReads ?? []).map((derivedNodeId) => [derivedNodeId, true]));
   const lessonByNode: Record<string, ConceptLessonView> = {};
-  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
-  const lessonAbsentNodeIds = new Set((input.lessonAbsent ?? []).map((node) => node.derivedNodeId));
+  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson, supportFor);
 
   // Calibration ∘ graded composition (R12): the trusted-edge down-closure of the `known`
   // verdicts is mastered via calibration; un-pruned nodes take their graded mastery; the
@@ -419,17 +510,6 @@ export function composeStudySession(input: {
   const knownNodes = input.verdicts.filter((verdict) => verdict.verdict === "known").map((verdict) => verdict.derivedNodeId);
   const knownClosure = pruneClosure(knownNodes, trailEdges);
   const gradedByNode = new Map(Object.entries(buildMasteryMap(input.rows)));
-  // The neutral trail's per-item latest-outcome map folds NEUTRAL responses only; scaffold
-  // step evidence is composed separately in the U4 detour projection (KTD4).
-  const latestOutcomeByStudyItemId: Record<string, StudyItemOutcome> = {};
-  const latestAttemptByStudyItemId = new Map<string, number>();
-  for (const row of neutralResponses(input.rows)) {
-    if (row.signalType !== "graded" || !row.judgedOutcome) continue;
-    const currentAttempt = latestAttemptByStudyItemId.get(row.studyItemId);
-    if (currentAttempt !== undefined && row.attemptSeq <= currentAttempt) continue;
-    latestAttemptByStudyItemId.set(row.studyItemId, row.attemptSeq);
-    latestOutcomeByStudyItemId[row.studyItemId] = row.judgedOutcome === "correct" ? "correct" : "incorrect";
-  }
   // Gating mastery is a COMPLETION rule now (U2, R7/R8 — ADR-0032), not a graded threshold
   // crossing: a node is mastered only when its lesson (if any) is read AND every activity
   // segment is latest-correct. This is the ONE rule that drives gating, the gem, and per-stop
@@ -515,31 +595,6 @@ export function composeStudySession(input: {
   const lessonAbsent: LessonAbsentView[] = (input.lessonAbsent ?? [])
     .map((node) => ({ derivedNodeId: node.derivedNodeId, label: labelByNode.get(node.derivedNodeId) ?? node.canonicalLabel, reason: node.reason }))
     .sort((a, b) => a.label.localeCompare(b.label));
-
-  // Learner-scoped Scaffold Detour composition (plan 2026-07-12-002 U4, KTD5). The projection is
-  // the single trail authority, so it composes detours from the SAME neutral evidence the trail
-  // uses: `masteredParentNodeIds` drives the R20 collapse, and a reference step's completion is
-  // the referenced node's neutral lesson-read + option-select subset (in lockstep with that
-  // node's own stop). Generated-step evidence is scoped inside `composeScaffoldDetours`.
-  const masteredParentNodeIds = new Set(
-    Object.entries(classification.stateByNode).filter(([, state]) => state === "mastered").map(([nodeId]) => nodeId)
-  );
-  const referencedNodeCompletion = (derivedNodeId: string) => {
-    const lessonRead = lessonReadByNode[derivedNodeId] === true || lessonAbsentNodeIds.has(derivedNodeId);
-    const optionSelect = (studySegmentsByNode[derivedNodeId] ?? []).find((segment) => segment.kind === "option_select");
-    const optionSelectCorrect = optionSelect ? latestOutcomeByStudyItemId[optionSelect.item.studyItemId] === "correct" : false;
-    return { lessonRead, optionSelectCorrect };
-  };
-  const detours = composeScaffoldDetours({
-    detours: input.detours ?? [],
-    responses: input.rows,
-    masteredParentNodeIds,
-    referencedNodeCompletion,
-    // The broad, honest phase at the projection level (KTD8); the fine stage→phase refinement is
-    // a U6 progress-dialog concern. The client renders one indeterminate bar and a phase sentence.
-    generatingPhase: () => "preparing"
-  });
-  const generatingDetours = detours.some((detour) => detour.status === "generating");
 
   return {
     enrichmentId: input.enrichmentId,

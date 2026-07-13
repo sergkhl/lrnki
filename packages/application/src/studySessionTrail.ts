@@ -10,10 +10,10 @@ import type {
   StudySession
 } from "./studySessionProjection";
 
-// Learner-scoped detour composition for the Study Session (plan 2026-07-12-002 U4, KTD5/KTD8).
+// Learner-scoped detour composition for the Study Session (plan 2026-07-13-002 U2, KTD6/KTD7).
 // PURE. Composes active Scaffold Detours under their parent Concept Marker into a finished
 // projection the Expedition Trail renders directly: per-step completion, whole-detour
-// completion, the R20 collapsed grouping, and the broad generating phase. Generated-step
+// completion, step counts, the first incomplete step, and the broad generating phase. Generated-step
 // evidence is SCOPED (scaffold responses + the step's lessonReadAt); reference-step evidence is
 // the NEUTRAL lesson-read + option-select subset for the referenced node — the same neutral
 // evidence that drives that node's own trail stop, so completion stays in lockstep with no
@@ -49,18 +49,19 @@ export type ScaffoldStepView =
 // projection never emits raw stage tags or counts.
 export type ScaffoldGeneratingPhase = "preparing" | "building" | "checking";
 
-// R14/R20 presentation group. `active` = a ready detour that is expanded on the live trail;
-// `support_available` = a ready, not-yet-complete detour collapsed under a mastered parent;
-// `support_explored` = a completed detour collapsed under a mastered parent.
-export type ScaffoldDetourGroup = "generating" | "failed" | "active" | "support_available" | "support_explored";
-
+// One always-visible visual Support Path node per active detour (plan 2026-07-13-002 U2,
+// KTD7): the mastered-parent presentation collapse is gone, so the view carries finished
+// status, progress counts, and the resume target directly. `firstIncompleteStepId` is null
+// for a complete path (the surface opens the overview instead) and for a non-ready detour.
 export type ScaffoldDetourView = {
   detourId: string;
   parentDerivedNodeId: string;
   term: string;
   status: ScaffoldDetour["status"];
-  group: ScaffoldDetourGroup;
   steps: ScaffoldStepView[];
+  completedStepCount: number;
+  totalStepCount: number;
+  firstIncompleteStepId: string | null;
   complete: boolean;
   phase: ScaffoldGeneratingPhase | null;
 };
@@ -76,8 +77,6 @@ export type ComposeScaffoldDetoursInput = {
   detours: readonly ScaffoldDetour[];
   // All of the learner's response rows (neutral + scaffold); the fold narrows per scope.
   responses: readonly ResponseLogRow[];
-  // Parent nodes the learner has fully mastered (drives the R20 collapse).
-  masteredParentNodeIds: ReadonlySet<string>;
   // Neutral completion for each referenced node id a reference step may point at.
   referencedNodeCompletion: (derivedNodeId: string) => ReferencedNodeCompletion;
   // Broad phase for a generating detour, mapped from its operation stage by the caller.
@@ -144,24 +143,29 @@ export function composeScaffoldDetours(input: ComposeScaffoldDetoursInput): Scaf
   return input.detours.map((detour): ScaffoldDetourView => {
     const steps = [...detour.steps].sort((a, b) => a.ordinal - b.ordinal).map((step) => stepView(step, input, scaffoldCorrectByStep));
     const complete = steps.length > 0 && steps.every((step) => step.complete);
-    const parentMastered = input.masteredParentNodeIds.has(detour.parentDerivedNodeId);
+    const completedStepCount = steps.filter((step) => step.complete).length;
+    // The resume target (R13): the ordinal-first incomplete step of a READY path. A complete
+    // path resumes nowhere (the overview is the entry); a generating/failed detour has no
+    // playable step yet.
+    const firstIncompleteStepId = detour.status === "ready"
+      ? steps.find((step) => !step.complete)?.scaffoldStepId ?? null
+      : null;
+    const phase: ScaffoldGeneratingPhase | null = detour.status === "generating"
+      ? (input.generatingPhase ? input.generatingPhase(detour) : "preparing")
+      : null;
 
-    let group: ScaffoldDetourGroup;
-    let phase: ScaffoldGeneratingPhase | null = null;
-    if (detour.status === "generating") {
-      group = "generating";
-      phase = input.generatingPhase ? input.generatingPhase(detour) : "preparing";
-    } else if (detour.status === "failed") {
-      group = "failed";
-    } else if (detour.status === "ready" && parentMastered && complete) {
-      group = "support_explored"; // R20: completed under a mastered parent
-    } else if (detour.status === "ready" && parentMastered && !complete) {
-      group = "support_available"; // R20: not-yet-complete (unstudied OR partial) under a mastered parent
-    } else {
-      group = "active"; // a live, expandable ready detour
-    }
-
-    return { detourId: detour.detourId, parentDerivedNodeId: detour.parentDerivedNodeId, term: detour.term, status: detour.status, group, steps, complete, phase };
+    return {
+      detourId: detour.detourId,
+      parentDerivedNodeId: detour.parentDerivedNodeId,
+      term: detour.term,
+      status: detour.status,
+      steps,
+      completedStepCount,
+      totalStepCount: steps.length,
+      firstIncompleteStepId,
+      complete,
+      phase
+    };
   });
 }
 
@@ -367,6 +371,22 @@ function stateForStop(input: {
   }
   if (!input.studyItemId) return "available";
   return input.session.latestOutcomeByStudyItemId[input.studyItemId] === "correct" ? "complete" : "available";
+}
+
+// --- Reference-step destination (plan 2026-07-13-002 U2, KTD8; R15, F3) -------
+//
+// A reference Support Step routes back to the CANONICAL neutral surface: the referenced
+// node's first incomplete ordinary (non-capstone) stop, so the learner studies the one real
+// concept and its normal evidence completes the step. When every ordinary stop is already
+// complete, fall back to the node's capstone — the review entry — so the tap still lands
+// somewhere meaningful. Returns null when the node is not on the trail (e.g. floored).
+export function resolveReferenceStopId(session: StudySession, referencedDerivedNodeId: string): string | null {
+  const cluster = buildTrailView(session).concepts.find((candidate) => candidate.derivedNodeId === referencedDerivedNodeId);
+  if (!cluster) return null;
+  const ordinaryStops = cluster.stops.filter((stop) => stop.kind !== "capstone");
+  const firstIncomplete = ordinaryStops.find((stop) => stop.state !== "complete");
+  if (firstIncomplete) return firstIncomplete.stopId;
+  return cluster.stops.find((stop) => stop.kind === "capstone")?.stopId ?? null;
 }
 
 // --- Activity lookup (former client `activityProgress.ts`, KTD5) --------------

@@ -131,8 +131,6 @@ export const LEARNER_VOCABULARY = {
   supportReadyBody: "Your support steps are on the trail, just below this stop.",
   supportFailedTitle: "Support didn’t build",
   supportFailedBody: "Nothing was added to your trail. You can try again or dismiss it.",
-  supportAvailableGroup: "Support available",
-  supportExploredGroup: "Support explored",
   supportSectionLabel: "Support",
   supportRetry: "Retry",
   supportDismiss: "Dismiss",

@@ -94,7 +94,10 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
               { optionId: "o1", text: "Assignment", provenance: "generated" as const },
               { optionId: "o2", text: "Borrowing", provenance: "generated" as const }
             ],
-            explorableTerms: ["ownership", "move semantics"]
+            explorableTerms: [
+              { term: "ownership", sectionKind: null, support: { kind: "available" as const } },
+              { term: "move semantics", sectionKind: null, support: { kind: "available" as const } }
+            ]
           }
         },
         {

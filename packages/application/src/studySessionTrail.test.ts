@@ -18,22 +18,24 @@ function detour(overrides: Partial<ScaffoldDetour> & { steps: ScaffoldStep[] }):
 
 const noNeutral = (): ReferencedNodeCompletion => ({ lessonRead: false, optionSelectCorrect: false });
 
-test("a generating detour projects the generating group and a broad phase, no child completion", () => {
+test("a generating detour projects a broad phase, no child completion, no resume target", () => {
   const [view] = composeScaffoldDetours({
     detours: [detour({ status: "generating", steps: [] })],
     responses: [],
-    masteredParentNodeIds: new Set(),
     referencedNodeCompletion: noNeutral,
     generatingPhase: () => "building"
   });
-  assert.equal(view.group, "generating");
+  assert.equal(view.status, "generating");
   assert.equal(view.phase, "building");
   assert.equal(view.complete, false);
+  assert.equal(view.firstIncompleteStepId, null);
 });
 
-test("a failed detour projects the failed group", () => {
-  const [view] = composeScaffoldDetours({ detours: [detour({ status: "failed", steps: [] })], responses: [], masteredParentNodeIds: new Set(), referencedNodeCompletion: noNeutral });
-  assert.equal(view.group, "failed");
+test("a failed detour projects its status with no phase and no resume target", () => {
+  const [view] = composeScaffoldDetours({ detours: [detour({ status: "failed", steps: [] })], responses: [], referencedNodeCompletion: noNeutral });
+  assert.equal(view.status, "failed");
+  assert.equal(view.phase, null);
+  assert.equal(view.firstIncompleteStepId, null);
 });
 
 test("a generated step completes only when its lesson is read AND its latest response is correct", () => {
@@ -41,7 +43,6 @@ test("a generated step completes only when its lesson is read AND its latest res
   const [view] = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [scaffoldResponse("s1", "correct")],
-    masteredParentNodeIds: new Set(),
     referencedNodeCompletion: noNeutral
   });
   assert.equal(view.steps[0].complete, true);
@@ -53,7 +54,6 @@ test("latest incorrect after correct reopens the generated step (neutral latest-
   const [view] = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [scaffoldResponse("s1", "correct"), scaffoldResponse("s1", "incorrect")],
-    masteredParentNodeIds: new Set(),
     referencedNodeCompletion: noNeutral
   });
   assert.equal(view.steps[0].complete, false);
@@ -64,47 +64,44 @@ test("a reference step's completion is the neutral lesson-read + option-select s
   const complete = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [],
-    masteredParentNodeIds: new Set(),
     referencedNodeCompletion: (id) => (id === "n-9" ? { lessonRead: true, optionSelectCorrect: true } : noNeutral())
   })[0];
   assert.equal(complete.steps[0].complete, true);
   const incomplete = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [],
-    masteredParentNodeIds: new Set(),
     referencedNodeCompletion: () => ({ lessonRead: true, optionSelectCorrect: false })
   })[0];
   assert.equal(incomplete.steps[0].complete, false);
 });
 
-// R20: the collapsed grouping under a mastered parent.
-test("R20: a completed detour under a mastered parent is support_explored; a not-yet-complete one is support_available", () => {
+// KTD7: no presentation grouping — the view carries counts and the resume target directly.
+test("a partial ready detour reports completed/total counts and resumes at the ordinal-first incomplete step (AE6)", () => {
   const done = generatedStep("s1", 0, "2026-01-01T00:00:00Z");
-  const explored = composeScaffoldDetours({
-    detours: [detour({ steps: [done] })],
-    responses: [scaffoldResponse("s1", "correct")],
-    masteredParentNodeIds: new Set(["parent"]),
-    referencedNodeCompletion: noNeutral
-  })[0];
-  assert.equal(explored.group, "support_explored");
-
-  const partial = composeScaffoldDetours({
-    detours: [detour({ steps: [generatedStep("s2", 0, null)] })],
-    responses: [],
-    masteredParentNodeIds: new Set(["parent"]),
-    referencedNodeCompletion: noNeutral
-  })[0];
-  assert.equal(partial.group, "support_available");
-});
-
-test("a ready detour under a NON-mastered parent stays active (expandable on the live trail)", () => {
+  const open2 = generatedStep("s2", 1, null);
+  const open3 = generatedStep("s3", 2, null);
   const [view] = composeScaffoldDetours({
-    detours: [detour({ steps: [generatedStep("s1", 0, null)] })],
-    responses: [],
-    masteredParentNodeIds: new Set(),
+    detours: [detour({ steps: [open3, done, open2] })],
+    responses: [scaffoldResponse("s1", "correct")],
     referencedNodeCompletion: noNeutral
   });
-  assert.equal(view.group, "active");
+  assert.equal(view.completedStepCount, 1);
+  assert.equal(view.totalStepCount, 3);
+  assert.equal(view.complete, false);
+  // Input order was shuffled; ordinal order decides the resume target (R13).
+  assert.equal(view.firstIncompleteStepId, "s2");
+});
+
+test("a complete ready detour has no resume step (the overview is the entry)", () => {
+  const done = generatedStep("s1", 0, "2026-01-01T00:00:00Z");
+  const [view] = composeScaffoldDetours({
+    detours: [detour({ steps: [done] })],
+    responses: [scaffoldResponse("s1", "correct")],
+    referencedNodeCompletion: noNeutral
+  });
+  assert.equal(view.complete, true);
+  assert.equal(view.completedStepCount, 1);
+  assert.equal(view.firstIncompleteStepId, null);
 });
 
 // --- Neutral trail composition (moved from the Learner App's former trailView.ts, U4) ---------
@@ -355,7 +352,6 @@ test("a generated step view carries its micro-lesson and key-free option-select 
   const [view] = composeScaffoldDetours({
     detours: [detour({ status: "ready", steps: [step] })],
     responses: [],
-    masteredParentNodeIds: new Set(),
     referencedNodeCompletion: noNeutral
   });
   const stepView = view.steps[0];
@@ -379,7 +375,7 @@ test("generated step option-select options are sorted by id so the answer is not
       { optionId: "o2", text: "b", isCorrect: false }
     ] } }
   };
-  const [view] = composeScaffoldDetours({ detours: [detour({ status: "ready", steps: [step] })], responses: [], masteredParentNodeIds: new Set(), referencedNodeCompletion: noNeutral });
+  const [view] = composeScaffoldDetours({ detours: [detour({ status: "ready", steps: [step] })], responses: [], referencedNodeCompletion: noNeutral });
   const stepView = view.steps[0];
   assert.equal(stepView.kind, "generated");
   if (stepView.kind !== "generated") return;

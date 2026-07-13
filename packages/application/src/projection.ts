@@ -29,6 +29,9 @@ export {
   labelFor,
   type ConceptLessonSectionView,
   type ConceptLessonView,
+  type ExplorableTermSupport,
+  type ExplorableTermSupportLookup,
+  type ExplorableTermView,
   type SheetContent,
   type StudyImpostorView,
   type StudyItemView,
@@ -42,9 +45,9 @@ export {
 // reconstructing mastery maps client-side. Runtime-pure (no node: builtins).
 export {
   buildTrailView,
+  resolveReferenceStopId,
   resolveStopActivity,
   sectionAnchorId,
-  type ScaffoldDetourGroup,
   type ScaffoldDetourView,
   type ScaffoldGeneratingPhase,
   type ScaffoldStepItemView,

@@ -12,10 +12,10 @@ import { normalizeConceptLabel, type ConceptLessonSectionKind, type ExplorableTe
 //   3. not the parent concept label (a term action to explore the concept you are already on
 //      is noise, R2).
 //   4. distinct after normalization — the first spelling wins; later duplicates drop.
-// At most three survive (R1/R4); the generator is told not to fill the limit, and anything
-// past the third valid term is dropped in emission order.
+// At most five survive (plan 2026-07-13-002 U1, R2); the generator is told not to fill the
+// limit, and anything past the fifth valid term is dropped in emission order.
 
-const MAX_TERMS = 3;
+const MAX_TERMS = 5;
 const MAX_CODE_POINTS = 80;
 
 function codePointLength(value: string): number {

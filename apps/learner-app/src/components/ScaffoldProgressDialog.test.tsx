@@ -6,7 +6,7 @@ import { ScaffoldProgressDialog } from "./ScaffoldProgressDialog";
 import { learnerTerm } from "@/learn/vocabulary";
 
 function detour(overrides: Partial<ScaffoldDetourView> = {}): ScaffoldDetourView {
-  return { detourId: "d1", parentDerivedNodeId: "p", term: "borrow checker", status: "generating", group: "generating", steps: [], complete: false, phase: "preparing", ...overrides };
+  return { detourId: "d1", parentDerivedNodeId: "p", term: "borrow checker", status: "generating", steps: [], completedStepCount: 0, totalStepCount: 0, firstIncompleteStepId: null, complete: false, phase: "preparing", ...overrides };
 }
 
 async function renderDialog(view: ScaffoldDetourView | undefined, onOpenChange = jest.fn()) {
@@ -26,12 +26,12 @@ test("generating shows a broad themed phase sentence (R15, KTD8)", async () => {
 });
 
 test("Covers AE7-adjacent: ready reflects readiness in place, not a toast (R17)", async () => {
-  await renderDialog(detour({ status: "ready", group: "active" }));
+  await renderDialog(detour({ status: "ready" }));
   expect(screen.getByText(learnerTerm("supportReadyBody"))).toBeTruthy();
 });
 
 test("a failed generation reports failure without losing the parent activity", async () => {
-  await renderDialog(detour({ status: "failed", group: "failed" }));
+  await renderDialog(detour({ status: "failed" }));
   expect(screen.getByText(learnerTerm("supportFailedBody"))).toBeTruthy();
 });
 

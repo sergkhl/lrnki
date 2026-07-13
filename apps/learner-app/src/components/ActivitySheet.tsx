@@ -394,11 +394,11 @@ function CompletedIndicator({
 // (keyed by the study item). Capstone, missing, and term-less activities show no menu (AE2).
 function termMenuFor(activity: Activity): { source: ScaffoldTermSource; terms: string[] } | null {
   if (activity.kind === "theory") {
-    const terms = activity.lesson?.explorableTerms ?? [];
+    const terms = (activity.lesson?.explorableTerms ?? []).map((entry) => entry.term);
     return terms.length ? { source: { kind: "lesson", derivedNodeId: activity.derivedNodeId }, terms } : null;
   }
   if (activity.kind === "option_select" || activity.kind === "impostor" || activity.kind === "matching") {
-    const terms = activity.item.explorableTerms;
+    const terms = activity.item.explorableTerms.map((entry) => entry.term);
     return terms.length ? { source: { kind: "study_item", studyItemId: activity.item.studyItemId }, terms } : null;
   }
   return null;

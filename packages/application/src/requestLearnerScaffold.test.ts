@@ -90,3 +90,26 @@ test("retry and hide are learner-scoped — another learner cannot address the r
   assert.deepEqual(await hideLearnerScaffold({ learnerStateRef: "owner", detourId: "d1" }, ports), { hidden: true });
   assert.deepEqual(await hideLearnerScaffold({ learnerStateRef: "intruder", detourId: "d1" }, ports), { hidden: false });
 });
+
+// Plan 2026-07-13-002 U2 regression (R4, AE4): the use-case is idempotent through the store's
+// unique upsert — repeated/concurrent presses return ONE detour identity, and a restore of an
+// existing (e.g. already-ready hidden) detour returns that detour's CURRENT status so the
+// client can branch on it instead of assuming a fresh generating job.
+test("requestLearnerScaffold — concurrent repeated requests return one identity with the durable row's current status", async () => {
+  let upsertCalls = 0;
+  const existing = { detourId: "d-durable", status: "ready" } as ScaffoldDetour;
+  const { ports } = makePorts();
+  (ports.scaffoldStore as { upsertPending: unknown }).upsertPending = async () => {
+    upsertCalls += 1;
+    return existing; // the store's unique (learner, enrichment, parent, normalized term) row
+  };
+  const request = () => requestLearnerScaffold(
+    { learnerStateRef: "owner", enrichmentId: "e", source: { kind: "study_item", studyItemId: "i1" }, term: "affine type" },
+    ports
+  );
+  const results = await Promise.all([request(), request(), request()]);
+  for (const result of results) {
+    assert.deepEqual(result, { created: true, detourId: "d-durable", status: "ready" });
+  }
+  assert.equal(upsertCalls, 3, "every press reaches the store; the STORE guarantees one row");
+});

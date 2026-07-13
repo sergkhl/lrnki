@@ -13,7 +13,7 @@ type GeneratedStep = Extract<ScaffoldStepView, { kind: "generated" }>;
 // parent Concept Marker (after the ordinary stops, before the capstone) from the finished Study
 // Session projection. It renders one of the projection's five presentation groups; the trail never
 // reconstructs detour policy. Generating shows a broad phase + progress reopen; failed shows Retry
-// + Dismiss; ready groups (active / support_available / support_explored) expand to one-to-three
+// + Dismiss; ready detours expand to one-to-three
 // tappable Support Steps with a Hide overflow (R18). One detour expands at a time — the parent owns
 // that (`expanded`/`onToggleExpand`). The generating→ready transition unfolds once (R17); reload or
 // reduced motion renders the final state statically.
@@ -66,15 +66,13 @@ export function ScaffoldDetour({
     );
   }
 
-  // Ready groups (active / support_available / support_explored): an expandable disclosure.
-  const groupLabel =
-    detour.group === "support_explored" ? learnerTerm("supportExploredGroup") :
-    detour.group === "support_available" ? learnerTerm("supportAvailableGroup") :
-    `${learnerTerm("exploreTermAction")} “${detour.term}”`;
-  const doneCount = detour.steps.filter((step) => step.complete).length;
+  // Ready: an expandable disclosure. (Interim shim for plan 2026-07-13-002 U2 — the projection's
+  // presentation grouping is deleted; U4 replaces this component with the visual SupportPathNode.)
+  const groupLabel = `${learnerTerm("exploreTermAction")} “${detour.term}”`;
+  const doneCount = detour.completedStepCount;
 
   return (
-    <ReadyReveal status={detour.status} group={detour.group}>
+    <ReadyReveal status={detour.status} group={groupLabel}>
       <View className="ml-6 rounded-card border border-line bg-card">
         <PressableSurface
           accessibilityLabel={groupLabel}
@@ -88,9 +86,8 @@ export function ScaffoldDetour({
           <Compass size={16} color={colors.ink} />
           <View className="min-w-0 flex-1">
             <Text variant="label" numberOfLines={1}>{groupLabel}</Text>
-            {detour.group !== "active" ? <Text variant="caption" color="muted" numberOfLines={1}>{`“${detour.term}”`}</Text> : null}
           </View>
-          <Text variant="caption" color="muted">{`${doneCount}/${detour.steps.length}`}</Text>
+          <Text variant="caption" color="muted">{`${doneCount}/${detour.totalStepCount}`}</Text>
         </PressableSurface>
         {expanded ? (
           <View className="gap-2 border-t border-line px-3 py-2">
@@ -142,7 +139,7 @@ function DetourFrame({ children, tone = "default" }: Readonly<{ children: React.
 // when this detour was observed generating in the previous render. Reload (first render already
 // ready) and reduced motion render the final state immediately, with a polite live announcement
 // standing in for the motion.
-function ReadyReveal({ status, group, children }: Readonly<{ status: ScaffoldDetourView["status"]; group: ScaffoldDetourView["group"]; children: React.ReactNode }>) {
+function ReadyReveal({ status, group, children }: Readonly<{ status: ScaffoldDetourView["status"]; group: string; children: React.ReactNode }>) {
   const reduceMotion = useReducedMotion();
   const prevStatus = useRef<ScaffoldDetourView["status"] | null>(null);
   const [justRevealed, setJustRevealed] = useState(false);

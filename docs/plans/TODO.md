@@ -2,6 +2,43 @@
 
 ## TODO
 
+### In-progress implementation plan
+
+- **Learner Support Path UX — U1+U2 DONE, resume at U3.** Execute the remaining units of the
+  linked [implementation plan](./2026-07-13-002-feat-learner-support-path-ux-plan.md); the plan
+  file stays canonical for requirements, KTDs, and gates until completion. Session handoff state
+  (2026-07-13):
+  - **U1 complete, rule-14 gate PASS.** Explorable Term capacity is five everywhere it is
+    authoritative (validator `MAX_TERMS`, both forced-tool `.max(5)` arrays, four prompts,
+    `CONTEXT.md`, domain-core + migration comments); Scaffold outline stays `.min(1).max(3)`.
+    Production gate: three fresh mixed-domain synthetic expeditions (Macroeconomics /
+    Volcanology / Computer Science), 89/89 emitted terms exact-anchored, distribution 0–4 per
+    lesson and 0–2 per item (no padding to the new cap). Evidence + evaluation note:
+    `tmp/2026-07-13-learner-support-path-ux/EVALUATION.md`. One recorded pre-existing caveat
+    for U6: sub-phrases of a compound parent label pass the exact parent-label exclusion
+    (e.g. "magma viscosity" on the "Magma viscosity and its controls…" node) — inspect in the
+    whole-flow gate before deciding anything (rule 16 forbids a lexical veto).
+  - **U2 complete (application projection).** `ExplorableTermView`/`ExplorableTermSupport`
+    (`available`/`generating`/`failed`/`ready+complete`) now ride on every projected lesson and
+    item term with the lesson `sectionKind` anchor preserved (`null` for item terms);
+    `composeStudySession` composes detours FIRST and correlates support by
+    (parent node, `normalizeConceptLabel(term)`). `ScaffoldDetourGroup`, the `group` field, and
+    `masteredParentNodeIds` are DELETED; `ScaffoldDetourView` carries `completedStepCount`,
+    `totalStepCount`, `firstIncompleteStepId` instead. New `resolveReferenceStopId(session,
+    nodeId)` (exported from `@lrnki/application/projection`) returns the referenced node's first
+    incomplete ordinary stop, capstone when complete, `null` off-trail. `requestLearnerScaffold`
+    unchanged + concurrent-idempotency regression test. Deterministic envelope green: workspace
+    typecheck, application 634, litellm 149, learner-app 136, learner-api 18, lint 0 errors,
+    Expo web export.
+  - **Interim shims the next session must REPLACE, not keep:** `ScaffoldDetour.tsx` renders
+    every ready detour as the former "active" disclosure (grouping copy deleted from
+    `vocabulary.ts`), `ActivitySheet.termMenuFor` maps term views back to strings for the old
+    overflow menu, and `sessionFixture.ts` carries the new term-view shape. U3–U5 delete these
+    components per the plan's file lists.
+  - **Remaining: U3 (inline highlights + Support Paths panel + state-aware dialog + shared
+    dialog anatomy), U4 (visual Support Path nodes), U5 (full-screen Support Path flow),
+    U6 (whole-flow browser gate + ADR-0037/CONTEXT/docs consolidation + plan deletion).**
+
 ### Evidence-triggered follow-up
 
 - **Difficulty / Leg-Trial follow-up (measure-first).** The goal-gradient flow evaluation (plan

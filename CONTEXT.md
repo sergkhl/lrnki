@@ -245,7 +245,7 @@ _Avoid_: cloned concept, Study Item Bank item, locked stop
 **Explorable Term**:
 Generation-time metadata on a Concept Lesson section or Study Item question: a specialized word or
 short phrase, verified as an exact substring of the final rendered text, that a learner may turn
-into a Scaffold Detour. At most three per lesson and per question; zero terms render no affordance.
+into a Scaffold Detour. At most five per lesson and per question; zero terms render no affordance.
 _Avoid_: keyword, inline highlight, Candidate
 
 **Grounding Provenance**:

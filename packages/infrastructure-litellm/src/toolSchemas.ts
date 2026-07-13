@@ -414,7 +414,7 @@ export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMe
 
 // --- Explorable Terms: shared affordance metadata (plan 2026-07-12-002 U1, R1-R3) ------
 // A learner may turn an unfamiliar specialized term in the current block into an optional
-// support detour. The generator advertises AT MOST THREE such terms, drawn from the block's
+// support detour. The generator advertises AT MOST FIVE such terms, drawn from the block's
 // own final text; a deterministic validator (application `explorableTerms.ts`) then keeps only
 // the distinct 1-80-code-point exact substrings that are not the concept label. The schema
 // keeps this a REQUIRED array so it closes its object without a trailing nullable (the
@@ -422,20 +422,20 @@ export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMe
 // language is structural only (rule 17) — it names no fixture, domain, or exemplar. `EXPLORE`
 // wording is deliberately restrained so the model does not manufacture affordances.
 const EXPLORABLE_TERM_GUIDANCE =
-  "A specialized word or short phrase that appears verbatim in this block's text, is needed to understand the block, and is NOT the concept being taught here. Copy it exactly as written. Emit only genuinely unfamiliar terms; return an empty array when none qualify and never pad to reach three.";
+  "A specialized word or short phrase that appears verbatim in this block's text, is needed to understand the block, and is NOT the concept being taught here. Copy it exactly as written. Emit only genuinely unfamiliar terms; return an empty array when none qualify and never pad to reach five.";
 
 const itemExplorableTerms = z
   .array(z.string().min(1).max(80).describe(EXPLORABLE_TERM_GUIDANCE))
-  .max(3)
-  .describe("Zero to three specialized terms from the question above that a learner might need to explore. Each must be copied verbatim from the question text. Prefer fewer; an empty array is expected when the question introduces no unfamiliar term.");
+  .max(5)
+  .describe("Zero to five specialized terms from the question above that a learner might need to explore. Each must be copied verbatim from the question text. Prefer fewer; an empty array is expected when the question introduces no unfamiliar term.");
 
 const lessonExplorableTerms = z
   .array(z.object({
     term: z.string().min(1).max(80).describe(EXPLORABLE_TERM_GUIDANCE),
     sectionKind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("The kind of the section whose prose text contains this term verbatim.")
   }).strict())
-  .max(3)
-  .describe("Zero to three specialized terms across the whole lesson that a learner might need to explore, each anchored to the section kind whose text contains it verbatim. Prefer fewer; an empty array is expected when the lesson introduces no unfamiliar term.");
+  .max(5)
+  .describe("Zero to five specialized terms across the whole lesson that a learner might need to explore, each anchored to the section kind whose text contains it verbatim. Prefer fewer; an empty array is expected when the lesson introduces no unfamiliar term.");
 
 export const optionSelectValidator = z.object({
   question: z.string().min(1).describe("One self-contained multiple-choice question about the learning node with a single correct answer. Do not reference 'the passage' or 'the source'."),

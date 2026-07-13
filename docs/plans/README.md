@@ -12,9 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- None currently. The
-  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md) is
-  fully implemented (all four candidates completed by 2026-07-13); see [TODO.md](./TODO.md).
+- [Learner Support Path UX](./2026-07-13-002-feat-learner-support-path-ux-plan.md) — ready for
+  implementation; improves contextual term discovery, adaptive dialogs, and the learner-scoped
+  Support Path presentation without changing the neutral graph or persisted detour shapes.
 
 ## Ownership rules
 

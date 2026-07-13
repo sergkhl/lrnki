@@ -719,7 +719,7 @@ CREATE TABLE study_items (
   question text NOT NULL,
   explanation text,
   facet text,
-  -- Zero-to-three validated Explorable Terms (plan 2026-07-12-002 U1) from the question
+  -- Zero-to-five validated Explorable Terms (plan 2026-07-13-002 U1) from the question
   -- stem, stored as a jsonb array of strings. Affordance metadata only — never graph
   -- knowledge. Lives on the parent row (payload-on-parent) because it is bounded and
   -- regenerated wholesale with the item.
@@ -918,7 +918,7 @@ CREATE TABLE concept_lessons (
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   canonical_label text NOT NULL,
-  -- Zero-to-three lesson-wide Explorable Terms (plan 2026-07-12-002 U1), each a
+  -- Zero-to-five lesson-wide Explorable Terms (plan 2026-07-13-002 U1), each a
   -- {term, sectionKind} object naming the section whose body contains it verbatim. jsonb
   -- array; affordance metadata only, never graph knowledge.
   explorable_terms jsonb NOT NULL DEFAULT '[]'::jsonb,
