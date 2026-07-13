@@ -118,7 +118,6 @@ export const LEARNER_VOCABULARY = {
   // Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U6). Quiet, optional support the learner
   // requests for an unfamiliar term. The three broad phases theme the projection's stable ids
   // (KTD8, ADR-0033); the UI never shows counts or raw stage names.
-  exploreTermAction: "Explore",
   termRequestFailed: "Couldn’t start that support. Try again.",
   // Contextual discovery + the state-aware Support Path dialog (plan 2026-07-13-002 U3).
   supportPanelTitle: "Support paths",
@@ -141,7 +140,14 @@ export const LEARNER_VOCABULARY = {
   supportHide: "Hide this support",
   supportGeneratedBadge: "Extra support",
   supportStepDone: "Done",
-  supportViewProgress: "View progress"
+  // Visual Support Path nodes + the full-screen path flow (plan 2026-07-13-002 U4/U5).
+  supportPathNode: "Support path",
+  supportPathComplete: "Path complete",
+  supportOverviewAction: "Overview",
+  supportOverviewHint: "Revisit any step, or hide this path.",
+  supportReferenceTitle: "Continue on the trail",
+  supportReferenceBody: "This step is a real stop on your trail. Study it there — finishing it completes this step too.",
+  supportReferenceAction: "Go to the trail stop"
 } as const;
 
 export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;
@@ -154,6 +160,12 @@ export function learnerTerm(key: LearnerVocabularyKey): string {
 // plus the EXACT term, shared by inline theory highlights and the panel's icon actions.
 export function termSupportActionLabel(term: string): string {
   return `${learnerTerm("supportPanelTitle")}: “${term}”`;
+}
+
+// The steps-progress copy every Support Path surface announces (R12/AE6): visible as `1/3`,
+// spoken as words so the a11y name never reads a bare fraction.
+export function supportStepsDoneCopy(done: number, total: number): string {
+  return `${done} of ${total} steps done`;
 }
 
 // Theme the projection's broad Scaffold Detour phase ids into learner copy (KTD8, ADR-0033).

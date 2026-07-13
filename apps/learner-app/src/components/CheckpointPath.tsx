@@ -1,12 +1,13 @@
 import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
 import { Flag, Mountain } from "lucide-react-native";
-import type { ScaffoldStepView, StudySession } from "@lrnki/application/projection";
+import type { ScaffoldDetourView, StudySession } from "@lrnki/application/projection";
+import { resolveReferenceStopId } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
-import { ScaffoldDetour } from "./ScaffoldDetour";
-import { ScaffoldStepSheet } from "./ScaffoldStepSheet";
+import { SupportPathNode } from "./SupportPathNode";
+import { SupportPathSheet } from "./SupportPathSheet";
 import { SupportPathDialog, dialogStateForDetour } from "./SupportPathDialog";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
 import { hideScaffoldDetour, retryScaffoldDetour } from "@/lib/actions";
@@ -14,8 +15,6 @@ import { legBannerLine, terminusLine } from "@/learn/goalCopy";
 import { Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 import type { TrailCluster, TrailStop, TrailView } from "@lrnki/application/projection";
-
-type GeneratedStep = Extract<ScaffoldStepView, { kind: "generated" }>;
 
 const WINDING_OFFSETS = [0, 1, 2, 1, 0, -1, -2, -1] as const;
 const WINDING_STEP_PX = 28;
@@ -32,21 +31,30 @@ export function CheckpointPath({
   scrollHandleRef
 }: Readonly<{ view: TrailView; session: StudySession; scrollHandleRef?: RefObject<TrailScrollHandle | null> }>) {
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
-  // Learner-scoped Scaffold Detour UI state (U6): exactly one detour expands at a time; the
-  // progress dialog and the generated-step sheet are root-owned here so they survive the activity
-  // sheet closing (KTD11, R13).
-  const [expandedDetourId, setExpandedDetourId] = useState<string | null>(null);
+  // Learner-scoped Support Path UI state (plan 2026-07-13-002 U4/U5): the state-aware dialog and
+  // the full-screen Support Path flow are root-owned here so they survive the activity sheet
+  // closing (KTD5). Tapping a node routes by status: ready → the path flow, otherwise → the
+  // progress/recovery dialog (R12-R13).
   const [progressDetourId, setProgressDetourId] = useState<string | null>(null);
-  const [scaffoldStep, setScaffoldStep] = useState<GeneratedStep | null>(null);
+  const [pathDetourId, setPathDetourId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   const referenceLabelFor = (derivedNodeId: string) =>
     session.detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
-  // A reference step studies the referenced neutral node through its own trail stops (R9): open
-  // its first stop in the ordinary Activity Sheet, which records normal neutral evidence.
+  // A reference step studies the referenced neutral node through its own trail stops (R15, F3):
+  // the path closes, the trail focuses the referenced Concept Marker, and the ordinary Activity
+  // Sheet opens the application-resolved first incomplete ordinary stop (KTD8).
   const openReferenceStep = (referencedDerivedNodeId: string) => {
-    const stopId = view.concepts.find((concept) => concept.derivedNodeId === referencedDerivedNodeId)?.stops[0]?.stopId;
-    if (stopId) setSelectedStopId(stopId);
+    setPathDetourId(null);
+    const stopId = resolveReferenceStopId(session, referencedDerivedNodeId);
+    if (!stopId) return;
+    const y = stopYRef.current[stopId];
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 220), animated: true });
+    setSelectedStopId(stopId);
+  };
+  const openDetour = (detour: ScaffoldDetourView) => {
+    if (detour.status === "ready") setPathDetourId(detour.detourId);
+    else setProgressDetourId(detour.detourId);
   };
   // onLayout registry replaces the DOM's scrollIntoView: stop and section rows report
   // their y offsets, and imperative scrolls target those.
@@ -103,26 +111,16 @@ export function CheckpointPath({
                       .slice(0, conceptIndex)
                       .reduce((count, priorConcept) => count + priorConcept.stops.length, stopIndex);
                     const offset = WINDING_OFFSETS[globalStopIndex % WINDING_OFFSETS.length] * WINDING_STEP_PX;
-                    // Detours render UNDER their parent, after the ordinary activity stops and
-                    // just before the capstone (plan 2026-07-12-002 U6 trail composition).
+                    // Support Path nodes branch UNDER their parent, after the ordinary activity
+                    // stops and just before the capstone (R12): one always-visible compact node
+                    // per active detour, no step rows or disclosure state on the map.
                     const conceptDetours = stop.kind === "capstone"
                       ? session.detours.filter((detour) => detour.parentDerivedNodeId === concept.derivedNodeId)
                       : [];
                     return (
                       <Fragment key={stop.stopId}>
                         {conceptDetours.map((detour) => (
-                          <ScaffoldDetour
-                            key={detour.detourId}
-                            detour={detour}
-                            expanded={expandedDetourId === detour.detourId}
-                            onToggleExpand={() => setExpandedDetourId((current) => (current === detour.detourId ? null : detour.detourId))}
-                            onOpenGeneratedStep={setScaffoldStep}
-                            onOpenReferenceStep={openReferenceStep}
-                            onRetry={(detourId) => void retryScaffoldDetour({ enrichmentId: session.enrichmentId, detourId })}
-                            onHide={(detourId) => void hideScaffoldDetour({ enrichmentId: session.enrichmentId, detourId })}
-                            onOpenProgress={setProgressDetourId}
-                            referenceLabelFor={referenceLabelFor}
-                          />
+                          <SupportPathNode key={detour.detourId} detour={detour} onPress={openDetour} />
                         ))}
                         <View onLayout={(event) => { stopYRef.current[stop.stopId] = event.nativeEvent.layout.y; }}>
                           <CheckpointStopRow stop={stop} concept={concept} offset={offset} onSelect={setSelectedStopId} />
@@ -145,22 +143,28 @@ export function CheckpointPath({
           if (!open) setSelectedStopId(null);
         }}
         onScaffoldRequested={(detourId) => setProgressDetourId(detourId)}
-        onOpenDetour={(detourId) => setExpandedDetourId(detourId)}
+        onOpenDetour={(detourId) => setPathDetourId(detourId)}
       />
-      <ScaffoldStepSheet
+      <SupportPathSheet
         enrichmentId={session.enrichmentId}
-        step={scaffoldStep}
-        open={scaffoldStep !== null}
+        detour={session.detours.find((detour) => detour.detourId === pathDetourId) ?? null}
+        open={pathDetourId !== null}
         onOpenChange={(open) => {
-          if (!open) setScaffoldStep(null);
+          if (!open) setPathDetourId(null);
         }}
+        onHide={(detourId) => {
+          // Hiding preserves the detour and returns its term to the panels (F4).
+          void hideScaffoldDetour({ enrichmentId: session.enrichmentId, detourId });
+          setPathDetourId(null);
+        }}
+        onOpenReference={openReferenceStep}
+        referenceLabelFor={referenceLabelFor}
       />
       {(() => {
         // The root-owned state-aware dialog (plan 2026-07-13-002 U3, KTD5): opened by the
         // staged handoff after a request. It branches on the DURABLE detour's projected
         // status — a restored already-ready detour shows ready actions immediately, with no
-        // generating flash. `Open support path` lands on the detour's trail surface (interim:
-        // the ready disclosure; U5 replaces it with the full-screen Support Path flow).
+        // generating flash. `Open support path` enters the full-screen Support Path flow.
         const progressDetour = session.detours.find((detour) => detour.detourId === progressDetourId);
         return (
           <SupportPathDialog
@@ -178,7 +182,7 @@ export function CheckpointPath({
               setProgressDetourId(null);
             }}
             onOpenPath={() => {
-              if (progressDetourId !== null) setExpandedDetourId(progressDetourId);
+              if (progressDetourId !== null) setPathDetourId(progressDetourId);
               setProgressDetourId(null);
             }}
           />

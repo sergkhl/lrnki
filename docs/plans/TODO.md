@@ -4,7 +4,7 @@
 
 ### In-progress implementation plan
 
-- **Learner Support Path UX — U1+U2+U3 DONE, resume at U4.** Execute the remaining units of the
+- **Learner Support Path UX — U1-U5 DONE, resume at U6.** Execute the remaining unit of the
   linked [implementation plan](./2026-07-13-002-feat-learner-support-path-ux-plan.md); the plan
   file stays canonical for requirements, KTDs, and gates until completion. Session handoff state
   (2026-07-13):
@@ -56,18 +56,37 @@
     `supportOpenAction`/`supportAvailableBody`/`supportGeneratingBody`. Envelope green:
     learner-app 148/38 suites, workspace typecheck, lint 0 errors (9 pre-existing warnings),
     Expo web export all 6 routes.
-  - **Interim shims the next session must REPLACE, not keep:** `ScaffoldDetour.tsx` still
-    renders each ready detour as the expandable disclosure row on the trail (U4 replaces it
-    with the visual `SupportPathNode`); `onOpenDetour`/root `onOpenPath` currently just expand
-    that disclosure (`setExpandedDetourId`) — U5 must route them into the full-screen
-    `SupportPathSheet` resume flow; `ScaffoldStepSheet` remains the generated-step surface
-    until U5 deletes it; `sessionFixture.ts` carries the term-view shape (kept).
-  - **Remaining: U4 (visual Support Path nodes; delete ScaffoldDetour + grouping copy),
-    U5 (full-screen Support Path flow; delete ScaffoldStepSheet; route reference steps via
-    `resolveReferenceStopId`), U6 (whole-flow browser gate at 320x568/390x844 + 200% zoom +
-    ADR-0037/CONTEXT/docs consolidation + plan deletion).** U6 must also inspect the U1
-    recorded caveat (compound-parent sub-phrase terms) and AE5 dialog behavior at constrained
-    heights against the NEW anatomy.
+  - **U4 complete (visual Support Path nodes).** New `SupportPathNode` renders every active
+    detour as ONE always-visible compact side-branch node under its parent (connector elbow,
+    term title wrapping to two lines, icon-shape state cues — Compass/TriangleAlert/Route/
+    CheckCircle2 — plus phase or `n of m steps done` caption, filled step dots + visible
+    `n/m`, testID `support-path-node-<id>`); the one-shot generating→ready reveal with
+    reduced-motion/live-region equivalence carried over. Tapping delegates the WHOLE detour
+    to the root: ready → path flow, generating/failed → the state-aware dialog (retry/hide
+    already wired there). `ScaffoldDetour`(+test) DELETED; vocabulary lost
+    `exploreTermAction`/`supportViewProgress`, gained `supportPathNode`/`supportPathComplete`
+    + `supportStepsDoneCopy()`.
+  - **U5 complete (full-screen Support Path flow).** New `SupportPathSheet` (keyed
+    `PathController` per detour) opens incomplete paths at the projected
+    `firstIncompleteStepId` and complete paths at the step overview; a fixed progress row
+    (step dots + spelled-out progress + `support-path-overview` button) always reaches the
+    overview. Generated steps keep the exact lesson-read → key-free option-select →
+    scaffold-scoped grading behavior, with local `locallyDone` advancement to the next
+    incomplete step (`support-path-continue`; last step → Return to trail). Reference steps
+    render a map-transition card ONLY (`support-path-reference-go`, no copied neutral
+    content) and route through root `openReferenceStep` → `resolveReferenceStopId` + scroll
+    to the resolved stop. Hide lives in the overview (`support-path-hide-<id>`).
+    `ScaffoldStepSheet`(+test) DELETED; `CheckpointPath` replaced
+    `expandedDetourId`/`scaffoldStep` with `pathDetourId`; ActivitySheet `onOpenDetour` and
+    root dialog `onOpenPath` now enter the sheet. Envelope green: learner-app 149/38 suites,
+    application 634, learner-api 18, workspace typecheck, lint 0 errors (9 pre-existing
+    warnings), Expo web export all 6 routes.
+  - **Remaining: U6 only (whole-flow real-use gate + consolidation).** Hard-reset dev data,
+    fresh mixed-domain production generation, Playwright whole-flow at 320x568/390x844 +
+    200% zoom (AE3-AE9), inspect the U1 recorded caveat (compound-parent sub-phrase terms),
+    AE5 dialog behavior against the NEW shared anatomy, accumulated always-visible nodes at
+    320x568 (five-detour parent), persistence-neutrality queries, then amend ADR-0037's
+    inline-highlighting claim, consolidate docs, and DELETE the plan file per policy.
 
 ### Evidence-triggered follow-up
 
