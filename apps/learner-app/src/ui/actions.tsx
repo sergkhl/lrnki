@@ -200,6 +200,7 @@ export function IconButton({
   onPress,
   disabled = false,
   busy = false,
+  expanded,
   variant = "outline",
   haptic,
   className,
@@ -210,6 +211,8 @@ export function IconButton({
   onPress: () => void;
   disabled?: boolean;
   busy?: boolean;
+  /** For a disclosure toggle: announces the expanded/collapsed state (aria-expanded). */
+  expanded?: boolean;
   variant?: ButtonVariant | "bare";
   haptic?: HapticIntent;
   className?: string;
@@ -223,6 +226,7 @@ export function IconButton({
       accessibilityLabel={accessibilityLabel}
       disabled={disabled}
       busy={busy}
+      expanded={expanded}
       haptic={haptic}
       onPress={onPress}
       className={`h-target w-target items-center justify-center ${box} ${disabled ? "opacity-50" : ""} ${className ?? ""}`}

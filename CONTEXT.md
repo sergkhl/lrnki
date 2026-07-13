@@ -215,7 +215,12 @@ _Avoid_: course, study screen, quiz, graded card, asserted graph mutation
 
 **Learner-Scoped Scaffold**:
 Learner/session-scoped generated support content that restores a Learner App's Flow Channel without
-becoming neutral graph or Study Item Bank content.
+becoming neutral graph or Study Item Bank content. Its durable, learner-requested realization is the
+**Scaffold Detour** of **Support Steps** below: a one-level, optional branch that records only
+learner-scoped evidence (or, for a reference Support Step, normal neutral evidence for the existing
+node) and never feeds neutral mastery, prerequisite gating, or rewards. Durable persistence,
+exact-reuse-as-reference, and the discriminated neutral-or-scaffold response identity are owned by
+[ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
 _Avoid_: generated prerequisite, personalized Concept Lesson, Study Item Bank item
 
 **Scaffold Detour**:

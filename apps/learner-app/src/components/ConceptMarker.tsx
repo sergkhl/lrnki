@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { clearLearnerVerdict, refreshLearnerExpedition, setLearnerVerdict } from "@/lib/actions";
 import { CrystalGlyph } from "./CrystalGlyph";
-import type { TrailCluster } from "@/learn/trailView";
+import type { TrailCluster } from "@lrnki/application/projection";
 import { learnerTerm } from "@/learn/vocabulary";
 import { Button, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 

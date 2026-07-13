@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import { buildCrystalFormation, completeSectionIndexes, isNameableCrystal, memoryDoorFor, placeFormation, type CrystalFormation } from "./crystalVistaView";
-import { buildTrailView } from "./trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import type { StudySession } from "@lrnki/application/projection";
 
 test("buildCrystalFormation maps trail clusters and keeps only on-trail edges", () => {
@@ -127,7 +127,7 @@ function session(): StudySession {
 
 test("memoryDoorFor reveals mastered and frontier crystals with gist + review navigation", () => {
   const s = session();
-  s.lessonByNode = { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [{ kind: "gist", text: "Every value has one owner.", groundingProvenance: "generated", isSourceCited: false }] } };
+  s.lessonByNode = { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [{ kind: "gist", text: "Every value has one owner.", groundingProvenance: "generated", isSourceCited: false }], explorableTerms: [] } };
   const formation = buildCrystalFormation(s, buildTrailView(s));
   const mastered = formation.nodes.find((node) => node.derivedNodeId === "n1")!;
   assert.equal(isNameableCrystal(mastered), true);

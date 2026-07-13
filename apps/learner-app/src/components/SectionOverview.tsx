@@ -3,7 +3,7 @@ import { ScrollView, View } from "react-native";
 import { Check, Lock, Map as MapIcon, MoveRight } from "lucide-react-native";
 import { learnerTerm } from "@/learn/vocabulary";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
-import type { TrailCluster, TrailSectionView } from "@/learn/trailView";
+import type { TrailCluster, TrailSectionView } from "@lrnki/application/projection";
 import { BottomSheet, OverlayHeader, PressableSurface, Text, colors } from "@/ui";
 
 // The non-blocking section overview (R5/R9). Opened on demand from the header — the

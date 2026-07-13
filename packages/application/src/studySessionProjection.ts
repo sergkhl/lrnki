@@ -1,6 +1,7 @@
 import { neutralResponses, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type ScaffoldDetour, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
 import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
 import { composeScaffoldDetours, type ScaffoldDetourView } from "./studySessionTrail";
+import { conceptLessonSectionToView } from "./conceptLessonSectionView";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
   classifyAdaptedNodes,
@@ -36,6 +37,10 @@ export type StudyOptionSelectView = {
     text: string;
     provenance: "source" | "generated";
   }[];
+  // Server-owned Explorable Term affordances advertised by this question stem (plan
+  // 2026-07-12-002 U1/U6, R1-R4). Zero-to-three validated exact substrings the learner may turn
+  // into a Scaffold Detour; the surface renders a quiet overflow action, never inline highlights.
+  explorableTerms: string[];
 };
 
 // The serializable Impostor view that rides down the projection (R10/R11). Four statements
@@ -55,6 +60,8 @@ export type StudyImpostorView = {
   reveal: string;
   lieSource: "sibling" | "generated";
   siblingLabel?: string;
+  // Explorable Term affordances advertised by this question stem (see StudyOptionSelectView).
+  explorableTerms: string[];
 };
 
 export type StudyMatchingView = {
@@ -64,6 +71,8 @@ export type StudyMatchingView = {
   groundingProvenance: StudyItemGroundingProvenance;
   prompts: { promptId: string; text: string }[];
   matches: { matchId: string; text: string }[];
+  // Explorable Term affordances advertised by this question stem (see StudyOptionSelectView).
+  explorableTerms: string[];
 };
 
 // The Concept Lesson view that rides down the projection (ADR-0031, KTD5). A serializable
@@ -88,6 +97,10 @@ export type ConceptLessonView = {
   derivedNodeId: string;
   canonicalLabel: string;
   sections: ConceptLessonSectionView[];
+  // Lesson-wide Explorable Term affordances (plan 2026-07-12-002 U1/U6, R1-R4). The persisted
+  // terms are anchored to a section kind server-side (used only to verify the request); the
+  // theory activity renders the flattened distinct term text as at most three overflow actions.
+  explorableTerms: string[];
 };
 
 // A thin lesson-absent record for the operator quality surface (U8): which nodes produced no
@@ -98,21 +111,14 @@ export type LessonAbsentView = {
   reason: string;
 };
 
-// Map a persisted Concept Lesson to its serializable view. A section is `source`-cited only when
-// its authoritative provenance is a source kind (the assembler already re-derived this, U6).
+// Map a persisted Concept Lesson to its serializable view, flattening its Explorable Term text
+// (distinct, order-preserving) for the theory activity's overflow actions.
 export function conceptLessonToView(lesson: ConceptLesson): ConceptLessonView {
   return {
     derivedNodeId: lesson.derivedNodeId,
     canonicalLabel: lesson.canonicalLabel,
-    sections: lesson.sections.map((section) => ({
-      kind: section.kind,
-      text: section.text,
-      ...(section.items?.length ? { items: section.items } : {}),
-      groundingProvenance: section.groundingProvenance,
-      isSourceCited: section.citation?.provenance === "source",
-      ...(section.citation?.provenance === "source" ? { matchKind: section.citation.matchKind } : {}),
-      ...(section.diagram ? { diagram: section.diagram } : {})
-    }))
+    sections: lesson.sections.map(conceptLessonSectionToView),
+    explorableTerms: [...new Set(lesson.explorableTerms.map((entry) => entry.term))]
   };
 }
 
@@ -157,7 +163,8 @@ export function studyItemToView(item: StudyItem): StudyItemView {
           groundingProvenance: item.groundingProvenance,
           options: [...item.options]
             .sort((a, b) => a.optionId.localeCompare(b.optionId))
-            .map((option) => ({ optionId: option.optionId, text: option.text, provenance: option.provenance }))
+            .map((option) => ({ optionId: option.optionId, text: option.text, provenance: option.provenance })),
+          explorableTerms: item.explorableTerms
         }
       };
     case "impostor": {
@@ -177,7 +184,8 @@ export function studyItemToView(item: StudyItem): StudyItemView {
             .map((statement) => ({ statementId: statement.statementId, text: statement.text, provenance: statement.provenance })),
           reveal: lie.reveal,
           lieSource: lie.lieSource,
-          ...(lie.siblingLabel ? { siblingLabel: lie.siblingLabel } : {})
+          ...(lie.siblingLabel ? { siblingLabel: lie.siblingLabel } : {}),
+          explorableTerms: item.explorableTerms
         }
       };
     }
@@ -194,7 +202,8 @@ export function studyItemToView(item: StudyItem): StudyItemView {
             .map((pair) => ({ promptId: pair.pairId, text: pair.promptText })),
           matches: [...item.pairs]
             .sort((a, b) => a.matchId.localeCompare(b.matchId))
-            .map((pair) => ({ matchId: pair.matchId, text: pair.matchText }))
+            .map((pair) => ({ matchId: pair.matchId, text: pair.matchText })),
+          explorableTerms: item.explorableTerms
         }
       };
   }

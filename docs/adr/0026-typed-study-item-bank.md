@@ -81,6 +81,13 @@ The Response Log port is append-only and graded-only. Corrections append another
 an explicit operator reset is a separate administrative operation. Learner history remains scoped to
 one Derived Graph Layer until stable cross-enrichment learner-facing identity is designed.
 
+A Response Log observation's subject/item identity is a discriminated **neutral-or-scaffold**
+reference over mutually exclusive foreign keys: the neutral `(study_item_id, derived_node_id)` pair
+this ADR defines, or a single `scaffold_step_id`. This ADR owns only the neutral side; the scaffold
+side, and the rule that every neutral mastery/calibration/leaderboard/journal fold consumes neutral
+observations only, are owned by [ADR-0037](0037-persist-learner-scoped-scaffold-detours.md). One
+append-only monotonic sequence per learner still spans both scopes.
+
 ## Context
 
 A concept-only item identity excluded rescued and minted nodes from recall, while a single untyped

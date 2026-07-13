@@ -1,6 +1,6 @@
 import type { StudySession } from "@lrnki/application/projection";
 import { layoutSphereGrid } from "@lrnki/application/projection";
-import type { TrailView } from "./trailView";
+import type { TrailView } from "@lrnki/application/projection";
 
 // The Crystal Vista's data seam. The vista renders a LIST of formations so extending
 // from "current expedition" to "all expeditions" later is a loader change (compose more

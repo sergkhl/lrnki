@@ -36,5 +36,26 @@ export {
   type StudyOptionSelectView,
   type StudySession
 } from "./studySessionProjection";
+// The learner-scoped Scaffold Detour composition AND the finished neutral trail/activity
+// composition (plan 2026-07-12-002 U4, KTD5): the Study Session projection is the single
+// trail/completion authority, so the Learner App consumes these read-only instead of
+// reconstructing mastery maps client-side. Runtime-pure (no node: builtins).
+export {
+  buildTrailView,
+  resolveStopActivity,
+  sectionAnchorId,
+  type ScaffoldDetourGroup,
+  type ScaffoldDetourView,
+  type ScaffoldGeneratingPhase,
+  type ScaffoldStepItemView,
+  type ScaffoldStepView,
+  type StopActivity,
+  type TrailCluster,
+  type TrailSectionView,
+  type TrailStop,
+  type TrailStopKind,
+  type TrailStopState,
+  type TrailView
+} from "./studySessionTrail";
 // Type-only: the defining module pulls node:crypto at runtime, but type re-exports are erased.
 export type { MatchingAttemptTrace } from "./gradedSelectionOutcome";

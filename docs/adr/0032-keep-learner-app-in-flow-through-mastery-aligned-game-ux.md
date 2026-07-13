@@ -75,6 +75,15 @@ sequence, and only then generate a **Learner-Scoped Scaffold**. Such scaffolds a
 support content, clearly labeled generated, and never mutate the Learner-Neutral Core Concept Graph,
 the Derived Graph Layer, or the neutral Study Item Bank.
 
+The support ladder governs *automatic* interventions. A learner may also *explicitly request* support
+on demand for an unfamiliar term through a quiet Explorable Term action; that request starts a
+**Scaffold Detour** immediately without climbing the ladder, because the learner has already named
+the gap. This is a one-level, optional detour bounded by its own Flow design gate (recorded in plan
+2026-07-12-002) and stays inside the same neutral boundary — it earns no crystals, points, or base
+progress and never becomes neutral graph knowledge. Its durable persistence, exact-reuse rule, and
+scoped-response identity are owned by
+[ADR-0037](0037-persist-learner-scoped-scaffold-detours.md).
+
 Each new Learner App mechanic must pass a Flow design gate before implementation: name the
 player-visible goal, confirm it matches the intended learning goal, identify distractions, describe
 the challenge curve and expected skill growth, state which pleasures it prioritizes, and define the

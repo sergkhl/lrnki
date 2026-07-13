@@ -5,7 +5,7 @@ import type { StudySession } from "@lrnki/application/projection";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { SectionOverview } from "./SectionOverview";
 import { isSummitPush, summitLine } from "@/learn/goalCopy";
-import type { TrailView } from "@/learn/trailView";
+import type { TrailView } from "@lrnki/application/projection";
 import { learnerTerm } from "@/learn/vocabulary";
 import { MOTION, PressableSurface, Text, useReducedMotion } from "@/ui";
 

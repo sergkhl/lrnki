@@ -4,110 +4,6 @@
 
 ### Execution order
 
-- **Adaptive Learner Scaffold Detours
-  ([implementation plan](./2026-07-12-002-feat-adaptive-scaffold-detours-plan.md)) — IN PROGRESS,
-  server spine complete through U5 (2026-07-12); U4 client-component refactor + U6 UI + U7 docs +
-  the three rule-14 real-model gates remain.** Add quiet generated term actions and durable
-  learner-scoped one-level support detours without mutating neutral graph assets.
-
-  **DONE (code + deterministic tests green; NOT yet committed — working tree carries the diff):**
-  - **U1 (fully done).** Explorable Term metadata: `ExplorableTerm` on `ConceptLesson` + `string[]`
-    on `StudyItemBase` (both required), shared pure validator `application/src/explorableTerms.ts`
-    (1-80 code points, exact-substring, distinct, parent-label exclusion, cap 3), forced-tool
-    schema fields on all four generators (required arrays → no trailing-nullable), 4 prompt edits,
-    adapters map them through, `study_items.explorable_terms` + `concept_lessons.explorable_terms`
-    jsonb columns with persist/hydrate. Tests: `explorableTerms.test.ts` (11) + adapter/guard/schema
-    round-trips + Postgres round-trip (all green).
-  - **U2 (fully done).** KTD4 Response Log identity is now a discriminated union
-    `{scope:"neutral",studyItemId,derivedNodeId} | {scope:"scaffold",scaffoldStepId}` with a
-    `neutralResponses()` narrowing helper; EVERY neutral fold (mastery, calibration, leaderboard,
-    journal, conflict, study-session trail) routes through it. `learner_scaffold_detours` +
-    `learner_scaffold_steps` (payload-on-step jsonb, `lesson_read_at`, `referenced_derived_node_id`,
-    exactly-one-of CHECK), `response_log.scaffold_step_id` FK + mutually-exclusive CHECK, admin read
-    path switched INNER→LEFT JOINs (scope-aware). New `PostgresLearnerScaffoldStore` +
-    `ScaffoldDetourStorePort` (upsertPending idempotent restore, claim single-winner, publishReady
-    fenced, markFailed/restartGenerating/hide, getStep/markLessonRead). Domain module
-    `learnerScaffold.ts`. Tests: domain (3) + `PostgresLearnerScaffoldStore.test.ts` (idempotency,
-    hide/restore, mixed-shape CHECK, competing claim, shared attempt-seq) all green vs a fresh
-    migration.
-  - **U3 (DONE except the real-use gate).** Two forced-tool descriptors
-    (`scaffold-outline` + `scaffold-content`) on the `kg-claim-extraction` alias (no config.yaml
-    change), prompts, `scaffoldGenerationConfigHash`, mimoDescriptorShape + toolValidators sweeps
-    include them. Operation-timeline catalog gained the `scaffold` arm + `SHARED_STAGES`
-    (knowledge-boundary-probe + grounding-generation, owned by enrichment AND scaffold). Deep
-    application module `learnerScaffoldGeneration.ts` (`runScaffoldGeneration`): direct
-    selected-term reuse (pure `resolveExactMatch`), minimal outline, per-label reuse, injected
-    `groundConcept` (probe+grounding seam), content gen, `buildScaffoldNodePayload` option-shape
-    validation, atomic fenced publish / markFailed. **Supervisor wiring landed 2026-07-12:**
-    `apps/learner-api/src/generationSupervisor.ts` (shared process-level claim/top-up scheduler
-    extracted from `topicGenerationSupervisor`, which now consumes it),
-    `scaffoldGenerationSupervisor.ts`, and `apps/learner-api/src/learnerScaffoldGeneration.ts` (api
-    composition wiring `groundConcept` from the real probe+grounding ports, wrapping the run in
-    `runInstrumentedOperation("scaffold", …)` so the two scaffold stages plus the SHARED probe +
-    grounding stages attribute spend/wall-clock under the claim's fresh op id — which IS the fencing
-    token, KTD7); both supervisors start in `index.ts`. Store gained supervisor methods
-    `claimNextGenerating` (single atomic select+claim, `SKIP LOCKED`, mints op-id==token) +
-    `failExhaustedGenerating`, backed by new `generation_attempts` + `claimed_at` columns on
-    `learner_scaffold_detours` (single initial migration edited; `restartGenerating` resets the
-    budget). Tests: `learnerScaffoldGeneration.test.ts` (12) + `PostgresLearnerScaffoldStore.test.ts`
-    gained the claim-budget/exhaustion case (77 Postgres integration green vs a FRESH migration).
-    **STILL TO DO in U3:** the **rule-14 real-use gate** (disposable tsx under `tmp/` calling
-    `runScaffoldGeneration` with production adapters + a disposable learner, ≥6 difficult terms
-    across ≥3 domains, human quality inspection — see below).
-  - **U4 (CORE + server-half compose DONE; Candidate-4 client refactor REMAINS).** Pure
-    detour-composition projection `application/src/studySessionTrail.ts` (`composeScaffoldDetours`):
-    per-step completion (generated = lessonRead && latest-scaffold-correct; reference = neutral
-    lesson-read + option-select subset via injected `referencedNodeCompletion`), whole-detour
-    completion, R20 grouping (`support_explored` vs `support_available` vs
-    `active`/`generating`/`failed`), broad phase (KTD8). **Server-half wiring landed 2026-07-12:**
-    `composeScaffoldDetours` is now threaded INTO the pure `composeStudySession` (the projection
-    owns detour composition, KTD5) — it derives `masteredParentNodeIds` from
-    `classification.stateByNode` and reference-step completion from the same neutral lesson-read +
-    option-select evidence the node's own stop uses, and exposes `detours` + a `generatingDetours`
-    polling flag on `StudySession`; `getStudySession` loads active detours through an optional
-    `scaffoldStore` port and the learner API wires `PostgresLearnerScaffoldStore` on
-    `/expedition/:id`. Tests: `studySessionTrail.test.ts` (8) + 3 new
-    `studySessionProjection.test.ts` integration cases. The generating→phase mapping is a coarse
-    honest `"preparing"` at the projection level; the fine stage→phase refinement is a U6 concern.
-    **STILL TO DO in U4:** delete `apps/learner-app/src/learn/trailView.ts` + `activityProgress.ts`
-    and migrate their **13 non-test importers** to the projection-owned trail (the plan's Candidate-4
-    deepening). The two client fixtures + three test fixtures were given the two new `StudySession`
-    fields so the tree stays green until the refactor lands.
-  - **U5 (DONE 2026-07-12).** Typed API create/restore/retry/hide + generalized neutral/scaffold
-    grading + polling. Application: `requestLearnerScaffold.ts` (server-side verification of the
-    active-ready expedition, the source block from server-owned neutral content, parent membership,
-    and the exact advertised term before an idempotent `upsertPending`; reason codes) plus
-    `retryLearnerScaffold`/`hideLearnerScaffold`; `gradeScaffoldOptionSelect` +
-    `recordScaffoldLessonRead` in `gradeStudyResponse.ts` (resolve the step scoped to the learner,
-    grade against the embedded key, append a `scaffold`-scoped row via new
-    `appendGradedScaffoldOutcome`). API: `/scaffold/request` (wakes the scaffold supervisor on a
-    determinate create), `/scaffold/retry`, `/scaffold/hide`, `/scaffold/option-select`,
-    `/scaffold/lesson-read`. Client: `actions.ts` scaffold mutations + `expeditionQuery`
-    `refetchInterval` that polls 5s ONLY while the finished session reports `generatingDetours`.
-    Tests: `requestLearnerScaffold.test.ts` (5) + scaffold-grade cases in `gradeStudyResponse.test.ts`
-    (3); 602 application tests green. `AppType` carries every new route to the Expo client with no
-    handwritten wire alias.
-
-  **NOT STARTED:** U4 client-component refactor (delete `trailView.ts`/`activityProgress.ts`,
-  migrate 13 importers to the projection-owned trail), U6 (TermExplorationMenu + ScaffoldDetour +
-  ScaffoldProgressDialog + ActivitySheet More button + motion), U7 (CONTEXT verify, ADR-0026/0032
-  amend, new ADR-0037, docs consolidation, delete plan). The three rule-14 real-model gates (U1 term
-  metadata, U3 scaffold generation, U6 browser) are still OWED — a green suite is not quality
-  evidence (rule 14).
-
-  **Verification status (2026-07-12 server-spine gate):** workspace `typecheck` exit 0, `lint` 0
-  errors / 9 pre-existing warnings, full `test` green (application 602, learner-app 137, learner-api
-  18, plus domain-core/litellm/admin-lab/kg-worker unchanged), `build` green (admin-lab + Expo web
-  export all 6 routes; the projection barrel stayed client-safe after `studySessionProjection`
-  began importing `composeScaffoldDetours`). Postgres integration (77) verified against a FRESH
-  migration applied to a scratch DB `lrnki_scaffold_u5_validate` (created + dropped; **the dev
-  `lrnki` DB was deliberately NOT reset**, preserving prior real-source graphs — the next session
-  must `scripts/reset-db.sh` before running the app end-to-end since the dev DB still lacks the new
-  columns/tables). **Three rule-14 real-model gates are still OWED** (code agent runs them, inspects
-  quality, reports findings + fixes obvious ones to the human): U1 term-metadata quality across
-  mixed domains, U3 scaffold-generation quality (≥6 terms / ≥3 domains), U6 learner-flow browser
-  gate. A green suite is not quality evidence (rule 14).
-
 - **Architecture deepening review Candidate 3
   ([2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md)).** Candidate 3
   (Topic Expedition generation behind its lifecycle interface) remains unplanned. Grill and plan
@@ -124,6 +20,27 @@
   at the leg-completion seam the duel's grade-only contract already proved.
 
 ## COMPLETED
+
+- **Adaptive Learner Scaffold Detours shipped (2026-07-12, plan 2026-07-12-002; plan DELETED).** A
+  learner can turn an unfamiliar Explorable Term in a lesson or question into a durable, optional,
+  one-level Scaffold Detour of one-to-three easier Support Steps, without ever mutating neutral graph
+  assets. Server-owned Explorable Term metadata rides into the projection item/lesson views; the
+  Study Session projection is now the single trail authority (`buildTrailView`/`resolveStopActivity`
+  moved into `@lrnki/application/projection`; the Learner App's `trailView.ts`/`activityProgress.ts`
+  are deleted and all importers consume the projection). Generated Support Steps carry a KEY-FREE
+  option-select view (`ScaffoldStepItemView` drops `isCorrect`); the shared Concept-Lesson section
+  mapper lives in a leaf `conceptLessonSectionView` module (no runtime import cycle). The Learner App
+  gained `TermExplorationMenu`, `ScaffoldDetour`, `ScaffoldProgressDialog`, and `ScaffoldStepSheet`,
+  a More overflow in the Activity Sheet, indented detour rows composed under each parent before the
+  capstone, a root-owned progress dialog, event-bound ready-reveal motion with reduced-motion
+  equivalence, and 5s polling only while a finished session reports generating detours. Durable
+  decisions: [ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md) (new), amended
+  [ADR-0026](../adr/0026-typed-study-item-bank.md) (response identity cedes the scaffold side) and
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)
+  (learner-requested support starts immediately; Flow Design Gate folded in); CONTEXT.md verified.
+  Three rule-14 gates PASS (U1 term metadata, U3 scaffold generation, U6 browser); one real defect
+  found and fixed (the `microLesson` `.max(600)` cap was clipping the model's natural output and
+  failing whole detours — raised to `.max(1200)`). Evidence: `tmp/2026-07-12-scaffold-detours/`.
 
 - **Expedition Journal is one finished application projection (2026-07-12, plan 2026-07-12-001).**
   A single `@lrnki/application` module (`expeditionJournal.ts`) owns candidate derivation,
@@ -328,6 +245,28 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Adaptive Learner Scaffold Detours gate, 2026-07-12.** Deterministic envelope (post-fix, fresh
+  migration): workspace `typecheck` all packages Done; `lint` 0 errors / 9 pre-existing warnings;
+  `test` green (domain-core 39, application 623 — incl. the moved neutral-trail characterization
+  tests and generated-step content projection, infrastructure-litellm 148 after the `microLesson`
+  cap change, infrastructure-postgres 77 vs a FRESH migration, learner-app 137 incl. the four new
+  scaffold component suites + the Activity Sheet AE1 integration, learner-api 18, admin-lab 62,
+  kg-worker 8); `build` green (Expo web export all 6 routes; no require-cycle after extracting the
+  `conceptLessonSectionView` leaf). Real-use (production LiteLLM, four cold synthetic expeditions
+  across Plant Biology / Computer Networking / Financial Engineering / Geology): **U1** term metadata
+  is restrained and useful in biology and networking (RuBisCO, ssthresh, ECN, AIMD, abbreviation
+  pairs), exact-substring/distinct/≤3/parent-excluded verified — recorded caveat that Black-Scholes
+  emitted zero terms (valid AE2 outcome, wiring confirmed correct, no domain tuning); **U3** ≥10
+  detours exercised direct reuse→reference (subduction, congestion window), generated single- and
+  multi-step (all genuinely easier, coherent, one concrete example, 4-option/1-correct, no key
+  leak), and a natural terminal failure (`asthenosphere`) whose root cause — the `microLesson`
+  `.max(600)` cap clipping the model's 495–593-char natural output — was fixed to `.max(1200)` and
+  confirmed by a successful retry; **U6** Playwright at a 390×844 phone viewport drove the full loop
+  (term menu → create → progress dialog → durable placeholder → generate to ready → study a
+  generated step → grade correct through the scaffold path → hide → restore) plus a reduced-motion
+  pass, all with zero console/page errors. Disposable learner state removed (DB reset before and
+  after). Evidence and the required evaluation note: `tmp/2026-07-12-scaffold-detours/`.
 
 - **Expedition Journal projection gate, 2026-07-12.** Deterministic envelope: workspace `typecheck`
   exit 0, workspace `test` green (application 568 including the new `expeditionJournal.test.ts`

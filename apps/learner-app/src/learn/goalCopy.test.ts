@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import { isSummitPush, legBannerLine, summitLine, terminusLine } from "./goalCopy";
-import type { TrailView } from "./trailView";
+import type { TrailView } from "@lrnki/application/projection";
 
 function trail(overrides: Partial<TrailView> = {}): TrailView {
   return {

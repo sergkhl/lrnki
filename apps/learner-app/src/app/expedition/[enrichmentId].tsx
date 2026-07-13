@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react-native";
 import { CheckpointPath, type TrailScrollHandle } from "@/components/CheckpointPath";
 import { CrystalVista } from "@/components/CrystalVista";
 import { QuestHeader } from "@/components/QuestHeader";
-import { buildTrailView } from "@/learn/trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import { expeditionQuery } from "@/lib/queries";
 import { Button, Screen, Text, buttonIconColor } from "@/ui";
 

@@ -1,7 +1,7 @@
 // Pure checkpoint presentation (KTD4, AE3): ONE mapping from a trail stop to its icon
 // and label, consumed by both the trail circle and the full-screen activity header so a
 // map-pin checkpoint always opens under a map-pin header.
-import type { TrailStop } from "./trailView";
+import type { TrailStop } from "@lrnki/application/projection";
 import { learnerTerm } from "./vocabulary";
 
 export type CheckpointIcon = "lock" | "book" | "map-pin" | "rows" | "search" | "crystal";

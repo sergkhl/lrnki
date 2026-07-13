@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } 
 import { BookOpen, Lock, MapPin, Rows3, Search } from "lucide-react-native";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
-import type { TrailCluster, TrailStop } from "@/learn/trailView";
+import type { TrailCluster, TrailStop } from "@lrnki/application/projection";
 import { MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
 const CIRCLE_ICONS: Record<Exclude<CheckpointIcon, "crystal">, typeof Lock> = {

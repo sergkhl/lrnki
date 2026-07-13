@@ -114,13 +114,46 @@ export const LEARNER_VOCABULARY = {
   duelDrawBody: "Matched point for point. Nothing lost, nothing crested.",
   duelAgain: "Back to the trail",
   duelUnlockTitle: "Crystal Duel unlocked!",
-  duelUnlockBody: "You’ve grown enough crystals to challenge a rival. Enter the arena whenever you like."
+  duelUnlockBody: "You’ve grown enough crystals to challenge a rival. Enter the arena whenever you like.",
+  // Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U6). Quiet, optional support the learner
+  // requests for an unfamiliar term. The three broad phases theme the projection's stable ids
+  // (KTD8, ADR-0033); the UI never shows counts or raw stage names.
+  exploreTermAction: "Explore",
+  termMenuLabel: "Explore a term",
+  termMenuHint: "Turn an unfamiliar term into a short support detour.",
+  termRequestFailed: "Couldn’t start that support. Try again.",
+  supportPreparingTitle: "Building support",
+  supportPhasePreparing: "Finding the right footing…",
+  supportPhaseBuilding: "Building your support steps…",
+  supportPhaseChecking: "Checking the ground…",
+  supportProgressClose: "Keep exploring",
+  supportReadyTitle: "Support ready",
+  supportReadyBody: "Your support steps are on the trail, just below this stop.",
+  supportFailedTitle: "Support didn’t build",
+  supportFailedBody: "Nothing was added to your trail. You can try again or dismiss it.",
+  supportAvailableGroup: "Support available",
+  supportExploredGroup: "Support explored",
+  supportSectionLabel: "Support",
+  supportRetry: "Retry",
+  supportDismiss: "Dismiss",
+  supportHide: "Hide this support",
+  supportGeneratedBadge: "Extra support",
+  supportStepDone: "Done",
+  supportViewProgress: "View progress"
 } as const;
 
 export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;
 
 export function learnerTerm(key: LearnerVocabularyKey): string {
   return LEARNER_VOCABULARY[key];
+}
+
+// Theme the projection's broad Scaffold Detour phase ids into learner copy (KTD8, ADR-0033).
+// The projection owns the phase; the UI only themes it.
+export function scaffoldPhaseCopy(phase: "preparing" | "building" | "checking" | null): string {
+  if (phase === "building") return learnerTerm("supportPhaseBuilding");
+  if (phase === "checking") return learnerTerm("supportPhaseChecking");
+  return learnerTerm("supportPhasePreparing");
 }
 
 export function expeditionStatusLabel(status: "generating" | "ready" | "failed"): string {

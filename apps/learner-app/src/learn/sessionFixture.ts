@@ -1,6 +1,6 @@
 // Test-only Study Session fixture for component suites: one lit concept with a lesson,
-// an option-select item, and an impostor item (mirrors the shape trailView.test.ts
-// builds inline). Options and statements are populated so choice surfaces render tiles.
+// an option-select item, and an impostor item (mirrors the projection's trail composition
+// inputs). Options and statements are populated so choice surfaces render tiles.
 import type { StudySession } from "@lrnki/application/projection";
 
 export function sessionFixture(overrides: Partial<StudySession> = {}): StudySession {
@@ -93,7 +93,8 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
             options: [
               { optionId: "o1", text: "Assignment", provenance: "generated" as const },
               { optionId: "o2", text: "Borrowing", provenance: "generated" as const }
-            ]
+            ],
+            explorableTerms: ["ownership", "move semantics"]
           }
         },
         {
@@ -108,12 +109,13 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
               { statementId: "s2", text: "Borrowing moves ownership", provenance: "generated" as const }
             ],
             reveal: "Borrowing never moves ownership.",
-            lieSource: "generated"
+            lieSource: "generated",
+            explorableTerms: []
           }
         }
       ]
     },
-    lessonByNode: { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [] } },
+    lessonByNode: { n1: { derivedNodeId: "n1", canonicalLabel: "Ownership", sections: [], explorableTerms: [] } },
     lessonReadByNode: {},
     lessonAbsent: [],
     detours: [],

@@ -10,10 +10,12 @@ import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { LessonSections } from "./LessonSections";
 import { MatchingBoard } from "./MatchingBoard";
+import { TermExplorationMenu } from "./TermExplorationMenu";
+import type { ScaffoldTermSource } from "@/lib/actions";
 import { activeStopFor, type AdvanceMemory } from "@/learn/advanceMemory";
-import { resolveStopActivity } from "@/learn/activityProgress";
+import { resolveStopActivity } from "@lrnki/application/projection";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
-import { buildTrailView } from "@/learn/trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import { learnerTerm } from "@/learn/vocabulary";
 
 type Activity = ReturnType<typeof resolveStopActivity>;
@@ -26,12 +28,16 @@ export function ActivitySheet({
   session,
   stopId,
   open,
-  onOpenChange
+  onOpenChange,
+  onScaffoldRequested
 }: Readonly<{
   session: StudySession;
   stopId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // A successful Explorable Term request (plan 2026-07-12-002 U6): the sheet closes into the
+  // root-owned progress dialog the parent opens for the returned detour id (KTD11, F1).
+  onScaffoldRequested?: (detourId: string) => void;
 }>) {
   const insets = useSafeAreaInsets();
   const [localStop, setLocalStop] = useState<AdvanceMemory>(null);
@@ -62,6 +68,21 @@ export function ActivitySheet({
           closeDisabled={mutationPending}
           closeLabel="Close"
         />
+        {activity ? (() => {
+          const menu = termMenuFor(activity);
+          if (!menu) return null;
+          return (
+            <TermExplorationMenu
+              enrichmentId={session.enrichmentId}
+              source={menu.source}
+              terms={menu.terms}
+              onRequested={(detourId) => {
+                close();
+                onScaffoldRequested?.(detourId);
+              }}
+            />
+          );
+        })() : null}
         {activity ? (
           <ActivityController
             key={activeStopId}
@@ -366,6 +387,21 @@ function CompletedIndicator({
       </Text>
     </View>
   );
+}
+
+// The Explorable Term source + advertised terms for the current activity (R1-R4). A theory stop's
+// terms are its lesson's flattened terms (keyed by node); a question stop's terms are the item's
+// (keyed by the study item). Capstone, missing, and term-less activities show no menu (AE2).
+function termMenuFor(activity: Activity): { source: ScaffoldTermSource; terms: string[] } | null {
+  if (activity.kind === "theory") {
+    const terms = activity.lesson?.explorableTerms ?? [];
+    return terms.length ? { source: { kind: "lesson", derivedNodeId: activity.derivedNodeId }, terms } : null;
+  }
+  if (activity.kind === "option_select" || activity.kind === "impostor" || activity.kind === "matching") {
+    const terms = activity.item.explorableTerms;
+    return terms.length ? { source: { kind: "study_item", studyItemId: activity.item.studyItemId }, terms } : null;
+  }
+  return null;
 }
 
 function descriptionFor(kind: Activity["kind"]): string {

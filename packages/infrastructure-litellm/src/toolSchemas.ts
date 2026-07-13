@@ -629,7 +629,7 @@ export const scaffoldOutlineSchema: JsonSchema = toForcedToolSchema(scaffoldOutl
 // pipeline are the four-option one-correct shape and never presenting text as a source quote.
 // The required `distractors` array closes the object (no trailing nullable).
 export const scaffoldContentValidator = z.object({
-  microLesson: z.string().min(1).max(600).describe("A compact, plain-language explanation of the sub-concept WITH one concrete example, written for a learner who does not yet know it. Self-contained; never reference 'the passage' or 'the source'."),
+  microLesson: z.string().min(1).max(1200).describe("A compact, plain-language explanation of the sub-concept WITH one concrete example, written for a learner who does not yet know it. Self-contained; never reference 'the passage' or 'the source'."),
   question: z.string().min(1).describe("One self-contained recall question about the sub-concept with a single correct answer."),
   explanation: z.string().min(1).describe("Short learner-facing rationale for why the correct answer is right."),
   correctAnswer: z.string().min(1).describe("The single correct option."),

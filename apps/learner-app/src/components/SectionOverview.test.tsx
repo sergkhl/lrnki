@@ -2,10 +2,10 @@ import { expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SectionOverview } from "./SectionOverview";
-import { buildTrailView } from "@/learn/trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import { sessionFixture } from "@/learn/sessionFixture";
 import { learnerTerm } from "@/learn/vocabulary";
-import type { TrailSectionView } from "@/learn/trailView";
+import type { TrailSectionView } from "@lrnki/application/projection";
 
 const SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },

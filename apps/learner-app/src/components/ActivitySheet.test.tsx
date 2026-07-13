@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { PortalHost } from "@rn-primitives/portal";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ActivitySheet } from "./ActivitySheet";
-import { submitLearnerOptionSelect } from "@/lib/actions";
+import { requestScaffoldDetour, submitLearnerOptionSelect } from "@/lib/actions";
 import { sessionFixture } from "@/learn/sessionFixture";
 import { learnerTerm } from "@/learn/vocabulary";
 
@@ -13,10 +13,12 @@ jest.mock("@/lib/actions", () => ({
   submitLearnerOptionSelect: jest.fn(),
   submitLearnerImpostor: jest.fn(),
   submitLearnerMatching: jest.fn(),
-  validateLearnerMatchingAttempt: jest.fn()
+  validateLearnerMatchingAttempt: jest.fn(),
+  requestScaffoldDetour: jest.fn()
 }));
 
 const submitMock = submitLearnerOptionSelect as jest.Mock;
+const requestScaffoldMock = requestScaffoldDetour as jest.Mock;
 
 const SAFE_AREA_METRICS = {
   insets: { top: 0, left: 0, right: 0, bottom: 0 },
@@ -63,4 +65,22 @@ test("a theory stop shows lesson content and its continue action", async () => {
   await renderSheet("n1:theory:main");
   expect(screen.getAllByText(learnerTerm("theoryStop")).length).toBeGreaterThan(0);
   expect(screen.getByLabelText(learnerTerm("continueAction"))).toBeTruthy();
+});
+
+test("Covers AE1: a question's Explore term closes the activity into the progress dialog", async () => {
+  requestScaffoldMock.mockImplementation(() => Promise.resolve({ created: true, detourId: "d9", status: "generating" }));
+  const onOpenChange = jest.fn();
+  const onScaffoldRequested = jest.fn();
+  await render(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <ActivitySheet session={sessionFixture()} stopId="n1:option_select:i1" open onOpenChange={onOpenChange} onScaffoldRequested={onScaffoldRequested} />
+      <PortalHost />
+    </SafeAreaProvider>
+  );
+  // The fixture's option-select advertises "ownership" and "move semantics".
+  await fireEvent.press(screen.getByTestId("term-menu-toggle"));
+  await fireEvent.press(screen.getByTestId("explore-term-ownership"));
+  await waitFor(() => expect(requestScaffoldMock).toHaveBeenCalledWith({ enrichmentId: "e1", source: { kind: "study_item", studyItemId: "i1" }, term: "ownership" }));
+  await waitFor(() => expect(onScaffoldRequested).toHaveBeenCalledWith("d9"));
+  expect(onOpenChange).toHaveBeenCalledWith(false);
 });
