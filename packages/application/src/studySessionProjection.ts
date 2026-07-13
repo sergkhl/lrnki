@@ -1,6 +1,9 @@
 import { neutralResponses, normalizeConceptLabel, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type ScaffoldDetour, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
 import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
 import { composeScaffoldDetours, type ScaffoldDetourView, type ScaffoldGeneratingPhase } from "./studySessionTrail";
+// Type-only (plan 2026-07-13-003 U4): the defining module pulls node:crypto at runtime, but
+// type imports are erased, so the client-safe projection closure stays Node-builtin-free.
+import type { RecallScopeStatus } from "./recallChallenge";
 import { conceptLessonSectionToView } from "./conceptLessonSectionView";
 import {
   ADAPTIVE_MASTERY_THRESHOLD,
@@ -385,6 +388,14 @@ export type StudySession = {
   // generating detour tells the client to keep polling (U5).
   detours: ScaffoldDetourView[];
   generatingDetours: boolean;
+  // Server-owned Recall Challenge scope views (plan 2026-07-13-003 U4, KTD3): one per Leg
+  // (section milestone) plus the Expedition (summit) scope, PRODUCED by the Recall Challenge
+  // module and attached here as finished data — the projection never re-derives challenge
+  // state. The Learner App maps these to Guardian entry, Leg fusion, and the summit keystone;
+  // fusion derives ONLY from `wonChallengeId`, never from mastery. Empty when the caller wires
+  // no challenge store (Admin Lab inspection composes unchanged). These facts ride OUTSIDE the
+  // neutral mastery fold: no field below reads them.
+  recallScopes: RecallScopeStatus[];
   // Nodes excluded as trail stops by the minimal difficulty floor (ADR-0024 consumer):
   // confident band-1, non-target. Their prerequisite gating survives by edge contraction
   // inside the projection; this list exists for inspection — no surface renders it.
@@ -415,6 +426,11 @@ export function composeStudySession(input: {
   // authority; absent/empty leaves `detours` empty and `generatingDetours` false (unchanged
   // behavior for callers that do not wire the scaffold store).
   detours?: readonly ScaffoldDetour[];
+  // Finished Recall Challenge scope statuses for this learner/enrichment (plan 2026-07-13-003
+  // U4). Already projected by the Recall Challenge module; attached verbatim. Absent/empty
+  // composes an unchanged session — and by construction the neutral fold below cannot read
+  // this input, so challenge history can never move mastery, gating, or points (KTD4).
+  recallScopes?: readonly RecallScopeStatus[];
 }): StudySession {
   const { detail } = input;
 
@@ -619,6 +635,7 @@ export function composeStudySession(input: {
     lessonAbsent,
     detours,
     generatingDetours,
+    recallScopes: [...(input.recallScopes ?? [])],
     flooredNodeIds: floor.flooredNodeIds
   };
 }

@@ -20,8 +20,9 @@ the typed Study Item Bank in [ADR-0026](../adr/0026-typed-study-item-bank.md), l
 
 ## Status and scope
 
-- **Readiness:** in progress — U1–U3 implemented 2026-07-13; [TODO](./TODO.md) carries the
-  authoritative execution status and the remaining-unit handoff (Gate A next).
+- **Readiness:** in progress — U1–U4 implemented and Gate A PASS 2026-07-13; [TODO](./TODO.md)
+  carries the authoritative execution status and the remaining-unit handoff (U5–U6 next, after
+  the native parity fix plan).
 - **Predecessor:** complete the ready
   [Learner App native parity fix](./2026-07-13-004-fix-learner-app-native-parity-plan.md) first;
   Guardian presentation depends on its native UI-kit verification.

@@ -1,5 +1,7 @@
 import { neutralResponses, type ResponseLogRow, type ScaffoldDetour, type ScaffoldStep } from "@lrnki/domain-core";
 import { conceptLessonSectionToView } from "./conceptLessonSectionView";
+// Type-only (plan 2026-07-13-003 U4): erased at runtime, keeping this module client-safe.
+import type { RecallScopeStatus } from "./recallChallenge";
 import type {
   ConceptLessonSectionView,
   ConceptLessonView,
@@ -228,6 +230,11 @@ export type TrailSectionView = {
   firstConceptId: string;
   // For a locked section: the unmet prerequisite milestone/concept labels gating entry, deduped.
   gatingLabels: string[];
+  // This Leg's Recall Challenge scope (plan 2026-07-13-003 U4, KTD3), matched by section index
+  // from the session's server-owned scope views. Leg fusion derives ONLY from its
+  // `wonChallengeId` — a fully mastered section with no won challenge stays unfused. Null when
+  // the session composed without a challenge store.
+  recallScope: RecallScopeStatus | null;
 };
 
 export type TrailView = {
@@ -240,6 +247,11 @@ export type TrailView = {
   nextStopLabel: string | null;
   masteredCount: number;
   totalClusters: number;
+  // The Expedition (summit) Recall Challenge scope (plan 2026-07-13-003 U4, KTD3): `locked`
+  // until every Leg formation exists; the summit keystone derives ONLY from its
+  // `wonChallengeId`. Null when the session composed without a challenge store or the layer
+  // has no summit.
+  enrichmentScope: RecallScopeStatus | null;
 };
 
 // The DOM id the trail gives a section's opening divider, so the non-blocking overview can scroll
@@ -311,7 +323,8 @@ export function buildTrailView(session: StudySession): TrailView {
     nextStopId: nextStop?.stopId ?? null,
     nextStopLabel: nextStop?.label ?? null,
     masteredCount: clusters.filter((cluster) => cluster.state === "mastered" && !cluster.isKnownSkipped).length,
-    totalClusters: clusters.length
+    totalClusters: clusters.length,
+    enrichmentScope: session.recallScopes.find((scope) => scope.scopeKind === "enrichment") ?? null
   };
 }
 
@@ -347,7 +360,8 @@ function buildSections(clusters: TrailCluster[], session: StudySession): TrailSe
         stopsComplete: stops.filter((stop) => stop.state === "complete").length,
         stopsTotal: stops.length,
         firstConceptId: sectionClusters[0]?.derivedNodeId ?? "",
-        gatingLabels
+        gatingLabels,
+        recallScope: session.recallScopes.find((scope) => scope.scopeKind === "section" && scope.sectionIndex === sectionIndex) ?? null
       };
     });
 }

@@ -122,7 +122,8 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
     lessonReadByNode: {},
     lessonAbsent: [],
     detours: [],
-    generatingDetours: false
+    generatingDetours: false,
+    recallScopes: []
   };
   return { ...base, ...overrides };
 }

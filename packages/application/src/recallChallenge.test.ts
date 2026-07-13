@@ -7,9 +7,11 @@ import {
   RECALL_MISS_BUFFER,
   SECTION_LINEUP_MAX,
   currentTurnItemId,
+  eligibleRecallItems,
   foldRecallChallenge,
   latestCorrectStudyItemIds,
   projectRecallChallengeView,
+  projectRecallScopeStatuses,
   selectRecallLineup,
   type RecallEligibleItem
 } from "./recallChallenge";
@@ -301,4 +303,111 @@ test("a won fold projects the terminal won view without any item payload", () =>
   const state = foldRecallChallenge({ lineup, events: [answer("i-1", true)], pairCountFor: noMatching });
   const view = projectRecallChallengeView({ challenge: viewChallenge, lineup, state, itemById: new Map() });
   assert.deepEqual(view, { state: "won", challengeId: "ch-1", enrichmentId: "en-1", scopeKind: "section", anchorDerivedNodeId: "n-1", wardTotal: 1 });
+});
+
+// --- Scope status projection (plan U4; KTD3, AE1/AE5-AE8 projection halves) ----
+
+const scopeNodes = [
+  { derivedNodeId: "m-0", label: "Leg Zero Milestone" },
+  { derivedNodeId: "m-1", label: "Leg One Milestone" },
+  { derivedNodeId: "summit", label: "The Summit" }
+];
+const scopeSections = [
+  { sectionIndex: 0, milestoneDerivedNodeId: "m-0" },
+  { sectionIndex: 1, milestoneDerivedNodeId: "m-1" }
+];
+
+function scopeInput(overrides: Partial<Parameters<typeof projectRecallScopeStatuses>[0]> = {}) {
+  return {
+    nodes: scopeNodes,
+    sections: scopeSections,
+    summit: { derivedNodeId: "summit" },
+    eligible: [eligible("i-1", "m-0", 0), eligible("i-2", "m-1", 1)],
+    challenges: [],
+    wonScopes: [],
+    ...overrides
+  };
+}
+
+test("a mastered Leg with no won challenge is available — mastery never auto-fuses (KTD3)", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput());
+  assert.deepEqual(scopes.map((scope) => [scope.scopeKind, scope.anchorDerivedNodeId, scope.state]), [
+    ["section", "m-0", "available"],
+    ["section", "m-1", "available"],
+    ["enrichment", "summit", "locked"]
+  ]);
+  assert.equal(scopes[0].anchorLabel, "Leg Zero Milestone");
+  assert.equal(scopes[0].sectionIndex, 0);
+  assert.equal(scopes[2].sectionIndex, null);
+});
+
+test("an active challenge projects active with its id after any refetch", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    challenges: [{ challengeId: "ch-live", status: "active", scopeKind: "section", scopeAnchorDerivedNodeId: "m-0" }]
+  }));
+  assert.equal(scopes[0].state, "active");
+  assert.equal(scopes[0].activeChallengeId, "ch-live");
+  assert.equal(scopes[1].state, "available");
+});
+
+test("a won Leg stays won when a later acquisition miss empties its eligible pool", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    eligible: [eligible("i-2", "m-1", 1)],
+    wonScopes: [{ scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-won" }]
+  }));
+  assert.equal(scopes[0].state, "won");
+  assert.equal(scopes[0].wonChallengeId, "ch-won");
+  assert.equal(scopes[0].eligibleItemCount, 0);
+  assert.equal(scopes[0].reason, undefined);
+});
+
+test("a zero-item Leg is honestly unavailable and blocks the Expedition scope", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    eligible: [eligible("i-1", "m-0", 0)],
+    wonScopes: [{ scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-won" }]
+  }));
+  assert.equal(scopes[1].state, "unavailable");
+  assert.equal(scopes[1].reason, "no_eligible_items");
+  // Leg 1 can never be won, so the summit stays locked (never auto-fused).
+  assert.equal(scopes[2].state, "locked");
+});
+
+test("every Leg won unlocks the Expedition scope; abandoned challenges never count", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    challenges: [{ challengeId: "ch-dead", status: "abandoned", scopeKind: "enrichment", scopeAnchorDerivedNodeId: "summit" }],
+    wonScopes: [
+      { scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-a" },
+      { scopeKind: "section", scopeAnchorDerivedNodeId: "m-1", challengeId: "ch-b" }
+    ]
+  }));
+  assert.equal(scopes[2].state, "available");
+  assert.equal(scopes[2].activeChallengeId, undefined);
+  assert.equal(scopes[2].eligibleItemCount, 2);
+});
+
+test("victory identity is FIRST-win-wins: a rematch win never re-keys the formation (KTD3)", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    wonScopes: [
+      { scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-first" },
+      { scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-rematch" }
+    ]
+  }));
+  assert.equal(scopes[0].wonChallengeId, "ch-first");
+});
+
+test("a summitless layer projects only section scopes", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({ summit: null }));
+  assert.deepEqual(scopes.map((scope) => scope.scopeKind), ["section", "section"]);
+});
+
+test("eligibleRecallItems filters by scope AND latest-correct, carrying exposure", () => {
+  const items = [
+    { ...optionSelectItem("i-in"), derivedNodeId: "m-0" },
+    { ...optionSelectItem("i-out-of-scope"), derivedNodeId: "elsewhere" },
+    { ...optionSelectItem("i-not-passed"), derivedNodeId: "m-1" }
+  ];
+  const rows = [gradedRow("i-in", 1, "correct"), gradedRow("i-not-passed", 1, "incorrect")];
+  const sectionOf = new Map([["m-0", 0], ["m-1", 1]]);
+  const pool = eligibleRecallItems({ items, rows, exposure: { "i-in": 2 }, sectionIndexFor: (id) => sectionOf.get(id) });
+  assert.deepEqual(pool, [{ studyItemId: "i-in", derivedNodeId: "m-0", sectionIndex: 0, priorChallengeExposure: 2 }]);
 });

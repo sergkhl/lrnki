@@ -4,6 +4,7 @@ import type {
   EnrichmentInspectionReadPort,
   NewRecallChallengeEvent,
   RecallChallengeEvent,
+  RecallChallenge,
   RecallChallengeLineupEntry,
   RecallChallengeRecord,
   RecallChallengeScopeKind,
@@ -139,6 +140,31 @@ export function latestCorrectStudyItemIds(rows: ResponseLogRow[]): Set<string> {
     latestBySeq.set(row.studyItemId, { attemptSeq: row.attemptSeq, correct: row.judgedOutcome === "correct" });
   }
   return new Set([...latestBySeq.entries()].filter(([, latest]) => latest.correct).map(([studyItemId]) => studyItemId));
+}
+
+// Pure eligibility assembly over already-loaded data (KTD5): the module's port reads and the
+// Study Session reader both feed this, so `/challenge/scopes` and the `/expedition/:id`
+// projection derive IDENTICAL pools from one definition. `sectionIndexFor` doubles as the
+// scope filter — undefined means the item's concept is out of scope.
+export function eligibleRecallItems(input: {
+  items: readonly StudyItem[];
+  rows: ResponseLogRow[];
+  exposure: Record<string, number>;
+  sectionIndexFor: (derivedNodeId: string) => number | undefined;
+}): RecallEligibleItem[] {
+  const passed = latestCorrectStudyItemIds(input.rows);
+  const eligible: RecallEligibleItem[] = [];
+  for (const item of input.items) {
+    const sectionIndex = input.sectionIndexFor(item.derivedNodeId);
+    if (sectionIndex === undefined || !passed.has(item.studyItemId)) continue;
+    eligible.push({
+      studyItemId: item.studyItemId,
+      derivedNodeId: item.derivedNodeId,
+      sectionIndex,
+      priorChallengeExposure: input.exposure[item.studyItemId] ?? 0
+    });
+  }
+  return eligible;
 }
 
 // --- Combat fold (KTD6) -----------------------------------------------------
@@ -360,6 +386,77 @@ export type RecallScopeStatus = {
   wonChallengeId?: string;
 };
 
+// Pure per-scope status projection over already-loaded data (plan 2026-07-13-003 U4): every
+// Leg (section milestone) plus the Expedition (summit) scope. The module's `scopeStatus`
+// loads through its ports and calls this; `getStudySession` reuses the rows it already loaded
+// and calls the same function, so the trail's Guardian facts cannot drift from the challenge
+// routes. Victory identity is FIRST-win-wins (KTD3): a duplicate won scope in the input never
+// re-keys the permanent formation. The enrichment scope stays `locked` until every Leg has a
+// formation — a zero-item Leg can never be won, so it honestly blocks the summit rather than
+// auto-fusing.
+export function projectRecallScopeStatuses(input: {
+  nodes: readonly { derivedNodeId: string; label: string }[];
+  sections: readonly { sectionIndex: number; milestoneDerivedNodeId: string }[];
+  summit: { derivedNodeId: string } | null;
+  eligible: readonly RecallEligibleItem[];
+  challenges: readonly Pick<RecallChallenge, "challengeId" | "status" | "scopeKind" | "scopeAnchorDerivedNodeId">[];
+  wonScopes: readonly { scopeKind: RecallChallengeScopeKind; scopeAnchorDerivedNodeId: string; challengeId: string }[];
+}): RecallScopeStatus[] {
+  const labelOf = new Map(input.nodes.map((node) => [node.derivedNodeId, node.label] as const));
+  const wonBy = new Map<string, string>();
+  for (const scope of input.wonScopes) {
+    const key = `${scope.scopeKind} ${scope.scopeAnchorDerivedNodeId}`;
+    if (!wonBy.has(key)) wonBy.set(key, scope.challengeId);
+  }
+  const activeBy = new Map<string, string>(
+    input.challenges
+      .filter((challenge) => challenge.status === "active")
+      .map((challenge) => [`${challenge.scopeKind} ${challenge.scopeAnchorDerivedNodeId}`, challenge.challengeId] as const)
+  );
+
+  const statusFor = (
+    scopeKind: RecallChallengeScopeKind,
+    anchorDerivedNodeId: string,
+    sectionIndex: number | null,
+    eligibleItemCount: number,
+    locked: boolean
+  ): RecallScopeStatus => {
+    const key = `${scopeKind} ${anchorDerivedNodeId}`;
+    const wonChallengeId = wonBy.get(key);
+    const activeChallengeId = activeBy.get(key);
+    const state: RecallScopeStatus["state"] = activeChallengeId
+      ? "active"
+      : wonChallengeId
+        ? "won"
+        : locked
+          ? "locked"
+          : eligibleItemCount === 0
+            ? "unavailable"
+            : "available";
+    return {
+      scopeKind,
+      anchorDerivedNodeId,
+      anchorLabel: labelOf.get(anchorDerivedNodeId) ?? anchorDerivedNodeId,
+      sectionIndex,
+      eligibleItemCount,
+      state,
+      ...(state === "unavailable" ? { reason: "no_eligible_items" as const } : {}),
+      ...(activeChallengeId ? { activeChallengeId } : {}),
+      ...(wonChallengeId ? { wonChallengeId } : {})
+    };
+  };
+
+  const sectionStatuses = input.sections.map((section) => {
+    const count = input.eligible.filter((item) => item.sectionIndex === section.sectionIndex).length;
+    return statusFor("section", section.milestoneDerivedNodeId, section.sectionIndex, count, false);
+  });
+  const everyLegWon = sectionStatuses.length > 0 && sectionStatuses.every((section) => Boolean(section.wonChallengeId));
+  const summitStatuses = input.summit
+    ? [statusFor("enrichment", input.summit.derivedNodeId, null, input.eligible.length, !everyLegWon)]
+    : [];
+  return [...sectionStatuses, ...summitStatuses];
+}
+
 export type RecallChallengeRefusal =
   | "not_found"
   | "invalid_scope"
@@ -412,19 +509,7 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
       deps.responseLog.listForLearner(input.learnerStateRef),
       deps.challengeStore.priorExposure({ learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId })
     ]);
-    const passed = latestCorrectStudyItemIds(rows);
-    const eligible: RecallEligibleItem[] = [];
-    for (const item of items) {
-      const sectionIndex = input.nodeIdsInScope(item.derivedNodeId);
-      if (sectionIndex === undefined || !passed.has(item.studyItemId)) continue;
-      eligible.push({
-        studyItemId: item.studyItemId,
-        derivedNodeId: item.derivedNodeId,
-        sectionIndex,
-        priorChallengeExposure: exposure[item.studyItemId] ?? 0
-      });
-    }
-    return eligible;
+    return eligibleRecallItems({ items, rows, exposure, sectionIndexFor: input.nodeIdsInScope });
   };
 
   const pairCounts = (items: readonly StudyItem[]) => {
@@ -574,7 +659,6 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
     async scopeStatus(input: { learnerStateRef: string; enrichmentId: string }): Promise<RecallScopeStatus[] | undefined> {
       const scopes = await loadScopes(input.enrichmentId);
       if (!scopes) return undefined;
-      const labelOf = new Map(scopes.detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
       const sectionOf = new Map<string, number>();
       for (const section of scopes.sections) {
         for (const nodeId of section.stepDerivedNodeIds) sectionOf.set(nodeId, section.sectionIndex);
@@ -584,56 +668,14 @@ export function createRecallChallenge(deps: RecallChallengeDeps) {
         deps.challengeStore.listWonScopes(input),
         loadEligible({ ...input, nodeIdsInScope: (nodeId) => sectionOf.get(nodeId) })
       ]);
-      const wonBy = new Map<string, string>(won.map((scope) => [`${scope.scopeKind} ${scope.scopeAnchorDerivedNodeId}`, scope.challengeId] as const));
-      const activeBy = new Map<string, string>(
-        challenges
-          .filter((challenge) => challenge.status === "active")
-          .map((challenge) => [`${challenge.scopeKind} ${challenge.scopeAnchorDerivedNodeId}`, challenge.challengeId] as const)
-      );
-
-      const statusFor = (
-        scopeKind: RecallChallengeScopeKind,
-        anchorDerivedNodeId: string,
-        sectionIndex: number | null,
-        eligibleItemCount: number,
-        locked: boolean
-      ): RecallScopeStatus => {
-        const key = `${scopeKind} ${anchorDerivedNodeId}`;
-        const wonChallengeId = wonBy.get(key);
-        const activeChallengeId = activeBy.get(key);
-        const state: RecallScopeStatus["state"] = activeChallengeId
-          ? "active"
-          : wonChallengeId
-            ? "won"
-            : locked
-              ? "locked"
-              : eligibleItemCount === 0
-                ? "unavailable"
-                : "available";
-        return {
-          scopeKind,
-          anchorDerivedNodeId,
-          anchorLabel: labelOf.get(anchorDerivedNodeId) ?? anchorDerivedNodeId,
-          sectionIndex,
-          eligibleItemCount,
-          state,
-          ...(state === "unavailable" ? { reason: "no_eligible_items" as const } : {}),
-          ...(activeChallengeId ? { activeChallengeId } : {}),
-          ...(wonChallengeId ? { wonChallengeId } : {})
-        };
-      };
-
-      const sectionStatuses = scopes.sections.map((section) => {
-        const count = eligible.filter((item) => item.sectionIndex === section.sectionIndex).length;
-        return statusFor("section", section.milestoneDerivedNodeId, section.sectionIndex, count, false);
+      return projectRecallScopeStatuses({
+        nodes: scopes.detail.nodes,
+        sections: scopes.sections,
+        summit: scopes.summit,
+        eligible,
+        challenges,
+        wonScopes: won
       });
-      // The Expedition scope unlocks only when every Leg formation exists (a zero-item Leg can
-      // never be won, so it honestly blocks the summit Guardian rather than auto-fusing).
-      const everyLegWon = sectionStatuses.length > 0 && sectionStatuses.every((section) => Boolean(section.wonChallengeId));
-      const summitStatuses = scopes.summit
-        ? [statusFor("enrichment", scopes.summit.derivedNodeId, null, eligible.length, !everyLegWon)]
-        : [];
-      return [...sectionStatuses, ...summitStatuses];
     },
 
     // Create or conflict (KTD2/KTD5): a fresh start over an active challenge is a conflict

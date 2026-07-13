@@ -6,6 +6,7 @@ import type {
   ConceptLessonStorePort,
   DerivedGraphDetail,
   EnrichmentInspectionReadPort,
+  RecallChallengeStorePort,
   ResponseLogStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
@@ -157,4 +158,53 @@ test("a calibrated learner who marked the prerequisite known yields the pruned/h
   // scope is mastered via calibration, so ownership (the goal) is now the frontier and scope is hidden.
   assert.equal(session.classification.selectedFrontierTarget, "ownership");
   assert.deepEqual(session.adaptedHiddenNodeIds, ["scope"]);
+});
+
+// --- Recall Challenge scope wiring (plan 2026-07-13-003 U4) --------------------
+
+test("getStudySession composes server-owned recall scopes from the challenge store and the rows it already loaded", async () => {
+  const challengeStore: RecallChallengeStorePort = {
+    async create() { throw new Error("not used"); },
+    async getForLearner() { throw new Error("not used"); },
+    async getActiveForScope() { throw new Error("not used"); },
+    async listForLearnerEnrichment() {
+      return [{ challengeId: "ch-live", learnerStateRef: "L1", enrichmentId: "e", scopeKind: "section", scopeAnchorDerivedNodeId: "ownership", status: "active", createdAt: "t", updatedAt: "t" }];
+    },
+    async appendEvent() { throw new Error("not used"); },
+    async priorExposure() { return { "os-scope": 3 }; },
+    async listWonScopes() { return []; },
+    async hydrateLineupItems() { throw new Error("not used"); }
+  };
+  const correctRow: ResponseLogRow = {
+    responseId: "r1", learnerStateRef: "L1", scope: "neutral", studyItemId: "os-scope", derivedNodeId: "scope",
+    signalType: "graded", judgedOutcome: "correct", gradedScore: 1, responseSource: "human", graderIdentity: "auto",
+    batchId: null, attemptSeq: 1, submittedAnswer: "x"
+  };
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    enrichmentRead: enrichmentRead({ e: detail() }),
+    studyItemStore: studyItemStore([optionItem]),
+    conceptLessonStore: conceptLessonStore([]),
+    responseLog: responseLog([correctRow]),
+    verdictStore: verdictStore([]),
+    challengeStore
+  });
+  assert.ok(session);
+  // The two-node layer is one section anchored on `ownership`: the passed item on `scope`
+  // makes one eligible item; the active challenge rides through; the summit scope is the
+  // milestone itself only when a summit exists past the sections — here the single milestone
+  // doubles as summit, so we assert the section scope's facts.
+  const sectionScope = session.recallScopes.find((scope) => scope.scopeKind === "section");
+  assert.ok(sectionScope);
+  assert.equal(sectionScope.anchorDerivedNodeId, "ownership");
+  assert.equal(sectionScope.state, "active");
+  assert.equal(sectionScope.activeChallengeId, "ch-live");
+  assert.equal(sectionScope.eligibleItemCount, 1);
+});
+
+test("getStudySession without a challenge store composes empty recall scopes", async () => {
+  const session = await callGetStudySession({});
+  assert.ok(session);
+  assert.deepEqual(session.recallScopes, []);
 });

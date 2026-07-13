@@ -10,7 +10,8 @@
   [ready plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) before Guardian builds new
   native surfaces on the same UI kit.
 
-- **Crystal Guardian Challenges (IN PROGRESS — U1–U3 shipped 2026-07-13, U4–U7 remain).**
+- **Crystal Guardian Challenges (IN PROGRESS — U1–U4 shipped + Gate A PASS 2026-07-13; U5–U7
+  remain).**
   Implement the accepted
   [requirements](../brainstorms/2026-07-13-crystal-guardian-challenges-requirements.md) through the
   [ready plan](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md). **Done this session
@@ -46,24 +47,44 @@
     create → 3 misses → Last Stand → retreat/resume → recovery win → idempotent replay →
     summit unlock → rematch → abandon, asserting no `isCorrect` on the wire and `response_log`
     count identical.
-  **Validation this session:** workspace typecheck green; lint 0 errors (9 pre-existing
-  warnings); tests green everywhere (application 658, learner-api 20 incl. the live-DB E2E,
-  infrastructure-postgres 83/84 — the ONE failure is the PRE-EXISTING scaffold-store global
-  `claimNextGenerating` test colliding with a real learner's ready detour in the dirty shared
-  DB, known since 2026-07-12; a fresh migration clears it), learner-app 149, admin-lab 62.
+  - **U4 (done 2026-07-13, second session)** — server-owned scope views ride the projection:
+    the pure `projectRecallScopeStatuses` + `eligibleRecallItems` were extracted from the
+    module's closure (the module's `scopeStatus` now delegates), `getStudySession` composes
+    `StudySession.recallScopes` from the SAME pure functions over the rows it already loads
+    (optional `challengeStore` dep — only the three cheap challenge reads are added; Admin Lab
+    composes unchanged/empty), `buildTrailView` attaches `TrailSectionView.recallScope` (by
+    section index) and `TrailView.enrichmentScope`, and `/expedition/:id` wires the store.
+    `RecallScopeStatus` reaches the client-safe `./projection` barrel type-only (the defining
+    module pulls `node:crypto`; Expo web export stays green). A projection test proves the
+    neutral fold is byte-identical under arbitrary scope input (KTD3/KTD4); scope-status
+    scenario tests (mastered-unfused, active-after-refetch, won-after-later-miss, zero-item Leg
+    blocking the summit, all-Legs-won unlock, FIRST-win-wins rematch identity) are table-driven
+    on the pure function.
+  **Validation this session (U4 + Gate A):** workspace typecheck green; lint 0 errors (9
+  pre-existing warnings); tests green EVERYWHERE incl. infrastructure-postgres 84/84 against a
+  fresh migration (the 2026-07-12 dirty-DB `claimNextGenerating` caveat is CLEARED — it was the
+  dirty shared DB, as suspected); application 672, learner-api 20 (live-DB E2E), learner-app
+  149, admin-lab 62; `pnpm build` green (Expo web export proves the client bundle stays
+  Node-free). **Rule-14 Gate A PASS** on a hard-reset DB + fresh production "Tides and lunar
+  gravitation" expedition (14 nodes / 31 items / 6 Legs, READY in 486 s): honest all-unavailable
+  + locked-summit initial scopes; real acquisition flipped exactly one Leg available (7
+  eligible); coverage-first anchor-led 5/7 lineup; misses→Last Stand→retreat→**byte-identical
+  resume on a freshly restarted API process**→recovery win→victory; duplicate-attempt replay,
+  state-edge lifecycle no-ops, 409 out-of-turn (incl. organic ward rotation), live dirty
+  Matching round (per-pair corrective feedback, ONE shield hit, `roundIndex` 0→1 reshuffle with
+  reset board), rematch + abandon + second victory all leaving the formation at the FIRST win,
+  later acquisition miss dropping eligibility 7→6 with the scope still won;
+  `session.recallScopes` deep-equals `/challenge/scopes` at every stage; `response_log`
+  md5 + mastery gating + points **identical** across ~60 challenge events. Evidence + required
+  note: `tmp/2026-07-13-crystal-guardian-challenges/EVALUATION.md`. Post-gate hard reset ran;
+  deployed container restarted; DB is fresh/empty.
   **Remaining for the next session, in order:**
-  1. **Rule-14 Gate A** (plan "Gate A"): hard-reset the shared DB, re-run `pnpm db:migrate`,
-     generate a fresh production Topic Expedition, play acquisition to eligibility, then drive
-     the authenticated `/challenge/*` API through every item type, miss/retreat/resume/recovery/
-     victory; inspect lineup/events/projection and the `response_log`+mastery+points checksum.
-     Evidence under `tmp/2026-07-13-crystal-guardian-challenges/`.
-  2. **U4** — thread `RecallScopeStatus` (already exported) into the Study Session/trail
-     projection + `/expedition/:id` payload; derive Leg fusion / summit keystone ONLY from won
-     scopes (KTD3); keep the neutral mastery fold provably unchanged.
-  3. **U5–U6** — Guardian fight surface + arrival/trail/formation/summit integration. BLOCKED on
+  1. **U5–U6** — Guardian fight surface + arrival/trail/formation/summit integration. BLOCKED on
      the [native parity fix plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) (run it
-     first; it is still ready and unstarted).
-  4. **U7** — hard-delete Crystal Duel (code, routes, `duel_win` award/badge, migration enum,
+     first; it is still ready and unstarted). U6 replaces the client's mastery-equals-fusion /
+     final-Leg-keystone helpers with `TrailSectionView.recallScope` / `TrailView.enrichmentScope`
+     (server facts already shipped by U4 — nothing client-side consumes them yet).
+  2. **U7** — hard-delete Crystal Duel (code, routes, `duel_win` award/badge, migration enum,
      vocabulary; keep weekly podium + rival simulation), consolidate docs (CONTEXT.md, affected
      ADRs), run Gate B, then close the plan + brainstorm lifecycle per `docs/plans/README.md`.
 

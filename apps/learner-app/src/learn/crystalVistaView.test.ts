@@ -121,7 +121,8 @@ function session(): StudySession {
     lessonReadByNode: {},
     lessonAbsent: [],
     detours: [],
-    generatingDetours: false
+    generatingDetours: false,
+    recallScopes: []
   };
 }
 

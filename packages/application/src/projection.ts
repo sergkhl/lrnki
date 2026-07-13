@@ -62,3 +62,4 @@ export {
 } from "./studySessionTrail";
 // Type-only: the defining module pulls node:crypto at runtime, but type re-exports are erased.
 export type { MatchingAttemptTrace } from "./gradedSelectionOutcome";
+export type { RecallScopeStatus } from "./recallChallenge";

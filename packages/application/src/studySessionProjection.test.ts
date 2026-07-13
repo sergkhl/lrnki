@@ -11,6 +11,7 @@ import {
   unmetPrerequisites
 } from "./studySessionProjection";
 import { type AdaptedNodeClassification } from "./adaptivePathProjection";
+import type { RecallScopeStatus } from "./recallChallenge";
 
 // DAG: scope -> ownership -> move (certain), plus borrow -> move (uncertain).
 const labelByNode: Record<string, string> = { scope: "Variable scope", ownership: "Ownership", move: "Move semantics", borrow: "Borrowing" };
@@ -138,7 +139,7 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
-function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[]; detours?: ScaffoldDetour[] } = {}) {
+function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[]; detours?: ScaffoldDetour[]; recallScopes?: RecallScopeStatus[] } = {}) {
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
@@ -149,7 +150,8 @@ function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verd
     lessons: args.lessons,
     lessonReads: args.lessonReads,
     lessonAbsent: args.lessonAbsent,
-    detours: args.detours
+    detours: args.detours,
+    recallScopes: args.recallScopes
   });
 }
 
@@ -689,4 +691,41 @@ test("AE7 — resolveReferenceStopId picks the referenced node's first incomplet
   assert.equal(resolveReferenceStopId(complete, "scope"), "scope:capstone:main");
 
   assert.equal(resolveReferenceStopId(fresh, "not-on-trail"), null);
+});
+
+// --- Recall Challenge scope threading (plan 2026-07-13-003 U4; KTD3/KTD4) -----
+
+test("composeStudySession attaches finished recall scopes verbatim and defaults to empty", () => {
+  const scope: RecallScopeStatus = {
+    scopeKind: "section",
+    anchorDerivedNodeId: "ownership",
+    anchorLabel: "Ownership",
+    sectionIndex: 0,
+    eligibleItemCount: 2,
+    state: "won",
+    wonChallengeId: "ch-first"
+  };
+  assert.deepEqual(compose({ recallScopes: [scope] }).recallScopes, [scope]);
+  assert.deepEqual(compose().recallScopes, []);
+});
+
+test("the neutral fold is provably unchanged by arbitrary Guardian scope state (KTD3/KTD4)", () => {
+  const args = {
+    studyItems: [optionItem("scope"), impostorItem("scope"), optionItem("ownership")],
+    lessons: [lessonFor("scope")],
+    lessonReads: ["scope"],
+    rows: [graded("scope", "correct", 1), { ...graded("scope", "correct", 2), studyItemId: "imp-scope" }, graded("ownership", "incorrect", 3)]
+  };
+  const withoutScopes = compose(args);
+  const withScopes = compose({
+    ...args,
+    recallScopes: [
+      { scopeKind: "section", anchorDerivedNodeId: "move", anchorLabel: "Move semantics", sectionIndex: 0, eligibleItemCount: 2, state: "active", activeChallengeId: "ch-live" },
+      { scopeKind: "enrichment", anchorDerivedNodeId: "move", anchorLabel: "Move semantics", sectionIndex: null, eligibleItemCount: 2, state: "won", wonChallengeId: "ch-won" }
+    ]
+  });
+  // Everything the neutral mastery fold produces — gating, per-item outcomes, sheets, trail
+  // path, mastery counts — is byte-identical; only the attached scope views differ.
+  const neutralHalf = (session: ReturnType<typeof compose>) => ({ ...session, recallScopes: [] });
+  assert.deepEqual(neutralHalf(withScopes), neutralHalf(withoutScopes));
 });

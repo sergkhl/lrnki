@@ -128,6 +128,8 @@ export {
   foldRecallChallenge,
   latestCorrectStudyItemIds,
   projectRecallChallengeView,
+  projectRecallScopeStatuses,
+  eligibleRecallItems,
   selectRecallLineup,
   createRecallChallenge,
   type RecallAnswerFeedback,

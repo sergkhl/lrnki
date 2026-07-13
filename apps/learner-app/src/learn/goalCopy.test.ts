@@ -7,14 +7,15 @@ function trail(overrides: Partial<TrailView> = {}): TrailView {
   return {
     concepts: [],
     sections: [
-      { sectionIndex: 0, milestoneLabel: "A", state: "complete", conceptCount: 2, masteredCount: 2, stopsComplete: 4, stopsTotal: 4, firstConceptId: "n1", gatingLabels: [] },
-      { sectionIndex: 1, milestoneLabel: "B", state: "available", conceptCount: 3, masteredCount: 1, stopsComplete: 2, stopsTotal: 6, firstConceptId: "n3", gatingLabels: [] }
+      { sectionIndex: 0, milestoneLabel: "A", state: "complete", conceptCount: 2, masteredCount: 2, stopsComplete: 4, stopsTotal: 4, firstConceptId: "n1", gatingLabels: [], recallScope: null },
+      { sectionIndex: 1, milestoneLabel: "B", state: "available", conceptCount: 3, masteredCount: 1, stopsComplete: 2, stopsTotal: 6, firstConceptId: "n3", gatingLabels: [], recallScope: null }
     ],
     currentSectionIndex: 1,
     nextStopId: "s1",
     nextStopLabel: "Stop",
     masteredCount: 3,
     totalClusters: 5,
+    enrichmentScope: null,
     ...overrides
   };
 }

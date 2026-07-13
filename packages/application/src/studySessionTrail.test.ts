@@ -190,7 +190,8 @@ function trailSession(opts: { withoutLesson?: boolean; includeLocked?: boolean; 
     lessonReadByNode: {},
     lessonAbsent: [],
     detours: [],
-    generatingDetours: false
+    generatingDetours: false,
+    recallScopes: []
   };
 }
 
@@ -380,4 +381,35 @@ test("generated step option-select options are sorted by id so the answer is not
   assert.equal(stepView.kind, "generated");
   if (stepView.kind !== "generated") return;
   assert.deepEqual(stepView.item.options.map((o) => o.optionId), ["o1", "o2", "o3"]);
+});
+
+// --- Recall Challenge scope attachment (plan 2026-07-13-003 U4, KTD3) ----------
+
+test("buildTrailView attaches each Leg's recall scope by section index and the summit scope", () => {
+  const sectionScope = {
+    scopeKind: "section" as const,
+    anchorDerivedNodeId: "n1",
+    anchorLabel: "Ownership",
+    sectionIndex: 0,
+    eligibleItemCount: 2,
+    state: "won" as const,
+    wonChallengeId: "ch-leg"
+  };
+  const summitScope = {
+    scopeKind: "enrichment" as const,
+    anchorDerivedNodeId: "n1",
+    anchorLabel: "Ownership",
+    sectionIndex: null,
+    eligibleItemCount: 2,
+    state: "available" as const
+  };
+  const view = buildTrailView({ ...trailSession(), recallScopes: [sectionScope, summitScope] });
+  assert.deepEqual(view.sections[0].recallScope, sectionScope);
+  assert.deepEqual(view.enrichmentScope, summitScope);
+});
+
+test("buildTrailView leaves scope views null when the session composed without a challenge store", () => {
+  const view = buildTrailView(trailSession());
+  assert.equal(view.sections[0].recallScope, null);
+  assert.equal(view.enrichmentScope, null);
 });

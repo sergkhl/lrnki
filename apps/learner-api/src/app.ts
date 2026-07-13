@@ -29,6 +29,7 @@ import {
   PostgresEnrichmentLayerPurposeStore,
   PostgresLearnerAwardsStore,
   PostgresLearnerExpeditionStore,
+  PostgresLearnerRecallChallengeStore,
   PostgresLearnerScaffoldStore,
   PostgresLearnerSessionStore,
   PostgresLearnerStore,
@@ -255,7 +256,9 @@ export function createLearnerApp(sql: DatabaseClient) {
           layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
           responseLog: new PostgresResponseLogStore(sql),
           verdictStore: new PostgresCalibrationVerdictStore(sql),
-          scaffoldStore: new PostgresLearnerScaffoldStore(sql)
+          scaffoldStore: new PostgresLearnerScaffoldStore(sql),
+          // Guardian scope views ride down with the session (plan 2026-07-13-003 U4, KTD3).
+          challengeStore: new PostgresLearnerRecallChallengeStore(sql)
         }),
         expeditionStore.getByEnrichment({ learnerStateRef, enrichmentId })
       ]);
