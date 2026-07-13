@@ -14,6 +14,7 @@ function sourceGrounding(): MatchingGrounding {
     graphVersionId: "gv-1",
     enrichmentId: "en-1",
     derivedNodeId: "dn-1",
+    canonicalLabel: "Memory regions",
     groundingProvenance: "source_cep",
     generatingModel: "test-model",
     configHash: "cfg-1",
@@ -30,8 +31,8 @@ function pair(promptText: string, matchText: string, passageId: string, evidence
   return { promptText, matchText, citation: { passageId, evidenceQuote } };
 }
 
-function draftOf(pairs: MatchingPairDraft[]): MatchingItemDraft {
-  return { itemType: "matching", question: "Match each concept to its grounded description.", pairs };
+function draftOf(pairs: MatchingPairDraft[], explorableTerms: string[] = []): MatchingItemDraft {
+  return { itemType: "matching", question: "Match each concept to its grounded description.", pairs, explorableTerms };
 }
 
 const validPairs = [

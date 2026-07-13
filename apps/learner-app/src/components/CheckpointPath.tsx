@@ -1,15 +1,21 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
 import { Flag, Mountain } from "lucide-react-native";
-import type { StudySession } from "@lrnki/application/projection";
+import type { ScaffoldStepView, StudySession } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
+import { ScaffoldDetour } from "./ScaffoldDetour";
+import { ScaffoldProgressDialog } from "./ScaffoldProgressDialog";
+import { ScaffoldStepSheet } from "./ScaffoldStepSheet";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
+import { hideScaffoldDetour, retryScaffoldDetour } from "@/lib/actions";
 import { legBannerLine, terminusLine } from "@/learn/goalCopy";
 import { Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
-import type { TrailCluster, TrailStop, TrailView } from "@/learn/trailView";
+import type { TrailCluster, TrailStop, TrailView } from "@lrnki/application/projection";
+
+type GeneratedStep = Extract<ScaffoldStepView, { kind: "generated" }>;
 
 const WINDING_OFFSETS = [0, 1, 2, 1, 0, -1, -2, -1] as const;
 const WINDING_STEP_PX = 28;
@@ -26,7 +32,22 @@ export function CheckpointPath({
   scrollHandleRef
 }: Readonly<{ view: TrailView; session: StudySession; scrollHandleRef?: RefObject<TrailScrollHandle | null> }>) {
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
+  // Learner-scoped Scaffold Detour UI state (U6): exactly one detour expands at a time; the
+  // progress dialog and the generated-step sheet are root-owned here so they survive the activity
+  // sheet closing (KTD11, R13).
+  const [expandedDetourId, setExpandedDetourId] = useState<string | null>(null);
+  const [progressDetourId, setProgressDetourId] = useState<string | null>(null);
+  const [scaffoldStep, setScaffoldStep] = useState<GeneratedStep | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+
+  const referenceLabelFor = (derivedNodeId: string) =>
+    session.detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
+  // A reference step studies the referenced neutral node through its own trail stops (R9): open
+  // its first stop in the ordinary Activity Sheet, which records normal neutral evidence.
+  const openReferenceStep = (referencedDerivedNodeId: string) => {
+    const stopId = view.concepts.find((concept) => concept.derivedNodeId === referencedDerivedNodeId)?.stops[0]?.stopId;
+    if (stopId) setSelectedStopId(stopId);
+  };
   // onLayout registry replaces the DOM's scrollIntoView: stop and section rows report
   // their y offsets, and imperative scrolls target those.
   const stopYRef = useRef<Record<string, number>>({});
@@ -82,13 +103,31 @@ export function CheckpointPath({
                       .slice(0, conceptIndex)
                       .reduce((count, priorConcept) => count + priorConcept.stops.length, stopIndex);
                     const offset = WINDING_OFFSETS[globalStopIndex % WINDING_OFFSETS.length] * WINDING_STEP_PX;
+                    // Detours render UNDER their parent, after the ordinary activity stops and
+                    // just before the capstone (plan 2026-07-12-002 U6 trail composition).
+                    const conceptDetours = stop.kind === "capstone"
+                      ? session.detours.filter((detour) => detour.parentDerivedNodeId === concept.derivedNodeId)
+                      : [];
                     return (
-                      <View
-                        key={stop.stopId}
-                        onLayout={(event) => { stopYRef.current[stop.stopId] = event.nativeEvent.layout.y; }}
-                      >
-                        <CheckpointStopRow stop={stop} concept={concept} offset={offset} onSelect={setSelectedStopId} />
-                      </View>
+                      <Fragment key={stop.stopId}>
+                        {conceptDetours.map((detour) => (
+                          <ScaffoldDetour
+                            key={detour.detourId}
+                            detour={detour}
+                            expanded={expandedDetourId === detour.detourId}
+                            onToggleExpand={() => setExpandedDetourId((current) => (current === detour.detourId ? null : detour.detourId))}
+                            onOpenGeneratedStep={setScaffoldStep}
+                            onOpenReferenceStep={openReferenceStep}
+                            onRetry={(detourId) => void retryScaffoldDetour({ enrichmentId: session.enrichmentId, detourId })}
+                            onHide={(detourId) => void hideScaffoldDetour({ enrichmentId: session.enrichmentId, detourId })}
+                            onOpenProgress={setProgressDetourId}
+                            referenceLabelFor={referenceLabelFor}
+                          />
+                        ))}
+                        <View onLayout={(event) => { stopYRef.current[stop.stopId] = event.nativeEvent.layout.y; }}>
+                          <CheckpointStopRow stop={stop} concept={concept} offset={offset} onSelect={setSelectedStopId} />
+                        </View>
+                      </Fragment>
                     );
                   })}
                 </View>
@@ -104,6 +143,22 @@ export function CheckpointPath({
         open={selectedStopId !== null}
         onOpenChange={(open) => {
           if (!open) setSelectedStopId(null);
+        }}
+        onScaffoldRequested={(detourId) => setProgressDetourId(detourId)}
+      />
+      <ScaffoldStepSheet
+        enrichmentId={session.enrichmentId}
+        step={scaffoldStep}
+        open={scaffoldStep !== null}
+        onOpenChange={(open) => {
+          if (!open) setScaffoldStep(null);
+        }}
+      />
+      <ScaffoldProgressDialog
+        detour={session.detours.find((detour) => detour.detourId === progressDetourId)}
+        open={progressDetourId !== null}
+        onOpenChange={(open) => {
+          if (!open) setProgressDetourId(null);
         }}
       />
     </>

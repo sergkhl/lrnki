@@ -43,8 +43,8 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       }
       for (const item of studyItems) {
         await tx`
-          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash)
-          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.itemType === "option_select" ? item.explanation : null}, ${item.facet ?? null}, ${item.generatingModel}, ${item.configHash})`;
+          INSERT INTO study_items (study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash)
+          VALUES (${item.studyItemId}, ${item.itemType}, ${item.graphVersionId}, ${item.enrichmentId}, ${item.derivedNodeId}, ${item.groundingProvenance}, ${item.question}, ${item.itemType === "option_select" ? item.explanation : null}, ${item.facet ?? null}, ${this.sql.json(item.explorableTerms)}, ${item.generatingModel}, ${item.configHash})`;
 
         // Sequential await keeps the per-item child inserts ordered within the tx.
         if (item.itemType === "option_select") {
@@ -133,7 +133,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async getStudyItem(derivedNodeId: string, itemType: StudyItemType): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
       FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
@@ -142,7 +142,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async getStudyItemById(studyItemId: string): Promise<StudyItem | undefined> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
       FROM study_items WHERE study_item_id = ${studyItemId} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [item] = await this.hydrate(rows);
@@ -151,7 +151,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
 
   async listStudyItemsForEnrichment(enrichmentId: string): Promise<StudyItem[]> {
     const rows = await this.sql<StudyItemRow[]>`
-      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, generating_model, config_hash
+      SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
       FROM study_items WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL ORDER BY derived_node_id, item_type`;
     return this.hydrate(rows);
   }
@@ -220,6 +220,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
         generatingModel: row.generating_model,
         configHash: row.config_hash,
         ...(row.facet ? { facet: row.facet } : {}),
+        explorableTerms: row.explorable_terms ?? [],
         question: row.question
       };
       if (row.item_type === "impostor") {
@@ -338,6 +339,7 @@ type StudyItemRow = {
   question: string;
   explanation: string | null;
   facet: string | null;
+  explorable_terms: string[];
   generating_model: string;
   config_hash: string;
 };
@@ -445,8 +447,8 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
       for (const lesson of lessons) {
         const lessonId = randomUUID();
         await tx`
-          INSERT INTO concept_lessons (concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash)
-          VALUES (${lessonId}, ${lesson.graphVersionId}, ${lesson.enrichmentId}, ${lesson.derivedNodeId}, ${lesson.canonicalLabel}, ${lesson.generatingModel}, ${lesson.configHash})`;
+          INSERT INTO concept_lessons (concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash)
+          VALUES (${lessonId}, ${lesson.graphVersionId}, ${lesson.enrichmentId}, ${lesson.derivedNodeId}, ${lesson.canonicalLabel}, ${this.sql.json(lesson.explorableTerms)}, ${lesson.generatingModel}, ${lesson.configHash})`;
         for (const [ordinal, section] of lesson.sections.entries()) {
           const sectionId = randomUUID();
           await tx`
@@ -484,7 +486,7 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
 
   async getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined> {
     const rows = await this.sql<LessonRow[]>`
-      SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash
+      SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash
       FROM concept_lessons WHERE derived_node_id = ${derivedNodeId} LIMIT 1`;
     if (rows.length === 0) return undefined;
     const [lesson] = await this.hydrate(rows);
@@ -493,7 +495,7 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
 
   async listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]> {
     const rows = await this.sql<LessonRow[]>`
-      SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash
+      SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash
       FROM concept_lessons WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id`;
     return this.hydrate(rows);
   }
@@ -548,7 +550,8 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
           base.diagram = { caption: section.diagram_caption, spec: section.diagram_spec };
         }
         return base;
-      })
+      }),
+      explorableTerms: row.explorable_terms ?? []
     }));
   }
 }
@@ -559,6 +562,7 @@ type LessonRow = {
   enrichment_id: string;
   derived_node_id: string;
   canonical_label: string;
+  explorable_terms: ConceptLesson["explorableTerms"];
   generating_model: string;
   config_hash: string;
 };
@@ -680,14 +684,19 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
           FROM response_log WHERE learner_state_ref = ${learnerStateRef}`;
         let attemptSeq = Number(next);
         for (const row of learnerRows) {
+          // Discriminated subject (KTD4): a neutral row writes the study_item_id + derived_node_id
+          // pair; a scaffold row writes scaffold_step_id only. The DB CHECK enforces exactly-one.
+          const studyItemId = row.scope === "neutral" ? row.studyItemId : null;
+          const derivedNodeId = row.scope === "neutral" ? row.derivedNodeId : null;
+          const scaffoldStepId = row.scope === "scaffold" ? row.scaffoldStepId : null;
           await tx`
             INSERT INTO response_log (
-              response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
+              response_id, learner_state_ref, study_item_id, derived_node_id, scaffold_step_id, signal_type,
               judged_outcome, graded_score,
               response_source, grader_identity, batch_id, attempt_seq, submitted_answer
             )
             VALUES (
-              ${row.responseId}, ${row.learnerStateRef}, ${row.studyItemId}, ${row.derivedNodeId}, ${row.signalType},
+              ${row.responseId}, ${row.learnerStateRef}, ${studyItemId}, ${derivedNodeId}, ${scaffoldStepId}, ${row.signalType},
               ${row.judgedOutcome}, ${row.gradedScore},
               ${row.responseSource}, ${row.graderIdentity}, ${row.batchId}, ${attemptSeq}, ${row.submittedAnswer}
             )`;
@@ -699,7 +708,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
 
   async listForLearner(learnerStateRef: string): Promise<ResponseLogRow[]> {
     const rows = await this.sql<ResponseLogDbRow[]>`
-      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
+      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, scaffold_step_id, signal_type,
              judged_outcome, graded_score,
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} ORDER BY attempt_seq`;
@@ -708,7 +717,7 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
 
   async listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]> {
     const rows = await this.sql<ResponseLogDbRow[]>`
-      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
+      SELECT response_id, learner_state_ref, study_item_id, derived_node_id, scaffold_step_id, signal_type,
              judged_outcome, graded_score,
              response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
       FROM response_log WHERE learner_state_ref = ${learnerStateRef} AND derived_node_id = ${derivedNodeId} ORDER BY attempt_seq`;
@@ -719,8 +728,9 @@ export class PostgresResponseLogStore implements ResponseLogStorePort {
 type ResponseLogDbRow = {
   response_id: string;
   learner_state_ref: string;
-  study_item_id: string;
-  derived_node_id: string;
+  study_item_id: string | null;
+  derived_node_id: string | null;
+  scaffold_step_id: string | null;
   signal_type: string;
   judged_outcome: string | null;
   graded_score: number | null;
@@ -733,11 +743,14 @@ type ResponseLogDbRow = {
 };
 
 function hydrateResponseLogRow(row: ResponseLogDbRow): ResponseLogRow {
+  // Rebuild the discriminated subject (KTD4) from the mutually-exclusive columns.
+  const subject = row.scaffold_step_id !== null
+    ? { scope: "scaffold" as const, scaffoldStepId: row.scaffold_step_id }
+    : { scope: "neutral" as const, studyItemId: row.study_item_id as string, derivedNodeId: row.derived_node_id as string };
   return {
+    ...subject,
     responseId: row.response_id,
     learnerStateRef: row.learner_state_ref,
-    studyItemId: row.study_item_id,
-    derivedNodeId: row.derived_node_id,
     signalType: row.signal_type as ResponseLogRow["signalType"],
     judgedOutcome: row.judged_outcome as ResponseLogRow["judgedOutcome"],
     gradedScore: row.graded_score === null ? null : Number(row.graded_score),

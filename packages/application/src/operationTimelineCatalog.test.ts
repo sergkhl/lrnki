@@ -5,6 +5,7 @@ import type { OperationType } from "@lrnki/ports";
 import {
   NON_LLM_STAGES,
   OPERATION_TIMELINE_CATALOG,
+  SHARED_STAGES,
   isLlmStage,
   operationTimelineLlmSpendStageTags,
   operationTimelineStageKind,
@@ -28,30 +29,48 @@ test("classifies the closed LLM vocabulary as LLM and non-LLM stages as non-LLM"
 // orphaned live tag (a tag no operation owns) and no dead tag (a tag no operation runs).
 // This set-equality property replaces the hand-copied per-operation stage lists that used
 // to restate the catalog: those could only ever re-encode the same gap, never catch it.
-test("catalog LLM stages are exactly the closed stage-tag vocabulary, each owned once", () => {
-  const ownerByStage = new Map<string, OperationType>();
+test("catalog LLM stages are exactly the closed stage-tag vocabulary, owned once except SHARED_STAGES", () => {
+  // KTD7 relaxation: an LLM stage is owned-exactly-once UNLESS it is a SHARED_STAGE, in which
+  // case it is owned-at-least-once. The set of owners for each stage is checked below.
+  const ownersByStage = new Map<string, OperationType[]>();
   for (const [operationType, stages] of Object.entries(OPERATION_TIMELINE_CATALOG) as [
     OperationType,
     readonly { stage: string; kind: "llm" | "non_llm" }[]
   ][]) {
     for (const { stage, kind } of stages) {
       if (kind !== "llm") continue;
-      const priorOwner = ownerByStage.get(stage);
-      assert.equal(
-        priorOwner,
-        undefined,
-        `LLM stage ${stage} is claimed by both ${priorOwner} and ${operationType}`
-      );
-      ownerByStage.set(stage, operationType);
+      const owners = ownersByStage.get(stage) ?? [];
+      if (owners.length > 0 && !SHARED_STAGES.has(stage)) {
+        assert.fail(`non-shared LLM stage ${stage} is claimed by both ${owners.join(", ")} and ${operationType}`);
+      }
+      ownersByStage.set(stage, [...owners, operationType]);
     }
   }
 
-  const catalogLlmStages = new Set(ownerByStage.keys());
+  const catalogLlmStages = new Set(ownersByStage.keys());
   const vocabulary = new Set<string>(Object.values(STAGE_TAGS));
   const orphanedTags = [...vocabulary].filter((tag) => !catalogLlmStages.has(tag));
   const unknownStages = [...catalogLlmStages].filter((stage) => !vocabulary.has(stage));
   assert.deepEqual(orphanedTags, [], `stage tags no operation catalogs: ${orphanedTags.join(", ")}`);
   assert.deepEqual(unknownStages, [], `catalog LLM stages absent from STAGE_TAGS: ${unknownStages.join(", ")}`);
+});
+
+// KTD7: SHARED_STAGES is EXACTLY the probe + grounding-generation descriptors, claimed by
+// EXACTLY enrichment and scaffold; every other LLM stage keeps a single owner.
+test("SHARED_STAGES is exactly the probe + grounding stages, owned by exactly enrichment and scaffold", () => {
+  assert.deepEqual(
+    [...SHARED_STAGES].sort(),
+    [STAGE_TAGS.groundingGeneration, STAGE_TAGS.knowledgeBoundaryProbe].sort()
+  );
+  for (const stage of SHARED_STAGES) {
+    assert.equal(stageBelongsToOperation(stage, "enrichment"), true, `${stage} belongs to enrichment`);
+    assert.equal(stageBelongsToOperation(stage, "scaffold"), true, `${stage} belongs to scaffold`);
+  }
+  // The two OWNED scaffold stages belong ONLY to scaffold.
+  for (const stage of [STAGE_TAGS.scaffoldOutlineGeneration, STAGE_TAGS.scaffoldContentGeneration]) {
+    assert.equal(stageBelongsToOperation(stage, "scaffold"), true, `${stage} belongs to scaffold`);
+    assert.equal(stageBelongsToOperation(stage, "enrichment"), false, `${stage} does not belong to enrichment`);
+  }
 });
 
 test("catalog non-LLM stages are drawn from the known non-LLM vocabulary", () => {

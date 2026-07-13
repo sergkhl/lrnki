@@ -1,4 +1,4 @@
-import type { JudgedOutcome, ResponseLogRow } from "@lrnki/domain-core";
+import { neutralResponses, type JudgedOutcome, type ResponseLogRow } from "@lrnki/domain-core";
 import type { LearnerStatePort, ResponseLogStorePort } from "@lrnki/ports";
 
 // Graded mastery estimator (U6, R11/R12). Deliberately simple, carried at EXPERIMENT_ONLY
@@ -35,8 +35,11 @@ export async function loadResponseLogLearnerState(input: {
   learnerStateRef: string;
 }): Promise<LearnerStatePort> {
   const rows = await input.responseLog.listForLearner(input.learnerStateRef);
+  // Base mastery folds NEUTRAL observations only — a scaffold response never enters neutral
+  // learner state (R19, KTD4). Existing-node reference steps submit neutral rows, so they DO
+  // count here exactly like studying the node elsewhere.
   const byNode = new Map<string, ResponseLogRow[]>();
-  for (const row of rows) {
+  for (const row of neutralResponses(rows)) {
     byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
   }
 

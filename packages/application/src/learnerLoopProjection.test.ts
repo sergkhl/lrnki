@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
+import type { CalibrationVerdict, NeutralResponseLogRow, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
 import type { Learner, LearnerLoopReadPort, LearnerStorePort } from "@lrnki/ports";
 import { buildMasteryMap, detectConflicts, listLearnerAdminSummaries, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoopProjection";
 
@@ -8,8 +8,8 @@ let seq = 0;
 function verdict(derivedNodeId: string, v: Verdict, learnerStateRef = "L1"): CalibrationVerdict {
   return { learnerStateRef, derivedNodeId, verdict: v };
 }
-function graded(derivedNodeId: string, outcome: JudgedOutcome, source: "synthetic" | "human" = "synthetic", learnerStateRef = "L1"): ResponseLogRow & { createdAt: string } {
-  return { responseId: `r${++seq}`, learnerStateRef, studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, responseSource: source, graderIdentity: "kg-independent-judge", attemptSeq: seq, batchId: null, submittedAnswer: "answer", createdAt: new Date().toISOString() };
+function graded(derivedNodeId: string, outcome: JudgedOutcome, source: "synthetic" | "human" = "synthetic", learnerStateRef = "L1"): NeutralResponseLogRow & { createdAt: string } {
+  return { responseId: `r${++seq}`, learnerStateRef, scope: "neutral", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, responseSource: source, graderIdentity: "kg-independent-judge", attemptSeq: seq, batchId: null, submittedAnswer: "answer", createdAt: new Date().toISOString() };
 }
 function learner(learnerRef: string, displayName = learnerRef, createdAt = "2026-06-01T00:00:00.000Z"): Learner {
   return { learnerRef, displayName, pinHash: "hash", createdAt };

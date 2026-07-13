@@ -412,6 +412,31 @@ export const nodeMergeAdjudicationSchema: JsonSchema = toForcedToolSchema(nodeMe
 // lists no exemplars. The deterministic guard (U2) enforces structure; this schema only
 // enforces SHAPE fail-closed (rule 6) — distractor quality is judged by the rule-14 pass.
 
+// --- Explorable Terms: shared affordance metadata (plan 2026-07-12-002 U1, R1-R3) ------
+// A learner may turn an unfamiliar specialized term in the current block into an optional
+// support detour. The generator advertises AT MOST THREE such terms, drawn from the block's
+// own final text; a deterministic validator (application `explorableTerms.ts`) then keeps only
+// the distinct 1-80-code-point exact substrings that are not the concept label. The schema
+// keeps this a REQUIRED array so it closes its object without a trailing nullable (the
+// MiMo-fatal shape); an empty array is the correct answer when nothing qualifies. Description
+// language is structural only (rule 17) — it names no fixture, domain, or exemplar. `EXPLORE`
+// wording is deliberately restrained so the model does not manufacture affordances.
+const EXPLORABLE_TERM_GUIDANCE =
+  "A specialized word or short phrase that appears verbatim in this block's text, is needed to understand the block, and is NOT the concept being taught here. Copy it exactly as written. Emit only genuinely unfamiliar terms; return an empty array when none qualify and never pad to reach three.";
+
+const itemExplorableTerms = z
+  .array(z.string().min(1).max(80).describe(EXPLORABLE_TERM_GUIDANCE))
+  .max(3)
+  .describe("Zero to three specialized terms from the question above that a learner might need to explore. Each must be copied verbatim from the question text. Prefer fewer; an empty array is expected when the question introduces no unfamiliar term.");
+
+const lessonExplorableTerms = z
+  .array(z.object({
+    term: z.string().min(1).max(80).describe(EXPLORABLE_TERM_GUIDANCE),
+    sectionKind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("The kind of the section whose prose text contains this term verbatim.")
+  }).strict())
+  .max(3)
+  .describe("Zero to three specialized terms across the whole lesson that a learner might need to explore, each anchored to the section kind whose text contains it verbatim. Prefer fewer; an empty array is expected when the lesson introduces no unfamiliar term.");
+
 export const optionSelectValidator = z.object({
   question: z.string().min(1).describe("One self-contained multiple-choice question about the learning node with a single correct answer. Do not reference 'the passage' or 'the source'."),
   explanation: z.string().min(1).describe("Short learner-facing rationale explaining why the correct answer follows from the provided grounding. Stay domain-neutral and do not mention tool or source mechanics."),
@@ -419,17 +444,20 @@ export const optionSelectValidator = z.object({
     text: z.string().min(1).describe("The single correct option, grounded strictly in the provided passages."),
     citation: passageCitation
   }).strict(),
-  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT option in the same domain register as the provided neighbor concepts. It must be clearly wrong for this question, never a paraphrase of the correct answer.")).length(3)
+  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT option in the same domain register as the provided neighbor concepts. It must be clearly wrong for this question, never a paraphrase of the correct answer.")).length(3),
+  explorableTerms: itemExplorableTerms
 }).strict();
 
 export const optionSelectSchema: JsonSchema = toForcedToolSchema(optionSelectValidator);
 
+// The required `generate` boolean closes the plan object so neither nullable is the
+// final property (the MiMo trailing-nullable fatal shape, plan 2026-07-10-004 U3).
 export const studyItemBlueprintValidator = z.object({
   typePlans: z.array(z.object({
     itemType: z.enum(["option_select", "matching", "impostor"]),
-    generate: z.boolean(),
     facet: z.string().nullable().describe("When generate=true, the distinct assessed facet this item type should test. Null when generate=false."),
-    reason: z.string().nullable().describe("When generate=false, a short reason this type should be skipped. Null when generate=true.")
+    reason: z.string().nullable().describe("When generate=false, a short reason this type should be skipped. Null when generate=true."),
+    generate: z.boolean()
   }).strict()).length(3).describe("Exactly one plan for each supported item type.")
 }).strict();
 
@@ -443,7 +471,8 @@ const matchingPair = z.object({
 
 export const matchingValidator = z.object({
   question: z.string().min(1).describe("One self-contained prompt asking the learner to match the pairs. Do not reference 'the passage' or 'the source'."),
-  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage.")
+  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage."),
+  explorableTerms: itemExplorableTerms
 }).strict();
 
 export const matchingSchema: JsonSchema = toForcedToolSchema(matchingValidator);
@@ -486,7 +515,8 @@ export const impostorValidator = z.object({
   lieText: z.string().min(1).describe("The single planted lie: a statement that reads plausibly true of the learning node but is false for that node."),
   reveal: z.string().min(1).describe("Post-answer explanation naming why the lie is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
   lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighbor concept rewritten as if about this node. 'generated' when no clean neighbor lie existed and the lie is a freshly minted plausible misconception."),
-  siblingLabel: z.string().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; when lieSource is 'generated', the empty string.")
+  siblingLabel: z.string().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; when lieSource is 'generated', the empty string."),
+  explorableTerms: itemExplorableTerms
 }).strict();
 
 export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
@@ -531,18 +561,23 @@ export const conceptLessonRedundancyJudgmentSchema: JsonSchema = toForcedToolSch
 
 export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
 
+// Property order matters on MiMo: its constrained decoder truncates arguments before
+// a trailing literal null (the proven-fatal shape, plan 2026-07-10-004 U3), so the
+// required `items` array closes the object and every nullable sits mid-object. The
+// mimoDescriptorShape congruence test enforces this mechanically.
 const conceptLessonSection = z.object({
   kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
   text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
-  items: z.array(z.string().min(1).max(280)).max(4).describe("List items for examples/applications sections only. Use 2-4 items for examples or applications; otherwise use an empty array."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),
   diagramCaption: z.string().nullable().describe("Optional one-line caption for a simple explanatory diagram for this section; null when there is none."),
-  diagramSpec: z.string().nullable().describe("Optional terse, renderer-neutral description of that diagram's structure (nodes and relationships); null when there is none.")
+  diagramSpec: z.string().nullable().describe("Optional terse, renderer-neutral description of that diagram's structure (nodes and relationships); null when there is none."),
+  items: z.array(z.string().min(1).max(280)).max(4).describe("List items for examples/applications sections only. Use 2-4 items for examples or applications; otherwise use an empty array.")
 }).strict();
 
 export const conceptLessonValidator = z.object({
-  sections: z.array(conceptLessonSection).describe("The ordered teaching sections for one learning node. Include only the sections the provided grounding supports — omit any section that does not apply rather than emitting a placeholder.")
+  sections: z.array(conceptLessonSection).describe("The ordered teaching sections for one learning node. Include only the sections the provided grounding supports — omit any section that does not apply rather than emitting a placeholder."),
+  explorableTerms: lessonExplorableTerms
 }).strict();
 
 export const conceptLessonSchema: JsonSchema = toForcedToolSchema(conceptLessonValidator);
@@ -555,8 +590,59 @@ export const layerPurposeValidator = z.object({
 
 export const layerPurposeSchema: JsonSchema = toForcedToolSchema(layerPurposeValidator);
 
+// --- Discovery-coverage audit: submit_discovery_coverage_audit ---------------
+// Measurement stage (plan 2026-07-10-004 U1): the cross-family judge reports the
+// standalone learning objectives an extraction run's admitted set fails to preserve.
+// An empty `misses` list is the well-formed "coverage is sufficient" answer. Runs on
+// gpt-oss-120b, not MiMo, so a trailing nullable would be harmless — but every field
+// is required prose anyway.
+
+export const discoveryCoverageAuditValidator = z.object({
+  misses: z.array(z.object({
+    missedObjective: z.string().min(1).describe("Concise concept-shaped name of the standalone learning objective the admitted set fails to preserve."),
+    sourceGrounding: z.string().min(1).describe("Short verbatim quote or tight paraphrase of the source passage that teaches this objective substantively."),
+    whyStandalone: z.string().min(1).describe("One sentence on why this is a durable standalone learning objective rather than a facet, illustration, or rephrasing of an admitted concept.")
+  }).strict()).describe("Every principal standalone learning objective the admitted set misses; empty when coverage is sufficient.")
+}).strict();
+
+export const discoveryCoverageAuditSchema: JsonSchema = toForcedToolSchema(discoveryCoverageAuditValidator);
+
+// --- Learner-Scoped Scaffold outline: submit_scaffold_outline (plan 2026-07-12-002 U3) ---
+// Proposes the smallest useful ordered set of STRICTLY-SIMPLER prerequisite sub-concepts a
+// learner needs before the target term. Exact reuse of existing nodes is resolved by the
+// application BEFORE and AFTER this call; this schema only asks for candidate lower-level
+// concepts. Domain-neutral (rule 17): no fixture, no exemplar. Every field is required so the
+// object closes without a trailing nullable (MiMo-fatal shape).
+export const scaffoldOutlineValidator = z.object({
+  steps: z.array(z.object({
+    label: z.string().min(1).max(80).describe("A concise name for ONE prerequisite sub-concept that is strictly simpler than the target term and needed to understand it."),
+    rationale: z.string().min(1).describe("One terse sentence on why this sub-concept is a necessary, lower-level building block for understanding the target term.")
+  }).strict()).min(1).max(3).describe("The smallest useful ordered set of one to three strictly-simpler prerequisite sub-concepts. Order them easiest-first. Do NOT pad to three — propose only genuinely necessary lower-level steps.")
+}).strict();
+
+export const scaffoldOutlineSchema: JsonSchema = toForcedToolSchema(scaffoldOutlineValidator);
+
+// --- Learner-Scoped Scaffold content: submit_scaffold_content (plan 2026-07-12-002 U3) ---
+// Generates a compact micro-lesson (one concrete example) plus one four-option recall item for
+// ONE approved lower-level sub-concept, from provided grounding. Content is ALWAYS labeled
+// generated and carries NO citations (KTD10); the only invariants carried from the neutral
+// pipeline are the four-option one-correct shape and never presenting text as a source quote.
+// The required `distractors` array closes the object (no trailing nullable).
+export const scaffoldContentValidator = z.object({
+  microLesson: z.string().min(1).max(1200).describe("A compact, plain-language explanation of the sub-concept WITH one concrete example, written for a learner who does not yet know it. Self-contained; never reference 'the passage' or 'the source'."),
+  question: z.string().min(1).describe("One self-contained recall question about the sub-concept with a single correct answer."),
+  explanation: z.string().min(1).describe("Short learner-facing rationale for why the correct answer is right."),
+  correctAnswer: z.string().min(1).describe("The single correct option."),
+  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT option, clearly wrong and never a paraphrase of the correct answer.")).length(3)
+}).strict();
+
+export const scaffoldContentSchema: JsonSchema = toForcedToolSchema(scaffoldContentValidator);
+
 export const toolValidators = [
+  scaffoldOutlineValidator,
+  scaffoldContentValidator,
   layerPurposeValidator,
+  discoveryCoverageAuditValidator,
   conceptDiscoveryValidator,
   conceptAdmissionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),

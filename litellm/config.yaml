@@ -133,6 +133,12 @@ model_list:
   # on, MiMo double-encodes nested array-of-object tool arguments (emits them as a JSON
   # string and swallows trailing fields inside it), which consistently broke the
   # impostor item's `truths` array (same knob DeepSeek needed, different symptom).
+  # A second decoder quirk — MiMo truncates arguments before a trailing literal `null`
+  # (an object whose FINAL property admits null) — is now enforced mechanically by
+  # infrastructure-litellm/src/mimoDescriptorShape.test.ts, which parses the MiMo-routed
+  # aliases from THIS file (model_group_alias below). The price fields are also the
+  # source the ADR-0029 cost read path uses to ESTIMATE spend for OpenRouter BYOK rows,
+  # which report response cost 0.0 (see LiteLlmSpendLogsReadAdapter); keep them accurate.
   - model_name: "openrouter/xiaomi/mimo-v2.5"
     litellm_params:
       model: "openrouter/xiaomi/mimo-v2.5"

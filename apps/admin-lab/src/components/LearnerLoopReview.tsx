@@ -56,7 +56,8 @@ export function LearnerLoopReview({ detail }: Readonly<{ detail: LearnerLoopDeta
       </Card>
 
       {detail.responses.map((response) => {
-        const conflict = conflictByNode.get(response.derivedNodeId);
+        // A calibration conflict is a NEUTRAL-node concept; scaffold responses have no node.
+        const conflict = response.derivedNodeId ? conflictByNode.get(response.derivedNodeId) : undefined;
         return (
           <Card key={response.responseId}>
             <CardHeader className="border-b">

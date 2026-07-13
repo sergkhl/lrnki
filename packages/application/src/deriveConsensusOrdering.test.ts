@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { InferredPrerequisiteEdge, PrerequisiteConceptContext, WholeSetOrdering } from "@lrnki/domain-core";
 import type { PrerequisiteOrderingPort } from "@lrnki/ports";
-import { DEFAULT_ENRICHMENT_CONFIG } from "./runGraphEnrichment";
+import { DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG } from "./completeDerivedGraphLayer";
 import { deriveConsensusOrdering } from "./deriveConsensusOrdering";
 
 type OrderInput = { declaredDomain: string; nodes: PrerequisiteConceptContext[] };
 type Responder = (input: OrderInput, drawIndex: number) => WholeSetOrdering;
 type LabelEdge = { prerequisiteLabel: string; dependentLabel: string; confidence: number; rationale: string };
 
-const K = DEFAULT_ENRICHMENT_CONFIG.orderingSampleCount;
+const K = DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG.orderingSampleCount;
 
 function context(derivedNodeId: string, canonicalLabel: string): PrerequisiteConceptContext {
   return {
@@ -84,9 +84,9 @@ function run(input: {
       domains: input.domains,
       prerequisiteOrdering: ordering.prerequisiteOrdering,
       orderingSampleCount: K,
-      directionContestMinorityFraction: DEFAULT_ENRICHMENT_CONFIG.directionContestMinorityFraction,
-      minEdgeConfidence: DEFAULT_ENRICHMENT_CONFIG.minEdgeConfidence,
-      maxDomainPromptChars: DEFAULT_ENRICHMENT_CONFIG.maxDomainPromptChars,
+      directionContestMinorityFraction: DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG.directionContestMinorityFraction,
+      minEdgeConfidence: DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG.minEdgeConfidence,
+      maxDomainPromptChars: DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG.maxDomainPromptChars,
       ...input.config
     })
   };

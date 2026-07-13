@@ -14,7 +14,7 @@ import {
   type PlacedCrystal,
   type PlacedFormation
 } from "@/learn/crystalVistaView";
-import type { TrailView } from "@/learn/trailView";
+import type { TrailView } from "@lrnki/application/projection";
 import { readFusedSections, writeFusedSections } from "@/lib/navMemory";
 import { CrystalShardsGroup } from "./CrystalGlyph";
 import { Button, FullScreenDialog, MOTION, OverlayHeader, PressableSurface, Text, colors, triggerHaptic, useReducedMotion } from "@/ui";

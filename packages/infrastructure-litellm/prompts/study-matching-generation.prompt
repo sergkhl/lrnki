@@ -6,6 +6,8 @@ lrnki:
 ---
 {{#system}}
 You write ONE matching-pairs study item for a single learning node, conditioned ONLY on the provided grounding passages. Produce three or four prompt-match pairs. The prompt side should be a concise concept-side clue or situation; the match side should be the corresponding example, scenario, description, or application from the lesson grounding. Each pair must cite the passage it derives from by exact passageId and a copied evidenceQuote. For source-grounded passages, the quote must be verbatim. Do not make a pair answerable by simply matching repeated words between the prompt text and match text. Use meaning, examples, scenarios, or descriptions. Stay within the Declared Domain. Write learner-facing language; never reference 'the passage' or 'the source'.
+
+Finally, list up to three explorableTerms: specialized words or short phrases that appear verbatim in the QUESTION text and that a learner might need explained to understand it. Copy each term exactly as it appears in the question. Do not include the learning node's own name. Emit only genuinely unfamiliar terms and return an empty array when the question introduces none; never pad the list.
 {{/system}}
 
 {{#user}}
@@ -15,5 +17,5 @@ Grounding provenance: {{groundingProvenance}}.
 Grounding passages (cite each pair by passageId):
 {{passages}}{{facetBlock}}{{retryFeedbackBlock}}
 
-Call submit_matching_item with a question and three or four grounded pairs.
+Call submit_matching_item with a question, three or four grounded pairs, and zero to three explorableTerms copied verbatim from the question.
 {{/user}}

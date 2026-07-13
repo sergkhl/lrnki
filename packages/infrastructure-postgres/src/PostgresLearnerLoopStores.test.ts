@@ -72,6 +72,7 @@ function optionSelectFor(s: Substrate): OptionSelectItem {
     graphVersionId: s.graphVersionId,
     enrichmentId: s.enrichmentId,
     derivedNodeId: s.derivedNodeId,
+    explorableTerms: [],
     groundingProvenance: "source_cep",
     question: "What does ownership govern?",
     explanation: "Ownership governs memory according to the grounded source.",
@@ -94,6 +95,7 @@ function impostorFor(s: Substrate, opts: { lieSource?: "sibling" | "generated"; 
     graphVersionId: s.graphVersionId,
     enrichmentId: s.enrichmentId,
     derivedNodeId: s.derivedNodeId,
+    explorableTerms: [],
     groundingProvenance: "source_cep",
     question: "Which statement about ownership is false?",
     generatingModel: "test-model",
@@ -142,6 +144,27 @@ maybe("persists an option_select item; it round-trips with options + citation; s
     }
 
     assert.deepEqual(await store.supportedItemTypes(s.derivedNodeId), ["option_select"]);
+  } finally {
+    await sql.end();
+  }
+});
+
+// Covers U1 scenario 1 (R1-R3): a study item's validated Explorable Terms persist to the
+// study_items.explorable_terms jsonb column and hydrate back in order; a lesson's anchored
+// terms round-trip on concept_lessons.explorable_terms.
+maybe("Explorable Terms round-trip on study_items and concept_lessons in order", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const s = await seedSubstrate(sql);
+    const item = { ...optionSelectFor(s), explorableTerms: ["borrow checker", "runtime"] };
+    await bankFor(sql, s, [item]);
+    const [readItem] = await new PostgresStudyItemBankStore(sql).listStudyItemsForEnrichment(s.enrichmentId);
+    assert.deepEqual(readItem.explorableTerms, ["borrow checker", "runtime"]);
+
+    const lesson = { ...lessonFor(s), explorableTerms: [{ term: "single owner", sectionKind: "gist" as const }] };
+    await new PostgresConceptLessonStore(sql).persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lesson], absent: [] });
+    const readLesson = await new PostgresConceptLessonStore(sql).getLesson(s.derivedNodeId);
+    assert.deepEqual(readLesson?.explorableTerms, [{ term: "single owner", sectionKind: "gist" }]);
   } finally {
     await sql.end();
   }
@@ -210,6 +233,7 @@ maybe("regenerating a study item bank after a learner response was logged agains
       {
         responseId,
         learnerStateRef,
+        scope: "neutral",
         studyItemId: prior.studyItemId,
         derivedNodeId: s.derivedNodeId,
         signalType: "graded",
@@ -406,7 +430,7 @@ async function seedItem(sql: Sql): Promise<{ studyItemId: string; derivedNodeId:
 
 function gradedRow(input: { learnerStateRef: string; studyItemId: string; derivedNodeId: string; outcome: "correct" | "partial" | "incorrect"; score: number }): NewResponseLogRow {
   return {
-    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, studyItemId: input.studyItemId, derivedNodeId: input.derivedNodeId,
+    responseId: randomUUID(), learnerStateRef: input.learnerStateRef, scope: "neutral", studyItemId: input.studyItemId, derivedNodeId: input.derivedNodeId,
     signalType: "graded", judgedOutcome: input.outcome, gradedScore: input.score,
     responseSource: "human", graderIdentity: "auto", batchId: null,
     submittedAnswer: null
@@ -422,7 +446,7 @@ maybe("a graded row referencing a real study_item_id inserts; one referencing an
     await store.append([gradedRow({ learnerStateRef: learner, studyItemId, derivedNodeId, outcome: "correct", score: 1 })]);
     const rows = await store.listForLearner(learner);
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].studyItemId, studyItemId);
+    assert.equal(rows[0].scope === "neutral" && rows[0].studyItemId, studyItemId);
 
     await assert.rejects(
       () => store.append([gradedRow({ learnerStateRef: learner, studyItemId: randomUUID(), derivedNodeId, outcome: "correct", score: 1 })]),
@@ -565,6 +589,7 @@ maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with
 function lessonFor(s: Substrate): ConceptLesson {
   return {
     derivedNodeId: s.derivedNodeId,
+    explorableTerms: [],
     graphVersionId: s.graphVersionId,
     enrichmentId: s.enrichmentId,
     generatingModel: "test-model",

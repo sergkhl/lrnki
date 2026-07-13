@@ -1,4 +1,4 @@
-import type { ResponseLogRow } from "@lrnki/domain-core";
+import { neutralResponses, type NeutralResponseLogRow, type ResponseLogRow } from "@lrnki/domain-core";
 import { prerequisiteAncestors } from "./prerequisiteDag";
 import type { ReadinessEdge } from "./adaptivePathProjection";
 
@@ -65,8 +65,10 @@ export function composeMastery(input: { knownClosure: Set<string>; gradedByNode:
 // an earlier `incorrect`. Returns the struggled node ids, sorted. Rows need not be
 // pre-ordered: the latest is selected by `attemptSeq`.
 export function struggledNodes(gradedRows: ResponseLogRow[]): string[] {
-  const latestByNode = new Map<string, ResponseLogRow>();
-  for (const row of gradedRows) {
+  // Calibration closure is NEUTRAL only — a scaffold response never marks a neutral node as
+  // struggled (R19, KTD4, U2 test scenario 5).
+  const latestByNode = new Map<string, NeutralResponseLogRow>();
+  for (const row of neutralResponses(gradedRows)) {
     if (row.signalType !== "graded") continue;
     const current = latestByNode.get(row.derivedNodeId);
     if (!current || row.attemptSeq > current.attemptSeq) latestByNode.set(row.derivedNodeId, row);

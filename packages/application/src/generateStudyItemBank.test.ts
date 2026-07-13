@@ -178,7 +178,8 @@ function osDraft(correctQuote: string, distractors: [string, string, string] = [
     options: [
       { text: "Heap", isCorrect: true, provenance: "source", citation: { passageId, evidenceQuote: correctQuote } },
       ...distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))
-    ]
+    ],
+    explorableTerms: []
   };
 }
 
@@ -191,7 +192,8 @@ function goodLessonDraft(passageId: string, defQuote: string): ConceptLessonDraf
       { kind: "gist", text: "A one-line gist." },
       { kind: "definition", text: "A definition restating the source.", citation: { passageId, evidenceQuote: defQuote } },
       { kind: "applications", text: "How it connects to neighbors.", items: ["First grounded use.", "Second grounded use."] }
-    ]
+    ],
+    explorableTerms: []
   };
 }
 
@@ -208,7 +210,8 @@ function impDraftFrom(passages: { passageId: string; text: string }[]): Impostor
       { text: "True statement two.", citation: { passageId: p.passageId, evidenceQuote: p.text } },
       { text: "True statement three.", citation: { passageId: p.passageId, evidenceQuote: p.text } }
     ],
-    lie: { text: "A planted lie about this node.", reveal: "The fourth statement is false.", lieSource: "generated" }
+    lie: { text: "A planted lie about this node.", reveal: "The fourth statement is false.", lieSource: "generated" },
+    explorableTerms: []
   };
 }
 
@@ -221,7 +224,8 @@ function matchingDraftFrom(passages: { passageId: string; text: string }[]): Mat
       { promptText: "Clue one", matchText: "Description one", citation: { passageId: p.passageId, evidenceQuote: p.text } },
       { promptText: "Clue two", matchText: "Description two", citation: { passageId: p.passageId, evidenceQuote: p.text } },
       { promptText: "Clue three", matchText: "Description three", citation: { passageId: p.passageId, evidenceQuote: p.text } }
-    ]
+    ],
+    explorableTerms: []
   };
 }
 
@@ -364,6 +368,7 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store } = capturingStore();
   const sparseLesson: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "definition", text: "Ownership is a set of rules that govern memory.", citation: { passageId: "b1", evidenceQuote: ownershipDef } }
     ]
@@ -657,7 +662,8 @@ test("an option-select guard miss gets one fresh generation attempt before rejec
           { text: "t2", citation: { passageId: p.passageId, evidenceQuote: p.text } },
           { text: "t3", citation: { passageId: p.passageId, evidenceQuote: p.text } }
         ],
-        lie: { text: "a lie", reveal: "The fourth is false.", lieSource: "generated" }
+        lie: { text: "a lie", reveal: "The fourth is false.", lieSource: "generated" },
+        explorableTerms: []
       };
     },
     async generateMatching(input) {
@@ -686,6 +692,7 @@ test("Covers R10: option-select grounds in the lesson's source-cited section; a 
   // A lesson that meets the minimum but whose substantive section is uncited (all synthesized):
   // the source-uniform fallback can still anchor generated-labeled items from substantive prose.
   const synthesizedLesson: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "Gist." },
       { kind: "examples", text: "An example with no citation." },
@@ -796,7 +803,8 @@ function impDraftCiting(passageId: string, quote: string, opts: { lieSource?: "s
       reveal: "The fourth is false.",
       lieSource: opts.lieSource ?? "generated",
       ...(opts.siblingLabel ? { siblingLabel: opts.siblingLabel } : {})
-    }
+    },
+    explorableTerms: []
   };
 }
 
@@ -963,7 +971,7 @@ test("source-grounded lesson with no verified substantive citation gets one feed
     async generate(input) {
       retryFeedbacks.push(input.retryFeedback);
       return retryFeedbacks.length === 1
-        ? { sections: [{ kind: "gist", text: "Gist." }, { kind: "definition", text: "Uncited definition." }, { kind: "applications", text: "Applications." }] }
+        ? { sections: [{ kind: "gist", text: "Gist." }, { kind: "definition", text: "Uncited definition." }, { kind: "applications", text: "Applications." }], explorableTerms: [] }
         : goodLessonDraft("b1", ownershipDef);
     }
   };
@@ -1027,6 +1035,7 @@ test("a minted lesson with no surviving citation can still anchor generated opti
   const { store, persisted } = capturingStore();
   const lessonStore = capturingLessonStore();
   const uncitedGeneratedLesson: ConceptLessonDraft = {
+    explorableTerms: [],
     sections: [
       { kind: "gist", text: "A one-line gist." },
       { kind: "definition", text: generatedDef },
@@ -1086,7 +1095,8 @@ function generatedLessonDraft(nodeId: string, def: string): ConceptLessonDraft {
       { kind: "gist", text: "A one-line gist." },
       { kind: "definition", text: "A definition restating the concept.", citation: { passageId: `${nodeId}:definition:0`, evidenceQuote: def } },
       { kind: "applications", text: "How it connects to neighbors." }
-    ]
+    ],
+    explorableTerms: []
   };
 }
 

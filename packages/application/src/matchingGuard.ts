@@ -5,6 +5,7 @@ import {
   type MatchingPair
 } from "@lrnki/domain-core";
 import { normalizeOptionText, resolveGroundingCitation, type StudyItemGuardGrounding } from "./optionSelectGuard";
+import { validateItemExplorableTerms } from "./explorableTerms";
 
 // Shared with option-select and impostor (rule 18).
 export type MatchingGrounding = StudyItemGuardGrounding;
@@ -51,6 +52,7 @@ export function validateMatchingItem(
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
       ...(grounding.facet ? { facet: grounding.facet } : {}),
+      explorableTerms: validateItemExplorableTerms(draft.explorableTerms ?? [], draft.question, grounding.canonicalLabel),
       question: draft.question,
       pairs
     }

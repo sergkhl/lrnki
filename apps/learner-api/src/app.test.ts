@@ -21,7 +21,7 @@ test("health responds without auth", async () => {
 
 test("authenticated routes refuse a missing bearer token", async () => {
   const app = createLearnerApp(stubSql);
-  for (const path of ["/journal", "/leaderboard", "/duel-setup", "/me"]) {
+  for (const path of ["/journal", "/catalog", "/leaderboard", "/duel-setup", "/me"]) {
     const res = await app.request(path);
     assert.equal(res.status, 401, path);
   }

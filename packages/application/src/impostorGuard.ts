@@ -6,6 +6,7 @@ import {
   type ImpostorTruthStatement
 } from "@lrnki/domain-core";
 import { normalizeOptionText, resolveGroundingCitation, type StudyItemGuardGrounding } from "./optionSelectGuard";
+import { validateItemExplorableTerms } from "./explorableTerms";
 
 // Deterministic impostor guard (U4, R1/R5/R6/R8, ADR-0026). Promotes an impostor draft to a
 // persistable item ONLY when it satisfies provable structural and provenance guarantees, and
@@ -112,6 +113,7 @@ export function validateImpostorItem(
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
       ...(grounding.facet ? { facet: grounding.facet } : {}),
+      explorableTerms: validateItemExplorableTerms(draft.explorableTerms ?? [], draft.question, grounding.canonicalLabel),
       question: draft.question,
       statements: built
     }

@@ -1,8 +1,7 @@
 # 0035 — Separate the Learner App into a universal Expo app over a typed learner API
 
 Date: 2026-07-08, amended 2026-07-10 (universal Expo cutover) and 2026-07-11 (app-owned interaction
-system). Status: accepted. Origin: plan 2026-07-08-003; amended by plans 2026-07-09-001 and
-2026-07-10-003.
+system). Status: accepted.
 
 ## Decision
 

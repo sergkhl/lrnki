@@ -81,7 +81,7 @@ export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
       { text: args.correctAnswer.text, isCorrect: true, provenance: correctProvenance, citation: args.correctAnswer.citation },
       ...args.distractors.map((text) => ({ text, isCorrect: false, provenance: "generated" as const }))
     ];
-    return { itemType: "option_select", question: args.question, explanation: args.explanation, options };
+    return { itemType: "option_select", question: args.question, explanation: args.explanation, options, explorableTerms: args.explorableTerms };
   }
 };
 
@@ -112,7 +112,8 @@ export const studyImpostorGenerationDescriptor: NeuralStageDescriptor<
       reveal: args.reveal,
       lieSource: args.lieSource,
       ...(args.siblingLabel ? { siblingLabel: args.siblingLabel } : {})
-    }
+    },
+    explorableTerms: args.explorableTerms
   })
 };
 
@@ -128,7 +129,7 @@ export const studyMatchingGenerationDescriptor: NeuralStageDescriptor<
   sentinelInput: sentinelStudyItemInput(),
   maxRetries: 4,
   templateData: studyItemTemplateData,
-  mapResult: (args) => ({ itemType: "matching", question: args.question, pairs: args.pairs })
+  mapResult: (args) => ({ itemType: "matching", question: args.question, pairs: args.pairs, explorableTerms: args.explorableTerms })
 };
 
 export const studyItemBlueprintDescriptor: NeuralStageDescriptor<
@@ -150,7 +151,8 @@ export const studyItemBlueprintDescriptor: NeuralStageDescriptor<
       generatingModel: "sentinel_model",
       configHash: "sentinel_config",
       canonicalLabel: "Sentinel node",
-      sections: [{ kind: "definition", text: "A sentinel definition.", groundingProvenance: "generated" }]
+      sections: [{ kind: "definition", text: "A sentinel definition.", groundingProvenance: "generated" }],
+      explorableTerms: []
     },
     siblings: [{ label: "Sentinel sibling", snippet: "A nearby concept." }],
     supportedItemTypes: ["option_select", "impostor", "matching"]

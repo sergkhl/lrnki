@@ -1,4 +1,4 @@
-import type { CalibrationVerdict, JudgedOutcome, ResponseLogRow } from "@lrnki/domain-core";
+import { neutralResponses, type CalibrationVerdict, type JudgedOutcome, type NeutralResponseLogRow, type ResponseLogRow } from "@lrnki/domain-core";
 import type { LearnerLoopReadPort, LearnerStorePort } from "@lrnki/ports";
 import { foldConceptMastery } from "./responseLogLearnerState";
 
@@ -30,8 +30,9 @@ export type ConceptConflict = {
 // the learner's verdicts + rows.
 export function detectConflicts(verdicts: CalibrationVerdict[], gradedRows: ResponseLogRow[]): ConceptConflict[] {
   const verdictByNode = new Map(verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
-  const latestGradedByNode = new Map<string, ResponseLogRow>();
-  for (const row of gradedRows) {
+  // Conflict detection is NEUTRAL only — a scaffold response never conflicts with a verdict.
+  const latestGradedByNode = new Map<string, NeutralResponseLogRow>();
+  for (const row of neutralResponses(gradedRows)) {
     if (row.signalType !== "graded") continue;
     const current = latestGradedByNode.get(row.derivedNodeId);
     if (!current || row.attemptSeq > current.attemptSeq) latestGradedByNode.set(row.derivedNodeId, row);
@@ -72,8 +73,9 @@ export function summarizeResponseSources(rows: { responseSource: string }[]): Re
 // (graded outranks self-report; latest graded wins). Rows must be ordered by attempt_seq,
 // as the loaders return them — this does NOT re-query (fold what is already loaded).
 export function buildMasteryMap(rows: ResponseLogRow[]): Record<string, number> {
-  const byNode = new Map<string, ResponseLogRow[]>();
-  for (const row of rows) byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
+  // Neutral only — scaffold responses never contribute to a neutral node's mastery (KTD4).
+  const byNode = new Map<string, NeutralResponseLogRow[]>();
+  for (const row of neutralResponses(rows)) byNode.set(row.derivedNodeId, [...(byNode.get(row.derivedNodeId) ?? []), row]);
   const masteryByNode: Record<string, number> = {};
   for (const [derivedNodeId, nodeRows] of byNode) masteryByNode[derivedNodeId] = foldConceptMastery(nodeRows);
   return masteryByNode;
@@ -142,13 +144,20 @@ export function summarizeLearnerStates(rows: TimestampedResponseLogRow[], verdic
 
 // --- Reading use-cases over the Learner Loop read port ----------------------
 
+// Admin inspection row (ADR-0027). `scope` distinguishes a neutral study-item response
+// (carrying derivedNodeId + studyItemId) from a learner-scoped scaffold-step response
+// (carrying scaffoldStepId), so the surface identifies scaffold subjects WITHOUT assuming
+// every response joins study_items (plan 2026-07-12-002 U2 System-Wide Impact). `nodeLabel`
+// and `question` are the joined display fields the read supplies for whichever scope.
 export type LearnerResponseView = {
   responseId: string;
   attemptSeq: number;
-  derivedNodeId: string;
+  scope: "neutral" | "scaffold";
+  derivedNodeId: string | null;
   enrichmentId: string;
   nodeLabel: string;
-  studyItemId: string;
+  studyItemId: string | null;
+  scaffoldStepId: string | null;
   question: string;
   signalType: string;
   judgedOutcome: string | null;
@@ -231,10 +240,12 @@ export async function getLearnerLoopDetail(loopRead: LearnerLoopReadPort, learne
     responses: rows.map((row) => ({
       responseId: row.responseId,
       attemptSeq: row.attemptSeq,
-      derivedNodeId: row.derivedNodeId,
+      scope: row.scope,
+      derivedNodeId: row.scope === "neutral" ? row.derivedNodeId : null,
       enrichmentId: row.enrichmentId,
       nodeLabel: row.nodeLabel,
-      studyItemId: row.studyItemId,
+      studyItemId: row.scope === "neutral" ? row.studyItemId : null,
+      scaffoldStepId: row.scope === "scaffold" ? row.scaffoldStepId : null,
       question: row.question,
       signalType: row.signalType,
       judgedOutcome: row.judgedOutcome,

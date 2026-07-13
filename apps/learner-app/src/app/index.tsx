@@ -33,7 +33,7 @@ export default function JournalPage() {
     ...journalQuery,
     enabled: signedIn,
     refetchInterval: (query) =>
-      query.state.data?.learnerExpeditions.some((expedition) => expedition.status === "generating")
+      query.state.data?.yours.some((expedition) => expedition.status === "generating")
         ? GENERATION_POLL_MS
         : false
   });

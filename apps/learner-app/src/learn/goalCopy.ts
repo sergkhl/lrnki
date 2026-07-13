@@ -1,5 +1,5 @@
 import type { StudySession } from "@lrnki/application/projection";
-import type { TrailView } from "./trailView";
+import type { TrailView } from "@lrnki/application/projection";
 import { learnerTerm } from "./vocabulary";
 
 // Goal-gradient copy (plan 2026-07-10-001 U2). The layer purpose is stored in PLAIN

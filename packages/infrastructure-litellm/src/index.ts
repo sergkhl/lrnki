@@ -57,8 +57,14 @@ export {
   matchingSchema,
   matchingValidator,
   conceptLessonRedundancyJudgmentSchema,
-  conceptLessonRedundancyJudgmentValidator
+  conceptLessonRedundancyJudgmentValidator,
+  discoveryCoverageAuditSchema,
+  discoveryCoverageAuditValidator
 } from "./toolSchemas";
+export {
+  createDiscoveryCoverageAuditPort,
+  discoveryCoverageAuditDescriptor
+} from "./discoveryCoverageAuditAdapters";
 export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,
@@ -73,6 +79,12 @@ export {
   createConceptLessonGenerationPort,
   conceptLessonGenerationDescriptor
 } from "./conceptLessonGenerationAdapters";
+export {
+  createScaffoldOutlinePort,
+  createScaffoldContentPort,
+  scaffoldOutlineGenerationDescriptor,
+  scaffoldContentGenerationDescriptor
+} from "./learnerScaffoldGenerationAdapters";
 export {
   createLayerPurposeGenerationPort,
   layerPurposeGenerationDescriptor

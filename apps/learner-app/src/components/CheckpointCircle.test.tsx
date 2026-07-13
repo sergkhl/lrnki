@@ -1,7 +1,7 @@
 import { expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { CheckpointCircle } from "./CheckpointCircle";
-import { buildTrailView } from "@/learn/trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import { sessionFixture } from "@/learn/sessionFixture";
 
 function trail() {

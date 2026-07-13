@@ -2,7 +2,7 @@ import { beforeEach, expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { ConceptMarker } from "./ConceptMarker";
 import { setLearnerVerdict, refreshLearnerExpedition } from "@/lib/actions";
-import { buildTrailView } from "@/learn/trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import { sessionFixture } from "@/learn/sessionFixture";
 import { learnerTerm } from "@/learn/vocabulary";
 

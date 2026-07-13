@@ -1,4 +1,7 @@
 import type {
+  ScaffoldDetour,
+  ScaffoldStep,
+  ScaffoldNodePayload,
   AdmissionLabelJudgment,
   AdmissionProposal,
   ArtifactEnvelope,
@@ -27,6 +30,7 @@ import type {
   DifficultyNodeContext,
   DerivedGraphLayer,
   DiscoveredCandidate,
+  DiscoveryCoverageMiss,
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
   ExtractionQualityIssue,
@@ -65,6 +69,28 @@ export interface ConceptDiscoveryPort {
 export interface ConceptAdmissionPort {
   // Precision-first; a separate stage from discovery, never collapsed into one prompt.
   admit(input: { document: StructuredDocument; declaredDomain: string; candidates: DiscoveredCandidate[] }): Promise<AdmissionProposal[]>;
+}
+
+// One admitted concept as the discovery-coverage audit presents it to the judge
+// (plan 2026-07-10-004 R1): the proposed canonical label plus a short evidence gist
+// so the judge sees what the admitted set already covers without re-reading CEPs.
+export interface DiscoveryCoverageAuditConcept {
+  label: string;
+  gist: string;
+}
+
+// Discovery-coverage audit judgment (plan 2026-07-10-004, KTD1/KTD2): ONE sample of
+// the cross-family judge over the source's teachable blocks plus the run's admitted
+// (core + optional) set. Returns the standalone learning objectives the admitted set
+// fails to preserve (empty = full coverage). K-sample orchestration and recurrence
+// aggregation live in the application use-case, not this transport.
+export interface DiscoveryCoverageAuditPort {
+  model: string;
+  audit(input: {
+    declaredDomain: string;
+    blocks: { blockType: string; headingPath: string[]; text: string }[];
+    admittedConcepts: DiscoveryCoverageAuditConcept[];
+  }): Promise<DiscoveryCoverageMiss[]>;
 }
 
 // Concept-conditioned Concept Evidence Profile extraction (ADR-0007 reset). For
@@ -739,6 +765,45 @@ export interface StudyItemGenerationPort {
   }): Promise<ImpostorItemDraft>;
 }
 
+// Learner-Scoped Scaffold generation neural seams (plan 2026-07-12-002 U3). Two small forced
+// named tools routed through the existing kg-claim-extraction alias (no config.yaml change).
+// The outline proposes strictly-simpler prerequisite sub-concepts; the content generator
+// produces a compact micro-lesson + one recall item for ONE approved sub-concept from provided
+// grounding. Domain-neutral prompts; content is always labeled generated and citation-free.
+export type ScaffoldOutlineStep = { label: string; rationale: string };
+export type ScaffoldOutline = { steps: ScaffoldOutlineStep[] };
+export type ScaffoldContentDraft = {
+  microLesson: string;
+  question: string;
+  explanation: string;
+  correctAnswer: string;
+  distractors: string[];
+};
+
+export interface ScaffoldOutlinePort {
+  readonly model: string;
+  propose(input: {
+    declaredDomain: string;
+    parentLabel: string;
+    term: string;
+    // Existing usable node labels in the parent's own layer, so the outline can avoid
+    // re-proposing a concept that already has a reusable node.
+    existingLabels: string[];
+    retryFeedback?: string;
+  }): Promise<ScaffoldOutline>;
+}
+
+export interface ScaffoldContentPort {
+  readonly model: string;
+  generate(input: {
+    declaredDomain: string;
+    label: string;
+    // Approved grounding text (verified parent/layer grounding or generated grounding that
+    // cleared the Knowledge-Boundary Probe). The generator writes only from this.
+    groundingText: string;
+  }): Promise<ScaffoldContentDraft>;
+}
+
 export interface StudyItemBlueprintPort {
   readonly model: string;
   plan(input: {
@@ -790,6 +855,58 @@ export interface ResponseLogStorePort {
   listForLearnerNode(learnerStateRef: string, derivedNodeId: string): Promise<ResponseLogRow[]>;
 }
 
+// Learner-Scoped Scaffold Detour persistence (plan 2026-07-12-002 U2, KTD2, ADR-0037). The
+// aggregate store owns request identity, lifecycle, claim/fence data, and the ordered steps.
+// Content lives ON the step (payload-on-step); a reference step points at a neutral node. All
+// writes are scoped to the owning learner. The generation module (U3) drives claim/publish/
+// fail; the API (U5) drives create/hide/restore/lesson-read; the projection (U4) reads the
+// active detours.
+export interface ScaffoldDetourStorePort {
+  // Idempotent create-or-restore for (learner, enrichment, parent, normalizedTerm) (R5/R13).
+  // Creates a fresh `generating` aggregate when none exists; restores a hidden detour to
+  // `ready` when it has published content or `generating` otherwise; returns the existing
+  // detour unchanged when one is already active. Always returns the durable aggregate.
+  upsertPending(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    parentDerivedNodeId: string;
+    term: string;
+    normalizedTerm: string;
+  }): Promise<ScaffoldDetour>;
+  getById(detourId: string): Promise<ScaffoldDetour | undefined>;
+  // Active (non-hidden) detours for one learner's expedition — the U4 projection input.
+  listActiveForLearnerEnrichment(learnerStateRef: string, enrichmentId: string): Promise<ScaffoldDetour[]>;
+  // Claim a `generating` detour for one attempt: install a fresh operation id + fencing token
+  // and clear any prior failed pointer (R14, KTD7). Returns false when the detour is not
+  // claimable (already ready/hidden or mismatched). The claim token fences the terminal write.
+  claim(input: { detourId: string; operationId: string; claimToken: string }): Promise<boolean>;
+  // Process-level supervisor claim (KTD7): atomically select ONE stale-or-unclaimed `generating`
+  // detour under the attempt budget and claim it, minting a fresh operation id that also acts as
+  // the fencing token (KTD7). Returns the claimed aggregate (its `latestOperationId` ==
+  // `claimToken`) or undefined when the queue is empty. `SKIP LOCKED` keeps competing processes
+  // single-winner per row.
+  claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<ScaffoldDetour | undefined>;
+  // Fail a stale `generating` detour whose attempts are exhausted (R16/AE5). Returns the count
+  // failed. Shares the staleness predicate with `claimNextGenerating`.
+  failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<number>;
+  // Atomic publish (R16, KTD9): write the ordered steps + generated payloads and transition to
+  // `ready`, guarded by the claim token. A stale token is rejected and nothing is written.
+  publishReady(input: { detourId: string; claimToken: string; steps: ScaffoldStep[] }): Promise<boolean>;
+  markFailed(input: { detourId: string; claimToken: string }): Promise<boolean>;
+  // Retry: clear the failed pointer and return the detour to `generating` for a fresh claim.
+  restartGenerating(input: { detourId: string; learnerStateRef: string }): Promise<ScaffoldDetour | undefined>;
+  // Hide a ready detour or dismiss a failed one; preserves content + evidence (R18).
+  hide(input: { detourId: string; learnerStateRef: string }): Promise<boolean>;
+  // Fetch one step for grading / lesson-read resolution (U5). Scoped to the owning learner.
+  getStep(input: { scaffoldStepId: string; learnerStateRef: string }): Promise<{ step: ScaffoldStep; detourId: string } | undefined>;
+  // Mark a generated step's micro-lesson read (R12). No-op for a reference step.
+  markLessonRead(input: { scaffoldStepId: string; learnerStateRef: string; readAt: string }): Promise<void>;
+}
+
+// The generated payloads a publish attempt commits, alongside their step ordering. Reference
+// steps carry only the referenced neutral node id (no payload).
+export type ScaffoldGeneratedPayload = ScaffoldNodePayload;
+
 // Calibration Verdict persistence (R10, KTD1). The MUTABLE counterpart to the
 // append-only Response Log: `upsert` writes the current `known`/`learn` intent per
 // (learner, node), overwriting any prior verdict for that node (one row, never two);
@@ -817,6 +934,7 @@ export interface CalibrationVerdictStorePort {
 
 export interface RunSummary {
   runId: string;
+  sourceResourceId: string;
   sourceTitle: string;
   declaredDomain: string;
   status: string;
@@ -1098,7 +1216,7 @@ export interface LearnerLoopReadPort {
 // The four triggered operations whose timeline these tables describe.
 // `study_items` is its own operation_type keyed by enrichmentId (ADR-0017 split
 // is preserved — these describe operations, they do not unify them).
-export type OperationType = "extraction" | "minting" | "enrichment" | "study_items";
+export type OperationType = "extraction" | "minting" | "enrichment" | "study_items" | "scaffold";
 
 // ---------------------------------------------------------------------------
 // Forced-tool failure detail (ADR-0006 fail-closed, made INSPECTABLE). When a
@@ -1231,7 +1349,15 @@ export interface OperationStageSpend {
   operationId: string;
   stage: string;
   logCount: number;
+  // Raw provider-billed spend as LiteLLM recorded it. OpenRouter BYOK rows report
+  // response cost 0.0 (provider-account billing), so this alone under-attributes
+  // BYOK stages (plan 2026-07-10-004 U4/KTD6).
   totalSpend: number;
+  // Usage-derived estimate for the zero-spend BYOK rows only: retained token/cache
+  // usage priced by the versioned deployment prices in `litellm/config.yaml`. Kept
+  // DISTINGUISHABLE from `totalSpend` so an estimated figure is never misrepresented
+  // as provider-billed spend; a stage's display cost is the sum of both.
+  estimatedSpend: number;
   totalTokens: number;
 }
 

@@ -140,6 +140,11 @@ by the Knowledge-Boundary Probe. Its lifecycle and asserted-graph boundaries are
 [ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
 _Avoid_: synthetic Grounding Origin, asserted synthetic concept, curated-source treatment of generated text
 
+**Topic Expedition**:
+A learner-owned expedition created from a requested topic, backed when ready by one Synthetic Topic
+Generation Derived Graph Layer and its Study Item Bank.
+_Avoid_: Learner Expedition, synthetic pipeline, source-grounded expedition
+
 **Synthetic Concept**:
 A `synthetic_primary` `llm_grounded` Enrichment Node — a first-class topic concept produced by
 Synthetic Topic Generation and grounded by a Generated Grounding Bundle that cites no source. Its
@@ -178,6 +183,13 @@ ordered easiest-first (ascending mean difficulty); their concatenation is a topo
 whole floored layer. Sections are derived during generation, never persisted.
 _Avoid_: quest, goal cone, chapter, persisted section
 
+**Expedition Journal**:
+The Learner App's entry projection: one application use-case composes expedition candidates, the
+learner's owned expeditions with study progress and layer purpose, and topic-generation progress
+into finished tiers — started, yours, and shared — plus a separate full browse catalog. Composition
+never lives in HTTP adapters or UI code; consuming surfaces apply themed vocabulary only.
+_Avoid_: route-stitched journal payload, client-side stage math, raw persistence rows on the wire
+
 **Learner App**:
 The downstream learner-facing application that turns Derived Graph Layers and Learner State into
 playable study experiences. Its game UX policy is defined by
@@ -208,8 +220,33 @@ _Avoid_: course, study screen, quiz, graded card, asserted graph mutation
 
 **Learner-Scoped Scaffold**:
 Learner/session-scoped generated support content that restores a Learner App's Flow Channel without
-becoming neutral graph or Study Item Bank content.
+becoming neutral graph or Study Item Bank content. Its durable, learner-requested realization is the
+**Scaffold Detour** of **Support Steps** below: a one-level, optional branch that records only
+learner-scoped evidence (or, for a reference Support Step, normal neutral evidence for the existing
+node) and never feeds neutral mastery, prerequisite gating, or rewards. Durable persistence,
+exact-reuse-as-reference, and the discriminated neutral-or-scaffold response identity are owned by
+[ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
 _Avoid_: generated prerequisite, personalized Concept Lesson, Study Item Bank item
+
+**Scaffold Detour**:
+A durable learner-owned support branch under one parent node of a Derived Graph Layer, identified by
+learner, enrichment, parent node, and normalized term. It holds one to three ordered Support Steps
+and never feeds neutral mastery, prerequisite gating, or rewards; its lifecycle states and atomic
+publication are owned by [ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
+_Avoid_: sub-expedition, generated prerequisite edge, second trail
+
+**Support Step**:
+One ordered element of a Scaffold Detour: either a reference to an existing node in the parent's own
+layer and Declared Domain, or a generated learner-scoped node carrying a citation-free micro-lesson
+and one option-select item. Reference steps record normal neutral evidence; generated steps record
+learner-scoped evidence that never enters neutral mastery.
+_Avoid_: cloned concept, Study Item Bank item, locked stop
+
+**Explorable Term**:
+Generation-time metadata on a Concept Lesson section or Study Item question: a specialized word or
+short phrase, verified as an exact substring of the final rendered text, that a learner may turn
+into a Scaffold Detour. At most three per lesson and per question; zero terms render no affordance.
+_Avoid_: keyword, inline highlight, Candidate
 
 **Grounding Provenance**:
 The citation/provenance language shared by learner-facing study assets. Source-grounded content cites

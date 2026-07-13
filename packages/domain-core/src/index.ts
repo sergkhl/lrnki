@@ -377,6 +377,17 @@ export type RunEvidenceProfile = {
   complete: boolean;
 };
 
+// One judged discovery-coverage miss (plan 2026-07-10-004, KTD1): a standalone
+// learning objective the source teaches that the run's ADMITTED (core + optional)
+// set does not preserve. Judged by the cross-family independent judge against the
+// source in hand — never against expected fixture concepts (AGENTS rule 17). A miss
+// is a candidate for human inspection (ADR-0013), not an auto-verdict.
+export type DiscoveryCoverageMiss = {
+  missedObjective: string;
+  sourceGrounding: string;
+  whyStandalone: string;
+};
+
 export type ExtractionQualityIssue = {
   stage: string;
   candidateKey?: string;
@@ -1390,6 +1401,9 @@ type StudyItemBase = {
   generatingModel: string;
   configHash: string;
   facet?: string;
+  // Zero-to-three validated Explorable Terms from this item's question stem (plan
+  // 2026-07-12-002 U1, R1-R3). Plain strings — item terms carry no section anchor.
+  explorableTerms: string[];
 };
 
 // Option-select item — auto-graded studying (R9). Four options, exactly one keyed
@@ -1483,6 +1497,9 @@ export type OptionSelectItemDraft = {
   question: string;
   explanation: string;
   options: StudyItemOptionDraft[];
+  // Raw pre-validation term affordances from the question stem (R1-R3); the guard runs the
+  // deterministic `explorableTerms` validator before the item is persisted.
+  explorableTerms: string[];
 };
 
 export type ImpostorTruthDraft = {
@@ -1502,6 +1519,7 @@ export type ImpostorItemDraft = {
   question: string;
   truths: [ImpostorTruthDraft, ImpostorTruthDraft, ImpostorTruthDraft];
   lie: ImpostorLieDraft;
+  explorableTerms: string[];
 };
 
 export type MatchingPairDraft = {
@@ -1514,6 +1532,7 @@ export type MatchingItemDraft = {
   itemType: "matching";
   question: string;
   pairs: MatchingPairDraft[];
+  explorableTerms: string[];
 };
 
 export type StudyItemDraft = OptionSelectItemDraft | MatchingItemDraft | ImpostorItemDraft;
@@ -1570,9 +1589,22 @@ export type ConceptLessonSection = {
   diagram?: ConceptLessonDiagramDescriptor;
 };
 
+// An Explorable Term (plan 2026-07-12-002 U1, R1-R3): a specialized word or short phrase,
+// advertised with the neutral asset, that a learner may turn into an optional Scaffold
+// Detour. It is server-owned affordance metadata, NOT graph knowledge — it never becomes a
+// node, edge, or citation. A lesson term is anchored to the section whose body it appears
+// in (`sectionKind`); the pure validator (application `explorableTerms.ts`) proves the term
+// is a distinct 1-80-code-point exact substring of that section body and not the parent
+// label. Study-item terms are plain strings validated against the question stem.
+export type ExplorableTerm = {
+  term: string;
+  sectionKind: ConceptLessonSectionKind;
+};
+
 // A persisted lesson, keyed like the Study Item Bank so a regeneration replaces the
 // prior asset cleanly (replace-by-enrichment). `sections` is ordered and meets the R3
-// minimum (a gist, ≥1 application, and ≥1 substantive section).
+// minimum (a gist, ≥1 application, and ≥1 substantive section). `explorableTerms` is the
+// zero-to-three validated affordance list (may be empty).
 export type ConceptLesson = {
   derivedNodeId: string;
   // NULL for a synthetic (source-less) layer's lessons; non-null for source-derived layers.
@@ -1582,6 +1614,7 @@ export type ConceptLesson = {
   configHash: string;
   canonicalLabel: string;
   sections: ConceptLessonSection[];
+  explorableTerms: ExplorableTerm[];
 };
 
 // A derived node whose grounding cannot meet the R3 minimum, recorded as a durable
@@ -1607,6 +1640,9 @@ export type ConceptLessonSectionDraft = {
 
 export type ConceptLessonDraft = {
   sections: ConceptLessonSectionDraft[];
+  // Raw pre-validation term affordances anchored to a section kind (R1-R3). The assembler
+  // runs the deterministic `explorableTerms` validator against the FINAL section bodies.
+  explorableTerms: { term: string; sectionKind: ConceptLessonSectionKind }[];
 };
 
 export type ConceptLessonRedundancyJudgment = {
@@ -1649,11 +1685,21 @@ export type SignalType = "graded";
 export type JudgedOutcome = "correct" | "partial" | "incorrect";
 export type ResponseSource = "synthetic" | "human";
 
-export type ResponseLogRow = {
+// The subject a graded response is ABOUT (plan 2026-07-12-002 U2, KTD4). Exhaustive and
+// mutually exclusive: a `neutral` response keys the neutral Study Item Bank identity
+// (`studyItemId`) on a Derived Graph node (`derivedNodeId`) — the only scope base mastery,
+// leaderboard, duel, journal, and calibration folds may consume; a `scaffold` response keys
+// one learner-scoped generated Scaffold Step (`scaffoldStepId`), which those neutral folds
+// MUST ignore. An existing-node reference step submits NEUTRAL responses (it studies the real
+// node), so scaffold-scoped rows exist only for GENERATED steps. Backed by mutually exclusive
+// foreign keys and a DB CHECK; the single append-only per-learner attempt sequence spans both.
+export type ResponseSubject =
+  | { scope: "neutral"; studyItemId: string; derivedNodeId: string }
+  | { scope: "scaffold"; scaffoldStepId: string };
+
+type ResponseLogCommon = {
   responseId: string;
   learnerStateRef: string;
-  studyItemId: string;
-  derivedNodeId: string;
   signalType: SignalType;
   judgedOutcome: JudgedOutcome | null;
   gradedScore: number | null;
@@ -1662,10 +1708,13 @@ export type ResponseLogRow = {
   // Reserved for grouping a batch of appends; unused now the sweep is gone (kept
   // nullable for IRT/BKT replay grouping later).
   batchId: string | null;
+  submittedAnswer: string | null;
+};
+
+export type ResponseLogRow = ResponseSubject & ResponseLogCommon & {
   // Monotonic per learner_state_ref — the ordered sequence BKT/IRT consume (R6).
   // Store-assigned on append (see NewResponseLogRow); populated on read.
   attemptSeq: number;
-  submittedAnswer: string | null;
   // Set by the store (DB default) on append; populated on read.
   createdAt?: string;
 };
@@ -1675,7 +1724,17 @@ export type ResponseLogRow = {
 // is allocated atomically inside the persistence boundary, so a caller never computes
 // (and never races on) it. There is deliberately no update/delete shape — corrections
 // APPEND (R5).
-export type NewResponseLogRow = Omit<ResponseLogRow, "createdAt" | "attemptSeq">;
+export type NewResponseLogRow = ResponseSubject & ResponseLogCommon;
+
+export type NeutralResponseLogRow = Extract<ResponseLogRow, { scope: "neutral" }>;
+export type ScaffoldResponseLogRow = Extract<ResponseLogRow, { scope: "scaffold" }>;
+
+// Narrow a mixed Response Log to the neutral observations only (KTD4). Every base-mastery,
+// leaderboard, duel, journal, and calibration fold routes its rows through this so a
+// scaffold response can never leak into neutral learner state (R19, U2 test scenario 5).
+export function neutralResponses(rows: readonly ResponseLogRow[]): NeutralResponseLogRow[] {
+  return rows.filter((row): row is NeutralResponseLogRow => row.scope === "neutral");
+}
 
 // Canonical pipeline LLM-stage identity (KTD4, R2). Each production LLM request
 // carries exactly one of these as its LiteLLM spend tag, so cost and wall-clock
@@ -1736,7 +1795,21 @@ export const STAGE_TAGS = {
   // Layer-purpose generation runs ONCE per bank inside the `study_items` operation: a
   // learner-neutral capability statement for the enrichment, stored in plain register and
   // themed only at render (ADR-0033). Fail-open: a stage failure writes no row.
-  layerPurposeGeneration: "layer-purpose-generation"
+  layerPurposeGeneration: "layer-purpose-generation",
+  // Discovery-coverage audit (plan 2026-07-10-004, KTD2): a MEASUREMENT stage, not a
+  // pipeline stage. K-sampled cross-family judgments over an extraction run's admitted
+  // set, invoked by the durable `kg-worker audit-discovery-coverage` command. Audit
+  // calls carry NO operation_id, so they can never pollute an operation's cost report;
+  // the catalog claim under `extraction` only satisfies stage-tag set-equality and
+  // names the owning pipeline arm.
+  discoveryCoverageAudit: "discovery-coverage-audit",
+  // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3). Two stages WITHIN the new
+  // `scaffold` operation: a minimal outline proposal and a compact lesson/item content
+  // generation. Scaffold generation ALSO reuses the `knowledge-boundary-probe` and
+  // `grounding-generation` descriptors unchanged — those are SHARED_STAGES claimed by both
+  // enrichment and scaffold (KTD7); spend stays exact through the (operation_id, stage) join.
+  scaffoldOutlineGeneration: "scaffold-outline-generation",
+  scaffoldContentGeneration: "scaffold-content-generation"
 } as const;
 
 export type StageTag = (typeof STAGE_TAGS)[keyof typeof STAGE_TAGS];
@@ -1749,3 +1822,6 @@ const STAGE_TAG_VALUES: ReadonlySet<string> = new Set(Object.values(STAGE_TAGS))
 export function isStageTag(stage: string): stage is StageTag {
   return STAGE_TAG_VALUES.has(stage);
 }
+
+// Learner-Scoped Scaffold Detour aggregate (plan 2026-07-12-002 U2, ADR-0037).
+export * from "./learnerScaffold";

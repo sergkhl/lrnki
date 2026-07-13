@@ -11,8 +11,40 @@ export {
   type KnowledgeBoundaryCalibrationReport,
   type KnowledgeBoundaryLadderConcept
 } from "./calibrateKnowledgeBoundaryProbe";
+export {
+  auditDiscoveryCoverage,
+  aggregateDiscoveryCoverageMisses,
+  normalizeObjectiveLabel,
+  DISCOVERY_COVERAGE_RECURRENCE_THRESHOLD,
+  type DiscoveryCoverageAuditReport,
+  type DiscoveryCoverageAggregatedMiss,
+  type DiscoveryCoverageSample
+} from "./auditDiscoveryCoverage";
 export { generateStudyItemBank } from "./generateStudyItemBank";
-export { generateTopicExpedition } from "./generateTopicExpedition";
+export {
+  composeScaffoldDetours,
+  type ScaffoldDetourView,
+  type ScaffoldStepView,
+  type ScaffoldDetourGroup,
+  type ScaffoldGeneratingPhase,
+  type ComposeScaffoldDetoursInput,
+  type ReferencedNodeCompletion
+} from "./studySessionTrail";
+export {
+  runScaffoldGeneration,
+  resolveExactMatch,
+  buildScaffoldNodePayload,
+  type ScaffoldGenerationDeps,
+  type ScaffoldReuseCandidate,
+  type ScaffoldParentContext,
+  type ScaffoldGroundResult,
+  type ScaffoldGenerationOutcome
+} from "./learnerScaffoldGeneration";
+export {
+  createTopicExpeditionGeneration,
+  type TopicExpeditionGeneration,
+  type TopicExpeditionRequest
+} from "./generateTopicExpedition";
 export {
   registerLearner,
   enterLearnerSession,
@@ -74,21 +106,46 @@ export {
   stageBelongsToOperation,
   spendStageBelongsToOperation
 } from "./operationTimelineCatalog";
+export {
+  runInstrumentedOperation,
+  noopRunProgressReporter,
+  passthroughStageBracket,
+  type StageBracket
+} from "./runProgressReporter";
+export {
+  probeKnowledgeBoundary,
+  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  type KnowledgeBoundaryVerdict,
+  type KnowledgeBoundaryProbeConfig
+} from "./knowledgeBoundaryProbe";
 
-export { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+export { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 export {
   gradeStudyResponse,
   checkMatchingAttempt,
   recordLearnerVerdict,
   recordLessonRead,
+  gradeScaffoldOptionSelect,
+  recordScaffoldLessonRead,
   type StudyResponseSubmission,
   type GradeStudyResponseResult,
   type GradeRefusalReason,
   type NodeWriteRefusalReason,
   type GradedResponse,
   type MatchingAttemptCheckResult,
-  type NodeWriteResult
+  type NodeWriteResult,
+  type GradeScaffoldOptionSelectResult,
+  type ScaffoldGradeRefusal,
+  type RecordScaffoldLessonReadResult
 } from "./gradeStudyResponse";
+export {
+  requestLearnerScaffold,
+  retryLearnerScaffold,
+  hideLearnerScaffold,
+  type ScaffoldTermSource,
+  type RequestScaffoldRefusal,
+  type RequestLearnerScaffoldResult
+} from "./requestLearnerScaffold";
 export {
   listLearnerStates,
   listLearnerAdminSummaries,
@@ -110,10 +167,19 @@ export {
   type TargetCandidate
 } from "./targetCandidates";
 export {
-  listExpeditionCandidates,
-  type ExpeditionCandidate,
-  type LearnerExpeditionEntry
-} from "./listExpeditionCandidates";
+  getExpeditionCatalog,
+  getExpeditionJournal,
+  type ExpeditionCandidateCard,
+  type ExpeditionCatalog,
+  type ExpeditionCatalogDeps,
+  type ExpeditionGenerationFacts,
+  type ExpeditionJournal,
+  type ExpeditionJournalDeps,
+  type ExpeditionJournalRow,
+  type ExpeditionProgress,
+  type GeneratingExpeditionRow,
+  type ReadyExpeditionRow
+} from "./expeditionJournal";
 
 export {
   labelFor,

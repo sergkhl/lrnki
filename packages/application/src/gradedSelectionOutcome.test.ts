@@ -16,7 +16,7 @@ function fakeResponseLog(): { store: ResponseLogStorePort; rows: NewResponseLogR
   const store: ResponseLogStorePort = {
     async append(appended) { rows.push(...appended); },
     async listForLearner(ref) { return forLearner(ref).map((r, i) => hydrate(r, i + 1)); },
-    async listForLearnerNode(ref, nodeId) { return forLearner(ref).map((r, i) => hydrate(r, i + 1)).filter((r) => r.derivedNodeId === nodeId); }
+    async listForLearnerNode(ref, nodeId) { return forLearner(ref).map((r, i) => hydrate(r, i + 1)).filter((r) => r.scope === "neutral" && r.derivedNodeId === nodeId); }
   };
   return { store, rows };
 }
@@ -33,6 +33,7 @@ const matchingItem: MatchingItem = {
   configHash: "cfg-1",
   itemType: "matching",
   question: "Match the pairs.",
+  explorableTerms: [],
   pairs: [
     { pairId: "p-1", matchId: "m-1", promptText: "Heap", matchText: "Runtime memory", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "Heap uses runtime memory." } },
     { pairId: "p-2", matchId: "m-2", promptText: "Stack", matchText: "Call frames", citation: { provenance: "generated", derivedNodeId: "node-1", passageText: "Stack stores call frames." } },
@@ -72,7 +73,7 @@ test("graded(auto) correct composes with the graded mastery fold to master the n
     learnerStateRef: "L1", item, chosenId: "option-correct", keyedCorrectId: "option-correct", responseSource: "human", responseLog: log.store
   });
 
-  const nodeRows = (await log.store.listForLearner("L1")).filter((r) => r.derivedNodeId === "node-1");
+  const nodeRows = (await log.store.listForLearner("L1")).filter((r) => r.scope === "neutral" && r.derivedNodeId === "node-1");
   assert.equal(foldConceptMastery(nodeRows), 1, "the latest graded(auto) correct masters the node");
 });
 

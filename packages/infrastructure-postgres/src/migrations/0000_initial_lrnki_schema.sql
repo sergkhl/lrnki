@@ -719,6 +719,11 @@ CREATE TABLE study_items (
   question text NOT NULL,
   explanation text,
   facet text,
+  -- Zero-to-three validated Explorable Terms (plan 2026-07-12-002 U1) from the question
+  -- stem, stored as a jsonb array of strings. Affordance metadata only — never graph
+  -- knowledge. Lives on the parent row (payload-on-parent) because it is bounded and
+  -- regenerated wholesale with the item.
+  explorable_terms jsonb NOT NULL DEFAULT '[]'::jsonb,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -913,6 +918,10 @@ CREATE TABLE concept_lessons (
   enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
   derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
   canonical_label text NOT NULL,
+  -- Zero-to-three lesson-wide Explorable Terms (plan 2026-07-12-002 U1), each a
+  -- {term, sectionKind} object naming the section whose body contains it verbatim. jsonb
+  -- array; affordance metadata only, never graph knowledge.
+  explorable_terms jsonb NOT NULL DEFAULT '[]'::jsonb,
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -1019,11 +1028,81 @@ CREATE TABLE lesson_reads (
 -- rows directly, never a store-port path — the append-only guarantee stands.
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U2, KTD2, ADR-0037). A learner-owned,
+-- optional, one-level support branch off a parent Concept Marker. NEVER neutral graph
+-- knowledge: a generated step's content lives entirely on the step (payload-on-step jsonb),
+-- and only a `reference` step points back at a neutral node. Steps are immutable once
+-- published, so the neutral supersede lifecycle / partial unique indexes / citation CHECKs are
+-- deliberately NOT mirrored here; the generation validator enforces the option-shape invariants
+-- before the fenced atomic publish.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE learner_scaffold_detours (
+  detour_id uuid PRIMARY KEY,
+  learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  parent_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  -- The advertised term as displayed, plus its normalized form for the idempotency key.
+  term text NOT NULL,
+  normalized_term text NOT NULL,
+  status text NOT NULL CHECK (status IN ('generating', 'ready', 'failed', 'hidden')),
+  -- The current/last generation attempt's operation id, kept SEPARATE from the stable
+  -- detour_id (KTD7): retry clears it and the next claim installs a fresh operation/fence UUID.
+  latest_operation_id uuid,
+  -- The fencing token that guards the terminal publish (KTD9). Null when not being generated.
+  claim_token uuid,
+  -- Bounded generation attempts + claim timestamp for the process-level supervisor (KTD7): the
+  -- shared claim/top-up scheduler claims a stale-or-unclaimed generating detour up to a maximum
+  -- attempt budget, then fails an exhausted one. Mirrors the topic expedition's claim columns.
+  generation_attempts integer NOT NULL DEFAULT 0,
+  claimed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  -- One detour per (learner, enrichment, parent, normalized term) — the idempotency key
+  -- (R5/R13). A repeated request for the same term restores rather than duplicating.
+  UNIQUE (learner_state_ref, enrichment_id, parent_derived_node_id, normalized_term)
+);
+
+CREATE INDEX learner_scaffold_detours_active_idx
+  ON learner_scaffold_detours (learner_state_ref, enrichment_id)
+  WHERE status <> 'hidden';
+
+CREATE TABLE learner_scaffold_steps (
+  scaffold_step_id uuid PRIMARY KEY,
+  detour_id uuid NOT NULL REFERENCES learner_scaffold_detours(detour_id) ON DELETE CASCADE,
+  ordinal integer NOT NULL CHECK (ordinal >= 0),
+  kind text NOT NULL CHECK (kind IN ('reference', 'generated')),
+  -- A `reference` step points at an existing neutral node (R8/R9); its lesson-read and
+  -- option-select evidence are NEUTRAL response_log rows and canonical mastery is unchanged.
+  referenced_derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  -- A `generated` step's whole content home (payload-on-step): the micro-lesson + one
+  -- option-select item, with stable scaffold node/item/option ids inside. Citation-free and
+  -- labeled generated (R11, KTD10). Immutable once published.
+  payload jsonb,
+  -- Mutable: when the learner read this generated micro-lesson (R12). Null until read.
+  lesson_read_at timestamptz,
+  -- Exactly one of the two shapes (KTD2): a reference carries a node id and no payload; a
+  -- generated step carries a payload and no reference.
+  CHECK (
+    (kind = 'reference' AND referenced_derived_node_id IS NOT NULL AND payload IS NULL)
+    OR (kind = 'generated' AND referenced_derived_node_id IS NULL AND payload IS NOT NULL)
+  ),
+  UNIQUE (detour_id, ordinal)
+);
+
 CREATE TABLE response_log (
   response_id uuid PRIMARY KEY,
   learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
-  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id),
-  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  -- Discriminated response subject (plan 2026-07-12-002 U2, KTD4). Exactly one of the two
+  -- shapes: the NEUTRAL pair (study_item_id + derived_node_id) — the only scope base mastery,
+  -- leaderboard, duel, journal, and calibration folds consume — or the SCAFFOLD reference
+  -- (scaffold_step_id → a GENERATED learner-scoped step). An existing-node reference step
+  -- studies the real node and so records NEUTRAL rows; only generated steps produce scaffold
+  -- rows. The subject columns are nullable and the CHECK enforces mutual exclusivity.
+  study_item_id uuid REFERENCES study_items(study_item_id),
+  derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  scaffold_step_id uuid REFERENCES learner_scaffold_steps(scaffold_step_id),
   signal_type text NOT NULL CHECK (signal_type IN ('graded')),
   judged_outcome text CHECK (judged_outcome IN ('correct', 'partial', 'incorrect')),
   graded_score real CHECK (graded_score >= 0 AND graded_score <= 1),
@@ -1036,6 +1115,12 @@ CREATE TABLE response_log (
   -- Outcome coherence: a graded row carries an outcome AND a score. Fail-closed at
   -- the DB so no incoherent row can ever enter the durable log.
   CHECK (signal_type = 'graded' AND judged_outcome IS NOT NULL AND graded_score IS NOT NULL),
+  -- Exactly one subject scope (KTD4): a neutral pair OR a scaffold step, never both, never
+  -- neither, never a mixed shape.
+  CHECK (
+    (study_item_id IS NOT NULL AND derived_node_id IS NOT NULL AND scaffold_step_id IS NULL)
+    OR (study_item_id IS NULL AND derived_node_id IS NULL AND scaffold_step_id IS NOT NULL)
+  ),
   UNIQUE (learner_state_ref, attempt_seq)
 );
 
@@ -1043,7 +1128,7 @@ CREATE TABLE response_log (
 -- projection — the log is normalized, not artifact-enveloped (it is learner state,
 -- not a published artifact).
 CREATE VIEW artifact_response_log AS
-SELECT response_id, learner_state_ref, study_item_id, derived_node_id, signal_type,
+SELECT response_id, learner_state_ref, study_item_id, derived_node_id, scaffold_step_id, signal_type,
        judged_outcome, graded_score,
        response_source, grader_identity, batch_id, attempt_seq, submitted_answer, created_at
 FROM response_log;
@@ -1064,7 +1149,7 @@ FROM response_log;
 
 CREATE TABLE operation_runs (
   operation_run_id uuid PRIMARY KEY,
-  operation_type text NOT NULL CHECK (operation_type IN ('extraction', 'minting', 'enrichment', 'study_items')),
+  operation_type text NOT NULL CHECK (operation_type IN ('extraction', 'minting', 'enrichment', 'study_items', 'scaffold')),
   operation_id uuid NOT NULL,
   status text NOT NULL CHECK (status IN ('running', 'succeeded', 'failed')),
   current_stage text,

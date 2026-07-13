@@ -176,10 +176,10 @@ export function SideSheet({ open, onOpenChange, dismissBlocked = false, children
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           closeOnPress={!dismissBlocked}
-          className="absolute inset-0 flex-row justify-end bg-black/40"
+          className="absolute inset-0 bg-black/40"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
-          <DialogPrimitive.Content className="h-full w-80 max-w-[85%] border-l border-line bg-card">
+          <DialogPrimitive.Content className="absolute bottom-0 right-0 top-0 w-80 max-w-[85%] border-l border-line bg-card">
             <OverlayEntrance className="flex-1" slideFrom="right">
               {children}
             </OverlayEntrance>

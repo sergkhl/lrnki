@@ -6,9 +6,10 @@ import type {
   LearnerExpeditionStorePort,
   LessonReadStorePort,
   ResponseLogStorePort,
+  ScaffoldDetourStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
-import { appendGradedMatchingOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+import { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 
 // The learner-grading use-case (Candidate 2, ADR-0027). It owns the whole load-guard-resolve-grade
 // -append composition the Admin Lab server actions used to hand-write in raw SQL, so the grading
@@ -142,6 +143,51 @@ export async function gradeStudyResponse(
 
   // Unreachable: type equality was verified above. Guards the discriminants exhaustively.
   return { graded: false, refused: "item_type_mismatch" };
+}
+
+// Scaffold-scoped grading (plan 2026-07-12-002 U5, KTD4). A generated Scaffold Step's option-select
+// grades through the SAME keyed-selection rule as neutral items, but resolves from the scaffold
+// store and appends a `scaffold`-scoped response — so scaffold study is durable and separate and
+// can NEVER touch base mastery. A reference step submits its neutral ids through the normal
+// `gradeStudyResponse` path instead; it is not gradable here.
+export type ScaffoldGradeRefusal = "invalid_input" | "step_not_found" | "step_not_gradable";
+export type GradeScaffoldOptionSelectResult =
+  | { graded: true; chosenId: string; keyedCorrectId: string; correct: boolean }
+  | { graded: false; refused: ScaffoldGradeRefusal };
+
+export async function gradeScaffoldOptionSelect(
+  input: { learnerStateRef: string; scaffoldStepId: string; chosenOptionId: string },
+  ports: { scaffoldStore: ScaffoldDetourStorePort; responseLog: ResponseLogStorePort }
+): Promise<GradeScaffoldOptionSelectResult> {
+  if (!input.learnerStateRef || !input.scaffoldStepId || !input.chosenOptionId) return { graded: false, refused: "invalid_input" };
+  const found = await ports.scaffoldStore.getStep({ scaffoldStepId: input.scaffoldStepId, learnerStateRef: input.learnerStateRef });
+  if (!found) return { graded: false, refused: "step_not_found" };
+  if (found.step.kind !== "generated") return { graded: false, refused: "step_not_gradable" };
+  const keyed = found.step.payload.item.options.find((option) => option.isCorrect);
+  if (!keyed) return { graded: false, refused: "step_not_gradable" };
+  await appendGradedScaffoldOutcome({
+    learnerStateRef: input.learnerStateRef,
+    scaffoldStepId: input.scaffoldStepId,
+    chosenId: input.chosenOptionId,
+    keyedCorrectId: keyed.optionId,
+    responseSource: "human",
+    responseLog: ports.responseLog
+  });
+  return { graded: true, chosenId: input.chosenOptionId, keyedCorrectId: keyed.optionId, correct: input.chosenOptionId === keyed.optionId };
+}
+
+// Mark a generated Scaffold Step's micro-lesson read (R12). A reference step's lesson-read rides
+// the existing NEUTRAL lesson-read path (`recordLessonRead`); only generated steps resolve here.
+export type RecordScaffoldLessonReadResult = { recorded: true } | { recorded: false; refused: "invalid_input" | "step_not_found" };
+export async function recordScaffoldLessonRead(
+  input: { learnerStateRef: string; scaffoldStepId: string },
+  ports: { scaffoldStore: ScaffoldDetourStorePort }
+): Promise<RecordScaffoldLessonReadResult> {
+  if (!input.learnerStateRef || !input.scaffoldStepId) return { recorded: false, refused: "invalid_input" };
+  const found = await ports.scaffoldStore.getStep({ scaffoldStepId: input.scaffoldStepId, learnerStateRef: input.learnerStateRef });
+  if (!found || found.step.kind !== "generated") return { recorded: false, refused: "step_not_found" };
+  await ports.scaffoldStore.markLessonRead({ scaffoldStepId: input.scaffoldStepId, learnerStateRef: input.learnerStateRef, readAt: new Date().toISOString() });
+  return { recorded: true };
 }
 
 // Mid-play single-pair check for matching (R5): guard, resolve the item once, answer purely — no

@@ -3,7 +3,6 @@ import { test } from "node:test";
 import type {
   AnchorProjectionNode,
   DerivedGraphLayer,
-  DifficultyNodeContext,
   EnrichmentRunTrace,
   GraphSnapshot,
   PrerequisiteConceptContext,
@@ -249,104 +248,47 @@ test("the enrichment operation context reaches concurrent ordering calls", async
   await run(ports);
 });
 
-// Each draw receives full CEPs (definitions, bounded mentions, labeled typed assertions,
-// aliases) — never bare labels alone.
-test("passes Concepts' CEPs to each ordering draw with bounded mentions", async () => {
+// The one handoff contract (plan 2026-07-11-001 U3/R11): the source-grounded facts the
+// front half prepares — nodes, published evidence, non-null version, config, and hooks —
+// reach the completion seam, and the producer returns the layer completion persisted.
+// The shared back-half policy matrix itself is proved once in
+// completeDerivedGraphLayer.test.ts, never re-asserted here.
+test("hands the source-grounded contribution to the completion seam and returns its layer", async () => {
   const ports = buildPorts();
-  await run(ports);
-  const xCall = ports.calls.find((call) => call.declaredDomain === "x");
-  assert.ok(xCall);
-  const cx1 = xCall.nodes.find((node) => node.canonicalLabel === "X One");
+  let summary: { k: number } | undefined;
+  const layer = await run(ports, {
+    config: configWith({ maxMentionsPerConceptInPair: 2 }),
+    onOrderingSummary: (value) => {
+      summary = value;
+    }
+  });
+
+  // Published CEP evidence crossed the seam: each ordering draw sees the anchor's
+  // definitions and the caller's configured mention bound (2 of the CEP's seven).
+  const cx1 = ports.calls.find((call) => call.declaredDomain === "x")?.nodes.find((node) => node.canonicalLabel === "X One");
   assert.ok(cx1);
   assert.deepEqual(cx1.definitions, ["X One is the definition of X One"]);
-  assert.equal(cx1.mentions.length, 6, "default bound of six even though the CEP holds seven");
-  assert.deepEqual(cx1.mentions, ["mention one", "mention two", "mention three", "mention four", "mention five", "mention six"]);
-  assert.deepEqual(cx1.assertions, [{ type: "defines", detail: "the first X concept" }]);
-  assert.deepEqual(cx1.aliases, ["XOne"]);
-});
-
-test("honors a non-default mention bound without reordering", async () => {
-  const ports = buildPorts();
-  await run(ports, { config: configWith({ maxMentionsPerConceptInPair: 2 }) });
-  const cx1 = ports.calls.flatMap((call) => call.nodes).find((node) => node.canonicalLabel === "X One");
-  assert.ok(cx1);
   assert.deepEqual(cx1.mentions, ["mention one", "mention two"]);
-});
+  assert.deepEqual(cx1.assertions, [{ type: "defines", detail: "the first X concept" }]);
 
-test("ordering output reaches persistence as kept prerequisite dispositions", async () => {
-  const ports = buildPorts();
-  const layer = await run(ports);
-  const id = idByLabel(layer);
-  const has = (prereq: string, dep: string) =>
-    layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get(prereq) && e.dependentDerivedNodeId === id.get(dep) && !e.uncertain);
-  assert.ok(has("X Two", "X One"));
-  assert.ok(has("X One", "X Three"));
-  assert.equal(layer.prerequisiteEdges.length, 2, "only the two stable edges; the unasserted X Two/X Three pair yields nothing");
-  assert.ok(layer.prerequisiteEdges.every((e) => !e.uncertain), "a stable, acyclic consensus has no uncertain edges");
-
-  const dispositions = ports.getTrace()?.dispositions ?? [];
-  assert.deepEqual(dispositions.map((d) => d.disposition).sort(), ["kept", "kept"]);
-  assert.ok(!dispositions.some((d) => d.prerequisiteDerivedNodeId === id.get("X Two") && d.dependentDerivedNodeId === id.get("X Three")));
-});
-
-// AE5 / R4: an evidence-free node is excluded from the ordering input and recorded ONCE.
-test("excludes an evidence-free node from ordering and records it once", async () => {
-  const withEmpty: GraphSnapshot = {
-    graphVersionId: "v1",
-    baseGraphVersionId: null,
-    concepts: [concept("g", "Grounded", "x"), concept("e", "Empty", "x"), concept("h", "Helper", "x")],
-    evidenceProfiles: [
-      { conceptId: "g", definitions: [passage("b1", "Grounded def")], mentions: [], assertions: [] },
-      { conceptId: "e", definitions: [], mentions: [], assertions: [] }, // no evidence
-      { conceptId: "h", definitions: [passage("b2", "Helper def")], mentions: [], assertions: [] }
-    ]
-  };
-  const ports = buildPorts({ snapshot: withEmpty });
-  const layer = await run(ports);
-  const xCall = ports.calls.find((call) => call.declaredDomain === "x");
-  assert.ok(xCall);
-  assert.ok(!xCall.nodes.some((node) => node.canonicalLabel === "Empty"), "the empty node never reaches the ordering call");
-  assert.equal(xCall.nodes.length, 2);
-
-  const exclusions = ports.getTrace()?.nodeExclusions ?? [];
-  assert.equal(exclusions.length, 1, "recorded exactly once, not once per pair");
-  assert.equal(exclusions[0].reason, "insufficient_evidence");
-  assert.equal(exclusions[0].declaredDomain, "x");
-  assert.ok(layer.derivedNodes.some((node) => node.canonicalLabel === "Empty"));
-});
-
-// R13: a redundant transitive shortcut among stable certain edges is reduced; the trace records it.
-test("transitive reduction drops a redundant shortcut among certain edges", async () => {
-  const responder: Responder = (input) =>
-    input.declaredDomain === "x"
-      ? presentEdges(input, [edgeOf("X One", "X Two"), edgeOf("X Two", "X Three"), edgeOf("X One", "X Three")])
-      : { edges: [] };
-  const ports = buildPorts({ responder });
-  const layer = await run(ports);
-  const id = idByLabel(layer);
-  // X One -> X Three is redundant given X One -> X Two -> X Three.
-  assert.ok(!layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("X One") && e.dependentDerivedNodeId === id.get("X Three")));
-  const dispositions = ports.getTrace()?.dispositions.map((d) => d.disposition) ?? [];
-  assert.ok(dispositions.includes("transitive_reduction"));
-  assert.ok(dispositions.includes("kept"));
-});
-
-test("persists a layer free of embedding and candidate-group fields with the unversioned artifact type", async () => {
-  const ports = buildPorts();
-  const layer = await run(ports);
-  assert.equal(layer.judgeModel, "mock-ordering");
-  assert.ok(!("embeddingModel" in layer));
-  for (const edge of layer.prerequisiteEdges) {
-    assert.ok(!("candidateGroupId" in edge));
-    assert.ok(!("evidencePacketRef" in edge.provenance));
-  }
-  assert.equal(ports.getPersisted()?.enrichmentId, "e1");
+  // The producer's identity, version, and ordering hook crossed the seam.
+  assert.equal(summary?.k, K);
+  assert.equal(ports.getPersisted()?.graphVersionId, "v1");
+  assert.equal(ports.getTrace()?.graphVersionId, "v1");
   assert.equal(ports.getArtifactType(), "enrichment_run");
-  // One ordering trace per domain (R1), each naming the ordering model and carrying k + pairVotes.
-  assert.equal(ports.getTrace()?.orderings.length, 2);
-  assert.ok(ports.getTrace()?.orderings.every((o) => o.judgeModel === "mock-ordering"));
-  assert.ok(ports.getTrace()?.orderings.every((o) => o.k === K));
-  assert.deepEqual(ports.getTrace()?.rescueDispositions, []);
+  assert.equal(ports.getPersistCalls(), 1);
+  assert.equal(layer, ports.getPersisted(), "the producer returns the layer completion persisted");
+  const id = idByLabel(layer);
+  assert.ok(layer.prerequisiteEdges.some((e) => e.prerequisiteDerivedNodeId === id.get("X Two") && e.dependentDerivedNodeId === id.get("X One")));
+});
+
+// A front-half failure (here: the published snapshot is missing) never reaches the
+// completion seam — no ordering draw, no persistence.
+test("front-half failure never reaches completion", async () => {
+  const ports = buildPorts();
+  await assert.rejects(() => run(ports, { graphVersionId: "missing" }), /published version missing not found/);
+  assert.equal(ports.calls.length, 0);
+  assert.equal(ports.getPersistCalls(), 0);
 });
 
 test("anchor derived node ids are per enrichment run, while concept ids stay stable", async () => {
@@ -359,55 +301,6 @@ test("anchor derived node ids are per enrichment run, while concept ids stay sta
   if (!firstAnchor || !secondAnchor) assert.fail("expected cx1 anchor in both enrichments");
   assert.equal(firstAnchor.conceptId, secondAnchor.conceptId);
   assert.notEqual(firstAnchor.derivedNodeId, secondAnchor.derivedNodeId);
-});
-
-test("scores intrinsic difficulty with per-node evidence contexts over all derived nodes", async () => {
-  const scoredInputs: DifficultyNodeContext[][] = [];
-  const ports = buildPorts();
-  ports.difficulty = {
-    method: "intrinsic-fused-v1",
-    async score({ nodes }) {
-      scoredInputs.push(nodes);
-      return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0.5, method: "intrinsic-fused-v1", components: { neuralScore: 0.5 }, neuralRationale: "" }));
-    }
-  };
-  const layer = await run(ports);
-  assert.equal(layer.difficulties.length, 5);
-  assert.equal(scoredInputs.length, 1);
-  assert.equal(scoredInputs[0].length, layer.derivedNodes.length);
-  const xOne = scoredInputs[0].find((node) => node.canonicalLabel === "X One");
-  assert.ok(xOne);
-  assert.deepEqual(xOne.definitions, ["X One is the definition of X One"]);
-});
-
-test("default config hash reflects the banded-difficulty reshape", async () => {
-  const ports = buildPorts();
-  const layer = await run(ports);
-  assert.equal(DEFAULT_ENRICHMENT_CONFIG.enrichmentConfigHash, "banded-difficulty");
-  assert.equal(layer.enrichmentConfigHash, "banded-difficulty");
-});
-
-// An evidence-free snapshot reaches no ordering draw and persists with only exclusions.
-test("fails closed on an evidence-free snapshot without an ordering call", async () => {
-  const ungrounded: GraphSnapshot = {
-    graphVersionId: "v1",
-    baseGraphVersionId: null,
-    concepts: [concept("a", "A", "x"), concept("b", "B", "x")],
-    evidenceProfiles: []
-  };
-  const ports = buildPorts({ snapshot: ungrounded });
-  const layer = await run(ports);
-  assert.equal(ports.calls.length, 0, "no ordering draw when nothing is evidenced");
-  assert.equal(layer.prerequisiteEdges.length, 0);
-  assert.equal(ports.getTrace()?.nodeExclusions.length, 2);
-  assert.deepEqual(ports.getTrace()?.dispositions, []);
-});
-
-// An ordering draw that exhausts its forced-tool retry budget fails the run before persistence.
-test("fails the run without persisting when an ordering draw throws", async () => {
-  const ports = buildPorts({ onOrder: async (input) => { if (input.declaredDomain === "x") throw new Error("forced-tool retry budget exhausted"); } });
-  await assert.rejects(() => run(ports), /retry budget exhausted/);
-  assert.equal(ports.getPersistCalls(), 0, "no partial enrichment run may be persisted");
 });
 
 // --- Node minting + rescue (sub-stages unchanged; ordering consumes their nodes) ------

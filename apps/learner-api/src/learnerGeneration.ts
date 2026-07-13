@@ -1,8 +1,11 @@
 import {
-  generateTopicExpedition,
+  createTopicExpeditionGeneration,
   createIntrinsicDifficultyPort,
+  generateStudyItemBank,
+  runSyntheticGeneration,
   DEFAULT_ENRICHMENT_CONFIG,
-  DEFAULT_SYNTHETIC_GENERATION_CONFIG
+  DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+  type TopicExpeditionGeneration
 } from "@lrnki/application";
 import {
   createConceptLessonGenerationPort,
@@ -15,7 +18,6 @@ import {
   createKnowledgeBoundaryProbePort,
   createDeclaredDomainInferencePort,
   LiteLlmNodeEmbeddingAdapter,
-  createNodeMergeAdjudicationPort,
   createPrerequisiteOrderingPort,
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,
@@ -34,70 +36,61 @@ import {
 } from "@lrnki/infrastructure-postgres";
 import type { DatabaseClient } from "./db";
 
-function buildContext(sql: DatabaseClient) {
+// Production composition for Topic Expedition generation (plan 2026-07-13-001 U2): the
+// full neural, store, reporter, and config-hash construction happens ONCE here, adapted
+// into the lifecycle module's small construction interface. `sql` is the supervisor's
+// shared pool — this composition borrows it and never closes it.
+export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): TopicExpeditionGeneration {
   // Client-construction policy (env base config + deterministic/probe/embedding
   // sampling decisions and their rationale) lives once in createNeuralClients,
   // shared with the kg-worker root.
   const { deterministicClient, probeClient, embeddingClient } = createNeuralClients();
   const graphStore = new PostgresGraphVersionStore(sql);
   const enrichmentStore = new PostgresEnrichmentRunStore(sql);
-  const runProgressReporter = new PostgresRunProgressReporter(sql);
-  return {
-    graphStore,
-    enrichmentStore,
-    runProgressReporter,
-    expeditionStore: new PostgresLearnerExpeditionStore(sql),
-    declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient),
-    conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
-    knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
-    nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
-    nodeMergeAdjudicator: createNodeMergeAdjudicationPort(deterministicClient),
-    groundingGeneration: createGroundingGenerationPort(deterministicClient),
-    prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
-    difficulty: createIntrinsicDifficultyPort(createIntrinsicDifficultyJudgmentPort(deterministicClient), DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount),
-    conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
-    conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
-    conceptLessonStore: new PostgresConceptLessonStore(sql),
-    layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient),
-    layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
-    studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
-    studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
-    impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
-    studyItemBankStore: new PostgresStudyItemBankStore(sql)
-  };
-}
-
-// `sql` is the supervisor's shared pool — this run borrows it and never closes it.
-export async function generateLearnerTopicExpedition(input: {
-  learnerExpeditionId: string;
-  topic: string;
-  declaredDomain: string | null;
-}, sql: DatabaseClient): Promise<void> {
-  const ctx = buildContext(sql);
-  await generateTopicExpedition({
-    learnerExpeditionId: input.learnerExpeditionId,
-    topic: input.topic,
-    declaredDomain: input.declaredDomain,
-    declaredDomainInference: ctx.declaredDomainInference,
-    expeditionStore: ctx.expeditionStore,
-    conceptSetSynthesis: ctx.conceptSetSynthesis,
-    knowledgeBoundaryProbe: ctx.knowledgeBoundaryProbe,
-    embedding: ctx.nodeEmbedding,
-    groundingGeneration: ctx.groundingGeneration,
-    prerequisiteOrdering: ctx.prerequisiteOrdering,
-    difficulty: ctx.difficulty,
-    enrichmentStore: ctx.enrichmentStore,
-    graphStore: ctx.graphStore,
-    conceptLessonGeneration: ctx.conceptLessonGeneration,
-    studyItemBlueprint: ctx.studyItemBlueprint,
-    impostorLieValidityJudge: ctx.impostorLieValidityJudge,
-    conceptLessonStore: ctx.conceptLessonStore,
-    layerPurposeGeneration: ctx.layerPurposeGeneration,
-    layerPurposeStore: ctx.layerPurposeStore,
-    studyItemGeneration: ctx.studyItemGeneration,
-    studyItemBankStore: ctx.studyItemBankStore,
-    config: withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG),
-    configHash: studyItemBankConfigHash(),
-    reporter: ctx.runProgressReporter
+  const reporter = new PostgresRunProgressReporter(sql);
+  const syntheticConfig = withSyntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
+  const bankConfigHash = studyItemBankConfigHash();
+  return createTopicExpeditionGeneration({
+    expeditionProgress: new PostgresLearnerExpeditionStore(sql),
+    syntheticGeneration: async (activity) => {
+      const layer = await runSyntheticGeneration({
+        enrichmentId: activity.enrichmentId,
+        topic: activity.topic,
+        declaredDomain: activity.declaredDomain,
+        onDeclaredDomain: activity.onDeclaredDomain,
+        declaredDomainInference: createDeclaredDomainInferencePort(deterministicClient),
+        conceptSetSynthesis: createConceptSetSynthesisPort(deterministicClient),
+        knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
+        embedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
+        groundingGeneration: createGroundingGenerationPort(deterministicClient),
+        prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
+        difficulty: createIntrinsicDifficultyPort(
+          createIntrinsicDifficultyJudgmentPort(deterministicClient),
+          DEFAULT_ENRICHMENT_CONFIG.difficultySampleCount
+        ),
+        enrichmentStore,
+        config: syntheticConfig,
+        reporter
+      });
+      return { conceptCount: layer.derivedNodes.length };
+    },
+    studyItemBankGeneration: async (activity) => {
+      await generateStudyItemBank({
+        enrichmentId: activity.enrichmentId,
+        configHash: bankConfigHash,
+        graphStore,
+        enrichmentStore,
+        conceptLessonGeneration: createConceptLessonGenerationPort(deterministicClient),
+        conceptLessonRedundancyJudge: createConceptLessonRedundancyJudgmentPort(deterministicClient),
+        layerPurposeGeneration: createLayerPurposeGenerationPort(deterministicClient),
+        layerPurposeStore: new PostgresEnrichmentLayerPurposeStore(sql),
+        studyItemBlueprint: createStudyItemBlueprintPort(deterministicClient),
+        impostorLieValidityJudge: createImpostorLieValidityJudgmentPort(deterministicClient),
+        conceptLessonStore: new PostgresConceptLessonStore(sql),
+        studyItemGeneration: createStudyItemGenerationPort(deterministicClient),
+        studyItemBankStore: new PostgresStudyItemBankStore(sql),
+        reporter
+      });
+    }
   });
 }

@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import { CrystalGlyph } from "./CrystalGlyph";
-import type { TrailCluster } from "@/learn/trailView";
+import type { TrailCluster } from "@lrnki/application/projection";
 
 // A section's crystals at a glance: one mini glyph per concept, growing exactly as its
 // trail capstone does. Decorative (the counts beside it carry the accessible truth).

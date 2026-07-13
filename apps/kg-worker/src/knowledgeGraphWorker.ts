@@ -20,7 +20,9 @@ import {
   type CostTimingReport,
   type RankedTarget,
   calibrateKnowledgeBoundaryProbe,
-  parseKnowledgeBoundaryLadder
+  parseKnowledgeBoundaryLadder,
+  auditDiscoveryCoverage,
+  type DiscoveryCoverageAuditReport
 } from "@lrnki/application";
 import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
 import { parseGenerateStudyItemsArgs } from "./workerArgs";
@@ -44,6 +46,7 @@ import {
   createStudyItemBlueprintPort,
   createImpostorLieValidityJudgmentPort,
   createConceptDiscoveryPort,
+  createDiscoveryCoverageAuditPort,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
@@ -78,6 +81,7 @@ import {
   PostgresRunProgressReporter,
   PostgresOperationTimelineRead,
   PostgresJourneyLineageRead,
+  PostgresInspectionRead,
   createDatabaseClient
 } from "@lrnki/infrastructure-postgres";
 
@@ -146,6 +150,15 @@ function buildContext() {
     graphStore,
     artifacts,
     parsers,
+    // Inspection read model (ADR-0027): the discovery-coverage audit reads the run's
+    // admitted set and the source's teachable blocks through the same read ports the
+    // Admin Lab uses — no bespoke SQL in the measurement path.
+    inspectionRead: new PostgresInspectionRead(sql),
+    // Discovery-coverage audit judge (plan 2026-07-10-004 KTD1): cross-family
+    // independent judge on the MODERATE-temperature client — the K samples need
+    // sampling diversity for recurrence to separate stable judgments from judge
+    // noise (ADR-0028); greedy decoding would collapse the draws.
+    discoveryCoverageAudit: createDiscoveryCoverageAuditPort(probeClient),
     discovery: createConceptDiscoveryPort(discoveryClient),
     admission: createConceptAdmissionPort(deterministicClient),
     evidenceProfileExtraction: createEvidenceProfileExtractionPort(deterministicClient),
@@ -522,6 +535,93 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
   }
 }
 
+const DEFAULT_DISCOVERY_COVERAGE_AUDIT_DIR = "tmp/2026-07-10-mimo-extraction-follow-ups";
+
+// Discovery-coverage audit (plan 2026-07-10-004 U1): durable measurement command, the
+// `calibrate-boundary-probe` precedent — every future extractor swap needs this same
+// audit. K-sampled cross-family judgments over one run's admitted set; the report goes
+// to gitignored tmp/ (rule 10) for human inspection (ADR-0013). Audit calls carry no
+// operation_id, so they never pollute an operation's cost report.
+async function auditDiscoveryCoverageCommand(ctx: Context, runId: string | undefined, flags: string[]) {
+  if (!runId) {
+    console.error("! audit-discovery-coverage requires <runId>.");
+    process.exitCode = 1;
+    return;
+  }
+  let k = 3;
+  let outDir = DEFAULT_DISCOVERY_COVERAGE_AUDIT_DIR;
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i];
+    const next = () => {
+      const value = flags[++i];
+      if (!value) throw new Error(`${flag} requires a value.`);
+      return value;
+    };
+    switch (flag) {
+      case "--k":
+        k = Math.trunc(Number(next()));
+        break;
+      case "--out":
+        outDir = next();
+        break;
+      default:
+        throw new Error(`unknown audit-discovery-coverage flag: ${flag}`);
+    }
+  }
+  console.log(`\n>> discovery-coverage audit run=${runId} k=${k}`);
+  const report = await auditDiscoveryCoverage({
+    runId,
+    k,
+    runInspectionRead: ctx.inspectionRead,
+    sourceInspectionRead: ctx.inspectionRead,
+    audit: ctx.discoveryCoverageAudit,
+    onSample: (sample) => console.log(`   sample ${sample.sampleIndex + 1}/${k}: misses=${sample.misses.length}`)
+  });
+  const resolvedOutDir = path.resolve(REPO_ROOT, outDir);
+  await mkdir(resolvedOutDir, { recursive: true });
+  const baseName = `discovery-coverage-${runId}`;
+  const jsonPath = path.join(resolvedOutDir, `${baseName}.json`);
+  await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  const markdownPath = path.join(resolvedOutDir, `${baseName}.md`);
+  await writeFile(markdownPath, discoveryCoverageMarkdown(report), "utf8");
+  console.log(`   admitted=${report.admittedConcepts.length} judged-misses=${report.aggregated.length} recurring=${report.recurringCount}`);
+  for (const miss of report.aggregated.filter((entry) => entry.recurring)) {
+    console.log(`   recurring ${miss.occurrences}/${report.k}: ${miss.instances[0]?.missedObjective ?? miss.normalizedObjective}`);
+  }
+  console.log(`   wrote ${path.relative(REPO_ROOT, jsonPath)} and ${path.relative(REPO_ROOT, markdownPath)}`);
+}
+
+function discoveryCoverageMarkdown(report: DiscoveryCoverageAuditReport): string {
+  const lines = [
+    `# Discovery-coverage audit — ${report.sourceTitle}`,
+    "",
+    `- Run: \`${report.runId}\` (source \`${report.sourceResourceId}\`, domain "${report.declaredDomain}")`,
+    `- Judge: \`${report.judgeModel}\`, K=${report.k}, generated ${report.generatedAt}`,
+    `- Admitted concepts (core + optional): ${report.admittedConcepts.length}`,
+    `- Judged misses: ${report.aggregated.length} (recurring ≥2/${report.k}: ${report.recurringCount})`,
+    "",
+    "A miss is a judge PROPOSAL for human inspection against the source (ADR-0013), not a verdict.",
+    ""
+  ];
+  if (report.aggregated.length === 0) {
+    lines.push("No misses reported in any sample: the admitted set preserves the source's principal learning structure per the judge.");
+  }
+  for (const miss of report.aggregated) {
+    const instance = miss.instances[0];
+    lines.push(`## ${instance?.missedObjective ?? miss.normalizedObjective} — ${miss.occurrences}/${report.k} samples${miss.recurring ? " (RECURRING)" : ""}`);
+    for (const detail of miss.instances) {
+      lines.push(`- grounding: ${detail.sourceGrounding}`);
+      lines.push(`  - why standalone: ${detail.whyStandalone}`);
+    }
+    lines.push("");
+  }
+  lines.push("## Admitted set the judge saw", "");
+  for (const concept of report.admittedConcepts) {
+    lines.push(`- [${concept.tier}] ${concept.label}${concept.gist ? ` — ${concept.gist}` : ""}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, targetDerivedNodeId?: string, learnerStateRef?: string) {
   if (!enrichmentId || !targetDerivedNodeId || !learnerStateRef) {
     console.error("! synthesize-responses requires <enrichmentId> <targetDerivedNodeId> <learnerStateRef>.");
@@ -626,17 +726,20 @@ function renderCostTimingTable(report: CostTimingReport) {
   if (!report.costAvailable) console.log("   ! LiteLLM spend logs unavailable — cost columns omitted, wall-clock only.");
   const fmtMs = (ms: number | null) => (ms === null ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
   const fmtUsd = (usd: number | null) => (usd === null ? "—" : `$${usd.toFixed(4)}`);
-  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"tokens".padStart(10)} ${"cost".padStart(10)}`;
+  // "≈" marks a figure containing a usage-derived estimate for zero-spend OpenRouter
+  // BYOK rows (plan 2026-07-10-004 U4) — distinguishable from provider-billed spend.
+  const fmtCost = (usd: number | null, estimated: boolean) => (usd === null ? "—" : `${estimated ? "≈" : ""}${fmtUsd(usd)}`);
+  const header = `   ${"stage".padEnd(30)} ${"wall".padStart(9)} ${"calls".padStart(6)} ${"tokens".padStart(10)} ${"cost".padStart(11)}`;
   for (const operation of report.operations) {
     console.log(`\n   [${operation.operationType}] ${operation.operationId} (${operation.status})`);
     console.log(header);
-    console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)} ${"-".repeat(10)}`);
+    console.log(`   ${"-".repeat(30)} ${"-".repeat(9)} ${"-".repeat(6)} ${"-".repeat(10)} ${"-".repeat(11)}`);
     for (const row of operation.stages) {
-      console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${(row.tokens ?? "—").toString().padStart(10)} ${fmtUsd(row.costUsd).padStart(10)}`);
+      console.log(`   ${row.stage.padEnd(30)} ${fmtMs(row.wallClockMs).padStart(9)} ${(row.calls ?? "—").toString().padStart(6)} ${(row.tokens ?? "—").toString().padStart(10)} ${fmtCost(row.costUsd, row.costEstimated).padStart(11)}`);
     }
-    console.log(`   ${"subtotal".padEnd(30)} ${fmtMs(operation.subtotal.wallClockMs).padStart(9)} ${(operation.subtotal.calls ?? "—").toString().padStart(6)} ${(operation.subtotal.tokens ?? "—").toString().padStart(10)} ${fmtUsd(operation.subtotal.costUsd).padStart(10)}`);
+    console.log(`   ${"subtotal".padEnd(30)} ${fmtMs(operation.subtotal.wallClockMs).padStart(9)} ${(operation.subtotal.calls ?? "—").toString().padStart(6)} ${(operation.subtotal.tokens ?? "—").toString().padStart(10)} ${fmtCost(operation.subtotal.costUsd, operation.subtotal.costEstimated).padStart(11)}`);
   }
-  console.log(`\n   ${report.scope} total: wall=${fmtMs(report.total.wallClockMs)} calls=${report.total.calls ?? "—"} tokens=${report.total.tokens ?? "—"} cost=${fmtUsd(report.total.costUsd)}`);
+  console.log(`\n   ${report.scope} total: wall=${fmtMs(report.total.wallClockMs)} calls=${report.total.calls ?? "—"} tokens=${report.total.tokens ?? "—"} cost=${fmtCost(report.total.costUsd, report.total.costEstimated)}${report.total.costEstimated ? " (≈ includes usage-derived estimate for BYOK rows)" : ""}`);
 }
 
 // Ranked-target renderer (U3): a cost-ranked and a wall-ranked list of (operation, stage)
@@ -737,6 +840,9 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "calibrate-boundary-probe":
       await calibrateBoundaryProbeCommand(ctx, arg, rest);
       break;
+    case "audit-discovery-coverage":
+      await auditDiscoveryCoverageCommand(ctx, arg, rest);
+      break;
     case "generate-study-items":
       await generateStudyItemsCommand(ctx, arg, rest);
       break;
@@ -753,7 +859,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | audit-discovery-coverage <runId> [--k <n>] [--out <dir>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 

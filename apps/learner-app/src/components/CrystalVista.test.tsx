@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { PortalHost } from "@rn-primitives/portal";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { CrystalVista } from "./CrystalVista";
-import { buildTrailView } from "@/learn/trailView";
+import { buildTrailView } from "@lrnki/application/projection";
 import { sessionFixture } from "@/learn/sessionFixture";
 import { learnerTerm } from "@/learn/vocabulary";
 import type { StudySession } from "@lrnki/application/projection";

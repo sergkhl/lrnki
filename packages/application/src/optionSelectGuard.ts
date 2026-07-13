@@ -7,6 +7,7 @@ import {
   type StudyItemGroundingProvenance,
   type StudyItemOption
 } from "@lrnki/domain-core";
+import { validateItemExplorableTerms } from "./explorableTerms";
 
 // Deterministic option-select guard (U2, R9/R10/R11, ADR-0026). Promotes an
 // option-select draft to a persistable item ONLY when it satisfies provable structural
@@ -35,6 +36,9 @@ export type StudyItemGuardGrounding = {
   graphVersionId: string | null;
   enrichmentId: string;
   derivedNodeId: string;
+  // The node's canonical label, used only to exclude a term that merely repeats it from the
+  // Explorable Term list (R2, plan 2026-07-12-002 U1). Shared by all three guards (rule 18).
+  canonicalLabel: string;
   groundingProvenance: StudyItemGroundingProvenance;
   generatingModel: string;
   configHash: string;
@@ -141,6 +145,7 @@ export function validateOptionSelectItem(
       generatingModel: grounding.generatingModel,
       configHash: grounding.configHash,
       ...(grounding.facet ? { facet: grounding.facet } : {}),
+      explorableTerms: validateItemExplorableTerms(draft.explorableTerms ?? [], draft.question, grounding.canonicalLabel),
       question: draft.question,
       explanation,
       options: builtOptions

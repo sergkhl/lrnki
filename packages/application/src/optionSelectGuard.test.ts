@@ -16,6 +16,7 @@ function sourceGrounding(): OptionSelectGrounding {
     graphVersionId: "gv-1",
     enrichmentId: "en-1",
     derivedNodeId: "dn-1",
+    canonicalLabel: "Heap",
     groundingProvenance: "source_cep",
     generatingModel: "test-model",
     configHash: "cfg-1",
@@ -31,6 +32,7 @@ function generatedGrounding(): OptionSelectGrounding {
     graphVersionId: "gv-1",
     enrichmentId: "en-1",
     derivedNodeId: "dn-2",
+    canonicalLabel: "Ownership",
     groundingProvenance: "generated",
     generatingModel: "test-model",
     configHash: "cfg-1",
@@ -49,8 +51,8 @@ function distractor(text: string): StudyItemOptionDraft {
   return { text, isCorrect: false, provenance: "generated" };
 }
 
-function draftOf(options: StudyItemOptionDraft[]): OptionSelectItemDraft {
-  return { itemType: "option_select", question: "Where is memory allocated at runtime?", explanation: "The grounding says a heap allocates memory at runtime.", options };
+function draftOf(options: StudyItemOptionDraft[], explorableTerms: string[] = []): OptionSelectItemDraft {
+  return { itemType: "option_select", question: "Where is memory allocated at runtime?", explanation: "The grounding says a heap allocates memory at runtime.", options, explorableTerms };
 }
 
 test("happy path: four distinct options, one grounded correct, three generated → ok with assigned ids", () => {

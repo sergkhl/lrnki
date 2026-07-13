@@ -42,3 +42,4 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0034 — Neural learner-facing stage descriptors](./0034-neural-stage-descriptors-dotprompt-config-hashes.md)
 - [0035 — Separate Learner App: universal Expo app over a typed learner API](./0035-separate-learner-app-static-spa-typed-api.md)
 - [0036 — Single shared learner environment during testing](./0036-run-single-shared-learner-environment-during-testing.md)
+- [0037 — Persist learner-scoped Scaffold Detours outside the neutral graph](./0037-persist-learner-scoped-scaffold-detours.md)

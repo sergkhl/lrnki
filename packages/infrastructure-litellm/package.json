@@ -15,6 +15,7 @@
     "@lrnki/ports": "workspace:*",
     "postgres": "catalog:",
     "undici": "catalog:",
+    "yaml": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

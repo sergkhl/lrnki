@@ -12,16 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-10-005 — Fix expedition discoverability: curated Explore + Browse all catalog](./2026-07-10-005-fix-expedition-catalog-discovery-plan.md)
-  — ready; stop the top-3 readiness slice from hiding ready trails: keep a curated top-5 Explore,
-  add a searchable Browse all screen over the full shared catalog via a new `/catalog` endpoint,
-  add a ≥2-stop structural floor, and clean degenerate/placeholder test enrichments from the data.
-- [2026-07-10-004 — MiMo extraction follow-ups](./2026-07-10-004-chore-mimo-extraction-follow-ups-plan.md)
-  — ready; measure discovery coverage across all fixture domains, lock the fatal trailing-nullable
-  MiMo schema shape, and restore honest per-journey cost attribution for OpenRouter Xiaomi BYOK.
-- [2026-07-11-001 — Derived Graph Layer completion](./2026-07-11-001-refactor-derived-graph-layer-completion-plan.md)
-  — ready; consolidate the duplicated Graph Enrichment and Synthetic Topic Generation completion
-  back halves behind one lifecycle-aware, atomically persisted application module.
+- None currently. The
+  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md) is
+  fully implemented (all four candidates completed by 2026-07-13); see [TODO.md](./TODO.md).
 
 ## Ownership rules
 

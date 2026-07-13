@@ -23,7 +23,11 @@ export interface CostTimingStageRow {
   stageKind: OperationTimelineStageKind;
   wallClockMs: number | null;
   calls: number | null;
+  // Provider-billed spend plus the usage-derived estimate for OpenRouter BYOK rows
+  // (plan 2026-07-10-004 U4/KTD6). `costEstimated` marks a row whose figure includes
+  // an estimated component, so surfaces label it instead of presenting it as billed.
   costUsd: number | null;
+  costEstimated: boolean;
   tokens: number | null;
 }
 
@@ -31,6 +35,7 @@ export interface CostTimingTotals {
   wallClockMs: number;
   calls: number | null;
   costUsd: number | null;
+  costEstimated: boolean;
   tokens: number | null;
 }
 
@@ -147,7 +152,8 @@ export function mergeOperationStageRows(
       stageKind: operationTimelineStageKind(stage),
       wallClockMs: wallClockByStage.get(stage) ?? null,
       calls: row?.logCount ?? null,
-      costUsd: row?.totalSpend ?? null,
+      costUsd: row ? row.totalSpend + row.estimatedSpend : null,
+      costEstimated: (row?.estimatedSpend ?? 0) > 0,
       tokens: row?.totalTokens ?? null
     };
   });
@@ -165,6 +171,7 @@ function sumStageRows(rows: CostTimingStageRow[], costAvailable: boolean): CostT
     wallClockMs: rows.reduce((sum, row) => sum + (row.wallClockMs ?? 0), 0),
     calls: costAvailable ? rows.reduce((sum, row) => sum + (row.calls ?? 0), 0) : null,
     costUsd: costAvailable ? rows.reduce((sum, row) => sum + (row.costUsd ?? 0), 0) : null,
+    costEstimated: costAvailable && rows.some((row) => row.costEstimated),
     tokens: costAvailable ? rows.reduce((sum, row) => sum + (row.tokens ?? 0), 0) : null
   };
 }
@@ -174,6 +181,7 @@ function sumTotals(rows: CostTimingTotals[], costAvailable: boolean): CostTiming
     wallClockMs: rows.reduce((sum, row) => sum + row.wallClockMs, 0),
     calls: costAvailable ? rows.reduce((sum, row) => sum + (row.calls ?? 0), 0) : null,
     costUsd: costAvailable ? rows.reduce((sum, row) => sum + (row.costUsd ?? 0), 0) : null,
+    costEstimated: costAvailable && rows.some((row) => row.costEstimated),
     tokens: costAvailable ? rows.reduce((sum, row) => sum + (row.tokens ?? 0), 0) : null
   };
 }

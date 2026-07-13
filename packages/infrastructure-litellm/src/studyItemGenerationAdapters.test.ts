@@ -13,7 +13,8 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
         question: "Where is memory allocated at runtime?",
         explanation: "The heap is correct because the grounding says it allocates at runtime.",
         correctAnswer: { text: "Heap", citation: { passageId: "b1", evidenceQuote: "the heap allocates at runtime" } },
-        distractors: ["Stack", "Register", "Cache"]
+        distractors: ["Stack", "Register", "Cache"],
+        explorableTerms: ["runtime"]
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -28,6 +29,8 @@ test("generateOptionSelect assembles a draft: grounded correct + three generated
   });
 
   assert.equal(draft.itemType, "option_select");
+  // U1: the adapter carries the raw explorableTerms through to the draft (validation is the guard's job).
+  assert.deepEqual(draft.explorableTerms, ["runtime"]);
   assert.equal(draft.explanation, "The heap is correct because the grounding says it allocates at runtime.");
   assert.equal(draft.options.length, 4);
   const correct = draft.options.filter((o) => o.isCorrect);
@@ -81,7 +84,8 @@ test("generateImpostor assembles a draft: three cited truths + one generated imp
         lieText: "The heap is a LIFO region for call frames.",
         reveal: "The LIFO statement is false; that is actually true of the Stack.",
         lieSource: "sibling",
-        siblingLabel: "Stack"
+        siblingLabel: "Stack",
+        explorableTerms: []
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -120,7 +124,8 @@ test("generateImpostor with lieSource 'generated' returns siblingLabel undefined
         lieText: "a fresh misconception",
         reveal: "The fourth is invented and false.",
         lieSource: "generated",
-        siblingLabel: ""
+        siblingLabel: "",
+        explorableTerms: []
       };
     }
   } as unknown as LiteLlmForcedToolClient;
@@ -184,7 +189,8 @@ test("optionSelectValidator accepts a well-formed argument set (shape only, no c
     question: "Q?",
     explanation: "The correct option follows from the grounding.",
     correctAnswer: { text: "x", citation: { passageId: "p", evidenceQuote: "q" } },
-    distractors: ["a", "b", "c"]
+    distractors: ["a", "b", "c"],
+    explorableTerms: []
   });
   assert.equal(parsed.distractors.length, 3);
 });

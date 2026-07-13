@@ -26,6 +26,7 @@ function buildResponseLogRow(
   return {
     responseId: randomUUID(),
     learnerStateRef: common.learnerStateRef,
+    scope: "neutral",
     studyItemId: common.studyItemId,
     derivedNodeId: common.derivedNodeId,
     signalType: "graded",
@@ -51,6 +52,36 @@ export async function appendGradedSelectionOutcome(input: {
     { learnerStateRef: input.learnerStateRef, studyItemId: input.item.studyItemId, derivedNodeId: input.item.derivedNodeId, responseSource: input.responseSource },
     { judgedOutcome, gradedScore, submittedAnswer: null }
   );
+  await input.responseLog.append([row]);
+  return { row };
+}
+
+// Scaffold-scoped counterpart (plan 2026-07-12-002 U5, KTD4): a generated Scaffold Step's
+// option-select grades through the SAME keyed-selection rule but appends a `scaffold`-scoped row
+// keyed on `scaffoldStepId`, never `study_item_id`/`derived_node_id`. Neutral folds ignore it
+// (`neutralResponses`), so scaffold study never touches base mastery, points, or duel pools.
+export async function appendGradedScaffoldOutcome(input: {
+  learnerStateRef: string;
+  scaffoldStepId: string;
+  chosenId: string;
+  keyedCorrectId: string;
+  responseSource: ResponseSource;
+  responseLog: ResponseLogStorePort;
+}): Promise<{ row: NewResponseLogRow }> {
+  const { judgedOutcome, gradedScore } = outcomeFor(input);
+  const row: NewResponseLogRow = {
+    responseId: randomUUID(),
+    learnerStateRef: input.learnerStateRef,
+    scope: "scaffold",
+    scaffoldStepId: input.scaffoldStepId,
+    signalType: "graded",
+    judgedOutcome,
+    gradedScore,
+    responseSource: input.responseSource,
+    graderIdentity: AUTO_GRADER_IDENTITY,
+    batchId: null,
+    submittedAnswer: null
+  };
   await input.responseLog.append([row]);
   return { row };
 }

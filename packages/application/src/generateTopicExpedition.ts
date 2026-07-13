@@ -1,108 +1,140 @@
 import { randomUUID } from "node:crypto";
 import type { ForcedToolFailureAttempt, LearnerExpeditionStorePort, StageErrorDetail } from "@lrnki/ports";
-import { generateStudyItemBank } from "./generateStudyItemBank";
-import { runSyntheticGeneration } from "./runSyntheticGeneration";
 
-export type GenerateTopicExpeditionDeps = {
-  runSynthetic?: typeof runSyntheticGeneration;
-  generateStudyItems?: typeof generateStudyItemBank;
+// Topic Expedition generation — the deep post-claim lifecycle module (plan 2026-07-13-001,
+// Candidate 3 of the 2026-07-11 architecture review). Constructed ONCE per process with
+// narrow lifecycle-shaped adapters and invoked with only one expedition's lifecycle facts.
+// Full DerivedGraphLayer / StudyItemBankGenerationResult artifacts stay behind their owning
+// sub-operations: this module sees a concept count and a completion signal, and owns the
+// claim-fencing protocol, phase order, Declared Domain persistence, readiness rule, and
+// failure classification. Scheduling, staleness, attempt budgets, and row claiming stay in
+// the shared generation supervisor (ADR-0029).
+
+export type TopicExpeditionRequest = {
+  learnerExpeditionId: string;
+  topic: string;
+  declaredDomain: string | null;
 };
+
+export type TopicExpeditionGeneration = (request: TopicExpeditionRequest) => Promise<void>;
 
 // Thrown when a fenced write affects 0 rows: another worker re-claimed the row, so
 // this run no longer owns it and must stop spending. The row is left untouched — the
-// new owner's writes are authoritative.
-export class GenerationClaimLostError extends Error {
+// new owner's writes are authoritative. Internal: the supervisor only needs a rejection.
+class GenerationClaimLostError extends Error {
   constructor(learnerExpeditionId: string) {
     super(`Generation claim lost for expedition ${learnerExpeditionId}.`);
     this.name = "GenerationClaimLostError";
   }
 }
 
-export async function generateTopicExpedition(input: Omit<Parameters<typeof runSyntheticGeneration>[0], "enrichmentId" | "topic" | "onDeclaredDomain"> & Omit<Parameters<typeof generateStudyItemBank>[0], "enrichmentId"> & {
-  learnerExpeditionId: string;
-  topic: string;
-  expeditionStore: LearnerExpeditionStorePort;
-  deps?: GenerateTopicExpeditionDeps;
+export function createTopicExpeditionGeneration(construction: {
+  // The one store capability the lifecycle needs — the fenced progress write. Store
+  // narrowing follows the completeDerivedGraphLayer precedent.
+  expeditionProgress: Pick<LearnerExpeditionStorePort, "updateProgress">;
+  // Synthetic Topic Generation, lifecycle-shaped: reports its concept count and delivers
+  // the resolved Declared Domain through the fenced callback before completing.
+  syntheticGeneration: (activity: {
+    enrichmentId: string;
+    topic: string;
+    declaredDomain: string | null;
+    onDeclaredDomain: (declaredDomain: string) => Promise<void>;
+  }) => Promise<{ conceptCount: number }>;
+  // Study Item Bank generation, completion-only. Readiness needs no item threshold:
+  // a sparse valid bank is still ready (ADR-0026).
+  studyItemBankGeneration: (activity: { enrichmentId: string }) => Promise<void>;
   newEnrichmentId?: () => string;
-}): Promise<{ enrichmentId: string }> {
-  const enrichmentId = (input.newEnrichmentId ?? randomUUID)();
-  const runSynthetic = input.deps?.runSynthetic ?? runSyntheticGeneration;
-  const generateStudyItems = input.deps?.generateStudyItems ?? generateStudyItemBank;
-  // Fencing token (lease pattern): the claim cleared current_operation_id, so the
-  // first write expects null and installs this run's enrichment id; every later
-  // write expects that id. A 0-row fenced write means a competing claim took the
-  // row — abort instead of double-running.
-  let fenceToken: string | null = null;
-  const fencedUpdate = async (update: Omit<Parameters<LearnerExpeditionStorePort["updateProgress"]>[0], "learnerExpeditionId" | "expectedOperationId">): Promise<void> => {
-    const affected = await input.expeditionStore.updateProgress({
-      learnerExpeditionId: input.learnerExpeditionId,
-      expectedOperationId: fenceToken,
-      ...update
-    });
-    if (affected === 0) throw new GenerationClaimLostError(input.learnerExpeditionId);
-  };
-  try {
-    await fencedUpdate({
-      status: "generating",
-      currentOperationId: enrichmentId,
-      currentOperationType: "enrichment"
-    });
-    fenceToken = enrichmentId;
-    let resolvedDeclaredDomain = input.declaredDomain?.trim() ?? "";
-    const layer = await runSynthetic({
-      ...input,
-      enrichmentId,
-      topic: input.topic,
-      onDeclaredDomain: async (declaredDomain) => {
-        resolvedDeclaredDomain = declaredDomain;
-        await fencedUpdate({ declaredDomain });
-      }
-    });
-    // Readiness is trail-wide now: an expedition is ready when its layer carries at least one
-    // concept and a study bank. The summit is DERIVED at read time (ADR-0032), so there is no
-    // target to persist — generation only fails loudly when the layer produced no concepts.
-    if (layer.derivedNodes.length === 0) {
-      throw new Error("Scouting produced no concepts.");
-    }
-
-    await fencedUpdate({
-      currentOperationId: enrichmentId,
-      currentOperationType: "study_items"
-    });
-    await generateStudyItems({ ...input, enrichmentId });
-    await fencedUpdate({
-      status: "ready",
-      enrichmentId,
-      declaredDomain: resolvedDeclaredDomain || input.declaredDomain,
-      currentOperationId: null,
-      currentOperationType: null,
-      failureMessage: null
-    });
-    return { enrichmentId };
-  } catch (error) {
-    // Lost claim: another worker owns the row now — write nothing.
-    if (error instanceof GenerationClaimLostError) throw error;
-    if (isTransientGenerationError(error)) {
-      // Transient (network / 5xx / 429 / timeout) exhaustion: release the claim so the
-      // supervisor's attempt budget governs re-runs — status stays `generating`, the
-      // operation id is cleared, claimed_at is kept as natural backoff. A best-effort
-      // write: losing the fence here just means someone else already took over.
-      await input.expeditionStore.updateProgress({
-        learnerExpeditionId: input.learnerExpeditionId,
+}): TopicExpeditionGeneration {
+  const newEnrichmentId = construction.newEnrichmentId ?? randomUUID;
+  return async (request) => {
+    // Per-call lifecycle state: nothing below outlives this invocation, so the
+    // supervisor's concurrent calls through one constructed generator cannot share
+    // enrichment identity, fence, or domain state.
+    const enrichmentId = newEnrichmentId();
+    // Fencing token (lease pattern): the claim cleared current_operation_id, so the
+    // first write expects null and installs this run's enrichment id; every later
+    // write expects that id. A 0-row fenced write means a competing claim took the
+    // row — abort instead of double-running.
+    let fenceToken: string | null = null;
+    const fencedUpdate = async (update: Omit<Parameters<LearnerExpeditionStorePort["updateProgress"]>[0], "learnerExpeditionId" | "expectedOperationId">): Promise<void> => {
+      const affected = await construction.expeditionProgress.updateProgress({
+        learnerExpeditionId: request.learnerExpeditionId,
         expectedOperationId: fenceToken,
+        ...update
+      });
+      if (affected === 0) throw new GenerationClaimLostError(request.learnerExpeditionId);
+    };
+    // A best-effort terminal write: losing the fence (0 rows) or a store rejection here
+    // just means someone else owns the row — the caught generation error stays the
+    // meaningful rejection.
+    const bestEffortUpdate = async (update: Omit<Parameters<LearnerExpeditionStorePort["updateProgress"]>[0], "learnerExpeditionId" | "expectedOperationId">): Promise<void> => {
+      try {
+        await construction.expeditionProgress.updateProgress({
+          learnerExpeditionId: request.learnerExpeditionId,
+          expectedOperationId: fenceToken,
+          ...update
+        });
+      } catch {
+        // Swallowed: the original generation error is rethrown by the caller.
+      }
+    };
+    try {
+      await fencedUpdate({
+        status: "generating",
+        currentOperationId: enrichmentId,
+        currentOperationType: "enrichment"
+      });
+      fenceToken = enrichmentId;
+      let resolvedDeclaredDomain = request.declaredDomain?.trim() ?? "";
+      const { conceptCount } = await construction.syntheticGeneration({
+        enrichmentId,
+        topic: request.topic,
+        declaredDomain: request.declaredDomain,
+        onDeclaredDomain: async (declaredDomain) => {
+          resolvedDeclaredDomain = declaredDomain;
+          await fencedUpdate({ declaredDomain });
+        }
+      });
+      // Readiness is trail-wide: an expedition is ready when its layer carries at least one
+      // concept and a study bank. The summit is DERIVED at read time (ADR-0032), so there is
+      // no target to persist — generation only fails loudly when no concepts were produced.
+      if (conceptCount === 0) {
+        throw new Error("Scouting produced no concepts.");
+      }
+
+      await fencedUpdate({
+        currentOperationId: enrichmentId,
+        currentOperationType: "study_items"
+      });
+      await construction.studyItemBankGeneration({ enrichmentId });
+      await fencedUpdate({
+        status: "ready",
+        enrichmentId,
+        declaredDomain: resolvedDeclaredDomain || request.declaredDomain,
         currentOperationId: null,
-        currentOperationType: null
+        currentOperationType: null,
+        failureMessage: null
+      });
+    } catch (error) {
+      // Lost claim: another worker owns the row now — write nothing.
+      if (error instanceof GenerationClaimLostError) throw error;
+      if (isTransientGenerationError(error)) {
+        // Transient (network / 5xx / 429 / timeout) exhaustion: release the claim so the
+        // supervisor's attempt budget governs re-runs — status stays `generating`, the
+        // operation id is cleared, claimed_at is kept as natural backoff.
+        await bestEffortUpdate({
+          currentOperationId: null,
+          currentOperationType: null
+        });
+        throw error;
+      }
+      await bestEffortUpdate({
+        status: "failed",
+        failureMessage: generationFailureMessage(error)
       });
       throw error;
     }
-    await input.expeditionStore.updateProgress({
-      learnerExpeditionId: input.learnerExpeditionId,
-      expectedOperationId: fenceToken,
-      status: "failed",
-      failureMessage: generationFailureMessage(error)
-    });
-    throw error;
-  }
+  };
 }
 
 // Transient vs. deterministic exhaustion, decided over the transport's classified
@@ -110,7 +142,7 @@ export async function generateTopicExpedition(input: Omit<Parameters<typeof runS
 // trail made ENTIRELY of infrastructure failures (network, timeout, HTTP 5xx/429) is
 // transient; any model deviation (schema-invalid, no tool call, …) means retrying the
 // same prompt is the budget the transport already spent, so fail immediately.
-export function isTransientGenerationError(error: unknown): boolean {
+function isTransientGenerationError(error: unknown): boolean {
   const attempts = stageErrorAttempts(error);
   if (!attempts || attempts.length === 0) return false;
   return attempts.every((attempt) =>

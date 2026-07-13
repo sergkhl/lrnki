@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ResponseLogRow, JudgedOutcome } from "@lrnki/domain-core";
+import type { NeutralResponseLogRow, ResponseLogRow, JudgedOutcome } from "@lrnki/domain-core";
 import type { ResponseLogStorePort } from "@lrnki/ports";
 import { foldConceptMastery, loadResponseLogLearnerState, outcomeToMastery } from "./responseLogLearnerState";
 
 let seq = 0;
-function graded(derivedNodeId: string, outcome: JudgedOutcome, score: number): ResponseLogRow {
-  return { responseId: `r${seq}`, learnerStateRef: "L1", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: score, responseSource: "synthetic", graderIdentity: "kg-independent-judge", attemptSeq: ++seq, batchId: null, submittedAnswer: "a", createdAt: new Date().toISOString() };
+function graded(derivedNodeId: string, outcome: JudgedOutcome, score: number): NeutralResponseLogRow {
+  return { responseId: `r${seq}`, learnerStateRef: "L1", scope: "neutral", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: score, responseSource: "synthetic", graderIdentity: "kg-independent-judge", attemptSeq: ++seq, batchId: null, submittedAnswer: "a", createdAt: new Date().toISOString() };
 }
 
 test("graded outcomes map to the documented mastery values", () => {
