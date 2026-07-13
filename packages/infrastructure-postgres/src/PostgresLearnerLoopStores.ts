@@ -136,7 +136,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
       FROM study_items WHERE derived_node_id = ${derivedNodeId} AND item_type = ${itemType} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
-    const [item] = await this.hydrate(rows);
+    const [item] = await hydrateStudyItemRows(this.sql, rows);
     return item;
   }
 
@@ -145,7 +145,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
       FROM study_items WHERE study_item_id = ${studyItemId} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
-    const [item] = await this.hydrate(rows);
+    const [item] = await hydrateStudyItemRows(this.sql, rows);
     return item;
   }
 
@@ -153,7 +153,7 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     const rows = await this.sql<StudyItemRow[]>`
       SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
       FROM study_items WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL ORDER BY derived_node_id, item_type`;
-    return this.hydrate(rows);
+    return hydrateStudyItemRows(this.sql, rows);
   }
 
   async supportedItemTypes(derivedNodeId: string): Promise<StudyItemType[]> {
@@ -162,34 +162,40 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
     return rows.map((row) => row.item_type as StudyItemType);
   }
 
-  private async hydrate(rows: StudyItemRow[]): Promise<StudyItem[]> {
+}
+
+// Hydrate persisted study-item rows into full domain items. Module-level (rather than a
+// private method) so PostgresLearnerRecallChallengeStore can hydrate a challenge lineup's
+// items — including superseded generations, whose child rows stay in place — through the
+// exact same stitch (plan 2026-07-13-003 U2, rule 18).
+export async function hydrateStudyItemRows(sql: Sql, rows: StudyItemRow[]): Promise<StudyItem[]> {
     if (rows.length === 0) return [];
     const optionSelectIds = rows.filter((row) => row.item_type === "option_select").map((row) => row.study_item_id);
     const matchingIds = rows.filter((row) => row.item_type === "matching").map((row) => row.study_item_id);
     const impostorIds = rows.filter((row) => row.item_type === "impostor").map((row) => row.study_item_id);
 
     const citationRows = optionSelectIds.length
-      ? await this.sql<CitationRow[]>`
+      ? await sql<CitationRow[]>`
         SELECT study_item_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
-        FROM study_item_citations WHERE study_item_id IN ${this.sql(optionSelectIds)}
+        FROM study_item_citations WHERE study_item_id IN ${sql(optionSelectIds)}
         ORDER BY study_item_id, study_item_citation_id`
       : [];
     const matchingRows = matchingIds.length
-      ? await this.sql<MatchingPairRow[]>`
+      ? await sql<MatchingPairRow[]>`
         SELECT matching_pair_id, match_tile_id, study_item_id, ordinal, prompt_text, match_text, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
-        FROM matching_pairs WHERE study_item_id IN ${this.sql(matchingIds)}
+        FROM matching_pairs WHERE study_item_id IN ${sql(matchingIds)}
         ORDER BY study_item_id, ordinal`
       : [];
     const optionRows = optionSelectIds.length
-      ? await this.sql<OptionRow[]>`
+      ? await sql<OptionRow[]>`
         SELECT option_id, study_item_id, ordinal, option_text, is_correct, provenance
-        FROM study_item_options WHERE study_item_id IN ${this.sql(optionSelectIds)}
+        FROM study_item_options WHERE study_item_id IN ${sql(optionSelectIds)}
         ORDER BY study_item_id, ordinal`
       : [];
     const statementRows = impostorIds.length
-      ? await this.sql<ImpostorStatementRow[]>`
+      ? await sql<ImpostorStatementRow[]>`
         SELECT impostor_statement_id, study_item_id, ordinal, statement_text, is_impostor, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text, reveal_text, lie_source, sibling_label
-        FROM impostor_statements WHERE study_item_id IN ${this.sql(impostorIds)}
+        FROM impostor_statements WHERE study_item_id IN ${sql(impostorIds)}
         ORDER BY study_item_id, ordinal`
       : [];
 
@@ -251,7 +257,6 @@ export class PostgresStudyItemBankStore implements StudyItemBankStorePort {
       }));
       return { ...base, itemType: "option_select", explanation: row.explanation ?? "", options };
     });
-  }
 }
 
 // Defense-in-depth structural assert before persist (the guard already validated). Dispatches
@@ -329,7 +334,7 @@ function assertNever(value: never): never {
   throw new Error(`unsupported study item type: ${String((value as { itemType?: string }).itemType)}`);
 }
 
-type StudyItemRow = {
+export type StudyItemRow = {
   study_item_id: string;
   item_type: StudyItemType;
   graph_version_id: string | null;

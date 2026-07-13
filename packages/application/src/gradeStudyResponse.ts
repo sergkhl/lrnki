@@ -9,7 +9,7 @@ import type {
   ScaffoldDetourStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
-import { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+import { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, keyedCorrectIdFor, keyedMatchIdFor, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
 
 // The learner-grading use-case (Candidate 2, ADR-0027). It owns the whole load-guard-resolve-grade
 // -append composition the Admin Lab server actions used to hand-write in raw SQL, so the grading
@@ -102,32 +102,19 @@ export async function gradeStudyResponse(
   if (typeof loaded === "string") return { graded: false, refused: loaded };
   const item = loaded;
 
-  if (item.itemType === "option_select" && submission.itemType === "option_select") {
-    const keyed = item.options.find((option) => option.isCorrect);
-    if (!keyed) return { graded: false, refused: "item_not_found" };
+  if ((item.itemType === "option_select" && submission.itemType === "option_select") || (item.itemType === "impostor" && submission.itemType === "impostor")) {
+    const keyedCorrectId = keyedCorrectIdFor(item);
+    if (!keyedCorrectId) return { graded: false, refused: "item_not_found" };
+    const chosenId = submission.itemType === "option_select" ? submission.chosenOptionId : submission.chosenStatementId;
     await appendGradedSelectionOutcome({
       learnerStateRef,
       item: { studyItemId, derivedNodeId: item.derivedNodeId },
-      chosenId: submission.chosenOptionId,
-      keyedCorrectId: keyed.optionId,
+      chosenId,
+      keyedCorrectId,
       responseSource: "human",
       responseLog: ports.responseLog
     });
-    return { graded: true, outcome: { kind: "selection", chosenId: submission.chosenOptionId, keyedCorrectId: keyed.optionId, correct: submission.chosenOptionId === keyed.optionId } };
-  }
-
-  if (item.itemType === "impostor" && submission.itemType === "impostor") {
-    const keyed = item.statements.find((statement) => statement.isImpostor);
-    if (!keyed) return { graded: false, refused: "item_not_found" };
-    await appendGradedSelectionOutcome({
-      learnerStateRef,
-      item: { studyItemId, derivedNodeId: item.derivedNodeId },
-      chosenId: submission.chosenStatementId,
-      keyedCorrectId: keyed.statementId,
-      responseSource: "human",
-      responseLog: ports.responseLog
-    });
-    return { graded: true, outcome: { kind: "selection", chosenId: submission.chosenStatementId, keyedCorrectId: keyed.statementId, correct: submission.chosenStatementId === keyed.statementId } };
+    return { graded: true, outcome: { kind: "selection", chosenId, keyedCorrectId, correct: chosenId === keyedCorrectId } };
   }
 
   if (item.itemType === "matching" && submission.itemType === "matching") {
@@ -205,9 +192,9 @@ export async function checkMatchingAttempt(
   const loaded = await loadGradableItem({ enrichmentId, studyItemId, itemType: "matching" }, ports.studyItemStore);
   if (typeof loaded === "string") return { checked: false, refused: loaded };
   if (loaded.itemType !== "matching") return { checked: false, refused: "item_type_mismatch" };
-  const pair = loaded.pairs.find((candidate) => candidate.pairId === promptId);
-  if (!pair) return { checked: false, refused: "item_not_found" };
-  return { checked: true, correct: pair.matchId === matchId };
+  const keyedMatchId = keyedMatchIdFor(loaded, promptId);
+  if (!keyedMatchId) return { checked: false, refused: "item_not_found" };
+  return { checked: true, correct: keyedMatchId === matchId };
 }
 
 // Node-membership guard shared by verdict and lesson-read writes (R4). `lesson_reads`/

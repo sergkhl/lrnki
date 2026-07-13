@@ -1,6 +1,6 @@
 ---
 type: feat
-status: ready
+status: in-progress
 origin: docs/brainstorms/2026-07-13-crystal-guardian-challenges-requirements.md
 artifact_readiness: implementation-ready
 execution: code
@@ -20,7 +20,8 @@ the typed Study Item Bank in [ADR-0026](../adr/0026-typed-study-item-bank.md), l
 
 ## Status and scope
 
-- **Readiness:** ready for implementation; no product questions remain.
+- **Readiness:** in progress — U1–U3 implemented 2026-07-13; [TODO](./TODO.md) carries the
+  authoritative execution status and the remaining-unit handoff (Gate A next).
 - **Predecessor:** complete the ready
   [Learner App native parity fix](./2026-07-13-004-fix-learner-app-native-parity-plan.md) first;
   Guardian presentation depends on its native UI-kit verification.

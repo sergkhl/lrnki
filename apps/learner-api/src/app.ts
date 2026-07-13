@@ -40,6 +40,7 @@ import {
 import { FixedWindowRateLimiter, bearerAuth, compactLearnerRef, hashSessionToken, mintSessionToken, type AuthEnv } from "./auth";
 import type { DatabaseClient } from "./db";
 import { loadLeaderboard } from "./leaderboard";
+import { createLearnerRecallChallenge } from "./recallChallenge";
 import { wakeScaffoldGenerationSupervisor } from "./scaffoldGenerationSupervisor";
 import { wakeTopicGenerationSupervisor } from "./topicGenerationSupervisor";
 
@@ -79,6 +80,30 @@ const duelSubmission = z.discriminatedUnion("itemType", [
   z.object({ itemType: z.literal("impostor"), chosenStatementId: z.string() })
 ]);
 
+// Recall Challenge transport bounds (plan 2026-07-13-003 KTD7/KTD8): UUIDs validated before
+// the application boundary, chosen ids bounded, and client-observed duration clamped to the
+// same 0–1h window the DB CHECK enforces. The duration is untrusted reporting evidence only.
+const challengeAnswerBase = {
+  challengeId: z.string().uuid(),
+  attemptRef: z.string().uuid(),
+  studyItemId: z.string().uuid(),
+  responseDurationMs: z.number().int().min(0).max(3600000).nullish()
+};
+const challengeLifecycleBody = z.object({
+  challengeId: z.string().uuid(),
+  operationRef: z.string().uuid()
+});
+
+// One refusal → HTTP status mapping for every Recall Challenge route: unknown/foreign
+// resources are 404, malformed or unusable requests 422, and everything that means "the
+// durable state disagrees with you" (stale turn, inactive challenge, active-scope conflict,
+// locked scope) is 409 so the client reloads the committed view.
+function challengeRefusalStatus(refused: string): 404 | 409 | 422 {
+  if (refused === "not_found") return 404;
+  if (refused === "invalid_input" || refused === "invalid_scope" || refused === "no_eligible_items" || refused === "item_type_mismatch") return 422;
+  return 409;
+}
+
 // PIN brute-force throttle at the ONE route where PINs exist (R2/KTD8): fixed windows,
 // keyed per client IP and per learner name.
 const SESSION_ATTEMPT_LIMIT = 10;
@@ -93,6 +118,8 @@ export function createLearnerApp(sql: DatabaseClient) {
   const expeditionStore = new PostgresLearnerExpeditionStore(sql);
   const rateLimiter = new FixedWindowRateLimiter(SESSION_ATTEMPT_LIMIT, SESSION_WINDOW_MS);
   const auth = bearerAuth(sessions);
+  // The Recall Challenge deep module, bound once at the composition root (KTD1).
+  const recallChallenges = createLearnerRecallChallenge(sql);
 
   const studyDeps = () => ({
     expeditionStore,
@@ -458,6 +485,97 @@ export function createLearnerApp(sql: DatabaseClient) {
         { scaffoldStore: new PostgresLearnerScaffoldStore(sql) }
       );
       return c.json({ recorded: result.recorded });
+    })
+
+    // --- Recall Challenges (plan 2026-07-13-003 U3, KTD7). One authenticated, learner-safe,
+    // idempotent lifecycle over the neutral Recall Challenge module. The Learner App maps
+    // these plain views to Crystal Guardian presentation. ------------------------------------
+
+    .get("/challenge/scopes/:enrichmentId", auth, async (c) => {
+      const scopes = await recallChallenges.scopeStatus({
+        learnerStateRef: c.get("learnerStateRef"),
+        enrichmentId: c.req.param("enrichmentId")
+      });
+      if (!scopes) return c.json({ error: "not_found" as const }, 404);
+      return c.json({ scopes });
+    })
+
+    .post("/challenge/create", auth, zValidator("json", z.object({
+      enrichmentId: z.string().uuid(),
+      scopeKind: z.enum(["section", "enrichment"]),
+      anchorDerivedNodeId: z.string().uuid()
+    })), async (c) => {
+      const result = await recallChallenges.create({ learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") });
+      if (!result.created) {
+        if (result.refused === "active_challenge_exists") {
+          return c.json({ created: false as const, refused: result.refused, activeChallengeId: result.activeChallengeId }, 409);
+        }
+        return c.json({ created: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
+      }
+      return c.json({ created: true as const, view: result.view });
+    })
+
+    .get("/challenge/:challengeId", auth, async (c) => {
+      const result = await recallChallenges.read({
+        learnerStateRef: c.get("learnerStateRef"),
+        challengeId: c.req.param("challengeId")
+      });
+      if (!result.found) return c.json({ error: "not_found" as const }, 404);
+      return c.json({ view: result.view });
+    })
+
+    .post("/challenge/answer", auth, zValidator("json", z.object({
+      ...challengeAnswerBase,
+      chosenId: z.string().min(1).max(200)
+    })), async (c) => {
+      const input = c.req.valid("json");
+      const result = await recallChallenges.answerSelection({
+        learnerStateRef: c.get("learnerStateRef"),
+        challengeId: input.challengeId,
+        attemptRef: input.attemptRef,
+        studyItemId: input.studyItemId,
+        chosenId: input.chosenId,
+        responseDurationMs: input.responseDurationMs ?? null
+      });
+      if (!result.answered) return c.json({ answered: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
+      return c.json({ answered: true as const, replayed: result.replayed, feedback: result.feedback, view: result.view });
+    })
+
+    .post("/challenge/matching-pair", auth, zValidator("json", z.object({
+      ...challengeAnswerBase,
+      promptId: z.string().min(1).max(200),
+      chosenMatchId: z.string().min(1).max(200)
+    })), async (c) => {
+      const input = c.req.valid("json");
+      const result = await recallChallenges.answerMatchingPair({
+        learnerStateRef: c.get("learnerStateRef"),
+        challengeId: input.challengeId,
+        attemptRef: input.attemptRef,
+        studyItemId: input.studyItemId,
+        promptId: input.promptId,
+        chosenMatchId: input.chosenMatchId,
+        responseDurationMs: input.responseDurationMs ?? null
+      });
+      if (!result.answered) return c.json({ answered: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
+      return c.json({ answered: true as const, replayed: result.replayed, feedback: result.feedback, view: result.view });
+    })
+
+    .post("/challenge/retreat", auth, zValidator("json", challengeLifecycleBody), async (c) => {
+      const result = await recallChallenges.retreat({ learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") });
+      if (!result.applied) return c.json({ applied: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
+      return c.json({ applied: true as const, view: result.view });
+    })
+
+    .post("/challenge/resume", auth, zValidator("json", challengeLifecycleBody), async (c) => {
+      const result = await recallChallenges.resume({ learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") });
+      if (!result.applied) return c.json({ applied: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
+      return c.json({ applied: true as const, view: result.view });
+    })
+
+    .post("/challenge/abandon", auth, zValidator("json", challengeLifecycleBody), async (c) => {
+      const result = await recallChallenges.abandon({ learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") });
+      if (!result.applied) return c.json({ applied: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
+      return c.json({ applied: true as const, view: result.view });
     })
 
     // Grade one duel answer (KTD3): resolves the key server-side and returns correctness only —

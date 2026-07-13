@@ -1,8 +1,24 @@
 import { randomUUID } from "node:crypto";
-import type { JudgedOutcome, MatchingItem, NewResponseLogRow, ResponseSource } from "@lrnki/domain-core";
+import type { JudgedOutcome, MatchingItem, NewResponseLogRow, ResponseSource, StudyItem } from "@lrnki/domain-core";
 import type { ResponseLogStorePort } from "@lrnki/ports";
 
 export const AUTO_GRADER_IDENTITY = "auto";
+
+// Persistence-neutral answer-key resolution shared by acquisition grading and the Recall
+// Challenge (plan 2026-07-13-003 KTD4, rule 18): the keyed-correct id of a selection item is
+// the `isCorrect` option or the planted `isImpostor` statement, resolved SERVER-SIDE off the
+// domain item — never trusted from a client. Matching has no single key; a pair attempt keys
+// promptId (pairId) → matchId. These import no store, so a grade-only consumer structurally
+// cannot write the response log.
+export function keyedCorrectIdFor(item: StudyItem): string | undefined {
+  if (item.itemType === "option_select") return item.options.find((option) => option.isCorrect)?.optionId;
+  if (item.itemType === "impostor") return item.statements.find((statement) => statement.isImpostor)?.statementId;
+  return undefined;
+}
+
+export function keyedMatchIdFor(item: MatchingItem, promptId: string): string | undefined {
+  return item.pairs.find((pair) => pair.pairId === promptId)?.matchId;
+}
 
 // One grading-neutral keyed-selection grader shared by every auto-graded selection item type
 // (KTD6, rule 18): option-select keys the correct option, impostor keys the planted lie. The

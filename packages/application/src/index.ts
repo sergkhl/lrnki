@@ -119,7 +119,33 @@ export {
   type KnowledgeBoundaryProbeConfig
 } from "./knowledgeBoundaryProbe";
 
-export { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+export { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, keyedCorrectIdFor, keyedMatchIdFor, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+export {
+  ENRICHMENT_LINEUP_MAX,
+  RECALL_MISS_BUFFER,
+  SECTION_LINEUP_MAX,
+  currentTurnItemId,
+  foldRecallChallenge,
+  latestCorrectStudyItemIds,
+  projectRecallChallengeView,
+  selectRecallLineup,
+  createRecallChallenge,
+  type RecallAnswerFeedback,
+  type RecallAnswerResult,
+  type RecallChallengeDeps,
+  type RecallChallengeModule,
+  type RecallChallengeRefusal,
+  type RecallCreateResult,
+  type RecallLifecycleResult,
+  type RecallReadResult,
+  type RecallScopeStatus,
+  type RecallChallengeView,
+  type RecallCombatPhase,
+  type RecallCombatState,
+  type RecallEligibleItem,
+  type RecallMatchingBoard,
+  type RecallMatchingProgressView
+} from "./recallChallenge";
 export {
   gradeStudyResponse,
   checkMatchingAttempt,

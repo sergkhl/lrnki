@@ -1134,6 +1134,93 @@ SELECT response_id, learner_state_ref, study_item_id, derived_node_id, scaffold_
 FROM response_log;
 
 -- ---------------------------------------------------------------------------
+-- Recall Challenges (plan 2026-07-13-003, KTD2). One challenge row per attempt over a
+-- section/enrichment scope, an IMMUTABLE ordered lineup of neutral Study Item references,
+-- and append-only idempotent events. Status is materialized here for indexed queries, but
+-- the lineup + ordered events are the replayable authority for the miss buffer, unresolved
+-- queue, recovery mode, and resume state. Challenge answers NEVER write `response_log`
+-- (KTD4) — a checksum of that log is byte-identical across any challenge-only actions.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE recall_challenges (
+  challenge_id uuid PRIMARY KEY,
+  learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
+  enrichment_id uuid NOT NULL REFERENCES graph_enrichments(enrichment_id),
+  scope_kind text NOT NULL CHECK (scope_kind IN ('section', 'enrichment')),
+  -- Stable scope identity (KTD2): the section milestone node or the enrichment summit node —
+  -- never a mutable section ordinal.
+  scope_anchor_derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  status text NOT NULL CHECK (status IN ('active', 'won', 'abandoned')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- One active challenge per learner/scope (KTD2): divergent device sessions resume the SAME
+-- durable history instead of forking it.
+CREATE UNIQUE INDEX recall_challenges_one_active_per_scope
+  ON recall_challenges (learner_state_ref, enrichment_id, scope_kind, scope_anchor_derived_node_id)
+  WHERE status = 'active';
+
+CREATE INDEX recall_challenges_learner_enrichment_idx
+  ON recall_challenges (learner_state_ref, enrichment_id, created_at DESC);
+
+-- The immutable lineup: coverage-first selected Study Item references in fight order. The FK
+-- targets the item's PRIMARY KEY, so a lineup survives Study Item Bank regeneration (the
+-- superseded row stays hydratable by identity, KTD4).
+CREATE TABLE recall_challenge_lineup (
+  challenge_id uuid NOT NULL REFERENCES recall_challenges(challenge_id) ON DELETE CASCADE,
+  lineup_index integer NOT NULL CHECK (lineup_index >= 0),
+  study_item_id uuid NOT NULL REFERENCES study_items(study_item_id),
+  derived_node_id uuid NOT NULL REFERENCES derived_graph_nodes(derived_node_id),
+  PRIMARY KEY (challenge_id, lineup_index),
+  UNIQUE (challenge_id, study_item_id)
+);
+
+-- Append-only challenge events: selection answers, Matching pair attempts, and lifecycle
+-- actions. `attempt_ref` (answers) and `operation_ref` (lifecycle) are client-created UUIDs
+-- held across retries — the partial uniques make a network replay a no-op that returns the
+-- already-committed view. `response_duration_ms` is bounded, client-observed, untrusted
+-- reporting evidence only (KTD8): no runtime branch reads it.
+CREATE TABLE recall_challenge_events (
+  event_id uuid PRIMARY KEY,
+  challenge_id uuid NOT NULL REFERENCES recall_challenges(challenge_id) ON DELETE CASCADE,
+  seq integer NOT NULL CHECK (seq >= 1),
+  kind text NOT NULL CHECK (kind IN ('selection_answer', 'matching_pair', 'retreat', 'resume', 'abandon')),
+  attempt_ref uuid,
+  operation_ref uuid,
+  study_item_id uuid REFERENCES study_items(study_item_id),
+  prompt_id text,
+  chosen_id text,
+  correct boolean,
+  recovery_phase boolean,
+  response_duration_ms integer CHECK (response_duration_ms IS NULL OR (response_duration_ms >= 0 AND response_duration_ms <= 3600000)),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  -- Exactly two column shapes (KTD2): an answer event carries attempt/item/answer facts (a
+  -- Matching pair attempt additionally its prompt), a lifecycle event only its operation ref.
+  CHECK (
+    (kind IN ('selection_answer', 'matching_pair')
+      AND attempt_ref IS NOT NULL AND operation_ref IS NULL
+      AND study_item_id IS NOT NULL AND chosen_id IS NOT NULL
+      AND correct IS NOT NULL AND recovery_phase IS NOT NULL
+      AND ((kind = 'matching_pair' AND prompt_id IS NOT NULL) OR (kind = 'selection_answer' AND prompt_id IS NULL)))
+    OR
+    (kind IN ('retreat', 'resume', 'abandon')
+      AND operation_ref IS NOT NULL AND attempt_ref IS NULL
+      AND study_item_id IS NULL AND prompt_id IS NULL AND chosen_id IS NULL
+      AND correct IS NULL AND recovery_phase IS NULL AND response_duration_ms IS NULL)
+  ),
+  UNIQUE (challenge_id, seq)
+);
+
+CREATE UNIQUE INDEX recall_challenge_events_attempt_idempotency
+  ON recall_challenge_events (challenge_id, attempt_ref)
+  WHERE attempt_ref IS NOT NULL;
+
+CREATE UNIQUE INDEX recall_challenge_events_operation_idempotency
+  ON recall_challenge_events (challenge_id, operation_ref)
+  WHERE operation_ref IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
 -- Operation-agnostic run-stage timeline (ADR-0029). ONE shared
 -- pair of tables describes the sub-stage timeline for ALL THREE operations
 -- (extraction, minting, enrichment + study-items) so progress and the

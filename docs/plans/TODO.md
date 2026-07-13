@@ -10,11 +10,62 @@
   [ready plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) before Guardian builds new
   native surfaces on the same UI kit.
 
-- **Crystal Guardian Challenges (ready).** Implement the accepted
+- **Crystal Guardian Challenges (IN PROGRESS — U1–U3 shipped 2026-07-13, U4–U7 remain).**
+  Implement the accepted
   [requirements](../brainstorms/2026-07-13-crystal-guardian-challenges-requirements.md) through the
-  [ready plan](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md): durable Leg and Expedition
-  retrieval challenges earn permanent crystal formations, preserve neutral mastery, and hard-replace
-  the redundant Crystal Duel path.
+  [ready plan](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md). **Done this session
+  (server side, uncommitted working tree):**
+  - **U1** — pure module `packages/application/src/recallChallenge.ts`: KTD5 coverage-first
+    lineup selection (anchor reservation, distinct concepts / distinct Legs before repeats,
+    least-exposure rank + FNV challenge-identity tie-break, 5/7 maxima, empty = unavailable),
+    KTD6 combat fold (3-segment miss buffer, queue-ward rotation, Last Stand restore-exactly-one,
+    Matching one-miss-per-dirty-round with `roundIndex` reshuffle key and mid-board resume,
+    out-of-turn events ignored), `latestCorrectStudyItemIds` eligibility fold, key-free
+    discriminated `RecallChallengeView` (reuses `studyItemToView`), and `RecallAnswerFeedback`.
+    Key resolution was extracted to persistence-neutral `keyedCorrectIdFor`/`keyedMatchIdFor` in
+    `gradedSelectionOutcome.ts`; `gradeStudyResponse` now consumes them (KTD4 share-semantics-
+    not-write-path). 24 table-driven tests.
+  - **U2** — `RecallChallengeStorePort` (+ record/event types) in `@lrnki/ports`; three tables in
+    the single initial migration (`recall_challenges` with the one-active-per-scope partial
+    unique, immutable `recall_challenge_lineup` FK'd to `study_items` PK so lineups survive
+    supersession, `recall_challenge_events` with per-kind CHECK shapes, bounded
+    `response_duration_ms`, and attempt/operation-ref idempotency partial uniques);
+    `PostgresLearnerRecallChallengeStore` (row-locked `appendEvent` with expectedSeq
+    serialization → appended/duplicate/stale/conflict, duplicate checked BEFORE the status gate
+    so a replayed final-ward answer reads as its committed self, `hydrateLineupItems` without the
+    superseded filter via the extracted `hydrateStudyItemRows`). 7 integration tests incl. the
+    `response_log`-untouched assertion. The three tables were ALSO applied incrementally to the
+    current shared dev DB (no hard reset yet — Gate A owns that).
+  - **U3** — `createRecallChallenge(deps)` deep-module factory (scopeStatus / create / read /
+    answerSelection / answerMatchingPair / retreat / resume / abandon; scope = section milestone
+    or enrichment summit via `deriveFlooredExpedition`; enrichment scope `locked` until every Leg
+    won; state-edge lifecycle no-ops so polling can't inflate events; duplicate attempt replays
+    the committed view with `feedback: null`), bound once in
+    `apps/learner-api/src/recallChallenge.ts` and exposed as typed `/challenge/*` routes
+    (UUID/zod bounds, 404/409/422 mapping). DB-gated end-to-end API test drives
+    create → 3 misses → Last Stand → retreat/resume → recovery win → idempotent replay →
+    summit unlock → rematch → abandon, asserting no `isCorrect` on the wire and `response_log`
+    count identical.
+  **Validation this session:** workspace typecheck green; lint 0 errors (9 pre-existing
+  warnings); tests green everywhere (application 658, learner-api 20 incl. the live-DB E2E,
+  infrastructure-postgres 83/84 — the ONE failure is the PRE-EXISTING scaffold-store global
+  `claimNextGenerating` test colliding with a real learner's ready detour in the dirty shared
+  DB, known since 2026-07-12; a fresh migration clears it), learner-app 149, admin-lab 62.
+  **Remaining for the next session, in order:**
+  1. **Rule-14 Gate A** (plan "Gate A"): hard-reset the shared DB, re-run `pnpm db:migrate`,
+     generate a fresh production Topic Expedition, play acquisition to eligibility, then drive
+     the authenticated `/challenge/*` API through every item type, miss/retreat/resume/recovery/
+     victory; inspect lineup/events/projection and the `response_log`+mastery+points checksum.
+     Evidence under `tmp/2026-07-13-crystal-guardian-challenges/`.
+  2. **U4** — thread `RecallScopeStatus` (already exported) into the Study Session/trail
+     projection + `/expedition/:id` payload; derive Leg fusion / summit keystone ONLY from won
+     scopes (KTD3); keep the neutral mastery fold provably unchanged.
+  3. **U5–U6** — Guardian fight surface + arrival/trail/formation/summit integration. BLOCKED on
+     the [native parity fix plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) (run it
+     first; it is still ready and unstarted).
+  4. **U7** — hard-delete Crystal Duel (code, routes, `duel_win` award/badge, migration enum,
+     vocabulary; keep weekly podium + rival simulation), consolidate docs (CONTEXT.md, affected
+     ADRs), run Gate B, then close the plan + brainstorm lifecycle per `docs/plans/README.md`.
 
 ### Evidence-triggered follow-up
 

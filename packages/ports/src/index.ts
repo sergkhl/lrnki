@@ -907,6 +907,126 @@ export interface ScaffoldDetourStorePort {
 // steps carry only the referenced neutral node id (no payload).
 export type ScaffoldGeneratedPayload = ScaffoldNodePayload;
 
+// ---------------------------------------------------------------------------
+// Recall Challenge persistence (plan 2026-07-13-003, KTD2). One challenge row per attempt,
+// an IMMUTABLE ordered lineup of neutral Study Item references, and append-only idempotent
+// events. Status is materialized on the challenge row for indexed queries, but the lineup +
+// ordered events are the replayable authority for the miss buffer, unresolved queue, recovery
+// mode, and resume state — the application fold re-derives combat state on every read.
+// Challenge answers NEVER touch `response_log` (KTD4): this store is the only write surface.
+// ---------------------------------------------------------------------------
+
+export type RecallChallengeScopeKind = "section" | "enrichment";
+export type RecallChallengeStatus = "active" | "won" | "abandoned";
+
+export type RecallChallenge = {
+  challengeId: string;
+  learnerStateRef: string;
+  enrichmentId: string;
+  scopeKind: RecallChallengeScopeKind;
+  // Stable scope identity: the section milestone node or the enrichment summit node — never a
+  // mutable section ordinal (KTD2).
+  scopeAnchorDerivedNodeId: string;
+  status: RecallChallengeStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RecallChallengeLineupEntry = {
+  lineupIndex: number;
+  studyItemId: string;
+  derivedNodeId: string;
+};
+
+// One graded answer event: a selection answer (option-select / impostor) or a single Matching
+// pair attempt. `correct` is resolved server-side at append time; `recoveryPhase` records the
+// phase the challenge was in when answered (observability — the fold re-derives it).
+// `responseDurationMs` is bounded, client-observed, untrusted evidence (KTD8).
+export type RecallChallengeAnswerEvent = {
+  seq: number;
+  kind: "selection_answer" | "matching_pair";
+  attemptRef: string;
+  studyItemId: string;
+  // Matching pair attempts key promptId → chosenId (the chosen matchId); selection answers
+  // carry the chosen option/statement id with `promptId` null.
+  promptId: string | null;
+  chosenId: string;
+  correct: boolean;
+  recoveryPhase: boolean;
+  responseDurationMs: number | null;
+};
+
+export type RecallChallengeLifecycleEvent = {
+  seq: number;
+  kind: "retreat" | "resume" | "abandon";
+  operationRef: string;
+};
+
+export type RecallChallengeEvent = RecallChallengeAnswerEvent | RecallChallengeLifecycleEvent;
+
+export type NewRecallChallengeEvent =
+  | Omit<RecallChallengeAnswerEvent, "seq">
+  | Omit<RecallChallengeLifecycleEvent, "seq">;
+
+export type RecallChallengeRecord = {
+  challenge: RecallChallenge;
+  lineup: RecallChallengeLineupEntry[];
+  events: RecallChallengeEvent[];
+};
+
+export type AppendRecallEventResult = "appended" | "duplicate" | "stale" | "conflict";
+
+export interface RecallChallengeStorePort {
+  // Create the challenge row + immutable lineup atomically. `created: false` means an active
+  // challenge already exists for this learner/scope (the partial-unique conflict) — the caller
+  // resumes that one instead.
+  create(input: {
+    challengeId: string;
+    learnerStateRef: string;
+    enrichmentId: string;
+    scopeKind: RecallChallengeScopeKind;
+    scopeAnchorDerivedNodeId: string;
+    lineup: { studyItemId: string; derivedNodeId: string }[];
+  }): Promise<{ created: boolean }>;
+  // Owner-scoped full record load (challenge + ordered lineup + seq-ordered events).
+  getForLearner(input: { challengeId: string; learnerStateRef: string }): Promise<RecallChallengeRecord | undefined>;
+  getActiveForScope(input: {
+    learnerStateRef: string;
+    enrichmentId: string;
+    scopeKind: RecallChallengeScopeKind;
+    scopeAnchorDerivedNodeId: string;
+  }): Promise<RecallChallengeRecord | undefined>;
+  // Thin challenge rows for scope-status projection (active + won per enrichment).
+  listForLearnerEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<RecallChallenge[]>;
+  // Serialized event append (KTD2): lock the challenge row, verify ownership + `active` status
+  // and that `expectedSeq` is exactly the next sequence, insert the event, and materialize an
+  // optional terminal status in the SAME transaction. `duplicate` = this attemptRef/operationRef
+  // already committed (the caller replays the committed view); `stale` = the sequence moved on
+  // (caller reloads and re-validates the turn); `conflict` = not owned or not active.
+  appendEvent(input: {
+    challengeId: string;
+    learnerStateRef: string;
+    expectedSeq: number;
+    event: NewRecallChallengeEvent;
+    materializeStatus?: "won" | "abandoned";
+  }): Promise<AppendRecallEventResult>;
+  // Prior lineup-membership count per study item across ALL of this learner's challenges for
+  // the enrichment — the KTD5 least-exposure selection rank input.
+  priorExposure(input: { learnerStateRef: string; enrichmentId: string }): Promise<Record<string, number>>;
+  // First-victory scope facts for reward projection (KTD3): the won challenge IS the formation
+  // record; projection collapses any repeat win to the one permanent formation.
+  listWonScopes(input: { learnerStateRef: string; enrichmentId: string }): Promise<{
+    scopeKind: RecallChallengeScopeKind;
+    scopeAnchorDerivedNodeId: string;
+    challengeId: string;
+  }[]>;
+  // Hydrate the lineup's referenced Study Items INCLUDING superseded generations (KTD4): a
+  // durable lineup stays resumable across bank regeneration because the FK identity survives.
+  // Restricted to items this challenge's lineup references — normal session projections still
+  // select only current bank items.
+  hydrateLineupItems(input: { challengeId: string }): Promise<StudyItem[]>;
+}
+
 // Calibration Verdict persistence (R10, KTD1). The MUTABLE counterpart to the
 // append-only Response Log: `upsert` writes the current `known`/`learn` intent per
 // (learner, node), overwriting any prior verdict for that node (one row, never two);
