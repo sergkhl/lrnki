@@ -1,7 +1,7 @@
 # Keep the Learner App in flow through mastery-aligned game UX
 
-Status: Accepted. Amended 2026-07-11 (plan 2026-07-10-003) with the app-owned interaction system,
-overlay, motion, and haptic contract.
+Status: Accepted. Amended 2026-07-11 with the app-owned interaction system, overlay, motion, and
+haptic contract; amended 2026-07-12 with learner-requested Scaffold Detour support.
 
 ## Decision
 
@@ -78,8 +78,8 @@ the Derived Graph Layer, or the neutral Study Item Bank.
 The support ladder governs *automatic* interventions. A learner may also *explicitly request* support
 on demand for an unfamiliar term through a quiet Explorable Term action; that request starts a
 **Scaffold Detour** immediately without climbing the ladder, because the learner has already named
-the gap. This is a one-level, optional detour bounded by its own Flow design gate (recorded in plan
-2026-07-12-002) and stays inside the same neutral boundary — it earns no crystals, points, or base
+the gap. This is a one-level, optional detour that passed the Flow design gate below like any other
+mechanic and stays inside the same neutral boundary — it earns no crystals, points, or base
 progress and never becomes neutral graph knowledge. Its durable persistence, exact-reuse rule, and
 scoped-response identity are owned by
 [ADR-0037](0037-persist-learner-scoped-scaffold-detours.md).

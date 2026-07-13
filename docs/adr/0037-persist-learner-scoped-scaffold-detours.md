@@ -1,6 +1,6 @@
 # 0037 — Persist learner-scoped Scaffold Detours outside the neutral graph
 
-Date: 2026-07-12. Status: accepted. Origin: plan 2026-07-12-002.
+Date: 2026-07-12. Status: accepted.
 
 ## Decision
 

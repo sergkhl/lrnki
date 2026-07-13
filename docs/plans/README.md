@@ -12,10 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- None currently. Candidate 3 of the
-  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md)
-  (Topic Expedition generation behind its lifecycle interface) remains unplanned; see
-  [TODO.md](./TODO.md).
+- None currently. The
+  [2026-07-11 architecture review](../brainstorms/2026-07-11-architecture-deepening-review.md) is
+  fully implemented (all four candidates completed by 2026-07-13); see [TODO.md](./TODO.md).
 
 ## Ownership rules
 

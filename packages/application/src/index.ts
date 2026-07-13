@@ -40,7 +40,11 @@ export {
   type ScaffoldGroundResult,
   type ScaffoldGenerationOutcome
 } from "./learnerScaffoldGeneration";
-export { generateTopicExpedition } from "./generateTopicExpedition";
+export {
+  createTopicExpeditionGeneration,
+  type TopicExpeditionGeneration,
+  type TopicExpeditionRequest
+} from "./generateTopicExpedition";
 export {
   registerLearner,
   enterLearnerSession,

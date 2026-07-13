@@ -1,6 +1,8 @@
 # Architecture deepening review
 
-Date: 2026-07-11
+Date: 2026-07-11. Status: **fully implemented 2026-07-13** — all four candidates completed
+(outcomes in [TODO.md](../plans/TODO.md)). Kept as the record of this review's rejected findings
+(the "Not promoted to candidates" ledger below); do not re-propose them.
 
 Legend: a solid box is a **module**; a dashed arrow crosses a **seam**; a thick dark box is the
 proposed **deep** module. Recommendation strengths are `Strong`, `Worth exploring`, or
@@ -117,6 +119,12 @@ candidate builds on; do not create a competing definition of catalog scope.
 
 ## Candidate 3 — Deepen Topic Expedition generation behind its lifecycle interface
 
+**COMPLETED 2026-07-13** via plan 2026-07-13-001 (plan deleted per the completed-plan
+convention; consolidated outcome and gate evidence in [TODO.md](../plans/TODO.md)).
+`createTopicExpeditionGeneration` is the one factory-bound callable lifecycle interface,
+production-bound once per learner API process, with the rule-14 concurrent fresh-topic gate
+recorded PASS under `tmp/2026-07-13-topic-expedition-generation-module/`.
+
 **Recommendation strength: Strong**  
 **Dependency category: in-process**
 
@@ -192,6 +200,11 @@ hypothetical adapters.
 
 ## Candidate 4 — Let the Study Session own Expedition Trail stop completion
 
+**COMPLETED 2026-07-12** with the Adaptive Learner Scaffold Detours work (outcome in
+[TODO.md](../plans/TODO.md)): `buildTrailView`/`resolveStopActivity` moved into
+`@lrnki/application/projection`, the Learner App's `trailView.ts`/`activityProgress.ts` were
+deleted, and the Study Session projection is the single trail authority.
+
 **Recommendation strength: Strong**  
 **Dependency category: in-process**
 
@@ -200,11 +213,10 @@ hypothetical adapters.
 - [`studySessionProjection.ts`](../../packages/application/src/studySessionProjection.ts), which
   owns the completion rule but exposes raw lesson-read and latest-outcome maps (currently lines
   282–337 and 390–433)
-- [`trailView.ts`](../../apps/learner-app/src/learn/trailView.ts), which reconstructs theory,
-  activity, and capstone stops, their completion, section progress, the next stop, and crystal
-  growth (currently lines 75–198)
-- [`activityProgress.ts`](../../apps/learner-app/src/learn/activityProgress.ts), which recomputes the
-  whole trail to resolve one capstone
+- `apps/learner-app/src/learn/trailView.ts` (deleted), which reconstructed theory, activity, and
+  capstone stops, their completion, section progress, the next stop, and crystal growth
+- `apps/learner-app/src/learn/activityProgress.ts` (deleted), which recomputed the whole trail to
+  resolve one capstone
 - [`ActivitySheet.tsx`](../../apps/learner-app/src/components/ActivitySheet.tsx), which checks the
   same completion primitives again for its indicator (currently lines 326–345)
 - the shipped event-bound mastery motion (plan 2026-07-10-003, completed 2026-07-11) now reads these
@@ -289,6 +301,6 @@ interface rather than leave them reading raw maps.
 
 ## Top recommendation
 
-Candidate 1 (the original top recommendation) is completed. Of the remaining candidates,
-**Candidate 2 — Make the Learner Journal a finished application projection** is the strongest
-next seam; Candidates 3 and 4 stay behind it per their dependency notes above.
+All four candidates are completed (Candidate 1 on 2026-07-11, Candidates 2 and 4 on 2026-07-12,
+Candidate 3 on 2026-07-13). This review has no remaining recommendation; only the rejected-findings
+ledger above stays live.

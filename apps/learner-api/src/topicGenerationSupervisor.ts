@@ -1,8 +1,14 @@
-import { operationStaleBefore } from "@lrnki/application";
+import { operationStaleBefore, type TopicExpeditionGeneration } from "@lrnki/application";
 import { PostgresLearnerExpeditionStore, PostgresRunProgressReporter } from "@lrnki/infrastructure-postgres";
 import { sharedSql } from "./db";
 import { createGenerationSupervisor } from "./generationSupervisor";
-import { generateLearnerTopicExpedition } from "./learnerGeneration";
+import { createLearnerTopicExpeditionGeneration } from "./learnerGeneration";
+
+// Process-lived generation callable (plan 2026-07-13-001 KTD5): constructed lazily on the
+// first claimed row — not at module import, so DB-free route imports never touch
+// `sharedSql()` or neural client construction — then reused across the supervisor's
+// concurrent claims. Per-expedition state lives inside each call.
+let topicGeneration: TopicExpeditionGeneration | undefined;
 
 const SUPERVISOR_INTERVAL_MS = 15 * 1000;
 const MAX_GENERATION_ATTEMPTS = 3;
@@ -31,11 +37,14 @@ const supervisor = createGenerationSupervisor({
       staleBefore: operationStaleBefore(),
       maxAttempts: MAX_GENERATION_ATTEMPTS
     }),
-  run: (claimed) =>
-    generateLearnerTopicExpedition(
-      { learnerExpeditionId: claimed.learnerExpeditionId, topic: claimed.title, declaredDomain: claimed.declaredDomain },
-      sharedSql()
-    )
+  run: (claimed) => {
+    topicGeneration ??= createLearnerTopicExpeditionGeneration(sharedSql());
+    return topicGeneration({
+      learnerExpeditionId: claimed.learnerExpeditionId,
+      topic: claimed.title,
+      declaredDomain: claimed.declaredDomain
+    });
+  }
 });
 
 export function startTopicGenerationSupervisor(): void {

@@ -140,6 +140,11 @@ by the Knowledge-Boundary Probe. Its lifecycle and asserted-graph boundaries are
 [ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
 _Avoid_: synthetic Grounding Origin, asserted synthetic concept, curated-source treatment of generated text
 
+**Topic Expedition**:
+A learner-owned expedition created from a requested topic, backed when ready by one Synthetic Topic
+Generation Derived Graph Layer and its Study Item Bank.
+_Avoid_: Learner Expedition, synthetic pipeline, source-grounded expedition
+
 **Synthetic Concept**:
 A `synthetic_primary` `llm_grounded` Enrichment Node — a first-class topic concept produced by
 Synthetic Topic Generation and grounded by a Generated Grounding Bundle that cites no source. Its
@@ -225,9 +230,9 @@ _Avoid_: generated prerequisite, personalized Concept Lesson, Study Item Bank it
 
 **Scaffold Detour**:
 A durable learner-owned support branch under one parent node of a Derived Graph Layer, identified by
-learner, enrichment, parent node, and normalized term. It holds one to three ordered Support Steps,
-moves through exactly four lifecycle states (`generating`, `ready`, `failed`, `hidden`), and never
-feeds neutral mastery, prerequisite gating, or rewards.
+learner, enrichment, parent node, and normalized term. It holds one to three ordered Support Steps
+and never feeds neutral mastery, prerequisite gating, or rewards; its lifecycle states and atomic
+publication are owned by [ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
 _Avoid_: sub-expedition, generated prerequisite edge, second trail
 
 **Support Step**:
