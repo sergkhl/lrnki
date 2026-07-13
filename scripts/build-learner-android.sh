@@ -8,6 +8,19 @@ cd "$(dirname "$0")/.."
 
 PROFILE="${1:-preview}"
 
+# Gradle/AGP for this Expo SDK requires JDK 17 (same as CI). Newer JDKs break the
+# androidJdkImage jlink transform and trip JDK 24+ native-access restrictions.
+if [ "$(uname)" = "Darwin" ]; then
+  JAVA_HOME="$(/usr/libexec/java_home -v 17 2>/dev/null)" \
+    || { echo "JDK 17 not found. Install it: brew install --cask temurin@17" >&2; exit 1; }
+  export JAVA_HOME
+fi
+java_major="$("${JAVA_HOME:+$JAVA_HOME/bin/}java" -version 2>&1 | sed -nE 's/.*version "([0-9]+).*/\1/p')"
+if [ "$java_major" != "17" ]; then
+  echo "Expected JDK 17 on PATH or JAVA_HOME, found ${java_major:-none}." >&2
+  exit 1
+fi
+
 # EXPO_TOKEN: repo-root .env wins when it defines one, else the environment.
 if [ -f .env ]; then
   token="$(grep -E '^EXPO_TOKEN=' .env | tail -n 1 | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//' || true)"
