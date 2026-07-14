@@ -1,7 +1,8 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
-import { Text as RNText } from "react-native";
+import { createRef } from "react";
+import { Text as RNText, type View as ViewType } from "react-native";
 import { Button, IconButton, PressableSurface } from "./actions";
 
 beforeEach(() => {
@@ -18,10 +19,33 @@ test("an enabled PressableSurface enters pressed state on press-in and fires onc
   const surface = screen.getByTestId("surface");
   await fireEvent(surface, "pressIn");
   expect(screen.getByText("pressed")).toBeTruthy();
+  expect(surface.props.className).toContain("bg-muted-panel");
   await fireEvent(surface, "pressOut");
   await fireEvent.press(surface);
   expect(screen.getByText("idle")).toBeTruthy();
+  expect(screen.getByTestId("surface").props.className).not.toContain("bg-muted-panel");
   expect(onPress).toHaveBeenCalledTimes(1);
+});
+
+test("keeps caller layout styles static while scale remains an opaque animated entry", async () => {
+  const ref = createRef<ViewType>();
+  const dimensions = { width: 72, height: 72 };
+  await render(
+    <PressableSurface ref={ref} testID="surface" accessibilityLabel="Checkpoint" style={dimensions} onPress={() => {}}>
+      <RNText>checkpoint</RNText>
+    </PressableSurface>
+  );
+
+  const surface = screen.getByTestId("surface");
+  expect(surface.props.style[0]).toBe(dimensions);
+  expect(surface.props.style[1]).toEqual({ transform: [{ scale: 1 }] });
+  expect(surface.props.accessibilityState).toEqual({
+    disabled: false,
+    busy: false,
+    selected: undefined,
+    expanded: undefined
+  });
+  expect(ref.current).toBeTruthy();
 });
 
 test("a disabled surface announces disabled state and never invokes action or haptic", async () => {

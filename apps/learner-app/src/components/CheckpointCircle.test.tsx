@@ -26,8 +26,12 @@ test("the guided next stop carries its label and opens on press", async () => {
   const next = concept.stops.find((stop) => stop.isNext)!;
   const onSelect = jest.fn();
   await render(<CheckpointCircle stop={next} concept={concept} onSelect={onSelect} />);
-  await fireEvent.press(screen.getByLabelText(/Field notes/));
+  const circle = screen.getByLabelText(/Field notes/);
+  await fireEvent.press(circle);
   expect(onSelect).toHaveBeenCalledWith(next.stopId);
+  expect(circle.props.className).toContain("rounded-full");
+  expect(circle.props.style[0]).toEqual({ width: 72, height: 72 });
+  expect(circle.props.style[1]).toEqual({ transform: [{ scale: 1 }] });
   // The next stop shows its kind label under the circle.
   expect(screen.getByText("Field notes")).toBeTruthy();
 });

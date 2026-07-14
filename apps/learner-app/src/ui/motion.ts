@@ -2,25 +2,52 @@
 // duration here, and every animated surface consults the SAME reduced-motion source.
 // Reduced motion swaps presentation only — state transitions and completion callbacks
 // never ride on an animation finishing.
-import { type ComponentType } from "react";
-import Animated, { useReducedMotion as useReanimatedReducedMotion } from "react-native-reanimated";
+import {
+  createElement,
+  forwardRef,
+  type ComponentPropsWithRef,
+  type ElementType,
+  type ForwardRefExoticComponent,
+  type PropsWithoutRef,
+  type RefAttributes
+} from "react";
+import { type StyleProp, type View, type ViewStyle } from "react-native";
+import Animated, { type AnimatedStyle, useReducedMotion as useReanimatedReducedMotion } from "react-native-reanimated";
 import { styled } from "nativewind";
 
-// Animated components are third-party surfaces, so they pass className through NativeWind v5's
-// supported Reanimated 4 bridge instead of relying on v4's global JSX interop registry. Keep
-// every animated class-bearing surface on this export. Pass-through preserves Reanimated's opaque
-// animated-style handles without NativeWind recursively inspecting their shared values during render.
-export function styleAnimatedComponent<Component extends ComponentType<never>>(component: Component): Component {
-  return (
-    styled as unknown as (
-      candidate: Component,
-      mapping: { className: "style" },
-      options: { passThrough: true }
-    ) => Component
-  )(component, { className: "style" }, { passThrough: true });
+type StyledAnimatedProps<Component extends ElementType> = Omit<ComponentPropsWithRef<Component>, "className" | "style"> &
+  Readonly<{
+    className?: string;
+    style?: StyleProp<ViewStyle>;
+    animatedStyle?: AnimatedStyle<ViewStyle>;
+  }>;
+
+type StyledAnimatedComponent<Component extends ElementType> = ForwardRefExoticComponent<
+  PropsWithoutRef<StyledAnimatedProps<Component>> & RefAttributes<View>
+>;
+
+// NativeWind resolves className plus ordinary inline style on the outer wrapper. The bridge keeps
+// Reanimated's opaque handle out of that resolver, then combines both entries only at the terminal
+// animated component. Static styles therefore retain normal NativeWind precedence while worklets
+// exclusively own the dynamic properties they return.
+export function createStyledAnimatedComponent<Component extends ElementType>(
+  component: Component
+): StyledAnimatedComponent<Component> {
+  type Props = StyledAnimatedProps<Component>;
+
+  const SplitStyleBridge = forwardRef<View, Props>(function SplitStyleBridge(incomingProps, ref) {
+    const { animatedStyle, style: resolvedStaticStyle, ...rest } = incomingProps as Props;
+    return createElement(component, {
+      ...rest,
+      ref,
+      style: [resolvedStaticStyle, animatedStyle]
+    } as ComponentPropsWithRef<Component>);
+  });
+
+  return styled(SplitStyleBridge) as unknown as StyledAnimatedComponent<Component>;
 }
 
-export const AnimatedView = styleAnimatedComponent(Animated.View);
+export const AnimatedView = createStyledAnimatedComponent(Animated.View);
 
 /** Durations in ms. `press` is the press-in acknowledgement; `standard` covers
  * disclosures and small layout reveals; `overlay` is dialog/sheet entrance;

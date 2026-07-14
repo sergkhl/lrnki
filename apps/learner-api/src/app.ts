@@ -153,7 +153,8 @@ export function createLearnerApp(sql: DatabaseClient) {
       origin: (origin) => {
         const allowed = new Set([
           process.env.LEARNER_WEB_ORIGIN ?? "https://lrnki.globesoul.com",
-          "http://localhost:8081"
+          "http://localhost:8081",
+          "http://localhost:3000"
         ]);
         return allowed.has(origin) ? origin : null;
       },

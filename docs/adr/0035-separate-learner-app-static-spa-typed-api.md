@@ -1,7 +1,7 @@
 # 0035 — Separate the Learner App into a universal Expo app over a typed learner API
 
-Date: 2026-07-08, amended 2026-07-10 (universal Expo cutover) and 2026-07-11 (app-owned interaction
-system). Status: accepted.
+Date: 2026-07-08, amended 2026-07-10 (universal Expo cutover), 2026-07-11 (app-owned interaction
+system), and 2026-07-14 (static/animated style boundary). Status: accepted.
 
 ## Decision
 
@@ -61,8 +61,11 @@ runbook; the single shared environment during testing is
   contract defined in
   [ADR-0032](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md); the learner-surface
   boundary is lint-enforced in the root ESLint config.
-- Reanimated-wrapped components (`Animated.View`, animated pressables) are **not** auto-registered
-  with NativeWind, so their `className` is silently dropped on every platform unless registered via
-  `cssInterop`. This is invisible to Jest (className props are inert in tests by design), so it is
-  catchable only in a browser pass — one more reason the rule-14 web gate, not the test suite, is
-  the styling-correctness authority for this app.
+- Class-bearing animated surfaces use the app-owned split bridge in `src/ui/motion.ts`: NativeWind's
+  `styled` wrapper resolves `className` and static inline `style` on a ref-forwarding component, and
+  that component appends the opaque Reanimated `animatedStyle` handle only at the terminal animated
+  view or pressable. This preserves class shells and static overrides without letting the CSS
+  resolver inspect shared values during React render. `passThrough`, duplicated consumer inline
+  styles, dependency patches, and Reanimated warning suppression are not part of this boundary.
+  Jest locks the bridge shape and prop/ref contracts; web and physical Android inspection remain
+  the styling and runtime-warning authority.

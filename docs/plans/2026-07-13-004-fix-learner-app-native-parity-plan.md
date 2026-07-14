@@ -2,7 +2,7 @@
 title: Learner App Native and Web Parity Fix - Plan
 type: fix
 date: 2026-07-13
-deepened: 2026-07-13
+deepened: 2026-07-14
 artifact_contract: ce-unified-plan/v1
 artifact_readiness: implementation-ready
 product_contract_source: user-reported-device-pass
@@ -16,7 +16,7 @@ execution: code
 - **Objective:** Make the Android Learner App render and behave like the proven web build across checkpoint geometry, motion, dialogs, concept headers, and every button affordance, including the `Set out` and `Plan a new expedition` calls to action.
 - **Authority:** Follow [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) for the app-owned interaction system and [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md) for the single universal rendering layer.
 - **Execution profile:** Diagnose at the shared `src/ui/` boundary first, then fix the smallest root cause that restores every reported native symptom without regressing web.
-- **Stop conditions:** Stop and re-plan before adding consumer-specific platform forks, changing learner API or persisted contracts, or carrying a full NativeWind v5 migration without evidence that the supported v4 line cannot work with Expo SDK 57.
+- **Stop conditions:** Stop and re-plan before adding consumer-specific platform forks, changing learner API or persisted contracts, suppressing Reanimated strict warnings, or changing the pinned styling/motion dependencies without evidence that the shared split boundary cannot work.
 - **Tail ownership:** Finish with a physical Android preview-build pass, a web regression pass, the required real-use quality gate, and consolidation in `docs/plans/TODO.md`, `docs/plans/BLOCKERS.md`, and `docs/plans/README.md`.
 
 ---
@@ -38,12 +38,16 @@ The new observations sharpen the failure boundary.
 Outline and secondary buttons retain readable dark labels but lose their container affordance, making them look like links.
 This is consistent with NativeWind styles being dropped from the shared animated press surface while nested text styling survives.
 
+The subsequent strict-log reproduction exposed the other half of the same boundary defect.
+Styling `Animated.*` directly resolves classes but lets `react-native-css` recursively inspect an opaque Reanimated style handle during render, producing `Reading from value during component render` warnings.
+Using `passThrough` keeps that handle opaque but leaves classes unresolved because the animated component is the terminal surface.
+
 ### Requirements
 
 **Trail and overlay presentation**
 
 - R1. Android renders checkpoint nodes as bordered circles with the guided-next halo.
-- R2. Android plays press, entrance, halo, and disclosure motion while reduced-motion users receive settled visible states immediately.
+- R2. Android plays press, entrance, halo, and disclosure motion without render-time shared-value warnings, while reduced-motion users receive settled visible states immediately.
 - R3. Android dialogs show their header, body, and reachable actions, with long content scrolling on a small viewport.
 - R4. Android concept headers render as one row with the label left and the glyph and chevron right.
 
@@ -91,36 +95,36 @@ This is consistent with NativeWind styles being dropped from the shared animated
 | S7 | Simple white buttons look like links. | Outline and secondary variants keep dark nested labels while their border, background, radius, size, padding, and alignment classes live on the affected animated press surface. |
 
 The symptoms are not independent.
-Every reported element is either an animated component or a consumer of the `cssInterop`-registered `AnimatedPressable` in `apps/learner-app/src/ui/actions.tsx`.
+Every reported element is either an animated component or a consumer of the shared styled/animated bridge in `apps/learner-app/src/ui/actions.tsx` and `apps/learner-app/src/ui/motion.ts`.
 
 ### Problem Class and Prior Art
 
-The established problem class is **NativeWind `className` interop silently dropping styles on Reanimated animated components on native**, with a related **NativeWind and Reanimated version/plugin misalignment** class that can also stop worklet execution:
+The established problem class is **CSS-in-JS resolution crossing an opaque animated-value boundary during React render**, with the earlier class-drop symptom caused by bypassing resolution at a terminal component. Recognized guidance is to resolve static styles separately and pass the `useAnimatedStyle` result directly to the animated component:
 
 - [reanimated#8329 — NativeWind classes not applied on Animated.View](https://github.com/software-mansion/react-native-reanimated/issues/8329)
 - [nativewind#1181 — classes not applied on Animated.View](https://github.com/nativewind/nativewind/issues/1181)
 - [nativewind#1709 — css-interop runtime and createAnimatedComponent refs](https://github.com/nativewind/nativewind/issues/1709)
 - [nativewind#785 — NativeWind, Reanimated, and worklets plugin compatibility](https://github.com/nativewind/nativewind/issues/785)
-- [NativeWind v5 migration guide](https://www.nativewind.dev/v5/guides/migrate-from-v4)
+- [NativeWind v5 `styled` API](https://www.nativewind.dev/v5/api/styled)
+- [Reanimated `useAnimatedStyle` guidance](https://docs.swmansion.com/react-native-reanimated/docs/core/useAnimatedStyle/)
 
-The repo pins Expo SDK 57, React Native 0.86 with the new architecture, `nativewind@4.2.6`, `react-native-reanimated@~4.5.0`, and `react-native-worklets@0.10.0` in `pnpm-workspace.yaml`.
-The conventional root-cause remedy is supported version and transform alignment at the shared boundary.
-A per-component inline-style workaround is a last resort and requires a rule-21 justification explaining why the conventional fix conflicts with this architecture.
+The repo pins Expo SDK 57, React Native 0.86 with the new architecture, `nativewind@5.0.0-preview.4`, `react-native-css@3.0.7`, `react-native-reanimated@4.5.0`, and `react-native-worklets@0.10.0` in `pnpm-workspace.yaml`.
+The conventional root-cause remedy is a shared static/animated separation boundary, not duplicated consumer inline styles or logger suppression.
 
 ### Established Facts and Active Hypotheses
 
 - **Established — stale artifact ruled out:** A full uninstall and rebuilt app reproduce S1-S7, so implementation must not spend a diagnosis cycle treating the installed APK as the likely cause.
-- **H-A — animated interop drop:** NativeWind fails to map `className` onto `AnimatedPressable` and possibly `Animated.View` on Android new architecture.
-  The split between invisible primary buttons and link-like outline buttons is strong supporting evidence because nested text colors survive while the shared shell disappears.
-- **H-B — worklets inactive:** Reanimated worklets do not execute in the native runtime because the reanimated/worklets/Babel plugin combination is misaligned.
-- **H-D — Yoga-only dialog collapse:** After H-A/H-B are fixed or ruled out, `DialogBody` may still collapse because its shrinkable scroll region is expressed for CSS rather than Yoga.
-- **H-E — native CSS-variable resolution loss:** If H-A does not explain all colors and radii, the `var(--...)` theme emitted from `apps/learner-app/tailwind.config.js` may not resolve on native.
+- **Established — direct animated wrapping crosses the opaque boundary:** `styled(Animated.*)` resolves classes but merges the Reanimated handle inside `react-native-css`, whose render-time traversal reaches shared-value getters and triggers strict warnings.
+- **Established — `passThrough` bypasses terminal resolution:** `passThrough` avoids that traversal but leaves class tokens unresolved because no later styled component exists, explaining the missing shells and geometry.
+- **H-C — worklets inactive:** If motion still fails after the split boundary, inspect native worklet execution without weakening strict logging or changing versions pre-emptively.
+- **H-D — Yoga-only dialog collapse:** After the shared split boundary is fixed, `DialogBody` may still collapse because its shrinkable scroll region is expressed for CSS rather than Yoga.
+- **H-E — native CSS-variable resolution loss:** If the split boundary does not explain all colors and radii, the `var(--...)` theme emitted from `apps/learner-app/tailwind.config.js` may not resolve on native.
 
 ### Key Technical Decisions
 
 - KTD1. **Accept the user's clean-install reproduction as evidence.** U1 starts with runtime inspection of the current failure instead of repeating uninstall/rebuild as a stale-artifact probe; development and preview builds remain necessary for fix iteration and final validation.
-- KTD2. **Fix the shared styling boundary before consumers.** If U1 confirms H-A/H-B, first align the supported NativeWind/Reanimated/worklets/Babel combination or correct its interop registration.
-  Consumer-specific styles are permitted only when a component has a separate proven layout defect.
+- KTD2. **Split static resolution from opaque animated styles at the shared boundary.** NativeWind `styled` targets a ref-forwarding bridge that receives `className` and static `style`; the bridge appends the separate `animatedStyle` handle only when rendering the terminal animated component.
+  Do not use `passThrough`, suppress Reanimated strict logging, patch dependencies, or duplicate semantic classes as consumer inline styles.
 - KTD3. **Button visibility is a system invariant.** A supported Android build may never render a primary button invisibly or degrade outline/secondary controls to indistinguishable bare links.
   The root fix must cover the central variant matrix and the two reported CTA consumers.
 - KTD4. **Entrance animation fails visible.** Overlay content must begin from or synchronously reach a visible structural state independent of worklet completion, so animation failure degrades to no entrance motion rather than no content.
@@ -131,14 +135,13 @@ A per-component inline-style workaround is a last resort and requires a rule-21 
 
 ```mermaid
 flowchart TB
-  A[NativeWind tokens and transforms] --> B[cssInterop on Reanimated surfaces]
-  B --> C[PressableSurface and Animated.View]
-  C --> D[Button variant shells]
-  C --> E[Checkpoint and concept surfaces]
-  C --> F[Overlay entrance and dialog anatomy]
-  D --> G[Signed-out Set out CTA]
-  D --> H[Signed-in Plan a new expedition CTA]
-  D --> I[Outline and secondary controls]
+  A[NativeWind classes plus static style] --> B[styled static resolver]
+  B --> C[Ref-forwarding split bridge]
+  D[Opaque Reanimated animatedStyle] --> C
+  C --> E[Terminal animated View or Pressable]
+  E --> F[Button variant shells]
+  E --> G[Checkpoint and concept surfaces]
+  E --> H[Progress halo and overlay motion]
 ```
 
 The shared boundary is authoritative.
@@ -146,8 +149,8 @@ Consumer checks prove reach, while fixes stay at the highest confirmed common ca
 
 ### Sequencing
 
-U1 determines whether U2 needs interop registration, dependency/config alignment, theme resolution, or a combination.
-U2 restores the static animated-surface shell before U3 evaluates worklet motion and before U4 isolates any remaining dialog-only Yoga defect.
+U1 determines whether U2 needs the shared split adapter alone or an additional proven theme/configuration correction.
+U2 restores the static animated-surface shell through the split bridge before U3 verifies warning-free worklet motion and before U4 isolates any remaining dialog-only Yoga defect.
 U5 validates the complete surface and consolidates documentation.
 
 ---
@@ -170,7 +173,7 @@ U5 validates the complete surface and consolidates documentation.
 - **Files:** Inspect `apps/learner-app/src/app/index.tsx`, `apps/learner-app/src/components/LearnerNameGate.tsx`, `apps/learner-app/src/components/ExpeditionEntry.tsx`, `apps/learner-app/src/components/PlanExpeditionSheet.tsx`, `apps/learner-app/src/ui/actions.tsx`, `apps/learner-app/src/ui/motion.ts`, `apps/learner-app/src/ui/overlays.tsx`, `apps/learner-app/babel.config.js`, `apps/learner-app/tailwind.config.js`, `apps/learner-app/package.json`, and `pnpm-workspace.yaml`; write evidence only under `tmp/2026-07-13-learner-app-native-parity/`.
 - **Approach:** On the current Android failure, use the accessibility tree or React Native inspector to distinguish an absent element from a visually invisible press surface for `Set out` and `Plan a new expedition`.
   If either CTA is absent from the accessibility tree, trace the session and `journal.data` render gates before changing the styling boundary.
-  Compare primary, secondary, and outline `Button`s against a plain styled `View`, then inspect press-scale and overlay entrance values to separate H-A from H-B.
+  Compare primary, secondary, and outline `Button`s against a plain styled `View`, then inspect press-scale and overlay entrance values to distinguish the shared style boundary from H-C.
   Investigate H-D only after the common styling and worklet failures are fixed or ruled out.
 - **Patterns to follow:** Keep temporary probes outside production routes and remove all probe-only code before U2 lands, following rules 10 and 18 in `AGENTS.md`.
 - **Test scenarios:**
@@ -186,17 +189,19 @@ U5 validates the complete surface and consolidates documentation.
 - **Requirements:** R1, R4-R8, R10; AE1-AE4.
 - **Dependencies:** U1.
 - **Files:** `apps/learner-app/src/ui/actions.tsx`, `apps/learner-app/src/ui/motion.ts`, `apps/learner-app/src/ui/actions.test.tsx`, `apps/learner-app/src/components/LearnerNameGate.test.tsx`, `apps/learner-app/src/components/PlanExpeditionSheet.test.tsx`, `apps/learner-app/src/components/CheckpointCircle.test.tsx`, `apps/learner-app/src/components/ConceptMarker.test.tsx`, and only the confirmed configuration or catalog files among `apps/learner-app/babel.config.js`, `apps/learner-app/tailwind.config.js`, `apps/learner-app/package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml`.
-- **Approach:** Apply KTD2 at `PressableSurface`, `Animated.View`, or the supported dependency/configuration seam identified by U1.
+- **Approach:** Apply KTD2 once in `createStyledAnimatedComponent`: NativeWind resolves `className` and static `style` on a ref-forwarding bridge, while the bridge renders the terminal animated component with `[resolvedStaticStyle, animatedStyle]`.
+  `PressableSurface` keeps its public static `style` contract and sends only its scale handle through `animatedStyle`; progress and halo consumers do the same.
   Treat the full button variant shell as one contract so background, border, radius, size, padding, alignment, pressed, disabled, and busy presentation cannot diverge independently.
-  If H-E is confirmed, repair native token resolution without adding a second token source.
+  Preserve refs, layout-animation props, accessibility state, and static-style precedence without `passThrough` or consumer forks.
 - **Execution note:** Start with assertions for the variant and CTA contracts, while keeping native inspection as the styling authority because Jest does not execute NativeWind interop.
 - **Patterns to follow:** Preserve the one app-owned component boundary in ADR-0032 and the catalog-owned dependency mapping in `pnpm-workspace.yaml`.
 - **Test scenarios:**
   1. Covers AE3. Render each `Button` variant and size; assert the semantic shell classes, accessible role/name, and stable busy/disabled behavior remain attached to its press surface.
   2. Covers AE1. Render `LearnerNameGate`; assert `Enter` and `Set out` are mounted as buttons and each still submits only its own intent under rapid presses.
   3. Covers AE2. Render `PlanExpeditionSheet`; assert `Plan a new expedition` is mounted as the trigger and opens the sheet before topic submission.
-  4. Render an available checkpoint and a concept disclosure; assert the interactive surfaces retain their accessible state and declared geometry/layout contract.
-  5. On Android, verify the two primary CTAs are visible and outline/secondary controls no longer resemble bare links; on web, verify the same screens remain unchanged.
+  4. Render an available checkpoint and a concept disclosure; assert the interactive surfaces retain their accessible state, refs, class shells, and declared geometry/layout contract.
+  5. Assert the styled wrapper targets the split bridge rather than `Animated.View` directly, and that static and animated styles reach the terminal component as separate entries for static-only, animated-only, combined, and layout-entrance-only surfaces.
+  6. On Android, verify the two primary CTAs are visible and outline/secondary controls no longer resemble bare links; on web, verify the same screens remain unchanged.
 - **Verification:** S1, S4-S7 pass on Android from the shared fix, the targeted component suites pass, and no consumer-specific platform style fork is introduced.
 
 ### U3. Restore native motion and fail-visible animated states
@@ -204,16 +209,17 @@ U5 validates the complete surface and consolidates documentation.
 - **Goal:** Restore worklet execution for S2 and ensure presentation remains visible when motion is unavailable.
 - **Requirements:** R2, R7, R8, R10; AE3-AE5.
 - **Dependencies:** U2.
-- **Files:** `apps/learner-app/src/ui/actions.tsx`, `apps/learner-app/src/ui/motion.ts`, `apps/learner-app/src/ui/overlays.tsx`, `apps/learner-app/src/ui/actions.test.tsx`, `apps/learner-app/src/ui/overlays.test.tsx`, `apps/learner-app/src/components/CheckpointCircle.test.tsx`, `apps/learner-app/src/components/ConceptMarker.test.tsx`, and, when H-B confirms transform/version changes, `apps/learner-app/babel.config.js`, `apps/learner-app/package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml`.
-- **Approach:** Align Reanimated, worklets, and Babel transforms when H-B is confirmed.
+- **Files:** `apps/learner-app/src/ui/actions.tsx`, `apps/learner-app/src/ui/motion.ts`, `apps/learner-app/src/ui/overlays.tsx`, `apps/learner-app/src/ui/actions.test.tsx`, `apps/learner-app/src/ui/overlays.test.tsx`, `apps/learner-app/src/components/CheckpointCircle.test.tsx`, `apps/learner-app/src/components/ConceptMarker.test.tsx`, and, when H-C confirms transform/version changes, `apps/learner-app/babel.config.js`, `apps/learner-app/package.json`, `pnpm-workspace.yaml`, and `pnpm-lock.yaml`.
+- **Approach:** Keep Reanimated strict logging enabled and verify the split boundary prevents render-time reads during repeated renders, presses, progress sweeps, halo emphasis, and overlay entrances.
+  Align Reanimated, worklets, and Babel transforms only if H-C remains after the boundary is proven.
   Make settled visibility structural for overlay entrances and preserve the shared reduced-motion policy so state transitions never depend on animation completion.
 - **Patterns to follow:** Use the event-bound motion and one reduced-motion source defined by ADR-0032.
 - **Test scenarios:**
-  1. Press an enabled control on Android and verify scale and surface feedback run once without moving layout.
+  1. Press an enabled control repeatedly on Android and verify scale and surface feedback run once per press without moving layout or logging a render-time shared-value read.
   2. Render a disabled or busy control and verify no worklet-driven press response or duplicate action occurs.
   3. Open an overlay with motion enabled and verify its entrance plays while content is visible throughout the transition.
   4. Enable reduced motion and verify checkpoint, disclosure, and overlay states render immediately in their settled visible form.
-- **Verification:** Press scale, guided-next halo, chevron rotation, and overlay entrance visibly run on Android, while reduced-motion and simulated non-running animation paths remain fully readable.
+- **Verification:** Press scale, progress sweep, guided-next halo, chevron rotation, and overlay entrance visibly run on Android with zero `Reading from value during component render` warnings, while reduced-motion and simulated non-running animation paths remain fully readable.
 
 ### U4. Restore Android dialog content and scrolling
 
@@ -237,7 +243,7 @@ U5 validates the complete surface and consolidates documentation.
 - **Requirements:** R1-R10; AE1-AE5.
 - **Dependencies:** U2, U3, U4.
 - **Files:** `docs/plans/TODO.md`, `docs/plans/BLOCKERS.md`, `docs/plans/README.md`, `docs/plans/2026-07-13-004-fix-learner-app-native-parity-plan.md`, and evidence under `tmp/2026-07-13-learner-app-native-parity/`.
-- **Approach:** Build the preview APK and run one real expedition through the signed-out gate, signed-in journal, trail, dialogs, press feedback, disclosure, reduced motion, haptics, and crystal growth.
+- **Approach:** Build the preview APK with strict logging unchanged and run one real expedition through the signed-out gate, signed-in journal, trail, dialogs, repeated press feedback, progress sweep, halo, disclosure, reduced motion, haptics, and crystal growth.
   Apply `.agents/skills/real-use-quality-evaluation/SKILL.md` after the behavior-changing milestone and stop downstream work if the learner experience is still unusable.
   Re-probe the equivalent web flows, then resolve or narrow the Android blocker and consolidate the validation outcome in the canonical planning docs.
 - **Patterns to follow:** Evidence belongs in gitignored `tmp/`; `docs/plans/TODO.md` owns the latest validation and `docs/plans/BLOCKERS.md` owns any remaining user action.
@@ -245,7 +251,7 @@ U5 validates the complete surface and consolidates documentation.
   1. Covers AE1. Fresh preview install starts at a registry gate with visible `Enter` and `Set out` controls; create and enter flows remain functional.
   2. Covers AE2. Authenticated journal shows `Plan a new expedition` with both empty and populated expedition lists; the trigger opens its sheet and creates a scouting request.
   3. Covers AE3. Primary, secondary, outline, compact, and icon buttons remain visibly button-like across gate, journal, trail, and dialogs.
-  4. Covers AE4 and AE5. A live expedition shows circular checkpoints, motion, single-row concept headers, and visible scrollable dialogs in normal-motion mode.
+  4. Covers AE4 and AE5. A live expedition shows circular checkpoints, motion, single-row concept headers, and visible scrollable dialogs in normal-motion mode with no render-time shared-value warnings.
   5. The same expedition remains readable and operable with reduced motion, and equivalent web flows show no regression.
 - **Verification:** Device screenshots or recordings cover every reported symptom, the real-use evaluation records concrete judgment, the Android blocker reflects the observed result, and superseded probe code or abandoned fixes are absent from the diff.
 
@@ -262,8 +268,8 @@ U5 validates the complete surface and consolidates documentation.
 | Android preview gate | `pnpm build:android` plus physical-device evidence | The distributable build satisfies AE1-AE5 after a fresh install. | U5 |
 | Real-use quality gate | `.agents/skills/real-use-quality-evaluation/SKILL.md` with evidence in `tmp/2026-07-13-learner-app-native-parity/` | The learner experience is useful and visually legible, not merely test-green. | U5 |
 
-Jest cannot prove native NativeWind interop or visual affordance because `apps/learner-app/babel.config.js` deliberately disables the NativeWind transform in the test environment.
-Green automated tests are necessary regression evidence, not completion evidence for this defect class.
+Jest does not execute NativeWind style resolution, but it does lock the split wiring, terminal style-array order, public props, refs, accessibility, and class contracts.
+Green automated tests remain necessary regression evidence, not completion evidence for native pixels or strict runtime logging.
 
 ---
 
@@ -271,8 +277,7 @@ Green automated tests are necessary regression evidence, not completion evidence
 
 - **Manual native observation:** Final physical-device evidence remains user-owned if the agent environment has no Android device or emulator.
   Batch manual work into one diagnosis checkpoint only if runtime inspection cannot proceed locally and one final preview gate.
-- **NativeWind v5 migration cascade:** A v5 migration would touch the whole styled app and must include a full-screen web and Android sweep.
-  Do not enter it until U1 proves the supported v4 line cannot restore the shared boundary.
+- **Pinned preview runtime:** The app already uses the NativeWind v5 preview and `react-native-css`; keep the pinned versions while validating the app-owned bridge so dependency churn does not obscure the boundary result.
 - **Upstream bug without a released fix:** A rule-21-recorded workaround may live in `apps/learner-app/src/ui/` only and must cover the full symptom ledger, not a single consumer.
 - **False confidence from accessibility-only tests:** A control can remain mounted and accessible while being visually invisible.
   Native screenshots or recordings must pair accessibility checks with visual inspection.
@@ -284,6 +289,7 @@ Green automated tests are necessary regression evidence, not completion evidence
 - U1 records a confirmed root-cause set and no longer treats a stale installed artifact as a live hypothesis.
 - U2 restores checkpoint geometry, concept-row layout, both reported CTAs, and the complete button-shell affordance through the shared UI-kit boundary.
 - U3 restores native motion and guarantees visible settled content when animation is reduced or unavailable.
+- Reanimated strict logging remains enabled and representative Android flows emit zero render-time shared-value-read warnings.
 - U4 makes representative Android dialogs visible and scrollable without regressing web.
 - U5 completes AE1-AE5 on a physical Android preview build, re-probes web, and records the real-use quality judgment.
 - `pnpm check`, targeted learner tests, and native builds are green at the applicable gates.

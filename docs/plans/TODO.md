@@ -4,13 +4,14 @@
 
 ### Active implementation
 
-- **Learner App native parity fix (IN PROGRESS — U1–U4 implemented; automated gate PASS
-  2026-07-13).** See the [active plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md)
-  for implementation scope. Its automated gate is green (`expo install --check`, `expo-doctor`,
-  Android and web release exports, 157 learner-app tests, and `pnpm check`); evidence:
-  `tmp/2026-07-13-learner-app-native-parity/EVALUATION.md`. The native real-use gate is **BLOCKED**
-  on the user-owned preview-APK/physical-device pass in [BLOCKERS.md](./BLOCKERS.md), so this
-  remains first before Guardian builds new native surfaces on the same UI kit.
+- **Learner App native parity fix (IN PROGRESS — U1–U4 implemented; web/automated gate PASS
+  2026-07-14).** See the [active plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md)
+  for implementation scope and KTD2 design. Focused split-boundary proofs, all 161 learner-app
+  tests, learner typecheck, web export, and `pnpm check` pass. The plan's representative Playwright
+  web gate also passed with zero page/console errors or strict shared-value warnings; evidence:
+  `tmp/2026-07-13-learner-app-native-parity/EVALUATION.md`. The native real-use gate remains
+  **BLOCKED** on the user-owned preview-APK/physical-device pass in [BLOCKERS.md](./BLOCKERS.md),
+  so this remains first before Guardian builds new native surfaces on the same UI kit.
 
 - **Crystal Guardian Challenges (IN PROGRESS — U1–U4 shipped + Gate A PASS 2026-07-13; U5–U7
   remain).**
@@ -249,9 +250,10 @@
   deferred journal overlays (right SideSheet menu, self-contained Board dialog, splash coordinator),
   gave every overlay a circular semantic icon header and one dismissal contract, and added
   restrained event-bound Reanimated motion with a single reduced-motion policy and selective
-  semantic haptics. Root-cause fix for the reported visual regressions: Reanimated-wrapped
-  components are not auto-registered with NativeWind, so their `className` was silently dropped —
-  fixed with `cssInterop`; a second web-only leak (react-native-svg `origin` → raw `transform-origin`
+  semantic haptics. The initial native investigation located the shared class-bearing animated
+  surface boundary; its current static/animated separation contract is owned by
+  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md). A second web-only leak
+  (react-native-svg `origin` → raw `transform-origin`
   DOM attribute on the crystal-assembly path) was found on the fresh-generation gate and fixed with
   an explicit pivot-decomposition transform. Decisions:
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) (amended) and

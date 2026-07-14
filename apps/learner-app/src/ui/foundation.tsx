@@ -199,5 +199,5 @@ function IndeterminateSweep() {
   if (reduceMotion) {
     return <View className="h-full w-[35%] rounded-full bg-gem opacity-60" />;
   }
-  return <AnimatedView className="h-full w-[35%] rounded-full bg-gem opacity-80" style={animatedStyle} />;
+  return <AnimatedView className="h-full w-[35%] rounded-full bg-gem opacity-80" animatedStyle={animatedStyle} />;
 }

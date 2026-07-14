@@ -14,13 +14,13 @@ import {
 } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { triggerHaptic, type HapticIntent } from "./feedback";
-import { MOTION, PRESS_SCALE, styleAnimatedComponent, useReducedMotion } from "./motion";
+import { createStyledAnimatedComponent, MOTION, PRESS_SCALE, useReducedMotion } from "./motion";
 import { colors } from "./tokens";
 import { AppText, type TextVariant } from "./foundation";
 
-// NativeWind v5's supported Reanimated 4 bridge terminates className at the animated
-// press surface itself, so every Button/Checkpoint/row keeps one shared shell.
-const AnimatedPressable = styleAnimatedComponent(Animated.createAnimatedComponent(Pressable));
+// Static/class styles resolve before the Reanimated handle reaches this terminal press surface,
+// so every Button/Checkpoint/row keeps one shared shell without render-time shared-value reads.
+const AnimatedPressable = createStyledAnimatedComponent(Animated.createAnimatedComponent(Pressable));
 
 export type PressableSurfaceProps = Readonly<{
   onPress: () => void;
@@ -101,7 +101,8 @@ export const PressableSurface = forwardRef<ViewType, PressableSurfaceProps>(func
       // Visible keyboard focus on web (R4) via :focus-visible only — pointer/touch
       // presses and persistent selection never draw the outline box.
       className={`web:focus-visible:outline web:focus-visible:outline-2 web:focus-visible:outline-offset-2 web:focus-visible:outline-frontier ${className ?? ""} ${pressed && pressedClassName ? pressedClassName : ""}`}
-      style={[animatedStyle, style]}
+      style={style}
+      animatedStyle={animatedStyle}
     >
       {typeof children === "function" ? children({ pressed }) : children}
     </AnimatedPressable>

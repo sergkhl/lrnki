@@ -83,7 +83,7 @@ function NextStopHalo({ stopId }: Readonly<{ stopId: string }>) {
     opacity: 0.25 + 0.3 * swell.get(),
     transform: [{ scale: 1 + 0.18 * swell.get() }]
   }));
-  return <AnimatedView className="absolute h-20 w-20 rounded-full bg-frontier" style={style} />;
+  return <AnimatedView className="absolute h-20 w-20 rounded-full bg-frontier" animatedStyle={style} />;
 }
 
 function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIcon) {
