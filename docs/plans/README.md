@@ -12,10 +12,10 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [Learner App Native Parity Fix](./2026-07-13-004-fix-learner-app-native-parity-plan.md) — ready;
-  diagnose and fix the Android rendering divergence (missing checkpoint circles, dead motion, empty
-  dialogs, stacked concept headers) so the UI kit is proven on native before new surfaces build on
-  it.
+- [Learner App Native Parity Fix](./2026-07-13-004-fix-learner-app-native-parity-plan.md) — in
+  progress; automated U1–U4 implementation and release-bundle gates pass, while the user-owned
+  Android preview APK and physical-device acceptance pass remains before new learner surfaces build
+  on the UI kit.
 - [Crystal Guardian Challenges](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md) — ready;
   durable Leg and Expedition recall challenges that earn crystal formations and supersede Crystal
   Duel.

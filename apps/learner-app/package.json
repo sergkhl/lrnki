@@ -32,6 +32,7 @@
     "lucide-react-native": "catalog:expo",
     "nativewind": "catalog:expo",
     "react": "catalog:",
+    "react-native-css": "catalog:expo",
     "react-dom": "catalog:",
     "react-native": "catalog:expo",
     "react-native-reanimated": "catalog:expo",
@@ -42,13 +43,15 @@
     "react-native-worklets": "catalog:expo"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "catalog:",
     "@testing-library/react-native": "catalog:expo",
     "@types/node": "catalog:",
     "@types/react": "catalog:expo",
     "babel-preset-expo": "catalog:expo",
     "jest": "catalog:expo",
     "jest-expo": "catalog:expo",
-    "tailwindcss": "catalog:expo",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
     "test-renderer": "catalog:expo",
     "typescript": "catalog:"
   }

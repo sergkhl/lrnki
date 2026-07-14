@@ -4,11 +4,13 @@
 
 ### Active implementation
 
-- **Learner App native parity fix (ready, first).** The 2026-07-13 Android device pass reported
-  four rendering defects absent on web (no checkpoint circles, no motion, empty dialogs, stacked
-  concept headers); diagnose and fix them through the
-  [ready plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) before Guardian builds new
-  native surfaces on the same UI kit.
+- **Learner App native parity fix (IN PROGRESS — U1–U4 implemented; automated gate PASS
+  2026-07-13).** See the [active plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md)
+  for implementation scope. Its automated gate is green (`expo install --check`, `expo-doctor`,
+  Android and web release exports, 157 learner-app tests, and `pnpm check`); evidence:
+  `tmp/2026-07-13-learner-app-native-parity/EVALUATION.md`. The native real-use gate is **BLOCKED**
+  on the user-owned preview-APK/physical-device pass in [BLOCKERS.md](./BLOCKERS.md), so this
+  remains first before Guardian builds new native surfaces on the same UI kit.
 
 - **Crystal Guardian Challenges (IN PROGRESS — U1–U4 shipped + Gate A PASS 2026-07-13; U5–U7
   remain).**
@@ -80,8 +82,9 @@
   deployed container restarted; DB is fresh/empty.
   **Remaining for the next session, in order:**
   1. **U5–U6** — Guardian fight surface + arrival/trail/formation/summit integration. BLOCKED on
-     the [native parity fix plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md) (run it
-     first; it is still ready and unstarted). U6 replaces the client's mastery-equals-fusion /
+     the physical Android acceptance gate of the
+     [native parity fix plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md). U6 replaces
+     the client's mastery-equals-fusion /
      final-Leg-keystone helpers with `TrailSectionView.recallScope` / `TrailView.enrichmentScope`
      (server facts already shipped by U4 — nothing client-side consumes them yet).
   2. **U7** — hard-delete Crystal Duel (code, routes, `duel_win` award/badge, migration enum,

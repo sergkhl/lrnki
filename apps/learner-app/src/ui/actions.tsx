@@ -13,16 +13,14 @@ import {
   type ViewStyle
 } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { cssInterop } from "nativewind";
 import { triggerHaptic, type HapticIntent } from "./feedback";
-import { MOTION, PRESS_SCALE, useReducedMotion } from "./motion";
+import { MOTION, PRESS_SCALE, styleAnimatedComponent, useReducedMotion } from "./motion";
 import { colors } from "./tokens";
 import { AppText, type TextVariant } from "./foundation";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-// Custom animated components need explicit NativeWind registration or their className
-// is dropped entirely (see the note in motion.ts).
-cssInterop(AnimatedPressable, { className: "style" });
+// NativeWind v5's supported Reanimated 4 bridge terminates className at the animated
+// press surface itself, so every Button/Checkpoint/row keeps one shared shell.
+const AnimatedPressable = styleAnimatedComponent(Animated.createAnimatedComponent(Pressable));
 
 export type PressableSurfaceProps = Readonly<{
   onPress: () => void;

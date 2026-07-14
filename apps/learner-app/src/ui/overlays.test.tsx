@@ -1,10 +1,11 @@
-import { expect, jest, test } from "@jest/globals";
+import { beforeEach, expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { PortalHost } from "@rn-primitives/portal";
 import { Text as RNText } from "react-native";
+import { useReducedMotion } from "react-native-reanimated";
 import { Map as MapIcon } from "lucide-react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Dialog, DialogBody, DialogFooter, FullScreenDialog, OverlayHeader, SideSheet } from "./overlays";
+import { Dialog, DialogBody, DialogFooter, FullScreenDialog, OverlayEntrance, OverlayHeader, SideSheet } from "./overlays";
 import { BottomSheet } from "./sheets";
 
 const SAFE_AREA_METRICS = {
@@ -20,6 +21,48 @@ function withHost(ui: React.ReactElement) {
     </>
   );
 }
+
+beforeEach(() => {
+  jest.mocked(useReducedMotion).mockReturnValue(false);
+});
+
+test("overlay content starts structurally visible before its entrance worklet advances", async () => {
+  await render(
+    <OverlayEntrance>
+      <RNText>visible fallback</RNText>
+    </OverlayEntrance>
+  );
+  // An entrance may decorate mounted content; it may not encode visibility in the
+  // base style that remains when the worklet does not run.
+  const wrapper = screen.getByText("visible fallback").parent;
+  expect(wrapper?.props.style?.opacity ?? 1).toBe(1);
+});
+
+test("overlay entrances settle immediately for reduced motion and retain both normal-motion directions", async () => {
+  const bottom = await render(
+    <OverlayEntrance>
+      <RNText>bottom entrance</RNText>
+    </OverlayEntrance>
+  );
+  expect(screen.getByText("bottom entrance").parent?.props.entering).toEqual({ direction: "down", duration: 220 });
+  await bottom.unmount();
+
+  const right = await render(
+    <OverlayEntrance slideFrom="right">
+      <RNText>right entrance</RNText>
+    </OverlayEntrance>
+  );
+  expect(screen.getByText("right entrance").parent?.props.entering).toEqual({ direction: "right", duration: 220 });
+  await right.unmount();
+
+  jest.mocked(useReducedMotion).mockReturnValue(true);
+  await render(
+    <OverlayEntrance>
+      <RNText>settled entrance</RNText>
+    </OverlayEntrance>
+  );
+  expect(screen.getByText("settled entrance").parent?.props.entering).toBeUndefined();
+});
 
 test("Dialog mounts its content with a header icon and closes through the header control", async () => {
   const onOpenChange = jest.fn();
@@ -103,6 +146,10 @@ test("Covers AE5 anatomy (KTD9): the dialog body scrolls while the footer stays 
   // The body is the ONE scrollable region; the actions render as a sibling after it, so a
   // tall body can never push them out of the bounded column (the former progress-dialog crop).
   expect(screen.getAllByTestId("dialog-body").length).toBe(1);
+  // `flex-1 min-h-0` is the Yoga contract: the bounded column gives this one body
+  // the available height, and it (rather than the header or footer) is allowed to shrink.
+  expect(screen.getByTestId("dialog-body").props.className ?? "").toContain("flex-1");
+  expect(screen.getByTestId("dialog-body").props.className ?? "").toContain("min-h-0");
   expect(screen.getByText("long body")).toBeTruthy();
   expect(screen.getByText("actions")).toBeTruthy();
 });

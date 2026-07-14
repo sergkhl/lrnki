@@ -1,5 +1,7 @@
 import { test, expect } from "@jest/globals";
-import { colors, cssVariables, radius, touch } from "./tokens";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { colors, nativewindThemeCss, radius, touch } from "./tokens";
 
 // WCAG 2.2 relative-luminance contrast (R4, U1 scenario 4): every semantic pairing the
 // UI module renders must clear 4.5:1 for normal text and 3:1 for large text, meaningful
@@ -52,12 +54,12 @@ test("icon, focus, and control-boundary pairs meet 3:1", () => {
   }
 });
 
-test("css variables are generated one-to-one from the token maps", () => {
-  const vars = cssVariables();
-  expect(Object.keys(vars)).toHaveLength(Object.keys(colors).length + Object.keys(radius).length + Object.keys(touch).length);
-  expect(vars["--color-ink"]).toBe(colors.ink);
-  expect(vars["--radius-card"]).toBe("8px");
-  expect(vars["--size-target"]).toBe("44px");
+test("the NativeWind theme CSS is mechanically generated from the token maps", () => {
+  const css = nativewindThemeCss();
+  expect(css).toContain(`--color-ink: ${colors.ink};`);
+  expect(css).toContain(`--radius-card: ${radius.card}px;`);
+  expect(css).toContain(`--spacing-target: ${touch.target}px;`);
+  expect(readFileSync(resolve(__dirname, "tokens.css"), "utf8")).toBe(css);
 });
 
 test("card radius stays flat and touch sizes hold the WCAG floor", () => {

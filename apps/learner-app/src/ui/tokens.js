@@ -1,6 +1,5 @@
-// The single source of semantic design tokens (KTD1, R2). Plain CommonJS so both
-// tailwind.config.js (node require) and the TypeScript app (allowJs) read the SAME
-// values; the CSS variables NativeWind consumes are generated mechanically from here.
+// The single source of semantic design tokens (KTD1, R2). Plain CommonJS keeps the
+// TypeScript app and the build-time CSS generator on exactly the same values.
 
 /** Semantic color palette. Interactive boundaries use `lineStrong` (>=3:1 on card);
  * `line` is decorative separation only. All pairs are asserted by tokens.test.ts. */
@@ -39,14 +38,17 @@ const touch = {
   control: 48
 };
 
-/** The generated `:root` block consumed by the tailwind plugin — never hand-edit CSS vars. */
-function cssVariables() {
-  /** @type {Record<string, string>} */
-  const vars = {};
-  for (const [name, value] of Object.entries(colors)) vars[`--color-${name}`] = value;
-  for (const [name, value] of Object.entries(radius)) vars[`--radius-${name}`] = `${value}px`;
-  for (const [name, value] of Object.entries(touch)) vars[`--size-${name}`] = `${value}px`;
-  return vars;
+/** Tailwind v4 needs theme declarations to generate semantic utilities and runtime
+ * declarations to resolve them on native. This is rendered into tokens.css; do not
+ * hand-maintain a second set of values in CSS. */
+function nativewindThemeCss() {
+  const declarations = [
+    ...Object.entries(colors).map(([name, value]) => [`--color-${name}`, value]),
+    ...Object.entries(radius).map(([name, value]) => [`--radius-${name}`, `${value}px`]),
+    ...Object.entries(touch).map(([name, value]) => [`--spacing-${name}`, `${value}px`])
+  ];
+  const body = declarations.map(([name, value]) => `  ${name}: ${value};`).join("\n");
+  return `/* Generated from tokens.js by scripts/generate-learner-token-css.cjs. Do not edit. */\n@theme {\n${body}\n}\n\n:root {\n${body}\n}\n`;
 }
 
-module.exports = { colors, radius, touch, cssVariables };
+module.exports = { colors, radius, touch, nativewindThemeCss };

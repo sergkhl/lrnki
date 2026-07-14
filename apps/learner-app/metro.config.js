@@ -3,11 +3,16 @@
 // @lrnki/learner-api/client, @lrnki/domain-core, @lrnki/ports) compile in place under
 // pnpm's isolated linker. Package-exports resolution is Metro's default on this SDK.
 const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
+const { withNativewind } = require("nativewind/metro");
 const path = require("node:path");
+const { generateLearnerTokenCss } = require("../../scripts/generate-learner-token-css.cjs");
 
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, "../..");
+
+// `tokens.js` is the one semantic-token authority. Regenerate its CSS-facing
+// representation before Metro reads global.css, including direct Expo CLI invocations.
+generateLearnerTokenCss();
 
 const config = getDefaultConfig(projectRoot);
 config.watchFolders = [workspaceRoot];
@@ -16,4 +21,4 @@ config.resolver.nodeModulesPaths = [
   path.join(workspaceRoot, "node_modules")
 ];
 
-module.exports = withNativeWind(config, { input: "./src/global.css" });
+module.exports = withNativewind(config);

@@ -49,6 +49,23 @@ test("a busy button blocks duplicate actions, announces busy, and keeps its labe
   expect(screen.getByText("Continue")).toBeTruthy();
 });
 
+test.each([
+  { variant: "primary" as const, shellClass: "bg-trail" },
+  { variant: "secondary" as const, shellClass: "bg-gem-soft" },
+  { variant: "outline" as const, shellClass: "border-line-strong" },
+  { variant: "destructive" as const, shellClass: "bg-destructive" }
+])("Button keeps its $variant semantic shell at the shared press surface", async ({ variant, shellClass }) => {
+  await render(<Button testID="button" label="Continue" variant={variant} onPress={() => {}} />);
+  const className = screen.getByTestId("button").props.className ?? "";
+  expect(className).toContain("h-control");
+  expect(className).toContain(shellClass);
+});
+
+test("a compact Button retains the shared minimum target class", async () => {
+  await render(<Button testID="button" label="Continue" size="compact" onPress={() => {}} />);
+  expect(screen.getByTestId("button").props.className ?? "").toContain("h-target");
+});
+
 test("a haptic intent fires exactly once per accepted press", async () => {
   const onPress = jest.fn();
   await render(<Button testID="button" label="Pick" haptic="selection" onPress={onPress} />);

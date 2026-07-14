@@ -39,17 +39,18 @@ jest.mock("react-native-reanimated", () => {
     withRepeat: (animation) => animation,
     cancelAnimation: () => {},
     runOnJS: (fn) => fn,
+    FadeInDown: { duration: (duration) => ({ direction: "down", duration }) },
+    FadeInRight: { duration: (duration) => ({ direction: "right", duration }) },
     Easing: new Proxy({}, { get: () => (x) => (typeof x === "number" ? x : (y) => y) }),
     __pressable: Pressable
   };
 });
 
-// NativeWind's runtime only matters for real rendering; in tests className props are
-// inert strings (babel keeps the interop transform off), so registration is a no-op.
+// NativeWind's Metro import rewrite only matters for real rendering; in tests className
+// props remain inert strings and the animated styling bridge is an identity wrapper.
 jest.mock("nativewind", () => ({
   __esModule: true,
-  cssInterop: jest.fn(),
-  remapProps: jest.fn(),
+  styled: jest.fn((Component) => Component),
   useColorScheme: () => ({ colorScheme: "light" })
 }));
 

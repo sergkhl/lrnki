@@ -4,15 +4,20 @@
 // mutation blocks every dismissal input via `dismissBlocked`.
 import { useEffect, type ComponentType, type ReactNode } from "react";
 import { BackHandler, Platform, ScrollView, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { FadeInDown, FadeInRight } from "react-native-reanimated";
 import * as DialogPrimitive from "@rn-primitives/dialog";
 import { X } from "lucide-react-native";
 import { AppText } from "./foundation";
 import { IconButton } from "./actions";
-import { MOTION, useReducedMotion } from "./motion";
+import { AnimatedView, MOTION, useReducedMotion } from "./motion";
 import { colors } from "./tokens";
 
 type IconComponent = ComponentType<{ size?: number; color?: string }>;
+
+const OVERLAY_ENTRANCE = {
+  bottom: FadeInDown.duration(MOTION.overlay),
+  right: FadeInRight.duration(MOTION.overlay)
+};
 
 /** The circular semantic icon header every overlay renders (R8). Activity overlays pass
  * the same icon + tone the opening checkpoint used, so trigger and header match (AE3). */
@@ -63,7 +68,7 @@ export function OverlayHeader({
 
 /** The centered dialog's shrinkable middle region (plan 2026-07-13-002 U3, KTD9). The
  * anatomy is FIXED header (OverlayHeader), THIS scrollable body, then DialogFooter: the
- * body carries `shrink min-h-0` so at constrained heights it — never the actions — gives
+ * body carries `flex-1 min-h-0` so at constrained heights it — never the actions — gives
  * up space and scrolls. Consumers must not add their own bounded wrapper (the former
  * `max-h-96` reflow-clipping problem class). */
 export function DialogBody({
@@ -71,7 +76,7 @@ export function DialogBody({
   contentClassName
 }: Readonly<{ children: ReactNode; contentClassName?: string }>) {
   return (
-    <ScrollView testID="dialog-body" className="min-h-0 shrink" contentContainerClassName={contentClassName ?? "gap-3 p-4"}>
+    <ScrollView testID="dialog-body" className="min-h-0 flex-1" contentContainerClassName={contentClassName ?? "gap-3 p-4"}>
       {children}
     </ScrollView>
   );
@@ -96,31 +101,19 @@ function useHardwareBack(open: boolean, blocked: boolean, close: () => void) {
 }
 
 /** Overlay entrance (R14): a restrained fade + short slide played once when the overlay
- * content mounts. Reduced motion renders the settled state immediately; dismissal stays
- * instant, so no state or callback ever waits on this. */
-function OverlayEntrance({
+ * content mounts. The base view has no opacity or transform override, so a missing or
+ * non-running worklet leaves content in its settled, visible structural state. */
+export function OverlayEntrance({
   children,
   className,
   slideFrom = "bottom"
 }: Readonly<{ children: ReactNode; className?: string; slideFrom?: "bottom" | "right" }>) {
   const reduceMotion = useReducedMotion();
-  const progress = useSharedValue(reduceMotion ? 1 : 0);
-  useEffect(() => {
-    if (!reduceMotion) progress.set(withTiming(1, { duration: MOTION.overlay }));
-    // Mount-only entrance by design.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const style = useAnimatedStyle(() => ({
-    opacity: progress.get(),
-    transform:
-      slideFrom === "right"
-        ? [{ translateX: (1 - progress.get()) * 24 }]
-        : [{ translateY: (1 - progress.get()) * 12 }]
-  }));
+  const entering = reduceMotion ? undefined : OVERLAY_ENTRANCE[slideFrom];
   return (
-    <Animated.View className={className} style={style}>
+    <AnimatedView className={className} entering={entering}>
       {children}
-    </Animated.View>
+    </AnimatedView>
   );
 }
 
@@ -149,7 +142,7 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
           {/* The bounded dialog column (KTD9): Content caps the height; the entrance
-              wrapper and DialogBody carry `shrink min-h-0` so the BODY shrinks and
+              wrapper and DialogBody carry `flex-1 min-h-0` so the BODY shrinks and
               scrolls while the header and DialogFooter actions stay reachable. On web
               the primitive inserts an unstyled auto-height focus wrapper between
               Overlay and Content, so a percentage max-height resolves against the
@@ -158,7 +151,7 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
             className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card"
             style={Platform.OS === "web" ? ({ maxHeight: "85vh" } as object) : undefined}
           >
-            <OverlayEntrance className="min-h-0 shrink">{children}</OverlayEntrance>
+            <OverlayEntrance className="min-h-0 flex-1">{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>

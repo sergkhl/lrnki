@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { BookOpen, Lock, MapPin, Rows3, Search } from "lucide-react-native";
 import { CrystalGlyph } from "./CrystalGlyph";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import type { TrailCluster, TrailStop } from "@lrnki/application/projection";
-import { MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
+import { AnimatedView, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
 const CIRCLE_ICONS: Record<Exclude<CheckpointIcon, "crystal">, typeof Lock> = {
   lock: Lock,
@@ -83,7 +83,7 @@ function NextStopHalo({ stopId }: Readonly<{ stopId: string }>) {
     opacity: 0.25 + 0.3 * swell.get(),
     transform: [{ scale: 1 + 0.18 * swell.get() }]
   }));
-  return <Animated.View className="absolute h-20 w-20 rounded-full bg-frontier" style={style} />;
+  return <AnimatedView className="absolute h-20 w-20 rounded-full bg-frontier" style={style} />;
 }
 
 function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIcon) {

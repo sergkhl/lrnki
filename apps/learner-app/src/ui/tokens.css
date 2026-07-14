@@ -1,0 +1,52 @@
+/* Generated from tokens.js by scripts/generate-learner-token-css.cjs. Do not edit. */
+@theme {
+  --color-background: #f7f0de;
+  --color-ink: #241f18;
+  --color-muted: #6d6152;
+  --color-card: #fffaf0;
+  --color-line: #d8c8aa;
+  --color-line-strong: #8d8064;
+  --color-trail: #617a55;
+  --color-trail-muted: #b9ad92;
+  --color-gem: #2f8f83;
+  --color-gem-soft: #cbe7df;
+  --color-fog: #8d887c;
+  --color-frontier: #9c5f2b;
+  --color-muted-panel: #eee4cd;
+  --color-destructive: #a13c2e;
+  --color-on-accent: #fdfaf2;
+  --color-gold: #d8b64c;
+  --color-award: #b45309;
+  --color-secured: #3f7d4e;
+  --radius-card: 8px;
+  --radius-control: 12px;
+  --radius-overlay: 16px;
+  --spacing-target: 44px;
+  --spacing-control: 48px;
+}
+
+:root {
+  --color-background: #f7f0de;
+  --color-ink: #241f18;
+  --color-muted: #6d6152;
+  --color-card: #fffaf0;
+  --color-line: #d8c8aa;
+  --color-line-strong: #8d8064;
+  --color-trail: #617a55;
+  --color-trail-muted: #b9ad92;
+  --color-gem: #2f8f83;
+  --color-gem-soft: #cbe7df;
+  --color-fog: #8d887c;
+  --color-frontier: #9c5f2b;
+  --color-muted-panel: #eee4cd;
+  --color-destructive: #a13c2e;
+  --color-on-accent: #fdfaf2;
+  --color-gold: #d8b64c;
+  --color-award: #b45309;
+  --color-secured: #3f7d4e;
+  --radius-card: 8px;
+  --radius-control: 12px;
+  --radius-overlay: 16px;
+  --spacing-target: 44px;
+  --spacing-control: 48px;
+}

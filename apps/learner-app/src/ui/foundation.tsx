@@ -13,7 +13,7 @@ import {
   type ViewStyle
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
+import {
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -23,7 +23,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useEffect } from "react";
 import { colors } from "./tokens";
-import { useReducedMotion } from "./motion";
+import { AnimatedView, useReducedMotion } from "./motion";
 
 export type TextVariant = "display" | "heading" | "title" | "label" | "body" | "caption";
 export type TextColor = "ink" | "muted" | "destructive" | "on-accent" | "trail" | "award";
@@ -199,5 +199,5 @@ function IndeterminateSweep() {
   if (reduceMotion) {
     return <View className="h-full w-[35%] rounded-full bg-gem opacity-60" />;
   }
-  return <Animated.View className="h-full w-[35%] rounded-full bg-gem opacity-80" style={animatedStyle} />;
+  return <AnimatedView className="h-full w-[35%] rounded-full bg-gem opacity-80" style={animatedStyle} />;
 }

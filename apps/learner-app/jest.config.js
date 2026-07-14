@@ -8,6 +8,6 @@ module.exports = {
   moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1" },
   testMatch: ["<rootDir>/src/**/*.test.(ts|tsx)"],
   transformIgnorePatterns: [
-    "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@rn-primitives|lucide-react-native|nativewind))"
+    "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@rn-primitives|lucide-react-native|nativewind|react-native-css))"
   ]
 };

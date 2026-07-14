@@ -2,13 +2,20 @@
 // duration here, and every animated surface consults the SAME reduced-motion source.
 // Reduced motion swaps presentation only — state transitions and completion callbacks
 // never ride on an animation finishing.
+import { type ComponentType } from "react";
 import Animated, { useReducedMotion as useReanimatedReducedMotion } from "react-native-reanimated";
-import { cssInterop } from "nativewind";
+import { styled } from "nativewind";
 
-// Reanimated components are NOT covered by NativeWind's automatic core-component
-// registration: without this, every className on an Animated.View is silently dropped
-// on all platforms (Jest can't see it — classNames are inert there by design).
-cssInterop(Animated.View, { className: "style" });
+// Animated components are third-party surfaces, so they terminate className through
+// NativeWind v5's supported Reanimated 4 bridge instead of relying on v4's global JSX
+// interop registry. Keep every animated class-bearing surface on this export.
+// The default mapping is className -> style. Its generic declaration maps every prop path,
+// while this boundary deliberately preserves the concrete component's existing prop contract.
+export function styleAnimatedComponent<Component extends ComponentType<never>>(component: Component): Component {
+  return (styled as unknown as (candidate: Component) => Component)(component);
+}
+
+export const AnimatedView = styleAnimatedComponent(Animated.View);
 
 /** Durations in ms. `press` is the press-in acknowledgement; `standard` covers
  * disclosures and small layout reveals; `overlay` is dialog/sheet entrance;
