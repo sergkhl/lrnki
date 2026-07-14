@@ -6,13 +6,18 @@ import { type ComponentType } from "react";
 import Animated, { useReducedMotion as useReanimatedReducedMotion } from "react-native-reanimated";
 import { styled } from "nativewind";
 
-// Animated components are third-party surfaces, so they terminate className through
-// NativeWind v5's supported Reanimated 4 bridge instead of relying on v4's global JSX
-// interop registry. Keep every animated class-bearing surface on this export.
-// The default mapping is className -> style. Its generic declaration maps every prop path,
-// while this boundary deliberately preserves the concrete component's existing prop contract.
+// Animated components are third-party surfaces, so they pass className through NativeWind v5's
+// supported Reanimated 4 bridge instead of relying on v4's global JSX interop registry. Keep
+// every animated class-bearing surface on this export. Pass-through preserves Reanimated's opaque
+// animated-style handles without NativeWind recursively inspecting their shared values during render.
 export function styleAnimatedComponent<Component extends ComponentType<never>>(component: Component): Component {
-  return (styled as unknown as (candidate: Component) => Component)(component);
+  return (
+    styled as unknown as (
+      candidate: Component,
+      mapping: { className: "style" },
+      options: { passThrough: true }
+    ) => Component
+  )(component, { className: "style" }, { passThrough: true });
 }
 
 export const AnimatedView = styleAnimatedComponent(Animated.View);
