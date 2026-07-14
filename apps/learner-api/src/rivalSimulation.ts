@@ -65,21 +65,6 @@ export function simulateRivals(input: {
   return rivals;
 }
 
-// One simulated rival answer inside a Crystal Duel (R7, KTD1). Per-question success is seeded and
-// scaled DOWN on higher item bands (a harder crystal is harder for the rival too), then gently
-// rubber-banded toward a ~60% learner win rate: when the learner leads, the rival answers a little
-// better; when the learner trails, a little worse. Pure and deterministic in its seed, so a duel
-// replays identically. Answer time is seeded within the per-question clock for the tie-breaker.
-export function rivalDuelAnswer(input: { seed: number; band: number; learnerLead: number; questionMs: number }): { correct: boolean; elapsedMs: number } {
-  faker.seed(input.seed);
-  const baseAccuracy = 0.78 - 0.08 * (input.band - 1); // band 1 ≈ 0.78, band 5 ≈ 0.46
-  const rubberBand = Math.max(-0.15, Math.min(0.15, input.learnerLead * 0.08)); // lead → tougher rival
-  const accuracy = Math.max(0.2, Math.min(0.9, baseAccuracy + rubberBand));
-  const roll = faker.number.float({ min: 0, max: 1 });
-  const elapsedMs = faker.number.int({ min: Math.round(input.questionMs * 0.2), max: Math.round(input.questionMs * 0.9) });
-  return { correct: roll < accuracy, elapsedMs };
-}
-
 export type ChaseTarget = { name: string; gap: number; direction: "ahead" | "behind" };
 
 // The one highlighted rival (R6): the nearest opponent above the viewer, or — when the viewer
@@ -99,14 +84,14 @@ export type BoardEntry = {
   rank: number;
   isViewer: boolean;
   isRival: boolean;
-  badges: { duelWins: number; podiums: number };
+  badges: { podiums: number };
 };
 
 export type RealBoardRow = {
   learnerRef: string;
   displayName: string;
   points: number;
-  badges: { duelWins: number; podiums: number };
+  badges: { podiums: number };
 };
 
 function windowRealRows(input: { viewerRef: string; realRows: RealBoardRow[]; size: number }): RealBoardRow[] {
@@ -147,7 +132,7 @@ export function assembleWeeklyBoard(input: {
 
   const unranked = [
     ...realRows.map((row) => ({ id: row.learnerRef, name: row.displayName, points: row.points, isViewer: row.learnerRef === input.viewerRef, isRival: false, badges: row.badges })),
-    ...rivals.map((rival) => ({ id: rival.rivalId, name: rival.name, points: rival.points, isViewer: false, isRival: true, badges: { duelWins: 0, podiums: 0 } }))
+    ...rivals.map((rival) => ({ id: rival.rivalId, name: rival.name, points: rival.points, isViewer: false, isRival: true, badges: { podiums: 0 } }))
   ];
   unranked.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
   const entries: BoardEntry[] = unranked.map((entry, index) => ({ ...entry, rank: index + 1 }));

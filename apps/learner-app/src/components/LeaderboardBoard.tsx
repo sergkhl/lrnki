@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { Award, Swords, Target } from "lucide-react-native";
+import { Award, Target } from "lucide-react-native";
 import { divisionForMasteredCrystals } from "@/learn/division";
 import type { BoardEntry, ChaseTarget } from "@lrnki/learner-api/rival-simulation";
 import { Badge, Text, colors } from "@/ui";
@@ -35,12 +35,6 @@ export function LeaderboardBoard({ entries, weekKey, masteredCrystalCount }: { e
               {entry.name}
               {entry.isViewer ? <Text variant="caption" color="trail"> ({learnerTerm("leaderboardYou")})</Text> : null}
             </Text>
-            {entry.badges.duelWins > 0 ? (
-              <View className="flex-row items-center gap-0.5">
-                <Swords size={14} color={colors.award} />
-                <Text variant="caption" color="award">{entry.badges.duelWins}</Text>
-              </View>
-            ) : null}
             {entry.badges.podiums > 0 ? (
               <View className="flex-row items-center gap-0.5">
                 <Award size={14} color={colors.award} />

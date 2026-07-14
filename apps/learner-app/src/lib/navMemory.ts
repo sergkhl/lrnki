@@ -1,12 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { BoardSeen } from "@/learn/seamClassifier";
 
-// Native storage half of the board/duel navigation memory seam (KTD5). Client-local only —
+// Native storage half of the board navigation memory seam (KTD5). Client-local only —
 // never in the schema; losing it re-fires a celebration at worst. Async on native, so the
 // splash surfaces (follow-up pass) read it once during their query phase.
 
 const BOARD_KEY_PREFIX = "lrnki_board_seen_";
-const DUEL_UNLOCK_KEY_PREFIX = "lrnki_duel_unlocked_seen_";
 
 export async function readBoardSeen(learnerRef: string): Promise<BoardSeen | null> {
   try {
@@ -25,19 +24,24 @@ export async function writeBoardSeen(learnerRef: string, seen: BoardSeen): Promi
   }
 }
 
-export async function readDuelUnlockSeen(learnerRef: string): Promise<boolean> {
+const GUARDIAN_ARRIVAL_KEY_PREFIX = "lrnki_guardian_arrival_";
+
+// Guardian arrival acknowledgement (plan 2026-07-13-003 U6, KTD3): whether this device has
+// already offered the arrival dialog for a scope, keyed by its durable anchor node. Losing
+// it re-offers the dialog at worst; the formation itself is server-owned.
+export async function readGuardianArrivalSeen(learnerRef: string, scopeAnchorId: string): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(DUEL_UNLOCK_KEY_PREFIX + learnerRef)) === "1";
+    return (await AsyncStorage.getItem(GUARDIAN_ARRIVAL_KEY_PREFIX + learnerRef + "_" + scopeAnchorId)) === "1";
   } catch {
     return true;
   }
 }
 
-export async function markDuelUnlockSeen(learnerRef: string): Promise<void> {
+export async function markGuardianArrivalSeen(learnerRef: string, scopeAnchorId: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(DUEL_UNLOCK_KEY_PREFIX + learnerRef, "1");
+    await AsyncStorage.setItem(GUARDIAN_ARRIVAL_KEY_PREFIX + learnerRef + "_" + scopeAnchorId, "1");
   } catch {
-    // Non-fatal: the splash may re-fire.
+    // Non-fatal: the arrival offer may re-fire.
   }
 }
 

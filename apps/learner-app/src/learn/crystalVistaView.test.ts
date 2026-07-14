@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
-import { buildCrystalFormation, completeSectionIndexes, isNameableCrystal, memoryDoorFor, placeFormation, type CrystalFormation } from "./crystalVistaView";
+import { buildCrystalFormation, fusedSectionIndexes, hasSummitKeystone, isNameableCrystal, memoryDoorFor, placeFormation } from "./crystalVistaView";
 import { buildTrailView } from "@lrnki/application/projection";
 import type { StudySession } from "@lrnki/application/projection";
 
@@ -43,17 +43,37 @@ test("placeFormation grows bedrock-up: a prerequisite sits below its dependent",
   assert.equal(placed.veins.length, 1);
 });
 
-test("completeSectionIndexes reports only sections whose every concept is mastered", () => {
-  const formation: CrystalFormation = {
-    title: "t",
-    edges: [],
-    nodes: [
-      { derivedNodeId: "a", label: "a", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false, gist: null, isMilestone: false, isSummit: false },
-      { derivedNodeId: "b", label: "b", domain: "d", difficulty: 0, state: "mastered", growthFraction: 1, sectionIndex: 0, isKnownSkipped: false, gist: null, isMilestone: true, isSummit: false },
-      { derivedNodeId: "c", label: "c", domain: "d", difficulty: 0, state: "frontier", growthFraction: 0.5, sectionIndex: 1, isKnownSkipped: false, gist: null, isMilestone: true, isSummit: true }
+test("fusion derives ONLY from a won section challenge — a fully mastered Leg with no victory stays unfused (KTD3, AE6)", () => {
+  const base = session();
+  const masteredUnwon: StudySession = {
+    ...base,
+    classification: { stateByNode: { n1: "mastered", n2: "mastered" }, selectedFrontierTarget: null },
+    expeditionPath: base.expeditionPath.map((step) => ({ ...step, state: "mastered" as const }))
+  };
+  assert.deepEqual(fusedSectionIndexes(buildTrailView(masteredUnwon)), []);
+  assert.equal(hasSummitKeystone(buildTrailView(masteredUnwon)), false);
+
+  const won: StudySession = {
+    ...masteredUnwon,
+    recallScopes: [
+      { scopeKind: "section", anchorDerivedNodeId: "n2", anchorLabel: "Borrowing", sectionIndex: 0, eligibleItemCount: 2, state: "won", wonChallengeId: "c-won" }
     ]
   };
-  assert.deepEqual(completeSectionIndexes(formation), [0]);
+  assert.deepEqual(fusedSectionIndexes(buildTrailView(won)), [0]);
+  // A won Leg alone never crowns the summit: the keystone needs the ENRICHMENT scope's win.
+  assert.equal(hasSummitKeystone(buildTrailView(won)), false);
+});
+
+test("the summit keystone derives ONLY from a won enrichment challenge (KTD3, AE8)", () => {
+  const base = session();
+  const s: StudySession = {
+    ...base,
+    recallScopes: [
+      { scopeKind: "section", anchorDerivedNodeId: "n2", anchorLabel: "Borrowing", sectionIndex: 0, eligibleItemCount: 2, state: "won", wonChallengeId: "c-leg" },
+      { scopeKind: "enrichment", anchorDerivedNodeId: "n2", anchorLabel: "Borrowing", sectionIndex: null, eligibleItemCount: 2, state: "won", wonChallengeId: "c-summit" }
+    ]
+  };
+  assert.equal(hasSummitKeystone(buildTrailView(s)), true);
 });
 
 function session(): StudySession {

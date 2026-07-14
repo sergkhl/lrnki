@@ -155,7 +155,9 @@ export function MatchingBoard({
 
 // A matching tile: selection state is announced, a locked (matched) pair keeps its
 // check icon, and a wrong pair shows a destructive boundary — never color alone.
-function TileButton({
+// Exported for the Guardian fight's server-driven matching board (plan 2026-07-13-003 U5),
+// so both boards share one tile presentation.
+export function TileButton({
   text,
   selected,
   locked,

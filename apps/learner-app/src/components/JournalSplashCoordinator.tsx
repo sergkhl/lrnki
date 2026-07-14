@@ -1,28 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { LeaderboardView } from "@/lib/api";
 import { classifySeam, type SeamChange } from "@/learn/seamClassifier";
-import { chooseSplash, isBoardSplash, type SplashEvent } from "@/learn/splashPriority";
-import { markDuelUnlockSeen, readBoardSeen, readDuelUnlockSeen, writeBoardSeen } from "@/lib/navMemory";
-import { DuelUnlockDialog } from "./DuelUnlockDialog";
+import { chooseSplash, type SplashEvent } from "@/learn/splashPriority";
+import { readBoardSeen, writeBoardSeen } from "@/lib/navMemory";
 import { LeaderboardDialog } from "./LeaderboardDialog";
 import { learnerTerm } from "@/learn/vocabulary";
 
-// One coordinator per journal visit (R13, KTD5): after the Board and Duel reads AND the
-// device navigation memory settle, a pure priority pick mounts at most one splash for
-// this mount. Dismissing (or accepting) writes ONLY the shown event's lossable seen
-// state — an eligible lower-priority event stays unseen for a later visit (AE5).
+// One coordinator per journal visit (R13, KTD5): after the Board read AND the device
+// navigation memory settle, a pure priority pick mounts at most one splash for this
+// mount. Dismissing writes the lossable board seen-snapshot; the next eligible event
+// waits for a later visit (AE5).
 export function JournalSplashCoordinator({
   learnerStateRef,
-  board,
-  duelUnlocked,
-  onEnterDuel
+  board
 }: Readonly<{
   learnerStateRef: string;
   /** The settled board view, or null when the read is unavailable. */
   board: LeaderboardView | null | undefined;
-  /** The settled duel unlock flag, or null when the read is unavailable. */
-  duelUnlocked: boolean | null | undefined;
-  onEnterDuel: () => void;
 }>) {
   // The seam rides along only to pick the rank-up vs rank-down title copy.
   const [splash, setSplash] = useState<{ event: SplashEvent; seam: SeamChange } | null>(null);
@@ -30,18 +24,14 @@ export function JournalSplashCoordinator({
 
   useEffect(() => {
     // undefined = still loading; null = settled but unavailable. Decide exactly once.
-    if (decidedRef.current || board === undefined || duelUnlocked === undefined) return;
+    if (decidedRef.current || board === undefined) return;
     decidedRef.current = true;
     void (async () => {
-      const [duelSeen, boardSeen] = await Promise.all([
-        readDuelUnlockSeen(learnerStateRef),
-        readBoardSeen(learnerStateRef)
-      ]);
+      const boardSeen = await readBoardSeen(learnerStateRef);
       const seam = board
         ? classifySeam(boardSeen, { weekKey: board.weekKey, rank: board.viewerRank, points: board.viewerPoints })
         : "none";
       const chosen = chooseSplash({
-        duelUnlockEligible: duelUnlocked === true && !duelSeen,
         podiumEarnedForPreviousWeek: board?.podiumEarnedForPreviousWeek ?? false,
         seam
       });
@@ -52,40 +42,18 @@ export function JournalSplashCoordinator({
       }
       setSplash({ event: chosen, seam });
     })();
-  }, [board, duelUnlocked, learnerStateRef]);
+  }, [board, learnerStateRef]);
 
   const dismiss = () => {
     if (splash === null) return;
-    if (isBoardSplash(splash.event) && board) {
+    if (board) {
       void writeBoardSeen(learnerStateRef, { weekKey: board.weekKey, rank: board.viewerRank, points: board.viewerPoints });
-    }
-    if (splash.event === "duel_unlock") {
-      void markDuelUnlockSeen(learnerStateRef);
     }
     // No chaining: the next eligible event waits for a later journal visit.
     setSplash(null);
   };
 
-  if (splash === null) return null;
-
-  if (splash.event === "duel_unlock") {
-    return (
-      <DuelUnlockDialog
-        open
-        onOpenChange={(next) => {
-          if (!next) dismiss();
-        }}
-        onEnterDuel={() => {
-          // Mark seen BEFORE navigating; a storage failure never blocks the arena.
-          void markDuelUnlockSeen(learnerStateRef);
-          setSplash(null);
-          onEnterDuel();
-        }}
-      />
-    );
-  }
-
-  if (!board) return null;
+  if (splash === null || !board) return null;
   return (
     <LeaderboardDialog
       open

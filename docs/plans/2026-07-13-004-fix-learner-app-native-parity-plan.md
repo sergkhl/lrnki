@@ -76,7 +76,7 @@ Using `passThrough` keeps that handle opaque but leaves classes unresolved becau
 - **In scope:** `apps/learner-app/src/ui/`, affected learner components, NativeWind/Tailwind/Babel/Metro configuration, and the pinned Expo catalog entries when diagnosis proves version misalignment.
 - **Out of scope:** learner projections, API behavior, persisted shapes, copy redesign, a general visual redesign, and iOS runtime validation.
 - **Deferred:** the broader haptics and reduced-motion device matrix beyond the scenarios needed to prove this root cause remains tracked in `docs/plans/BLOCKERS.md` unless the final Android gate completes it.
-- **Coordination:** This plan precedes [Crystal Guardian Challenges](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md), whose new native surfaces depend on the same UI kit.
+- **Coordination:** Crystal Guardian Challenges (shipped 2026-07-14, see `TODO.md` COMPLETED) built new native surfaces on this same UI kit; their Android device acceptance rides this plan's shared Android blocker.
 
 ---
 

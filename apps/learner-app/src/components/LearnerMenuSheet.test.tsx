@@ -13,7 +13,6 @@ const SAFE_AREA_METRICS = {
 const handlers = {
   onOpenChange: jest.fn(),
   onOpenBoard: jest.fn(),
-  onEnterDuel: jest.fn(),
   onLogout: jest.fn()
 };
 
@@ -29,7 +28,6 @@ function renderMenu(boardAvailable = true) {
         onOpenChange={handlers.onOpenChange}
         boardAvailable={boardAvailable}
         onOpenBoard={handlers.onOpenBoard}
-        onEnterDuel={handlers.onEnterDuel}
         onLogout={handlers.onLogout}
       />
       <PortalHost />
@@ -37,9 +35,8 @@ function renderMenu(boardAvailable = true) {
   );
 }
 
-test("the menu exposes Duel, Board, and logout rows", async () => {
+test("the menu exposes Board and logout rows", async () => {
   await renderMenu();
-  expect(screen.getByLabelText(learnerTerm("duelEntry"))).toBeTruthy();
   expect(screen.getByLabelText(learnerTerm("viewBoard"))).toBeTruthy();
   expect(screen.getByLabelText(learnerTerm("logoutAction"))).toBeTruthy();
 });

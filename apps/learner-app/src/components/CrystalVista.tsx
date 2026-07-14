@@ -6,7 +6,8 @@ import { ArrowRight, Gem } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import {
   buildCrystalFormation,
-  completeSectionIndexes,
+  fusedSectionIndexes,
+  hasSummitKeystone,
   isNameableCrystal,
   memoryDoorFor,
   placeFormation,
@@ -44,9 +45,10 @@ export function CrystalVista({
 
   const formation = useMemo(() => buildCrystalFormation(session, trail), [session, trail]);
   const placed = useMemo(() => placeFormation(formation), [formation]);
-  const fused = useMemo(() => completeSectionIndexes(formation), [formation]);
-  const lastSectionIndex = Math.max(-1, ...formation.nodes.map((node) => node.sectionIndex));
-  const keystone = lastSectionIndex >= 0 && fused.includes(lastSectionIndex);
+  // Fusion and the keystone are the server-projected Guardian victories (plan
+  // 2026-07-13-003 U6, KTD3) — mastery alone never fuses a Leg or crowns the summit.
+  const fused = useMemo(() => fusedSectionIndexes(trail), [trail]);
+  const keystone = hasSummitKeystone(trail);
   const mastered = trail.concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped);
 
   // Fusion celebration, once per newly fused leg: compare against the device memo, play

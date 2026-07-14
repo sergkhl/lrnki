@@ -1,16 +1,21 @@
 import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
+import { useRouter } from "expo-router";
 import { Flag, Mountain } from "lucide-react-native";
-import type { ScaffoldDetourView, StudySession } from "@lrnki/application/projection";
+import type { RecallScopeStatus, ScaffoldDetourView, StudySession } from "@lrnki/application/projection";
 import { resolveReferenceStopId } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
+import { GuardianArrivalDialog } from "./GuardianArrivalDialog";
+import { GuardianTrailNode } from "./GuardianTrailNode";
 import { SupportPathNode } from "./SupportPathNode";
 import { SupportPathSheet } from "./SupportPathSheet";
 import { SupportPathDialog, dialogStateForDetour } from "./SupportPathDialog";
 import { SectionCrystalStrip } from "./SectionCrystalStrip";
 import { hideScaffoldDetour, retryScaffoldDetour } from "@/lib/actions";
+import { enterGuardianScope } from "@/lib/guardianEntry";
+import { markGuardianArrivalSeen, readGuardianArrivalSeen } from "@/lib/navMemory";
 import { legBannerLine, terminusLine } from "@/learn/goalCopy";
 import { Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
@@ -38,6 +43,40 @@ export function CheckpointPath({
   const [progressDetourId, setProgressDetourId] = useState<string | null>(null);
   const [pathDetourId, setPathDetourId] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const router = useRouter();
+
+  // Guardian entry (plan 2026-07-13-003 U6): resume the active challenge or ask the server
+  // to create one, then move to the route-addressable fight. The scope facts are entirely
+  // server-projected; a failed entry leaves the trail untouched.
+  const enterScope = async (scope: RecallScopeStatus) => {
+    const result = await enterGuardianScope({ enrichmentId: session.enrichmentId, scope });
+    if (result.entered) router.push(`/guardian/${result.challengeId}`);
+  };
+
+  // The arrival offer (F1): the first unacknowledged available scope whose Leg is complete
+  // (or the unlocked summit) opens the non-blocking dialog once per device.
+  const [arrivalScope, setArrivalScope] = useState<RecallScopeStatus | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const candidates: RecallScopeStatus[] = [
+        ...view.sections.flatMap((section) =>
+          section.state === "complete" && section.recallScope?.state === "available" ? [section.recallScope] : []
+        ),
+        ...(view.enrichmentScope?.state === "available" ? [view.enrichmentScope] : [])
+      ];
+      for (const scope of candidates) {
+        if (await readGuardianArrivalSeen(session.learnerStateRef, scope.anchorDerivedNodeId)) continue;
+        if (!cancelled) setArrivalScope(scope);
+        return;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [view.sections, view.enrichmentScope, session.learnerStateRef]);
+  const acknowledgeArrival = () => {
+    if (arrivalScope) void markGuardianArrivalSeen(session.learnerStateRef, arrivalScope.anchorDerivedNodeId);
+    setArrivalScope(null);
+  };
 
   const referenceLabelFor = (derivedNodeId: string) =>
     session.detail.nodes.find((node) => node.derivedNodeId === derivedNodeId)?.label ?? derivedNodeId;
@@ -93,7 +132,13 @@ export function CheckpointPath({
         <View className="relative mx-auto w-full max-w-sm gap-5 px-2 py-2">
           {/* The dashed center trail line. */}
           <View className="absolute bottom-0 left-1/2 top-0 w-[3px] -translate-x-1/2 bg-trail-muted opacity-60" />
-          {view.concepts.map((concept, conceptIndex) => (
+          {view.concepts.map((concept, conceptIndex) => {
+            // The Leg's Guardian node projects after its LAST concept (F5): guarding the
+            // milestone the Leg builds toward, persistent across mastered/unfused, active,
+            // and won states; won nodes become rematch entries (KTD3).
+            const isSectionEnd = view.concepts[conceptIndex + 1]?.sectionIndex !== concept.sectionIndex;
+            const sectionView = view.sections.find((section) => section.sectionIndex === concept.sectionIndex);
+            return (
             <View key={concept.derivedNodeId} className="gap-5">
               {concept.isSectionStart ? (
                 <View onLayout={(event) => { sectionYRef.current[concept.sectionIndex] = event.nativeEvent.layout.y; }}>
@@ -130,8 +175,19 @@ export function CheckpointPath({
                   })}
                 </View>
               </View>
+              {isSectionEnd && sectionView?.recallScope ? (
+                <GuardianTrailNode
+                  scope={sectionView.recallScope}
+                  sectionComplete={sectionView.state === "complete"}
+                  onEnter={enterScope}
+                />
+              ) : null}
             </View>
-          ))}
+            );
+          })}
+          {view.enrichmentScope ? (
+            <GuardianTrailNode scope={view.enrichmentScope} sectionComplete onEnter={enterScope} />
+          ) : null}
           {view.concepts.length > 0 ? <TrailTerminus view={view} summitLabel={session.target.label} /> : null}
         </View>
       </ScrollView>
@@ -159,6 +215,16 @@ export function CheckpointPath({
         }}
         onOpenReference={openReferenceStep}
         referenceLabelFor={referenceLabelFor}
+      />
+      <GuardianArrivalDialog
+        scope={arrivalScope}
+        open={arrivalScope !== null}
+        onFace={() => {
+          const scope = arrivalScope;
+          acknowledgeArrival();
+          if (scope) void enterScope(scope);
+        }}
+        onDismiss={acknowledgeArrival}
       />
       {(() => {
         // The root-owned state-aware dialog (plan 2026-07-13-002 U3, KTD5): opened by the

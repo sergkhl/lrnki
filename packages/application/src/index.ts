@@ -65,17 +65,6 @@ export {
   type LearnerBadges
 } from "./weeklyLeaderboard";
 export { getWeeklyLeaderboard, lifetimeMasteredCrystalCount, type WeeklyLeaderboard } from "./getWeeklyLeaderboard";
-export {
-  getDuelSetup,
-  gradeDuelAnswer,
-  DUEL_REQUIRED_CRYSTALS,
-  DUEL_REQUIRED_ITEMS,
-  DUEL_QUESTION_COUNT,
-  type DuelSetup,
-  type DuelPoolItem,
-  type DuelAnswerSubmission,
-  type GradeDuelAnswerResult
-} from "./crystalDuel";
 
 export { createIntrinsicDifficultyPort } from "./intrinsicDifficulty";
 export { resolveConceptIdentity, type ConceptIdentityCandidate } from "./resolveConceptIdentity";

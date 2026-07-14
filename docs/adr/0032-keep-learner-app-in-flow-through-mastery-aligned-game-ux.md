@@ -1,7 +1,9 @@
 # Keep the Learner App in flow through mastery-aligned game UX
 
 Status: Accepted. Amended 2026-07-11 with the app-owned interaction system, overlay, motion, and
-haptic contract; amended 2026-07-12 with learner-requested Scaffold Detour support.
+haptic contract; amended 2026-07-12 with learner-requested Scaffold Detour support; amended
+2026-07-14 with the durable Recall Challenge (Crystal Guardian) recall-challenge path superseding
+Crystal Duel.
 
 ## Decision
 
@@ -56,6 +58,30 @@ activity advances into the capstone reward (gem) state. The learner should see t
 beat and then continue to the next available stop, or return to the trail only when the expedition
 has no next stop. Every learner-facing count (progress, gems) derives from the same trail scope the
 projection walks, so counts never drift from the trail.
+
+The single durable **recall challenge** is the **Recall Challenge** defined in
+[CONTEXT.md](../../CONTEXT.md), presented as the **Crystal Guardian** (Leg) and **Expedition
+Guardian** (summit) duel; it supersedes and replaces the earlier global Crystal Duel (its timer,
+simulated rival, unlock splash, grade/win API, award/badge, navigation, vocabulary, and client-local
+unlock memory are removed in the same change; the weekly podium is unaffected). A recall challenge is
+earned, scope-shaped, and mastery-aligned: it fires only at a completed Leg or the completed
+Expedition summit, draws its lineup exclusively from that scope's *already-passed* neutral Study Item
+Bank items (coverage-first — distinct concepts and the milestone/summit concept before repeats; five
+Leg / seven Expedition rounds are maxima, never invented minimums), and grants **no** reward when no
+eligible item exists (a content-coverage defect to surface, never a silent award). Its stakes are
+**corrective, not punitive**: a miss counterattacks a learner shield and re-queues the item, shield
+exhaustion enters a Last Stand that recovery repairs, and no challenge outcome ever causes defeat,
+mastery loss, reward loss, or a restart; there is no correctness timer. The lifecycle is durable and
+idempotent (one active fight per learner+scope, exact retreat/resume, confirmed abandon). The reward
+is a **permanent, singular** crystal formation (Leg) or summit keystone earned on the first victory;
+rematches rotate coverage and may replay the celebration but never dim, revoke, duplicate, or
+re-award it. Crucially, **challenge evidence is not acquisition evidence**: Guardian answers persist
+in their own durable challenge tables and never enter the neutral acquisition `response_log`, count
+toward Concept Mastery, award learning points, or alter prerequisite access — so finishing a Leg's
+normal Study Sessions keeps the next prerequisite-valid stop available even while its Guardian is
+postponed (the challenge gates the *reward*, never the *learning*). Version one challenges neutral
+concept Study Items only; extending fixed-budget selection to completed learner-scoped Support Paths
+is deferred until they carry a richer typed Study Item set.
 
 Achievement sharing is an accepted future need: a learner should eventually be able to export an
 achievement — at minimum their Crystal Vista formation — as a picture fit for posting outside the app

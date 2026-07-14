@@ -17,15 +17,6 @@ export {
   type SphereGridNodeInput
 } from "./sphereGridLayout";
 export {
-  DUEL_REQUIRED_CRYSTALS,
-  DUEL_REQUIRED_ITEMS,
-  DUEL_QUESTION_COUNT,
-  type DuelSetup,
-  type DuelPoolItem,
-  type DuelAnswerSubmission,
-  type GradeDuelAnswerResult
-} from "./crystalDuel";
-export {
   labelFor,
   type ConceptLessonSectionView,
   type ConceptLessonView,
@@ -62,4 +53,9 @@ export {
 } from "./studySessionTrail";
 // Type-only: the defining module pulls node:crypto at runtime, but type re-exports are erased.
 export type { MatchingAttemptTrace } from "./gradedSelectionOutcome";
-export type { RecallScopeStatus } from "./recallChallenge";
+export type {
+  RecallAnswerFeedback,
+  RecallChallengeView,
+  RecallMatchingProgressView,
+  RecallScopeStatus
+} from "./recallChallenge";

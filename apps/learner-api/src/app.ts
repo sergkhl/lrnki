@@ -6,11 +6,9 @@ import { z } from "zod";
 import {
   checkMatchingAttempt,
   enterLearnerSession,
-  getDuelSetup,
   getExpeditionCatalog,
   getExpeditionJournal,
   getStudySession,
-  gradeDuelAnswer,
   gradeScaffoldOptionSelect,
   gradeStudyResponse,
   hideLearnerScaffold,
@@ -27,7 +25,6 @@ import {
   PostgresConceptLessonStore,
   PostgresEnrichmentInspectionRead,
   PostgresEnrichmentLayerPurposeStore,
-  PostgresLearnerAwardsStore,
   PostgresLearnerExpeditionStore,
   PostgresLearnerRecallChallengeStore,
   PostgresLearnerScaffoldStore,
@@ -75,11 +72,6 @@ const sessionBody = z.object({
 });
 
 const matchingTrace = z.array(z.object({ promptId: z.string(), chosenMatchId: z.string() }));
-
-const duelSubmission = z.discriminatedUnion("itemType", [
-  z.object({ itemType: z.literal("option_select"), chosenOptionId: z.string() }),
-  z.object({ itemType: z.literal("impostor"), chosenStatementId: z.string() })
-]);
 
 // Recall Challenge transport bounds (plan 2026-07-13-003 KTD7/KTD8): UUIDs validated before
 // the application boundary, chosen ids bounded, and client-observed duration clamped to the
@@ -225,22 +217,6 @@ export function createLearnerApp(sql: DatabaseClient) {
 
     .get("/leaderboard", auth, async (c) => {
       return c.json(await loadLeaderboard(sql, c.get("learnerStateRef")));
-    })
-
-    .get("/duel-setup", auth, async (c) => {
-      const setup = await getDuelSetup(
-        { learnerStateRef: c.get("learnerStateRef") },
-        {
-          expeditionStore,
-          enrichmentRead: new PostgresEnrichmentInspectionRead(sql),
-          studyItemStore: new PostgresStudyItemBankStore(sql),
-          conceptLessonStore: new PostgresConceptLessonStore(sql),
-          responseLog: new PostgresResponseLogStore(sql),
-          verdictStore: new PostgresCalibrationVerdictStore(sql),
-          lessonReadStore: new PostgresLessonReadStore(sql)
-        }
-      );
-      return c.json(setup);
     })
 
     .get("/expedition/:enrichmentId", auth, async (c) => {
@@ -580,29 +556,6 @@ export function createLearnerApp(sql: DatabaseClient) {
       const result = await recallChallenges.abandon({ learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") });
       if (!result.applied) return c.json({ applied: false as const, refused: result.refused }, challengeRefusalStatus(result.refused));
       return c.json({ applied: true as const, view: result.view });
-    })
-
-    // Grade one duel answer (KTD3): resolves the key server-side and returns correctness only —
-    // it NEVER writes to the response log, so a duel cannot touch mastery state.
-    .post("/duel/grade", auth, zValidator("json", z.object({
-      studyItemId: z.string(),
-      submission: duelSubmission
-    })), async (c) => {
-      const result = await gradeDuelAnswer(c.req.valid("json"), { studyItemStore: new PostgresStudyItemBankStore(sql) });
-      return c.json(result);
-    })
-
-    // Record a durable `duel_win` award (R7/R8). `duelId` is the dedupe key, so a screen that
-    // re-submits the same finished duel never double-awards. Losing never calls this.
-    .post("/duel/win", auth, zValidator("json", z.object({ duelId: z.string().min(1) })), async (c) => {
-      await new PostgresLearnerAwardsStore(sql).record({
-        awardId: randomUUID(),
-        learnerRef: c.get("learnerStateRef"),
-        awardType: "duel_win",
-        dedupeKey: c.req.valid("json").duelId,
-        context: { at: new Date().toISOString() }
-      });
-      return c.json({ ok: true as const });
     });
 
   return app;

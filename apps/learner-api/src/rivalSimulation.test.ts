@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { assembleWeeklyBoard, rivalDuelAnswer, selectChase, simulateRivals } from "./rivalSimulation";
+import { assembleWeeklyBoard, selectChase, simulateRivals } from "./rivalSimulation";
 
 const base = { learnerRef: "Ada", weekKey: "2026-W28", viewerPoints: 20, count: 9, weekFraction: 0.5 };
 
@@ -50,29 +50,12 @@ test("selectChase picks the nearest rival above, else the nearest below when lea
   assert.equal(selectChase(10, []), null);
 });
 
-test("rivalDuelAnswer is deterministic in its seed and answer time stays within the clock (R7)", () => {
-  const a = rivalDuelAnswer({ seed: 7, band: 3, learnerLead: 0, questionMs: 15000 });
-  const b = rivalDuelAnswer({ seed: 7, band: 3, learnerLead: 0, questionMs: 15000 });
-  assert.deepEqual(a, b);
-  assert.ok(a.elapsedMs >= 0 && a.elapsedMs <= 15000);
-});
-
-test("rivalDuelAnswer accuracy falls on harder bands (aggregate over many seeds)", () => {
-  const winRate = (band: number) => {
-    let correct = 0;
-    const trials = 400;
-    for (let i = 0; i < trials; i += 1) if (rivalDuelAnswer({ seed: i, band, learnerLead: 0, questionMs: 15000 }).correct) correct += 1;
-    return correct / trials;
-  };
-  assert.ok(winRate(1) > winRate(5), "a band-5 crystal is harder for the rival than a band-1");
-});
-
 test("assembleWeeklyBoard fills to 10 rows, ranks them, and flags the viewer (AE2)", () => {
   const { entries, chase, viewerPoints } = assembleWeeklyBoard({
     viewerRef: "Ada",
     realRows: [
-      { learnerRef: "Ada", displayName: "Ada", points: 20, badges: { duelWins: 1, podiums: 0 } },
-      { learnerRef: "Bo", displayName: "Bo", points: 8, badges: { duelWins: 0, podiums: 0 } }
+      { learnerRef: "Ada", displayName: "Ada", points: 20, badges: { podiums: 0 } },
+      { learnerRef: "Bo", displayName: "Bo", points: 8, badges: { podiums: 0 } }
     ],
     weekKey: "2026-W28",
     nowMs: 500,
@@ -90,10 +73,10 @@ test("assembleWeeklyBoard hides zero-point non-viewers but keeps the viewer at 0
   const { entries, viewerPoints } = assembleWeeklyBoard({
     viewerRef: "Ada",
     realRows: [
-      { learnerRef: "Ada", displayName: "Ada", points: 0, badges: { duelWins: 0, podiums: 0 } },
-      { learnerRef: "Dormant", displayName: "Dormant", points: 0, badges: { duelWins: 0, podiums: 0 } },
-      { learnerRef: "junk-11c61546", displayName: "junk-11c61546", points: 0, badges: { duelWins: 0, podiums: 0 } },
-      { learnerRef: "Bo", displayName: "Bo", points: 5, badges: { duelWins: 0, podiums: 0 } }
+      { learnerRef: "Ada", displayName: "Ada", points: 0, badges: { podiums: 0 } },
+      { learnerRef: "Dormant", displayName: "Dormant", points: 0, badges: { podiums: 0 } },
+      { learnerRef: "junk-11c61546", displayName: "junk-11c61546", points: 0, badges: { podiums: 0 } },
+      { learnerRef: "Bo", displayName: "Bo", points: 5, badges: { podiums: 0 } }
     ],
     weekKey: "2026-W28",
     nowMs: 500,
@@ -112,7 +95,7 @@ function realRow(index: number, points: number) {
     learnerRef: `L${index}`,
     displayName: `Learner ${index}`,
     points,
-    badges: { duelWins: 0, podiums: 0 }
+    badges: { podiums: 0 }
   };
 }
 

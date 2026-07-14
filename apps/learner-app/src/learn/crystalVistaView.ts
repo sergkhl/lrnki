@@ -156,15 +156,19 @@ function lessonGist(session: StudySession, derivedNodeId: string): string | null
   return gist.text;
 }
 
-// The sections whose every concept is mastered — the vista celebrates when this set
-// gains a member (derived from the same nodes, so it cannot drift from the overview).
-export function completeSectionIndexes(formation: CrystalFormation): number[] {
-  const bySection = new Map<number, CrystalFormationNode[]>();
-  for (const node of formation.nodes) {
-    (bySection.get(node.sectionIndex) ?? bySection.set(node.sectionIndex, []).get(node.sectionIndex)!).push(node);
-  }
-  return [...bySection.entries()]
-    .filter(([, nodes]) => nodes.every((node) => node.state === "mastered"))
-    .map(([sectionIndex]) => sectionIndex)
+// The fused Legs — the sections whose Recall Challenge is WON (plan 2026-07-13-003 U6,
+// KTD3). Fusion is the server-projected first-victory fact, never mastery: a fully
+// mastered Leg with no won Guardian stays unfused, and a zero-item Leg can never fuse.
+// The vista celebrates when this set gains a member.
+export function fusedSectionIndexes(trail: TrailView): number[] {
+  return trail.sections
+    .filter((section) => Boolean(section.recallScope?.wonChallengeId))
+    .map((section) => section.sectionIndex)
     .sort((a, b) => a - b);
+}
+
+// The summit keystone exists exactly when the Expedition (summit) Recall Challenge is won
+// (KTD3) — not when the final Leg completes.
+export function hasSummitKeystone(trail: TrailView): boolean {
+  return Boolean(trail.enrichmentScope?.wonChallengeId);
 }

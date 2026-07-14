@@ -560,15 +560,14 @@ CREATE TABLE learners (
 );
 
 -- Durable learner awards (plan 2026-07-07-005, R8). One row per earned flair. A
--- `duel_win` is written when a learner wins a Crystal Duel; a `weekly_podium` is
--- awarded lazily and idempotently on first entry into a new ISO week (top 3 of the
--- prior week's final standings, KTD6). `dedupe_key` scopes idempotency: the ISO week
--- key for a podium, a duel id for a win. The UNIQUE makes re-award a no-op. Real
--- learners only — rivals are fiction and never earn persisted awards (KTD1).
+-- `weekly_podium` is awarded lazily and idempotently on first entry into a new ISO week
+-- (top 3 of the prior week's final standings, KTD6). `dedupe_key` scopes idempotency:
+-- the ISO week key for a podium. The UNIQUE makes re-award a no-op. Real learners only —
+-- rivals are fiction and never earn persisted awards (KTD1).
 CREATE TABLE learner_awards (
   award_id uuid PRIMARY KEY,
   learner_ref text NOT NULL REFERENCES learners(learner_ref),
-  award_type text NOT NULL CHECK (award_type IN ('duel_win', 'weekly_podium')),
+  award_type text NOT NULL CHECK (award_type IN ('weekly_podium')),
   dedupe_key text NOT NULL,
   context jsonb NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -1096,7 +1095,7 @@ CREATE TABLE response_log (
   learner_state_ref text NOT NULL REFERENCES learners(learner_ref),
   -- Discriminated response subject (plan 2026-07-12-002 U2, KTD4). Exactly one of the two
   -- shapes: the NEUTRAL pair (study_item_id + derived_node_id) — the only scope base mastery,
-  -- leaderboard, duel, journal, and calibration folds consume — or the SCAFFOLD reference
+  -- leaderboard, recall-challenge, journal, and calibration folds consume — or the SCAFFOLD reference
   -- (scaffold_step_id → a GENERATED learner-scoped step). An existing-node reference step
   -- studies the real node and so records NEUTRAL rows; only generated steps produce scaffold
   -- rows. The subject columns are nullable and the CHECK enforces mutual exclusivity.

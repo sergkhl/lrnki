@@ -75,7 +75,7 @@ export async function appendGradedSelectionOutcome(input: {
 // Scaffold-scoped counterpart (plan 2026-07-12-002 U5, KTD4): a generated Scaffold Step's
 // option-select grades through the SAME keyed-selection rule but appends a `scaffold`-scoped row
 // keyed on `scaffoldStepId`, never `study_item_id`/`derived_node_id`. Neutral folds ignore it
-// (`neutralResponses`), so scaffold study never touches base mastery, points, or duel pools.
+// (`neutralResponses`), so scaffold study never touches base mastery, points, or recall-challenge pools.
 export async function appendGradedScaffoldOutcome(input: {
   learnerStateRef: string;
   scaffoldStepId: string;

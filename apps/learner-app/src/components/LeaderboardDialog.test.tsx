@@ -14,7 +14,7 @@ export function boardFixture(overrides: Partial<LeaderboardView> = {}): Leaderbo
       name: index === 4 ? "scout" : `Rival ${index}`,
       isViewer: index === 4,
       points: 100 - index * 7,
-      badges: { duelWins: index === 0 ? 2 : 0, podiums: index === 1 ? 1 : 0 }
+      badges: { podiums: index === 1 ? 1 : 0 }
     })),
     chase: { name: "Rival 3", direction: "behind", gap: 7 },
     viewerPoints: 72,

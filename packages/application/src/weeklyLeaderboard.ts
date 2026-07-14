@@ -93,16 +93,14 @@ export function nodeCompletionTimeMs(input: {
 }
 
 // The board flair counts folded from a learner's durable awards (R6/R8).
-export type LearnerBadges = { duelWins: number; podiums: number };
+export type LearnerBadges = { podiums: number };
 
 export function badgesFromAwards(awards: LearnerAward[]): LearnerBadges {
-  let duelWins = 0;
   let podiums = 0;
   for (const award of awards) {
-    if (award.awardType === "duel_win") duelWins += 1;
-    else if (award.awardType === "weekly_podium") podiums += 1;
+    if (award.awardType === "weekly_podium") podiums += 1;
   }
-  return { duelWins, podiums };
+  return { podiums };
 }
 
 // One real learner's row on the weekly board (real rows only; rivals are merged presentation-side

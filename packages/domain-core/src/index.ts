@@ -1688,7 +1688,7 @@ export type ResponseSource = "synthetic" | "human";
 // The subject a graded response is ABOUT (plan 2026-07-12-002 U2, KTD4). Exhaustive and
 // mutually exclusive: a `neutral` response keys the neutral Study Item Bank identity
 // (`studyItemId`) on a Derived Graph node (`derivedNodeId`) — the only scope base mastery,
-// leaderboard, duel, journal, and calibration folds may consume; a `scaffold` response keys
+// leaderboard, recall-challenge, journal, and calibration folds may consume; a `scaffold` response keys
 // one learner-scoped generated Scaffold Step (`scaffoldStepId`), which those neutral folds
 // MUST ignore. An existing-node reference step submits NEUTRAL responses (it studies the real
 // node), so scaffold-scoped rows exist only for GENERATED steps. Backed by mutually exclusive
@@ -1730,7 +1730,7 @@ export type NeutralResponseLogRow = Extract<ResponseLogRow, { scope: "neutral" }
 export type ScaffoldResponseLogRow = Extract<ResponseLogRow, { scope: "scaffold" }>;
 
 // Narrow a mixed Response Log to the neutral observations only (KTD4). Every base-mastery,
-// leaderboard, duel, journal, and calibration fold routes its rows through this so a
+// leaderboard, recall-challenge, journal, and calibration fold routes its rows through this so a
 // scaffold response can never leak into neutral learner state (R19, U2 test scenario 5).
 export function neutralResponses(rows: readonly ResponseLogRow[]): NeutralResponseLogRow[] {
   return rows.filter((row): row is NeutralResponseLogRow => row.scope === "neutral");

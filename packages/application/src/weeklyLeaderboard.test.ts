@@ -62,9 +62,8 @@ test("computeWeeklyPoints sums bands only for nodes completed inside the half-op
 
 test("badgesFromAwards counts by type", () => {
   const badges = badgesFromAwards([
-    { awardId: "1", learnerRef: "x", awardType: "duel_win", dedupeKey: "d1", context: {}, createdAt: "2026-07-07T00:00:00Z" },
-    { awardId: "2", learnerRef: "x", awardType: "duel_win", dedupeKey: "d2", context: {}, createdAt: "2026-07-07T00:00:00Z" },
+    { awardId: "1", learnerRef: "x", awardType: "weekly_podium", dedupeKey: "2026-W26", context: {}, createdAt: "2026-06-30T00:00:00Z" },
     { awardId: "3", learnerRef: "x", awardType: "weekly_podium", dedupeKey: "2026-W27", context: {}, createdAt: "2026-07-07T00:00:00Z" }
   ]);
-  assert.deepEqual(badges, { duelWins: 2, podiums: 1 });
+  assert.deepEqual(badges, { podiums: 2 });
 });

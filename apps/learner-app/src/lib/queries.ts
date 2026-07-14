@@ -49,11 +49,26 @@ export const leaderboardQuery = queryOptions({
   staleTime: 60_000
 });
 
-export const duelSetupQuery = queryOptions({
-  queryKey: ["duel-setup"],
-  queryFn: () => api["duel-setup"].$get().then(unwrap),
-  staleTime: 60_000
-});
+// The Recall Challenge read (plan 2026-07-13-003 U5, KTD7): the route read IS exact resume —
+// the server refolds the immutable lineup + events, so a refreshed fight screen shows the
+// same wards, shield, and current item. `null` means over/foreign/unknown: the screen
+// returns safely to the trail instead of synthesizing local challenge state.
+export type ChallengeReadView = InferResponseType<(typeof api.challenge)[":challengeId"]["$get"], 200>["view"];
+
+export function challengeQuery(challengeId: string) {
+  return queryOptions({
+    queryKey: ["challenge", challengeId],
+    queryFn: async (): Promise<ChallengeReadView | null> => {
+      const res = await api.challenge[":challengeId"].$get({ param: { challengeId } });
+      if (res.status === 404) return null;
+      const body = await unwrap(res);
+      return body.view;
+    },
+    // The fight is mutation-driven: every answer/lifecycle response carries the next view,
+    // so background refetches would only race the committed state.
+    staleTime: Infinity
+  });
+}
 
 export function expeditionQuery(enrichmentId: string) {
   return queryOptions({

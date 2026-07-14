@@ -218,6 +218,27 @@ Item Bank. It teaches a concept before it is tested; structure and grounding are
 [ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md). Reading it is non-graded.
 _Avoid_: course, study screen, quiz, graded card, asserted graph mutation
 
+**Recall Challenge**:
+A durable, scope-shaped retrieval challenge over an Expedition Section (a **Leg**) or the whole Topic
+Expedition (the **summit**). Its lineup is a snapshot of only that scope's current neutral Study Item
+Bank items whose latest acquisition grade is correct — coverage-first, milestone/summit concept first,
+five-per-Leg / seven-per-Expedition maxima; a scope with no eligible item is unavailable, not
+auto-rewarded. Grading is server-owned and shares the Study Item response semantics but its evidence
+is written only to the challenge's own durable tables: challenge answers never enter the neutral
+acquisition `response_log`, Concept Mastery, learning points, or prerequisite gating (a miss cannot
+unmaster, a recovery cannot master). The Expedition (summit) scope stays locked until every Leg is
+won. The first victory is the sole, permanent reward for a scope (a Leg **crystal formation**, or the
+summit **keystone** binding the formations); rematches rotate coverage but never dim, revoke,
+duplicate, or re-award it. Its learner-facing presentation is the **Crystal Guardian** (Leg) and
+**Expedition Guardian** (summit) duel — wards, a recoverable crystal shield, and Last Stand — a
+corrective, never punitive metaphor rendered through the Learner App vocabulary
+([ADR-0033](docs/adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md)); its game-UX and
+reward-isolation policy is owned by
+[ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Support Steps
+and other non-neutral evidence are excluded from lineups.
+_Avoid_: Crystal Duel, retrieval sprint over all items, weakness-first selection, correctness timer,
+mastery-affecting challenge, boss-only generated content
+
 **Learner-Scoped Scaffold**:
 Learner/session-scoped generated support content that restores a Learner App's Flow Channel without
 becoming neutral graph or Study Item Bank content. Its durable, learner-requested realization is the

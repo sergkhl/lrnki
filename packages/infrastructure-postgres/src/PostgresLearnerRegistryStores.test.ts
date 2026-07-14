@@ -44,7 +44,7 @@ maybe("record is idempotent on (learner, type, dedupe_key): re-award is a no-op 
     assert.equal(listed.length, 1, "the re-award never duplicated the row");
     assert.deepEqual(listed[0].context, { rank: 1 });
 
-    const win = await awards.record({ awardId: randomUUID(), learnerRef: ref, awardType: "duel_win", dedupeKey: randomUUID(), context: {} });
+    const win = await awards.record({ awardId: randomUUID(), learnerRef: ref, awardType: "weekly_podium", dedupeKey: randomUUID(), context: {} });
     assert.equal(win.recorded, true, "a different type/dedupe is a distinct award");
     assert.equal((await awards.listForLearners([ref])).length, 2);
   } finally {

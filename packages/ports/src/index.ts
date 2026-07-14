@@ -614,7 +614,7 @@ export interface LearnerStorePort {
 export interface LearnerAward {
   awardId: string;
   learnerRef: string;
-  awardType: "duel_win" | "weekly_podium";
+  awardType: "weekly_podium";
   dedupeKey: string;
   context: Record<string, unknown>;
   createdAt: string;
@@ -622,8 +622,7 @@ export interface LearnerAward {
 
 // Durable award store (R8). `record` is idempotent on (learner, type, dedupe_key):
 // a repeat write is a no-op (`recorded: false`), so a re-entered week never
-// duplicates a podium and a re-shown duel never doubles a win. `listForLearner` and
-// `listForLearners` feed board flair.
+// duplicates a podium. `listForLearner` and `listForLearners` feed board flair.
 export interface LearnerAwardsStorePort {
   record(input: {
     awardId: string;

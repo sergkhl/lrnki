@@ -1,3 +1,4 @@
+import type { InferResponseType } from "hono/client";
 import type { MatchingAttemptTrace } from "@lrnki/application/projection";
 import type { Verdict } from "@lrnki/domain-core";
 import { api, queryClient } from "./api";
@@ -74,16 +75,55 @@ export async function markLearnerLessonRead(input: { enrichmentId: string; deriv
   await api.study["lesson-read"].$post({ json: input });
 }
 
-export async function gradeDuelAnswerAction(input: {
-  studyItemId: string;
-  submission: { itemType: "option_select"; chosenOptionId: string } | { itemType: "impostor"; chosenStatementId: string };
-}) {
-  const res = await api.duel.grade.$post({ json: input });
-  return (await res.json()) as import("@lrnki/application/projection").GradeDuelAnswerResult;
+// --- Recall Challenges (plan 2026-07-13-003 U5, KTD7) ------------------------------------
+// Thin typed calls over the neutral `/challenge/*` lifecycle. Result shapes derive
+// mechanically from the hono AppType (success AND refusal arms), so a server contract
+// change surfaces as a type error here. Callers mint attemptRef/operationRef UUIDs ONCE
+// per submission and reuse them across retries (KTD2 idempotency); the fight screen owns
+// query invalidation because only it knows when a scope's durable state changed.
+
+export type ChallengeCreateResult = InferResponseType<typeof api.challenge.create.$post>;
+export type ChallengeAnswerResult = InferResponseType<typeof api.challenge.answer.$post>;
+export type ChallengeLifecycleResult = InferResponseType<typeof api.challenge.retreat.$post>;
+
+export async function createChallengeAction(input: {
+  enrichmentId: string;
+  scopeKind: "section" | "enrichment";
+  anchorDerivedNodeId: string;
+}): Promise<ChallengeCreateResult> {
+  const res = await api.challenge.create.$post({ json: input });
+  return (await res.json()) as ChallengeCreateResult;
 }
 
-export async function recordDuelWinAction(input: { duelId: string }): Promise<void> {
-  await api.duel.win.$post({ json: input });
+export async function answerChallengeSelectionAction(input: {
+  challengeId: string;
+  attemptRef: string;
+  studyItemId: string;
+  chosenId: string;
+  responseDurationMs: number | null;
+}): Promise<ChallengeAnswerResult> {
+  const res = await api.challenge.answer.$post({ json: input });
+  return (await res.json()) as ChallengeAnswerResult;
+}
+
+export async function answerChallengeMatchingPairAction(input: {
+  challengeId: string;
+  attemptRef: string;
+  studyItemId: string;
+  promptId: string;
+  chosenMatchId: string;
+  responseDurationMs: number | null;
+}): Promise<ChallengeAnswerResult> {
+  const res = await api.challenge["matching-pair"].$post({ json: input });
+  return (await res.json()) as ChallengeAnswerResult;
+}
+
+export async function challengeLifecycleAction(
+  kind: "retreat" | "resume" | "abandon",
+  input: { challengeId: string; operationRef: string }
+): Promise<ChallengeLifecycleResult> {
+  const res = await api.challenge[kind].$post({ json: input });
+  return (await res.json()) as ChallengeLifecycleResult;
 }
 
 // --- Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U5) ----------------------------

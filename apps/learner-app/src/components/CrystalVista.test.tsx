@@ -13,8 +13,8 @@ jest.mock("@/lib/navMemory", () => ({
   writeFusedSections: jest.fn(() => Promise.resolve()),
   readBoardSeen: jest.fn(() => Promise.resolve(null)),
   writeBoardSeen: jest.fn(() => Promise.resolve()),
-  readDuelUnlockSeen: jest.fn(() => Promise.resolve(true)),
-  markDuelUnlockSeen: jest.fn(() => Promise.resolve())
+  readGuardianArrivalSeen: jest.fn(() => Promise.resolve(true)),
+  markGuardianArrivalSeen: jest.fn(() => Promise.resolve())
 }));
 
 const SAFE_AREA_METRICS = {

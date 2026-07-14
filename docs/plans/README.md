@@ -16,9 +16,6 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
   progress; automated U1–U4 and Playwright web gates pass for the split static/animated boundary,
   while the user-owned Android preview APK and physical-device acceptance pass remains before new
   learner surfaces build on the UI kit.
-- [Crystal Guardian Challenges](./2026-07-13-003-feat-crystal-guardian-challenges-plan.md) — ready;
-  durable Leg and Expedition recall challenges that earn crystal formations and supersede Crystal
-  Duel.
 
 ## Ownership rules
 
