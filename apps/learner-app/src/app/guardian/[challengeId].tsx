@@ -1,10 +1,9 @@
-import { ActivityIndicator, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { GuardianFight } from "@/components/GuardianFight";
 import { queryClient } from "@/lib/api";
 import { challengeQuery } from "@/lib/queries";
-import { Button, Screen, Text, colors } from "@/ui";
+import { RouteStatus } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
 // The route-addressable Guardian fight (plan 2026-07-13-003 U5, KTD9): the route read IS
@@ -23,34 +22,33 @@ export default function GuardianPage() {
     else router.replace("/");
   };
 
+  // The Guardian route already partitioned pending/error/over cleanly; U2 keeps that exact
+  // behavior and copy but renders it through the shared RouteStatus anatomy (KTD4).
   if (challenge.isPending) {
-    return (
-      <Screen className="items-center justify-center gap-3 p-6">
-        <ActivityIndicator size="large" color={colors.gem} />
-        <Text variant="label" color="muted">{learnerTerm("guardianTitle")}</Text>
-      </Screen>
-    );
+    return <RouteStatus tone="loading" title={learnerTerm("guardianTitle")} />;
   }
 
   if (challenge.isError) {
     return (
-      <Screen className="items-center justify-center gap-3 p-6">
-        <Text variant="title">{learnerTerm("guardianLoadError")}</Text>
-        <View className="flex-row gap-2">
-          <Button variant="primary" onPress={() => void challenge.refetch()} label={learnerTerm("guardianRetry")} />
-          <Button variant="outline" onPress={goBack} label={learnerTerm("returnToTrail")} />
-        </View>
-      </Screen>
+      <RouteStatus
+        tone="error"
+        title={learnerTerm("guardianLoadError")}
+        actions={[
+          { label: learnerTerm("guardianRetry"), onPress: () => void challenge.refetch() },
+          { label: learnerTerm("returnToTrail"), variant: "outline", onPress: goBack }
+        ]}
+      />
     );
   }
 
   if (!challenge.data) {
     return (
-      <Screen className="items-center justify-center gap-3 p-6">
-        <Text variant="title">{learnerTerm("guardianOverTitle")}</Text>
-        <Text variant="label" color="muted" className="text-center font-normal">{learnerTerm("guardianOverBody")}</Text>
-        <Button variant="primary" onPress={goBack} label={learnerTerm("returnToTrail")} />
-      </Screen>
+      <RouteStatus
+        tone="unavailable"
+        title={learnerTerm("guardianOverTitle")}
+        message={learnerTerm("guardianOverBody")}
+        actions={[{ label: learnerTerm("returnToTrail"), onPress: goBack }]}
+      />
     );
   }
 

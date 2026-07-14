@@ -16,7 +16,7 @@ beforeEach(() => {
 });
 
 test("the PIN field is secure and numeric, both fields keep labels and hints", async () => {
-  await render(<LearnerNameGate onEntered={() => {}} />);
+  await render(<LearnerNameGate />);
   const pin = screen.getByLabelText(learnerTerm("pinLabel"));
   expect(pin.props.secureTextEntry).toBe(true);
   expect(pin.props.inputMode).toBe("numeric");
@@ -28,22 +28,21 @@ test("the PIN field is secure and numeric, both fields keep labels and hints", a
 test("rapid repeated presses submit exactly one session request", async () => {
   let release: (value: { ok: true }) => void = () => {};
   enterSessionMock.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
-  const onEntered = jest.fn();
-  await render(<LearnerNameGate onEntered={onEntered} />);
+  await render(<LearnerNameGate />);
   const enter = screen.getByLabelText(learnerTerm("enterExplorerAction"));
   await fireEvent.press(enter);
   await fireEvent.press(enter);
   await fireEvent.press(screen.getByLabelText(learnerTerm("createAction")));
+  // Single-flight: only the first intent submits while one is pending (the transition to
+  // signed-in is owned by the seeded `me` query, not a gate callback — plan U1 KTD1).
   expect(enterSessionMock).toHaveBeenCalledTimes(1);
   release({ ok: true });
-  await waitFor(() => expect(onEntered).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.queryByText(gateErrorMessage("wrong_pin"))).toBeNull());
 });
 
-test("a refusal shows its themed message and never enters", async () => {
+test("a refusal shows its themed message and clears no error on success", async () => {
   enterSessionMock.mockResolvedValue({ ok: false, error: "wrong_pin" });
-  const onEntered = jest.fn();
-  await render(<LearnerNameGate onEntered={onEntered} />);
+  await render(<LearnerNameGate />);
   await fireEvent.press(screen.getByLabelText(learnerTerm("enterExplorerAction")));
   await waitFor(() => expect(screen.getByText(gateErrorMessage("wrong_pin"))).toBeTruthy());
-  expect(onEntered).not.toHaveBeenCalled();
 });

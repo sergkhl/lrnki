@@ -1,11 +1,19 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
-import { api, readToken } from "./api";
+import { api, clearToken, queryClient, readToken } from "./api";
 
 // Typed read layer (R1). The hono client keeps the request paths honest and the response
 // payloads derive mechanically from `AppType` (plan 2026-07-12-001 R12): a projection
 // field change in the application layer surfaces here as a type error, never as a stale
 // hand-written alias.
+
+// Every signed-in read lives under one learner-scoped prefix (plan 2026-07-14-001 KTD2):
+// a session swap or sign-out removes this single subtree, so no prior learner's cached
+// journal, catalog, expedition, challenge, or leaderboard view can survive into the next
+// session. `me` stays OUTSIDE the prefix — it is the session state machine itself (KTD1),
+// seeded and settled explicitly rather than purged.
+export const LEARNER_SCOPE = "learner" as const;
+export const learnerScopeKey = [LEARNER_SCOPE] as const;
 
 export type JournalView = InferResponseType<typeof api.journal.$get, 200>;
 export type CatalogView = InferResponseType<typeof api.catalog.$get, 200>;
@@ -20,31 +28,45 @@ async function unwrap<T>(res: { ok: boolean; status: number; json(): Promise<T> 
   return await res.json();
 }
 
+// The session state machine (KTD1). `me` is the SOLE signed-in source of truth:
+//   - pending  → a stored token is being validated (visible loading, plan U2)
+//   - error    → validation could not complete (network); the token is RETAINED and the
+//                route offers retry — a transient failure must never silently sign out
+//   - data     → signed in
+//   - null     → signed out (no token, or the token was rejected)
+// A 401 means the stored token is stale/revoked (a dev DB reset orphans tokens): drop it
+// and every learner-scoped cache here so the registry gate becomes the stable signed-out
+// state (R3), then settle to null. Only a 401 clears the credential; a thrown transport
+// error propagates as the error state above.
 export const meQuery = queryOptions({
   queryKey: ["me"],
   queryFn: async (): Promise<MeView | null> => {
     if (!readToken()) return null;
     const res = await api.me.$get();
-    if (res.status === 401) return null;
+    if (res.status === 401) {
+      clearToken();
+      queryClient.removeQueries({ queryKey: learnerScopeKey });
+      return null;
+    }
     return unwrap(res);
   },
   staleTime: Infinity
 });
 
 export const journalQuery = queryOptions({
-  queryKey: ["journal"],
+  queryKey: [LEARNER_SCOPE, "journal"],
   queryFn: () => api.journal.$get().then(unwrap)
 });
 
 // The catalog is deliberately not part of the journal's generation-poll payload.
 // It is fetched only after a learner opens Browse all.
 export const catalogQuery = queryOptions({
-  queryKey: ["catalog"],
+  queryKey: [LEARNER_SCOPE, "catalog"],
   queryFn: () => api.catalog.$get().then(unwrap)
 });
 
 export const leaderboardQuery = queryOptions({
-  queryKey: ["leaderboard"],
+  queryKey: [LEARNER_SCOPE, "leaderboard"],
   queryFn: () => api.leaderboard.$get().then(unwrap),
   staleTime: 60_000
 });
@@ -57,7 +79,7 @@ export type ChallengeReadView = InferResponseType<(typeof api.challenge)[":chall
 
 export function challengeQuery(challengeId: string) {
   return queryOptions({
-    queryKey: ["challenge", challengeId],
+    queryKey: [LEARNER_SCOPE, "challenge", challengeId],
     queryFn: async (): Promise<ChallengeReadView | null> => {
       const res = await api.challenge[":challengeId"].$get({ param: { challengeId } });
       if (res.status === 404) return null;
@@ -72,7 +94,7 @@ export function challengeQuery(challengeId: string) {
 
 export function expeditionQuery(enrichmentId: string) {
   return queryOptions({
-    queryKey: ["expedition", enrichmentId],
+    queryKey: [LEARNER_SCOPE, "expedition", enrichmentId],
     queryFn: async (): Promise<ExpeditionView | null> => {
       const res = await api.expedition[":enrichmentId"].$get({ param: { enrichmentId } });
       if (res.status === 404) return null;

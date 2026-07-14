@@ -25,7 +25,22 @@ const USED_KEYS = [
   "groundedBadge",
   "topicDoor",
   "generatingProgress",
-  "summit"
+  "summit",
+  "bootstrapLoading",
+  "sessionValidating",
+  "sessionErrorTitle",
+  "sessionErrorBody",
+  "retryAction",
+  "journalLoading",
+  "journalErrorTitle",
+  "journalErrorBody",
+  "catalogLoading",
+  "catalogErrorTitle",
+  "catalogErrorBody",
+  "expeditionLoading",
+  "expeditionErrorTitle",
+  "expeditionErrorBody",
+  "expeditionUnavailable"
 ] satisfies LearnerVocabularyKey[];
 
 test("learnerTerm returns text for every learner UI key", () => {

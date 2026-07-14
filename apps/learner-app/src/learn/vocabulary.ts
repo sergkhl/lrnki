@@ -54,6 +54,25 @@ export const LEARNER_VOCABULARY = {
   vistaGuardedTemplate: "Guarded by Leg {n}.",
   vistaEmpty: "No crystals on this trail yet.",
   vistaOpen: "Open the crystal formation",
+  // Async route states (plan 2026-07-14-001 U2, R6). One presentational RouteStatus surface
+  // renders these; the copy and recovery actions stay at each route boundary (KTD4). No
+  // query-driven route returns a blank frame — every pending/error/unavailable branch names
+  // its state and offers a way forward.
+  bootstrapLoading: "Starting up…",
+  sessionValidating: "Checking your explorer…",
+  sessionErrorTitle: "Couldn’t verify your explorer",
+  sessionErrorBody: "We couldn’t reach the trail to confirm your session. Check your connection and try again.",
+  retryAction: "Retry",
+  journalLoading: "Loading your journal…",
+  journalErrorTitle: "Your journal didn’t load",
+  journalErrorBody: "You’re still signed in. Retry, or log out to start fresh.",
+  catalogLoading: "Loading expeditions…",
+  catalogErrorTitle: "Couldn’t load expeditions",
+  catalogErrorBody: "The catalog is out of reach right now. Try again.",
+  expeditionLoading: "Loading your trail…",
+  expeditionErrorTitle: "This trail didn’t load",
+  expeditionErrorBody: "We couldn’t reach this expedition. Try again.",
+  expeditionUnavailable: "This expedition isn’t available.",
   // Registry gate.
   gateTitle: "Choose your explorer",
   gateDescription: "Pick up where you left off, or set out as a new explorer.",

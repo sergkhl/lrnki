@@ -4,15 +4,49 @@
 
 ### Active implementation
 
-- **Learner App native parity fix (IN PROGRESS — U1–U4 implemented; web/automated gate PASS
-  2026-07-14).** See the [active plan](./2026-07-13-004-fix-learner-app-native-parity-plan.md)
-  for implementation scope and KTD2 design. Focused split-boundary proofs, all 161 learner-app
-  tests, learner typecheck, web export, and `pnpm check` pass. The plan's representative Playwright
-  web gate also passed with zero page/console errors or strict shared-value warnings; evidence:
-  `tmp/2026-07-13-learner-app-native-parity/EVALUATION.md`. The native real-use gate remains
-  **BLOCKED** on the user-owned preview-APK/physical-device pass in [BLOCKERS.md](./BLOCKERS.md).
-  The Crystal Guardian surfaces shipped on web-correctness evidence (see COMPLETED); their native
-  device acceptance rides this same shared Android blocker, not a Guardian-specific one.
+- **Learner Runtime Reliability Fix (IN PROGRESS — U1+U2 done, U3–U6 next).** Execute the
+  [active plan](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) to repair
+  failed-login-then-signup session entry, blank query states, Android Theory scrolling and Support
+  Path generation-dialog geometry, and the web expedition-planning scrim layer. The prior
+  native-parity plan was deleted because physical Android observations disproved its dialog/scroll
+  acceptance despite its passing automated and web evidence. Web acceptance becomes a checked-in
+  automatic production-export gate; the final preview APK build and physical-Android pass remain
+  user-owned in [BLOCKERS.md](./BLOCKERS.md).
+
+  **Handoff (session 2026-07-14a):**
+  - **U1 DONE — atomic, query-owned session (`apps/learner-app`).** `me` is now the sole signed-in
+    source of truth. Removed the duplicate `hasToken` state and `LearnerNameGate.onEntered`; replaced
+    `queryClient.clear()` with a scoped swap. All signed-in reads (journal/catalog/leaderboard/
+    expedition/challenge) sit under one `["learner", …]` prefix (`LEARNER_SCOPE`/`learnerScopeKey` in
+    `lib/queries.ts`); `me` stays outside it. `enterSession` (`lib/session.ts`) now
+    cancels+removes the learner prefix, writes the token, and seeds `me` from the response (no second
+    `/me`). `meQuery` on 401 clears the token + removes the learner prefix (KTD1). `logout` removes
+    the prefix + sets `me` null (still re-throws a revoke failure after local cleanup — matches the
+    original `try/finally`). `actions.ts` invalidations reference `journalQuery.queryKey` /
+    `expeditionQuery(id).queryKey` (KTD3). `guardianEntry.ts` + guardian route already used
+    `challengeQuery(...).queryKey`, so they inherited the prefix automatically. Tests:
+    `lib/session.test.ts` (401 purge, AE1 failed-then-success seed + old-data-absent, in-flight
+    cancellation, logout cleanup incl. revoke failure, key-prefix invariant).
+  - **U2 DONE — exhaustive route states.** New app-owned `ui/routeStatus.tsx` (`RouteStatus`,
+    exported from `ui/index.ts`; loading/error/unavailable tones, copy+actions stay at the route
+    boundary per KTD4) + `ui/routeStatus.test.tsx`. Wired into `_layout.tsx` (visible bootstrap
+    loading, now rendered INSIDE the providers so `Screen` reads safe-area), `app/index.tsx` (session
+    validating / session error+retry+token-retained / gate / journal loading / journal error with
+    Retry+Log out — AE2), `app/catalog.tsx`, `app/expedition/[enrichmentId].tsx` (loading / error+retry
+    / 404-unavailable distinct), and `app/guardian/[challengeId].tsx` (migrated its existing
+    pending/error/over copy onto RouteStatus). New vocabulary keys (bootstrap/session/journal/catalog/
+    expedition status copy + `retryAction`) in `learn/vocabulary.ts` (+ test). Route test:
+    `app/index.test.tsx`.
+  - **Gate so far:** learner-app `typecheck` clean, `test` 185/185 (was 137), `eslint` 0 errors
+    (3 pre-existing warnings). No API/schema/content changes touched. Nothing committed (user hasn't
+    asked).
+  - **NEXT: U3** (bounded Android activity + dialog geometry — `ui/overlays.tsx`, `ActivitySheet.tsx`;
+    single numeric viewport cap replacing the %/class dual cap, natural-height shrink, bounded native
+    flex chain for `FullScreenDialog`, keep the web focus-wrapper compensation). Then **U4** (lift the
+    web `BottomSheet` into the root `PortalHost` on web only — `ui/sheets.tsx`), **U5** (checked-in
+    `@playwright/test` production-export suite; drop the unused direct `playwright` dep), **U6**
+    (rule-14 real-use + user-owned physical-Android gate; do NOT delete the plan or clear the blocker
+    until Android passes). U3 and U4 are independent of U1/U2 and of each other.
 
 ### Evidence-triggered follow-up
 

@@ -26,8 +26,10 @@ export function gateErrorMessage(error: GateError | "rate_limited"): string {
 // The registry gate: one identifier + secret form with two intents. Both branches call
 // POST /session, the single PIN-aware route; a wrong PIN never swaps the stored token.
 // `pending` remembers WHICH intent is in flight so only that button shows busy while
-// both stay locked (single-flight, U2 scenario 2).
-export function LearnerNameGate({ onEntered }: { onEntered: () => void }) {
+// both stay locked (single-flight, U2 scenario 2). On success `enterSession` seeds the
+// `me` query itself (plan 2026-07-14-001 KTD1/KTD2), so the mounted observer flips to the
+// Journal with no callback — the gate simply clears its error and unwinds.
+export function LearnerNameGate() {
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
   const [error, setError] = useState<GateError | "rate_limited" | null>(null);
@@ -41,7 +43,6 @@ export function LearnerNameGate({ onEntered }: { onEntered: () => void }) {
         const result = await enterSession({ intent, learnerStateRef: name, pin });
         if (result.ok) {
           setError(null);
-          onEntered();
           return;
         }
         setError(result.error);

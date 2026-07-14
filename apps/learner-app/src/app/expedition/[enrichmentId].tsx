@@ -8,7 +8,8 @@ import { CrystalVista } from "@/components/CrystalVista";
 import { QuestHeader } from "@/components/QuestHeader";
 import { buildTrailView } from "@lrnki/application/projection";
 import { expeditionQuery } from "@/lib/queries";
-import { Button, Screen, Text, buttonIconColor } from "@/ui";
+import { Button, RouteStatus, Screen, buttonIconColor } from "@/ui";
+import { learnerTerm } from "@/learn/vocabulary";
 
 // The expedition trail screen. Data comes prefetched/cached by Query before the sheet
 // opens (R6): the whole study session is one read, so the activity loop never spins.
@@ -24,13 +25,32 @@ export default function ExpeditionPage() {
     else router.replace("/");
   };
 
-  if (expedition.isPending) return null;
+  // Explicit async states (R6): loading is a visible progress state, a transport failure
+  // offers retry, and a genuine 404 (queryFn returns null) reads as "unavailable" — each
+  // distinct from the others and from a successful trail. Retry keeps the trail route.
+  if (expedition.isPending) {
+    return <RouteStatus tone="loading" title={learnerTerm("expeditionLoading")} />;
+  }
+  if (expedition.isError) {
+    return (
+      <RouteStatus
+        tone="error"
+        title={learnerTerm("expeditionErrorTitle")}
+        message={learnerTerm("expeditionErrorBody")}
+        actions={[
+          { label: learnerTerm("retryAction"), onPress: () => void expedition.refetch() },
+          { label: learnerTerm("returnToTrail"), variant: "outline", onPress: goHome }
+        ]}
+      />
+    );
+  }
   if (!expedition.data) {
     return (
-      <Screen className="items-center justify-center gap-3 p-4">
-        <Text variant="label" color="muted">This expedition is not available.</Text>
-        <BackButton onPress={goHome} />
-      </Screen>
+      <RouteStatus
+        tone="unavailable"
+        title={learnerTerm("expeditionUnavailable")}
+        actions={[{ label: learnerTerm("returnToTrail"), onPress: goHome }]}
+      />
     );
   }
 

@@ -4,6 +4,7 @@
 export { Button, IconButton, PressableSurface, buttonIconColor, type ButtonVariant, type PressableSurfaceProps } from "./actions";
 export { AppText as Text, Badge, Card, Input, Progress, Screen, type TextColor, type TextVariant } from "./foundation";
 export { Dialog, DialogBody, DialogFooter, FullScreenDialog, OverlayHeader, SideSheet, type OverlayProps } from "./overlays";
+export { RouteStatus, type RouteStatusAction, type RouteStatusTone } from "./routeStatus";
 export { BottomSheet } from "./sheets";
 export { triggerHaptic, type HapticIntent } from "./feedback";
 export { AnimatedView, MOTION, PRESS_SCALE, useReducedMotion } from "./motion";

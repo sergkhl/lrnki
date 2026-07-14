@@ -6,7 +6,8 @@ import { ArrowLeft } from "lucide-react-native";
 import { CandidateCard } from "@/components/ExpeditionEntry";
 import { filterCatalogCandidates } from "@/learn/catalogSearch";
 import { catalogQuery } from "@/lib/queries";
-import { Button, Card, Input, Screen, Text, buttonIconColor } from "@/ui";
+import { Button, Card, Input, RouteStatus, Screen, Text, buttonIconColor } from "@/ui";
+import { learnerTerm } from "@/learn/vocabulary";
 
 export default function CatalogPage() {
   const router = useRouter();
@@ -17,6 +18,26 @@ export default function CatalogPage() {
     if (router.canGoBack()) router.back();
     else router.replace("/");
   };
+
+  // Explicit pending/error states (R6): loading is no longer a blank list, and a failed read
+  // is distinct from a valid empty catalog (which the data branch below still renders as its
+  // own "no expeditions" card). Retry keeps the Browse route and its navigation context.
+  if (catalog.isPending) {
+    return <RouteStatus tone="loading" title={learnerTerm("catalogLoading")} />;
+  }
+  if (catalog.isError || !catalog.data) {
+    return (
+      <RouteStatus
+        tone="error"
+        title={learnerTerm("catalogErrorTitle")}
+        message={learnerTerm("catalogErrorBody")}
+        actions={[
+          { label: learnerTerm("retryAction"), onPress: () => void catalog.refetch() },
+          { label: learnerTerm("returnToTrail"), variant: "outline", onPress: goBack }
+        ]}
+      />
+    );
+  }
 
   return (
     <Screen>
@@ -42,7 +63,7 @@ export default function CatalogPage() {
           onChangeText={setSearch}
           accessibilityLabel="Search expeditions"
         />
-        {catalog.isPending ? null : results.length > 0 ? results.map((candidate) => (
+        {results.length > 0 ? results.map((candidate) => (
           <CandidateCard key={candidate.enrichmentId} candidate={candidate} />
         )) : (
           <Card>

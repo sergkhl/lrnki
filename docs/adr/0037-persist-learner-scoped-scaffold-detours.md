@@ -47,9 +47,9 @@ gating, crystals, leaderboard points, or base expedition progress
   discriminated neutral-or-scaffold reference over mutually exclusive foreign keys: the neutral
   `(study_item_id, derived_node_id)` pair ([ADR-0026](0026-typed-study-item-bank.md)) or one
   `scaffold_step_id`. Reference steps keep neutral identities, so scaffold-scoped rows exist only for
-  generated steps. Every neutral fold — mastery, calibration, leaderboard, duel, journal — consumes
-  neutral observations only; shared grading mechanics handle both scopes; one append-only monotonic
-  sequence per learner spans both.
+  generated steps. Every neutral fold — mastery, calibration, leaderboard, Recall Challenge,
+  journal — consumes neutral observations only; shared grading mechanics handle both scopes; one
+  append-only monotonic sequence per learner spans both.
 
 - **Grounding and observability.** Generated steps reuse verified parent/layer grounding when
   sufficient and pass the existing Knowledge-Boundary Probe before synthesizing source-less concepts
@@ -84,12 +84,13 @@ than merely discouraged.
 
 ## Consequences
 
-- Learner-scoped scaffold content and its scoped responses persist and remain inspectable for a later
-  fixed-budget Boss Fight recall challenge that samples completed visible detours — without
-  implementing that feature now.
-- Neutral mastery, prerequisite semantics, crystals, leaderboard points, duel behavior, and
-  expedition progress are provably unaffected by generated scaffold work; existing-node references
-  behave exactly like studying that node elsewhere.
+- Learner-scoped scaffold content and its scoped responses persist and remain inspectable for the
+  planned later fixed-budget Recall Challenge extension that samples completed visible detours;
+  implementing that extension remains deferred under
+  [ADR-0032](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+- Neutral mastery, prerequisite semantics, crystals, leaderboard points, Recall Challenge behavior,
+  and expedition progress are provably unaffected by generated scaffold work; existing-node
+  references behave exactly like studying that node elsewhere.
 - Admin learner-response inspection must resolve neutral versus scaffold subjects without assuming
   every observation joins `study_items`.
 - Development data is reset rather than migrated when the single initial schema gains the detour and

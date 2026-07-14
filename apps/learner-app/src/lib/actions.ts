@@ -2,6 +2,7 @@ import type { InferResponseType } from "hono/client";
 import type { MatchingAttemptTrace } from "@lrnki/application/projection";
 import type { Verdict } from "@lrnki/domain-core";
 import { api, queryClient } from "./api";
+import { expeditionQuery, journalQuery } from "./queries";
 import type { LearnerGradingResult, LearnerMatchingAttemptResult, LearnerMatchingResult } from "./api";
 
 export type { LearnerGradingResult, LearnerMatchingAttemptResult, LearnerMatchingResult };
@@ -11,15 +12,18 @@ export type { LearnerGradingResult, LearnerMatchingAttemptResult, LearnerMatchin
 // learnerStateRef leaves the client. `refreshLearnerExpedition` becomes Query
 // invalidation, the SPA's `revalidatePath`.
 
+// Invalidations reference the exported query definitions (KTD3): the learner-scope prefix
+// and every read's key have exactly one source of truth, so a key change cannot leave a
+// mutation refreshing a stale string array.
 export async function refreshLearnerExpedition(input: { enrichmentId: string }): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["expedition", input.enrichmentId] }),
-    queryClient.invalidateQueries({ queryKey: ["journal"] })
+    queryClient.invalidateQueries({ queryKey: expeditionQuery(input.enrichmentId).queryKey }),
+    queryClient.invalidateQueries({ queryKey: journalQuery.queryKey })
   ]);
 }
 
 export async function refreshJournal(): Promise<void> {
-  await queryClient.invalidateQueries({ queryKey: ["journal"] });
+  await queryClient.invalidateQueries({ queryKey: journalQuery.queryKey });
 }
 
 export async function chooseCandidateExpedition(input: { enrichmentId: string; title: string; declaredDomain: string }): Promise<void> {

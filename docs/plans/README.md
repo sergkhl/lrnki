@@ -12,10 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [Learner App Native Parity Fix](./2026-07-13-004-fix-learner-app-native-parity-plan.md) — in
-  progress; automated U1–U4 and Playwright web gates pass for the split static/animated boundary,
-  while the user-owned Android preview APK and physical-device acceptance pass remains before new
-  learner surfaces build on the UI kit.
+- [Learner Runtime Reliability Fix](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) — ready; supersedes the disproven native-parity plan and covers shared session entry, explicit route states, Android Theory/dialog geometry, web sheet layering, automatic browser acceptance, and the user-owned preview-APK/physical-Android gate.
 
 ## Ownership rules
 

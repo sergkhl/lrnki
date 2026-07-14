@@ -50,8 +50,8 @@ runbook; the single shared environment during testing is
   learner web build.
 - Pure learner view-model modules and the data layer moved into `apps/learner-app` with their
   tests; the seeded rival board assembly lives in `learner-api` (exported as a pure subpath for
-  the duel's client-side rival), and the sphere-grid layout lives in `@lrnki/application`
-  because both Admin Lab and the learner app render it.
+  the weekly leaderboard's presentation-only seeded rivals), and the sphere-grid layout lives in
+  `@lrnki/application` because both Admin Lab and the learner app render it.
 - The interim Vite + TanStack Router web SPA (`apps/learner-web`) was deleted at cutover; the
   monorepo uses pnpm's hoisted node linker because Metro's resolution needs transitive Babel
   plugins materialized.
