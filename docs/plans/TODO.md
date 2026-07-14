@@ -4,7 +4,7 @@
 
 ### Active implementation
 
-- **Learner Runtime Reliability Fix (IN PROGRESS — U1+U2 done, U3–U6 next).** Execute the
+- **Learner Runtime Reliability Fix (IN PROGRESS — U1–U4 done, U5–U6 next).** Execute the
   [active plan](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) to repair
   failed-login-then-signup session entry, blank query states, Android Theory scrolling and Support
   Path generation-dialog geometry, and the web expedition-planning scrim layer. The prior
@@ -40,13 +40,41 @@
   - **Gate so far:** learner-app `typecheck` clean, `test` 185/185 (was 137), `eslint` 0 errors
     (3 pre-existing warnings). No API/schema/content changes touched. Nothing committed (user hasn't
     asked).
-  - **NEXT: U3** (bounded Android activity + dialog geometry — `ui/overlays.tsx`, `ActivitySheet.tsx`;
-    single numeric viewport cap replacing the %/class dual cap, natural-height shrink, bounded native
-    flex chain for `FullScreenDialog`, keep the web focus-wrapper compensation). Then **U4** (lift the
-    web `BottomSheet` into the root `PortalHost` on web only — `ui/sheets.tsx`), **U5** (checked-in
-    `@playwright/test` production-export suite; drop the unused direct `playwright` dep), **U6**
-    (rule-14 real-use + user-owned physical-Android gate; do NOT delete the plan or clear the blocker
-    until Android passes). U3 and U4 are independent of U1/U2 and of each other.
+  **Handoff (session 2026-07-14b):**
+  - **U3 DONE — bounded Android activity + dialog geometry (`ui/overlays.tsx`, `ui/overlays.test.tsx`).**
+    Root cause of the border-only Android dialog = Yoga *grow-from-zero* collapse: `flex-1` (`flex:1 1
+    0%`) children under a max-height-ONLY column satisfy at zero intrinsic height. Fixes: (1) the
+    centered `Dialog` now caps with ONE window-derived NUMERIC px maximum (`Math.round(height*0.85)`
+    via `useWindowDimensions`), replacing the `max-h-[85%]` class + web-only `85vh` inline dual cap —
+    a numeric px cap resolves identically on Yoga and behind the web focus wrapper. (2) `DialogBody`
+    and the centered `Dialog`'s `OverlayEntrance` wrapper went `flex-1 min-h-0` → `shrink min-h-0`
+    (shrink-from-natural: content-height when short, body scrolls when the cap bites; header/footer
+    stay `shrink-0`). (3) `FullScreenDialog` native branch is now `flex-1 bg-background` (bounded flex
+    chain under the definite-height inset-0 Overlay) instead of `absolute inset-0`, which did NOT hand
+    the activity ScrollView a definite height on native (Theory couldn't scroll) — WEB keeps `absolute
+    inset-0` for the focus-wrapper compensation (`Platform.OS==="web"` split). No consumer heights/
+    platform checks added (Support Path/Theory/Board untouched). Added `testID="dialog-content"` +
+    `"fullscreen-content"` to lock the numeric cap and the native flex branch in tests.
+  - **U4 DONE — web planning sheet in the root modal layer (`ui/sheets.tsx`, `ui/overlays.test.tsx`).**
+    `BottomSheet` now wraps the Expo primitive in `<Portal name={useId()}>` from `@rn-primitives/portal`
+    on web ONLY (the same root-`PortalHost` escape the RN-Primitives dialogs already use), so the vaul
+    scrim+content out-rank every journal/Browse/expedition/Guardian stacking context with ZERO consumer
+    z-index change and no `node_modules` patch. Native returns the primitive in place unchanged
+    (system modal sheet, pan-down, safe-area, keyboard, dismissal guard all intact — R13). New test
+    flips `Platform.OS` to `"web"` and proves relocation (no host → nothing renders; root host present
+    → renders). The actual top-layer hit-testing proof is deferred to U5's Playwright suite per plan.
+  - **Gate so far:** learner-app `typecheck` clean, `test` 187/187 (was 185; +2 new: numeric-cap +
+    web-portal), `eslint` 0 errors on changed files, Expo **web export builds** (all 7 routes). jest
+    runs the NATIVE branch, so real Android scroll gestures + measured dialog pixels + the web top-layer
+    scrim remain U6/U5 proofs, not covered here (see U3/U4 risk mitigations). Nothing committed.
+  - **NEXT: U5** (checked-in `@playwright/test` production-export suite over the Expo web export;
+    deterministic API interception for session/journal/catalog/expedition/sheet; Chromium phone+desktop
+    viewports; wire into `pnpm check`; one-time pinned-Chromium provisioning script that FAILS with an
+    actionable command rather than downloading at test time; drop the unused direct `playwright` dep if
+    tracked code no longer imports it — verify first). Then **U6** (rule-14 real-use web gate + fold
+    result into TODO/BLOCKERS/README; the preview-APK physical-Android pass stays user-owned in
+    BLOCKERS.md — do NOT delete the plan or clear the blocker until Android passes). U5 depends on
+    U1–U4; U6 depends on U1–U5.
 
 ### Evidence-triggered follow-up
 

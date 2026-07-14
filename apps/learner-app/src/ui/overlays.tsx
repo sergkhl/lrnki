@@ -3,7 +3,7 @@
 // OverlayHeader with a circular semantic icon, and one dismissal contract. A pending
 // mutation blocks every dismissal input via `dismissBlocked`.
 import { useEffect, type ComponentType, type ReactNode } from "react";
-import { BackHandler, Platform, ScrollView, View } from "react-native";
+import { BackHandler, Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import { FadeInDown, FadeInRight } from "react-native-reanimated";
 import * as DialogPrimitive from "@rn-primitives/dialog";
 import { X } from "lucide-react-native";
@@ -75,8 +75,12 @@ export function DialogBody({
   children,
   contentClassName
 }: Readonly<{ children: ReactNode; contentClassName?: string }>) {
+  // `shrink min-h-0`, not `flex-1`: the body sizes to its content when the dialog fits and
+  // gives up space (scrolling) only when the numeric viewport cap bites. `flex-1` grows from
+  // a zero basis, which Yoga collapses to nothing under a max-height-only column (the former
+  // border-only Android dialog); shrink-from-natural is the measured-cap contract (KTD5, H2).
   return (
-    <ScrollView testID="dialog-body" className="min-h-0 flex-1" contentContainerClassName={contentClassName ?? "gap-3 p-4"}>
+    <ScrollView testID="dialog-body" className="min-h-0 shrink" contentContainerClassName={contentClassName ?? "gap-3 p-4"}>
       {children}
     </ScrollView>
   );
@@ -128,6 +132,7 @@ export type OverlayProps = Readonly<{
 /** Centered adaptive dialog (Board, celebrations): close control, Escape / system back,
  * and backdrop press all honor `dismissBlocked`. */
 export function Dialog({ open, onOpenChange, dismissBlocked = false, children }: OverlayProps) {
+  const { height } = useWindowDimensions();
   const requestClose = (next: boolean) => {
     if (!next && dismissBlocked) return;
     onOpenChange(next);
@@ -141,17 +146,20 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
           className="absolute inset-0 items-center justify-center bg-black/40 p-4"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
-          {/* The bounded dialog column (KTD9): Content caps the height; the entrance
-              wrapper and DialogBody carry `flex-1 min-h-0` so the BODY shrinks and
-              scrolls while the header and DialogFooter actions stay reachable. On web
-              the primitive inserts an unstyled auto-height focus wrapper between
-              Overlay and Content, so a percentage max-height resolves against the
-              dialog's own natural height and always clips it — cap by viewport there. */}
+          {/* The bounded dialog column (KTD5/KTD9): Content caps the height with ONE
+              window-derived NUMERIC maximum — a percentage cap needs a definite-height
+              parent, but on web the primitive inserts an unstyled auto-height focus
+              wrapper between Overlay and Content (percentage resolves against the
+              dialog's own natural height and clips it) and on native a max-only column
+              collapses `flex-1` children to zero. A numeric px cap resolves identically
+              on both engines. The entrance wrapper and DialogBody shrink from natural
+              height so the BODY scrolls while the header and DialogFooter stay reachable. */}
           <DialogPrimitive.Content
-            className="max-h-[85%] w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card"
-            style={Platform.OS === "web" ? ({ maxHeight: "85vh" } as object) : undefined}
+            testID="dialog-content"
+            className="w-full max-w-md overflow-hidden rounded-overlay border border-line bg-card"
+            style={{ maxHeight: Math.round(height * 0.85) }}
           >
-            <OverlayEntrance className="min-h-0 flex-1">{children}</OverlayEntrance>
+            <OverlayEntrance className="min-h-0 shrink">{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>
       </DialogPrimitive.Portal>
@@ -175,9 +183,16 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
           className="absolute inset-0"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
-          {/* absolute, not flex-1: the web primitive inserts an unstyled focus wrapper
-              between Overlay and Content, so stretch-based sizing collapses there. */}
-          <DialogPrimitive.Content className="absolute inset-0 bg-background">
+          {/* Web keeps absolute inset-0: the primitive inserts an unstyled focus wrapper
+              between Overlay and Content, so stretch-based flex sizing collapses there.
+              Native takes a bounded flex chain instead (H1): an absolute-positioned scroll
+              ancestor does not propagate a definite height to the activity ScrollView, so
+              Theory content grows unbounded and cannot scroll. `flex-1` under the
+              definite-height (inset-0) Overlay gives the ScrollView a real bound. */}
+          <DialogPrimitive.Content
+            testID="fullscreen-content"
+            className={Platform.OS === "web" ? "absolute inset-0 bg-background" : "flex-1 bg-background"}
+          >
             <OverlayEntrance className="flex-1">{children}</OverlayEntrance>
           </DialogPrimitive.Content>
         </DialogPrimitive.Overlay>

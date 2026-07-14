@@ -1,10 +1,11 @@
-// Bottom sheet (KTD2, R9-R10): a narrow controlled wrapper over the Expo UI drop-in
+// Bottom sheet (KTD2/KTD7, R9-R13): a narrow controlled wrapper over the Expo UI drop-in
 // bottom sheet, which owns platform gesture behavior (SwiftUI detents on iOS, Material3
 // modal sheet on Android, vaul on web). The app owns the header, dismissal guard, and
-// safe-area/keyboard framing.
-import { useEffect, useRef } from "react";
-import { View } from "react-native";
+// safe-area/keyboard framing — and, on web only, the root-layer placement.
+import { useEffect, useId, useRef } from "react";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Portal } from "@rn-primitives/portal";
 import BottomSheetPrimitive, { BottomSheetView, type BottomSheetMethods } from "@expo/ui/community/bottom-sheet";
 import type { OverlayProps } from "./overlays";
 import { colors } from "./tokens";
@@ -14,6 +15,9 @@ import { colors } from "./tokens";
 export function BottomSheet({ open, onOpenChange, dismissBlocked = false, children }: OverlayProps) {
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheetMethods>(null);
+  // A stable per-instance portal identity so sequential opens register and clean up their
+  // own root-layer entry (KTD7); it is constant across this instance's renders.
+  const portalName = useId();
 
   useEffect(() => {
     if (open) sheetRef.current?.snapToIndex(0);
@@ -22,7 +26,7 @@ export function BottomSheet({ open, onOpenChange, dismissBlocked = false, childr
 
   if (!open) return null;
 
-  return (
+  const sheet = (
     <BottomSheetPrimitive
       ref={sheetRef}
       enableDynamicSizing
@@ -44,4 +48,15 @@ export function BottomSheet({ open, onOpenChange, dismissBlocked = false, childr
       </BottomSheetView>
     </BottomSheetPrimitive>
   );
+
+  // On web the Expo sheet renders its scrim in place, trapped inside the journal's stacking
+  // contexts, so transformed/positioned journal, Browse, expedition, and Crystal Guardian
+  // surfaces can paint over it. Relocating the whole primitive to the root PortalHost — the
+  // same escape RN Primitives dialogs use — lifts scrim and content above every journal
+  // surface without any consumer z-index change (KTD7, R11-R12). Native keeps Expo's in-place
+  // system modal sheet and its gesture/safe-area/keyboard semantics untouched (R13).
+  if (Platform.OS === "web") {
+    return <Portal name={portalName}>{sheet}</Portal>;
+  }
+  return sheet;
 }
