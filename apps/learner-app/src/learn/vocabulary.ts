@@ -150,6 +150,16 @@ export const LEARNER_VOCABULARY = {
   guardianAnswerError: "That answer didn’t reach the Guardian.",
   guardianRetry: "Retry",
   guardianContinue: "Continue",
+  // Crystal Formation reward system (plan 2026-07-15-002 U3). The four Leg structural
+  // states plus the honest Guardian substates, announced as text everywhere the geode
+  // renders — color, glow, and animation are never the sole signal (R31).
+  legFuture: "Fogged leg",
+  legCollecting: "Collecting crystals",
+  legGuardianAwaits: "Guardian awaits",
+  legGuardianEngaged: "Guardian engaged",
+  legGuardianUnavailable: "Guardian has nothing to test yet",
+  legBound: "Bound formation",
+  capstoneCollected: "Crystal collected",
   // Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U6). Quiet, optional support the learner
   // requests for an unfamiliar term. The three broad phases theme the projection's stable ids
   // (KTD8, ADR-0033); the UI never shows counts or raw stage names.
@@ -209,6 +219,20 @@ export function scaffoldPhaseCopy(phase: "preparing" | "building" | "checking" |
   if (phase === "building") return learnerTerm("supportPhaseBuilding");
   if (phase === "checking") return learnerTerm("supportPhaseChecking");
   return learnerTerm("supportPhasePreparing");
+}
+
+// Theme a Leg's structural state + Guardian substate into one announced line (R7/R31).
+// The formation model owns the state; the UI only themes it (ADR-0033).
+export function legStateCopy(
+  state: "future" | "collecting" | "guardian_ready" | "bound",
+  substate: "available" | "engaged" | "unavailable" | null
+): string {
+  if (state === "future") return learnerTerm("legFuture");
+  if (state === "collecting") return learnerTerm("legCollecting");
+  if (state === "bound") return learnerTerm("legBound");
+  if (substate === "engaged") return learnerTerm("legGuardianEngaged");
+  if (substate === "unavailable") return learnerTerm("legGuardianUnavailable");
+  return learnerTerm("legGuardianAwaits");
 }
 
 export function expeditionStatusLabel(status: "generating" | "ready" | "failed"): string {

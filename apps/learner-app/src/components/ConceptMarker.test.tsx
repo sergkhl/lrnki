@@ -30,6 +30,24 @@ test("the concept row is a disclosure: expanded state toggles and the panel appe
   expect(screen.queryByLabelText(learnerTerm("skipKnown"))).toBeNull();
 });
 
+test("the compact row shows a status icon with exact growth text, never a tiny specimen (U1, R14)", async () => {
+  const session = sessionFixture();
+  const concept = buildTrailView(session).concepts[0];
+  await render(<ConceptMarker concept={concept} session={session} />);
+  expect(screen.getByLabelText("Not collected")).toBeTruthy();
+  expect(screen.getByText(`${Math.round(concept.growthFraction * 100)}%`)).toBeTruthy();
+  expect(screen.queryAllByTestId("facet-grown")).toHaveLength(0);
+  expect(screen.queryAllByTestId("shard-static")).toHaveLength(0);
+});
+
+test("a known-skipped concept row announces known ground, not a collection", async () => {
+  const session = sessionFixture();
+  const concept = { ...buildTrailView(session).concepts[0], isKnownSkipped: true, state: "mastered" as const };
+  await render(<ConceptMarker concept={concept} session={{ ...session, verdictByNode: { n1: "known" as const } }} />);
+  expect(screen.getByLabelText(learnerTerm("known"))).toBeTruthy();
+  expect(screen.queryByLabelText("Collected")).toBeNull();
+});
+
 test("skip-as-known still runs the verdict mutation and refresh", async () => {
   const session = sessionFixture();
   const concept = buildTrailView(session).concepts[0];

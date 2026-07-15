@@ -1,19 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BookOpen, CheckCircle2, HelpCircle, MapPin, Rows3, Search } from "lucide-react-native";
+import { BookOpen, CheckCircle2, Gem, HelpCircle, MapPin, Rows3, Search } from "lucide-react-native";
 import type { ExplorableTermView, StudySession } from "@lrnki/application/projection";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/lib/api";
 import { hideScaffoldDetour, markLearnerLessonRead, refreshLearnerExpedition, requestScaffoldDetour, retryScaffoldDetour, submitLearnerImpostor, submitLearnerMatching, submitLearnerOptionSelect, validateLearnerMatchingAttempt } from "@/lib/actions";
 import { Button, FullScreenDialog, OverlayHeader, Text, colors, triggerHaptic } from "@/ui";
 import { ImpostorBody, OptionSelectBody } from "./ActivityCards";
-import { CrystalGlyph } from "./CrystalGlyph";
+import { LegFormationScene } from "./LegFormationScene";
 import { LessonSections } from "./LessonSections";
 import { MatchingBoard } from "./MatchingBoard";
 import { SupportPathDialog, type SupportPathDialogState } from "./SupportPathDialog";
 import { SupportPathsPanel } from "./SupportPathsPanel";
 import type { ScaffoldTermSource } from "@/lib/actions";
 import { activeStopFor, type AdvanceMemory } from "@/learn/advanceMemory";
+import { buildLegModel, formationInputFrom } from "@/learn/crystalFormationLayout";
 import { resolveStopActivity } from "@lrnki/application/projection";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import { buildTrailView } from "@lrnki/application/projection";
@@ -103,7 +104,7 @@ export function ActivitySheet({
     >
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <OverlayHeader
-          icon={activity ? <ActivityHeaderIcon session={session} activity={activity} /> : <HelpCircle size={20} color={colors.ink} />}
+          icon={activity ? <ActivityHeaderIcon activity={activity} /> : <HelpCircle size={20} color={colors.ink} />}
           title={title}
           description={activity ? descriptionFor(activity.kind) : learnerTerm("nextStop")}
           onClose={close}
@@ -183,20 +184,12 @@ function dialogStateFor(view: ExplorableTermView | null, requesting: boolean): S
 }
 
 // The header circle mirrors the checkpoint that opened the activity: same icon set,
-// same crystal for a capstone (KTD4 single mapping via checkpointPresentation).
-function ActivityHeaderIcon({ session, activity }: Readonly<{ session: StudySession; activity: Activity }>) {
+// a universal gem status icon for a capstone — a detailed specimen is unreadable at
+// this size (U1, R14); the capstone card below carries the real specimen.
+function ActivityHeaderIcon({ activity }: Readonly<{ activity: Activity }>) {
   if (activity.kind === "missing") return <HelpCircle size={20} color={colors.ink} />;
   if (activity.kind === "capstone") {
-    return (
-      <CrystalGlyph
-        derivedNodeId={activity.derivedNodeId}
-        difficulty={activity.difficulty}
-        growthFraction={activity.growthFraction}
-        state={activity.mastered ? "mastered" : "frontier"}
-        ghost={activity.isKnownSkipped}
-        size={28}
-      />
-    );
+    return <Gem size={20} color={activity.mastered && !activity.isKnownSkipped ? colors.gem : colors.ink} />;
   }
   const icon = checkpointPresentation({ kind: activity.kind, state: "available" }).icon;
   const Icon = HEADER_ICONS[icon as Exclude<CheckpointIcon, "crystal">] ?? HelpCircle;
@@ -321,7 +314,7 @@ function ActivityController({
       <ScrollView className="flex-1">
         <View className="mx-auto w-full max-w-3xl gap-4 p-4">
           <CompletedIndicator session={session} activity={activity} result={result} />
-          <ActivityBody activity={activity} selectedId={selectedId} result={result} pending={pending} justAdvanced={justAdvanced} supportSlot={supportSlot} onPressTerm={onPressTerm} onSelect={submitSelection} onMatchingAttempt={validateMatching} onMatchingComplete={submitMatching} />
+          <ActivityBody session={session} activity={activity} selectedId={selectedId} result={result} pending={pending} justAdvanced={justAdvanced} supportSlot={supportSlot} onPressTerm={onPressTerm} onSelect={submitSelection} onMatchingAttempt={validateMatching} onMatchingComplete={submitMatching} />
           {result && !result.graded ? <Text variant="label" color="destructive" className="font-normal">{result.message}</Text> : null}
         </View>
       </ScrollView>
@@ -341,6 +334,7 @@ function ActivityController({
 }
 
 function ActivityBody({
+  session,
   activity,
   selectedId,
   result,
@@ -352,6 +346,7 @@ function ActivityBody({
   onMatchingAttempt,
   onMatchingComplete
 }: Readonly<{
+  session: StudySession;
   activity: Activity;
   selectedId: string | null;
   result: ActivityResult;
@@ -371,7 +366,7 @@ function ActivityBody({
   if (activity.kind === "matching") return <MatchingBoard item={activity.item} result={isMatchingResult(result) ? result : null} disabled={pending} supportSlot={supportSlot} onAttempt={onMatchingAttempt} onComplete={onMatchingComplete} />;
   if (activity.kind === "impostor") return <ImpostorBody item={activity.item} selectedId={selectedId} result={isSelectionResult(result) ? result : null} disabled={pending} supportSlot={supportSlot} onSelect={onSelect} />;
   if (activity.kind === "capstone") {
-    return <CapstoneReveal activity={activity} justAdvanced={justAdvanced} />;
+    return <CapstoneReveal session={session} activity={activity} justAdvanced={justAdvanced} />;
   }
   // Theory: inline first-occurrence highlights in the prose (R5-R6) with the persistent
   // panel FOLLOWING the content as the large-target inventory (R7).
@@ -390,43 +385,53 @@ function ActivityBody({
   );
 }
 
-// The mastery reveal (U5, R14-R15): a capstone reached by advancing IN this sheet
-// assembles its crystal facet-by-facet once, with one mastery haptic at that same
-// transition. Reopening a mastered capstone — and any known-skipped capstone — renders
-// the complete crystal statically with no haptic (AE7).
+// The mastery collection reward (plan 2026-07-15-002 U3, R16/KTD5-KTD6): a capstone
+// reached by advancing IN this sheet renders a focused crop of the concept's SHARED Leg
+// scene — only the new specimen rises into its deterministic slot, existing specimens
+// stay still, and one mastery haptic fires at that same in-sheet transition. Reopening a
+// mastered capstone — and any known-skipped capstone — renders the settled scene
+// statically with no haptic (AE2/AE7). No gem flies between screens.
 function CapstoneReveal({
+  session,
   activity,
   justAdvanced
-}: Readonly<{ activity: Extract<Activity, { kind: "capstone" }>; justAdvanced: boolean }>) {
-  const assemble = justAdvanced && activity.mastered && !activity.isKnownSkipped;
+}: Readonly<{ session: StudySession; activity: Extract<Activity, { kind: "capstone" }>; justAdvanced: boolean }>) {
+  const collected = justAdvanced && activity.mastered && !activity.isKnownSkipped;
   useEffect(() => {
-    if (assemble) triggerHaptic("mastery");
+    if (collected) triggerHaptic("mastery");
     // The haptic belongs to the one just-mastered reveal; deps stay mount-scoped so a
     // re-render can never repeat it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const leg = useMemo(() => {
+    const input = formationInputFrom(session, buildTrailView(session));
+    const sectionIndex = input.concepts.find((concept) => concept.derivedNodeId === activity.derivedNodeId)?.sectionIndex;
+    const section = input.sections.find((candidate) => candidate.sectionIndex === sectionIndex);
+    if (section === undefined) return null;
+    return buildLegModel(section, input.concepts.filter((concept) => concept.sectionIndex === sectionIndex), input.edges);
+  }, [session, activity.derivedNodeId]);
   return (
     <View className="gap-3 rounded-card border border-line bg-card p-4">
-      <View className="flex-row items-center gap-3">
-        <CrystalGlyph
-          derivedNodeId={activity.derivedNodeId}
-          difficulty={activity.difficulty}
-          growthFraction={activity.growthFraction}
-          state={activity.mastered ? "mastered" : "frontier"}
-          ghost={activity.isKnownSkipped}
-          assemble={assemble}
-          size={72}
-        />
-        <View className="min-w-0 flex-1">
-          <Text variant="title" className="text-lg">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("summit") : learnerTerm("capstone")}</Text>
-          <Text variant="label" color="muted" className="font-normal">
-            {activity.isKnownSkipped
-              ? "Known ground is complete, but no crystal is collected."
-              : activity.mastered
-                ? "This crystal is collected."
-                : "Complete the earlier stops to finish growing this crystal."}
-          </Text>
+      {leg ? (
+        <View className="items-center">
+          <LegFormationScene
+            leg={leg}
+            mode="collection"
+            focusNodeId={activity.derivedNodeId}
+            enteringNodeId={collected ? activity.derivedNodeId : null}
+            width={220}
+          />
         </View>
+      ) : null}
+      <View className="min-w-0">
+        <Text variant="title" className="text-lg">{activity.isKnownSkipped ? learnerTerm("known") : activity.mastered ? learnerTerm("capstoneCollected") : learnerTerm("capstone")}</Text>
+        <Text variant="label" color="muted" className="font-normal">
+          {activity.isKnownSkipped
+            ? "Known ground is complete, but no crystal is collected."
+            : activity.mastered
+              ? "This crystal now sits in its leg's formation."
+              : "Complete the earlier stops to finish growing this crystal."}
+        </Text>
       </View>
     </View>
   );

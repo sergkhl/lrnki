@@ -12,12 +12,12 @@ import { GuardianTrailNode } from "./GuardianTrailNode";
 import { SupportPathNode } from "./SupportPathNode";
 import { SupportPathSheet } from "./SupportPathSheet";
 import { SupportPathDialog, dialogStateForDetour } from "./SupportPathDialog";
-import { SectionCrystalStrip } from "./SectionCrystalStrip";
 import { hideScaffoldDetour, retryScaffoldDetour } from "@/lib/actions";
 import { enterGuardianScope } from "@/lib/guardianEntry";
 import { markGuardianArrivalSeen, readGuardianArrivalSeen } from "@/lib/navMemory";
 import { legBannerLine, terminusLine } from "@/learn/goalCopy";
-import { Text, colors } from "@/ui";
+import { formationProgress, formationProgressLine } from "@/learn/mineralSpecimen";
+import { Progress, Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 import type { TrailCluster, TrailStop, TrailView } from "@lrnki/application/projection";
 
@@ -260,23 +260,27 @@ export function CheckpointPath({
 
 // The leg banner (plan 2026-07-10-001 U2): a section boundary that ANNOUNCES the leg's
 // goal in advance — how many crystals guard the milestone — and flips to the secured
-// state once every concept in the leg is mastered. Its crystal strip previews the
-// section's formation growing as concepts complete.
+// state once every concept in the leg is mastered. An accessible completion meter plus
+// exact crystal/known counts replaced the miniature specimen row (U1, R14-R15).
 function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailCluster; sectionConcepts: TrailCluster[] }>) {
   const masteredCount = sectionConcepts.filter((candidate) => candidate.state === "mastered").length;
   const secured = masteredCount >= sectionConcepts.length;
+  const progress = formationProgress(sectionConcepts);
   return (
-    <View className="flex-row items-center gap-2 rounded-card border border-line bg-card px-3 py-2">
-      <Flag size={16} color={secured ? colors.secured : colors.frontier} />
-      <Text variant="label" className="min-w-0 flex-1 font-semibold" numberOfLines={2}>
-        {legBannerLine({
-          sectionIndex: concept.sectionIndex,
-          conceptCount: sectionConcepts.length,
-          masteredCount,
-          milestoneLabel: concept.milestoneLabel
-        })}
-      </Text>
-      <SectionCrystalStrip concepts={sectionConcepts} className="shrink-0 justify-end" />
+    <View className="gap-1.5 rounded-card border border-line bg-card px-3 py-2">
+      <View className="flex-row items-center gap-2">
+        <Flag size={16} color={secured ? colors.secured : colors.frontier} />
+        <Text variant="label" className="min-w-0 flex-1 font-semibold" numberOfLines={2}>
+          {legBannerLine({
+            sectionIndex: concept.sectionIndex,
+            conceptCount: sectionConcepts.length,
+            masteredCount,
+            milestoneLabel: concept.milestoneLabel
+          })}
+        </Text>
+      </View>
+      <Progress fraction={progress.completionFraction} accessibilityLabel={formationProgressLine(progress)} />
+      <Text variant="caption" color="muted">{formationProgressLine(progress)}</Text>
     </View>
   );
 }

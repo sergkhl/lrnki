@@ -4,8 +4,73 @@
 
 ### Active implementation
 
-- None. The Durable Learner E2E Gates work completed 2026-07-15 (see COMPLETED + VALIDATION); its
-  durable policy is [ADR-0038](../adr/0038-native-interaction-gate-scope-and-physical-authority.md).
+- **Crystal Formation Reward UX (IN PROGRESS — U1–U3 DONE, Milestone Gate A PASS 2026-07-15;
+  next = U4).** Execute the
+  [active plan](./2026-07-15-002-feat-crystal-formation-reward-ux-plan.md): replace miniature
+  shard/aura presentation with one shared mineral-geode formation language for mastery collection,
+  first Guardian reward, honest rematches, and deliberate Crystal Vista exploration.
+
+  **Status (2026-07-15): U1–U3 complete and green (application 670, learner-app 225 jest across 49
+  suites, workspace typecheck, `pnpm e2e:web` 22/22 phone+desktop); nothing committed (user hasn't
+  asked).** Gate A evidence + evaluation note:
+  `tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection/EVALUATION.md` (PASS after 3
+  in-gate fixes: "Summit reached"→`capstoneCollected` copy defect, over-dominant branch zigzag
+  thinned/rerouted, collection crop 1.7→2.2×slot to stop neighbor clipping).
+  - **U1.** `TrailCluster.sectionPositionIndex` copied from the expedition step (neutral ordering
+    metadata, `studySessionTrail.ts`). New pure `src/learn/mineralSpecimen.ts`: balanced
+    quartz/fluorite/calcite habit cycle (`mineralHabitFor` = FNV section offset +
+    `sectionPositionIndex`), node-seeded facet geometry (shared FNV-1a/mulberry32 exported for the
+    layout module), `visibleMineralFacets` (final facet reserved for mastery), and the ONE honest
+    compact-progress derivation `formationProgress`/`formationProgressLine`
+    ("N of M ground complete · K crystals · J known" — known ground can never inflate crystals).
+    New `CrystalSpecimen`/`MineralFacetsGroup` (ghost = outline-only in every state). Compact
+    surfaces migrated: QuestHeader vista door = Gem icon + exact count (new test), SectionOverview
+    + CheckpointPath `SectionDivider` = `Progress` meter + progress line (`SectionCrystalStrip`
+    DELETED), ConceptMarker = Gem status icon + exact `%`, ActivitySheet header = Gem icon,
+    CheckpointCircle 40px capstone = real `CrystalSpecimen`, CrystalGuardian body = composed
+    3-habit mineral group (`GUARDIAN_DIFFICULTY` + `CrystalShardsGroup` use deleted).
+  - **U2.** Pure `src/learn/crystalFormationLayout.ts`: per-Leg Sphere Grid with constant `"leg"`
+    domain over ONLY trusted same-Leg edges, Leg-local normalization (flip/scale 130→76-px
+    lattice, `SLOT_SIZE` 48), 4 structural states (`legStructuralState`: bound ONLY from
+    `wonChallengeId`; guardian substates available/engaged/unavailable), irregular matrix contour +
+    seam (jitter ≤10 inside `MATRIX_PAD` 34 so slots provably contained), flagged-Leg vein
+    omission with `crossings` diagnostic, alternating non-overlapping ascent + winding spine
+    (`lit` per bound Leg) + terminus (`crowned` only from enrichment `wonChallengeId`), and
+    `fitLegWidth` (40-px floor → horizontal overflow). Input-order independent (slots/veins
+    canonically sorted). Per-Leg zero-crossing regression added to
+    `packages/application/src/sphereGridLayout.test.ts` (17 Legs / max 10 nodes from the 59-node
+    real-shape fixture via `projectExpeditionSections`, every Leg crossing-free); the known
+    4-node/5-edge tangle (n0→n1,n2,n3; n1→n2,n3) is the locked flagged fixture.
+  - **U3.** `LegFormationScene` (modes `overview`/`collection`/`binding`-stub): layered geode
+    bands, seam open/fractured/sealed, quiet nonsemantic branch, thin dotted exact veins, one
+    slot-specimen per concept; ONLY `enteringNodeId` plays the one-shot rise (played-event ref, no
+    replay on rerender; reduced motion = immediate final state). ActivitySheet `CapstoneReveal`
+    now renders the focused shared Leg crop (width 220, crop 2.2×slot), single mastery haptic
+    unchanged and mount-scoped. New `e2e/crystal-formation.spec.ts` +
+    `e2e/scenarios/crystalFormation.ts` (domain-neutral Waypoint fixture; collecting→collected
+    phase flip on the graded POST): AE1 honest compact progress, AE2 collection + settled reopen,
+    AE9 reduced motion — 8/8 on phone+desktop. New vocab: `legFuture/legCollecting/
+    legGuardianAwaits/legGuardianEngaged/legGuardianUnavailable/legBound/capstoneCollected` +
+    `legStateCopy`.
+  - **Gotchas for the next session:** (a) in learner-app jest, any root mounted after the SECOND
+    `render()` inside one test renders EMPTY and poisons later tests in the file — one render per
+    test (`test.each`), never loops; (b) on web, RNSVG hosts expose the parsed viewBox as
+    `vbWidth`/`vbHeight` props (no `viewBox` prop) and `getByRole("img", { name })` is the robust
+    Playwright selector for scene labels (the Leg banner `Progress` meter announces the same
+    progress line — plain `getByLabel` strict-mode collides); (c) multiple complete capstones share
+    `checkpoint-capstone-complete` — scope with `.last()`; (d) legacy `CrystalGlyph`/
+    `crystalGeometry` now have exactly ONE live consumer, `CrystalVista` — U4 deletes them
+    together with `crystalVistaView`/`FusionAuras`/`SummitKeystone`.
+  - **NEXT — U4 (Crystal Vista rebuild, Milestone Gate B):** compose `CrystalFormationScene` over
+    `composeCrystalFormation` (already returns placed legs/spine/terminus), rewrite `CrystalVista`,
+    rename fused-section navMemory → Vista-seen bindings (`leg:<sectionIndex>`/`summit` keys, both
+    platforms), delete `crystalVistaView.ts`/`crystalGeometry.ts`/`CrystalGlyph.tsx` (+tests) with
+    the last consumer, extend `crystal-formation.spec.ts` through the four Leg states + multi-Leg
+    Vista, and run Gate B into `tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista/`.
+    Then U5 (Guardian reward + route handoff, Gate C), U6 (full Playwright polish + real-use
+    skill), U7 (ADR-0032 amendment + plan deletion). Gate A accepted caveats to re-judge in B/U6:
+    seam dash overhang at matrix corners, conservative specimen-to-matrix scale.
+
 
 ### Evidence-triggered follow-up
 

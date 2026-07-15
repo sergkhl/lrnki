@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { ChevronDown } from "lucide-react-native";
+import { ChevronDown, Gem } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { clearLearnerVerdict, refreshLearnerExpedition, setLearnerVerdict } from "@/lib/actions";
-import { CrystalGlyph } from "./CrystalGlyph";
 import type { TrailCluster } from "@lrnki/application/projection";
 import { learnerTerm } from "@/learn/vocabulary";
 import { Button, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
@@ -53,15 +52,17 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
         pressedClassName="bg-muted-panel"
       >
         <Text variant="label" className="min-w-0 flex-1 font-semibold" numberOfLines={1}>{concept.label}</Text>
-        <CrystalGlyph
-          derivedNodeId={concept.derivedNodeId}
-          difficulty={concept.difficulty}
-          growthFraction={concept.growthFraction}
-          state={concept.state}
-          ghost={concept.isKnownSkipped}
-          size={26}
-          ariaLabel={concept.isKnownSkipped ? learnerTerm("known") : isMastered ? "Collected" : "Not collected"}
-        />
+        {/* Compact status (U1, R14): a universal gem icon plus exact text — a detailed
+            specimen is unreadable at this row height. */}
+        <View
+          accessibilityLabel={concept.isKnownSkipped ? learnerTerm("known") : isMastered ? "Collected" : "Not collected"}
+          className="flex-row items-center gap-1"
+        >
+          <Gem size={16} color={isMastered && !concept.isKnownSkipped ? colors.gem : colors.muted} />
+          {!isMastered && concept.state === "frontier" ? (
+            <Text variant="caption" color="muted" className="tabular-nums">{Math.round(concept.growthFraction * 100)}%</Text>
+          ) : null}
+        </View>
         <Animated.View style={chevronStyle}>
           <ChevronDown size={18} color={colors.muted} />
         </Animated.View>

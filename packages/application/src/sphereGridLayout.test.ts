@@ -242,3 +242,56 @@ test("determinism: identical input yields byte-identical positions across runs",
   const second = layoutSphereGrid(nodes, edges);
   assert.deepEqual(first, second);
 });
+
+// --- Per-Leg regression (plan 2026-07-15-002 U2, R9-R10) ---------------------------
+//
+// The Crystal Formation runs the SAME layered layout independently inside each Leg
+// (milestone-anchored section) with one constant local domain and only trusted
+// same-Leg edges. This locks the measured production-shaped fit — every real Leg
+// embeds crossing-free — without promising arbitrary-graph planarity (R10 still
+// flags, never draws, a tangle).
+test("per-Leg layout: every real-shape Leg embeds with zero crossings", async () => {
+  const { projectExpeditionSections } = await import("./expeditionSections");
+  const detail = {
+    nodes: realShapeNodes.map((node) => ({
+      derivedNodeId: node.id,
+      label: node.label,
+      aliases: [],
+      declaredDomain: node.domain,
+      difficulty: node.difficulty,
+      difficultyRationale: null,
+      nodeKind: "anchor" as const,
+      groundingOrigin: "document_anchored" as const
+    })),
+    edges: realShapeEdges.map((edge) => ({
+      prerequisiteDerivedNodeId: edge.source,
+      dependentDerivedNodeId: edge.target,
+      confidence: 1,
+      uncertain: !(edge.uncertain === false || edge.uncertain === "no"),
+      judgeModel: "fixture"
+    }))
+  };
+  const stateByNode = Object.fromEntries(detail.nodes.map((node) => [node.derivedNodeId, "frontier" as const]));
+  const sectioned = projectExpeditionSections({
+    detail: detail as unknown as Parameters<typeof projectExpeditionSections>[0]["detail"],
+    stateByNode
+  });
+
+  // The measured fit this regression locks: 17 Legs, the widest holding 10 nodes.
+  assert.equal(sectioned.sections.length, 17);
+  assert.equal(Math.max(...sectioned.sections.map((section) => section.stepDerivedNodeIds.length)), 10);
+
+  const nodeById = new Map(realShapeNodes.map((node) => [node.id, node]));
+  for (const section of sectioned.sections) {
+    const legIds = new Set(section.stepDerivedNodeIds);
+    const legNodes = section.stepDerivedNodeIds.map((id) => ({ ...nodeById.get(id)!, domain: "leg" }));
+    const legEdges = realShapeEdges.filter(
+      (edge) =>
+        (edge.uncertain === false || edge.uncertain === "no") && legIds.has(edge.source) && legIds.has(edge.target)
+    );
+    const layout = layoutSphereGrid(legNodes, legEdges);
+    assert.equal(layout.crossings, 0, `Leg ${section.sectionIndex} (${section.milestoneLabel}) must embed crossing-free`);
+    assert.equal(layout.flaggedLoops.length, 0);
+    assert.equal(layout.positions.length, legNodes.length);
+  }
+});

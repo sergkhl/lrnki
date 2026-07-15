@@ -2,9 +2,9 @@ import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { Check, Lock, Map as MapIcon, MoveRight } from "lucide-react-native";
 import { learnerTerm } from "@/learn/vocabulary";
-import { SectionCrystalStrip } from "./SectionCrystalStrip";
+import { formationProgress, formationProgressLine } from "@/learn/mineralSpecimen";
 import type { TrailCluster, TrailSectionView } from "@lrnki/application/projection";
-import { BottomSheet, OverlayHeader, PressableSurface, Text, colors } from "@/ui";
+import { BottomSheet, OverlayHeader, PressableSurface, Progress, Text, colors } from "@/ui";
 
 // The non-blocking section overview (R5/R9). Opened on demand from the header — the
 // guided "continue" flow never requires it. A bottom sheet lists every section with its
@@ -46,7 +46,12 @@ export function SectionOverview({
           onClose={() => setOpen(false)}
         />
         <ScrollView contentContainerClassName="gap-2 p-4" className="max-h-96">
-          {sections.map((section) => (
+          {sections.map((section) => {
+            // Honest compact progress (U1, R14/AE1): completed ground drives the meter;
+            // crystals collected and known ground are named separately in the copy —
+            // no miniature specimen row.
+            const progress = formationProgress(concepts.filter((concept) => concept.sectionIndex === section.sectionIndex));
+            return (
             <PressableSurface
               key={section.sectionIndex}
               accessibilityLabel={`${learnerTerm("section")} ${section.sectionIndex + 1}: ${section.milestoneLabel}`}
@@ -61,19 +66,21 @@ export function SectionOverview({
                   {learnerTerm("section")} {section.sectionIndex + 1}: {section.milestoneLabel}
                 </Text>
                 <Text variant="caption" color="muted" numberOfLines={2}>
-                  {section.masteredCount}/{section.conceptCount} concepts · {section.stopsComplete}/{section.stopsTotal} stops
+                  {formationProgressLine(progress)} · {section.stopsComplete}/{section.stopsTotal} stops
                   {section.state === "locked" && section.gatingLabels.length
                     ? ` · ${learnerTerm("gatedBy")}: ${section.gatingLabels.join(", ")}`
                     : ""}
                 </Text>
-                <SectionCrystalStrip
-                  concepts={concepts.filter((concept) => concept.sectionIndex === section.sectionIndex)}
-                  className="mt-1"
+                <Progress
+                  fraction={progress.completionFraction}
+                  accessibilityLabel={`${learnerTerm("section")} ${section.sectionIndex + 1}: ${formationProgressLine(progress)}`}
+                  className="mt-1.5"
                 />
               </View>
               {section.state === "locked" ? null : <MoveRight size={16} color={colors.muted} />}
             </PressableSurface>
-          ))}
+            );
+          })}
         </ScrollView>
       </BottomSheet>
     </>
