@@ -36,15 +36,22 @@ pnpm check
 ```
 
 `pnpm check` includes the intercepted production-web Playwright gate (`pnpm e2e:web`), which mocks
-the API and runs deterministically. Two heavier suites are **opt-in** and not part of `pnpm check`:
+the API and runs deterministically. Two heavier suites are **opt-in** and not part of `pnpm check`
+([ADR-0038](docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md)):
 
 ```bash
-pnpm e2e:web:realuse   # one command: real supervisor-free API over Postgres, no generation
+pnpm e2e:web:realuse    # real supervisor-free API over Postgres, no generation
+pnpm e2e:native:maestro # real Android APK on an emulator, deterministic loopback fixture
 ```
 
 The real-backend web gate needs live Postgres with at least one ready catalog enrichment; it
 selects one by capability, never generates, and cleans up its disposable learners on success or
 failure. See [apps/learner-app/e2e-realuse/README.md](apps/learner-app/e2e-realuse/README.md).
+
+The native gate drives a standalone e2e-profile APK on a booted Android emulator with Maestro; it
+holds automatic authority only for the sensitivity-proven Support Path dialog scenario (the Theory
+touch-responder class stays physically owned). Prerequisites and scope:
+[apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
 
 ## Deployment
 

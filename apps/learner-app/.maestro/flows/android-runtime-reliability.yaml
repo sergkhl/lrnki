@@ -1,12 +1,16 @@
 # Android runtime-reliability flow (plan 2026-07-15-001 U5, R17-R18). Drives the REAL standalone
 # e2e-profile APK against the deterministic loopback fixture (10.0.2.2) — real React Native
-# primitives, real Yoga layout, real gesture dispatch; only the upstream data is mocked. It targets
-# the two escaped Android interaction classes:
-#   1. Theory scroll — a drag beginning over ordinary long Theory content must reach later content
-#      (the touch-responder regression) while the activity header/footer stay reachable.
-#   2. Support Path dialog — opening a contextual term dialog must show its title, body, and
-#      close/footer action, and closing it must return to the same Theory activity (the measured
-#      dialog-geometry regression).
+# primitives, real Yoga layout, real gesture dispatch; only the upstream data is mocked.
+#
+# U6 sensitivity result (see docs/adr/0038) scopes what this flow is AUTHORITY for:
+#   1. Support Path dialog — ADOPTED automatic authority. Opening a contextual term dialog must show
+#      its title, body, and close/footer action, and closing must return to the same Theory activity
+#      (the measured dialog-geometry regression, commit 0b1c9d3). Its negative control fails this
+#      block deterministically 3/3, so these assertions are a trustworthy gate.
+#   2. Theory scroll — NAVIGATION only, NOT a proven gate. The real device swipe is needed to reach
+#      the Support Paths panel and open the dialog, but its negative control (the touch-responder
+#      regression, commit ddc0ec9) fails only intermittently on the emulator, so the touch-responder
+#      class stays PHYSICALLY owned (docs/plans/BLOCKERS.md) and is not narrowed by this flow.
 # The fixture login (${LEARNER_REF}/${PIN}) is passed via `maestro test -e`, never committed here.
 # Selectors are accessibility labels and app-owned testIDs, never generated prose or coordinates.
 appId: com.globesoul.lrnki
@@ -40,11 +44,12 @@ appId: com.globesoul.lrnki
 - tapOn:
     id: "checkpoint-theory-available"
 
-# --- Theory scroll (R17 / AE7): a real device swipe over long Theory content must reach the
-# post-content Support Paths panel, and the fixed header (Field notes) + footer (Continue) must
-# remain reachable afterward. scrollUntilVisible issues DEVICE swipes, not programmatic scroll —
-# this is the touch-responder assertion. The panel is a real view (large-target equivalent of the
-# inline Explorable Term, which is a non-queryable nested text span). ---
+# --- Theory scroll (NAVIGATION, not a proven gate — see header + ADR-0038): a real device swipe
+# over long Theory content reaches the post-content Support Paths panel to open the dialog. The
+# fixed header (Field notes) + footer (Continue) reachability are cheap sanity checks, not the
+# adopted authority (the touch-responder negative control is emulator-flaky). scrollUntilVisible
+# issues DEVICE swipes. The panel is a real view (large-target equivalent of the inline Explorable
+# Term, which is a non-queryable nested text span). ---
 - assertVisible: "Field notes"
 - scrollUntilVisible:
     element:

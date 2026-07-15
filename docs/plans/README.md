@@ -12,7 +12,9 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [Durable Learner E2E Gates](./2026-07-15-001-feat-durable-learner-e2e-gates-plan.md) — in progress; turn the checked-in U6 scaffold into a one-command real-backend integration spine, then use a negative-control Maestro experiment to decide the durable native gate without prematurely adopting EAS Workflows.
+- None. The Durable Learner E2E Gates work completed 2026-07-15; its durable native-gate and
+  physical-authority policy is [ADR-0038](../adr/0038-native-interaction-gate-scope-and-physical-authority.md)
+  and its outcome/validation live in [TODO.md](./TODO.md).
 
 ## Ownership rules
 

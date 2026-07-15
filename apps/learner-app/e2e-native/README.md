@@ -1,16 +1,20 @@
 # Native Android Maestro gate (opt-in)
 
-The **native interaction gate** (plan `2026-07-15-001` U5). It drives the **real standalone
-e2e-profile APK** on an Android emulator with [Maestro](https://maestro.dev), against a
-**deterministic loopback fixture** — real React Native primitives, real Yoga layout, real gesture
-dispatch; only the upstream data service is mocked. Its purpose is the two escaped Android-only
-interaction classes that web gates and jest cannot observe:
+The **native interaction gate**
+([ADR-0038](../../../docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md)). It
+drives the **real standalone e2e-profile APK** on an Android emulator with
+[Maestro](https://maestro.dev), against a **deterministic loopback fixture** — real React Native
+primitives, real Yoga layout, real gesture dispatch; only the upstream data service is mocked.
 
-1. **Theory scroll** — a real device swipe beginning over long Theory content must reach later
-   content (the `@rn-primitives/dialog` touch-responder regression, commit `ddc0ec9`).
-2. **Support Path dialog** — the contextual term dialog must show its title, body, and close action,
-   and closing must return to the same Theory activity (the measured dialog-geometry regression,
-   commit `0b1c9d3`).
+**Scope (measured, U6 negative-control sensitivity):**
+
+1. **Support Path dialog — ADOPTED automatic authority.** The contextual term dialog must show its
+   title, body, and close action, and closing must return to the same Theory activity (the measured
+   dialog-geometry regression, commit `0b1c9d3`). Its negative control collapses the dialog to zero
+   height and fails this block deterministically 3/3, so these assertions are a trustworthy gate.
+2. **Theory scroll — NAVIGATION only.** The real device swipe reaches the Support Paths panel to open
+   the dialog, but the touch-responder regression (commit `ddc0ec9`) is only intermittently
+   reproducible on the emulator, so that class stays **physically owned** and is not narrowed here.
 
 This is **not** in `pnpm check` and shares nothing with the intercepted web suite or the real-use
 web suite. It never touches production or the real-use database.
@@ -46,15 +50,16 @@ expedition with a long Theory activity and available Explorable Terms) and froze
 no mutable state: `server.ts` replays them and acks non-graded writes. The emulator reaches the host
 loopback fixture through Android's `10.0.2.2` alias.
 
-> **Deviation from the plan's R16.** The plan called for extracted shared response *builders*
-> (`learnerApiScenarios.ts`) consumed by both the Playwright adapter and this HTTP adapter. This
-> implementation instead freezes captured real responses to guarantee shape-correctness without
-> refactoring the green intercepted suite's inline fixtures. The two suites therefore do not yet
-> share one scenario module; unifying them (or proving the extraction does not obscure the
-> intercepted suite) remains open (see the plan's H3 / U6–U7 handoff).
+> **Design note — captured shapes, not shared builders.** This adapter freezes captured real
+> responses rather than sharing one response-builder module with the intercepted Playwright suite.
+> That guarantees shape-correctness without refactoring the green intercepted suite's inline
+> fixtures. The two suites therefore do not share one scenario module; unifying them is optional and
+> only worthwhile if it does not obscure the intercepted suite (it currently would).
 
 ## Selectors
 
 Accessibility labels and app-owned `testID`s only — never generated prose or coordinates. The
-Explorable Term testID (`theory-term-<term>`) is a stable semantic control boundary; the specific
-term value is fixed by the checked-in deterministic scenario.
+inline Explorable Term is a nested `<Text>` span with no queryable Android resource-id, so the flow
+targets the real `SupportPathsPanel` views (`support-paths-panel`, `support-path-add-<term>`, the
+component's designed large-target equivalent); scrolling to the panel still exercises the long-Theory
+device swipe. The specific term value is fixed by the checked-in deterministic scenario.
