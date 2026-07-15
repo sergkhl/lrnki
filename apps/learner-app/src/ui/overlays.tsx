@@ -180,6 +180,13 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           closeOnPress={false}
+          // Native: the Overlay is a Pressable and would claim the JS touch responder at
+          // touch START for any non-pressable descendant touch; a JS ancestor responder
+          // blocks the descendant ScrollView's native move interception, so drags on
+          // Theory prose scroll nothing. This surface has no backdrop-close (closeOnPress
+          // is false), so disabling its pressability loses no behavior. Web keeps the
+          // Radix overlay untouched.
+          disabled={Platform.OS === "web" ? undefined : true}
           className="absolute inset-0"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
@@ -192,6 +199,12 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
           <DialogPrimitive.Content
             testID="fullscreen-content"
             className={Platform.OS === "web" ? "absolute inset-0 bg-background" : "flex-1 bg-background"}
+            // Native: the primitive hardwires `onStartShouldSetResponder: () => true` on
+            // Content, claiming every touch before the activity ScrollView can win the
+            // drag (the props spread after it makes this override sanctioned). The
+            // dialog has no backdrop-close to shield content taps from, so the claim
+            // only breaks scrolling here.
+            onStartShouldSetResponder={undefined}
           >
             <OverlayEntrance className="flex-1">{children}</OverlayEntrance>
           </DialogPrimitive.Content>

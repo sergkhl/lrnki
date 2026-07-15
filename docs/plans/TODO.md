@@ -25,6 +25,29 @@
   OPEN**: the Verification Contract forbids declaring the plan complete or deleting it until the
   user-owned physical-Android preview-APK pass is recorded in [BLOCKERS.md](./BLOCKERS.md).
 
+  **Status (2026-07-15b): physical-Android gate FAILED on Theory scroll — diagnosis in progress.**
+  The user's fresh post-U3 preview APK shows the U3 geometry fix working on device (Support Path
+  `Preparing support` dialog renders fully; journal/trail scrolls), but dragging Theory prose in the
+  full-screen activity does **nothing at all — no overscroll glow** — so the ScrollView never
+  acquires the gesture: this is touch-responder acquisition, not geometry (U3's target). Prime
+  suspect: native `@rn-primitives/dialog@1.5.2` hardwires `onStartShouldSetResponder → () => true`
+  on `Content` (and `Overlay` is a Pressable), so a JS ancestor claims every touch at START and
+  blocks the descendant ScrollView's native move interception (problem class: JS gesture responder
+  vs native ScrollView interception, Android-only; web uses the responderless Radix build — exactly
+  why every web gate passed). **Probe applied, UNCOMMITTED, in `ui/overlays.tsx`
+  `FullScreenDialog` native branch**: Overlay `disabled` (it has no backdrop-close to lose) +
+  `onStartShouldSetResponder={undefined}` on Content (the primitive spreads `{...props}` after its
+  own responder prop, so this is a sanctioned consumer override — no node_modules patch).
+  Typecheck clean, 187/187 tests green. NEXT: user verifies the probe via dev client + Metro on the
+  device. If fixed: keep as root-cause fix, add a jest responder-contract lock, and check
+  `DialogBody` scroll with long content on device (same problem class is latent in the centered
+  `Dialog`, whose Content claim shields `closeOnPress` — fix there would be the deepest-claim
+  wrapper inside `DialogBody`, not an Overlay disable). If not fixed: fall back in order to the
+  deepest-claim wrapper (`onStartShouldSetResponder={() => true}` View inside the ScrollView),
+  then the absolute-ancestor class (facebook/react-native#38730) with `onLayout` instrumentation
+  over adb. Also: the working tree carries an unexplained revert of BLOCKERS.md to pre-U6 wording —
+  restore the committed version unless intentional.
+
   **Handoff (session 2026-07-14a):**
   - **U1 DONE — atomic, query-owned session (`apps/learner-app`).** `me` is now the sole signed-in
     source of truth. Removed the duplicate `hasToken` state and `LearnerNameGate.onEntered`; replaced
