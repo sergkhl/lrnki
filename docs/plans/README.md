@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [Learner Runtime Reliability Fix](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) — ready; supersedes the disproven native-parity plan and covers shared session entry, explicit route states, Android Theory/dialog geometry, web sheet layering, automatic browser acceptance, and the user-owned preview-APK/physical-Android gate.
+- [Learner Runtime Reliability Fix](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) — in progress; U1–U5 shipped and the U6 automatic real-use web gate PASSED (2026-07-15). Supersedes the disproven native-parity plan and covers shared session entry, explicit route states, Android Theory/dialog geometry, web sheet layering, and automatic browser acceptance. Only the user-owned preview-APK/physical-Android gate remains ([BLOCKERS.md](./BLOCKERS.md)); the plan stays until that passes.
 
 ## Ownership rules
 

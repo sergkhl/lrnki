@@ -4,7 +4,8 @@
 
 ### Active implementation
 
-- **Learner Runtime Reliability Fix (IN PROGRESS — U1–U5 done, U6 next).** Execute the
+- **Learner Runtime Reliability Fix (IN PROGRESS — U1–U6 web gate DONE; only physical-Android
+  remains).** Execute the
   [active plan](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) to repair
   failed-login-then-signup session entry, blank query states, Android Theory scrolling and Support
   Path generation-dialog geometry, and the web expedition-planning scrim layer. The prior
@@ -12,6 +13,17 @@
   acceptance despite its passing automated and web evidence. Web acceptance becomes a checked-in
   automatic production-export gate; the final preview APK build and physical-Android pass remain
   user-owned in [BLOCKERS.md](./BLOCKERS.md).
+
+  **Status (2026-07-15):** U1–U5 are implemented **and committed** (`d0e8928` session/RouteStatus,
+  `0b1c9d3` overlay dialog+sheet geometry, `9c2e44f` Playwright web gate). The follow-on
+  native-bundling fix is applied in the working tree (uncommitted): the U2 route test moved from
+  `src/app/index.test.tsx` to `src/components/IndexRoute.test.tsx`, because any `.test.tsx` under
+  `src/app/` is globbed as an Expo Router route and breaks native Android bundling
+  (`require("console")`) — the web export tolerated it, so U5's web gate never caught it. **U6's
+  rule-14 real-use WEB gate is DONE and PASSED (2026-07-15)** — see VALIDATION below; evidence in
+  `tmp/2026-07-14-learner-runtime-reliability/EVALUATION.md`. **The plan and the Android blocker stay
+  OPEN**: the Verification Contract forbids declaring the plan complete or deleting it until the
+  user-owned physical-Android preview-APK pass is recorded in [BLOCKERS.md](./BLOCKERS.md).
 
   **Handoff (session 2026-07-14a):**
   - **U1 DONE — atomic, query-owned session (`apps/learner-app`).** `me` is now the sole signed-in
@@ -36,7 +48,7 @@
     / 404-unavailable distinct), and `app/guardian/[challengeId].tsx` (migrated its existing
     pending/error/over copy onto RouteStatus). New vocabulary keys (bootstrap/session/journal/catalog/
     expedition status copy + `retryAction`) in `learn/vocabulary.ts` (+ test). Route test:
-    `app/index.test.tsx`.
+    `app/index.test.tsx` (relocated to `src/components/IndexRoute.test.tsx` on 2026-07-15 — see Status).
   - **Gate so far:** learner-app `typecheck` clean, `test` 185/185 (was 137), `eslint` 0 errors
     (3 pre-existing warnings). No API/schema/content changes touched. Nothing committed (user hasn't
     asked).
@@ -118,6 +130,35 @@
     on U1–U5.
 
 ### Evidence-triggered follow-up
+
+- **Durable real-backend web e2e suite + evaluate Maestro/EAS Workflows for the native gate.** The
+  U6 real-use gate (2026-07-15) proved a reusable Playwright driver that exercises the REAL learner
+  experience end-to-end. It is now seeded as a checked-in **scaffold** in
+  `apps/learner-app/e2e-realuse/` (`realuse.spec.ts`, `realuse.config.ts`, `serve.mjs`,
+  `cleanup-learner.sh`, `README.md`; opt-in `pnpm --filter @lrnki/learner-app e2e:realuse`, NOT in
+  `pnpm check`); the frozen gate evidence stays in `tmp/2026-07-14-learner-runtime-reliability/`.
+  Two distinct, separately-decidable
+  threads — do NOT conflate them, and keep all three e2e layers distinct: (1) the committed
+  **intercepted** suite `apps/learner-app/e2e/` (client behavior, mocked transport, in `pnpm check`);
+  (2) a **real-backend** suite (real Postgres + LiteLLM); (3) **native on-device**.
+  - **(A) Promote a durable real-backend web suite** by reusing the U6 driver. Design decisions to
+    settle first: how to stand up a real learner-api + seed ONE disposable learner and a ready
+    expedition deterministically (reuse an existing shared enrichment via `/catalog` to avoid a
+    ~5-min live generation per run, or gate generation behind an opt-in), where it runs (NOT default
+    `pnpm check` — it needs live services and real model spend; a separate opt-in `e2e:realuse`
+    target), the exact-match CORS origin gotcha (`localhost` ≠ `127.0.0.1`), run-unique signup names
+    + FK-safe teardown (the two harness defects U6 found), and credential hygiene (keep PIN/bearer
+    out of committed artifacts). This complements — does not replace — the intercepted suite.
+  - **(B) Evaluate Maestro + EAS Workflows** (https://docs.expo.dev/eas/workflows/examples/e2e-tests/)
+    to reduce the recurring MANUAL physical-Android gate that has landed in
+    [BLOCKERS.md](./BLOCKERS.md) across the native-parity, interaction-system, Crystal Guardian, and
+    Learner Runtime Reliability plans. Maestro drives real build artifacts (Android/iOS/web) as
+    black-box UI flows and would extend the existing `scripts/build-learner-android.sh` /
+    `.github/workflows/build-learner-android.yml` EAS pipeline. Judge whether an emulator/device-cloud
+    Maestro run can certify scroll gestures / Yoga measurement / dialog reachability that Playwright
+    provably cannot (plan KTD9/R15) — and if so, whether it downgrades the physical-device pass from
+    a hard blocker to a spot-check. Record the decision (adopt / defer / reject) with reasoning; do
+    not assume a device-cloud run fully substitutes for a real phone without evidence.
 
 - **Scaffold step content polish (measure-first).** Two model-variance observations from the
   2026-07-13 U6 gate, in the scaffold content generator (not the Support Path UX contract): a
@@ -373,9 +414,10 @@
   five-question grade-only retrieval sprint over a pure exhaustive `duelMachine` that persists
   nothing (`response_log` byte-identical across a duel) and awards a durable `duel_win` crest
   ([ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)). The
-  completed 2026-07-07 architecture review's rejected-findings ledger is preserved by the
-  [2026-07-11 review](../brainstorms/2026-07-11-architecture-deepening-review.md). Rule-14 gates
-  PASS per change; evidence under `tmp/2026-07-07-*/` and `tmp/2026-07-08-*/`.
+  completed 2026-07-07 architecture review's rejected-findings ledger lives in git history (the
+  2026-07-11 architecture-deepening review brainstorm, deleted on completion per the brainstorms
+  archival policy). Rule-14 gates PASS per change; evidence under `tmp/2026-07-07-*/` and
+  `tmp/2026-07-08-*/`.
 
 - **Learner study experience and generation durability foundations (2026-07-02→07).** The Study
   Session projection became layer-wide and sectioned with a derived summit and the single
@@ -402,6 +444,29 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner Runtime Reliability Fix — U6 real-use WEB gate, 2026-07-15 (U1–U5).** Working-tree
+  learner-api (`:8790`, over Postgres + production LiteLLM) + a fresh production Expo web export
+  baked against it, served on `localhost:8091`, driven by Playwright on phone (Pixel 7) + desktop
+  (1280×800). A real "Photosynthesis light reactions" expedition (Plant Biology, 14 items / 3
+  sections) was generated end-to-end by production extraction; the app was then driven against the
+  REAL api with NOTHING intercepted. **8/8 tests PASS (34.4s), zero unexpected page/console errors.**
+  Real backend states (each verified by curl first): **AE1** stale token → real `/me` 401 clears it →
+  failed `Enter` (real 401) does not block a following `Set out` → immediate Journal, new token, no
+  reload; **AE3** `/expedition/<uuid>` real 404 → "isn't available" (unavailable, no Retry),
+  `/guardian/<uuid>` real 404 → "This fight is over", `/guardian/not-a-uuid` real 500 → error +
+  Retry, `/catalog` real candidates; **AE6** the planning-sheet vaul scrim covers the full viewport
+  and `elementFromPoint` over the Menu resolves into `[data-vaul-overlay]` (page inert), scrim press
+  dismisses without activating the Menu and leaves the URL unchanged — screenshots show the scrim
+  dimming the real journal incl. the generated expedition card. **Neutral invariant proven**:
+  `gate-u6-explorer` wrote 0 `response_log` and 0 `learner_awards` (Concept Mastery + weekly points
+  provably unchanged); no API/schema/content change (R16). Two GATE-HARNESS defects found+fixed
+  (exact-match CORS origin; durable-signup test-data leakage → run-unique names + FK-safe cleanup) —
+  not product defects. Injected-failure AE2 stays proven by the committed deterministic suite (U5);
+  live Guardian COMBAT was proven in Crystal Guardian Gate B (2026-07-14). Disposable learners
+  removed (only pre-existing data remains); enrichments retained. **The physical-Android
+  preview-APK pass remains user-owned and open in [BLOCKERS.md](./BLOCKERS.md); the plan is NOT
+  deleted.** Evidence + evaluation note: `tmp/2026-07-14-learner-runtime-reliability/EVALUATION.md`.
 
 - **Crystal Guardian Challenges Gate B — live real-use browser evaluation, 2026-07-14 (U5–U7).**
   Working-tree learner-api (`:8790`) + static Expo web export (`:8082`) driven by Playwright against

@@ -5,6 +5,7 @@ node_modules/
 .next/
 dist/
 dist-e2e/
+dist-u6/
 .expo/
 .venv/
 .data/

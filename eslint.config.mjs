@@ -90,7 +90,12 @@ const eslintConfig = [
     // surfaces. `react-hooks/rules-of-hooks` false-positives on Playwright's `use()` fixture
     // callback, and the learner interaction boundary (RN primitive restrictions) does not apply
     // to a browser-driving test harness that never renders the app.
-    files: ["apps/learner-app/e2e/**/*.ts", "apps/learner-app/playwright.config.ts"],
+    // Also covers the opt-in real-use scaffold in e2e-realuse/ (plan 2026-07-14-001 U6).
+    files: [
+      "apps/learner-app/e2e/**/*.ts",
+      "apps/learner-app/e2e-realuse/**/*.ts",
+      "apps/learner-app/playwright.config.ts"
+    ],
     rules: {
       "react-hooks/rules-of-hooks": "off",
       "no-restricted-imports": "off"

@@ -31,7 +31,7 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({})
 }));
 
-import JournalPage from "./index";
+import JournalPage from "@/app/index";
 import { api, clearToken, queryClient, readToken, writeToken } from "@/lib/api";
 import { logout } from "@/lib/session";
 import { meQuery } from "@/lib/queries";
