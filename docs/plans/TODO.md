@@ -15,38 +15,35 @@
   user-owned in [BLOCKERS.md](./BLOCKERS.md).
 
   **Status (2026-07-15):** U1–U5 are implemented **and committed** (`d0e8928` session/RouteStatus,
-  `0b1c9d3` overlay dialog+sheet geometry, `9c2e44f` Playwright web gate). The follow-on
-  native-bundling fix is applied in the working tree (uncommitted): the U2 route test moved from
-  `src/app/index.test.tsx` to `src/components/IndexRoute.test.tsx`, because any `.test.tsx` under
-  `src/app/` is globbed as an Expo Router route and breaks native Android bundling
-  (`require("console")`) — the web export tolerated it, so U5's web gate never caught it. **U6's
+  `0b1c9d3` overlay dialog+sheet geometry, `9c2e44f` Playwright web gate, and the follow-on
+  native-bundling fix in `623a53d`: the U2 route test moved from `src/app/index.test.tsx` to
+  `src/components/IndexRoute.test.tsx`, because any `.test.tsx` under `src/app/` is globbed as an
+  Expo Router route and breaks native Android bundling (`require("console")`) — the web export
+  tolerated it, so U5's web gate never caught it). **U6's
   rule-14 real-use WEB gate is DONE and PASSED (2026-07-15)** — see VALIDATION below; evidence in
   `tmp/2026-07-14-learner-runtime-reliability/EVALUATION.md`. **The plan and the Android blocker stay
   OPEN**: the Verification Contract forbids declaring the plan complete or deleting it until the
   user-owned physical-Android preview-APK pass is recorded in [BLOCKERS.md](./BLOCKERS.md).
 
-  **Status (2026-07-15b): physical-Android gate FAILED on Theory scroll — diagnosis in progress.**
-  The user's fresh post-U3 preview APK shows the U3 geometry fix working on device (Support Path
-  `Preparing support` dialog renders fully; journal/trail scrolls), but dragging Theory prose in the
-  full-screen activity does **nothing at all — no overscroll glow** — so the ScrollView never
-  acquires the gesture: this is touch-responder acquisition, not geometry (U3's target). Prime
-  suspect: native `@rn-primitives/dialog@1.5.2` hardwires `onStartShouldSetResponder → () => true`
-  on `Content` (and `Overlay` is a Pressable), so a JS ancestor claims every touch at START and
-  blocks the descendant ScrollView's native move interception (problem class: JS gesture responder
-  vs native ScrollView interception, Android-only; web uses the responderless Radix build — exactly
-  why every web gate passed). **Probe applied, UNCOMMITTED, in `ui/overlays.tsx`
-  `FullScreenDialog` native branch**: Overlay `disabled` (it has no backdrop-close to lose) +
-  `onStartShouldSetResponder={undefined}` on Content (the primitive spreads `{...props}` after its
-  own responder prop, so this is a sanctioned consumer override — no node_modules patch).
-  Typecheck clean, 187/187 tests green. NEXT: user verifies the probe via dev client + Metro on the
-  device. If fixed: keep as root-cause fix, add a jest responder-contract lock, and check
-  `DialogBody` scroll with long content on device (same problem class is latent in the centered
-  `Dialog`, whose Content claim shields `closeOnPress` — fix there would be the deepest-claim
-  wrapper inside `DialogBody`, not an Overlay disable). If not fixed: fall back in order to the
-  deepest-claim wrapper (`onStartShouldSetResponder={() => true}` View inside the ScrollView),
-  then the absolute-ancestor class (facebook/react-native#38730) with `onLayout` instrumentation
-  over adb. Also: the working tree carries an unexplained revert of BLOCKERS.md to pre-U6 wording —
-  restore the committed version unless intentional.
+  **Status (2026-07-15b): Android Theory-scroll defect root-caused and FIXED (verified on the
+  physical device via dev client + Metro; committed `ddc0ec9`).** The first preview-APK pass
+  FAILED AE4 while confirming U3's geometry fix held (the Support Path `Preparing support` dialog
+  renders fully; journal/trail scrolls): Theory drags did nothing — no overscroll glow — i.e.
+  gesture acquisition, not geometry. Root cause (a second, distinct problem class): native
+  `@rn-primitives/dialog@1.5.2` hardwires `onStartShouldSetResponder → () => true` on `Content`,
+  and `Overlay` is a Pressable, so a JS ancestor claimed every touch at START and blocked the
+  descendant activity ScrollView's native move interception (Android-only; web is the responderless
+  Radix build — exactly why every web gate passed while the device failed). Fix, in
+  `ui/overlays.tsx` `FullScreenDialog`'s native branch only: `disabled` on the Overlay (this
+  surface has no backdrop-close to lose) + `onStartShouldSetResponder={undefined}` on Content (the
+  primitive spreads `{...props}` after its own responder prop — a sanctioned consumer override, no
+  node_modules patch). A jest responder-contract test locks the invariant (no FullScreenDialog
+  ancestor claims a starting touch); learner-app typecheck clean, 188/188 tests green. **Latent
+  same-class risk, deliberately NOT changed:** the centered `Dialog`'s Content claim is what
+  shields content taps from `closeOnPress`, so if a long `DialogBody` ever proves scroll-dead on
+  device, the fix is a deepest-claim wrapper INSIDE `DialogBody` — never an Overlay disable there.
+  The user-owned fresh preview-APK full U6 pass in [BLOCKERS.md](./BLOCKERS.md) remains the
+  completion bar.
 
   **Handoff (session 2026-07-14a):**
   - **U1 DONE — atomic, query-owned session (`apps/learner-app`).** `me` is now the sole signed-in

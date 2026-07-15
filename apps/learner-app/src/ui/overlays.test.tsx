@@ -120,6 +120,30 @@ test("FullScreenDialog renders full-surface content without a backdrop close", a
   expect(onOpenChange).toHaveBeenCalledWith(false);
 });
 
+test("Covers AE4 responder contract: no FullScreenDialog ancestor claims the touch at start", async () => {
+  await render(
+    withHost(
+      <FullScreenDialog open onOpenChange={() => {}}>
+        <RNText>activity body</RNText>
+      </FullScreenDialog>
+    )
+  );
+  // On Android a JS ancestor that claims the responder at touch START blocks the
+  // descendant activity ScrollView's native move interception, so Theory drags scroll
+  // nothing (the primitive hardwires the claim on Content, and Overlay is a Pressable).
+  // Jest runs the native branch: walk every ancestor of the content and assert none
+  // would claim a starting touch.
+  let node: { props?: { onStartShouldSetResponder?: () => boolean }; parent: unknown } | null =
+    screen.getByTestId("fullscreen-content");
+  while (node) {
+    const shouldSet = node.props?.onStartShouldSetResponder;
+    if (typeof shouldSet === "function") {
+      expect(shouldSet()).toBe(false);
+    }
+    node = node.parent as typeof node;
+  }
+});
+
 test("SideSheet mounts its menu content and closes through the shared header", async () => {
   const onOpenChange = jest.fn();
   await render(
