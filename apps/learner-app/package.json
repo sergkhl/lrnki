@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "e2e": "pnpm run export:web:e2e && playwright test",
     "e2e:setup": "playwright install chromium",
-    "e2e:realuse": "playwright test --config=e2e-realuse/realuse.config.ts"
+    "e2e:realuse": "tsx --env-file=../../.env e2e-realuse/run.ts"
   },
   "dependencies": {
     "@expo/ui": "catalog:expo",
@@ -47,6 +47,7 @@
     "react-native-worklets": "catalog:expo"
   },
   "devDependencies": {
+    "@lrnki/infrastructure-postgres": "workspace:*",
     "@playwright/test": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@testing-library/react-native": "catalog:expo",
@@ -58,6 +59,7 @@
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "test-renderer": "catalog:expo",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   }
 }

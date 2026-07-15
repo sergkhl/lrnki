@@ -4,181 +4,86 @@
 
 ### Active implementation
 
-- **Learner Runtime Reliability Fix (IN PROGRESS — U1–U6 web gate DONE; only physical-Android
-  remains).** Execute the
-  [active plan](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) to repair
-  failed-login-then-signup session entry, blank query states, Android Theory scrolling and Support
-  Path generation-dialog geometry, and the web expedition-planning scrim layer. The prior
-  native-parity plan was deleted because physical Android observations disproved its dialog/scroll
-  acceptance despite its passing automated and web evidence. Web acceptance becomes a checked-in
-  automatic production-export gate; the final preview APK build and physical-Android pass remain
-  user-owned in [BLOCKERS.md](./BLOCKERS.md).
+- **Durable Learner E2E Gates (IN PROGRESS — U1–U3 web layer DONE; U4–U7 remain).** Execute the
+  [active plan](./2026-07-15-001-feat-durable-learner-e2e-gates-plan.md): turn the proven U6
+  real-backend web driver (seeded as `apps/learner-app/e2e-realuse/`) into one durable, opt-in,
+  self-orchestrating command (never in `pnpm check`; no live generation in the routine suite), then
+  run a bounded negative-control Maestro Android-emulator experiment over a real APK to decide — in
+  an ADR — whether the recurring user-owned physical-device gate can be narrowed.
 
-  **Status (2026-07-15):** U1–U5 are implemented **and committed** (`d0e8928` session/RouteStatus,
-  `0b1c9d3` overlay dialog+sheet geometry, `9c2e44f` Playwright web gate, and the follow-on
-  native-bundling fix in `623a53d`: the U2 route test moved from `src/app/index.test.tsx` to
-  `src/components/IndexRoute.test.tsx`, because any `.test.tsx` under `src/app/` is globbed as an
-  Expo Router route and breaks native Android bundling (`require("console")`) — the web export
-  tolerated it, so U5's web gate never caught it). **U6's
-  rule-14 real-use WEB gate is DONE and PASSED (2026-07-15)** — see VALIDATION below; evidence in
-  `tmp/2026-07-14-learner-runtime-reliability/EVALUATION.md`. **The plan and the Android blocker stay
-  OPEN**: the Verification Contract forbids declaring the plan complete or deleting it until the
-  user-owned physical-Android preview-APK pass is recorded in [BLOCKERS.md](./BLOCKERS.md).
+  **Status (2026-07-15): U1–U3 (the durable real-backend WEB suite) implemented and PASSING; nothing
+  committed (user hasn't asked).** `pnpm e2e:web:realuse` is now one self-orchestrating command that
+  exits 0 on success — proven twice on both phone (Pixel 7) + desktop projects against the real
+  supervisor-free API over Postgres, selecting a real 12-stop enrichment by capability, with exact
+  3-learner cleanup and 0 residual rows. No generation, no LiteLLM call.
+  - **U1 (`packages/infrastructure-postgres`).** `deleteLearner` now covers the WHOLE learner FK
+    graph in the current migration — the drift fix added the missing `recall_challenges` (cascades
+    lineup+events) and `learner_sessions`, preserving the `response_log`-before-`learner_scaffold_detours`
+    ordering constraint (response_log FKs scaffold steps). New guarded teardown authority
+    `cleanupReservedLearners`/`reservedLearnerRefs` (roles `probe`/`phone`/`desktop`, refs
+    `realuse-<role>-<runId>`, `runId` `/^[0-9a-z]{6,40}$/`) rejects empty/duplicate/malformed/
+    non-reserved/wildcard input BEFORE any SQL, resolves by equality, deletes each learner in its own
+    transaction. Exposed via a new `@lrnki/infrastructure-postgres/test-support` package subpath (test
+    helpers stay out of the production root export). `e2e/static-server.mjs` parameterized
+    (`E2E_DIST_DIR`/`E2E_WEB_PORT`/`E2E_API_ORIGIN`) so BOTH web suites share it; duplicate
+    `e2e-realuse/serve.mjs` and `cleanup-learner.sh` DELETED. New live-Postgres integration test
+    `testSupport.test.ts` (3/3 green): full-coverage delete + shared-graph survival, exact-name
+    cleanup preserving unrelated/reserved-but-different-run learners, pre-SQL rejection.
+  - **U2 (`apps/learner-api/src/realuseServer.ts`, `apps/learner-app/e2e-realuse/{run,preflight}.ts`).**
+    Supervisor-free loopback API entrypoint composes the SAME Hono app WITHOUT starting the topic/
+    Scaffold supervisors — the neural clients are constructed lazily inside a supervisor `run` hook, so
+    a read-only journey provably makes no model call; owns its own DB client, closes HTTP+DB on
+    SIGTERM. `run.ts` is the lifecycle owner: generates run id + ephemeral PIN (prints only the run
+    id), free-port checks, `--clear` export baked against the real API origin, starts API + shared
+    static server, runs preflight, runs Playwright, and ALWAYS cleans up in `finally` + `--cleanup-run=<id>`
+    retry mode. Child env is secret-stripped (denylist) with per-child re-adds — only the API gets
+    `DATABASE_URL`; nothing gets LiteLLM/Expo secrets. `preflight.ts` registers a disposable probe
+    learner over public routes, reads `/catalog`, and picks the first ready enrichment whose real
+    Study Session (via the client's own `buildTrailView`) has a reachable one-tap graded stop; fails
+    closed (no generation) on an empty/unsuitable catalog. Config rewritten to `REALUSE_*`, tracing
+    OFF (bearer leak). Root `e2e:web:realuse` script + learner-app test-only dep on
+    `@lrnki/infrastructure-postgres` + `tsx` wired.
+  - **U3 (`apps/learner-app/e2e-realuse/realuse.spec.ts` + 3 selector seams).** One
+    project-parameterized journey replaced the four U6 scenarios: phone drives real stale-token→/me
+    401→failed Enter→signup; desktop registers directly; both then choose the runtime-selected shared
+    enrichment through the Catalog, open the Study Session, submit ONE auto-graded selection (any
+    outcome — correctness never asserted), reload, and confirm the expedition in `Continue`. Three
+    content-neutral `testID` seams (never generated prose): `candidate-<enrichmentId>`
+    (ExpeditionEntry `CandidateCard`), `checkpoint-<kind>-<state>` (CheckpointCircle),
+    `study-choice` (ActivityCards shared tile). learner-app 188/188 unit tests + typecheck + lint
+    green.
+  - **Two real HARNESS bugs found & fixed by the live gate itself** (not product defects): (1) the
+    same shared candidate renders in BOTH the journal Explore section and the Catalog with the same
+    testID → strict-mode 2-element violation on a client-side "Browse all" push → fixed by a hard
+    `goto("/catalog")`; (2) `page.addInitScript` re-seeds the stale token on EVERY later navigation,
+    clobbering the real signup token so the later `/catalog` bounced to the gate → fixed by seeding
+    the stale token once via `evaluate`+`reload`. Also hardened teardown: long-lived children are
+    spawned `detached` and signalled by process GROUP (a `pnpm run` wrapper otherwise orphaned the
+    tsx/node grandchild holding the port), and the API is spawned via the hoisted `tsx` bin directly
+    (no pnpm wrapper) so teardown is clean and the command exits 0.
 
-  **Status (2026-07-15b): Android Theory-scroll defect root-caused and FIXED (verified on the
-  physical device via dev client + Metro; committed `ddc0ec9`).** The first preview-APK pass
-  FAILED AE4 while confirming U3's geometry fix held (the Support Path `Preparing support` dialog
-  renders fully; journal/trail scrolls): Theory drags did nothing — no overscroll glow — i.e.
-  gesture acquisition, not geometry. Root cause (a second, distinct problem class): native
-  `@rn-primitives/dialog@1.5.2` hardwires `onStartShouldSetResponder → () => true` on `Content`,
-  and `Overlay` is a Pressable, so a JS ancestor claimed every touch at START and blocked the
-  descendant activity ScrollView's native move interception (Android-only; web is the responderless
-  Radix build — exactly why every web gate passed while the device failed). Fix, in
-  `ui/overlays.tsx` `FullScreenDialog`'s native branch only: `disabled` on the Overlay (this
-  surface has no backdrop-close to lose) + `onStartShouldSetResponder={undefined}` on Content (the
-  primitive spreads `{...props}` after its own responder prop — a sanctioned consumer override, no
-  node_modules patch). A jest responder-contract test locks the invariant (no FullScreenDialog
-  ancestor claims a starting touch); learner-app typecheck clean, 188/188 tests green. **Latent
-  same-class risk, deliberately NOT changed:** the centered `Dialog`'s Content claim is what
-  shields content taps from `closeOnPress`, so if a long `DialogBody` ever proves scroll-dead on
-  device, the fix is a deepest-claim wrapper INSIDE `DialogBody` — never an Overlay disable there.
-  The user-owned fresh preview-APK full U6 pass in [BLOCKERS.md](./BLOCKERS.md) remains the
-  completion bar.
+  **NEXT — U4 (real-use quality gate, `.agents/skills/real-use-quality-evaluation/SKILL.md`).** Run
+  `pnpm e2e:web:realuse` against MORE THAN ONE eligible catalog enrichment (the dev DB currently has
+  two: `bca30d14…` 33 items and `10915d48…` 19 items; the gate selected the 12-stop `bca30d14…`),
+  inspect phone/desktop screenshots (gitignored `tmp/realuse-artifacts/`, `tmp/2026-07-15-durable-learner-e2e-gates/web/`)
+  and terminal ergonomics, and record concrete usefulness/cleanliness/domain-neutrality/safety
+  findings. Then **U5–U6 (native Maestro)**: this environment has **no Android emulator or Maestro
+  CLI**, so U5 (portable deterministic Maestro flow over a real e2e-profile APK with `10.0.2.2`
+  cleartext + shared fixture builders) and U6 (negative-control sensitivity: reverse the `ddc0ec9`
+  responder fix for the Theory scenario and the `0b1c9d3` measured-cap fix for the Support Path
+  scenario in a throwaway worktree, require each to fail at its target assertion) require a host with
+  Android tooling. **U7** records the adopt/defer/reject ADR (EAS Workflows = defer) and consolidates
+  docs; per the plan, the physical-Android blocker is NOT cleared by emulator evidence. U4 depends on
+  U1–U3; U5 on U4; U6 on U5; U7 on U4+U6.
 
-  **Handoff (session 2026-07-14a):**
-  - **U1 DONE — atomic, query-owned session (`apps/learner-app`).** `me` is now the sole signed-in
-    source of truth. Removed the duplicate `hasToken` state and `LearnerNameGate.onEntered`; replaced
-    `queryClient.clear()` with a scoped swap. All signed-in reads (journal/catalog/leaderboard/
-    expedition/challenge) sit under one `["learner", …]` prefix (`LEARNER_SCOPE`/`learnerScopeKey` in
-    `lib/queries.ts`); `me` stays outside it. `enterSession` (`lib/session.ts`) now
-    cancels+removes the learner prefix, writes the token, and seeds `me` from the response (no second
-    `/me`). `meQuery` on 401 clears the token + removes the learner prefix (KTD1). `logout` removes
-    the prefix + sets `me` null (still re-throws a revoke failure after local cleanup — matches the
-    original `try/finally`). `actions.ts` invalidations reference `journalQuery.queryKey` /
-    `expeditionQuery(id).queryKey` (KTD3). `guardianEntry.ts` + guardian route already used
-    `challengeQuery(...).queryKey`, so they inherited the prefix automatically. Tests:
-    `lib/session.test.ts` (401 purge, AE1 failed-then-success seed + old-data-absent, in-flight
-    cancellation, logout cleanup incl. revoke failure, key-prefix invariant).
-  - **U2 DONE — exhaustive route states.** New app-owned `ui/routeStatus.tsx` (`RouteStatus`,
-    exported from `ui/index.ts`; loading/error/unavailable tones, copy+actions stay at the route
-    boundary per KTD4) + `ui/routeStatus.test.tsx`. Wired into `_layout.tsx` (visible bootstrap
-    loading, now rendered INSIDE the providers so `Screen` reads safe-area), `app/index.tsx` (session
-    validating / session error+retry+token-retained / gate / journal loading / journal error with
-    Retry+Log out — AE2), `app/catalog.tsx`, `app/expedition/[enrichmentId].tsx` (loading / error+retry
-    / 404-unavailable distinct), and `app/guardian/[challengeId].tsx` (migrated its existing
-    pending/error/over copy onto RouteStatus). New vocabulary keys (bootstrap/session/journal/catalog/
-    expedition status copy + `retryAction`) in `learn/vocabulary.ts` (+ test). Route test:
-    `app/index.test.tsx` (relocated to `src/components/IndexRoute.test.tsx` on 2026-07-15 — see Status).
-  - **Gate so far:** learner-app `typecheck` clean, `test` 185/185 (was 137), `eslint` 0 errors
-    (3 pre-existing warnings). No API/schema/content changes touched. Nothing committed (user hasn't
-    asked).
-  **Handoff (session 2026-07-14b):**
-  - **U3 DONE — bounded Android activity + dialog geometry (`ui/overlays.tsx`, `ui/overlays.test.tsx`).**
-    Root cause of the border-only Android dialog = Yoga *grow-from-zero* collapse: `flex-1` (`flex:1 1
-    0%`) children under a max-height-ONLY column satisfy at zero intrinsic height. Fixes: (1) the
-    centered `Dialog` now caps with ONE window-derived NUMERIC px maximum (`Math.round(height*0.85)`
-    via `useWindowDimensions`), replacing the `max-h-[85%]` class + web-only `85vh` inline dual cap —
-    a numeric px cap resolves identically on Yoga and behind the web focus wrapper. (2) `DialogBody`
-    and the centered `Dialog`'s `OverlayEntrance` wrapper went `flex-1 min-h-0` → `shrink min-h-0`
-    (shrink-from-natural: content-height when short, body scrolls when the cap bites; header/footer
-    stay `shrink-0`). (3) `FullScreenDialog` native branch is now `flex-1 bg-background` (bounded flex
-    chain under the definite-height inset-0 Overlay) instead of `absolute inset-0`, which did NOT hand
-    the activity ScrollView a definite height on native (Theory couldn't scroll) — WEB keeps `absolute
-    inset-0` for the focus-wrapper compensation (`Platform.OS==="web"` split). No consumer heights/
-    platform checks added (Support Path/Theory/Board untouched). Added `testID="dialog-content"` +
-    `"fullscreen-content"` to lock the numeric cap and the native flex branch in tests.
-  - **U4 DONE — web planning sheet in the root modal layer (`ui/sheets.tsx`, `ui/overlays.test.tsx`).**
-    `BottomSheet` now wraps the Expo primitive in `<Portal name={useId()}>` from `@rn-primitives/portal`
-    on web ONLY (the same root-`PortalHost` escape the RN-Primitives dialogs already use), so the vaul
-    scrim+content out-rank every journal/Browse/expedition/Guardian stacking context with ZERO consumer
-    z-index change and no `node_modules` patch. Native returns the primitive in place unchanged
-    (system modal sheet, pan-down, safe-area, keyboard, dismissal guard all intact — R13). New test
-    flips `Platform.OS` to `"web"` and proves relocation (no host → nothing renders; root host present
-    → renders). The actual top-layer hit-testing proof is deferred to U5's Playwright suite per plan.
-  - **Gate so far:** learner-app `typecheck` clean, `test` 187/187 (was 185; +2 new: numeric-cap +
-    web-portal), `eslint` 0 errors on changed files, Expo **web export builds** (all 7 routes). jest
-    runs the NATIVE branch, so real Android scroll gestures + measured dialog pixels + the web top-layer
-    scrim remain U6/U5 proofs, not covered here (see U3/U4 risk mitigations). Nothing committed.
-  **Handoff (session 2026-07-14c):**
-  - **U5 DONE — durable automatic web acceptance (`apps/learner-app/e2e/`, `playwright.config.ts`).**
-    Checked-in `@playwright/test` suite over the REAL production Expo web export, 14 tests green on
-    Chromium phone (Pixel 7) + desktop (1280×800), zero page/console errors. Files:
-    `playwright.config.ts` (two viewport projects, `globalSetup`, html+list reporters → gitignored
-    `tmp/`), `e2e/static-server.mjs` (webServer: exports to `dist-e2e` on demand then serves with SPA
-    fallback), `e2e/global-setup.ts` (real launch/close probe → actionable `e2e:setup` message, NEVER
-    downloads at test time), `e2e/fixtures.ts` (typed-API interception + fixtures + console-error
-    guard), `e2e/learner-runtime.spec.ts` (AE1 stale-token→failed-Enter→Set-out→Journal; AE2
-    journal-fail→Retry/Log-out recovery; AE3 catalog loading/error/Retry-recover + expedition +
-    guardian error surfaces; AE6 vaul `[data-vaul-overlay]` covers viewport + `elementFromPoint` over
-    the Menu control resolves into the modal layer + scrim-dismiss with unchanged URL; R12
-    pending-mutation blocks Escape dismissal). Wired: root `check` → `e2e:web` → learner `e2e`
-    (`E2E_FORCE_EXPORT=1 playwright test`, forces a fresh `--clear` export so the gate never serves a
-    stale bundle). `e2e:setup` = `playwright install chromium` (one-time). **Two gotchas solved:**
-    (1) the export bakes `EXPO_PUBLIC_LEARNER_API_URL` — a sentinel `http://127.0.0.1:8788` that is
-    only ever intercepted, never served, so any un-mocked call fails fast instead of hitting
-    production; **Metro caches that inlined value**, so the export MUST run `expo export --clear` or a
-    prior dev export's `:8790` origin silently persists (this bit me — fixed in static-server.mjs).
-    (2) cross-origin (web `:8099` ↔ api `:8788`) means authenticated GET / JSON POST preflight, so
-    the interceptor answers `OPTIONS` 204 with CORS headers or the real request never fires. Removed
-    the unused direct `playwright` root devDep + catalog entry (no tracked importer); added
-    `@playwright/test` (catalog) to learner-app; eslint override turns off `react-hooks/rules-of-hooks`
-    + `no-restricted-imports` for `e2e/**` (Playwright's `use()` fixture is not a React hook). Env
-    note: this sandbox pre-bakes `chromium_headless_shell-1223` in root-owned `/ms-playwright`
-    (`PLAYWRIGHT_BROWSERS_PATH`), so `e2e:setup` errors on write-permission there but the browser is
-    already present and launches fine — the actionable failure path is for fresh hosts.
-    The gate export is DECOUPLED from Playwright's webServer: `e2e` = `export:web:e2e`
-    (`expo export --clear` with the sentinel origin) THEN `playwright test`, so the webServer just
-    serves an existing `dist-e2e` and starts instantly. (First attempt ran the `--clear` cold export
-    INSIDE the webServer and blew its 180s startup cap — hence the pre-export step; webServer timeout
-    still raised to 300s as a fallback for a bare `playwright test`.) `--clear` is REQUIRED in `check`
-    because the preceding `build` step's `export:web` warms the Metro cache with the PRODUCTION
-    origin. Also: `dist-e2e/**` added to eslint `ignores` (else `eslint .` OOMs walking the 4.6MB
-    bundle) and to `.gitignore` + tsconfig `exclude`.
-  - **Gate:** FULL `pnpm check` GREEN end-to-end (exit 0): tmp-clean, typecheck (all pkgs), test (all
-    suites incl. learner-app 187/187), lint (0 errors / 9 pre-existing warnings), build (admin-lab +
-    learner export), and the new production-web Playwright gate 14/14 both viewports. Nothing
-    committed (user hasn't asked).
-  - **NEXT: U6** — rule-14 real-use WEB gate (`.agents/skills/real-use-quality-evaluation/SKILL.md`):
-    stand up the working-tree learner-api against Postgres (load `.env`; API on `:8790`) + production
-    LiteLLM, generate ONE real expedition, drive the REAL app (served export against the REAL api, NOT
-    the intercepted fixtures) through failed-entry→signup, all route states, and the planning-sheet
-    scrim over a populated page; keep the disposable learner/PIN/bearer out of screenshots/logs and
-    hard-reset it after; evidence in `tmp/2026-07-14-learner-runtime-reliability/`. Then fold the
-    result into TODO/BLOCKERS/README. **The preview-APK physical-Android pass stays user-owned in
-    BLOCKERS.md — do NOT delete the plan or clear the blocker until Android passes** (Verification
-    Contract: the plan cannot be declared complete until the manual Android gate passes). U6 depends
-    on U1–U5.
+  **Deviations to note:** (a) the plan listed U1 test-scenario 4 (shared static-server serving) under
+  `testSupport.test.ts`, but that's a DB-only file; static-server sharing is instead proven by the two
+  live e2e runs (intercepted default dir + realuse `dist-realuse`). (b) the `study-choice` testID
+  landed in `ActivityCards.tsx` (the shared tile), which the plan's U3 file list didn't enumerate but
+  is the correct seam. (c) learner-api keeps an unused `realuse-server` npm script (documented
+  standalone convenience); the runner spawns tsx directly.
 
 ### Evidence-triggered follow-up
-
-- **Durable real-backend web e2e suite + evaluate Maestro/EAS Workflows for the native gate.** The
-  U6 real-use gate (2026-07-15) proved a reusable Playwright driver that exercises the REAL learner
-  experience end-to-end. It is now seeded as a checked-in **scaffold** in
-  `apps/learner-app/e2e-realuse/` (`realuse.spec.ts`, `realuse.config.ts`, `serve.mjs`,
-  `cleanup-learner.sh`, `README.md`; opt-in `pnpm --filter @lrnki/learner-app e2e:realuse`, NOT in
-  `pnpm check`); the frozen gate evidence stays in `tmp/2026-07-14-learner-runtime-reliability/`.
-  Two distinct, separately-decidable
-  threads — do NOT conflate them, and keep all three e2e layers distinct: (1) the committed
-  **intercepted** suite `apps/learner-app/e2e/` (client behavior, mocked transport, in `pnpm check`);
-  (2) a **real-backend** suite (real Postgres + LiteLLM); (3) **native on-device**.
-  - **(A) Promote a durable real-backend web suite** by reusing the U6 driver. Design decisions to
-    settle first: how to stand up a real learner-api + seed ONE disposable learner and a ready
-    expedition deterministically (reuse an existing shared enrichment via `/catalog` to avoid a
-    ~5-min live generation per run, or gate generation behind an opt-in), where it runs (NOT default
-    `pnpm check` — it needs live services and real model spend; a separate opt-in `e2e:realuse`
-    target), the exact-match CORS origin gotcha (`localhost` ≠ `127.0.0.1`), run-unique signup names
-    + FK-safe teardown (the two harness defects U6 found), and credential hygiene (keep PIN/bearer
-    out of committed artifacts). This complements — does not replace — the intercepted suite.
-  - **(B) Evaluate Maestro + EAS Workflows** (https://docs.expo.dev/eas/workflows/examples/e2e-tests/)
-    to reduce the recurring MANUAL physical-Android gate that has landed in
-    [BLOCKERS.md](./BLOCKERS.md) across the native-parity, interaction-system, Crystal Guardian, and
-    Learner Runtime Reliability plans. Maestro drives real build artifacts (Android/iOS/web) as
-    black-box UI flows and would extend the existing `scripts/build-learner-android.sh` /
-    `.github/workflows/build-learner-android.yml` EAS pipeline. Judge whether an emulator/device-cloud
-    Maestro run can certify scroll gestures / Yoga measurement / dialog reachability that Playwright
-    provably cannot (plan KTD9/R15) — and if so, whether it downgrades the physical-device pass from
-    a hard blocker to a spot-check. Record the decision (adopt / defer / reject) with reasoning; do
-    not assume a device-cloud run fully substitutes for a real phone without evidence.
 
 - **Scaffold step content polish (measure-first).** Two model-variance observations from the
   2026-07-13 U6 gate, in the scaffold content generator (not the Support Path UX contract): a
@@ -192,6 +97,35 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Learner Runtime Reliability Fix shipped (2026-07-14→15, plan 2026-07-14-001; plan DELETED;
+  Android blocker CLEARED).** Learner entry, asynchronous route states, Android Theory scrolling,
+  Support Path dialog geometry, and the web planning-sheet layer are now reliable on their real
+  runtimes, proven by both an automatic production-web gate and the user-owned physical-Android
+  preview-APK pass. U1 made the `me` query the sole session truth with one `["learner", …]` cache
+  prefix and atomic session replacement (`hasToken`, `LearnerNameGate.onEntered`, and
+  `queryClient.clear()` deleted); U2 added the app-owned `RouteStatus` surface so bootstrap and
+  every query-driven route renders explicit loading/error/unavailable states with recovery actions;
+  U4 portals the web `BottomSheet` through the root `PortalHost` so the vaul scrim out-ranks every
+  journal stacking context (native sheet untouched); U5 checked the intercepted `@playwright/test`
+  production-export suite into `pnpm check` (phone + desktop Chromium). U3 plus the device loop
+  fixed **two distinct Android-only overlay defect classes** on the same surfaces: (1) Yoga
+  *grow-from-zero* collapse — one window-derived NUMERIC px dialog cap, shrink-from-natural
+  `DialogBody`/entrance, and a bounded native flex chain in `FullScreenDialog`; and (2) found by
+  the first failed APK pass, the `@rn-primitives/dialog` native **touch-responder claim**
+  (`Content` hardwires `onStartShouldSetResponder → true` and `Overlay` is a Pressable, so a JS
+  ancestor claimed drags before the activity ScrollView could scroll) — overridden in the
+  app-owned `FullScreenDialog` native branch only (Overlay `disabled` + `onStartShouldSetResponder`
+  `={undefined}` via the primitive's own props-spread; jest responder-contract lock; the centered
+  `Dialog` deliberately keeps its claim to shield `closeOnPress` — a deepest-claim wrapper inside
+  `DialogBody` is the designed fix if a long body ever proves scroll-dead on device). Also fixed en
+  route: any `.test.tsx` under `src/app/` is globbed as an Expo Router route and breaks native
+  Android bundling (`require("console")`), so the U2 route test moved to
+  `src/components/IndexRoute.test.tsx`. Neither defect class is observable by web gates (the web
+  build is the responderless Radix path) or jest (classes inert, no real gestures) — the durable
+  answer is the active [Durable Learner E2E Gates plan](./2026-07-15-001-feat-durable-learner-e2e-gates-plan.md).
+  Commits `d0e8928`/`0b1c9d3`/`9c2e44f`/`623a53d`/`ddc0ec9`. Both U6 gates PASS (see VALIDATION);
+  evidence `tmp/2026-07-14-learner-runtime-reliability/`.
 
 - **Crystal Guardian Challenges shipped (2026-07-14, plan 2026-07-13-003; plan + accepted
   brainstorm DELETED).** A Leg and the whole Topic Expedition now culminate in a durable,
@@ -465,7 +399,8 @@
 
 ## VALIDATION
 
-- **Learner Runtime Reliability Fix — U6 real-use WEB gate, 2026-07-15 (U1–U5).** Working-tree
+- **Learner Runtime Reliability Fix — U6 gates, 2026-07-15: automatic real-use WEB gate PLUS
+  user-owned physical-Android preview-APK pass (U1–U6, plan completed).** Working-tree
   learner-api (`:8790`, over Postgres + production LiteLLM) + a fresh production Expo web export
   baked against it, served on `localhost:8091`, driven by Playwright on phone (Pixel 7) + desktop
   (1280×800). A real "Photosynthesis light reactions" expedition (Plant Biology, 14 items / 3
@@ -484,9 +419,18 @@
   (exact-match CORS origin; durable-signup test-data leakage → run-unique names + FK-safe cleanup) —
   not product defects. Injected-failure AE2 stays proven by the committed deterministic suite (U5);
   live Guardian COMBAT was proven in Crystal Guardian Gate B (2026-07-14). Disposable learners
-  removed (only pre-existing data remains); enrichments retained. **The physical-Android
-  preview-APK pass remains user-owned and open in [BLOCKERS.md](./BLOCKERS.md); the plan is NOT
-  deleted.** Evidence + evaluation note: `tmp/2026-07-14-learner-runtime-reliability/EVALUATION.md`.
+  removed (only pre-existing data remains); enrichments retained. **Physical Android (user-owned,
+  preview APK):** the FIRST pass (2026-07-15) FAILED AE4 — Theory drags did nothing, no overscroll
+  glow — while confirming U3's dialog geometry held on device (Support Path dialog fully rendered,
+  journal/trail scrolled); root cause was the native `@rn-primitives/dialog` touch-responder claim
+  (see COMPLETED), fixed in `ui/overlays.tsx` (`ddc0ec9`) and scroll-verified on the phone through
+  a dev client + Metro. A FRESH preview APK then **PASSED the full U6 scenario set (user-recorded,
+  2026-07-15)**: failed entry → successful signup reaching the Journal, visible loading/error
+  recovery, real long-Theory scrolling with fixed header/footer, the Support Path `Preparing
+  support` dialog fully visible through generation, and the button/checkpoint/motion/
+  reduced-motion/strict-log/Crystal Guardian regression samples. Blocker CLEARED; plan deleted per
+  the Verification Contract. Evidence + evaluation note:
+  `tmp/2026-07-14-learner-runtime-reliability/EVALUATION.md`.
 
 - **Crystal Guardian Challenges Gate B — live real-use browser evaluation, 2026-07-14 (U5–U7).**
   Working-tree learner-api (`:8790`) + static Expo web export (`:8082`) driven by Playwright against

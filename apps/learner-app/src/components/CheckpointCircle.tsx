@@ -43,6 +43,10 @@ export function CheckpointCircle({
         {stop.isNext ? <NextStopHalo stopId={stop.stopId} /> : null}
         <PressableSurface
           accessibilityLabel={`${presentation.label}: ${stop.label}`}
+          // Content-neutral seam for the real-backend e2e journey (plan 2026-07-15-001 U3): the
+          // visible name is the dynamic concept label, so the durable suite targets a checkpoint by
+          // its typed kind + state instead. No effect on the shipped UX.
+          testID={`checkpoint-${stop.kind}-${stop.state}`}
           disabled={disabled}
           haptic="selection"
           onPress={() => onSelect(stop.stopId)}

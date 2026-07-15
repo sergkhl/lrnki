@@ -457,6 +457,9 @@ importers:
         specifier: catalog:expo
         version: 0.10.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(react-native@0.86.0(@babel/core@7.29.7)(@react-native/jest-preset@0.86.0(@babel/core@7.29.7)(react@19.2.3))(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.15)(react@19.2.3))(react@19.2.3)
     devDependencies:
+      '@lrnki/infrastructure-postgres':
+        specifier: workspace:*
+        version: link:../../packages/infrastructure-postgres
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
@@ -490,6 +493,9 @@ importers:
       test-renderer:
         specifier: catalog:expo
         version: 1.2.0(@types/react@19.2.15)(react@19.2.3)
+      tsx:
+        specifier: 'catalog:'
+        version: 4.21.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

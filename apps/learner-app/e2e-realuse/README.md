@@ -1,77 +1,80 @@
-# Real-use web e2e (opt-in) — scaffold
+# Real-backend web e2e (opt-in, one command)
 
-A durable seed of the plan 2026-07-14-001 **U6** real-use gate. Unlike the committed `../e2e/`
-suite (which mocks the API and runs inside `pnpm check`), this drives the production Expo web
-export against a **REAL** learner-api backed by Postgres + production LiteLLM — nothing is
-intercepted. It proves the real learner experience, so it needs live services and is **NOT** part
-of `pnpm check`.
+A durable, opt-in gate that drives the production Expo web export against a **REAL** supervisor-free
+learner-api over Postgres — nothing is intercepted. It is the integration counterpart to the
+committed `../e2e/` suite (which mocks the API and runs inside `pnpm check`). Because it needs live
+Postgres and a ready catalog enrichment, it is **NOT** part of `pnpm check`.
 
-> Status: **scaffold**, not yet a turnkey suite. It ran green end-to-end on 2026-07-15
-> (8/8 tests, phone + desktop). The remaining productization work — a deterministic learner +
-> expedition seed, an opt-in CI target, and credential handling — is tracked in
-> `docs/plans/TODO.md` (Evidence-triggered follow-up). Treat the steps below as the manual runbook.
-
-## Files
-
-- `realuse.spec.ts` — the four real-backend scenarios (AE1 signup, AE3 route states, AE6 sheet scrim).
-- `realuse.config.ts` — phone (Pixel 7) + desktop projects; `baseURL` uses `localhost` on purpose.
-- `serve.mjs` — static server with SPA fallback for the export (`dist-u6/` by default).
-- `cleanup-learner.sh` — FK-safe teardown of disposable learners by a `LIKE` pattern.
+It proves one thin persisted spine — real auth, catalog selection, Study Session, one graded answer,
+and persistence — on a phone and a desktop viewport. It performs **no generation** and makes **no
+LiteLLM call**: it selects an existing ready enrichment by capability.
 
 ## Run it
 
-From `apps/learner-app/`, with the repo-root `.env` providing `DATABASE_URL` + LiteLLM keys:
+From the repo root, with the repo `.env` providing `DATABASE_URL`:
 
 ```bash
-# 1. Start the working-tree learner-api on :8790. LEARNER_WEB_ORIGIN MUST equal the web origin
-#    below EXACTLY — CORS is an exact-match allowlist (localhost != 127.0.0.1), and the bearer
-#    flow is credentialed so it can never widen to "*".
-LEARNER_API_PORT=8790 LEARNER_WEB_ORIGIN=http://localhost:8091 \
-  pnpm --filter @lrnki/learner-api start &
-
-# 2. Seed a real learner + a ready expedition. Either:
-#    (a) register via POST /session {intent:"create"} and POST /expedition/start, then poll
-#        /journal until READY (~5 min of real generation), or
-#    (b) register and choose an existing shared enrichment from /catalog (no generation wait).
-#    Export U6_EXPLORER + U6_PIN for that learner. Keep the PIN out of committed files.
-
-# 3. Export the web bundle baked against the REAL api origin (:8790). `--clear` is REQUIRED:
-#    Metro caches the inlined EXPO_PUBLIC_LEARNER_API_URL, so a stale cache bakes the wrong origin.
-EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8790 \
-  npx expo export --clear --platform web --output-dir dist-u6
-
-# 4. Serve it on :8091 (matches LEARNER_WEB_ORIGIN above).
-node e2e-realuse/serve.mjs &
-
-# 5. Run the gate.
-U6_EXPLORER=<learner> U6_PIN=<pin> \
-  npx playwright test --config=e2e-realuse/realuse.config.ts
-
-# 6. Clean up EVERY disposable learner (weekly-board hygiene; AGENTS rule 14 / plan R2).
-bash e2e-realuse/cleanup-learner.sh 'gate-u6-signup%'
-bash e2e-realuse/cleanup-learner.sh '<learner>'
+pnpm e2e:web:realuse
 ```
 
-## Env vars
+That single command (`e2e-realuse/run.ts`) does everything:
 
-| Var | Required | Purpose |
+1. Loads `.env` into its own process and prints a safe run id.
+2. Verifies the API/web ports are free (fails rather than reusing an unknown process).
+3. Exports the production web bundle baked against the real API origin.
+4. Starts a **supervisor-free** learner-api (`realuseServer.ts`) over real Postgres and the shared
+   static server for the export.
+5. Runs capability **preflight** (`preflight.ts`): registers a disposable probe learner over public
+   routes, reads `/catalog`, and selects the first ready enrichment with a reachable one-tap graded
+   stop. An empty/unsuitable catalog fails with an actionable message and starts no journey.
+6. Runs Playwright (`realuse.spec.ts`) on phone (Pixel 7) + desktop.
+7. **Always** (success or failure) deletes exactly this run's three reserved learners and stops its
+   children.
+
+### First-time setup
+
+```bash
+pnpm --filter @lrnki/learner-app e2e:setup   # one-time: playwright install chromium
+```
+
+### If cleanup ever fails
+
+The runner prints an exact retry command with the run id:
+
+```bash
+pnpm --filter @lrnki/learner-app run e2e:realuse -- --cleanup-run=<runId>
+```
+
+This derives only the three exact reserved names (`realuse-{probe,phone,desktop}-<runId>`) and
+performs no other step. It cannot express a prefix or wildcard delete.
+
+## Env vars (optional)
+
+| Var | Default | Purpose |
 |---|---|---|
-| `U6_EXPLORER` / `U6_PIN` | yes | A real seeded learner with a populated journal. |
-| `U6_WEB_PORT` | no (8091) | Port `serve.mjs` binds and the config targets. |
-| `U6_DIST_DIR` | no (`../dist-u6`) | Export directory `serve.mjs` serves. |
-| `U6_EVIDENCE_DIR` | no (`tmp/realuse-screenshots`) | Where screenshots land (gitignored). |
-| `U6_CATALOG_MATCH` | no (`Expedition:`) | Substring proving a real catalog card rendered. |
-| `U6_RUNID` | no (timestamp) | Stable suffix for the disposable AE1 signup name. |
-| `U6_START_SERVER` | no | If set, the config starts `serve.mjs` itself (export must exist). |
+| `REALUSE_API_PORT` | `8790` | Supervisor-free learner-api port (loopback). |
+| `REALUSE_WEB_PORT` | `8091` | Static-server port; the browser Origin + API CORS use `http://localhost:<port>`. |
 
-## Gotchas (learned the hard way)
+The runner sets `REALUSE_RUN_ID`, `REALUSE_PIN`, and the selected `REALUSE_ENRICHMENT_*` /
+`REALUSE_GRADED_KIND` for the Playwright process. No pre-seeded learner or PIN is required, and no
+credential is committed.
 
-- **CORS is exact-match.** Drive from `http://localhost:8091`, not `127.0.0.1`, and set the api's
-  `LEARNER_WEB_ORIGIN` to the same string. Otherwise every authenticated call is blocked at preflight.
-- **AE1 persists a durable learner.** Its "failed Enter" needs the signup name to be UNREGISTERED,
-  so the name carries a run-unique suffix — always run `cleanup-learner.sh 'gate-u6-signup%'` after.
-- **Real HTTP 401/404/500 emit `Failed to load resource` console errors.** The console guard
-  ignores exactly those statuses (they're intentional) but still fails on any other runtime error.
-- **Route copy / DB column names can drift.** The spec asserts learner vocabulary strings and the
-  cleanup script names learner-scoped tables; re-verify against `src/learn/vocabulary.ts` and the
-  migration if the suite or teardown starts failing.
+## Safety properties
+
+- **No secret reaches the wrong child.** The base child env strips every secret-shaped key; only the
+  API re-adds `DATABASE_URL`. The browser/export/static/Playwright processes never see a database or
+  provider secret; the API never sees a LiteLLM/Expo secret.
+- **No model call.** The API entrypoint composes the same Hono app without the generation
+  supervisors, and the journey only reads a ready enrichment.
+- **No bearer leakage.** Playwright tracing is off (a trace captures the Authorization header); only
+  failure screenshots and sanitized diagnostics land in gitignored `tmp/`.
+- **Exact-name teardown.** Cleanup is derived from the current migration's learner FK graph
+  (`@lrnki/infrastructure-postgres/test-support`) and only ever deletes the three reserved names.
+
+## Gotchas
+
+- **CORS is exact-match.** The browser drives `http://localhost:<webPort>`, and the API's
+  `LEARNER_WEB_ORIGIN` is set to the same string. `localhost` ≠ `127.0.0.1`.
+- **`--clear` on export is required.** Metro caches the inlined `EXPO_PUBLIC_LEARNER_API_URL`.
+- **The catalog must already contain a suitable ready enrichment.** This suite never generates one;
+  preflight fails closed when none exists.

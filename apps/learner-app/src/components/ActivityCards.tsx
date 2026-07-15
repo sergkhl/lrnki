@@ -35,6 +35,10 @@ function ChoiceTile({
   return (
     <PressableSurface
       accessibilityLabel={text}
+      // Content-neutral seam (plan 2026-07-15-001 U3): every choice's visible name is generated
+      // answer prose, so the real-backend journey selects a tile by this stable kind instead —
+      // then asserts persisted lifecycle, never answer correctness.
+      testID="study-choice"
       disabled={disabled || graded}
       selected={chosen}
       busy={disabled && chosen && !graded}

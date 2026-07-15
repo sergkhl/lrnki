@@ -12,6 +12,8 @@ const eslintConfig = [
       "**/dist/**",
       "dist-e2e/**",
       "**/dist-e2e/**",
+      "dist-realuse/**",
+      "**/dist-realuse/**",
       "coverage/**",
       "**/coverage/**",
       ".data/**",

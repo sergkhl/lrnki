@@ -17,20 +17,26 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Parameterized so BOTH web suites share this one static Expo server (plan 2026-07-15-001 U1,
+// R14): the intercepted `pnpm e2e` gate keeps every default below, while the opt-in real-backend
+// runner overrides E2E_DIST_DIR/E2E_WEB_PORT/E2E_API_ORIGIN to serve its own export against the
+// real api origin. This replaces the deleted `e2e-realuse/serve.mjs` copy.
 const here = fileURLToPath(new URL(".", import.meta.url));
 const appRoot = resolve(here, "..");
-const outDir = join(appRoot, "dist-e2e");
+const outDir = process.env.E2E_DIST_DIR ? resolve(process.env.E2E_DIST_DIR) : join(appRoot, "dist-e2e");
 const indexHtml = join(outDir, "index.html");
 const PORT = Number(process.env.E2E_WEB_PORT ?? 8099);
 const API_ORIGIN = process.env.E2E_API_ORIGIN ?? "http://127.0.0.1:8788";
 
 if (process.env.E2E_FORCE_EXPORT || !existsSync(indexHtml)) {
-  console.log(`[e2e] exporting Expo web to dist-e2e (API origin ${API_ORIGIN})…`);
+  console.log(`[e2e] exporting Expo web to ${outDir} (API origin ${API_ORIGIN})…`);
   // `--clear` is REQUIRED, not optional: Metro caches the babel transform that inlines
   // `process.env.EXPO_PUBLIC_LEARNER_API_URL` into the bundle, so a stale cache from a prior
   // session (e.g. a dev export against :8790) would silently bake the wrong API origin and the
   // interception would never match. Clearing the cache makes the sentinel origin deterministic.
-  execFileSync("pnpm", ["exec", "expo", "export", "--clear", "--platform", "web", "--output-dir", "dist-e2e"], {
+  // The real-backend runner pre-exports its own dir, so this convenience path is normally only
+  // hit by the intercepted suite with the default dist-e2e.
+  execFileSync("pnpm", ["exec", "expo", "export", "--clear", "--platform", "web", "--output-dir", outDir], {
     cwd: appRoot,
     stdio: "inherit",
     env: { ...process.env, EXPO_PUBLIC_LEARNER_API_URL: API_ORIGIN }

@@ -197,6 +197,9 @@ export function CandidateCard({ candidate }: Readonly<{ candidate: CandidateCard
         onPress={begin}
         icon={<Compass size={16} color={buttonIconColor("primary")} />}
         label={learnerTerm("beginExpedition")}
+        // Content-neutral seam (plan 2026-07-15-001 U3): the real-backend suite selects the
+        // runtime-discovered candidate by its enrichment id, never by generated title text.
+        testID={`candidate-${candidate.enrichmentId}`}
       />
     </Card>
   );

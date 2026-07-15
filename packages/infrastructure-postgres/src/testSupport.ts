@@ -35,17 +35,24 @@ export function trackLearner(learnerRef: string): string {
   return learnerRef;
 }
 
-// FK-ordered delete of one learner and all five learner-state tables that reference it
-// (plan 2026-07-07-007, R2/KTD1 ordering). Children first, then the `learners` row.
+// FK-ordered delete of one learner and every learner-owned table in the current initial migration
+// (AGENTS.md: the migration is the deletion-graph authority; plan 2026-07-15-001 U1). Children
+// first, then the `learners` row. Ordering constraints, all read off the FK graph in
+// `0000_initial_lrnki_schema.sql`:
+//   - recall_challenges cascades its lineup + events, so a plain challenge delete clears them.
+//   - response_log carries a scaffold_step_id FK into learner_scaffold_steps (which cascade from
+//     their detour), so response_log MUST be deleted before learner_scaffold_detours.
+//   - learner_sessions cascades on the learners delete, but is removed explicitly for clarity and
+//     so this function is complete on its own (not reliant on cascade side effects).
 export async function deleteLearner(sql: Sql, learnerRef: string): Promise<void> {
-  await sql`DELETE FROM learner_expeditions WHERE learner_state_ref = ${learnerRef}`;
+  await sql`DELETE FROM recall_challenges WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM response_log WHERE learner_state_ref = ${learnerRef}`;
-  // Scaffold detours reference the learner; steps cascade on detour delete. Must run after
-  // response_log (whose scaffold_step_id rows reference the steps).
   await sql`DELETE FROM learner_scaffold_detours WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM calibration_verdicts WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM lesson_reads WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM learner_awards WHERE learner_ref = ${learnerRef}`;
+  await sql`DELETE FROM learner_expeditions WHERE learner_state_ref = ${learnerRef}`;
+  await sql`DELETE FROM learner_sessions WHERE learner_ref = ${learnerRef}`;
   await sql`DELETE FROM learners WHERE learner_ref = ${learnerRef}`;
 }
 
@@ -61,6 +68,66 @@ export async function cleanupTrackedLearners(databaseUrl: string | undefined): P
   } finally {
     await sql.end();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Durable real-use web gate cleanup (plan 2026-07-15-001 U1, R8-R9). The opt-in real-backend
+// runner creates exactly three disposable, run-unique learners — one per role — and this is the
+// ONLY teardown authority it uses. It replaces the deleted `cleanup-learner.sh` LIKE-pattern
+// script: no prefix or wildcard delete can ever be expressed here. Every accepted ref must match
+// the reserved shape `realuse-<role>-<runId>` exactly, so an arbitrary or attacker-supplied name
+// (including a SQL-wildcard-shaped value like `realuse-phone-%`) is rejected BEFORE any SQL runs.
+// ---------------------------------------------------------------------------
+
+export const REALUSE_ROLES = ["probe", "phone", "desktop"] as const;
+export type RealuseRole = (typeof REALUSE_ROLES)[number];
+
+// A run id is domain-neutral and format-locked to lowercase alphanumerics so it can never carry a
+// wildcard (`%`/`_`), separator, or SQL metacharacter into a reserved name.
+const RUN_ID_RE = /^[0-9a-z]{6,40}$/;
+// The full reserved-name grammar. `realuse-` prefix + one of the three fixed roles + the run id.
+const RESERVED_REF_RE = /^realuse-(probe|phone|desktop)-[0-9a-z]{6,40}$/;
+
+// The three exact learner refs a given run owns. Shared by the runner (to create/select) and by
+// `--cleanup-run=<id>` (to derive teardown scope from the run id alone). Throws on a malformed id.
+export function reservedLearnerRefs(runId: string): Record<RealuseRole, string> {
+  if (!RUN_ID_RE.test(runId)) {
+    throw new Error(`Invalid real-use run id ${JSON.stringify(runId)}; expected /^[0-9a-z]{6,40}$/.`);
+  }
+  return {
+    probe: `realuse-probe-${runId}`,
+    phone: `realuse-phone-${runId}`,
+    desktop: `realuse-desktop-${runId}`
+  };
+}
+
+// Delete exactly the named reserved learners and everything they own, each in its own transaction
+// so a partial FK sequence can be retried safely (R9). Validates the whole list up front — empty,
+// duplicate, malformed, non-reserved, or wildcard-shaped input throws before a single row is
+// touched — then resolves each ref by equality (never a pattern) and skips refs with no learner
+// row. Returns the refs that actually existed and were removed. Opens no client of its own; the
+// caller (runner `finally`, or the DB integration test) owns the `Sql` lifetime.
+export async function cleanupReservedLearners(sql: Sql, refs: readonly string[]): Promise<string[]> {
+  if (refs.length === 0) throw new Error("cleanupReservedLearners: no learner refs supplied.");
+  const seen = new Set<string>();
+  for (const ref of refs) {
+    if (!RESERVED_REF_RE.test(ref)) {
+      throw new Error(`cleanupReservedLearners: refusing non-reserved learner ref ${JSON.stringify(ref)}.`);
+    }
+    if (seen.has(ref)) throw new Error(`cleanupReservedLearners: duplicate learner ref ${JSON.stringify(ref)}.`);
+    seen.add(ref);
+  }
+  const deleted: string[] = [];
+  for (const ref of seen) {
+    const [existing] = await sql<{ learner_ref: string }[]>`
+      SELECT learner_ref FROM learners WHERE learner_ref = ${ref}`;
+    if (!existing) continue;
+    // postgres types don't declare TransactionSql assignable to Sql, but the tagged-template
+    // surface deleteLearner uses is identical; the cast keeps the whole delete in one transaction.
+    await sql.begin((tx) => deleteLearner(tx as unknown as Sql, ref));
+    deleted.push(ref);
+  }
+  return deleted;
 }
 
 export async function purgeOperationRun(sql: Sql, operationId: string): Promise<void> {

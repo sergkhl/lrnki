@@ -35,6 +35,17 @@ Run the quality checks:
 pnpm check
 ```
 
+`pnpm check` includes the intercepted production-web Playwright gate (`pnpm e2e:web`), which mocks
+the API and runs deterministically. Two heavier suites are **opt-in** and not part of `pnpm check`:
+
+```bash
+pnpm e2e:web:realuse   # one command: real supervisor-free API over Postgres, no generation
+```
+
+The real-backend web gate needs live Postgres with at least one ready catalog enrichment; it
+selects one by capability, never generates, and cleans up its disposable learners on success or
+failure. See [apps/learner-app/e2e-realuse/README.md](apps/learner-app/e2e-realuse/README.md).
+
 ## Deployment
 
 Target topology ([ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md)): the

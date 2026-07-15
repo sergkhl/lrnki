@@ -21,6 +21,7 @@
     "typecheck": "pnpm -r --sort --if-present run typecheck",
     "check": "pnpm run tmp:clean && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build && pnpm run e2e:web",
     "e2e:web": "pnpm --filter @lrnki/learner-app e2e",
+    "e2e:web:realuse": "pnpm --filter @lrnki/learner-app e2e:realuse",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
     "db:migrate": "scripts/migrate-db.sh",
     "seed:demo": "scripts/seed-demo.sh",
