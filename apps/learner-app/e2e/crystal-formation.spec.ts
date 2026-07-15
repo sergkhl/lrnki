@@ -2,7 +2,16 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { test, expect, ok, seedToken } from "./fixtures";
-import { FORMATION_ENRICHMENT_ID, formationExpedition, formationVistaExpedition, gradedCorrect } from "./scenarios/crystalFormation";
+import {
+  FORMATION_ENRICHMENT_ID,
+  formationExpedition,
+  formationVistaExpedition,
+  gradedCorrect,
+  guardianAnswerReply,
+  guardianChallenge,
+  guardianLegRewardExpedition,
+  guardianSummitRewardExpedition
+} from "./scenarios/crystalFormation";
 
 // Crystal Formation reward acceptance (plan 2026-07-15-002 U3 — the mastery collection
 // case; U4-U6 expand this file through Vista, Guardian reward, and summit states). Runs
@@ -11,6 +20,7 @@ import { FORMATION_ENRICHMENT_ID, formationExpedition, formationVistaExpedition,
 
 const EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection");
 const VISTA_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista");
+const GUARDIAN_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-c-guardian");
 
 test.afterEach(async ({ pageErrors }) => {
   expect(pageErrors, `unexpected runtime errors:\n${pageErrors.join("\n")}`).toEqual([]);
@@ -24,6 +34,11 @@ function shot(name: string, projectName: string): string {
 function vistaShot(name: string, projectName: string): string {
   mkdirSync(VISTA_EVIDENCE_DIR, { recursive: true });
   return path.join(VISTA_EVIDENCE_DIR, `${projectName}-${name}.png`);
+}
+
+function guardianShot(name: string, projectName: string): string {
+  mkdirSync(GUARDIAN_EVIDENCE_DIR, { recursive: true });
+  return path.join(GUARDIAN_EVIDENCE_DIR, `${projectName}-${name}.png`);
 }
 
 async function seedVistaNavigationMemory(page: Page) {
@@ -157,4 +172,83 @@ test("explicit Vista focus opens once and closing consumes route intent (AE10)",
   await expect(page.getByTestId("formation-spine-segment")).toHaveCount(0);
   await page.reload();
   await expect(page.getByTestId("formation-spine-segment")).toHaveCount(0);
+});
+
+test("final Guardian feedback hands a first Leg win into the refetched binding reward", async ({ page, mock }) => {
+  const challengeId = "guardian-first-ready-leg";
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
+    "GET /expedition/*": () => ok(guardianLegRewardExpedition(challengeId))
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await expect(page.getByText("The keyed marker completes the route and preserves the learned relationship.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "See your formation" })).toBeVisible();
+  await expect(page.getByText("Leg bound!")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Leg bound!")).toBeVisible();
+  await expect(page.getByTestId("leg-binding-event")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
+  await page.screenshot({ path: guardianShot("first-leg", test.info().project.name), fullPage: false });
+  await page.getByRole("button", { name: "Explore formation" }).click();
+  await expect(page).toHaveURL(new RegExp(`/expedition/${FORMATION_ENRICHMENT_ID}\\?vista=1&formationFocus=leg(?:%3A|:)1$`));
+});
+
+test("a Guardian rematch keeps the formation settled and uses endurance copy", async ({ page, mock }) => {
+  const challengeId = "guardian-ready-leg-rematch";
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
+    "GET /expedition/*": () => ok(guardianLegRewardExpedition("guardian-original-first-win"))
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Formation holds strong")).toBeVisible();
+  await expect(page.getByText(/permanent formation stays exactly as earned/)).toBeVisible();
+  await expect(page.getByTestId("leg-binding-event")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
+  await page.screenshot({ path: guardianShot("rematch", test.info().project.name), fullPage: false });
+});
+
+test("the first Expedition Guardian win seats the summit crown", async ({ page, mock }) => {
+  const challengeId = "guardian-first-summit";
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId, "enrichment") }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId, "enrichment")),
+    "GET /expedition/*": () => ok(guardianSummitRewardExpedition(challengeId))
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Summit crowned!")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit terminus — Crown seated." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
+  await page.screenshot({ path: guardianShot("first-summit", test.info().project.name), fullPage: false });
+});
+
+test("reward preview failure preserves committed victory, Retry, and plain Continue", async ({ page, mock }) => {
+  const challengeId = "guardian-preview-failure";
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
+    "GET /expedition/*": () => ({ status: 500, body: { error: "preview_failed" } })
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText(/victory is secure, but the formation preview didn’t load/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry preview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
+  await page.screenshot({ path: guardianShot("preview-error", test.info().project.name), fullPage: false });
 });

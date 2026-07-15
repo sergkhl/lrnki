@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { withSequence, withTiming } from "react-native-reanimated";
 import { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
-import { ArrowLeft, RotateCcw, ShieldAlert, Swords, Trophy } from "lucide-react-native";
+import { ArrowLeft, RotateCcw, ShieldAlert, Swords } from "lucide-react-native";
 import type {
   RecallAnswerFeedback,
   RecallChallengeView,
@@ -64,12 +64,16 @@ const DURATION_CAP_MS = 3_600_000;
 export function GuardianFight({
   view,
   onCommit,
-  onExit
+  onExit,
+  onVictoryReady
 }: Readonly<{
   view: RecallChallengeView;
   // Writes the post-commit view into the route's query cache — the single view source.
   onCommit: (view: RecallChallengeView) => void;
   onExit: () => void;
+  // The final keyed reveal explicitly hands the route into its reward stage. The token
+  // proves this mount observed the win edge; direct won-route loads never mint one.
+  onVictoryReady: (transitionToken: string | null) => void;
 }>) {
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [busy, setBusy] = useState(false);
@@ -79,6 +83,7 @@ export function GuardianFight({
   // Reshuffle key for the matching board: bumps when a dirty round completes or the current
   // item changes, so recovery presents a genuinely re-randomized, key-free board (KTD6).
   const [boardEpoch, setBoardEpoch] = useState(0);
+  const victoryTransitionRef = useRef<string | null>(null);
 
   const fighting = view.state === "active" || view.state === "recovery";
   const currentItemId = fighting ? view.currentItem.item.studyItemId : null;
@@ -141,6 +146,7 @@ export function GuardianFight({
       return null;
     }
     const feedback = result.feedback;
+    if (result.view.state === "won") victoryTransitionRef.current ??= clientUuid();
     if (feedback.kind === "selection" && answered) {
       triggerHaptic(feedback.correct ? "success" : "warning");
       setReveal({
@@ -244,11 +250,6 @@ export function GuardianFight({
     });
   };
 
-  const finishVictory = () => {
-    void refreshLearnerExpedition({ enrichmentId: view.enrichmentId });
-    onExit();
-  };
-
   if (over) {
     return (
       <Screen className="items-center justify-center gap-3 p-6">
@@ -277,12 +278,26 @@ export function GuardianFight({
         )}
       </View>
       <ScrollView contentContainerClassName="mx-auto w-full max-w-lg gap-4 p-4 pb-8">
-        {view.state === "won" ? (
-          <VictoryPanel scopeKind={view.scopeKind} anchorDerivedNodeId={view.anchorDerivedNodeId} wardTotal={view.wardTotal} onContinue={finishVictory} />
+        {reveal !== null ? (
+          <RevealPanel
+            reveal={reveal}
+            nextView={view}
+            onContinue={() => {
+              if (view.state === "won" && victoryTransitionRef.current) {
+                onVictoryReady(victoryTransitionRef.current);
+                return;
+              }
+              setReveal(null);
+            }}
+          />
+        ) : view.state === "won" ? (
+          // A won view can only occur here for a replayed response without feedback. The
+          // ordinary direct-load case is routed straight to GuardianReward by the route.
+          <RouteRewardHandoff onContinue={() => onVictoryReady(victoryTransitionRef.current)} />
         ) : (
           <>
             <GuardianStage view={view} title={title} />
-            {view.state === "recovery" && reveal === null ? <LastStandBanner /> : null}
+            {view.state === "recovery" ? <LastStandBanner /> : null}
             {failed ? (
               <Card className="gap-3 border-destructive">
                 <Text variant="label">{learnerTerm("guardianAnswerError")}</Text>
@@ -292,17 +307,13 @@ export function GuardianFight({
                 </View>
               </Card>
             ) : null}
-            {reveal !== null ? (
-              <RevealPanel reveal={reveal} nextView={view} onContinue={() => setReveal(null)} />
-            ) : (
-              <CurrentWard
-                view={view}
-                busy={busy}
-                boardEpoch={boardEpoch}
-                onSelect={answerSelection}
-                onPair={answerMatchingPair}
-              />
-            )}
+            <CurrentWard
+              view={view}
+              busy={busy}
+              boardEpoch={boardEpoch}
+              onSelect={answerSelection}
+              onPair={answerMatchingPair}
+            />
           </>
         )}
       </ScrollView>
@@ -414,7 +425,7 @@ function RevealPanel({
           <ImpostorBody item={reveal.item.item} selectedId={null} result={reveal.result} disabled onSelect={() => {}} />
         ) : null
       ) : null}
-      <Button variant="primary" onPress={onContinue} label={won ? learnerTerm("continueAction") : learnerTerm("guardianContinue")} />
+      <Button variant="primary" onPress={onContinue} label={won ? learnerTerm("guardianSeeFormation") : learnerTerm("guardianContinue")} />
     </View>
   );
 }
@@ -548,35 +559,11 @@ function GuardianMatchingBoard({
   );
 }
 
-// The victory state (F4, KTD3): the formation/keystone fact itself is server-owned — this
-// panel only celebrates and returns; the trail projection renders the permanent reward.
-function VictoryPanel({
-  scopeKind,
-  anchorDerivedNodeId,
-  wardTotal,
-  onContinue
-}: Readonly<{ scopeKind: "section" | "enrichment"; anchorDerivedNodeId: string; wardTotal: number; onContinue: () => void }>) {
+function RouteRewardHandoff({ onContinue }: Readonly<{ onContinue: () => void }>) {
   return (
-    <View className="gap-4">
-      <View className="items-center gap-1">
-        <View className="flex-row items-center gap-2">
-          <Trophy size={20} color={colors.award} />
-          <Text variant="title">{learnerTerm("guardianVictoryTitle")}</Text>
-        </View>
-        <CrystalGuardian
-          anchorDerivedNodeId={anchorDerivedNodeId}
-          phase="won"
-          wardTotal={wardTotal}
-          wardsRemaining={0}
-          shieldRemaining={0}
-          shieldTotal={0}
-          size={180}
-        />
-        <Text variant="label" color="muted" className="text-center font-normal">
-          {scopeKind === "enrichment" ? learnerTerm("guardianVictorySummitBody") : learnerTerm("guardianVictoryLegBody")}
-        </Text>
-      </View>
-      <Button variant="primary" onPress={onContinue} label={learnerTerm("returnToTrail")} />
-    </View>
+    <Card className="gap-3">
+      <Text variant="label">{learnerTerm("guardianVictoryCommitted")}</Text>
+      <Button variant="primary" onPress={onContinue} label={learnerTerm("guardianSeeFormation")} />
+    </Card>
   );
 }

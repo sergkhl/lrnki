@@ -130,8 +130,9 @@ function wonView(): RecallChallengeView {
 function Harness({
   initial,
   onCommit,
-  onExit
-}: Readonly<{ initial: RecallChallengeView; onCommit: jest.Mock; onExit: jest.Mock }>) {
+  onExit,
+  onVictoryReady
+}: Readonly<{ initial: RecallChallengeView; onCommit: jest.Mock; onExit: jest.Mock; onVictoryReady: jest.Mock }>) {
   const [view, setView] = useState(initial);
   return (
     <GuardianFight
@@ -141,6 +142,7 @@ function Harness({
         setView(next);
       }}
       onExit={onExit}
+      onVictoryReady={onVictoryReady}
     />
   );
 }
@@ -148,13 +150,14 @@ function Harness({
 async function renderFight(view: RecallChallengeView) {
   const onCommit = jest.fn();
   const onExit = jest.fn();
+  const onVictoryReady = jest.fn();
   await render(
     <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
-      <Harness initial={view} onCommit={onCommit} onExit={onExit} />
+      <Harness initial={view} onCommit={onCommit} onExit={onExit} onVictoryReady={onVictoryReady} />
       <PortalHost />
     </SafeAreaProvider>
   );
-  return { onCommit, onExit };
+  return { onCommit, onExit, onVictoryReady };
 }
 
 beforeEach(() => {
@@ -265,13 +268,72 @@ test("a fresh start requires confirmation, then abandons and creates a new chall
   expect(createMock).toHaveBeenCalledWith({ enrichmentId: "e1", scopeKind: "section", anchorDerivedNodeId: "anchor-1" });
 });
 
-test("a won challenge renders the victory panel and returns to the refreshed trail (KTD3: no client-side reward writes)", async () => {
-  const { onExit } = await renderFight(wonView());
-  expect(screen.getByText(learnerTerm("guardianVictoryTitle"))).toBeTruthy();
-  expect(screen.getByText(learnerTerm("guardianVictoryLegBody"))).toBeTruthy();
-  await fireEvent.press(screen.getByText(learnerTerm("returnToTrail")));
-  expect(onExit).toHaveBeenCalledTimes(1);
-  expect(refreshMock).toHaveBeenCalledWith({ enrichmentId: "e1" });
+test("a direct won fight hands off statically without rendering the superseded Guardian victory panel", async () => {
+  const { onVictoryReady } = await renderFight(wonView());
+  expect(screen.getByText(learnerTerm("guardianVictoryCommitted"))).toBeTruthy();
+  await fireEvent.press(screen.getByText(learnerTerm("guardianSeeFormation")));
+  expect(onVictoryReady).toHaveBeenCalledWith(null);
+  expect(refreshMock).not.toHaveBeenCalled();
+});
+
+test("the final selection reveal survives the committed won view until See your formation", async () => {
+  answerMock.mockImplementation(() => Promise.resolve({
+    answered: true,
+    replayed: false,
+    feedback: { kind: "selection", correct: true, chosenId: "o-right", keyedCorrectId: "o-right" },
+    view: wonView()
+  }));
+  const { onVictoryReady } = await renderFight(activeView({ unresolvedItemCount: 1, resolvedItemCount: 2 }));
+  await fireEvent.press(screen.getByText("Right answer for q1"));
+  await waitFor(() => expect(screen.getByText("Because the tide follows the moon.")).toBeTruthy());
+  expect(onVictoryReady).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByText(learnerTerm("guardianSeeFormation")));
+  expect(onVictoryReady).toHaveBeenCalledWith(expect.stringMatching(UUID_PATTERN));
+});
+
+test("even an unexpected final incorrect selection keeps its keyed reveal ahead of a won view", async () => {
+  answerMock.mockImplementation(() => Promise.resolve({
+    answered: true,
+    replayed: false,
+    feedback: { kind: "selection", correct: false, chosenId: "o-wrong", keyedCorrectId: "o-right" },
+    view: wonView()
+  }));
+  const { onVictoryReady } = await renderFight(activeView({ unresolvedItemCount: 1, resolvedItemCount: 2 }));
+  await fireEvent.press(screen.getByText("Wrong answer for q1"));
+  await waitFor(() => expect(screen.getByText(learnerTerm("guardianWardHolds"))).toBeTruthy());
+  expect(screen.getByText("Because the tide follows the moon.")).toBeTruthy();
+  expect(onVictoryReady).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByText(learnerTerm("guardianSeeFormation")));
+  expect(onVictoryReady).toHaveBeenCalledTimes(1);
+});
+
+test("the final matching-round reveal survives the committed won view until See your formation", async () => {
+  pairMock.mockImplementation(() => Promise.resolve({
+    answered: true,
+    replayed: false,
+    feedback: {
+      kind: "matching_pair",
+      correct: true,
+      promptId: "p2",
+      chosenMatchId: "m2",
+      keyedMatchId: "m2",
+      roundComplete: true,
+      roundClean: true
+    },
+    view: wonView()
+  }));
+  const { onVictoryReady } = await renderFight(activeView({
+    unresolvedItemCount: 1,
+    resolvedItemCount: 2,
+    currentItem: matchingItem("q3"),
+    matchingProgress: { matchedPromptIds: ["p1"], roundIndex: 0 }
+  }));
+  await fireEvent.press(screen.getByText("Clue two"));
+  await fireEvent.press(screen.getByText("Match two"));
+  await waitFor(() => expect(screen.getByText(learnerTerm("guardianWardBroken"))).toBeTruthy());
+  expect(onVictoryReady).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByText(learnerTerm("guardianSeeFormation")));
+  expect(onVictoryReady).toHaveBeenCalledWith(expect.stringMatching(UUID_PATTERN));
 });
 
 test("opening a retreated challenge fires the resume state-edge exactly once (KTD2)", async () => {

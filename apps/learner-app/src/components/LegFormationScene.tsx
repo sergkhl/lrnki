@@ -27,13 +27,15 @@ export function LegFormationScene({
   mode,
   focusNodeId = null,
   enteringNodeId = null,
-  width
+  width,
+  bindingEventId = null
 }: Readonly<{
   leg: LegFormationModel;
   mode: LegSceneMode;
   focusNodeId?: string | null;
   enteringNodeId?: string | null;
   width: number;
+  bindingEventId?: string | null;
 }>) {
   const viewBox = useMemo(() => cropFor(leg, mode, focusNodeId), [leg, mode, focusNodeId]);
   const height = (width * viewBox.height) / viewBox.width;
@@ -84,6 +86,10 @@ export function LegFormationScene({
         opacity={future ? 0.3 : bound ? 0.9 : 0.45}
       />
 
+      {mode === "binding" && bindingEventId !== null ? (
+        <BindingEvent key={bindingEventId} leg={leg} />
+      ) : null}
+
       {/* Exact intra-Leg prerequisite veins (R9/R10): thin, cool hairlines inside the
           matrix. Omitted entirely for a flagged Leg. */}
       {leg.veins.map((vein) => (
@@ -120,6 +126,34 @@ export function LegFormationScene({
         />
       ))}
     </Svg>
+  );
+}
+
+// First victory traces the already-earned structure only: minerals never regrow. The
+// bright seam then branch overlay settles onto the same bound geometry used by Vista.
+function BindingEvent({ leg }: Readonly<{ leg: LegFormationModel }>) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.set(withTiming(1, { duration: MOTION.emphasis }));
+  }, [progress]);
+  const animatedProps = useAnimatedProps(() => ({ opacity: 0.95 - progress.get() * 0.45 }));
+  return (
+    <AnimatedG testID="leg-binding-event" animatedProps={animatedProps}>
+      <Polyline
+        points={leg.seam.map((point) => `${point.x},${point.y}`).join(" ")}
+        fill="none"
+        stroke={colors.gold}
+        strokeWidth={7}
+        strokeLinecap="round"
+      />
+      <Polyline
+        points={branchPoints(leg)}
+        fill="none"
+        stroke={colors.gold}
+        strokeWidth={6}
+        strokeLinecap="round"
+      />
+    </AnimatedG>
   );
 }
 

@@ -255,6 +255,124 @@ export function formationVistaExpedition() {
   };
 }
 
+export const GUARDIAN_LEG_ANCHOR = "v1m";
+export const GUARDIAN_SUMMIT_ANCHOR = "v3m";
+
+export function guardianChallenge(
+  challengeId: string,
+  scopeKind: "section" | "enrichment" = "section"
+) {
+  return {
+    state: "active" as const,
+    challengeId,
+    enrichmentId: FORMATION_ENRICHMENT_ID,
+    scopeKind,
+    anchorDerivedNodeId: scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR,
+    wardTotal: 1,
+    unresolvedItemCount: 1,
+    resolvedItemCount: 0,
+    remainingMissBuffer: 1,
+    missBufferTotal: 1,
+    retreated: false,
+    matchingProgress: null,
+    currentItem: {
+      kind: "option_select" as const,
+      item: {
+        studyItemId: "guardian-final-item",
+        derivedNodeId: scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR,
+        question: "Which marker completes the route?",
+        explanation: "The keyed marker completes the route and preserves the learned relationship.",
+        groundingProvenance: "generated" as const,
+        options: [
+          { optionId: "guardian-correct", text: "The keyed route marker", provenance: "generated" as const },
+          { optionId: "guardian-wrong", text: "An unrelated marker", provenance: "generated" as const }
+        ],
+        explorableTerms: []
+      }
+    }
+  };
+}
+
+export function guardianWonChallenge(challengeId: string, scopeKind: "section" | "enrichment" = "section") {
+  return {
+    state: "won" as const,
+    challengeId,
+    enrichmentId: FORMATION_ENRICHMENT_ID,
+    scopeKind,
+    anchorDerivedNodeId: scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR,
+    wardTotal: 1
+  };
+}
+
+export function guardianLegRewardExpedition(firstWonChallengeId: string) {
+  const base = formationVistaExpedition();
+  return {
+    ...base,
+    session: {
+      ...base.session,
+      recallScopes: [
+        ...base.session.recallScopes.filter((scope) => scope.anchorDerivedNodeId !== GUARDIAN_LEG_ANCHOR),
+        {
+          scopeKind: "section" as const,
+          anchorDerivedNodeId: GUARDIAN_LEG_ANCHOR,
+          anchorLabel: "Ready Ridge",
+          sectionIndex: 1,
+          eligibleItemCount: 2,
+          state: "won" as const,
+          wonChallengeId: firstWonChallengeId
+        }
+      ]
+    }
+  };
+}
+
+export function guardianSummitRewardExpedition(firstWonChallengeId: string) {
+  const base = formationVistaExpedition();
+  const stateByNode = Object.fromEntries(Object.keys(base.session.classification.stateByNode).map((id) => [id, "mastered"]));
+  return {
+    ...base,
+    session: {
+      ...base.session,
+      classification: { stateByNode, selectedFrontierTarget: null },
+      expeditionPath: base.session.expeditionPath.map((step) => ({ ...step, state: "mastered" as const })),
+      recallScopes: [
+        ...base.session.sections.map((section) => ({
+          scopeKind: "section" as const,
+          anchorDerivedNodeId: section.milestoneDerivedNodeId,
+          anchorLabel: section.milestoneLabel,
+          sectionIndex: section.sectionIndex,
+          eligibleItemCount: 2,
+          state: "won" as const,
+          wonChallengeId: `leg-first-${section.sectionIndex}`
+        })),
+        {
+          scopeKind: "enrichment" as const,
+          anchorDerivedNodeId: GUARDIAN_SUMMIT_ANCHOR,
+          anchorLabel: "Waypoint Future Marker",
+          sectionIndex: null,
+          eligibleItemCount: 2,
+          state: "won" as const,
+          wonChallengeId: firstWonChallengeId
+        }
+      ]
+    }
+  };
+}
+
+export function guardianAnswerReply(challengeId: string, scopeKind: "section" | "enrichment" = "section") {
+  return {
+    answered: true,
+    replayed: false,
+    feedback: {
+      kind: "selection" as const,
+      correct: true,
+      chosenId: "guardian-correct",
+      keyedCorrectId: "guardian-correct"
+    },
+    view: guardianWonChallenge(challengeId, scopeKind)
+  };
+}
+
 // The grading reply the real client expects from `POST /study/option-select`.
 export function gradedCorrect(chosenOptionId: string) {
   return {

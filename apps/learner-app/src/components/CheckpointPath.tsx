@@ -50,7 +50,12 @@ export function CheckpointPath({
   // server-projected; a failed entry leaves the trail untouched.
   const enterScope = async (scope: RecallScopeStatus) => {
     const result = await enterGuardianScope({ enrichmentId: session.enrichmentId, scope });
-    if (result.entered) router.push(`/guardian/${result.challengeId}`);
+    if (!result.entered) return;
+    // A successful entry owns the study-surface handoff: close first, then yield a frame
+    // before navigation so the Activity Sheet cannot remain visible over the fight.
+    setSelectedStopId(null);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    router.push(`/guardian/${result.challengeId}`);
   };
 
   // The arrival offer (F1): the first unacknowledged available scope whose Leg is complete

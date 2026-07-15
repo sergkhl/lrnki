@@ -4,15 +4,14 @@
 
 ### Active implementation
 
-- **Crystal Formation Reward UX (IN PROGRESS — U1–U4 DONE, Milestone Gates A+B PASS 2026-07-15;
-  next = U5).** Execute the
+- **Crystal Formation Reward UX (IN PROGRESS — U1–U5 DONE, Milestone Gates A–C PASS 2026-07-15;
+  next = U6).** Execute the
   [active plan](./2026-07-15-002-feat-crystal-formation-reward-ux-plan.md): replace miniature
   shard/aura presentation with one shared mineral-geode formation language for mastery collection,
   first Guardian reward, honest rematches, and deliberate Crystal Vista exploration.
 
-  **Status (2026-07-15): U1–U4 complete and green (application 670; learner-app 211 jest across 48
-  suites after legacy-renderer test deletion; learner typecheck; focused Crystal Formation
-  Playwright 12/12 phone+desktop).** Gate A evidence + evaluation note:
+  **Status (2026-07-15): U1–U5 complete and green (application 670; full learner-app jest;
+  learner typecheck; changed-file lint; Crystal Formation Playwright 20/20 phone+desktop).** Gate A evidence + evaluation note:
   `tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection/EVALUATION.md` (PASS after 3
   in-gate fixes: "Summit reached"→`capstoneCollected` copy defect, over-dominant branch zigzag
   thinned/rerouted, collection crop 1.7→2.2×slot to stop neighbor clipping).
@@ -63,6 +62,22 @@
     translucent matrices; state/progress existed only in accessibility labels); port routing +
     direct labels fixed them, and a second screenshot pass widened exact-count labels. Evidence:
     `tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista/EVALUATION.md` (PASS).
+  - **U5.** `GuardianFight` now gives a pending selection/matching reveal priority over the committed
+    `won` view and hands the same route a mount-local transition token only after `See your
+    formation`; the repeated Guardian trophy panel and its superseded vocabulary are deleted.
+    `GuardianReward` classifies first/rematch only from the refreshed matching scope's durable
+    `wonChallengeId`, composes shared Leg binding or summit-crown scenes, gates normal-motion actions,
+    emits one first-win-only fusion/unlock haptic, and keeps direct/refreshed wins static. The route
+    explicitly invalidates/refetches the existing Expedition query; loading/error/inconsistent
+    previews preserve committed victory and plain Continue, while Explore replaces with explicit
+    Vista focus. Successful Guardian entry closes Activity Sheet state before route push; failure
+    leaves it open. Intercepted controllers now exercise actual final answer → cache commit → keyed
+    reveal → Expedition refetch → first/rematch/summit/error → route replacement boundaries. Gate C
+    initially found a FIX_FIRST responsive content-priority defect (the full summit ascent pushed
+    actions several phone screens below the crown); a focus viewport over the shared scene now keeps
+    crown, nearest bound Leg, and actions in one reward beat while Explore retains the complete
+    ascent. Evidence: `tmp/2026-07-15-crystal-formation-reward-ux/milestone-c-guardian/EVALUATION.md`
+    (PASS).
   - **Gotchas for the next session:** (a) in learner-app jest, any root mounted after the SECOND
     `render()` inside one test renders EMPTY and poisons later tests in the file — one render per
     test (`test.each`), never loops; (b) on web, RNSVG hosts expose the parsed viewBox as
@@ -72,15 +87,17 @@
     `checkpoint-capstone-complete` — scope with `.last()`; (d) the Vista fixture includes a
     Guardian-ready Leg, so seed `lrnki_guardian_arrival_gate-explorer_v1m=1` before navigation or
     the legitimate arrival dialog intercepts Vista actions; (e) Expo export wrappers may yield
-    before their child finishes—check the child process and do not start a duplicate.
-  - **NEXT — U5 (Guardian reward + route handoff, Milestone Gate C):** preserve final keyed answer
-    feedback ahead of the won state, add the local reward stage + authoritative Expedition refetch,
-    classify first victory only by `challengeId === wonChallengeId`, compose binding/crown/rematch
-    scenes with event-token-only motion/haptics, keep Continue available through preview failure,
-    clear Activity Sheet only after successful Guardian entry, and extend the intercepted controller
-    through the actual answer/refetch/route boundaries. Then U6 full Playwright polish/real-use gate
-    and U7 ADR/TODO/index consolidation + plan deletion. Gate B caveat to re-judge in Gate C/U6:
-    natural-size formation is intentionally compact on desktop; phone sees the ascent by scrolling.
+    before their child finishes—check the child process and do not start a duplicate; (f) React 19
+    learner tests require awaited `render`/`rerender`/`fireEvent`/async `act`, or overlapping act scopes
+    can empty later roots; (g) Expo Router percent-encodes the Vista focus colon in the browser URL
+    (`leg%3A1`) even though `useLocalSearchParams` correctly returns `leg:1`.
+  - **NEXT SESSION HANDOFF — start U6 only.** Branch `feat/crystal-formation-reward-ux` contains U4
+    commit `3840f48` plus the U5 commit immediately following it. Do not rebuild Guardian reward or
+    alter its authoritative classification. Execute U6's production-web exercise/polish across the
+    complete collection → Guardian → reward → Vista flow, including normal/reduced motion and both
+    viewports; use the existing intercepted controller rather than component-only fixtures. Re-run
+    the real-use quality skill and store U6 evidence under the plan's designated `tmp/` path. U7
+    (ADR/TODO/index consolidation and active-plan deletion) remains unstarted and must follow U6.
 
 
 ### Evidence-triggered follow-up

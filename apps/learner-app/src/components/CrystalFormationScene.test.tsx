@@ -51,3 +51,28 @@ test("the full scene renders separated Legs, a winding spine, and a terminus", a
   expect(screen.queryByTestId("fusion-aura")).toBeNull();
   expect(screen.queryByTestId("summit-keystone-floating")).toBeNull();
 });
+
+test("summit reward focus crops the shared ascent to the crown and nearest Leg", async () => {
+  const layout = composeCrystalFormation({
+    concepts: [concept("a", 0, "mastered"), concept("b", 1, "mastered")],
+    sections: [
+      { sectionIndex: 0, milestoneLabel: "First Ridge", state: "complete", recallScope: null },
+      { sectionIndex: 1, milestoneLabel: "Summit Ridge", state: "complete", recallScope: null }
+    ],
+    edges: [],
+    enrichmentScope: null
+  });
+  await render(
+    <CrystalFormationScene
+      layout={layout}
+      width={358}
+      focus={{ kind: "summit" }}
+      contextualizingRewardKey="summit"
+      cropToFocus
+      selectedNodeId={null}
+      onSelectNode={() => undefined}
+    />
+  );
+  expect(screen.getByTestId("formation-focused-viewport")).toBeTruthy();
+  expect(screen.getByTestId("formation-focus-summit")).toBeTruthy();
+});

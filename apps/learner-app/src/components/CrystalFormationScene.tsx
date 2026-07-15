@@ -22,6 +22,7 @@ export function CrystalFormationScene({
   width,
   focus,
   contextualizingRewardKey,
+  cropToFocus = false,
   selectedNodeId,
   onSelectNode
 }: Readonly<{
@@ -29,6 +30,7 @@ export function CrystalFormationScene({
   width: number;
   focus: VistaFocus | null;
   contextualizingRewardKey: VistaRewardKey | null;
+  cropToFocus?: boolean;
   selectedNodeId: string | null;
   onSelectNode: (derivedNodeId: string) => void;
 }>) {
@@ -36,6 +38,10 @@ export function CrystalFormationScene({
   const scale = fit.scale;
   const sceneWidth = layout.width * scale;
   const sceneHeight = layout.height * scale;
+  const summitNeighbor = layout.legs.at(-1) ?? null;
+  const focusedSceneHeight = cropToFocus && focus?.kind === "summit" && summitNeighbor
+    ? Math.min(sceneHeight, (summitNeighbor.frame.y + summitNeighbor.height) * scale)
+    : sceneHeight;
 
   const scene = (
     <View style={{ width: sceneWidth, height: sceneHeight }}>
@@ -124,13 +130,22 @@ export function CrystalFormationScene({
     </View>
   );
 
-  return fit.horizontalOverflow ? (
+  const fittedScene = fit.horizontalOverflow ? (
     <ScrollView horizontal contentContainerStyle={{ width: sceneWidth }} showsHorizontalScrollIndicator>
       {scene}
     </ScrollView>
   ) : (
     <View style={{ width: sceneWidth, height: sceneHeight }}>{scene}</View>
   );
+  return focusedSceneHeight < sceneHeight ? (
+    <View
+      testID="formation-focused-viewport"
+      className="overflow-hidden"
+      style={{ width: sceneWidth, height: focusedSceneHeight }}
+    >
+      {fittedScene}
+    </View>
+  ) : fittedScene;
 }
 
 function FormationPiece({
