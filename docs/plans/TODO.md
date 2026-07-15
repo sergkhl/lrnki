@@ -4,101 +4,7 @@
 
 ### Active implementation
 
-- **Crystal Formation Reward UX (IN PROGRESS — U1–U5 DONE, Milestone Gates A–C PASS 2026-07-15;
-  next = U6).** Execute the
-  [active plan](./2026-07-15-002-feat-crystal-formation-reward-ux-plan.md): replace miniature
-  shard/aura presentation with one shared mineral-geode formation language for mastery collection,
-  first Guardian reward, honest rematches, and deliberate Crystal Vista exploration.
-
-  **Status (2026-07-15): U1–U5 complete and green (application 670; full learner-app jest;
-  learner typecheck; changed-file lint; Crystal Formation Playwright 20/20 phone+desktop).** Gate A evidence + evaluation note:
-  `tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection/EVALUATION.md` (PASS after 3
-  in-gate fixes: "Summit reached"→`capstoneCollected` copy defect, over-dominant branch zigzag
-  thinned/rerouted, collection crop 1.7→2.2×slot to stop neighbor clipping).
-  - **U1.** `TrailCluster.sectionPositionIndex` copied from the expedition step (neutral ordering
-    metadata, `studySessionTrail.ts`). New pure `src/learn/mineralSpecimen.ts`: balanced
-    quartz/fluorite/calcite habit cycle (`mineralHabitFor` = FNV section offset +
-    `sectionPositionIndex`), node-seeded facet geometry (shared FNV-1a/mulberry32 exported for the
-    layout module), `visibleMineralFacets` (final facet reserved for mastery), and the ONE honest
-    compact-progress derivation `formationProgress`/`formationProgressLine`
-    ("N of M ground complete · K crystals · J known" — known ground can never inflate crystals).
-    New `CrystalSpecimen`/`MineralFacetsGroup` (ghost = outline-only in every state). Compact
-    surfaces migrated: QuestHeader vista door = Gem icon + exact count (new test), SectionOverview
-    + CheckpointPath `SectionDivider` = `Progress` meter + progress line (`SectionCrystalStrip`
-    DELETED), ConceptMarker = Gem status icon + exact `%`, ActivitySheet header = Gem icon,
-    CheckpointCircle 40px capstone = real `CrystalSpecimen`, CrystalGuardian body = composed
-    3-habit mineral group (`GUARDIAN_DIFFICULTY` + `CrystalShardsGroup` use deleted).
-  - **U2.** Pure `src/learn/crystalFormationLayout.ts`: per-Leg Sphere Grid with constant `"leg"`
-    domain over ONLY trusted same-Leg edges, Leg-local normalization (flip/scale 130→76-px
-    lattice, `SLOT_SIZE` 48), 4 structural states (`legStructuralState`: bound ONLY from
-    `wonChallengeId`; guardian substates available/engaged/unavailable), irregular matrix contour +
-    seam (jitter ≤10 inside `MATRIX_PAD` 34 so slots provably contained), flagged-Leg vein
-    omission with `crossings` diagnostic, alternating non-overlapping ascent + winding spine
-    (`lit` per bound Leg) + terminus (`crowned` only from enrichment `wonChallengeId`), and
-    `fitLegWidth` (40-px floor → horizontal overflow). Input-order independent (slots/veins
-    canonically sorted). Per-Leg zero-crossing regression added to
-    `packages/application/src/sphereGridLayout.test.ts` (17 Legs / max 10 nodes from the 59-node
-    real-shape fixture via `projectExpeditionSections`, every Leg crossing-free); the known
-    4-node/5-edge tangle (n0→n1,n2,n3; n1→n2,n3) is the locked flagged fixture.
-  - **U3.** `LegFormationScene` (modes `overview`/`collection`/`binding`-stub): layered geode
-    bands, seam open/fractured/sealed, quiet nonsemantic branch, thin dotted exact veins, one
-    slot-specimen per concept; ONLY `enteringNodeId` plays the one-shot rise (played-event ref, no
-    replay on rerender; reduced motion = immediate final state). ActivitySheet `CapstoneReveal`
-    now renders the focused shared Leg crop (width 220, crop 2.2×slot), single mastery haptic
-    unchanged and mount-scoped. New `e2e/crystal-formation.spec.ts` +
-    `e2e/scenarios/crystalFormation.ts` (domain-neutral Waypoint fixture; collecting→collected
-    phase flip on the graded POST): AE1 honest compact progress, AE2 collection + settled reopen,
-    AE9 reduced motion — 8/8 on phone+desktop. New vocab: `legFuture/legCollecting/
-    legGuardianAwaits/legGuardianEngaged/legGuardianUnavailable/legBound/capstoneCollected` +
-    `legStateCopy`.
-  - **U4.** `CrystalFormationScene` composes the finished two-level layout as separated shared Leg
-    scenes, one port-consistent winding spine, direct Leg state/progress labels, native 44 px
-    memory-door targets, and a terminus-owned crown. `CrystalVista` uses server-derived formation
-    facts plus lossable canonical `leg:<sectionIndex>`/`summit` seen snapshots; explicit reward focus
-    wins, ordinary render stays closed, and close consumes route intent. Native/web memory seams
-    match. Legacy `crystalVistaView`, `crystalGeometry`, `CrystalGlyph`, fusion auras/sockets, and the
-    floating keystone were deleted with their tests. Gate B initially found two FIX_FIRST defects
-    invisible to semantic assertions (the spine aimed at the next Leg bottom and cut through
-    translucent matrices; state/progress existed only in accessibility labels); port routing +
-    direct labels fixed them, and a second screenshot pass widened exact-count labels. Evidence:
-    `tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista/EVALUATION.md` (PASS).
-  - **U5.** `GuardianFight` now gives a pending selection/matching reveal priority over the committed
-    `won` view and hands the same route a mount-local transition token only after `See your
-    formation`; the repeated Guardian trophy panel and its superseded vocabulary are deleted.
-    `GuardianReward` classifies first/rematch only from the refreshed matching scope's durable
-    `wonChallengeId`, composes shared Leg binding or summit-crown scenes, gates normal-motion actions,
-    emits one first-win-only fusion/unlock haptic, and keeps direct/refreshed wins static. The route
-    explicitly invalidates/refetches the existing Expedition query; loading/error/inconsistent
-    previews preserve committed victory and plain Continue, while Explore replaces with explicit
-    Vista focus. Successful Guardian entry closes Activity Sheet state before route push; failure
-    leaves it open. Intercepted controllers now exercise actual final answer → cache commit → keyed
-    reveal → Expedition refetch → first/rematch/summit/error → route replacement boundaries. Gate C
-    initially found a FIX_FIRST responsive content-priority defect (the full summit ascent pushed
-    actions several phone screens below the crown); a focus viewport over the shared scene now keeps
-    crown, nearest bound Leg, and actions in one reward beat while Explore retains the complete
-    ascent. Evidence: `tmp/2026-07-15-crystal-formation-reward-ux/milestone-c-guardian/EVALUATION.md`
-    (PASS).
-  - **Gotchas for the next session:** (a) in learner-app jest, any root mounted after the SECOND
-    `render()` inside one test renders EMPTY and poisons later tests in the file — one render per
-    test (`test.each`), never loops; (b) on web, RNSVG hosts expose the parsed viewBox as
-    `vbWidth`/`vbHeight` props (no `viewBox` prop) and `getByRole("img", { name })` is the robust
-    Playwright selector for scene labels (the Leg banner `Progress` meter announces the same
-    progress line — plain `getByLabel` strict-mode collides); (c) multiple complete capstones share
-    `checkpoint-capstone-complete` — scope with `.last()`; (d) the Vista fixture includes a
-    Guardian-ready Leg, so seed `lrnki_guardian_arrival_gate-explorer_v1m=1` before navigation or
-    the legitimate arrival dialog intercepts Vista actions; (e) Expo export wrappers may yield
-    before their child finishes—check the child process and do not start a duplicate; (f) React 19
-    learner tests require awaited `render`/`rerender`/`fireEvent`/async `act`, or overlapping act scopes
-    can empty later roots; (g) Expo Router percent-encodes the Vista focus colon in the browser URL
-    (`leg%3A1`) even though `useLocalSearchParams` correctly returns `leg:1`.
-  - **NEXT SESSION HANDOFF — start U6 only.** Branch `feat/crystal-formation-reward-ux` contains U4
-    commit `3840f48` plus the U5 commit immediately following it. Do not rebuild Guardian reward or
-    alter its authoritative classification. Execute U6's production-web exercise/polish across the
-    complete collection → Guardian → reward → Vista flow, including normal/reduced motion and both
-    viewports; use the existing intercepted controller rather than component-only fixtures. Re-run
-    the real-use quality skill and store U6 evidence under the plan's designated `tmp/` path. U7
-    (ADR/TODO/index consolidation and active-plan deletion) remains unstarted and must follow U6.
-
+- None.
 
 ### Evidence-triggered follow-up
 
@@ -114,6 +20,39 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Crystal Formation Reward UX shipped (2026-07-15, plan 2026-07-15-002; plan DELETED).** Crystal
+  collection, Leg binding after a Guardian first win, honest rematches, the summit crown, and
+  Crystal Vista now speak one mineral-geode formation language, owned durably by the amended
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) Crystal
+  Formation reward-presentation contract. **(U1)** Pure `mineralSpecimen.ts` (balanced
+  quartz/fluorite/calcite habit cycle keyed on section-stable offset + `sectionPositionIndex`,
+  node-seeded cosmetic variation, honest `formationProgress` where known ground never inflates
+  crystals) + `CrystalSpecimen`; compact surfaces migrated to Gem/status icons, exact counts, and
+  `Progress` (no specimen below 40 px; `SectionCrystalStrip` deleted);
+  `TrailCluster.sectionPositionIndex` copied from the expedition step (neutral ordering metadata).
+  **(U2)** Pure `crystalFormationLayout.ts`: per-Leg Sphere Grid over trusted same-Leg edges only,
+  four structural states (`bound`/`crowned` ONLY from durable `wonChallengeId`), irregular matrix +
+  seam containing every slot, flagged-Leg vein omission, alternating non-overlapping ascent +
+  nonsemantic winding spine + terminus, 40-px floor with horizontal overflow; per-Leg zero-crossing
+  regression locked over the 59-node real-shape fixture (17 Legs). **(U3)** Shared
+  `LegFormationScene` (overview/collection/binding modes, one-shot event-keyed rise, reduced motion
+  = immediate final state); ActivitySheet capstone renders the focused shared Leg crop with one
+  mount-scoped mastery haptic. **(U4)** `CrystalFormationScene` + rebuilt `CrystalVista` (explicit
+  open/focus intent consumed on close, `leg:<sectionIndex>`/`summit` seen-snapshot navigation
+  memory with native/web parity, memory doors + 44 px targets); legacy `crystalVistaView`,
+  `crystalGeometry`, `CrystalGlyph`, fusion auras/sockets, and the floating keystone deleted.
+  **(U5)** GuardianFight renders the pending keyed reveal ahead of the committed `won` view and
+  hands a mount-local transition token through `See your formation`; `GuardianReward` classifies
+  first/rematch only from the refreshed scope's durable `wonChallengeId`, plays binding/crown once
+  with one first-win-only fusion/unlock haptic, keeps direct/refreshed wins static, preserves
+  victory + Continue through preview loading/error/inconsistent, and Explore replaces with explicit
+  Vista focus; Guardian entry closes the Activity Sheet only after success. **(U6)** Full
+  production-web Playwright exercise (13 scenarios × phone/desktop, normal + reduced motion) found
+  and fixed two in-gate defects: reduced motion still ran the reward sweep/binding overlay
+  (R20 violation), and the one-time Vista contextualization banner auto-scrolled out of view (now
+  pinned below the header). Evidence + evaluation notes under
+  `tmp/2026-07-15-crystal-formation-reward-ux/` (milestone-a/b/c + `u6-final/EVALUATION.md`).
 
 - **Durable Learner E2E Gates shipped (2026-07-15, plan 2026-07-15-001; plan DELETED).** Three
   learner test layers with three distinct claims now exist, folded into
@@ -442,6 +381,24 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Crystal Formation Reward UX — U6 production-web gate, 2026-07-15.** `pnpm e2e:web` over the
+  fresh production Expo static export with the typed API intercepted by production-shaped
+  domain-neutral fixtures: **46/46 PASS** (13 crystal-formation scenarios × Pixel-7-phone +
+  1280×800 desktop, plus the shared runtime suite), zero unexpected page/console errors. Scenario
+  coverage: honest compact progress with known ground; mastery collection + settled reopen;
+  Guardian-ready available/engaged/zero-eligible copy; keyed final reveal preceding the first Leg
+  binding reward and Explore landing on `?vista=1&formationFocus=leg:1`; Leg rematch endurance;
+  four-state multi-Leg Vista with memory door; first summit crown; summit rematch (crown stays
+  seated, no first-reward panel); preview refetch failure preserving victory/Retry/Continue;
+  reduced-motion equivalents for collection, binding, crown, and Vista contextualization. Screenshot
+  inspection at both viewports judged Leg boundaries, states, spine-vs-vein distinction, mineral
+  habits, and the crown identifiable from stills (AE12) and caught one defect semantic assertions
+  could not (the contextualization banner scrolling out of view); the reduced-motion spec design
+  caught the second (reward sweep/binding overlay animating under reduced motion). Both fixed and
+  re-proven in the same gate; real-use quality evaluation **PASS**. No API/schema/persistence/LLM
+  change; jest (application 670-suite + full learner-app) and learner typecheck green. Evidence:
+  `tmp/2026-07-15-crystal-formation-reward-ux/u6-final/EVALUATION.md`.
 
 - **Durable Learner E2E Gates — native-gate sensitivity (U6), 2026-07-15.** Emulator
   `Medium_Phone_API_36.1` (Android 36.1/arm64), Maestro 2.6.1, one checked-in flow/fixture/selectors

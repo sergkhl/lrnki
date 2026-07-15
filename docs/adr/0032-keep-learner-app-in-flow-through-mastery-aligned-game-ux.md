@@ -3,7 +3,7 @@
 Status: Accepted. Amended 2026-07-11 with the app-owned interaction system, overlay, motion, and
 haptic contract; amended 2026-07-12 with learner-requested Scaffold Detour support; amended
 2026-07-14 with the durable Recall Challenge (Crystal Guardian) recall-challenge path superseding
-Crystal Duel.
+Crystal Duel; amended 2026-07-15 with the Crystal Formation reward-presentation contract.
 
 ## Decision
 
@@ -73,9 +73,10 @@ eligible item exists (a content-coverage defect to surface, never a silent award
 exhaustion enters a Last Stand that recovery repairs, and no challenge outcome ever causes defeat,
 mastery loss, reward loss, or a restart; there is no correctness timer. The lifecycle is durable and
 idempotent (one active fight per learner+scope, exact retreat/resume, confirmed abandon). The reward
-is a **permanent, singular** crystal formation (Leg) or summit keystone earned on the first victory;
-rematches rotate coverage and may replay the celebration but never dim, revoke, duplicate, or
-re-award it. Crucially, **challenge evidence is not acquisition evidence**: Guardian answers persist
+is a **permanent, singular** Leg binding or summit crown in the Crystal Formation earned on the
+first victory; rematches rotate coverage and receive only a restrained endurance acknowledgment —
+they never replay binding or growth, never fire a re-award haptic, and never dim, revoke,
+duplicate, or re-award the permanent reward (see the Crystal Formation contract below). Crucially, **challenge evidence is not acquisition evidence**: Guardian answers persist
 in their own durable challenge tables and never enter the neutral acquisition `response_log`, count
 toward Concept Mastery, award learning points, or alter prerequisite access — so finishing a Leg's
 normal Study Sessions keeps the next prerequisite-valid stop available even while its Guardian is
@@ -139,15 +140,47 @@ indeterminate progress, next-stop attention, matching feedback, crystal growth, 
 fusion, and unlock moments. Every enabled press gives a restrained physical response (slight scale,
 reduced elevation, surface-color change) with no layout movement; disabled and busy states stay
 still and prevent duplicate actions. Completed crystals and Vista formations stay still — no ambient
-crystal motion, no audio. Crystal Vista is **never auto-opened**: mastery assembly plays in flow,
-the Vista trigger is emphasized, and a newly fused cluster is preserved for one-time assembly when
-the learner opens Vista.
+crystal motion, no audio. Crystal Vista is **never auto-opened**; its deliberate entry and one-time
+reward contextualization are owned by the Crystal Formation contract below.
 
 One shared **reduced-motion policy** honors the OS or browser preference (there is no app-specific
 motion setting): transform and assembly motion are replaced by immediate state and static emphasis,
 and assistive-preference users receive equivalent state and progress information. Haptics are
 **selective and semantic** — checkpoint and answer selection, grading outcomes, mastery, fusion, and
 unlock — fired once at the transition; generic navigation never vibrates.
+
+## Crystal Formation reward presentation
+
+The learner's expedition rewards render as **one Crystal Formation**: a vertical, scrollable ascent
+of visually disjoint per-Leg geode islands joined by a single winding, **nonsemantic** binding spine
+and ended by a distinct summit terminus. The formation is a downstream presentation of existing
+learner facts only — structural state derives from the section/scope projection (`future`,
+`collecting`, `guardian_ready` with honest available/engaged/unavailable copy, `bound` only from the
+durable first `wonChallengeId`), mineral habits are cosmetic with no semantic meaning, exact
+prerequisite veins appear only between trusted same-Leg concepts, and neither the spine nor any
+rendered element ever claims a cross-Leg graph edge. Known-calibrated concepts stay labeled ghosts
+and are never counted as collected crystals; compact surfaces speak exact progress, counts, and
+status language instead of rendering detailed specimens below a readable size.
+
+**One shared Leg scene** is the single visual boundary for a Leg's slots, minerals, veins, matrix,
+and transitions; capstone collection, Guardian reward, and Crystal Vista compose that scene in
+explicit modes rather than maintaining parallel drawings. **Collection and binding are distinct
+event-bound rewards**: mastery grows only the newly earned specimen into its shared slot (one
+mastery haptic), a first Guardian victory seals the Leg's seam and lights its spine segment (one
+fusion haptic) or seats the summit crown (one unlock haptic) without regrowing minerals, and a
+rematch receives only a restrained light sweep with endurance copy and no re-award haptic. Reward
+motion requires the route-local win transition observed by the mounted fight; direct loads,
+refreshes, and rerenders of an already-won challenge render the settled scene. The final keyed
+answer reveal always precedes the same-route reward stage, and a failed reward-preview refetch can
+never hide a committed victory, be classified as a rematch, or block continuing.
+
+**Crystal Vista opens only through explicit learner action** (including explicit reward-driven
+Explore intent, consumed on close). The one-time contextualization for a newly bound reward is a
+focused island settle plus spine light — never a second binding or growth replay — and the whole
+displayed bound snapshot is marked seen so stale animations cannot queue; local memory records only
+whether contextualization was viewed, while reward existence always derives from the server
+projection. Reduced motion renders every reward's final state immediately with equivalent copy and
+static emphasis. There is no ambient formation motion or audio.
 
 ## Context
 

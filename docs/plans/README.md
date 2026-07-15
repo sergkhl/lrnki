@@ -12,9 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [Crystal Formation Reward UX](./2026-07-15-002-feat-crystal-formation-reward-ux-plan.md) — ready;
-  rebuild crystal collection, Leg binding, Guardian reward, and Crystal Vista around one shared,
-  crossing-aware geode formation language, then validate the real rendered UX with Playwright.
+- None.
 
 ## Ownership rules
 
