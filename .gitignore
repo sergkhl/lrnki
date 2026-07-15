@@ -24,3 +24,6 @@ next-env.d.ts
 fixtures/pdf/
 fixtures/docx/
 fixtures/pptx/
+
+# Disposable local e2e/preview APKs — never committed or distributed (cleartext e2e artifact)
+apps/learner-app/lrnki-learner-*.apk

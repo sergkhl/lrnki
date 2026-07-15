@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "e2e": "pnpm run export:web:e2e && playwright test",
     "e2e:setup": "playwright install chromium",
-    "e2e:realuse": "tsx --env-file=../../.env e2e-realuse/run.ts"
+    "e2e:realuse": "tsx --env-file=../../.env e2e-realuse/run.ts",
+    "e2e:native:maestro": "tsx e2e-native/run.ts"
   },
   "dependencies": {
     "@expo/ui": "catalog:expo",
@@ -25,6 +26,7 @@
     "@rn-primitives/portal": "catalog:expo",
     "@tanstack/react-query": "catalog:",
     "expo": "catalog:expo",
+    "expo-build-properties": "catalog:",
     "expo-constants": "catalog:expo",
     "expo-dev-client": "catalog:expo",
     "expo-haptics": "catalog:expo",
@@ -36,9 +38,9 @@
     "lucide-react-native": "catalog:expo",
     "nativewind": "catalog:expo",
     "react": "catalog:",
-    "react-native-css": "catalog:expo",
     "react-dom": "catalog:",
     "react-native": "catalog:expo",
+    "react-native-css": "catalog:expo",
     "react-native-reanimated": "catalog:expo",
     "react-native-safe-area-context": "catalog:expo",
     "react-native-screens": "catalog:expo",

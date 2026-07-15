@@ -1,0 +1,71 @@
+# Android runtime-reliability flow (plan 2026-07-15-001 U5, R17-R18). Drives the REAL standalone
+# e2e-profile APK against the deterministic loopback fixture (10.0.2.2) — real React Native
+# primitives, real Yoga layout, real gesture dispatch; only the upstream data is mocked. It targets
+# the two escaped Android interaction classes:
+#   1. Theory scroll — a drag beginning over ordinary long Theory content must reach later content
+#      (the touch-responder regression) while the activity header/footer stay reachable.
+#   2. Support Path dialog — opening a contextual term dialog must show its title, body, and
+#      close/footer action, and closing it must return to the same Theory activity (the measured
+#      dialog-geometry regression).
+# The fixture login (${LEARNER_REF}/${PIN}) is passed via `maestro test -e`, never committed here.
+# Selectors are accessibility labels and app-owned testIDs, never generated prose or coordinates.
+appId: com.globesoul.lrnki
+---
+- launchApp:
+    clearState: true
+
+# --- Registry entry with runner-generated fixture-only login (R17) ---
+- assertVisible: "Choose your explorer"
+- tapOn:
+    id: "gate-name"
+- inputText: ${LEARNER_REF}
+- tapOn:
+    id: "gate-pin"
+- inputText: ${PIN}
+- hideKeyboard
+- tapOn: "Set out"
+- assertVisible: "Choose an expedition"
+
+# --- Open the shared long-Theory expedition through the real Explore/Catalog UI (R17) ---
+- scrollUntilVisible:
+    element:
+      id: "candidate-012c74c3-c197-43e6-810c-072786ed9ee9"
+    direction: DOWN
+- tapOn:
+    id: "candidate-012c74c3-c197-43e6-810c-072786ed9ee9"
+
+# The trail: open the Theory ("Field notes") activity by its typed checkpoint, not by label.
+- assertVisible:
+    id: "checkpoint-theory-available"
+- tapOn:
+    id: "checkpoint-theory-available"
+
+# --- Theory scroll (R17 / AE7): a real device swipe over long Theory content must reach the
+# post-content Support Paths panel, and the fixed header (Field notes) + footer (Continue) must
+# remain reachable afterward. scrollUntilVisible issues DEVICE swipes, not programmatic scroll —
+# this is the touch-responder assertion. The panel is a real view (large-target equivalent of the
+# inline Explorable Term, which is a non-queryable nested text span). ---
+- assertVisible: "Field notes"
+- scrollUntilVisible:
+    element:
+      id: "support-paths-panel"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Continue"      # footer control reachable after the long scroll
+- assertVisible: "Field notes"   # fixed header still present
+
+# --- Support Path dialog (R17 / AE7): tapping the Explorable Term affordance opens the contextual
+# dialog; its title, body, and close action must all be reachable (the measured dialog-geometry
+# assertion). ---
+- tapOn:
+    id: "support-path-add-phospholipid bilayer"
+- assertVisible: "Support paths"                 # dialog title (OverlayHeader)
+- assertVisible: "Add support path"              # dialog body/primary action reachable
+- assertVisible: "Keep exploring"               # dialog footer close action reachable
+- tapOn: "Keep exploring"
+
+# Closing returns the learner to the SAME Theory activity (not a dead/blank surface). Assert the
+# dialog-only action is gone ("Add support path" exists only in the dialog; the panel's own term
+# buttons carry a "Support paths: …" label, so that phrase is not a valid dialog-dismissed signal).
+- assertVisible: "Field notes"
+- assertNotVisible: "Add support path"

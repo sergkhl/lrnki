@@ -58,6 +58,7 @@ catalog:
   "@tanstack/react-query": 5.101.2
   vite: 8.1.3
   "@vitejs/plugin-react": 6.0.3
+  expo-build-properties: 57.0.3
 
 # Expo universal learner app. NativeWind v5 is the supported NativeWind/Reanimated 4
 # integration for Expo SDK 57's always-on New Architecture.

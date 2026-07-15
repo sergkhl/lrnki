@@ -22,6 +22,7 @@
     "check": "pnpm run tmp:clean && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build && pnpm run e2e:web",
     "e2e:web": "pnpm --filter @lrnki/learner-app e2e",
     "e2e:web:realuse": "pnpm --filter @lrnki/learner-app e2e:realuse",
+    "e2e:native:maestro": "pnpm --filter @lrnki/learner-app e2e:native:maestro",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",
     "db:migrate": "scripts/migrate-db.sh",
     "seed:demo": "scripts/seed-demo.sh",

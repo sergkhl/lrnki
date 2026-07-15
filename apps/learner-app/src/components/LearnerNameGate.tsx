@@ -64,6 +64,7 @@ export function LearnerNameGate() {
         </View>
       ) : null}
       <Input
+        testID="gate-name"
         label={learnerTerm("learnerRefLabel")}
         hint={learnerTerm("gateNameHint")}
         autoComplete="username"
@@ -73,6 +74,7 @@ export function LearnerNameGate() {
         onChangeText={setName}
       />
       <Input
+        testID="gate-pin"
         label={learnerTerm("pinLabel")}
         hint={learnerTerm("gatePinHint")}
         inputMode="numeric"

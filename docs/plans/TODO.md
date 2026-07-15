@@ -4,18 +4,25 @@
 
 ### Active implementation
 
-- **Durable Learner E2E Gates (IN PROGRESS — U1–U3 web layer DONE; U4–U7 remain).** Execute the
+- **Durable Learner E2E Gates (IN PROGRESS — U1–U5 DONE; U6–U7 remain).** Execute the
   [active plan](./2026-07-15-001-feat-durable-learner-e2e-gates-plan.md): turn the proven U6
   real-backend web driver (seeded as `apps/learner-app/e2e-realuse/`) into one durable, opt-in,
   self-orchestrating command (never in `pnpm check`; no live generation in the routine suite), then
   run a bounded negative-control Maestro Android-emulator experiment over a real APK to decide — in
   an ADR — whether the recurring user-owned physical-device gate can be narrowed.
 
-  **Status (2026-07-15): U1–U3 (the durable real-backend WEB suite) implemented and PASSING; nothing
-  committed (user hasn't asked).** `pnpm e2e:web:realuse` is now one self-orchestrating command that
-  exits 0 on success — proven twice on both phone (Pixel 7) + desktop projects against the real
-  supervisor-free API over Postgres, selecting a real 12-stop enrichment by capability, with exact
-  3-learner cleanup and 0 residual rows. No generation, no LiteLLM call.
+  **Status (2026-07-15): U1–U5 implemented and PASSING; U6–U7 remain; nothing committed (user hasn't
+  asked).** The durable real-backend WEB suite (U1–U3) plus its quality gate (U4) are green, AND the
+  portable native Maestro Android-emulator flow (U5) passes 3/3 on a real e2e-profile APK — the whole
+  headline ask ("run e2e on an android emulator") is done for the current build. `pnpm e2e:web:realuse`
+  is one self-orchestrating command that exits 0 on success (phone Pixel 7 + desktop, real
+  supervisor-free API over Postgres, capability-selected enrichment, exact 3-learner cleanup, 0
+  residual rows, no generation/LiteLLM). `pnpm e2e:native:maestro` installs the real APK and drives
+  Maestro against a deterministic loopback fixture (`10.0.2.2`). Verification this session:
+  `testSupport.test.ts` 3/3, intercepted `pnpm e2e:web` 14/14 (twice — before and after the dynamic
+  Expo config swap), `e2e:web:realuse` 2/2 on both candidates, learner-app typecheck + LearnerNameGate
+  test green, native flow 3/3. Evidence + evaluations under `tmp/2026-07-15-durable-learner-e2e-gates/`
+  (`web/EVALUATION.md`, `native/EVALUATION.md`).
   - **U1 (`packages/infrastructure-postgres`).** `deleteLearner` now covers the WHOLE learner FK
     graph in the current migration — the drift fix added the missing `recall_challenges` (cascades
     lineup+events) and `learner_sessions`, preserving the `response_log`-before-`learner_scaffold_detours`
@@ -62,26 +69,80 @@
     tsx/node grandchild holding the port), and the API is spawned via the hoisted `tsx` bin directly
     (no pnpm wrapper) so teardown is clean and the command exits 0.
 
-  **NEXT — U4 (real-use quality gate, `.agents/skills/real-use-quality-evaluation/SKILL.md`).** Run
-  `pnpm e2e:web:realuse` against MORE THAN ONE eligible catalog enrichment (the dev DB currently has
-  two: `bca30d14…` 33 items and `10915d48…` 19 items; the gate selected the 12-stop `bca30d14…`),
-  inspect phone/desktop screenshots (gitignored `tmp/realuse-artifacts/`, `tmp/2026-07-15-durable-learner-e2e-gates/web/`)
-  and terminal ergonomics, and record concrete usefulness/cleanliness/domain-neutrality/safety
-  findings. Then **U5–U6 (native Maestro)**: this environment has **no Android emulator or Maestro
-  CLI**, so U5 (portable deterministic Maestro flow over a real e2e-profile APK with `10.0.2.2`
-  cleartext + shared fixture builders) and U6 (negative-control sensitivity: reverse the `ddc0ec9`
-  responder fix for the Theory scenario and the `0b1c9d3` measured-cap fix for the Support Path
-  scenario in a throwaway worktree, require each to fail at its target assertion) require a host with
-  Android tooling. **U7** records the adopt/defer/reject ADR (EAS Workflows = defer) and consolidates
-  docs; per the plan, the physical-Android blocker is NOT cleared by emulator evidence. U4 depends on
-  U1–U3; U5 on U4; U6 on U5; U7 on U4+U6.
+  **U4 (real-use quality gate) — DONE, PASS (2026-07-15, macOS session).** Ran `pnpm e2e:web:realuse`
+  against BOTH eligible dev enrichments (the DB now holds two freshly generated: `012c74c3…`
+  "Cell membrane transport" / Cell Biology / 10 stops, and `de855967…` "Map projections and
+  distortion" / Cartography / 16 stops). Gate passed 2/2 selecting `012c74c3…`; re-ran with that
+  candidate's enrichment status flipped non-`succeeded`/`failed` → fell back to `de855967…` (16 stops)
+  and passed 2/2 with NO code/assertion change (H1 domain-neutrality confirmed on a second
+  domain/title). Empty-catalog preflight fail-closed verified (exact actionable message, no
+  generation, probe learner cleaned, no browser start — AE4). Visual inspection (phone Pixel 7 +
+  desktop) captured the full surface set to `tmp/2026-07-15-durable-learner-e2e-gates/web/*.png`:
+  real long Theory lesson with explorable-term underlines, honest graded feedback (tapped an
+  incorrect option → red ✗, correct in green → journey never asserts correctness, AE3), and the
+  persisted `Continue` card ("Vesicular transport · 0 of 23 collected · active") while Explore showed
+  the OTHER domain. Cleanup left 0 residual run learners (only `content-owner`, the harness account
+  owning the two seeded enrichments, remains). Evaluation: `web/EVALUATION.md`.
 
-  **Deviations to note:** (a) the plan listed U1 test-scenario 4 (shared static-server serving) under
-  `testSupport.test.ts`, but that's a DB-only file; static-server sharing is instead proven by the two
-  live e2e runs (intercepted default dir + realuse `dist-realuse`). (b) the `study-choice` testID
-  landed in `ActivityCards.tsx` (the shared tile), which the plan's U3 file list didn't enumerate but
-  is the correct seam. (c) learner-api keeps an unused `realuse-server` npm script (documented
-  standalone convenience); the runner spawns tsx directly.
+  **U5 (portable deterministic Maestro Android flow) — DONE, PASS (2026-07-15).** The user's headline
+  ask ("run e2e on an android emulator") is DONE. `pnpm e2e:native:maestro` drives the REAL standalone
+  e2e-profile APK on the `Medium_Phone_API_36.1` emulator (Android 36.1/arm64) against a deterministic
+  loopback fixture and PASSED **3/3** consecutive runs (~1m each), screen recording +
+  screenshots retained under `tmp/2026-07-15-durable-learner-e2e-gates/native/`. Both escaped Android
+  interaction classes proven: real device-swipe Theory scroll reaching deep content with fixed
+  header/footer reachable, and the Support Path dialog opening with correct (un-clipped) geometry.
+  Built: `app.config.ts` (canonical dynamic Expo config; `app.json` DELETED) with a
+  `LRNKI_E2E_BUILD`-gated `expo-build-properties` cleartext seam; `eas.json` `e2e` profile
+  (`LRNKI_E2E_BUILD=1`, `EXPO_PUBLIC_LEARNER_API_URL=http://10.0.2.2:8799`) + explicit `=0` in
+  dev/preview; `e2e-native/{server.ts,run.ts,README.md,scenario/*.json}`;
+  `.maestro/flows/android-runtime-reliability.yaml`; `gate-name`/`gate-pin` testIDs on
+  `LearnerNameGate`. e2e APK manifest confirmed `usesCleartextTraffic=true`; config proves preview/
+  prod stay `false` (AE10, e2e-APK half). APK is gitignored, never distributed. Evaluation:
+  `native/EVALUATION.md`.
+  - **Two U5 selector realities worth carrying forward:** (1) RN `<Input>` exposed only
+    `accessibilityLabel` (content-desc), which Maestro `id` does NOT match → added `gate-name`/
+    `gate-pin` testIDs (required the one product change + rebuild). (2) the inline Explorable Term is
+    a nested `<Text>` span with NO queryable Android resource-id → the flow targets the real
+    `SupportPathsPanel` views (`support-paths-panel`, `support-path-add-<term>`, the component's
+    designed "large-target equivalent"); scrolling to the panel still exercises the long-Theory swipe.
+  - **U5 deviation from R16:** used FROZEN CAPTURED real responses (`e2e-native/scenario/*.json`,
+    captured once from the supervisor-free API over the real "Vesicular transport" enrichment) instead
+    of extracted shared response *builders* (`learnerApiScenarios.ts`) consumed by both the Playwright
+    adapter and the native HTTP adapter. This guaranteed shape-correctness without refactoring the
+    green intercepted suite. The two suites therefore do NOT yet share one scenario module — unifying
+    them (H3) is deferred to U6/U7 judgment.
+
+  **NEXT — U6 (native-gate SENSITIVITY, negative controls).** A green current-build flow is necessary
+  but NOT sufficient (KTD8). In a THROWAWAY worktree from the current revision, apply — one at a time,
+  preserving current testIDs/fixture/nav/selectors — (1) the minimal full-screen flex/responder
+  mutation from `ddc0ec9` for the Theory-scroll scenario and (2) the minimal measured-cap/shrink
+  mutation from `0b1c9d3` for the Support Path dialog scenario; do NOT wholesale-revert either commit
+  (they also touched tests/blockers/TODO). Build each negative-control APK with the SAME `e2e` profile
+  + emulator image; require each scenario to FAIL AT ITS TARGET ASSERTION (not setup/nav), then
+  restore the current APK and require two clean passes. Classify each scenario adopt/defer/reject;
+  keep only adopted scenarios in the gate. Note: the current flow's Theory assertion scrolls to the
+  `support-paths-panel` — CONFIRM under the `ddc0ec9` mutation that this actually fails (if the panel
+  still becomes reachable another way, tighten the assertion to a mid-Theory swipe checkpoint). Then
+  **U7**: ADR recording scenario-level adopt/defer/reject + overall runner decision + EAS Workflows =
+  DEFER (alpha, consumes a build-id not the local APK, hosted cost); consolidate README/TODR; the
+  physical-Android blocker is NOT cleared by emulator evidence. U6 on U5; U7 on U4+U6.
+
+  **Environment provisioning notes for a fresh macOS host (this session had to redo all of it):**
+  `node_modules` synced from another machine had a BROKEN pnpm store (missing `tsx` dist) → fixed by
+  `rm -rf node_modules apps/*/node_modules packages/*/node_modules && pnpm install`. Docker Postgres
+  init scripts failed with "bad interpreter: Permission denied" (macOS bind-mount drops the exec bit
+  on the two `scripts/docker/postgres/*.sh`) → worked around by `docker start` (skips init) then
+  creating `litellm`/`lrnki_test` DBs manually via `psql`; do NOT commit shebang edits, they don't
+  fix it. LiteLLM's virtual key in the recreated proxy DB did not match `.env`'s `LITELLM_API_KEY`
+  → re-registered via `POST /key/generate` with the master key (first two generations 401'd until
+  then). pnpm `minimumReleaseAge: 1440` (strict) blocks packages published <1 day → had to pin
+  `expo-build-properties@57.0.3` (57.0.4/5 were published the same day). `psql` is at
+  `/opt/homebrew/opt/libpq/bin/psql` (not on PATH); root `.env` is NOT auto-loaded.
+
+  **Web-layer deviations (unchanged from prior session):** (a) U1 test-scenario 4 (shared
+  static-server serving) is proven by live e2e runs, not the DB-only `testSupport.test.ts`. (b) the
+  `study-choice` testID landed in `ActivityCards.tsx`. (c) learner-api keeps an unused `realuse-server`
+  npm script; the runner spawns tsx directly.
 
 ### Evidence-triggered follow-up
 
