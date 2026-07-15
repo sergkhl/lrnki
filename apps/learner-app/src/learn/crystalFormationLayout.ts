@@ -49,10 +49,12 @@ export type MineralSlot = {
   sectionIndex: number;
   sectionPositionIndex: number;
   growthFraction: number;
+  trailState: TrailCluster["state"];
   state: SlotState;
   isKnownSkipped: boolean;
   isMilestone: boolean;
   isSummit: boolean;
+  gist: string | null;
   // Slot center in Leg-local scene coordinates (bedrock at the bottom).
   x: number;
   y: number;
@@ -122,7 +124,7 @@ export type CrystalFormationLayout = {
 export type FormationConceptInput = Pick<
   TrailCluster,
   "derivedNodeId" | "label" | "difficulty" | "state" | "isKnownSkipped" | "sectionIndex" | "sectionPositionIndex" | "growthFraction"
-> & { isMilestone: boolean; isSummit: boolean };
+> & { isMilestone: boolean; isSummit: boolean; gist: string | null };
 
 export type FormationSectionInput = Pick<TrailSectionView, "sectionIndex" | "milestoneLabel" | "state" | "recallScope">;
 
@@ -151,7 +153,8 @@ export function formationInputFrom(session: StudySession, trail: TrailView): For
       sectionPositionIndex: concept.sectionPositionIndex,
       growthFraction: concept.growthFraction,
       isMilestone: stepByNode.get(concept.derivedNodeId)?.isMilestone ?? false,
-      isSummit: stepByNode.get(concept.derivedNodeId)?.isSummit ?? false
+      isSummit: stepByNode.get(concept.derivedNodeId)?.isSummit ?? false,
+      gist: lessonGist(session, concept.derivedNodeId)
     })),
     sections: trail.sections,
     edges: session.detail.edges
@@ -238,10 +241,12 @@ export function buildLegModel(
       sectionIndex: concept.sectionIndex,
       sectionPositionIndex: concept.sectionPositionIndex,
       growthFraction: concept.growthFraction,
+      trailState: concept.state,
       state: slotStateFor(concept),
       isKnownSkipped: concept.isKnownSkipped,
       isMilestone: concept.isMilestone,
       isSummit: concept.isSummit,
+      gist: concept.gist,
       x: point.x,
       y: point.y
     };
@@ -356,7 +361,7 @@ export function composeCrystalFormation(input: FormationInput): CrystalFormation
     const from: Point = { x: leg.frame.x + leg.junction.x, y: leg.frame.y + leg.junction.y };
     const next = placed[index + 1] ?? null;
     const to: Point = next
-      ? { x: next.frame.x + next.junction.x, y: next.frame.y + next.height }
+      ? { x: next.frame.x + next.junction.x, y: next.frame.y + next.junction.y }
       : { x: terminus!.frame.x + terminus!.width / 2, y: terminus!.frame.y + terminus!.height };
     const midX = index % 2 === 0 ? Math.min(from.x, to.x) - WIND_X / 2 : Math.max(from.x, to.x) + WIND_X / 2;
     return {
@@ -368,6 +373,75 @@ export function composeCrystalFormation(input: FormationInput): CrystalFormation
   });
 
   return { legs: placed, spine, terminus, enrichmentScope: input.enrichmentScope, width: canvasWidth, height };
+}
+
+// --- Finished Vista selectors -------------------------------------------------------
+
+export type VistaFocus = { kind: "leg"; sectionIndex: number } | { kind: "summit" };
+export type VistaRewardKey = `leg:${number}` | "summit";
+
+export function vistaRewardSnapshot(layout: CrystalFormationLayout): VistaRewardKey[] {
+  const rewards: VistaRewardKey[] = layout.legs
+    .filter((leg) => leg.structuralState === "bound")
+    .map((leg) => `leg:${leg.sectionIndex}` as const);
+  if (layout.terminus?.crowned) rewards.push("summit");
+  return rewards;
+}
+
+export function rewardKeyForFocus(focus: VistaFocus): VistaRewardKey {
+  return focus.kind === "summit" ? "summit" : `leg:${focus.sectionIndex}`;
+}
+
+export function selectVistaFocus(
+  layout: CrystalFormationLayout,
+  explicitFocus: VistaFocus | null,
+  currentSectionIndex: number | null,
+  seenBindings: readonly VistaRewardKey[]
+): VistaFocus | null {
+  if (explicitFocus && focusExists(layout, explicitFocus)) return explicitFocus;
+  const seen = new Set(seenBindings);
+  if (layout.terminus?.crowned && !seen.has("summit")) return { kind: "summit" };
+  const unseenLeg = [...layout.legs]
+    .filter((leg) => leg.structuralState === "bound" && !seen.has(`leg:${leg.sectionIndex}`))
+    .sort((a, b) => b.sectionIndex - a.sectionIndex)[0];
+  if (unseenLeg) return { kind: "leg", sectionIndex: unseenLeg.sectionIndex };
+  if (currentSectionIndex !== null && layout.legs.some((leg) => leg.sectionIndex === currentSectionIndex)) {
+    return { kind: "leg", sectionIndex: currentSectionIndex };
+  }
+  return layout.legs[0] ? { kind: "leg", sectionIndex: layout.legs[0].sectionIndex } : layout.terminus ? { kind: "summit" } : null;
+}
+
+function focusExists(layout: CrystalFormationLayout, focus: VistaFocus): boolean {
+  return focus.kind === "summit"
+    ? layout.terminus !== null
+    : layout.legs.some((leg) => leg.sectionIndex === focus.sectionIndex);
+}
+
+export function isNameableMineral(slot: Pick<MineralSlot, "trailState" | "state" | "isMilestone" | "isSummit">): boolean {
+  return slot.state === "collected" || slot.state === "known" || slot.trailState === "frontier" || slot.isMilestone || slot.isSummit;
+}
+
+export type FormationMemoryDoor =
+  | { kind: "reveal"; derivedNodeId: string; label: string; gist: string | null }
+  | { kind: "guarded"; derivedNodeId: string; label: string; legNumber: number };
+
+export function formationMemoryDoorFor(layout: CrystalFormationLayout, selectedNodeId: string | null): FormationMemoryDoor | null {
+  if (selectedNodeId === null) return null;
+  for (const leg of layout.legs) {
+    const slot = leg.slots.find((candidate) => candidate.derivedNodeId === selectedNodeId);
+    if (!slot || !isNameableMineral(slot)) continue;
+    if (slot.trailState === "locked" && slot.state !== "known") {
+      return { kind: "guarded", derivedNodeId: slot.derivedNodeId, label: slot.label, legNumber: slot.sectionIndex + 1 };
+    }
+    return { kind: "reveal", derivedNodeId: slot.derivedNodeId, label: slot.label, gist: slot.gist };
+  }
+  return null;
+}
+
+function lessonGist(session: StudySession, derivedNodeId: string): string | null {
+  const lesson = session.lessonByNode[derivedNodeId];
+  if (!lesson || lesson.sections.length === 0) return null;
+  return (lesson.sections.find((section) => section.kind === "gist") ?? lesson.sections[0]).text;
 }
 
 // --- Width fitting (R5/KTD3) ----------------------------------------------------------

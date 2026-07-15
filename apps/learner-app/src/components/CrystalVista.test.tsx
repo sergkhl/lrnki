@@ -9,8 +9,8 @@ import { learnerTerm } from "@/learn/vocabulary";
 import type { StudySession } from "@lrnki/application/projection";
 
 jest.mock("@/lib/navMemory", () => ({
-  readFusedSections: jest.fn(() => Promise.resolve([])),
-  writeFusedSections: jest.fn(() => Promise.resolve()),
+  readVistaSeenBindings: jest.fn(() => Promise.resolve([])),
+  writeVistaSeenBindings: jest.fn(() => Promise.resolve()),
   readBoardSeen: jest.fn(() => Promise.resolve(null)),
   writeBoardSeen: jest.fn(() => Promise.resolve()),
   readGuardianArrivalSeen: jest.fn(() => Promise.resolve(true)),
@@ -95,4 +95,34 @@ test("closing the vista clears selection and reports the change", async () => {
   const { onOpenChange } = await renderVista();
   await fireEvent.press(screen.getByLabelText(learnerTerm("returnToTrail")));
   await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+});
+
+test("an unseen bound Leg contextualizes once and records the complete displayed reward snapshot", async () => {
+  const base = twoNodeSession();
+  const session: StudySession = {
+    ...base,
+    classification: { stateByNode: { n1: "mastered", n2: "mastered" }, selectedFrontierTarget: null },
+    expeditionPath: base.expeditionPath.map((step) => ({ ...step, state: "mastered" as const })),
+    recallScopes: [
+      {
+        scopeKind: "section",
+        anchorDerivedNodeId: "n1",
+        anchorLabel: "Ownership",
+        sectionIndex: 0,
+        eligibleItemCount: 2,
+        state: "won",
+        wonChallengeId: "first-win"
+      }
+    ]
+  };
+  const trail = buildTrailView(session);
+  await render(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <CrystalVista session={session} trail={trail} open onOpenChange={jest.fn()} onExamine={jest.fn()} />
+      <PortalHost />
+    </SafeAreaProvider>
+  );
+  expect(await screen.findByText("Leg 1 settles into the Crystal Formation.")).toBeTruthy();
+  const { writeVistaSeenBindings } = jest.requireMock("@/lib/navMemory") as { writeVistaSeenBindings: jest.Mock };
+  await waitFor(() => expect(writeVistaSeenBindings).toHaveBeenCalledWith("learner", "e1", ["leg:0"]));
 });

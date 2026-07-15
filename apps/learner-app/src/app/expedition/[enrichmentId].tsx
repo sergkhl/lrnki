@@ -10,15 +10,22 @@ import { buildTrailView } from "@lrnki/application/projection";
 import { expeditionQuery } from "@/lib/queries";
 import { Button, RouteStatus, Screen, buttonIconColor } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
+import type { VistaFocus } from "@/learn/crystalFormationLayout";
 
 // The expedition trail screen. Data comes prefetched/cached by Query before the sheet
 // opens (R6): the whole study session is one read, so the activity loop never spins.
 export default function ExpeditionPage() {
   const router = useRouter();
-  const { enrichmentId } = useLocalSearchParams<{ enrichmentId: string }>();
+  const { enrichmentId, vista, formationFocus } = useLocalSearchParams<{
+    enrichmentId: string;
+    vista?: string;
+    formationFocus?: string;
+  }>();
   const expedition = useQuery(expeditionQuery(enrichmentId));
   const scrollHandleRef = useRef<TrailScrollHandle | null>(null);
-  const [vistaOpen, setVistaOpen] = useState(false);
+  const [manualVistaOpen, setManualVistaOpen] = useState(false);
+  const [routeIntentConsumed, setRouteIntentConsumed] = useState(false);
+  const vistaOpen = (vista === "1" && !routeIntentConsumed) || manualVistaOpen;
 
   const goHome = () => {
     if (router.canGoBack()) router.back();
@@ -67,22 +74,34 @@ export default function ExpeditionPage() {
         trail={trail}
         expeditionTitle={row?.title ?? null}
         onJumpToSection={(sectionIndex) => scrollHandleRef.current?.scrollToSection(sectionIndex)}
-        onOpenVista={() => setVistaOpen(true)}
+        onOpenVista={() => setManualVistaOpen(true)}
       />
       <CheckpointPath view={trail} session={session} scrollHandleRef={scrollHandleRef} />
       <CrystalVista
         session={session}
         trail={trail}
         open={vistaOpen}
-        onOpenChange={setVistaOpen}
+        explicitFocus={parseVistaFocus(formationFocus)}
+        currentSectionIndex={trail.currentSectionIndex}
+        onOpenChange={setManualVistaOpen}
+        onIntentConsumed={() => {
+          setRouteIntentConsumed(true);
+          router.setParams({ vista: undefined, formationFocus: undefined });
+        }}
         onExamine={(derivedNodeId) => {
-          setVistaOpen(false);
+          setManualVistaOpen(false);
           // Defer one tick so the trail is back on screen before scrolling to the stop.
           setTimeout(() => scrollHandleRef.current?.scrollToNode(derivedNodeId), 60);
         }}
       />
     </Screen>
   );
+}
+
+export function parseVistaFocus(value: string | undefined): VistaFocus | null {
+  if (value === "summit") return { kind: "summit" };
+  const match = /^leg:(\d+)$/.exec(value ?? "");
+  return match ? { kind: "leg", sectionIndex: Number(match[1]) } : null;
 }
 
 function BackButton({ onPress }: Readonly<{ onPress: () => void }>) {

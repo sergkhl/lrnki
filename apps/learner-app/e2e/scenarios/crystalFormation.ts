@@ -154,6 +154,107 @@ export function formationExpedition(phase: "collecting" | "collected") {
   return { session, expedition: null };
 }
 
+// Production-shaped four-state Vista fixture: one bound Leg, one Guardian-ready Leg,
+// one collecting Leg, and one future Leg. It also contains a trusted cross-Leg edge so
+// the real scene proves that only Leg-local veins enter the reward composition.
+export function formationVistaExpedition() {
+  const base = formationExpedition("collected");
+  const concepts: ConceptSpec[] = [
+    { id: "v0a", label: "Waypoint Bound Alpha", sectionIndex: 0, sectionPositionIndex: 0, state: "mastered", milestoneId: "v0m", milestoneLabel: "Bound Ridge" },
+    { id: "v0k", label: "Waypoint Bound Known", sectionIndex: 0, sectionPositionIndex: 1, state: "mastered", known: true, milestoneId: "v0m", milestoneLabel: "Bound Ridge" },
+    { id: "v0m", label: "Waypoint Bound Marker", sectionIndex: 0, sectionPositionIndex: 2, state: "mastered", isMilestone: true, milestoneId: "v0m", milestoneLabel: "Bound Ridge" },
+    { id: "v1a", label: "Waypoint Ready Alpha", sectionIndex: 1, sectionPositionIndex: 0, state: "mastered", milestoneId: "v1m", milestoneLabel: "Ready Ridge" },
+    { id: "v1m", label: "Waypoint Ready Marker", sectionIndex: 1, sectionPositionIndex: 1, state: "mastered", isMilestone: true, milestoneId: "v1m", milestoneLabel: "Ready Ridge" },
+    { id: "v2a", label: "Waypoint Growing Alpha", sectionIndex: 2, sectionPositionIndex: 0, state: "mastered", milestoneId: "v2m", milestoneLabel: "Growing Ridge" },
+    { id: "v2m", label: "Waypoint Growing Marker", sectionIndex: 2, sectionPositionIndex: 1, state: "frontier", isMilestone: true, milestoneId: "v2m", milestoneLabel: "Growing Ridge" },
+    { id: "v3a", label: "Waypoint Future Alpha", sectionIndex: 3, sectionPositionIndex: 0, state: "locked", milestoneId: "v3m", milestoneLabel: "Summit Ridge" },
+    { id: "v3m", label: "Waypoint Future Marker", sectionIndex: 3, sectionPositionIndex: 1, state: "locked", isMilestone: true, isSummit: true, milestoneId: "v3m", milestoneLabel: "Summit Ridge" }
+  ];
+  const edges = [
+    ["v0a", "v0m"],
+    ["v1a", "v1m"],
+    ["v2a", "v2m"],
+    ["v0m", "v1a"]
+  ].map(([source, target]) => ({
+    prerequisiteDerivedNodeId: source,
+    dependentDerivedNodeId: target,
+    confidence: 1,
+    uncertain: false,
+    judgeModel: "e2e"
+  }));
+  return {
+    session: {
+      ...base.session,
+      target: { derivedNodeId: "v3m", label: "Waypoint Future Marker" },
+      studyItemCount: 0,
+      detail: {
+        ...base.session.detail,
+        summary: {
+          ...base.session.detail.summary,
+          edgeCount: edges.length,
+          certainEdgeCount: edges.length,
+          conceptCount: concepts.length,
+          studyItemCount: 0
+        },
+        nodes: concepts.map((concept) => ({
+          derivedNodeId: concept.id,
+          label: concept.label,
+          aliases: [],
+          declaredDomain: "orientation",
+          difficulty: 0.15 + concept.sectionIndex * 0.16 + concept.sectionPositionIndex * 0.04,
+          difficultyRationale: null,
+          nodeKind: "enrichment",
+          groundingOrigin: "llm_grounded",
+          role: "prerequisite",
+          hasStudyItem: false,
+          grounding: null
+        })),
+        edges
+      },
+      classification: {
+        stateByNode: Object.fromEntries(concepts.map((concept) => [concept.id, concept.state])),
+        selectedFrontierTarget: "v2m"
+      },
+      expeditionPath: concepts.map((concept, position) => ({
+        position,
+        derivedNodeId: concept.id,
+        difficulty: 0.15 + concept.sectionIndex * 0.16 + concept.sectionPositionIndex * 0.04,
+        topologicalDepth: position,
+        state: concept.state,
+        isSummit: Boolean(concept.isSummit),
+        sectionIndex: concept.sectionIndex,
+        sectionPositionIndex: concept.sectionPositionIndex,
+        milestoneDerivedNodeId: concept.milestoneId,
+        milestoneLabel: concept.milestoneLabel,
+        isMilestone: Boolean(concept.isMilestone)
+      })),
+      sections: [
+        { sectionIndex: 0, milestoneDerivedNodeId: "v0m", milestoneLabel: "Bound Ridge", stepDerivedNodeIds: ["v0a", "v0k", "v0m"], meanDifficulty: 0.2 },
+        { sectionIndex: 1, milestoneDerivedNodeId: "v1m", milestoneLabel: "Ready Ridge", stepDerivedNodeIds: ["v1a", "v1m"], meanDifficulty: 0.35 },
+        { sectionIndex: 2, milestoneDerivedNodeId: "v2m", milestoneLabel: "Growing Ridge", stepDerivedNodeIds: ["v2a", "v2m"], meanDifficulty: 0.5 },
+        { sectionIndex: 3, milestoneDerivedNodeId: "v3m", milestoneLabel: "Summit Ridge", stepDerivedNodeIds: ["v3a", "v3m"], meanDifficulty: 0.7 }
+      ],
+      verdictByNode: { v0k: "known" },
+      latestOutcomeByStudyItemId: {},
+      studySegmentsByNode: {},
+      lessonByNode: {
+        v0a: {
+          derivedNodeId: "v0a",
+          canonicalLabel: "Waypoint Bound Alpha",
+          sections: [{ kind: "gist", text: "The first waypoint anchors the ascent.", groundingProvenance: "generated", isSourceCited: false }],
+          explorableTerms: []
+        }
+      },
+      lessonAbsent: concepts.filter((concept) => concept.id !== "v0a").map((concept) => concept.id),
+      recallScopes: [
+        { scopeKind: "section", anchorDerivedNodeId: "v0m", anchorLabel: "Bound Ridge", sectionIndex: 0, eligibleItemCount: 3, state: "won", wonChallengeId: "guardian-first" },
+        { scopeKind: "section", anchorDerivedNodeId: "v1m", anchorLabel: "Ready Ridge", sectionIndex: 1, eligibleItemCount: 2, state: "available" }
+      ]
+    },
+    expedition: null
+  };
+}
+
 // The grading reply the real client expects from `POST /study/option-select`.
 export function gradedCorrect(chosenOptionId: string) {
   return {

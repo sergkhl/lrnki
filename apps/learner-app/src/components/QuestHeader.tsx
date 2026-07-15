@@ -21,24 +21,25 @@ export function QuestHeader({
   // mid-horizon goal, template fallback when no purpose row exists.
   const title = expeditionTitle ?? session.target.label;
   const collectedCrystals = trail.concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped).length;
-  // Vista-trigger emphasis (U5, R15): when a section completes WHILE the trail is open,
-  // pulse the tally door once instead of auto-opening the Vista. Visual only — the
-  // fusion haptic fires when the learner actually sees the new fusion inside the Vista.
+  // A newly projected permanent reward emphasizes the deliberate Vista door without
+  // opening it. The lossable Vista snapshot decides later contextualization; this pulse
+  // never creates a reward or fires a haptic.
   const reduceMotion = useReducedMotion();
-  const completeSections = trail.sections.filter((section) => section.state === "complete").length;
-  const previousCompleteRef = useRef(completeSections);
+  const boundRewards = trail.sections.filter((section) => Boolean(section.recallScope?.wonChallengeId)).length
+    + (trail.enrichmentScope?.wonChallengeId ? 1 : 0);
+  const previousBoundRef = useRef(boundRewards);
   const pulse = useSharedValue(0);
   useEffect(() => {
-    const previous = previousCompleteRef.current;
-    previousCompleteRef.current = completeSections;
-    if (reduceMotion || completeSections <= previous) return;
+    const previous = previousBoundRef.current;
+    previousBoundRef.current = boundRewards;
+    if (reduceMotion || boundRewards <= previous) return;
     pulse.set(
       withSequence(
         withTiming(1, { duration: MOTION.emphasis / 2 }),
         withTiming(0, { duration: MOTION.emphasis / 2 })
       )
     );
-  }, [completeSections, reduceMotion, pulse]);
+  }, [boundRewards, reduceMotion, pulse]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.12 * pulse.get() }] }));
   return (
     <View className="border-b border-line bg-card px-4 py-3">

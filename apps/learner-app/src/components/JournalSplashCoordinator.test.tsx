@@ -12,8 +12,8 @@ jest.mock("@/lib/navMemory", () => ({
   writeBoardSeen: jest.fn(() => Promise.resolve()),
   readGuardianArrivalSeen: jest.fn(() => Promise.resolve(false)),
   markGuardianArrivalSeen: jest.fn(() => Promise.resolve()),
-  readFusedSections: jest.fn(() => Promise.resolve(null)),
-  writeFusedSections: jest.fn(() => Promise.resolve())
+  readVistaSeenBindings: jest.fn(() => Promise.resolve(null)),
+  writeVistaSeenBindings: jest.fn(() => Promise.resolve())
 }));
 
 const readBoardSeenMock = readBoardSeen as jest.MockedFunction<typeof readBoardSeen>;

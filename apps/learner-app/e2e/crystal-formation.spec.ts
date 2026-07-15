@@ -1,7 +1,8 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import type { Page } from "@playwright/test";
 import { test, expect, ok, seedToken } from "./fixtures";
-import { FORMATION_ENRICHMENT_ID, formationExpedition, gradedCorrect } from "./scenarios/crystalFormation";
+import { FORMATION_ENRICHMENT_ID, formationExpedition, formationVistaExpedition, gradedCorrect } from "./scenarios/crystalFormation";
 
 // Crystal Formation reward acceptance (plan 2026-07-15-002 U3 — the mastery collection
 // case; U4-U6 expand this file through Vista, Guardian reward, and summit states). Runs
@@ -9,6 +10,7 @@ import { FORMATION_ENRICHMENT_ID, formationExpedition, gradedCorrect } from "./s
 // semantic (accessible names, copy, app-owned state selectors), never pixel baselines.
 
 const EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection");
+const VISTA_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista");
 
 test.afterEach(async ({ pageErrors }) => {
   expect(pageErrors, `unexpected runtime errors:\n${pageErrors.join("\n")}`).toEqual([]);
@@ -17,6 +19,17 @@ test.afterEach(async ({ pageErrors }) => {
 function shot(name: string, projectName: string): string {
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   return path.join(EVIDENCE_DIR, `${projectName}-${name}.png`);
+}
+
+function vistaShot(name: string, projectName: string): string {
+  mkdirSync(VISTA_EVIDENCE_DIR, { recursive: true });
+  return path.join(VISTA_EVIDENCE_DIR, `${projectName}-${name}.png`);
+}
+
+async function seedVistaNavigationMemory(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("lrnki_guardian_arrival_gate-explorer_v1m", "1");
+  });
 }
 
 // Wire the collecting → collected transition: the expedition read serves the collecting
@@ -104,4 +117,44 @@ test("reduced motion renders the final collected scene immediately with equivale
   await expect(page.getByRole("img", { name: /3 of 3 ground complete · 2 crystals · 1 known/ })).toBeVisible();
   await expect(page.locator('[data-testid="leg-slot-entering"]')).toHaveCount(0);
   await page.screenshot({ path: shot("collection-reduced-motion", test.info().project.name), fullPage: false });
+});
+
+test("Crystal Vista renders the four Leg states as one separated ascent with a memory door (AE6, AE12)", async ({ page, mock }) => {
+  await seedToken(page, "valid-token");
+  await seedVistaNavigationMemory(page);
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /expedition/*": () => ok(formationVistaExpedition())
+  };
+  await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
+  await page.getByRole("button", { name: "Open the crystal formation" }).click();
+
+  await expect(page.getByRole("img", { name: /Leg 1: Bound Ridge — Bound formation/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Leg 2: Ready Ridge — Guardian awaits/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Leg 3: Growing Ridge — Collecting crystals/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Leg 4: Summit Ridge — Fogged leg/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit terminus — Crown awaits." })).toBeVisible();
+  await expect(page.getByText("Leg 1 settles into the Crystal Formation.")).toBeVisible();
+  await expect(page.getByTestId("formation-spine-segment")).toHaveCount(4);
+
+  await page.getByRole("button", { name: "Waypoint Bound Alpha" }).click();
+  await expect(page.getByText("The first waypoint anchors the ascent.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Examine" })).toBeVisible();
+  await page.screenshot({ path: vistaShot("four-state-ascent", test.info().project.name), fullPage: false });
+});
+
+test("explicit Vista focus opens once and closing consumes route intent (AE10)", async ({ page, mock }) => {
+  await seedToken(page, "valid-token");
+  await seedVistaNavigationMemory(page);
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /expedition/*": () => ok(formationVistaExpedition())
+  };
+  await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}?vista=1&formationFocus=leg:2`);
+  await expect(page.getByTestId("formation-focus-leg-2")).toBeVisible();
+  await page.screenshot({ path: vistaShot("explicit-focus", test.info().project.name), fullPage: false });
+  await page.getByRole("button", { name: "Return to trail" }).click();
+  await expect(page.getByTestId("formation-spine-segment")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByTestId("formation-spine-segment")).toHaveCount(0);
 });

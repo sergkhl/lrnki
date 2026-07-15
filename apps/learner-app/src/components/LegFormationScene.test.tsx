@@ -18,6 +18,7 @@ function concept(id: string, over: Partial<FormationConceptInput> = {}): Formati
     growthFraction: 0,
     isMilestone: false,
     isSummit: false,
+    gist: null,
     ...over
   };
 }

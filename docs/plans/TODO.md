@@ -4,15 +4,15 @@
 
 ### Active implementation
 
-- **Crystal Formation Reward UX (IN PROGRESS — U1–U3 DONE, Milestone Gate A PASS 2026-07-15;
-  next = U4).** Execute the
+- **Crystal Formation Reward UX (IN PROGRESS — U1–U4 DONE, Milestone Gates A+B PASS 2026-07-15;
+  next = U5).** Execute the
   [active plan](./2026-07-15-002-feat-crystal-formation-reward-ux-plan.md): replace miniature
   shard/aura presentation with one shared mineral-geode formation language for mastery collection,
   first Guardian reward, honest rematches, and deliberate Crystal Vista exploration.
 
-  **Status (2026-07-15): U1–U3 complete and green (application 670, learner-app 225 jest across 49
-  suites, workspace typecheck, `pnpm e2e:web` 22/22 phone+desktop); nothing committed (user hasn't
-  asked).** Gate A evidence + evaluation note:
+  **Status (2026-07-15): U1–U4 complete and green (application 670; learner-app 211 jest across 48
+  suites after legacy-renderer test deletion; learner typecheck; focused Crystal Formation
+  Playwright 12/12 phone+desktop).** Gate A evidence + evaluation note:
   `tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection/EVALUATION.md` (PASS after 3
   in-gate fixes: "Summit reached"→`capstoneCollected` copy defect, over-dominant branch zigzag
   thinned/rerouted, collection crop 1.7→2.2×slot to stop neighbor clipping).
@@ -52,24 +52,35 @@
     AE9 reduced motion — 8/8 on phone+desktop. New vocab: `legFuture/legCollecting/
     legGuardianAwaits/legGuardianEngaged/legGuardianUnavailable/legBound/capstoneCollected` +
     `legStateCopy`.
+  - **U4.** `CrystalFormationScene` composes the finished two-level layout as separated shared Leg
+    scenes, one port-consistent winding spine, direct Leg state/progress labels, native 44 px
+    memory-door targets, and a terminus-owned crown. `CrystalVista` uses server-derived formation
+    facts plus lossable canonical `leg:<sectionIndex>`/`summit` seen snapshots; explicit reward focus
+    wins, ordinary render stays closed, and close consumes route intent. Native/web memory seams
+    match. Legacy `crystalVistaView`, `crystalGeometry`, `CrystalGlyph`, fusion auras/sockets, and the
+    floating keystone were deleted with their tests. Gate B initially found two FIX_FIRST defects
+    invisible to semantic assertions (the spine aimed at the next Leg bottom and cut through
+    translucent matrices; state/progress existed only in accessibility labels); port routing +
+    direct labels fixed them, and a second screenshot pass widened exact-count labels. Evidence:
+    `tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista/EVALUATION.md` (PASS).
   - **Gotchas for the next session:** (a) in learner-app jest, any root mounted after the SECOND
     `render()` inside one test renders EMPTY and poisons later tests in the file — one render per
     test (`test.each`), never loops; (b) on web, RNSVG hosts expose the parsed viewBox as
     `vbWidth`/`vbHeight` props (no `viewBox` prop) and `getByRole("img", { name })` is the robust
     Playwright selector for scene labels (the Leg banner `Progress` meter announces the same
     progress line — plain `getByLabel` strict-mode collides); (c) multiple complete capstones share
-    `checkpoint-capstone-complete` — scope with `.last()`; (d) legacy `CrystalGlyph`/
-    `crystalGeometry` now have exactly ONE live consumer, `CrystalVista` — U4 deletes them
-    together with `crystalVistaView`/`FusionAuras`/`SummitKeystone`.
-  - **NEXT — U4 (Crystal Vista rebuild, Milestone Gate B):** compose `CrystalFormationScene` over
-    `composeCrystalFormation` (already returns placed legs/spine/terminus), rewrite `CrystalVista`,
-    rename fused-section navMemory → Vista-seen bindings (`leg:<sectionIndex>`/`summit` keys, both
-    platforms), delete `crystalVistaView.ts`/`crystalGeometry.ts`/`CrystalGlyph.tsx` (+tests) with
-    the last consumer, extend `crystal-formation.spec.ts` through the four Leg states + multi-Leg
-    Vista, and run Gate B into `tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista/`.
-    Then U5 (Guardian reward + route handoff, Gate C), U6 (full Playwright polish + real-use
-    skill), U7 (ADR-0032 amendment + plan deletion). Gate A accepted caveats to re-judge in B/U6:
-    seam dash overhang at matrix corners, conservative specimen-to-matrix scale.
+    `checkpoint-capstone-complete` — scope with `.last()`; (d) the Vista fixture includes a
+    Guardian-ready Leg, so seed `lrnki_guardian_arrival_gate-explorer_v1m=1` before navigation or
+    the legitimate arrival dialog intercepts Vista actions; (e) Expo export wrappers may yield
+    before their child finishes—check the child process and do not start a duplicate.
+  - **NEXT — U5 (Guardian reward + route handoff, Milestone Gate C):** preserve final keyed answer
+    feedback ahead of the won state, add the local reward stage + authoritative Expedition refetch,
+    classify first victory only by `challengeId === wonChallengeId`, compose binding/crown/rematch
+    scenes with event-token-only motion/haptics, keep Continue available through preview failure,
+    clear Activity Sheet only after successful Guardian entry, and extend the intercepted controller
+    through the actual answer/refetch/route boundaries. Then U6 full Playwright polish/real-use gate
+    and U7 ADR/TODO/index consolidation + plan deletion. Gate B caveat to re-judge in Gate C/U6:
+    natural-size formation is intentionally compact on desktop; phone sees the ascent by scrolling.
 
 
 ### Evidence-triggered follow-up

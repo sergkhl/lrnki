@@ -7,7 +7,11 @@ import {
   buildLegModel,
   composeCrystalFormation,
   fitLegWidth,
+  formationMemoryDoorFor,
+  isNameableMineral,
   legStructuralState,
+  selectVistaFocus,
+  vistaRewardSnapshot,
   type FormationConceptInput,
   type FormationEdgeInput,
   type FormationSectionInput
@@ -25,9 +29,61 @@ function concept(id: string, over: Partial<FormationConceptInput> = {}): Formati
     growthFraction: 0,
     isMilestone: false,
     isSummit: false,
+    gist: null,
     ...over
   };
 }
+
+test("Vista focus prioritizes explicit intent, then the furthest unseen reward, current Leg, and first Leg", () => {
+  const won0 = scope({ state: "won", wonChallengeId: "leg-0" });
+  const won1 = scope({ sectionIndex: 1, anchorDerivedNodeId: "m1", state: "won", wonChallengeId: "leg-1" });
+  const summit = scope({ scopeKind: "enrichment", sectionIndex: null, state: "won", wonChallengeId: "summit" });
+  const layout = composeCrystalFormation({
+    concepts: [concept("a"), concept("b", { sectionIndex: 1 })],
+    sections: [section(0, { recallScope: won0 }), section(1, { recallScope: won1 })],
+    edges: [],
+    enrichmentScope: summit
+  });
+
+  assert.deepEqual(selectVistaFocus(layout, { kind: "leg", sectionIndex: 0 }, 1, []), { kind: "leg", sectionIndex: 0 });
+  assert.deepEqual(selectVistaFocus(layout, null, 0, []), { kind: "summit" });
+  assert.deepEqual(selectVistaFocus(layout, null, 0, ["summit"]), { kind: "leg", sectionIndex: 1 });
+  assert.deepEqual(selectVistaFocus(layout, null, 1, ["summit", "leg:0", "leg:1"]), { kind: "leg", sectionIndex: 1 });
+  assert.deepEqual(vistaRewardSnapshot(layout), ["leg:0", "leg:1", "summit"]);
+});
+
+test("Vista memory doors preserve revealed, guarded, and unnamed mineral behavior", () => {
+  const layout = composeCrystalFormation({
+    concepts: [
+      concept("mastered", { state: "mastered", gist: "A stable memory." }),
+      concept("known", { state: "mastered", isKnownSkipped: true, sectionPositionIndex: 1 }),
+      concept("mystery", { state: "locked", sectionPositionIndex: 2 }),
+      concept("goal", { state: "locked", sectionPositionIndex: 3, isMilestone: true })
+    ],
+    sections: [section(0, { state: "available" })],
+    edges: [],
+    enrichmentScope: null
+  });
+  const slots = new Map(layout.legs[0].slots.map((slot) => [slot.derivedNodeId, slot]));
+
+  assert.equal(isNameableMineral(slots.get("mastered")!), true);
+  assert.equal(isNameableMineral(slots.get("known")!), true);
+  assert.equal(isNameableMineral(slots.get("mystery")!), false);
+  assert.equal(isNameableMineral(slots.get("goal")!), true);
+  assert.deepEqual(formationMemoryDoorFor(layout, "mastered"), {
+    kind: "reveal",
+    derivedNodeId: "mastered",
+    label: "mastered",
+    gist: "A stable memory."
+  });
+  assert.equal(formationMemoryDoorFor(layout, "mystery"), null);
+  assert.deepEqual(formationMemoryDoorFor(layout, "goal"), {
+    kind: "guarded",
+    derivedNodeId: "goal",
+    label: "goal",
+    legNumber: 1
+  });
+});
 
 function section(sectionIndex: number, over: Partial<FormationSectionInput> = {}): FormationSectionInput {
   return { sectionIndex, milestoneLabel: `Milestone ${sectionIndex}`, state: "available", recallScope: null, ...over };
@@ -146,6 +202,10 @@ test("packed Leg frames are disjoint, contain their slots, and join only via the
   // One spine segment per Leg; the last climbs to the terminus; none is a graph edge.
   assert.equal(layout.spine.length, 3);
   assert.equal(layout.spine[2].toSectionIndex, null);
+  assert.deepEqual(layout.spine[0].points.at(-1), {
+    x: layout.legs[1].frame.x + layout.legs[1].junction.x,
+    y: layout.legs[1].frame.y + layout.legs[1].junction.y
+  });
   assert.ok(layout.terminus);
   // Legs ascend: canonical order climbs bottom → top (Leg 0 lowest, terminus above all).
   assert.ok(layout.legs[0].frame.y > layout.legs[2].frame.y);
