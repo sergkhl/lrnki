@@ -4,7 +4,7 @@
 
 ### Active implementation
 
-- **Learner Runtime Reliability Fix (IN PROGRESS — U1–U4 done, U5–U6 next).** Execute the
+- **Learner Runtime Reliability Fix (IN PROGRESS — U1–U5 done, U6 next).** Execute the
   [active plan](./2026-07-14-001-fix-learner-runtime-reliability-plan.md) to repair
   failed-login-then-signup session entry, blank query states, Android Theory scrolling and Support
   Path generation-dialog geometry, and the web expedition-planning scrim layer. The prior
@@ -67,14 +67,55 @@
     web-portal), `eslint` 0 errors on changed files, Expo **web export builds** (all 7 routes). jest
     runs the NATIVE branch, so real Android scroll gestures + measured dialog pixels + the web top-layer
     scrim remain U6/U5 proofs, not covered here (see U3/U4 risk mitigations). Nothing committed.
-  - **NEXT: U5** (checked-in `@playwright/test` production-export suite over the Expo web export;
-    deterministic API interception for session/journal/catalog/expedition/sheet; Chromium phone+desktop
-    viewports; wire into `pnpm check`; one-time pinned-Chromium provisioning script that FAILS with an
-    actionable command rather than downloading at test time; drop the unused direct `playwright` dep if
-    tracked code no longer imports it — verify first). Then **U6** (rule-14 real-use web gate + fold
-    result into TODO/BLOCKERS/README; the preview-APK physical-Android pass stays user-owned in
-    BLOCKERS.md — do NOT delete the plan or clear the blocker until Android passes). U5 depends on
-    U1–U4; U6 depends on U1–U5.
+  **Handoff (session 2026-07-14c):**
+  - **U5 DONE — durable automatic web acceptance (`apps/learner-app/e2e/`, `playwright.config.ts`).**
+    Checked-in `@playwright/test` suite over the REAL production Expo web export, 14 tests green on
+    Chromium phone (Pixel 7) + desktop (1280×800), zero page/console errors. Files:
+    `playwright.config.ts` (two viewport projects, `globalSetup`, html+list reporters → gitignored
+    `tmp/`), `e2e/static-server.mjs` (webServer: exports to `dist-e2e` on demand then serves with SPA
+    fallback), `e2e/global-setup.ts` (real launch/close probe → actionable `e2e:setup` message, NEVER
+    downloads at test time), `e2e/fixtures.ts` (typed-API interception + fixtures + console-error
+    guard), `e2e/learner-runtime.spec.ts` (AE1 stale-token→failed-Enter→Set-out→Journal; AE2
+    journal-fail→Retry/Log-out recovery; AE3 catalog loading/error/Retry-recover + expedition +
+    guardian error surfaces; AE6 vaul `[data-vaul-overlay]` covers viewport + `elementFromPoint` over
+    the Menu control resolves into the modal layer + scrim-dismiss with unchanged URL; R12
+    pending-mutation blocks Escape dismissal). Wired: root `check` → `e2e:web` → learner `e2e`
+    (`E2E_FORCE_EXPORT=1 playwright test`, forces a fresh `--clear` export so the gate never serves a
+    stale bundle). `e2e:setup` = `playwright install chromium` (one-time). **Two gotchas solved:**
+    (1) the export bakes `EXPO_PUBLIC_LEARNER_API_URL` — a sentinel `http://127.0.0.1:8788` that is
+    only ever intercepted, never served, so any un-mocked call fails fast instead of hitting
+    production; **Metro caches that inlined value**, so the export MUST run `expo export --clear` or a
+    prior dev export's `:8790` origin silently persists (this bit me — fixed in static-server.mjs).
+    (2) cross-origin (web `:8099` ↔ api `:8788`) means authenticated GET / JSON POST preflight, so
+    the interceptor answers `OPTIONS` 204 with CORS headers or the real request never fires. Removed
+    the unused direct `playwright` root devDep + catalog entry (no tracked importer); added
+    `@playwright/test` (catalog) to learner-app; eslint override turns off `react-hooks/rules-of-hooks`
+    + `no-restricted-imports` for `e2e/**` (Playwright's `use()` fixture is not a React hook). Env
+    note: this sandbox pre-bakes `chromium_headless_shell-1223` in root-owned `/ms-playwright`
+    (`PLAYWRIGHT_BROWSERS_PATH`), so `e2e:setup` errors on write-permission there but the browser is
+    already present and launches fine — the actionable failure path is for fresh hosts.
+    The gate export is DECOUPLED from Playwright's webServer: `e2e` = `export:web:e2e`
+    (`expo export --clear` with the sentinel origin) THEN `playwright test`, so the webServer just
+    serves an existing `dist-e2e` and starts instantly. (First attempt ran the `--clear` cold export
+    INSIDE the webServer and blew its 180s startup cap — hence the pre-export step; webServer timeout
+    still raised to 300s as a fallback for a bare `playwright test`.) `--clear` is REQUIRED in `check`
+    because the preceding `build` step's `export:web` warms the Metro cache with the PRODUCTION
+    origin. Also: `dist-e2e/**` added to eslint `ignores` (else `eslint .` OOMs walking the 4.6MB
+    bundle) and to `.gitignore` + tsconfig `exclude`.
+  - **Gate:** FULL `pnpm check` GREEN end-to-end (exit 0): tmp-clean, typecheck (all pkgs), test (all
+    suites incl. learner-app 187/187), lint (0 errors / 9 pre-existing warnings), build (admin-lab +
+    learner export), and the new production-web Playwright gate 14/14 both viewports. Nothing
+    committed (user hasn't asked).
+  - **NEXT: U6** — rule-14 real-use WEB gate (`.agents/skills/real-use-quality-evaluation/SKILL.md`):
+    stand up the working-tree learner-api against Postgres (load `.env`; API on `:8790`) + production
+    LiteLLM, generate ONE real expedition, drive the REAL app (served export against the REAL api, NOT
+    the intercepted fixtures) through failed-entry→signup, all route states, and the planning-sheet
+    scrim over a populated page; keep the disposable learner/PIN/bearer out of screenshots/logs and
+    hard-reset it after; evidence in `tmp/2026-07-14-learner-runtime-reliability/`. Then fold the
+    result into TODO/BLOCKERS/README. **The preview-APK physical-Android pass stays user-owned in
+    BLOCKERS.md — do NOT delete the plan or clear the blocker until Android passes** (Verification
+    Contract: the plan cannot be declared complete until the manual Android gate passes). U6 depends
+    on U1–U5.
 
 ### Evidence-triggered follow-up
 

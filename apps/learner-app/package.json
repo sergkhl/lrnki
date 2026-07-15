@@ -7,8 +7,11 @@
     "dev": "BROWSER=none expo start --web",
     "start": "expo start",
     "export:web": "expo export --platform web",
+    "export:web:e2e": "EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8788 expo export --clear --platform web --output-dir dist-e2e",
     "test": "jest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "e2e": "pnpm run export:web:e2e && playwright test",
+    "e2e:setup": "playwright install chromium"
   },
   "dependencies": {
     "@expo/ui": "catalog:expo",
@@ -43,6 +46,7 @@
     "react-native-worklets": "catalog:expo"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "@tailwindcss/postcss": "catalog:",
     "@testing-library/react-native": "catalog:expo",
     "@types/node": "catalog:",

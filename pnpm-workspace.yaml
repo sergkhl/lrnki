@@ -49,7 +49,6 @@ catalog:
   "@faker-js/faker": 9.9.0
   cytoscape: 3.33.4
   '@types/cytoscape': 3.21.9
-  playwright: ^1.60.0
   postcss: 8.5.17
   undici: ^8.7.0
   hono: 4.12.28

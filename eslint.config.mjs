@@ -10,6 +10,8 @@ const eslintConfig = [
       "**/node_modules/**",
       "dist/**",
       "**/dist/**",
+      "dist-e2e/**",
+      "**/dist-e2e/**",
       "coverage/**",
       "**/coverage/**",
       ".data/**",
@@ -81,6 +83,17 @@ const eslintConfig = [
           ]
         }
       ]
+    }
+  },
+  {
+    // Playwright web-acceptance suite (plan 2026-07-14-001 U5): Node test files, not React
+    // surfaces. `react-hooks/rules-of-hooks` false-positives on Playwright's `use()` fixture
+    // callback, and the learner interaction boundary (RN primitive restrictions) does not apply
+    // to a browser-driving test harness that never renders the app.
+    files: ["apps/learner-app/e2e/**/*.ts", "apps/learner-app/playwright.config.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+      "no-restricted-imports": "off"
     }
   }
 ];
