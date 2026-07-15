@@ -21,6 +21,7 @@ import {
 const EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection");
 const VISTA_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista");
 const GUARDIAN_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-c-guardian");
+const U6_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/u6-final");
 
 test.afterEach(async ({ pageErrors }) => {
   expect(pageErrors, `unexpected runtime errors:\n${pageErrors.join("\n")}`).toEqual([]);
@@ -39,6 +40,11 @@ function vistaShot(name: string, projectName: string): string {
 function guardianShot(name: string, projectName: string): string {
   mkdirSync(GUARDIAN_EVIDENCE_DIR, { recursive: true });
   return path.join(GUARDIAN_EVIDENCE_DIR, `${projectName}-${name}.png`);
+}
+
+function u6Shot(name: string, projectName: string): string {
+  mkdirSync(U6_EVIDENCE_DIR, { recursive: true });
+  return path.join(U6_EVIDENCE_DIR, `${projectName}-${name}.png`);
 }
 
 async function seedVistaNavigationMemory(page: Page) {
@@ -251,4 +257,113 @@ test("reward preview failure preserves committed victory, Retry, and plain Conti
   await expect(page.getByRole("button", { name: "Retry preview" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
   await page.screenshot({ path: guardianShot("preview-error", test.info().project.name), fullPage: false });
+});
+
+// —— U6: complete production-web exercise (plan 2026-07-15-002) ——————————————————————
+
+test("a Guardian-ready Leg announces the engaged fight honestly (R7)", async ({ page, mock }) => {
+  await seedToken(page, "valid-token");
+  await seedVistaNavigationMemory(page);
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /expedition/*": () => ok(formationVistaExpedition("active"))
+  };
+  await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
+  await page.getByRole("button", { name: "Open the crystal formation" }).click();
+  await expect(page.getByRole("img", { name: /Leg 2: Ready Ridge — Guardian engaged/ })).toBeVisible();
+  await page.screenshot({ path: u6Shot("guardian-engaged", test.info().project.name), fullPage: false });
+});
+
+test("a complete Leg with zero eligible items shows the honest unavailable copy (R7)", async ({ page, mock }) => {
+  await seedToken(page, "valid-token");
+  await seedVistaNavigationMemory(page);
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /expedition/*": () => ok(formationVistaExpedition("unavailable"))
+  };
+  await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
+  await page.getByRole("button", { name: "Open the crystal formation" }).click();
+  await expect(page.getByRole("img", { name: /Leg 2: Ready Ridge — Guardian has nothing to test yet/ })).toBeVisible();
+  await page.screenshot({ path: u6Shot("guardian-unavailable", test.info().project.name), fullPage: false });
+});
+
+test("a summit rematch keeps the crown seated with endurance copy (AE8)", async ({ page, mock }) => {
+  const challengeId = "guardian-summit-rematch";
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId, "enrichment") }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId, "enrichment")),
+    "GET /expedition/*": () => ok(guardianSummitRewardExpedition("summit-original-first-win"))
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Formation holds strong")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit terminus — Crown seated." })).toBeVisible();
+  await expect(page.getByTestId("guardian-reward-rematch")).toBeVisible();
+  await expect(page.getByText("Summit crowned!")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
+  await page.screenshot({ path: u6Shot("summit-rematch", test.info().project.name), fullPage: false });
+});
+
+test("reduced motion binds the first Leg statically with immediate actions (AE9)", async ({ page, mock }) => {
+  const challengeId = "guardian-first-ready-leg";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
+    "GET /expedition/*": () => ok(guardianLegRewardExpedition(challengeId))
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Leg bound!")).toBeVisible();
+  // The final sealed scene renders immediately: no binding overlay, no light sweep.
+  await expect(page.getByTestId("leg-binding-event")).toHaveCount(0);
+  await expect(page.getByTestId("guardian-reward-sweep")).toHaveCount(0);
+  await expect(page.getByTestId("leg-seam-sealed")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
+  await page.screenshot({ path: u6Shot("binding-reduced-motion", test.info().project.name), fullPage: false });
+});
+
+test("reduced motion seats the summit crown immediately with equivalent copy (AE9)", async ({ page, mock }) => {
+  const challengeId = "guardian-first-summit";
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId, "enrichment") }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId, "enrichment")),
+    "GET /expedition/*": () => ok(guardianSummitRewardExpedition(challengeId))
+  };
+  await page.goto(`/guardian/${challengeId}`);
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Summit crowned!")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit terminus — Crown seated." })).toBeVisible();
+  await expect(page.getByTestId("guardian-reward-sweep")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
+  await page.screenshot({ path: u6Shot("crown-reduced-motion", test.info().project.name), fullPage: false });
+});
+
+test("reduced motion contextualizes an unseen bound Leg with static emphasis and copy (AE9)", async ({ page, mock }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await seedToken(page, "valid-token");
+  await seedVistaNavigationMemory(page);
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /expedition/*": () => ok(formationVistaExpedition())
+  };
+  await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
+  await page.getByRole("button", { name: "Open the crystal formation" }).click();
+  // Equivalent text still announces the one-time contextualization; the island renders
+  // its final settled state with no transform animation.
+  await expect(page.getByText("Leg 1 settles into the Crystal Formation.")).toBeVisible();
+  await expect(page.getByRole("img", { name: /Leg 1: Bound Ridge — Bound formation/ })).toBeVisible();
+  await page.screenshot({ path: u6Shot("contextualization-reduced-motion", test.info().project.name), fullPage: false });
 });

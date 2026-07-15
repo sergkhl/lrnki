@@ -165,6 +165,9 @@ test("direct won loads and reduced motion expose settled actions without haptics
 
   jest.mocked(useReducedMotion).mockReturnValue(true);
   const reduced = await renderReward(preview, { transitionToken: "reduced-event" });
+  // R20: the final sealed scene renders directly — no binding overlay, no light sweep.
+  expect(screen.queryByTestId("leg-binding-event")).toBeNull();
+  expect(screen.queryByTestId("guardian-reward-sweep")).toBeNull();
   await fireEvent.press(screen.getByText(learnerTerm("guardianRewardContinue")));
   expect(reduced.onContinue).toHaveBeenCalledTimes(1);
   await act(async () => { jest.advanceTimersByTime(1200); });

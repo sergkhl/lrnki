@@ -157,7 +157,11 @@ export function formationExpedition(phase: "collecting" | "collected") {
 // Production-shaped four-state Vista fixture: one bound Leg, one Guardian-ready Leg,
 // one collecting Leg, and one future Leg. It also contains a trusted cross-Leg edge so
 // the real scene proves that only Leg-local veins enter the reward composition.
-export function formationVistaExpedition() {
+// `readyLegScope` selects the honest Guardian-ready substate for Ready Ridge (U6):
+// an available scope, an engaged (active) fight, or the zero-eligible unavailable case.
+export function formationVistaExpedition(
+  readyLegScope: "available" | "active" | "unavailable" = "available"
+) {
   const base = formationExpedition("collected");
   const concepts: ConceptSpec[] = [
     { id: "v0a", label: "Waypoint Bound Alpha", sectionIndex: 0, sectionPositionIndex: 0, state: "mastered", milestoneId: "v0m", milestoneLabel: "Bound Ridge" },
@@ -248,7 +252,11 @@ export function formationVistaExpedition() {
       lessonAbsent: concepts.filter((concept) => concept.id !== "v0a").map((concept) => concept.id),
       recallScopes: [
         { scopeKind: "section", anchorDerivedNodeId: "v0m", anchorLabel: "Bound Ridge", sectionIndex: 0, eligibleItemCount: 3, state: "won", wonChallengeId: "guardian-first" },
-        { scopeKind: "section", anchorDerivedNodeId: "v1m", anchorLabel: "Ready Ridge", sectionIndex: 1, eligibleItemCount: 2, state: "available" }
+        readyLegScope === "active"
+          ? { scopeKind: "section", anchorDerivedNodeId: "v1m", anchorLabel: "Ready Ridge", sectionIndex: 1, eligibleItemCount: 2, state: "active", activeChallengeId: "guardian-engaged" }
+          : readyLegScope === "unavailable"
+            ? { scopeKind: "section", anchorDerivedNodeId: "v1m", anchorLabel: "Ready Ridge", sectionIndex: 1, eligibleItemCount: 0, state: "unavailable", reason: "no_eligible_items" }
+            : { scopeKind: "section", anchorDerivedNodeId: "v1m", anchorLabel: "Ready Ridge", sectionIndex: 1, eligibleItemCount: 2, state: "available" }
       ]
     },
     expedition: null

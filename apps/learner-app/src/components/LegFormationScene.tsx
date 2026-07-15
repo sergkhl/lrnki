@@ -37,6 +37,7 @@ export function LegFormationScene({
   width: number;
   bindingEventId?: string | null;
 }>) {
+  const reduceMotion = useReducedMotion();
   const viewBox = useMemo(() => cropFor(leg, mode, focusNodeId), [leg, mode, focusNodeId]);
   const height = (width * viewBox.height) / viewBox.width;
   const stateLine = legStateCopy(leg.structuralState, leg.guardianSubstate);
@@ -86,7 +87,9 @@ export function LegFormationScene({
         opacity={future ? 0.3 : bound ? 0.9 : 0.45}
       />
 
-      {mode === "binding" && bindingEventId !== null ? (
+      {/* Reduced motion renders the sealed bound state directly: the binding overlay is
+          pure event emphasis, so it is skipped rather than frozen mid-fade (R20). */}
+      {mode === "binding" && bindingEventId !== null && !reduceMotion ? (
         <BindingEvent key={bindingEventId} leg={leg} />
       ) : null}
 

@@ -91,13 +91,11 @@ export function CrystalVista({
           onClose={close}
           closeLabel={learnerTerm("returnToTrail")}
         />
-        <ScrollView
-          ref={scrollRef}
-          className="flex-1"
-          contentContainerClassName="items-center gap-3 p-4"
-        >
-          <Text variant="caption" color="muted" className="max-w-md text-center">{learnerTerm("vistaHint")}</Text>
-          {contextualizingRewardKey ? (
+        {/* Pinned below the header so the one-time contextualization stays readable
+            while the focus effect scrolls the ascent to the rewarded Leg (U6 finding:
+            inside the scroll content it left the viewport with the auto-scroll). */}
+        {contextualizingRewardKey ? (
+          <View className="items-center px-4 pt-3">
             <View accessibilityLiveRegion="polite" className="rounded-card border border-line-strong bg-card px-3 py-1.5">
               <Text variant="caption" className="font-semibold">
                 {contextualizingRewardKey === "summit"
@@ -105,7 +103,14 @@ export function CrystalVista({
                   : learnerTerm("vistaBoundTemplate").replace("{n}", contextualizingRewardKey.slice(4).replace(/^\d+$/, (value) => String(Number(value) + 1)))}
               </Text>
             </View>
-          ) : null}
+          </View>
+        ) : null}
+        <ScrollView
+          ref={scrollRef}
+          className="flex-1"
+          contentContainerClassName="items-center gap-3 p-4"
+        >
+          <Text variant="caption" color="muted" className="max-w-md text-center">{learnerTerm("vistaHint")}</Text>
           {layout.legs.length > 0 ? (
             <CrystalFormationScene
               layout={layout}

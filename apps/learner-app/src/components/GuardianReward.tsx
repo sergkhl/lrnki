@@ -178,7 +178,9 @@ export function GuardianReward({
                   onSelectNode={() => {}}
                 />
               )}
-              {eventKey ? <RewardSweep eventKey={eventKey} /> : null}
+              {/* The light sweep is a translation transform — reduced motion drops it and
+                  shows the settled scene immediately (R20/AE9). */}
+              {eventKey && !reduceMotion ? <RewardSweep eventKey={eventKey} /> : null}
             </Card>
           </View>
         ) : null}
