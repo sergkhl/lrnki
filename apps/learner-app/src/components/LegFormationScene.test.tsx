@@ -2,9 +2,11 @@ import { beforeEach, expect, jest, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { LegFormationScene } from "./LegFormationScene";
-import { SLOT_SIZE, buildLegModel, type FormationConceptInput, type FormationSectionInput } from "@/learn/crystalFormationLayout";
+import { buildLegModel, type FormationConceptInput, type FormationSectionInput } from "@/learn/crystalFormationLayout";
 import { legStateCopy } from "@/learn/vocabulary";
 import type { RecallScopeStatus } from "@lrnki/application/projection";
+
+const WIDTH = 320;
 
 function concept(id: string, over: Partial<FormationConceptInput> = {}): FormationConceptInput {
   return {
@@ -48,7 +50,7 @@ const LEG = () =>
       concept("skipped", { state: "mastered", isKnownSkipped: true, sectionPositionIndex: 2 }),
       concept("open", { sectionPositionIndex: 3 })
     ],
-    [{ source: "done", target: "fresh", uncertain: false }]
+    WIDTH
   );
 
 beforeEach(() => {
@@ -56,7 +58,7 @@ beforeEach(() => {
 });
 
 test("collection marks exactly the just-mastered specimen as entering; every other slot is static", async () => {
-  await render(<LegFormationScene leg={LEG()} mode="collection" focusNodeId="fresh" enteringNodeId="fresh" width={220} />);
+  await render(<LegFormationScene leg={LEG()} mode="collection" enteringNodeId="fresh" />);
   expect(screen.getAllByTestId("leg-slot-entering")).toHaveLength(1);
   // The other collected, known-ghost, and awaiting slots render statically alongside.
   expect(screen.getAllByTestId("leg-slot-collected").length).toBeGreaterThanOrEqual(2);
@@ -64,22 +66,20 @@ test("collection marks exactly the just-mastered specimen as entering; every oth
   expect(screen.getAllByTestId("leg-slot-awaiting")).toHaveLength(1);
 });
 
-test("a settled scene without an entering event is fully static (AE2 reopen)", async () => {
-  await render(<LegFormationScene leg={LEG()} mode="collection" focusNodeId="fresh" enteringNodeId={null} width={220} />);
+test("a settled scene without an entering event is fully static (reopen honesty)", async () => {
+  await render(<LegFormationScene leg={LEG()} mode="collection" enteringNodeId={null} />);
   expect(screen.queryAllByTestId("leg-slot-entering")).toHaveLength(0);
 });
 
 test("rerendering the same entering event never multiplies the entrance", async () => {
-  const view = await render(
-    <LegFormationScene leg={LEG()} mode="collection" focusNodeId="fresh" enteringNodeId="fresh" width={220} />
-  );
-  await view.rerender(<LegFormationScene leg={LEG()} mode="collection" focusNodeId="fresh" enteringNodeId="fresh" width={220} />);
+  const view = await render(<LegFormationScene leg={LEG()} mode="collection" enteringNodeId="fresh" />);
+  await view.rerender(<LegFormationScene leg={LEG()} mode="collection" enteringNodeId="fresh" />);
   expect(screen.getAllByTestId("leg-slot-entering")).toHaveLength(1);
 });
 
 test("reduced motion renders the final collected slot immediately with no entrance transform", async () => {
   (useReducedMotion as jest.Mock).mockReturnValue(true);
-  await render(<LegFormationScene leg={LEG()} mode="collection" focusNodeId="fresh" enteringNodeId="fresh" width={220} />);
+  await render(<LegFormationScene leg={LEG()} mode="collection" enteringNodeId="fresh" />);
   expect(screen.queryAllByTestId("leg-slot-entering")).toHaveLength(0);
   expect(screen.getAllByTestId("leg-slot-collected").length).toBeGreaterThanOrEqual(2);
 });
@@ -87,46 +87,54 @@ test("reduced motion renders the final collected slot immediately with no entran
 // One render per test: this jest environment drops any root mounted after the second
 // render inside a single test, and an over-limit test poisons the rest of the file.
 const STATE_CASES = [
-  { name: "future", make: () => buildLegModel(section({ state: "locked" }), [concept("a")], []), state: "future" as const, substate: null },
-  { name: "collecting", make: () => buildLegModel(section(), [concept("a")], []), state: "collecting" as const, substate: null },
+  { name: "future", make: () => buildLegModel(section({ state: "locked" }), [concept("a")], WIDTH), state: "future" as const, substate: null, badge: null },
+  { name: "collecting", make: () => buildLegModel(section(), [concept("a")], WIDTH), state: "collecting" as const, substate: null, badge: null },
   {
     name: "guardian_ready",
-    make: () => buildLegModel(section({ state: "complete", recallScope: { ...wonScope(), state: "available", wonChallengeId: undefined } }), [concept("a", { state: "mastered" })], []),
+    make: () => buildLegModel(section({ state: "complete", recallScope: { ...wonScope(), state: "available", wonChallengeId: undefined } }), [concept("a", { state: "mastered" })], WIDTH),
     state: "guardian_ready" as const,
-    substate: "available" as const
+    substate: "available" as const,
+    badge: "island-badge-guardian"
   },
-  { name: "bound", make: () => buildLegModel(section({ state: "complete", recallScope: wonScope() }), [concept("a", { state: "mastered" })], []), state: "bound" as const, substate: null }
+  {
+    name: "bound",
+    make: () => buildLegModel(section({ state: "complete", recallScope: wonScope() }), [concept("a", { state: "mastered" })], WIDTH),
+    state: "bound" as const,
+    substate: null,
+    badge: "island-badge-seal"
+  }
 ];
 
-test.each(STATE_CASES)("the $name state announces its copy and shape-differentiated seam/matrix", async (entry) => {
+test.each(STATE_CASES)("the $name state announces its copy on the rim with its shape badge (D4)", async (entry) => {
   const leg = entry.make();
   expect(leg.structuralState).toBe(entry.state);
-  await render(<LegFormationScene leg={leg} mode="overview" width={220} />);
+  await render(<LegFormationScene leg={leg} mode="overview" />);
   expect(screen.getByLabelText(new RegExp(legStateCopy(entry.state, entry.substate)))).toBeTruthy();
-  expect(screen.getByTestId(`leg-matrix-${entry.state}`)).toBeTruthy();
-  expect(screen.getByTestId(`leg-seam-${entry.state === "bound" ? "sealed" : "open"}`)).toBeTruthy();
+  expect(screen.getByTestId(`island-rim-${entry.state}`)).toBeTruthy();
+  if (entry.badge) expect(screen.getByTestId(entry.badge)).toBeTruthy();
+  else {
+    expect(screen.queryByTestId("island-badge-guardian")).toBeNull();
+    expect(screen.queryByTestId("island-badge-seal")).toBeNull();
+  }
 });
 
-test("exact veins render as their own structure alongside the nonsemantic branch", async () => {
-  await render(<LegFormationScene leg={LEG()} mode="overview" width={220} />);
-  expect(screen.getAllByTestId("leg-vein")).toHaveLength(1);
-  expect(screen.getByTestId("leg-branch")).toBeTruthy();
+test("binding plays the keyed one-shot seal + rim sweep; reduced motion settles immediately", async () => {
+  const leg = buildLegModel(section({ state: "complete", recallScope: wonScope() }), [concept("a", { state: "mastered" })], WIDTH);
+  await render(<LegFormationScene leg={leg} mode="binding" bindingEventId="win-1" />);
+  expect(screen.getByTestId("leg-binding-event")).toBeTruthy();
 });
 
-test("a future leg ghosts every slot with no grown facet", async () => {
-  const future = buildLegModel(section({ state: "locked" }), [concept("a", { state: "locked" }), concept("b", { state: "locked", sectionPositionIndex: 1 })], []);
-  await render(<LegFormationScene leg={future} mode="overview" width={220} />);
-  expect(screen.queryAllByTestId("facet-grown")).toHaveLength(0);
-  expect(screen.getAllByTestId("facet-ghost").length).toBeGreaterThan(0);
+test("reduced motion skips the binding overlay and shows the sealed bound rim directly", async () => {
+  (useReducedMotion as jest.Mock).mockReturnValue(true);
+  const leg = buildLegModel(section({ state: "complete", recallScope: wonScope() }), [concept("a", { state: "mastered" })], WIDTH);
+  await render(<LegFormationScene leg={leg} mode="binding" bindingEventId="win-1" />);
+  expect(screen.queryByTestId("leg-binding-event")).toBeNull();
+  expect(screen.getByTestId("island-rim-bound")).toBeTruthy();
 });
 
-test("the collection crop keeps the full specimen at 40 px or larger", async () => {
-  const leg = LEG();
-  await render(<LegFormationScene leg={leg} mode="collection" focusNodeId="fresh" enteringNodeId={null} width={220} />);
-  const svg = screen.getByLabelText(/Ridge/);
-  // The host component receives the parsed viewBox as vbWidth/vbHeight.
-  const cropWidth = svg.props.vbWidth as number;
-  expect(cropWidth).toBeLessThanOrEqual(leg.width);
-  // Rendered specimen px = SLOT_SIZE / cropWidth * rendered width — never below 40 (R14).
-  expect((SLOT_SIZE / cropWidth) * 220).toBeGreaterThanOrEqual(40);
+test("a future leg ghosts every slot with no fill", async () => {
+  const future = buildLegModel(section({ state: "locked" }), [concept("a", { state: "locked" }), concept("b", { state: "locked", sectionPositionIndex: 1 })], WIDTH);
+  await render(<LegFormationScene leg={future} mode="overview" />);
+  expect(screen.queryAllByTestId("specimen-fill")).toHaveLength(0);
+  expect(screen.getAllByTestId("specimen-ghost").length).toBe(2);
 });

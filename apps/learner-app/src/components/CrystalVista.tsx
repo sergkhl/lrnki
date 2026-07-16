@@ -4,7 +4,6 @@ import { ArrowRight, Gem } from "lucide-react-native";
 import type { StudySession, TrailView } from "@lrnki/application/projection";
 import {
   buildCrystalFormationLayout,
-  fitLegWidth,
   formationMemoryDoorFor,
   rewardKeyForFocus,
   selectVistaFocus,
@@ -42,9 +41,9 @@ export function CrystalVista({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [focus, setFocus] = useState<VistaFocus | null>(null);
   const [contextualizingRewardKey, setContextualizingRewardKey] = useState<VistaRewardKey | null>(null);
-  const layout = useMemo(() => buildCrystalFormationLayout(session, trail), [session, trail]);
-  const door = formationMemoryDoorFor(layout, selectedNodeId);
   const canvasWidth = Math.min(width - 32, 720);
+  const layout = useMemo(() => buildCrystalFormationLayout(session, trail, canvasWidth), [session, trail, canvasWidth]);
+  const door = formationMemoryDoorFor(layout, selectedNodeId);
 
   useEffect(() => {
     if (!open) return;
@@ -66,13 +65,12 @@ export function CrystalVista({
 
   useEffect(() => {
     if (!open || !focus) return;
-    const scale = fitLegWidth(layout.width, canvasWidth).scale;
     const targetY = focus.kind === "summit"
       ? 0
-      : (layout.legs.find((leg) => leg.sectionIndex === focus.sectionIndex)?.frame.y ?? 0) * scale;
-    const timer = setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, targetY - 120), animated: !reduceMotion }), 0);
+      : layout.legs.find((leg) => leg.sectionIndex === focus.sectionIndex)?.header.y ?? 0;
+    const timer = setTimeout(() => scrollRef.current?.scrollTo({ y: Math.max(0, targetY - 80), animated: !reduceMotion }), 0);
     return () => clearTimeout(timer);
-  }, [canvasWidth, focus, layout, open, reduceMotion]);
+  }, [focus, layout, open, reduceMotion]);
 
   const close = () => {
     setSelectedNodeId(null);
@@ -99,7 +97,7 @@ export function CrystalVista({
             <View accessibilityLiveRegion="polite" className="rounded-card border border-line-strong bg-card px-3 py-1.5">
               <Text variant="caption" className="font-semibold">
                 {contextualizingRewardKey === "summit"
-                  ? learnerTerm("vistaCrownJoined")
+                  ? learnerTerm("vistaKeystoneJoined")
                   : learnerTerm("vistaBoundTemplate").replace("{n}", contextualizingRewardKey.slice(4).replace(/^\d+$/, (value) => String(Number(value) + 1)))}
               </Text>
             </View>
@@ -114,7 +112,6 @@ export function CrystalVista({
           {layout.legs.length > 0 ? (
             <CrystalFormationScene
               layout={layout}
-              width={canvasWidth}
               focus={focus}
               contextualizingRewardKey={contextualizingRewardKey}
               selectedNodeId={selectedNodeId}

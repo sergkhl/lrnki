@@ -1,6 +1,6 @@
 import { View } from "react-native";
 import Svg, { Circle, G, Polygon, Rect } from "react-native-svg";
-import { MineralFacetsGroup } from "./CrystalSpecimen";
+import { MineralSpecimenGroup } from "./CrystalSpecimen";
 import { learnerTerm } from "@/learn/vocabulary";
 import { colors } from "@/ui";
 
@@ -48,15 +48,16 @@ export function CrystalGuardian({
         <Circle cx={50} cy={70} r={36} fill={auraColor} opacity={phase === "active" ? 0.5 : 0.35} />
         <Circle cx={50} cy={70} r={36} stroke={phase === "active" ? colors["line-strong"] : auraColor} strokeWidth={1.5} fill="none" opacity={0.8} />
         {/* The Guardian body: an intergrown mineral group deterministic per anchor —
-            flanking fluorite and calcite behind a dominant central quartz. */}
+            flanking amethyst and quartz behind a dominant central quartz column
+            (diamond stays reserved for the scarce hardest-tier specimens). */}
         <G transform="translate(24, 52) scale(0.52)">
-          <MineralFacetsGroup habit="fluorite" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
+          <MineralSpecimenGroup species="amethyst" derivedNodeId={`${anchorDerivedNodeId}:left`} growthFraction={1} state="collected" />
         </G>
         <G transform="translate(44, 52) scale(0.52)">
-          <MineralFacetsGroup habit="calcite" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
+          <MineralSpecimenGroup species="quartz" derivedNodeId={`${anchorDerivedNodeId}:right`} growthFraction={1} state="collected" />
         </G>
         <G transform="translate(15, 24) scale(0.7)">
-          <MineralFacetsGroup habit="quartz" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
+          <MineralSpecimenGroup species="quartz" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
         </G>
         <WardArc total={wardTotal} remaining={phase === "won" ? 0 : wardsRemaining} />
         {phase === "won" ? null : <ShieldRow total={shieldTotal} remaining={shieldRemaining} />}

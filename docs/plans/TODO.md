@@ -4,10 +4,19 @@
 
 ### Active implementation
 
-- **Crystal Formation Minimal Redesign** — READY (next up), plan
-  [2026-07-16-002](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md): curated
-  difficulty-tiered mineral library + quiet single-outline geode ascent replacing the noisy
-  2026-07-15 visuals; design decisions locked in the plan's ledger 2026-07-16 — don't re-ask.
+- **Crystal Formation Minimal Redesign** — IN PROGRESS, plan
+  [2026-07-16-002](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md): **U1–U4
+  implemented 2026-07-16 (uncommitted)** — curated difficulty-tiered mineral library
+  (`difficultyBand` re-exported via the projection barrel; tier tint tokens; half-plane fill
+  clip), width-driven mound-packing layout (headers/badges/one sampled spine/peak+keystone;
+  sphere-grid/veins/seam/branch/`fitLegWidth` deleted), scene + composition-point rewrite
+  (`guardianRewardSceneWidth` feeds the preview layout width), ADR-0032 formation section
+  rewritten, crown→keystone everywhere. Deterministic envelope green (workspace typecheck, lint 0
+  errors, learner-app jest 225, application suite, intercepted `pnpm e2e` 46/46 with evidence
+  screenshots under `tmp/2026-07-16-crystal-formation-minimal-redesign/`). **NEXT = U5 rule-14
+  live-browser gate** over a real synthetic expedition (then fold status here and delete the
+  plan). Screenshot notes for the gate: the future island's `fog` fill reads heavy, and the spine
+  crosses the header band text on offset islands — judge/tune in U5.
 
 ### Evidence-triggered follow-up
 

@@ -18,10 +18,10 @@ import {
 // against the production Expo export with the typed API intercepted; assertions are
 // semantic (accessible names, copy, app-owned state selectors), never pixel baselines.
 
-const EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-a-collection");
-const VISTA_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-b-vista");
-const GUARDIAN_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/milestone-c-guardian");
-const U6_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-15-crystal-formation-reward-ux/u6-final");
+const EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-16-crystal-formation-minimal-redesign/milestone-a-collection");
+const VISTA_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-16-crystal-formation-minimal-redesign/milestone-b-vista");
+const GUARDIAN_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-16-crystal-formation-minimal-redesign/milestone-c-guardian");
+const U6_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-16-crystal-formation-minimal-redesign/u6-final");
 
 test.afterEach(async ({ pageErrors }) => {
   expect(pageErrors, `unexpected runtime errors:\n${pageErrors.join("\n")}`).toEqual([]);
@@ -154,7 +154,7 @@ test("Crystal Vista renders the four Leg states as one separated ascent with a m
   await expect(page.getByRole("img", { name: /Leg 2: Ready Ridge — Guardian awaits/ })).toBeVisible();
   await expect(page.getByRole("img", { name: /Leg 3: Growing Ridge — Collecting crystals/ })).toBeVisible();
   await expect(page.getByRole("img", { name: /Leg 4: Summit Ridge — Fogged leg/ })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Summit terminus — Crown awaits." })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit peak — Keystone awaits." })).toBeVisible();
   await expect(page.getByText("Leg 1 settles into the Crystal Formation.")).toBeVisible();
   await expect(page.getByTestId("formation-spine-segment")).toHaveCount(4);
 
@@ -223,7 +223,7 @@ test("a Guardian rematch keeps the formation settled and uses endurance copy", a
   await page.screenshot({ path: guardianShot("rematch", test.info().project.name), fullPage: false });
 });
 
-test("the first Expedition Guardian win seats the summit crown", async ({ page, mock }) => {
+test("the first Expedition Guardian win seats the summit keystone", async ({ page, mock }) => {
   const challengeId = "guardian-first-summit";
   await seedToken(page, "valid-token");
   mock.handlers = {
@@ -235,8 +235,8 @@ test("the first Expedition Guardian win seats the summit crown", async ({ page, 
   await page.goto(`/guardian/${challengeId}`);
   await page.getByRole("button", { name: "The keyed route marker" }).click();
   await page.getByRole("button", { name: "See your formation" }).click();
-  await expect(page.getByText("Summit crowned!")).toBeVisible();
-  await expect(page.getByRole("img", { name: "Summit terminus — Crown seated." })).toBeVisible();
+  await expect(page.getByText("Keystone seated!")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit peak — Keystone seated." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
   await page.screenshot({ path: guardianShot("first-summit", test.info().project.name), fullPage: false });
 });
@@ -287,7 +287,7 @@ test("a complete Leg with zero eligible items shows the honest unavailable copy 
   await page.screenshot({ path: u6Shot("guardian-unavailable", test.info().project.name), fullPage: false });
 });
 
-test("a summit rematch keeps the crown seated with endurance copy (AE8)", async ({ page, mock }) => {
+test("a summit rematch keeps the keystone seated with endurance copy (AE8)", async ({ page, mock }) => {
   const challengeId = "guardian-summit-rematch";
   await seedToken(page, "valid-token");
   mock.handlers = {
@@ -300,9 +300,9 @@ test("a summit rematch keeps the crown seated with endurance copy (AE8)", async 
   await page.getByRole("button", { name: "The keyed route marker" }).click();
   await page.getByRole("button", { name: "See your formation" }).click();
   await expect(page.getByText("Formation holds strong")).toBeVisible();
-  await expect(page.getByRole("img", { name: "Summit terminus — Crown seated." })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit peak — Keystone seated." })).toBeVisible();
   await expect(page.getByTestId("guardian-reward-rematch")).toBeVisible();
-  await expect(page.getByText("Summit crowned!")).toHaveCount(0);
+  await expect(page.getByText("Keystone seated!")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
   await page.screenshot({ path: u6Shot("summit-rematch", test.info().project.name), fullPage: false });
 });
@@ -324,13 +324,13 @@ test("reduced motion binds the first Leg statically with immediate actions (AE9)
   // The final sealed scene renders immediately: no binding overlay, no light sweep.
   await expect(page.getByTestId("leg-binding-event")).toHaveCount(0);
   await expect(page.getByTestId("guardian-reward-sweep")).toHaveCount(0);
-  await expect(page.getByTestId("leg-seam-sealed")).toBeVisible();
+  await expect(page.getByTestId("island-rim-bound")).toBeVisible();
   await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
   await page.screenshot({ path: u6Shot("binding-reduced-motion", test.info().project.name), fullPage: false });
 });
 
-test("reduced motion seats the summit crown immediately with equivalent copy (AE9)", async ({ page, mock }) => {
+test("reduced motion seats the summit keystone immediately with equivalent copy (AE9)", async ({ page, mock }) => {
   const challengeId = "guardian-first-summit";
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seedToken(page, "valid-token");
@@ -343,12 +343,12 @@ test("reduced motion seats the summit crown immediately with equivalent copy (AE
   await page.goto(`/guardian/${challengeId}`);
   await page.getByRole("button", { name: "The keyed route marker" }).click();
   await page.getByRole("button", { name: "See your formation" }).click();
-  await expect(page.getByText("Summit crowned!")).toBeVisible();
-  await expect(page.getByRole("img", { name: "Summit terminus — Crown seated." })).toBeVisible();
+  await expect(page.getByText("Keystone seated!")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Summit peak — Keystone seated." })).toBeVisible();
   await expect(page.getByTestId("guardian-reward-sweep")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
-  await page.screenshot({ path: u6Shot("crown-reduced-motion", test.info().project.name), fullPage: false });
+  await page.screenshot({ path: u6Shot("keystone-reduced-motion", test.info().project.name), fullPage: false });
 });
 
 test("reduced motion contextualizes an unseen bound Leg with static emphasis and copy (AE9)", async ({ page, mock }) => {

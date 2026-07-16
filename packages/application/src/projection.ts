@@ -51,6 +51,9 @@ export {
   type TrailStopState,
   type TrailView
 } from "./studySessionTrail";
+// The one difficulty→band mapping (ADR-0024): the learner app's mineral tiers and
+// difficulty markers read the SAME banding the weekly score uses. Runtime-pure.
+export { difficultyBand } from "./weeklyLeaderboard";
 // Type-only: the defining module pulls node:crypto at runtime, but type re-exports are erased.
 export type { MatchingAttemptTrace } from "./gradedSelectionOutcome";
 export type {

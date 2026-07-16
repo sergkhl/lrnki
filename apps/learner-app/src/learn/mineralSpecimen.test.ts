@@ -1,104 +1,104 @@
 import assert from "node:assert/strict";
 import { test } from "@jest/globals";
+import { difficultyBand } from "@lrnki/application/projection";
 import {
-  MINERAL_HABITS,
+  MINERAL_GROUND_Y,
+  clipPolygonBelow,
   formationProgress,
   formationProgressLine,
-  mineralHabitFor,
+  growthCutY,
+  mineralSpeciesFor,
   mineralSpecimenSpec,
-  visibleMineralFacets
+  mineralVariationFor,
+  type MineralSpecies
 } from "./mineralSpecimen";
 
-test("mineralHabitFor is a balanced cycle: three consecutive section positions yield one of each habit", () => {
-  for (const sectionIndex of [0, 1, 2, 7, 13]) {
-    const habits = [0, 1, 2].map((sectionPositionIndex) => mineralHabitFor({ sectionIndex, sectionPositionIndex }));
-    assert.deepEqual([...habits].sort(), [...MINERAL_HABITS].sort());
+// Species = intrinsic difficulty band ONLY (D1): 1–2 quartz, 3–4 amethyst, 5 diamond,
+// through the SAME shared banding the weekly score uses.
+test("mineralSpeciesFor maps difficulty bands to the three curated species", () => {
+  const byBand = new Map<number, MineralSpecies>();
+  for (const difficulty of [null, 0, 0.1, 0.3, 0.5, 0.62, 0.75, 0.9, 1]) {
+    byBand.set(difficultyBand(difficulty), mineralSpeciesFor(difficulty));
   }
+  assert.equal(byBand.get(1), "quartz");
+  assert.equal(byBand.get(2), "quartz");
+  assert.equal(byBand.get(3), "amethyst");
+  assert.equal(byBand.get(4), "amethyst");
+  assert.equal(byBand.get(5), "diamond");
+  assert.equal(mineralSpeciesFor(null), "quartz");
 });
 
-test("mineralHabitFor depends only on the concept's own section coordinates", () => {
-  const a = mineralHabitFor({ sectionIndex: 3, sectionPositionIndex: 1 });
-  const b = mineralHabitFor({ sectionIndex: 3, sectionPositionIndex: 1 });
-  assert.equal(a, b);
-  // The section-stable offset varies which habit OPENS a section.
-  const openers = new Set(Array.from({ length: 12 }, (_, sectionIndex) => mineralHabitFor({ sectionIndex, sectionPositionIndex: 0 })));
-  assert.ok(openers.size > 1);
-});
-
-test("mineralSpecimenSpec is deterministic per habit and node id", () => {
-  assert.deepEqual(mineralSpecimenSpec("quartz", "node-a"), mineralSpecimenSpec("quartz", "node-a"));
-  assert.notDeepEqual(
-    mineralSpecimenSpec("quartz", "node-a").facets.map((facet) => facet.points),
-    mineralSpecimenSpec("quartz", "node-b").facets.map((facet) => facet.points)
+// The curated specs are static, closed, and grounded: no runtime PRNG geometry.
+test("every species spec is a grounded closed silhouette with 2-3 facets and a gloss", () => {
+  for (const species of ["quartz", "amethyst", "diamond"] as const) {
+    const spec = mineralSpecimenSpec(species);
+    assert.equal(spec.species, species);
+    assert.deepEqual(mineralSpecimenSpec(species), spec);
+    assert.ok(spec.silhouette.length >= 5);
+    assert.equal(Math.max(...spec.silhouette.map(([, y]) => y)), MINERAL_GROUND_Y);
+    assert.ok(spec.facets.length >= 2 && spec.facets.length <= 3);
+    assert.ok(spec.gloss.length >= 3);
+    assert.ok(spec.glossOpacity > 0 && spec.glossOpacity <= 1);
+  }
+  // Diamond carries the strongest gloss (D7).
+  assert.ok(
+    mineralSpecimenSpec("diamond").glossOpacity >
+      Math.max(mineralSpecimenSpec("quartz").glossOpacity, mineralSpecimenSpec("amethyst").glossOpacity)
   );
 });
 
-test("the three habits expose shape-distinct facet structures, not color differences", () => {
-  const quartz = mineralSpecimenSpec("quartz", "node-a");
-  const fluorite = mineralSpecimenSpec("fluorite", "node-a");
-  const calcite = mineralSpecimenSpec("calcite", "node-a");
-  // Quartz terminates in triangular pyramid facets; fluorite and calcite are all quads.
-  assert.ok(quartz.facets.some((facet) => facet.points.length === 3));
-  assert.ok(fluorite.facets.every((facet) => facet.points.length === 4));
-  assert.ok(calcite.facets.every((facet) => facet.points.length === 4));
-  // Fluorite tops are flat (its sealing facet is the level top rhombus); calcite's
-  // sealing top rhomb is oblique (its first two points differ in y — the shear).
-  const fluoriteTop = fluorite.facets[fluorite.facets.length - 1];
-  const calciteFront = calcite.facets[2];
-  assert.equal(calciteFront.points[0][0] === calciteFront.points[1][0], false);
-  assert.notDeepEqual(fluoriteTop.points, calcite.facets[calcite.facets.length - 1].points);
-  // Same shared palette language: hue seeded identically per node id.
-  for (const spec of [quartz, fluorite, calcite]) {
-    assert.ok(spec.hue >= 152 && spec.hue <= 192);
-  }
+test("per-concept variation is deterministic, bounded, and never new geometry", () => {
+  const variation = mineralVariationFor("node-a");
+  assert.deepEqual(mineralVariationFor("node-a"), variation);
+  assert.ok(variation.scale >= 0.9 && variation.scale <= 1);
+  const flips = new Set(Array.from({ length: 16 }, (_, index) => mineralVariationFor(`node-${index}`).mirrored));
+  assert.equal(flips.size, 2);
 });
 
-test("all facets stay inside the 0..100 viewBox and stand on the ground line", () => {
-  for (const habit of MINERAL_HABITS) {
-    for (const id of ["n1", "n2", "n3", "n4", "n5", "n6", "n7", "n8"]) {
-      const spec = mineralSpecimenSpec(habit, id);
-      const points = spec.facets.flatMap((facet) => facet.points);
-      for (const [x, y] of points) {
-        assert.ok(x >= 0 && x <= 100, `${habit}/${id} x=${x}`);
-        assert.ok(y >= 0 && y <= 100, `${habit}/${id} y=${y}`);
-      }
-      assert.equal(Math.max(...points.map(([, y]) => y)), 95);
-    }
-  }
+// KTD1: the half-plane clip at 0 / fractional / 1 growth.
+test("growth clip keeps exactly the region below the cut line", () => {
+  const spec = mineralSpecimenSpec("quartz");
+
+  // Growth 1: cut at the silhouette top keeps the whole silhouette.
+  assert.deepEqual(clipPolygonBelow(spec.silhouette, growthCutY(spec, 1)), [...spec.silhouette]);
+
+  // Growth 0: cut at the ground leaves a degenerate (zero-height) region.
+  const flat = clipPolygonBelow(spec.silhouette, growthCutY(spec, 0));
+  assert.ok(flat.every(([, y]) => y === MINERAL_GROUND_Y));
+
+  // Fractional: every kept point sits on or below the cut; the cut edge is exact.
+  const cut = growthCutY(spec, 0.5);
+  const half = clipPolygonBelow(spec.silhouette, cut);
+  assert.ok(half.length >= 3);
+  assert.ok(half.every(([, y]) => y >= cut));
+  assert.ok(half.some(([, y]) => y === cut));
+
+  // A triangle entirely above the cut clips to nothing.
+  assert.deepEqual(clipPolygonBelow([[0, 0], [10, 0], [5, 8]], 50), []);
+
+  // Out-of-range growth clamps.
+  assert.equal(growthCutY(spec, 1.4), growthCutY(spec, 1));
+  assert.equal(growthCutY(spec, -0.2), growthCutY(spec, 0));
 });
 
-test("growth reveals facets in order and reserves the final facet for completion", () => {
-  const spec = mineralSpecimenSpec("fluorite", "node-a");
-  assert.equal(visibleMineralFacets(spec, 0).length, 0);
-  const partial = visibleMineralFacets(spec, 0.99);
-  assert.equal(partial.length, spec.facets.length - 1);
-  assert.equal(visibleMineralFacets(spec, 1).length, spec.facets.length);
-  assert.deepEqual(
-    visibleMineralFacets(spec, 1).map((facet) => facet.revealIndex),
-    spec.facets.map((_, index) => index)
-  );
-});
-
-test("formationProgress counts completed ground, crystals, and known ground independently", () => {
+test("formationProgress separates completed ground, collected crystals, and known ground", () => {
   const progress = formationProgress([
     { state: "mastered", isKnownSkipped: false },
-    { state: "mastered", isKnownSkipped: false },
     { state: "mastered", isKnownSkipped: true },
-    { state: "frontier", isKnownSkipped: false }
+    { state: "frontier", isKnownSkipped: false },
+    { state: "locked", isKnownSkipped: false }
   ]);
   assert.deepEqual(progress, {
     totalGround: 4,
-    completedGround: 3,
-    collectedCrystals: 2,
+    completedGround: 2,
+    collectedCrystals: 1,
     knownGround: 1,
-    completionFraction: 0.75
+    completionFraction: 0.5
   });
-  assert.equal(formationProgressLine(progress), "3 of 4 ground complete · 2 crystals · 1 known");
-});
-
-test("formationProgress is total for an empty scope and omits a zero known count from copy", () => {
-  const empty = formationProgress([]);
-  assert.equal(empty.completionFraction, 0);
-  const line = formationProgressLine(formationProgress([{ state: "mastered", isKnownSkipped: false }]));
-  assert.equal(line, "1 of 1 ground complete · 1 crystal");
+  assert.equal(formationProgressLine(progress), "2 of 4 ground complete · 1 crystal · 1 known");
+  assert.equal(formationProgress([]).completionFraction, 0);
+  assert.equal(
+    formationProgressLine(formationProgress([{ state: "frontier", isKnownSkipped: false }])),
+    "0 of 1 ground complete · 0 crystals"
+  );
 });

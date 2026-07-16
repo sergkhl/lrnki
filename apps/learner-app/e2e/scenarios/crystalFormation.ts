@@ -156,7 +156,7 @@ export function formationExpedition(phase: "collecting" | "collected") {
 
 // Production-shaped four-state Vista fixture: one bound Leg, one Guardian-ready Leg,
 // one collecting Leg, and one future Leg. It also contains a trusted cross-Leg edge so
-// the real scene proves that only Leg-local veins enter the reward composition.
+// the real scene proves the formation renders NO graph edges (plan 2026-07-16-002 U4).
 // `readyLegScope` selects the honest Guardian-ready substate for Ready Ridge (U6):
 // an available scope, an engaged (active) fight, or the zero-eligible unavailable case.
 export function formationVistaExpedition(

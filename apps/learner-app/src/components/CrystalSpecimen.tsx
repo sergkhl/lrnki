@@ -1,34 +1,35 @@
 import Svg, { G, Polygon } from "react-native-svg";
 import {
-  MINERAL_SATURATION,
+  MINERAL_GROUND_Y,
   MINERAL_VIEWBOX,
-  mineralHabitFor,
+  clipPolygonBelow,
+  growthCutY,
+  mineralSpeciesFor,
   mineralSpecimenSpec,
-  visibleMineralFacets,
-  type MineralFacet,
-  type MineralHabit,
-  type MineralSpecimenSpec
+  mineralVariationFor,
+  type MineralPoint,
+  type MineralSpecies,
+  type MineralSpeciesSpec
 } from "@/learn/mineralSpecimen";
+import { colors } from "@/ui";
 
 export type SpecimenState = "ghost" | "growing" | "collected";
 
-// One mineral specimen (plan 2026-07-15-002 U1, R12/R14): renders the pure Mineral
-// Menagerie geometry at readable sizes (>= 40 px). Rendering only — habit assignment,
-// facet geometry, and growth policy live in `@/learn/mineralSpecimen`; event-bound
-// motion arrives with the shared Leg scene (U3). A ghost stays an outlined slot in
-// every state (R8): it never fills, so known ground never reads as a collected crystal.
+// One mineral specimen (plan 2026-07-16-002 U1, D1): renders the curated species
+// geometry at readable sizes (>= 40 px). Rendering only — species mapping, silhouettes,
+// and the growth clip live in `@/learn/mineralSpecimen`; event-bound motion belongs to
+// the scenes. A ghost stays an outlined slot in every state: it never fills, so known
+// ground never reads as a collected crystal.
 export function CrystalSpecimen({
   derivedNodeId,
-  sectionIndex,
-  sectionPositionIndex,
+  difficulty,
   growthFraction,
   state,
   size = 40,
   ariaLabel
 }: Readonly<{
   derivedNodeId: string;
-  sectionIndex: number;
-  sectionPositionIndex: number;
+  difficulty: number | null;
   growthFraction: number;
   state: SpecimenState;
   size?: number;
@@ -42,8 +43,8 @@ export function CrystalSpecimen({
       width={size}
       height={size}
     >
-      <MineralFacetsGroup
-        habit={mineralHabitFor({ sectionIndex, sectionPositionIndex })}
+      <MineralSpecimenGroup
+        species={mineralSpeciesFor(difficulty)}
         derivedNodeId={derivedNodeId}
         growthFraction={growthFraction}
         state={state}
@@ -52,84 +53,107 @@ export function CrystalSpecimen({
   );
 }
 
-// The facet geometry as an embeddable <G> (no own <Svg> root), so a Leg scene can place
-// many specimens inside ONE canvas — react-native-svg does not nest Svg roots.
-export function MineralFacetsGroup({
-  habit,
+// The specimen as an embeddable <G> (no own <Svg> root), so a Leg scene can place many
+// specimens inside ONE canvas — react-native-svg does not nest Svg roots. The tiny
+// deterministic mirror/scale variation applies here about the bedrock pivot, so the
+// growth cut line stays horizontal under it.
+export function MineralSpecimenGroup({
+  species,
   derivedNodeId,
   growthFraction,
   state
 }: Readonly<{
-  habit: MineralHabit;
+  species: MineralSpecies;
   derivedNodeId: string;
   growthFraction: number;
   state: SpecimenState;
 }>) {
-  const spec = mineralSpecimenSpec(habit, derivedNodeId);
-  if (state === "ghost") return <GhostSlot spec={spec} />;
-  const grown = state === "collected" ? visibleMineralFacets(spec, 1) : visibleMineralFacets(spec, growthFraction);
-  const grownIndexes = new Set(grown.map((facet) => facet.revealIndex));
-  return (
-    <G>
-      {/* The full silhouette always shows faintly behind a growing specimen: the
-          eventual form teases what mastery will finish. */}
-      {spec.facets.map((facet) =>
-        grownIndexes.has(facet.revealIndex) ? null : (
-          <Polygon key={facet.revealIndex} testID="facet-pending" points={toPoints(facet)} fill="#8d887c" opacity={0.3} />
-        )
-      )}
-      {grown.map((facet) => (
-        <Polygon
-          key={facet.revealIndex}
-          testID="facet-grown"
-          points={toPoints(facet)}
-          fill={fillFor(spec, facet, state)}
-          stroke={strokeFor(spec, facet)}
-          strokeWidth={1}
-        />
-      ))}
-      {state === "collected" ? <Highlight spec={spec} /> : null}
-    </G>
-  );
-}
+  const spec = mineralSpecimenSpec(species);
+  const variation = mineralVariationFor(derivedNodeId);
+  const sx = variation.mirrored ? -variation.scale : variation.scale;
+  const transform = `translate(50, ${MINERAL_GROUND_Y}) scale(${sx}, ${variation.scale}) translate(-50, -${MINERAL_GROUND_Y})`;
+  const tint = tintFor(species);
 
-// A ghost slot: the specimen's full outline with no fill — labeled ground that is
-// complete (known) or awaited, never a collected mineral.
-function GhostSlot({ spec }: Readonly<{ spec: MineralSpecimenSpec }>) {
-  return (
-    <G>
-      {spec.facets.map((facet) => (
+  if (state === "ghost") {
+    return (
+      <G transform={transform}>
         <Polygon
-          key={facet.revealIndex}
-          testID="facet-ghost"
-          points={toPoints(facet)}
+          testID="specimen-ghost"
+          points={toPoints(spec.silhouette)}
           fill="transparent"
-          stroke={`hsl(${spec.hue}, ${MINERAL_SATURATION}%, ${facet.lightness - 4}%)`}
+          stroke={tint}
           strokeWidth={2.5}
-          opacity={0.65}
+          strokeLinejoin="round"
+          opacity={0.6}
         />
-      ))}
+      </G>
+    );
+  }
+
+  if (state === "collected") {
+    return (
+      <G transform={transform}>
+        <FilledBody spec={spec} tint={tint} cutY={growthCutY(spec, 1)} />
+        <Polygon testID="specimen-gloss" points={toPoints(spec.gloss)} fill="white" opacity={spec.glossOpacity} />
+      </G>
+    );
+  }
+
+  // Growing: the eventual form teases as a faint outline while the tinted fill rises
+  // from the bedrock to the honest growth cut — one visual variable (D1).
+  return (
+    <G transform={transform}>
+      <Polygon
+        testID="specimen-outline"
+        points={toPoints(spec.silhouette)}
+        fill="transparent"
+        stroke={tint}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        opacity={0.4}
+      />
+      <FilledBody spec={spec} tint={tint} cutY={growthCutY(spec, growthFraction)} />
     </G>
   );
 }
 
-// A gradient-free gloss on the sealing facet, shrunk toward its centroid: the shared
-// highlight language across all three habits. Plain polygons avoid SVG defs ids.
-function Highlight({ spec }: Readonly<{ spec: MineralSpecimenSpec }>) {
-  const top = spec.facets[spec.facets.length - 1];
-  const cx = top.points.reduce((sum, [x]) => sum + x, 0) / top.points.length;
-  const cy = top.points.reduce((sum, [, y]) => sum + y, 0) / top.points.length;
-  const points = top.points.map(([x, y]) => `${x + (cx - x) * 0.45},${y + (cy - y) * 0.45}`).join(" ");
-  return <Polygon testID="facet-highlight" points={points} fill="white" opacity={0.35} />;
+// The silhouette fill plus its facet planes, clipped below the growth cut. Facets shade
+// with white/ink overlays so the planes read on any tier tint.
+function FilledBody({ spec, tint, cutY }: Readonly<{ spec: MineralSpeciesSpec; tint: string; cutY: number }>) {
+  const body = clipPolygonBelow(spec.silhouette, cutY);
+  // A degenerate region (fewer than 3 points, or a flat ground-line sliver at growth 0)
+  // renders nothing rather than a zero-area polygon.
+  if (body.length < 3 || body.every(([, y]) => y === body[0][1])) return null;
+  return (
+    <G>
+      <Polygon
+        testID="specimen-fill"
+        points={toPoints(body)}
+        fill={tint}
+        stroke={colors.ink}
+        strokeOpacity={0.25}
+        strokeWidth={1}
+        strokeLinejoin="round"
+      />
+      {spec.facets.map((facet, index) => {
+        const clipped = clipPolygonBelow(facet.points, cutY);
+        if (clipped.length < 3) return null;
+        return (
+          <Polygon
+            key={index}
+            testID="specimen-facet"
+            points={toPoints(clipped)}
+            fill={facet.shade > 0 ? "white" : colors.ink}
+            opacity={Math.abs(facet.shade)}
+          />
+        );
+      })}
+    </G>
+  );
 }
 
-function fillFor(spec: MineralSpecimenSpec, facet: MineralFacet, state: SpecimenState): string {
-  return `hsl(${spec.hue}, ${MINERAL_SATURATION}%, ${state === "collected" ? facet.lightness + 8 : facet.lightness}%)`;
-}
-
-// Same-hue darker hairline: separates facets from the near-white journal paper.
-function strokeFor(spec: MineralSpecimenSpec, facet: MineralFacet): string {
-  return `hsl(${spec.hue}, ${MINERAL_SATURATION}%, ${Math.max(0, facet.lightness - 18)}%)`;
+export function tintFor(species: MineralSpecies): string {
+  return colors[`mineral-${species}`];
 }
 
 function defaultLabel(state: SpecimenState): string {
@@ -138,6 +162,6 @@ function defaultLabel(state: SpecimenState): string {
   return "Growing crystal";
 }
 
-function toPoints(facet: MineralFacet): string {
-  return facet.points.map(([x, y]) => `${x},${y}`).join(" ");
+function toPoints(points: readonly MineralPoint[]): string {
+  return points.map(([x, y]) => `${x},${y}`).join(" ");
 }

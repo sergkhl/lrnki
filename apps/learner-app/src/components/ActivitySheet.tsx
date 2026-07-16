@@ -408,7 +408,8 @@ function CapstoneReveal({
     const sectionIndex = input.concepts.find((concept) => concept.derivedNodeId === activity.derivedNodeId)?.sectionIndex;
     const section = input.sections.find((candidate) => candidate.sectionIndex === sectionIndex);
     if (section === undefined) return null;
-    return buildLegModel(section, input.concepts.filter((concept) => concept.sectionIndex === sectionIndex), input.edges);
+    // The capstone frames the WHOLE compact island (D8) at a fixed card-friendly width.
+    return buildLegModel(section, input.concepts.filter((concept) => concept.sectionIndex === sectionIndex), 280);
   }, [session, activity.derivedNodeId]);
   return (
     <View className="gap-3 rounded-card border border-line bg-card p-4">
@@ -417,9 +418,7 @@ function CapstoneReveal({
           <LegFormationScene
             leg={leg}
             mode="collection"
-            focusNodeId={activity.derivedNodeId}
             enteringNodeId={collected ? activity.derivedNodeId : null}
-            width={220}
           />
         </View>
       ) : null}

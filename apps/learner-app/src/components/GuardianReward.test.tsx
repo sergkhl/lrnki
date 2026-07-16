@@ -82,14 +82,14 @@ beforeEach(() => {
 afterEach(() => { jest.useRealTimers(); });
 
 test("classifies only a matching durable won scope as first or rematch", () => {
-  expect(guardianRewardPreview(challenge(), wonSession())).toMatchObject({ status: "ready", rewardKind: "first", focus: { kind: "leg", sectionIndex: 0 } });
-  expect(guardianRewardPreview(challenge({ challengeId: "rematch" }), wonSession())).toMatchObject({ status: "ready", rewardKind: "rematch" });
-  expect(guardianRewardPreview(challenge(), wonSession(scope({ wonChallengeId: undefined, state: "available" })))).toEqual({ status: "inconsistent" });
-  expect(guardianRewardPreview(challenge({ anchorDerivedNodeId: "other" }), wonSession())).toEqual({ status: "inconsistent" });
+  expect(guardianRewardPreview(challenge(), wonSession(), 358)).toMatchObject({ status: "ready", rewardKind: "first", focus: { kind: "leg", sectionIndex: 0 } });
+  expect(guardianRewardPreview(challenge({ challengeId: "rematch" }), wonSession(), 358)).toMatchObject({ status: "ready", rewardKind: "rematch" });
+  expect(guardianRewardPreview(challenge(), wonSession(scope({ wonChallengeId: undefined, state: "available" })), 358)).toEqual({ status: "inconsistent" });
+  expect(guardianRewardPreview(challenge({ anchorDerivedNodeId: "other" }), wonSession(), 358)).toEqual({ status: "inconsistent" });
 });
 
 test("a mounted first Leg win binds once, gates actions, and emits one fusion haptic", async () => {
-  const preview = guardianRewardPreview(challenge(), wonSession());
+  const preview = guardianRewardPreview(challenge(), wonSession(), 358);
   const rendered = await renderReward(preview, { transitionToken: "win-event" });
   expect(screen.getByText(learnerTerm("guardianRewardFirstLegTitle"))).toBeTruthy();
   expect(screen.getByTestId("leg-binding-event")).toBeTruthy();
@@ -120,7 +120,7 @@ test("a mounted first Leg win binds once, gates actions, and emits one fusion ha
 
 test("a rematch uses endurance copy and never emits a reward haptic", async () => {
   const current = challenge({ challengeId: "rematch" });
-  const rendered = await renderReward(guardianRewardPreview(current, wonSession()), {
+  const rendered = await renderReward(guardianRewardPreview(current, wonSession(), 358), {
     challenge: current,
     transitionToken: "rematch-event"
   });
@@ -132,7 +132,7 @@ test("a rematch uses endurance copy and never emits a reward haptic", async () =
   expect(rendered.onExplore).toHaveBeenCalledWith({ kind: "leg", sectionIndex: 0 });
 });
 
-test("a mounted first summit win emits one unlock haptic and seats the crown", async () => {
+test("a mounted first summit win emits one unlock haptic and seats the keystone", async () => {
   const summitChallenge = challenge({
     challengeId: "summit-first",
     scopeKind: "enrichment",
@@ -143,12 +143,12 @@ test("a mounted first summit win emits one unlock haptic and seats the crown", a
     sectionIndex: null,
     wonChallengeId: "summit-first"
   }));
-  await renderReward(guardianRewardPreview(summitChallenge, summitSession), {
+  await renderReward(guardianRewardPreview(summitChallenge, summitSession, 358), {
     challenge: summitChallenge,
     transitionToken: "summit-event"
   });
   expect(screen.getByText(learnerTerm("guardianRewardFirstSummitTitle"))).toBeTruthy();
-  expect(screen.getByTestId("formation-summit-crown")).toBeTruthy();
+  expect(screen.getByTestId("formation-summit-keystone")).toBeTruthy();
   await act(async () => { jest.advanceTimersByTime(560); });
   expect(impactAsync).toHaveBeenCalledWith(ImpactFeedbackStyle.Heavy);
   await act(async () => { jest.advanceTimersByTime(700); });
@@ -156,7 +156,7 @@ test("a mounted first summit win emits one unlock haptic and seats the crown", a
 });
 
 test("direct won loads and reduced motion expose settled actions without haptics", async () => {
-  const preview = guardianRewardPreview(challenge(), wonSession());
+  const preview = guardianRewardPreview(challenge(), wonSession(), 358);
   const direct = await renderReward(preview);
   await fireEvent.press(screen.getByText(learnerTerm("guardianRewardContinue")));
   expect(direct.onContinue).toHaveBeenCalledTimes(1);
