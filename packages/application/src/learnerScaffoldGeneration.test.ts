@@ -61,11 +61,12 @@ function fakeDetour(term: string): ScaffoldDetour {
   return { detourId: "d-1", learnerStateRef: "L", enrichmentId: "e", parentDerivedNodeId: "parent", term, normalizedTerm: term.toLowerCase(), status: "generating", latestOperationId: "op-1", claimToken: "tok", steps: [] };
 }
 
-function makeDeps(context: ScaffoldParentContext, overrides: Partial<ScaffoldGenerationDeps> & { detourTerm?: string } = {}): { deps: ScaffoldGenerationDeps; published: ScaffoldStep[][]; failed: number; outlineCalls: number; contentCalls: number } {
+function makeDeps(context: ScaffoldParentContext, overrides: Partial<ScaffoldGenerationDeps> & { detourTerm?: string } = {}): { deps: ScaffoldGenerationDeps; published: ScaffoldStep[][]; failed: number; outlineCalls: number; contentCalls: number; judgeCalls: number } {
   const published: ScaffoldStep[][] = [];
   let failed = 0;
   let outlineCalls = 0;
   let contentCalls = 0;
+  let judgeCalls = 0;
   const deps: ScaffoldGenerationDeps = {
     scaffoldStore: {
       getById: async () => fakeDetour(overrides.detourTerm ?? "Borrow checker"),
@@ -79,16 +80,20 @@ function makeDeps(context: ScaffoldParentContext, overrides: Partial<ScaffoldGen
       restartGenerating: async () => undefined,
       hide: async () => true,
       getStep: async () => undefined,
-      markLessonRead: async () => {}
+      markLessonRead: async () => {},
+      listGeneratedStepsForAudit: async () => []
     },
     loadParentContext: async () => context,
     outline: { model: "m", propose: async () => { outlineCalls += 1; return { steps: [{ label: "Affine types", rationale: "needed" }] }; } },
     content: { model: "m", generate: async () => { contentCalls += 1; return contentDraft(); } },
+    // Default congruence judge accepts every draft (teaches + simpler), so the pre-existing
+    // orchestration tests are unaffected; the re-pick tests override it.
+    congruence: { model: "j", judge: async () => { judgeCalls += 1; return { teachesStepLabel: true, isSimplerPrerequisite: true, rationale: "ok" }; } },
     groundConcept: async () => ({ kind: "grounded", groundingText: "grounding" }),
     newId: (() => { let n = 0; return () => `x-${++n}`; })(),
     ...overrides
   };
-  return { deps, published, get failed() { return failed; }, get outlineCalls() { return outlineCalls; }, get contentCalls() { return contentCalls; } };
+  return { deps, published, get failed() { return failed; }, get outlineCalls() { return outlineCalls; }, get contentCalls() { return contentCalls; }, get judgeCalls() { return judgeCalls; } };
 }
 
 const emptyContext: ScaffoldParentContext = { declaredDomain: "cs", parentLabel: "Ownership", parentDerivedNodeId: "parent", reuseCandidates: [], parentGroundingText: "parent grounding" };
@@ -133,4 +138,41 @@ test("a lost fence on publish reports failure without claiming success", async (
   h.deps.scaffoldStore.publishReady = async () => false;
   const outcome = await runScaffoldGeneration({ detourId: "d-1", claimToken: "stale" }, h.deps);
   assert.equal(outcome.kind, "failed");
+});
+
+// --- KTD4b: generation-time congruence re-pick ------------------------------
+
+test("a congruence NO drops the draft and retries once, then publishes the accepted retry", async () => {
+  let judged = 0;
+  const h = makeDeps(emptyContext, {
+    // First draft fails congruence (does not teach its label), second draft passes.
+    congruence: { model: "j", judge: async () => { judged += 1; return judged === 1 ? { teachesStepLabel: false, isSimplerPrerequisite: true, rationale: "off-label" } : { teachesStepLabel: true, isSimplerPrerequisite: true, rationale: "ok" }; } }
+  });
+  const outcome = await runScaffoldGeneration({ detourId: "d-1", claimToken: "tok" }, h.deps);
+  assert.deepEqual(outcome, { kind: "published", stepCount: 1 });
+  assert.equal(h.contentCalls, 2, "one retry after the congruence NO");
+  assert.equal(h.published[0][0].kind, "generated");
+});
+
+test("two congruence NOs skip the step and, with nothing left, the detour fails (no unscaffolded support)", async () => {
+  const h = makeDeps(emptyContext, {
+    // A step whose label is a synonym of the term is never a SIMPLER prerequisite — both attempts
+    // are rejected, so no generated step survives.
+    congruence: { model: "j", judge: async () => ({ teachesStepLabel: true, isSimplerPrerequisite: false, rationale: "same as term" }) }
+  });
+  const outcome = await runScaffoldGeneration({ detourId: "d-1", claimToken: "tok" }, h.deps);
+  assert.equal(outcome.kind, "failed");
+  assert.equal(h.contentCalls, 2, "exactly two bounded content attempts");
+  assert.equal(h.published.length, 0, "no partial publish");
+  assert.equal(h.failed, 1);
+});
+
+test("a judge infra error accepts the current draft (fail-open, rule 16)", async () => {
+  const h = makeDeps(emptyContext, {
+    congruence: { model: "j", judge: async () => { throw new Error("judge upstream 503"); } }
+  });
+  const outcome = await runScaffoldGeneration({ detourId: "d-1", claimToken: "tok" }, h.deps);
+  assert.deepEqual(outcome, { kind: "published", stepCount: 1 });
+  assert.equal(h.contentCalls, 1, "no retry — the draft was accepted fail-open");
+  assert.equal(h.published[0][0].kind, "generated");
 });

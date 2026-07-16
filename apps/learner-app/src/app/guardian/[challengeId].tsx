@@ -1,16 +1,23 @@
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import type { RecallChallengeView } from "@lrnki/application/projection";
 import { GuardianFight } from "@/components/GuardianFight";
+import {
+  GuardianReward,
+  guardianRewardPreview,
+  type GuardianRewardPreview,
+  type WonGuardianView
+} from "@/components/GuardianReward";
 import { queryClient } from "@/lib/api";
-import { challengeQuery } from "@/lib/queries";
+import { challengeQuery, expeditionQuery } from "@/lib/queries";
 import { RouteStatus } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
+import type { VistaFocus } from "@/learn/crystalFormationLayout";
 
-// The route-addressable Guardian fight (plan 2026-07-13-003 U5, KTD9): the route read IS
-// exact resume — the server refolds the durable challenge, so refresh/deep-link land on the
-// same wards, shield, and current item. The query cache is the ONE view source: every
-// answer/lifecycle response is committed back into it, and an over/foreign challenge (null)
-// returns safely to the trail instead of synthesizing local state.
+// Exact-resume Guardian route. The challenge query remains the one fight source; after
+// the final reveal, this same route mounts a reward controller that explicitly refetches
+// the existing Expedition projection before it classifies first win versus rematch.
 export default function GuardianPage() {
   const router = useRouter();
   const { challengeId } = useLocalSearchParams<{ challengeId: string }>();
@@ -22,12 +29,7 @@ export default function GuardianPage() {
     else router.replace("/");
   };
 
-  // The Guardian route already partitioned pending/error/over cleanly; U2 keeps that exact
-  // behavior and copy but renders it through the shared RouteStatus anatomy (KTD4).
-  if (challenge.isPending) {
-    return <RouteStatus tone="loading" title={learnerTerm("guardianTitle")} />;
-  }
-
+  if (challenge.isPending) return <RouteStatus tone="loading" title={learnerTerm("guardianTitle")} />;
   if (challenge.isError) {
     return (
       <RouteStatus
@@ -40,7 +42,6 @@ export default function GuardianPage() {
       />
     );
   }
-
   if (!challenge.data) {
     return (
       <RouteStatus
@@ -53,18 +54,99 @@ export default function GuardianPage() {
   }
 
   return (
-    <GuardianFight
-      // Abandon+fresh swaps the committed view to a NEW challenge id; keying on the durable
-      // id remounts the fight (fresh board shuffle, cleared reveals) exactly then.
+    <GuardianResolvedRoute
       key={challenge.data.challengeId}
       view={challenge.data}
+      routeChallengeId={challengeId}
       onCommit={(view) => {
-        // Views commit under their OWN durable id; abandon+fresh yields a new challenge, so
-        // the route moves there — a refresh then resumes the new fight, not a 404 on the old.
         queryClient.setQueryData(challengeQuery(view.challengeId).queryKey, view);
         if (view.challengeId !== challengeId) router.replace(`/guardian/${view.challengeId}`);
       }}
       onExit={goBack}
+      onReplace={(href) => router.replace(href)}
+    />
+  );
+}
+
+export function GuardianResolvedRoute({
+  view,
+  routeChallengeId,
+  onCommit,
+  onExit,
+  onReplace
+}: Readonly<{
+  view: RecallChallengeView;
+  routeChallengeId: string;
+  onCommit: (view: RecallChallengeView) => void;
+  onExit: () => void;
+  onReplace: (href: string) => void;
+}>) {
+  const [stage, setStage] = useState<"fight" | "reward">(() => view.state === "won" ? "reward" : "fight");
+  const [transitionToken, setTransitionToken] = useState<string | null>(null);
+
+  if (stage === "reward" && view.state === "won") {
+    return (
+      <GuardianRewardRoute
+        challenge={view}
+        transitionToken={transitionToken}
+        onReplace={onReplace}
+      />
+    );
+  }
+  return (
+    <GuardianFight
+      key={routeChallengeId}
+      view={view}
+      onCommit={onCommit}
+      onExit={onExit}
+      onVictoryReady={(token) => {
+        setTransitionToken(token);
+        setStage("reward");
+      }}
+    />
+  );
+}
+
+export function GuardianRewardRoute({
+  challenge,
+  transitionToken,
+  onReplace
+}: Readonly<{
+  challenge: WonGuardianView;
+  transitionToken: string | null;
+  onReplace: (href: string) => void;
+}>) {
+  const query = expeditionQuery(challenge.enrichmentId);
+  // Disabled initial execution lets this controller own one explicit invalidate/refetch,
+  // including when a cached Expedition is already present.
+  const expedition = useQuery({ ...query, enabled: false });
+  const refreshStartedRef = useRef(false);
+  useEffect(() => {
+    if (refreshStartedRef.current) return;
+    refreshStartedRef.current = true;
+    void queryClient.invalidateQueries({ queryKey: query.queryKey, refetchType: "none" });
+    void expedition.refetch();
+  }, [expedition, query.queryKey]);
+
+  let preview: GuardianRewardPreview;
+  if (expedition.isPending || expedition.isFetching) preview = { status: "loading" };
+  else if (expedition.isError) preview = { status: "error" };
+  else if (!expedition.data) preview = { status: "inconsistent" };
+  else preview = guardianRewardPreview(challenge, expedition.data.session);
+
+  const continueRoute = `/expedition/${challenge.enrichmentId}`;
+  const explore = (focus: VistaFocus) => {
+    const focusParam = focus.kind === "summit" ? "summit" : `leg:${focus.sectionIndex}`;
+    onReplace(`${continueRoute}?vista=1&formationFocus=${focusParam}`);
+  };
+  return (
+    <GuardianReward
+      challenge={challenge}
+      preview={preview}
+      transitionToken={transitionToken}
+      onRetry={() => void expedition.refetch()}
+      onContinue={() => onReplace(continueRoute)}
+      onExplore={explore}
     />
   );
 }

@@ -1,4 +1,5 @@
 import type { BoardSeen } from "@/learn/seamClassifier";
+import type { VistaRewardKey } from "@/learn/crystalFormationLayout";
 
 // Web storage half of the navigation memory seam (KTD5): same async contract as the
 // native AsyncStorage module so callers never branch on platform.
@@ -43,24 +44,31 @@ export async function markGuardianArrivalSeen(learnerRef: string, scopeAnchorId:
   }
 }
 
-const VISTA_FUSED_KEY_PREFIX = "lrnki_vista_fused_";
+const VISTA_BINDINGS_KEY_PREFIX = "lrnki_vista_bindings_";
 
-// Fused-cluster memory for the Crystal Vista (plan 2026-07-10-001 U3): which section
-// indexes this device has already celebrated, per learner+enrichment. Same seam pattern
-// as the board memory — client-local, lossable, worst case one replayed fusion.
-export async function readFusedSections(learnerRef: string, enrichmentId: string): Promise<number[] | null> {
+// Web half of the lossable Vista contextualization seam; identical reward-key contract
+// to native AsyncStorage.
+export async function readVistaSeenBindings(learnerRef: string, enrichmentId: string): Promise<VistaRewardKey[] | null> {
   try {
-    const raw = window.localStorage.getItem(VISTA_FUSED_KEY_PREFIX + learnerRef + "_" + enrichmentId);
-    return raw ? (JSON.parse(raw) as number[]) : null;
+    const raw = window.localStorage.getItem(VISTA_BINDINGS_KEY_PREFIX + learnerRef + "_" + enrichmentId);
+    return raw ? parseVistaBindings(JSON.parse(raw)) : null;
   } catch {
     return null;
   }
 }
 
-export async function writeFusedSections(learnerRef: string, enrichmentId: string, sections: number[]): Promise<void> {
+export async function writeVistaSeenBindings(learnerRef: string, enrichmentId: string, bindings: readonly VistaRewardKey[]): Promise<void> {
   try {
-    window.localStorage.setItem(VISTA_FUSED_KEY_PREFIX + learnerRef + "_" + enrichmentId, JSON.stringify(sections));
+    window.localStorage.setItem(VISTA_BINDINGS_KEY_PREFIX + learnerRef + "_" + enrichmentId, JSON.stringify(bindings));
   } catch {
-    // Non-fatal: the fusion celebration may re-fire.
+    // Non-fatal: a settled Vista contextualization may replay.
   }
+}
+
+function parseVistaBindings(value: unknown): VistaRewardKey[] | null {
+  if (!Array.isArray(value)) return null;
+  const valid = value.filter((entry): entry is VistaRewardKey =>
+    entry === "summit" || (typeof entry === "string" && /^leg:\d+$/.test(entry))
+  );
+  return valid.length === value.length ? [...new Set(valid)] : null;
 }

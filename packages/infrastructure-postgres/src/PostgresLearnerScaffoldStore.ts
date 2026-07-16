@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ScaffoldDetour, ScaffoldNodePayload, ScaffoldStep } from "@lrnki/domain-core";
-import type { ScaffoldDetourStorePort } from "@lrnki/ports";
+import type { GeneratedScaffoldStepForAudit, ScaffoldDetourStorePort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
 
 // Learner-Scoped Scaffold Detour persistence (plan 2026-07-12-002 U2, KTD2, ADR-0037). The
@@ -274,4 +274,39 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
       WHERE s.detour_id = d.detour_id AND s.scaffold_step_id = ${input.scaffoldStepId}
         AND d.learner_state_ref = ${input.learnerStateRef} AND s.kind = 'generated'`;
   }
+
+  async listGeneratedStepsForAudit(enrichmentId?: string): Promise<GeneratedScaffoldStepForAudit[]> {
+    // Scaffold-content audit read seam (plan 2026-07-16-001 U1, KTD1). A clean relational join:
+    // generated step → its detour (term, enrichment) → the parent derived node (label + Declared
+    // Domain). Reference steps are filtered out (they carry no generated payload). Ordered
+    // deterministically so re-runs and evidence diffs are stable.
+    const rows = await this.sql<AuditStepRow[]>`
+      SELECT s.scaffold_step_id, s.detour_id, s.payload, d.enrichment_id, d.term,
+             n.canonical_label AS parent_label, n.declared_domain
+      FROM learner_scaffold_steps s
+      JOIN learner_scaffold_detours d ON d.detour_id = s.detour_id
+      JOIN derived_graph_nodes n ON n.derived_node_id = d.parent_derived_node_id
+      WHERE s.kind = 'generated'
+        ${enrichmentId ? this.sql`AND d.enrichment_id = ${enrichmentId}` : this.sql``}
+      ORDER BY d.created_at, s.ordinal`;
+    return rows.map((row) => ({
+      detourId: row.detour_id,
+      scaffoldStepId: row.scaffold_step_id,
+      enrichmentId: row.enrichment_id,
+      declaredDomain: row.declared_domain,
+      term: row.term,
+      parentLabel: row.parent_label,
+      payload: row.payload as ScaffoldNodePayload
+    }));
+  }
 }
+
+type AuditStepRow = {
+  scaffold_step_id: string;
+  detour_id: string;
+  payload: ScaffoldNodePayload | null;
+  enrichment_id: string;
+  term: string;
+  parent_label: string;
+  declared_domain: string;
+};

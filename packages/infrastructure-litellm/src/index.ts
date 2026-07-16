@@ -59,12 +59,18 @@ export {
   conceptLessonRedundancyJudgmentSchema,
   conceptLessonRedundancyJudgmentValidator,
   discoveryCoverageAuditSchema,
-  discoveryCoverageAuditValidator
+  discoveryCoverageAuditValidator,
+  scaffoldContentCongruenceSchema,
+  scaffoldContentCongruenceValidator
 } from "./toolSchemas";
 export {
   createDiscoveryCoverageAuditPort,
   discoveryCoverageAuditDescriptor
 } from "./discoveryCoverageAuditAdapters";
+export {
+  createScaffoldContentCongruencePort,
+  scaffoldContentCongruenceDescriptor
+} from "./scaffoldContentCongruenceAdapters";
 export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,

@@ -79,6 +79,12 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.scaffoldContentGeneration),
     llm(STAGE_TAGS.knowledgeBoundaryProbe),
     llm(STAGE_TAGS.groundingGeneration),
+    // Label↔content congruence judge (plan 2026-07-16-001). Two call sites share ONE descriptor:
+    // the scaffold operation runs it as a generation-time re-pick (KTD4b) — those calls carry this
+    // operation_id and DO aggregate under the scaffold cost report — while the standing
+    // `audit-scaffold-content` command K-samples the same descriptor with NO operation_id, so
+    // audit runs never touch any operation's cost report.
+    llm(STAGE_TAGS.scaffoldContentCongruence),
     nonLlm(NON_LLM_STAGES.persist)
   ]
 } as const;

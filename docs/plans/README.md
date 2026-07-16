@@ -12,9 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- None. The Durable Learner E2E Gates work completed 2026-07-15; its durable native-gate and
-  physical-authority policy is [ADR-0038](../adr/0038-native-interaction-gate-scope-and-physical-authority.md)
-  and its outcome/validation live in [TODO.md](./TODO.md).
+- [2026-07-16-002 — Crystal Formation Minimal Redesign](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md)
 
 ## Ownership rules
 

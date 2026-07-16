@@ -63,6 +63,46 @@ test("grading blocks explicit close until the request settles, then one result i
   expect(onOpenChange).toHaveBeenCalledWith(false);
 });
 
+test("a directly opened mastered capstone renders the settled shared Leg scene with no entrance or haptic (AE2)", async () => {
+  const session = sessionFixture({
+    expeditionPath: [{ ...sessionFixture().expeditionPath[0], state: "mastered" }],
+    classification: { stateByNode: { n1: "mastered" }, selectedFrontierTarget: null },
+    lessonReadByNode: { n1: true },
+    latestOutcomeByStudyItemId: { i1: "correct", i2: "correct" }
+  });
+  await render(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <ActivitySheet session={session} stopId="n1:capstone:main" open onOpenChange={jest.fn()} />
+      <PortalHost />
+    </SafeAreaProvider>
+  );
+  // The capstone card is a focused crop of the SHARED Leg scene (U3, R16) — settled:
+  // the collected specimen is static, nothing enters, and no mastery haptic fires.
+  expect(screen.getAllByTestId("leg-slot-collected").length).toBeGreaterThan(0);
+  expect(screen.queryAllByTestId("leg-slot-entering")).toHaveLength(0);
+  expect(screen.getByText("This crystal now sits in its leg's formation.")).toBeTruthy();
+  const haptics = jest.requireMock("expo-haptics") as { notificationAsync: jest.Mock; impactAsync: jest.Mock; selectionAsync: jest.Mock };
+  expect(haptics.notificationAsync).not.toHaveBeenCalled();
+  expect(haptics.impactAsync).not.toHaveBeenCalled();
+});
+
+test("a known-skipped capstone stays a ghost scene and never assembles a mineral", async () => {
+  const session = sessionFixture({
+    expeditionPath: [{ ...sessionFixture().expeditionPath[0], state: "mastered" }],
+    classification: { stateByNode: { n1: "mastered" }, selectedFrontierTarget: null },
+    verdictByNode: { n1: "known" }
+  });
+  await render(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <ActivitySheet session={session} stopId="n1:capstone:main" open onOpenChange={jest.fn()} />
+      <PortalHost />
+    </SafeAreaProvider>
+  );
+  expect(screen.getAllByTestId("leg-slot-known").length).toBeGreaterThan(0);
+  expect(screen.queryAllByTestId("leg-slot-entering")).toHaveLength(0);
+  expect(screen.getByText("Known ground is complete, but no crystal is collected.")).toBeTruthy();
+});
+
 test("a theory stop shows lesson content and its continue action", async () => {
   await renderSheet("n1:theory:main");
   expect(screen.getAllByText(learnerTerm("theoryStop")).length).toBeGreaterThan(0);

@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { Gem } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
-import { CrystalGlyph } from "./CrystalGlyph";
 import { SectionOverview } from "./SectionOverview";
 import { isSummitPush, summitLine } from "@/learn/goalCopy";
 import type { TrailView } from "@lrnki/application/projection";
 import { learnerTerm } from "@/learn/vocabulary";
-import { MOTION, PressableSurface, Text, useReducedMotion } from "@/ui";
+import { MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
 export function QuestHeader({
   session,
@@ -20,25 +20,26 @@ export function QuestHeader({
   // summit label with the layer purpose (plan 2026-07-10-001 U2) — the advance-visible
   // mid-horizon goal, template fallback when no purpose row exists.
   const title = expeditionTitle ?? session.target.label;
-  const mastered = trail.concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped);
-  // Vista-trigger emphasis (U5, R15): when a section completes WHILE the trail is open,
-  // pulse the tally door once instead of auto-opening the Vista. Visual only — the
-  // fusion haptic fires when the learner actually sees the new fusion inside the Vista.
+  const collectedCrystals = trail.concepts.filter((concept) => concept.state === "mastered" && !concept.isKnownSkipped).length;
+  // A newly projected permanent reward emphasizes the deliberate Vista door without
+  // opening it. The lossable Vista snapshot decides later contextualization; this pulse
+  // never creates a reward or fires a haptic.
   const reduceMotion = useReducedMotion();
-  const completeSections = trail.sections.filter((section) => section.state === "complete").length;
-  const previousCompleteRef = useRef(completeSections);
+  const boundRewards = trail.sections.filter((section) => Boolean(section.recallScope?.wonChallengeId)).length
+    + (trail.enrichmentScope?.wonChallengeId ? 1 : 0);
+  const previousBoundRef = useRef(boundRewards);
   const pulse = useSharedValue(0);
   useEffect(() => {
-    const previous = previousCompleteRef.current;
-    previousCompleteRef.current = completeSections;
-    if (reduceMotion || completeSections <= previous) return;
+    const previous = previousBoundRef.current;
+    previousBoundRef.current = boundRewards;
+    if (reduceMotion || boundRewards <= previous) return;
     pulse.set(
       withSequence(
         withTiming(1, { duration: MOTION.emphasis / 2 }),
         withTiming(0, { duration: MOTION.emphasis / 2 })
       )
     );
-  }, [completeSections, reduceMotion, pulse]);
+  }, [boundRewards, reduceMotion, pulse]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.12 * pulse.get() }] }));
   return (
     <View className="border-b border-line bg-card px-4 py-3">
@@ -75,17 +76,11 @@ export function QuestHeader({
             className="h-target flex-row items-center gap-1.5 rounded-control border border-line-strong bg-card px-2.5"
             pressedClassName="bg-muted-panel"
           >
-            {mastered.length > 0 ? (
-              <CrystalGlyph
-                derivedNodeId={mastered[mastered.length - 1].derivedNodeId}
-                difficulty={mastered[mastered.length - 1].difficulty}
-                growthFraction={1}
-                state="mastered"
-                size={18}
-              />
-            ) : null}
+            {/* Compact honesty (U1, R14): the door names the exact crystal count with a
+                universal gem icon — no specimen is legible at this size. */}
+            <Gem size={16} color={collectedCrystals > 0 ? colors.gem : colors.muted} />
             <Text variant="caption" className="font-medium tabular-nums">
-              {mastered.length}/{trail.concepts.length}
+              {collectedCrystals}/{trail.concepts.length}
             </Text>
           </PressableSurface>
           </Animated.View>

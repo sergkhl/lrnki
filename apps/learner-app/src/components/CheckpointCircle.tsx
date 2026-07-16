@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { View } from "react-native";
 import { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { BookOpen, Lock, MapPin, Rows3, Search } from "lucide-react-native";
-import { CrystalGlyph } from "./CrystalGlyph";
+import { CrystalSpecimen } from "./CrystalSpecimen";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import type { TrailCluster, TrailStop } from "@lrnki/application/projection";
 import { AnimatedView, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
@@ -92,15 +92,16 @@ function NextStopHalo({ stopId }: Readonly<{ stopId: string }>) {
 
 function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIcon) {
   if (icon === "crystal") {
-    // The capstone is the concept's own crystal, mid-growth until the completion rule
-    // masters the node — the same formation the marker, header, and vista show.
+    // The capstone is the concept's own mineral specimen (U1, R12/R14), mid-growth until
+    // the completion rule masters the node — 40 px is the smallest readable specimen.
+    const isGhost = concept.isKnownSkipped && stop.state === "complete";
     return (
-      <CrystalGlyph
+      <CrystalSpecimen
         derivedNodeId={concept.derivedNodeId}
-        difficulty={concept.difficulty}
+        sectionIndex={concept.sectionIndex}
+        sectionPositionIndex={concept.sectionPositionIndex}
         growthFraction={concept.growthFraction}
-        state={stop.state === "complete" ? "mastered" : "frontier"}
-        ghost={concept.isKnownSkipped && stop.state === "complete"}
+        state={isGhost ? "ghost" : stop.state === "complete" ? "collected" : "growing"}
         size={40}
       />
     );

@@ -206,6 +206,9 @@ export type TrailCluster = {
   // Section metadata: which milestone-anchored section this concept belongs to, and whether it
   // opens that section on the trail (the first concept of the section).
   sectionIndex: number;
+  // The concept's neutral position within its own section (already ordered on the
+  // expedition path) — learner surfaces key deterministic cosmetic cycles off it.
+  sectionPositionIndex: number;
   milestoneLabel: string;
   isSectionStart: boolean;
   // How far this concept's crystal has grown: the fraction of its own non-capstone stops
@@ -300,6 +303,7 @@ export function buildTrailView(session: StudySession): TrailView {
       isTarget: step.isSummit,
       isKnownSkipped,
       sectionIndex: step.sectionIndex,
+      sectionPositionIndex: step.sectionPositionIndex,
       milestoneLabel: step.milestoneLabel,
       isSectionStart,
       growthFraction,

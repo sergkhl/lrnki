@@ -4,16 +4,12 @@
 
 ### Active implementation
 
-- None. The Durable Learner E2E Gates work completed 2026-07-15 (see COMPLETED + VALIDATION); its
-  durable policy is [ADR-0038](../adr/0038-native-interaction-gate-scope-and-physical-authority.md).
+- **Crystal Formation Minimal Redesign** — READY (next up), plan
+  [2026-07-16-002](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md): curated
+  difficulty-tiered mineral library + quiet single-outline geode ascent replacing the noisy
+  2026-07-15 visuals; design decisions locked in the plan's ledger 2026-07-16 — don't re-ask.
 
 ### Evidence-triggered follow-up
-
-- **Scaffold step content polish (measure-first).** Two model-variance observations from the
-  2026-07-13 U6 gate, in the scaffold content generator (not the Support Path UX contract): a
-  micro-lesson emitted literal `**bold**` markdown rendered raw, and one step's label mismatched
-  its own (accurate, easier) lesson/question. If real use shows these recur, address them in the
-  scaffold generation prompt or an ADR-0028-style congruence judge — not a lexical gate (rule 16).
 
 - **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a
   richer learner-scoped typed Study Item set and passed-item semantics for Support Steps, then extend
@@ -21,6 +17,60 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Scaffold Content Quality Audit shipped (2026-07-16, plan 2026-07-16-001; plan DELETED).**
+  Generated Support Step content now has a standing quality instrument AND two generation-time
+  guards, both licensed by a fresh-generation sweep that measured each 2026-07-13 defect recurring.
+  **U1–U4 (durable command, commit `2c56302`):** `kg-worker audit-scaffold-content <enrichmentId>
+  [--k <n>] [--out <dir>]` reads persisted `generated` steps (never regenerates — rule 18) and
+  classifies each with the epistemics its defect class demands — a deterministic markdown artifact
+  detector that only REPORTS (rule 16) and a K-sampled label↔content congruence judgment by
+  `kg-independent-judge` with human inspection deciding (ADR-0013/0028); read seam
+  `listGeneratedStepsForAudit`, pure `auditScaffoldContent.ts`, `scaffold-content-congruence.prompt`
+  + port, and the `scaffoldContentCongruence` STAGE_TAG in the `scaffold` catalog arm. **U5 (this
+  session):** the fresh-generation gate ran, both KTD4 triggers fired against human-confirmed genuine
+  defects, and both licensed fixes shipped — (a) an explicit plain-prose/no-markup output contract in
+  `learner-scaffold-content-generation.prompt`, and (b) a bounded congruence re-pick in
+  `runScaffoldGeneration` over the SAME independent judge the audit uses (K=1; congruence NO → drop +
+  retry once → skip; fails OPEN on judge infra error, rule 16; instrumented under the scaffold
+  operation). One congruence definition, two call sites. ADR-0037 Consequences amended to name the
+  command as the standing scaffold-content quality instrument (re-run after any scaffold prompt /
+  schema / model change). Working tree UNCOMMITTED for the U5 fixes (user did not ask to commit; U1–U4
+  are committed). Rule-14 gate PASS (see VALIDATION); evidence
+  `tmp/2026-07-16-scaffold-content-audit/EVALUATION.md`.
+
+- **Crystal Formation Reward UX shipped (2026-07-15, plan 2026-07-15-002; plan DELETED).** Crystal
+  collection, Leg binding after a Guardian first win, honest rematches, the summit crown, and
+  Crystal Vista now speak one mineral-geode formation language, owned durably by the amended
+  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md) Crystal
+  Formation reward-presentation contract. **(U1)** Pure `mineralSpecimen.ts` (balanced
+  quartz/fluorite/calcite habit cycle keyed on section-stable offset + `sectionPositionIndex`,
+  node-seeded cosmetic variation, honest `formationProgress` where known ground never inflates
+  crystals) + `CrystalSpecimen`; compact surfaces migrated to Gem/status icons, exact counts, and
+  `Progress` (no specimen below 40 px; `SectionCrystalStrip` deleted);
+  `TrailCluster.sectionPositionIndex` copied from the expedition step (neutral ordering metadata).
+  **(U2)** Pure `crystalFormationLayout.ts`: per-Leg Sphere Grid over trusted same-Leg edges only,
+  four structural states (`bound`/`crowned` ONLY from durable `wonChallengeId`), irregular matrix +
+  seam containing every slot, flagged-Leg vein omission, alternating non-overlapping ascent +
+  nonsemantic winding spine + terminus, 40-px floor with horizontal overflow; per-Leg zero-crossing
+  regression locked over the 59-node real-shape fixture (17 Legs). **(U3)** Shared
+  `LegFormationScene` (overview/collection/binding modes, one-shot event-keyed rise, reduced motion
+  = immediate final state); ActivitySheet capstone renders the focused shared Leg crop with one
+  mount-scoped mastery haptic. **(U4)** `CrystalFormationScene` + rebuilt `CrystalVista` (explicit
+  open/focus intent consumed on close, `leg:<sectionIndex>`/`summit` seen-snapshot navigation
+  memory with native/web parity, memory doors + 44 px targets); legacy `crystalVistaView`,
+  `crystalGeometry`, `CrystalGlyph`, fusion auras/sockets, and the floating keystone deleted.
+  **(U5)** GuardianFight renders the pending keyed reveal ahead of the committed `won` view and
+  hands a mount-local transition token through `See your formation`; `GuardianReward` classifies
+  first/rematch only from the refreshed scope's durable `wonChallengeId`, plays binding/crown once
+  with one first-win-only fusion/unlock haptic, keeps direct/refreshed wins static, preserves
+  victory + Continue through preview loading/error/inconsistent, and Explore replaces with explicit
+  Vista focus; Guardian entry closes the Activity Sheet only after success. **(U6)** Full
+  production-web Playwright exercise (13 scenarios × phone/desktop, normal + reduced motion) found
+  and fixed two in-gate defects: reduced motion still ran the reward sweep/binding overlay
+  (R20 violation), and the one-time Vista contextualization banner auto-scrolled out of view (now
+  pinned below the header). Evidence + evaluation notes under
+  `tmp/2026-07-15-crystal-formation-reward-ux/` (milestone-a/b/c + `u6-final/EVALUATION.md`).
 
 - **Durable Learner E2E Gates shipped (2026-07-15, plan 2026-07-15-001; plan DELETED).** Three
   learner test layers with three distinct claims now exist, folded into
@@ -349,6 +399,45 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Scaffold Content Quality Audit — U5 fresh-generation gate, 2026-07-16.** Working-tree
+  learner-api (`:8899`, both supervisors, production LiteLLM) generated three mixed-domain synthetic
+  expeditions distinct from prior gates (Options/Greeks → Financial Engineering, Adaptive immune
+  response → Immunology, Fourier transforms → Signal Processing; rule 17). Detours driven over HTTP
+  through the real learner-api path so audited steps are what a learner would generate.
+  **Pre-fix sweep (15 detours / 27 generated steps):** 1 formatting artifact (raw Markdown italic
+  `*when*`) + 3 recurring (≥2/3 NO) congruence mismatches — **all confirmed genuine by human
+  inspection of the actual persisted content**, spanning three distinct sub-modes (content-drift
+  "Option pricing basics"→taught Vega itself; outline-synonym "Somatic recombination
+  mechanism"≈V(D)J recombination; question-drift "Expected value…"→tested risk-neutral). Both KTD4
+  triggers fired → both fixes applied. **Post-fix re-sweep (12 fresh detours on unused terms / 23
+  generated steps, pre-fix steps deleted first):** **0 formatting artifacts, 0 recurring congruence
+  problems** across both enrichments. The re-pick provably executed — `operation_run_stages` recorded
+  **25 `scaffold-content-congruence`** runs over the 23 accepted steps (every draft judged + ~2
+  retries after a NO), and **0/12 detours were starved**. Honest caveat: the post-fix sweep uses
+  different terms than the baseline, so it verifies non-recurrence over fresh generation (ADR-0028),
+  not a controlled A/B. Deterministic envelope: typecheck all 12 projects Done; application 680
+  (+3 congruence-re-pick tests), infrastructure-litellm/learner-api/kg-worker green; lint 0 errors.
+  Real-use quality gate **PASS**. Disposable learner + gate state removed; server stopped. Evidence
+  and evaluation note: `tmp/2026-07-16-scaffold-content-audit/EVALUATION.md`.
+
+- **Crystal Formation Reward UX — U6 production-web gate, 2026-07-15.** `pnpm e2e:web` over the
+  fresh production Expo static export with the typed API intercepted by production-shaped
+  domain-neutral fixtures: **46/46 PASS** (13 crystal-formation scenarios × Pixel-7-phone +
+  1280×800 desktop, plus the shared runtime suite), zero unexpected page/console errors. Scenario
+  coverage: honest compact progress with known ground; mastery collection + settled reopen;
+  Guardian-ready available/engaged/zero-eligible copy; keyed final reveal preceding the first Leg
+  binding reward and Explore landing on `?vista=1&formationFocus=leg:1`; Leg rematch endurance;
+  four-state multi-Leg Vista with memory door; first summit crown; summit rematch (crown stays
+  seated, no first-reward panel); preview refetch failure preserving victory/Retry/Continue;
+  reduced-motion equivalents for collection, binding, crown, and Vista contextualization. Screenshot
+  inspection at both viewports judged Leg boundaries, states, spine-vs-vein distinction, mineral
+  habits, and the crown identifiable from stills (AE12) and caught one defect semantic assertions
+  could not (the contextualization banner scrolling out of view); the reduced-motion spec design
+  caught the second (reward sweep/binding overlay animating under reduced motion). Both fixed and
+  re-proven in the same gate; real-use quality evaluation **PASS**. No API/schema/persistence/LLM
+  change; jest (application 670-suite + full learner-app) and learner typecheck green. Evidence:
+  `tmp/2026-07-15-crystal-formation-reward-ux/u6-final/EVALUATION.md`.
 
 - **Durable Learner E2E Gates — native-gate sensitivity (U6), 2026-07-15.** Emulator
   `Medium_Phone_API_36.1` (Android 36.1/arm64), Maestro 2.6.1, one checked-in flow/fixture/selectors

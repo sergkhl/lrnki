@@ -388,6 +388,20 @@ export type DiscoveryCoverageMiss = {
   whyStandalone: string;
 };
 
+// One sample of the scaffold-content congruence judgment (plan 2026-07-16-001, KTD3). The
+// cross-family independent judge sees ONE generated Support Step's content — the step label plus
+// its micro-lesson / question / explanation / options, with the correct answer NOT identified —
+// against the detour term and parent label, and answers two booleans + a rationale. Judgment-based
+// quality, measured neurally (ADR-0028): K samples plus human inspection decide, never a lexical
+// veto. `teachesStepLabel` = does the content actually teach the named step label? A false is the
+// label↔content mismatch this audit hunts. `isSimplerPrerequisite` = is the taught content a
+// genuinely simpler prerequisite of the term (not the term itself, not the parent)?
+export type ScaffoldContentCongruenceVerdict = {
+  teachesStepLabel: boolean;
+  isSimplerPrerequisite: boolean;
+  rationale: string;
+};
+
 export type ExtractionQualityIssue = {
   stage: string;
   candidateKey?: string;
@@ -1809,7 +1823,13 @@ export const STAGE_TAGS = {
   // `grounding-generation` descriptors unchanged — those are SHARED_STAGES claimed by both
   // enrichment and scaffold (KTD7); spend stays exact through the (operation_id, stage) join.
   scaffoldOutlineGeneration: "scaffold-outline-generation",
-  scaffoldContentGeneration: "scaffold-content-generation"
+  scaffoldContentGeneration: "scaffold-content-generation",
+  // Scaffold-content congruence audit (plan 2026-07-16-001, KTD2): a MEASUREMENT stage, not a
+  // pipeline stage. K-sampled cross-family judgments over an enrichment's persisted generated
+  // Support Steps, invoked by the durable `kg-worker audit-scaffold-content` command. Audit calls
+  // carry NO operation_id, so they can never pollute an operation's cost report; the catalog claim
+  // under `scaffold` only satisfies stage-tag set-equality and names the owning pipeline arm.
+  scaffoldContentCongruence: "scaffold-content-congruence"
 } as const;
 
 export type StageTag = (typeof STAGE_TAGS)[keyof typeof STAGE_TAGS];

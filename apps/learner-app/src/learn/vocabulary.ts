@@ -49,8 +49,9 @@ export const LEARNER_VOCABULARY = {
   gems: "Crystals",
   gatedBy: "Clears after",
   vistaTitle: "Crystal formation",
-  vistaHint: "Every concept you master grows a crystal here. Fogged shapes still wait in the rock. Tap a crystal to remember it.",
-  vistaFusedTemplate: "Leg {n} fused into the formation!",
+  vistaHint: "Follow the winding spine through each leg’s geode. Tap a named crystal to remember it.",
+  vistaBoundTemplate: "Leg {n} settles into the Crystal Formation.",
+  vistaCrownJoined: "The summit crown locks into the Crystal Formation.",
   vistaGuardedTemplate: "Guarded by Leg {n}.",
   vistaEmpty: "No crystals on this trail yet.",
   vistaOpen: "Open the crystal formation",
@@ -141,15 +142,36 @@ export const LEARNER_VOCABULARY = {
   guardianAbandonBody: "This challenge ends and a new Guardian rises with a fresh lineup. Nothing you’ve mastered is lost.",
   guardianAbandonConfirm: "Abandon and start fresh",
   guardianAbandonCancel: "Keep fighting",
-  guardianVictoryTitle: "Guardian bested!",
-  guardianVictoryLegBody: "The leg’s crystals fuse into a permanent formation.",
-  guardianVictorySummitBody: "The summit keystone is yours. The expedition’s formation is complete.",
+  guardianVictoryCommitted: "The Guardian is bested. Your formation is ready.",
+  guardianSeeFormation: "See your formation",
   guardianOverTitle: "This fight is over",
   guardianOverBody: "The challenge has ended or belongs to another explorer.",
   guardianLoadError: "The Guardian is out of reach right now.",
   guardianAnswerError: "That answer didn’t reach the Guardian.",
   guardianRetry: "Retry",
   guardianContinue: "Continue",
+  guardianRewardFirstLegTitle: "Leg bound!",
+  guardianRewardFirstSummitTitle: "Summit crowned!",
+  guardianRewardRematchTitle: "Formation holds strong",
+  guardianRewardFirstLegBody: "The geode seals and this leg joins the Expedition spine.",
+  guardianRewardFirstSummitBody: "The crown locks into the summit. Your Crystal Formation is complete.",
+  guardianRewardRematchBody: "You bested this Guardian again. Your permanent formation stays exactly as earned.",
+  guardianRewardLoading: "Your victory is secure. Reading the formation…",
+  guardianRewardError: "Your victory is secure, but the formation preview didn’t load.",
+  guardianRewardInconsistent: "Your victory is secure, but the trail has not recorded this formation reward yet.",
+  guardianRewardRetry: "Retry preview",
+  guardianRewardContinue: "Continue expedition",
+  guardianRewardExplore: "Explore formation",
+  // Crystal Formation reward system (plan 2026-07-15-002 U3). The four Leg structural
+  // states plus the honest Guardian substates, announced as text everywhere the geode
+  // renders — color, glow, and animation are never the sole signal (R31).
+  legFuture: "Fogged leg",
+  legCollecting: "Collecting crystals",
+  legGuardianAwaits: "Guardian awaits",
+  legGuardianEngaged: "Guardian engaged",
+  legGuardianUnavailable: "Guardian has nothing to test yet",
+  legBound: "Bound formation",
+  capstoneCollected: "Crystal collected",
   // Learner-Scoped Scaffold Detours (plan 2026-07-12-002 U6). Quiet, optional support the learner
   // requests for an unfamiliar term. The three broad phases theme the projection's stable ids
   // (KTD8, ADR-0033); the UI never shows counts or raw stage names.
@@ -209,6 +231,20 @@ export function scaffoldPhaseCopy(phase: "preparing" | "building" | "checking" |
   if (phase === "building") return learnerTerm("supportPhaseBuilding");
   if (phase === "checking") return learnerTerm("supportPhaseChecking");
   return learnerTerm("supportPhasePreparing");
+}
+
+// Theme a Leg's structural state + Guardian substate into one announced line (R7/R31).
+// The formation model owns the state; the UI only themes it (ADR-0033).
+export function legStateCopy(
+  state: "future" | "collecting" | "guardian_ready" | "bound",
+  substate: "available" | "engaged" | "unavailable" | null
+): string {
+  if (state === "future") return learnerTerm("legFuture");
+  if (state === "collecting") return learnerTerm("legCollecting");
+  if (state === "bound") return learnerTerm("legBound");
+  if (substate === "engaged") return learnerTerm("legGuardianEngaged");
+  if (substate === "unavailable") return learnerTerm("legGuardianUnavailable");
+  return learnerTerm("legGuardianAwaits");
 }
 
 export function expeditionStatusLabel(status: "generating" | "ready" | "failed"): string {

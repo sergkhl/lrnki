@@ -54,6 +54,16 @@ correlated physical pass. Uncovered native primitives, the touch-responder class
 physical touch feel, haptics, thermals, and safe-area variants retain their physical gate until each
 is independently automated and correlated.
 
+**Real-device and emulator e2e runs are user-initiated; the agent never starts one on its own.**
+Coding sessions normally run on the VPS workspace, which has no JDK, Android SDK, emulator, or
+attached device — an agent there must not attempt, simulate, or claim a device/emulator pass, and
+web or jest evidence never stands in for one. An agent may drive the native gate only inside a
+session the user has deliberately started on the macOS host that carries the Android tooling and
+device. When a change needs device validation and no such session exists, the agent records the
+concrete manual step in [BLOCKERS.md](../plans/BLOCKERS.md) (device, build profile, scenario,
+expected observation), completes its scope on the automated layers above, and the user initiates
+the device run; the result is then folded into the validation record.
+
 **EAS Workflows is deferred.** The hosted Maestro job is alpha, couples a `type: maestro` job to a
 `type: build` job through an EAS `build_id` rather than consuming this repository's
 `eas build --local` APK, and introduces paid hosted build/workflow usage. The flow is kept

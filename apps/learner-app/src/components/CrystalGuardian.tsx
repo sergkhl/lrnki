@@ -1,21 +1,18 @@
 import { View } from "react-native";
 import Svg, { Circle, G, Polygon, Rect } from "react-native-svg";
-import { CrystalShardsGroup } from "./CrystalGlyph";
+import { MineralFacetsGroup } from "./CrystalSpecimen";
 import { learnerTerm } from "@/learn/vocabulary";
 import { colors } from "@/ui";
 
 // The Crystal Guardian (plan 2026-07-13-003 U5, KTD9): an abstract boss composed entirely
 // from react-native-svg geometry and the existing crystal tokens — no raster asset, no
-// canvas engine. The silhouette IS the scope anchor's own procedural crystal (crystalSpec
-// is deterministic per node id), so the Guardian a learner faces is the same recognizable
-// crystal that guards their milestone on the trail and in the vista. Wards (one per lineup
-// item) arc above it; the three-segment shield sits at its base. Every state is shape- and
+// canvas engine. The body is a composed mineral group seeded by the scope anchor's node
+// id (plan 2026-07-15-002 U1): all three Menagerie habits intergrown around a tall
+// central quartz, so the Guardian a learner faces is deterministic per anchor and speaks
+// the same specimen language as the formation it guards. Wards (one per lineup item) arc
+// above it; the three-segment shield sits at its base. Every state is shape- and
 // fill-differentiated, never color-alone, and the whole figure is a single labeled image
 // for screen readers — the fight surface announces the numbers as text alongside.
-
-// Guardians render imposing regardless of the anchor concept's intrinsic difficulty: a
-// fixed high difficulty seeds a dense shard formation.
-const GUARDIAN_DIFFICULTY = 5;
 
 export type GuardianPhase = "active" | "recovery" | "won";
 
@@ -50,14 +47,16 @@ export function CrystalGuardian({
             victory — always accompanied by the banner/summary text, never color-alone. */}
         <Circle cx={50} cy={70} r={36} fill={auraColor} opacity={phase === "active" ? 0.5 : 0.35} />
         <Circle cx={50} cy={70} r={36} stroke={phase === "active" ? colors["line-strong"] : auraColor} strokeWidth={1.5} fill="none" opacity={0.8} />
-        {/* The Guardian body: the anchor concept's own deterministic crystal, fully grown. */}
-        <G transform="translate(11, 22) scale(0.78)">
-          <CrystalShardsGroup
-            derivedNodeId={anchorDerivedNodeId}
-            difficulty={GUARDIAN_DIFFICULTY}
-            growthFraction={1}
-            state="mastered"
-          />
+        {/* The Guardian body: an intergrown mineral group deterministic per anchor —
+            flanking fluorite and calcite behind a dominant central quartz. */}
+        <G transform="translate(24, 52) scale(0.52)">
+          <MineralFacetsGroup habit="fluorite" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
+        </G>
+        <G transform="translate(44, 52) scale(0.52)">
+          <MineralFacetsGroup habit="calcite" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
+        </G>
+        <G transform="translate(15, 24) scale(0.7)">
+          <MineralFacetsGroup habit="quartz" derivedNodeId={anchorDerivedNodeId} growthFraction={1} state="collected" />
         </G>
         <WardArc total={wardTotal} remaining={phase === "won" ? 0 : wardsRemaining} />
         {phase === "won" ? null : <ShieldRow total={shieldTotal} remaining={shieldRemaining} />}

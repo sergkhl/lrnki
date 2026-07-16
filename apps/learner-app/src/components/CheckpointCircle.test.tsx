@@ -36,11 +36,22 @@ test("the guided next stop carries its label and opens on press", async () => {
   expect(screen.getByText("Field notes")).toBeTruthy();
 });
 
-test("a capstone renders the concept's crystal, not a generic icon", async () => {
+test("a capstone renders the concept's mineral specimen, not a generic icon", async () => {
   const view = trail();
   const concept = view.concepts[0];
   const capstone = concept.stops.find((stop) => stop.kind === "capstone")!;
   await render(<CheckpointCircle stop={{ ...capstone, state: "available" }} concept={concept} onSelect={() => {}} />);
   expect(screen.getByLabelText(/Crystal/)).toBeTruthy();
   expect(screen.getByLabelText("Growing crystal")).toBeTruthy();
+  // The 40 px capstone is the smallest surface with a real specimen (U1, R14).
+  expect(screen.getAllByTestId("facet-pending").length).toBeGreaterThan(0);
+});
+
+test("a known-skipped complete capstone stays a ghost slot and never a collected mineral", async () => {
+  const view = trail();
+  const concept = { ...view.concepts[0], isKnownSkipped: true };
+  const capstone = concept.stops.find((stop) => stop.kind === "capstone")!;
+  await render(<CheckpointCircle stop={{ ...capstone, state: "complete" }} concept={concept} onSelect={() => {}} />);
+  expect(screen.getAllByTestId("facet-ghost").length).toBeGreaterThan(0);
+  expect(screen.queryAllByTestId("facet-grown")).toHaveLength(0);
 });

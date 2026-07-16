@@ -162,6 +162,40 @@ maybe("claimNextGenerating claims within the attempt budget; failExhaustedGenera
   }
 });
 
+// Covers plan 2026-07-16-001 U1 (KTD1): the audit read seam returns each GENERATED step with its
+// detour term + parent label + Declared Domain, excludes reference steps, and scopes by enrichment.
+maybe("listGeneratedStepsForAudit returns generated steps with context and excludes references", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, parentNodeId, refNodeId } = await seedSubstrate(sql);
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const store = new PostgresLearnerScaffoldStore(sql);
+    const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "Affine type", normalizedTerm: "affine type" });
+    const token = randomUUID();
+    await store.claim({ detourId: detour.detourId, operationId: token, claimToken: token });
+    const gen = generatedStep(0);
+    const ref: ScaffoldStep = { scaffoldStepId: randomUUID(), ordinal: 1, kind: "reference", referencedDerivedNodeId: refNodeId };
+    assert.equal(await store.publishReady({ detourId: detour.detourId, claimToken: token, steps: [gen, ref] }), true);
+
+    const scoped = await store.listGeneratedStepsForAudit(enrichmentId);
+    const mine = scoped.filter((row) => row.detourId === detour.detourId);
+    assert.equal(mine.length, 1, "only the generated step is returned; the reference step is excluded");
+    const [row] = mine;
+    assert.equal(row.scaffoldStepId, gen.scaffoldStepId);
+    assert.equal(row.term, "Affine type");
+    assert.equal(row.parentLabel, "Parent");
+    assert.equal(row.declaredDomain, "software engineering");
+    assert.equal(row.enrichmentId, enrichmentId);
+    assert.equal(row.payload.item.question, "Which best describes an affine type?");
+
+    // An unrelated enrichment id returns nothing for this detour.
+    const otherScoped = await store.listGeneratedStepsForAudit(randomUUID());
+    assert.equal(otherScoped.filter((r) => r.detourId === detour.detourId).length, 0, "enrichment scoping excludes other enrichments");
+  } finally {
+    await sql.end();
+  }
+});
+
 // Covers U2 scenario 4 + 6: a scaffold response appends through the same monotonic sequence as
 // neutral rows and hydrates to the scaffold scope; a competing claim yields one active token.
 maybe("scaffold and neutral responses share one attempt sequence; a claimed detour rejects a second claim", async () => {

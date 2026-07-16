@@ -216,6 +216,7 @@ test("buildTrailView marks exactly one next stop across the trail", () => {
 test("buildTrailView groups concepts under their sections and marks section starts", () => {
   const view = buildTrailView(trailSession({ includeLocked: true }));
   assert.deepEqual(view.concepts.map((concept) => concept.sectionIndex), [0, 0]);
+  assert.deepEqual(view.concepts.map((concept) => concept.sectionPositionIndex), [0, 1]);
   assert.deepEqual(view.concepts.map((concept) => concept.isSectionStart), [true, false]);
   assert.equal(view.sections.length, 1);
   assert.equal(view.sections[0].conceptCount, 2);
