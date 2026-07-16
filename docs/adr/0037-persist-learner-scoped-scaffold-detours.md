@@ -96,3 +96,23 @@ than merely discouraged.
 - Development data is reset rather than migrated when the single initial schema gains the detour and
   step tables and the scoped Response Log reference; no compatibility migration or dual-read path is
   kept ([ADR-0003](0003-use-postgres-json-table-artifact-store.md), greenfield rule).
+- Generated Support Step content quality is measured by a standing instrument, the durable
+  `kg-worker audit-scaffold-content <enrichmentId> [--k <n>] [--out <dir>]` command. It reads the
+  persisted `generated` steps (never regenerating — one composition root owns production generation,
+  rule 18) and classifies each with the epistemics its defect class demands: a deterministic markdown
+  artifact detector that only REPORTS (never a gate — rule 16), and a K-sampled label↔content
+  congruence judgment by the cross-family independent judge with human inspection deciding
+  ([ADR-0028](0028-measure-non-deterministic-quality-with-non-deterministic-methods.md),
+  [ADR-0013](0013-verify-quality-by-real-source-inspection.md)). Re-run it after any change to the
+  scaffold outline/content/grounding prompts, the persisted scaffold shapes, or the extraction model
+  alias, and inspect the report against the actual generated content.
+- Two generation-time quality guards keep fresh content clean, both licensed by the 2026-07-16
+  fresh-generation sweep that measured each defect recurring: (1) the content-generation prompt now
+  carries an explicit plain-prose / no-markup output contract, because the plain-text learner surface
+  renders any Markdown verbatim; (2) `runScaffoldGeneration` gates every drafted step with a bounded
+  congruence re-pick over the SAME independent judge the audit uses (K=1) — a step whose content does
+  not teach its own label or is not a genuinely simpler prerequisite of the term is dropped and
+  retried once, then skipped. The re-pick fails OPEN on judge infra error (rule 16: congruence is not
+  a provable guarantee, so a flaky judge call never drops otherwise-valid support). Its judge calls
+  carry the scaffold operation id and aggregate under that operation's cost report; the same descriptor
+  run by the audit carries no operation id.

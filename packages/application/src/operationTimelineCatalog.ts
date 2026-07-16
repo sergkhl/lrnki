@@ -79,9 +79,11 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.scaffoldContentGeneration),
     llm(STAGE_TAGS.knowledgeBoundaryProbe),
     llm(STAGE_TAGS.groundingGeneration),
-    // Measurement-mode stage (plan 2026-07-16-001 KTD2): claimed here only to satisfy the
-    // stage-tag set-equality test and name the owning pipeline arm. Audit calls carry no
-    // operation_id, so no operation's cost report ever aggregates this row.
+    // Label↔content congruence judge (plan 2026-07-16-001). Two call sites share ONE descriptor:
+    // the scaffold operation runs it as a generation-time re-pick (KTD4b) — those calls carry this
+    // operation_id and DO aggregate under the scaffold cost report — while the standing
+    // `audit-scaffold-content` command K-samples the same descriptor with NO operation_id, so
+    // audit runs never touch any operation's cost report.
     llm(STAGE_TAGS.scaffoldContentCongruence),
     nonLlm(NON_LLM_STAGES.persist)
   ]

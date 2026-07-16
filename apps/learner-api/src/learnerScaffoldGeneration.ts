@@ -15,6 +15,7 @@ import {
   createGroundingGenerationPort,
   createKnowledgeBoundaryProbePort,
   createNeuralClients,
+  createScaffoldContentCongruencePort,
   createScaffoldContentPort,
   createScaffoldOutlinePort,
   LiteLlmNodeEmbeddingAdapter
@@ -53,6 +54,10 @@ function buildScaffoldContext(sql: DatabaseClient) {
     reporter: new PostgresRunProgressReporter(sql),
     outline: createScaffoldOutlinePort(deterministicClient),
     content: createScaffoldContentPort(deterministicClient),
+    // The generation-time congruence re-pick shares the SAME cross-family independent judge on the
+    // moderate-temperature client the audit uses (plan 2026-07-16-001 U5, KTD4b) — the scaffold
+    // generator never grades its own output.
+    congruence: createScaffoldContentCongruencePort(probeClient),
     knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
     nodeEmbedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
     groundingGeneration: createGroundingGenerationPort(deterministicClient)
@@ -166,6 +171,10 @@ export async function runLearnerScaffoldGeneration(
       content: {
         model: ctx.content.model,
         generate: (generateInput) => runStage(STAGE_TAGS.scaffoldContentGeneration, () => ctx.content.generate(generateInput))
+      },
+      congruence: {
+        model: ctx.congruence.model,
+        judge: (judgeInput) => runStage(STAGE_TAGS.scaffoldContentCongruence, () => ctx.congruence.judge(judgeInput))
       },
       groundConcept: groundConcept(ctx, runStage)
     };

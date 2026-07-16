@@ -4,41 +4,7 @@
 
 ### Active implementation
 
-- **Scaffold Content Quality Audit** — IN PROGRESS, plan
-  [2026-07-16-001](./2026-07-16-001-feat-scaffold-content-quality-audit-plan.md). **U1–U4 built +
-  deterministic envelope GREEN (uncommitted, 2026-07-16); U5 is the remaining real-use gate.** The
-  durable `kg-worker audit-scaffold-content <enrichmentId> [--k <n>] [--out <dir>]` command exists
-  end to end: **U1** read seam `ScaffoldDetourStorePort.listGeneratedStepsForAudit(enrichmentId?)`
-  (clean `learner_scaffold_steps`→`learner_scaffold_detours`→`derived_graph_nodes` join returning
-  term + parent label + Declared Domain; reference steps excluded; postgres test passes vs the live
-  migration); **U2** pure `packages/application/src/auditScaffoldContent.ts` (deterministic markdown
-  artifact classifier — report-only, never a gate, rule 16 — plus K-sample congruence orchestration
-  over `ScaffoldContentCongruencePort`, per-step recurrence at `SCAFFOLD_CONTENT_CONGRUENCE_RECURRENCE_THRESHOLD=2`,
-  one typed `ScaffoldContentAuditReport`; 7 unit tests); **U3** `scaffold-content-congruence.prompt`
-  (`kg-independent-judge`, forced tool `submit_scaffold_content_congruence`, KTD3 fields, options
-  sorted so correct-first order leaks nothing) + `createScaffoldContentCongruencePort` + validator +
-  new `scaffoldContentCongruence` STAGE_TAG claimed under the `scaffold` catalog arm (measurement,
-  no `operation_id`); **U4** worker command wired like `audit-discovery-coverage` (JSON + markdown to
-  `tmp/2026-07-16-scaffold-content-audit/`, per-sample progress, usage string updated). Envelope:
-  `pnpm typecheck` all 12 projects Done; `lint` 0 errors (8 pre-existing warnings, none new); tests
-  green — domain-core 39, application 677, infrastructure-litellm 151, infrastructure-postgres 88
-  (vs live migration), kg-worker 8, learner-api 18, admin-lab 62; command smoke-tested against an
-  empty enrichment (reads seam, dispatches, "nothing to audit"). **NOTHING COMMITTED** (user did not
-  ask). **U5 — NEXT SESSION (rule-14 gate + docs):** the live DB currently holds ZERO generated
-  Support Steps (post-gate resets wiped them), so recurrence must be measured against fresh
-  generation. Generate ≥3 mixed-domain synthetic expeditions over production LiteLLM, drive ≥10 real
-  detours through the real learner-api path (2026-07-13 scale: 131 terms / 8 detours / 16 steps), run
-  `audit-scaffold-content <enrichmentId>`, then human-inspect the report against the actual generated
-  content (ADR-0013). Apply ONLY the KTD4-licensed fixes: defect (a) recurs ≥1 artifact-bearing step
-  → add one plain-prose/no-markup sentence to `learner-scaffold-content-generation.prompt` system
-  block (currently has NO output-format constraint) and re-sweep; defect (b) shows ≥1 human-confirmed
-  recurring (≥2-of-K) mismatch → add the generation-time congruence check as one bounded re-pick
-  inside `runScaffoldGeneration`'s content loop. Neither firing → record the negative result. Then
-  amend [ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md) Consequences to name the
-  command as the standing scaffold-content quality instrument, fold status into COMPLETED here, and
-  delete the plan. Evidence + evaluation note under `tmp/2026-07-16-scaffold-content-audit/`.
-
-- **Crystal Formation Minimal Redesign** — READY (queued after 2026-07-16-001), plan
+- **Crystal Formation Minimal Redesign** — READY (next up), plan
   [2026-07-16-002](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md): curated
   difficulty-tiered mineral library + quiet single-outline geode ascent replacing the noisy
   2026-07-15 visuals; design decisions locked in the plan's ledger 2026-07-16 — don't re-ask.
@@ -51,6 +17,27 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Scaffold Content Quality Audit shipped (2026-07-16, plan 2026-07-16-001; plan DELETED).**
+  Generated Support Step content now has a standing quality instrument AND two generation-time
+  guards, both licensed by a fresh-generation sweep that measured each 2026-07-13 defect recurring.
+  **U1–U4 (durable command, commit `2c56302`):** `kg-worker audit-scaffold-content <enrichmentId>
+  [--k <n>] [--out <dir>]` reads persisted `generated` steps (never regenerates — rule 18) and
+  classifies each with the epistemics its defect class demands — a deterministic markdown artifact
+  detector that only REPORTS (rule 16) and a K-sampled label↔content congruence judgment by
+  `kg-independent-judge` with human inspection deciding (ADR-0013/0028); read seam
+  `listGeneratedStepsForAudit`, pure `auditScaffoldContent.ts`, `scaffold-content-congruence.prompt`
+  + port, and the `scaffoldContentCongruence` STAGE_TAG in the `scaffold` catalog arm. **U5 (this
+  session):** the fresh-generation gate ran, both KTD4 triggers fired against human-confirmed genuine
+  defects, and both licensed fixes shipped — (a) an explicit plain-prose/no-markup output contract in
+  `learner-scaffold-content-generation.prompt`, and (b) a bounded congruence re-pick in
+  `runScaffoldGeneration` over the SAME independent judge the audit uses (K=1; congruence NO → drop +
+  retry once → skip; fails OPEN on judge infra error, rule 16; instrumented under the scaffold
+  operation). One congruence definition, two call sites. ADR-0037 Consequences amended to name the
+  command as the standing scaffold-content quality instrument (re-run after any scaffold prompt /
+  schema / model change). Working tree UNCOMMITTED for the U5 fixes (user did not ask to commit; U1–U4
+  are committed). Rule-14 gate PASS (see VALIDATION); evidence
+  `tmp/2026-07-16-scaffold-content-audit/EVALUATION.md`.
 
 - **Crystal Formation Reward UX shipped (2026-07-15, plan 2026-07-15-002; plan DELETED).** Crystal
   collection, Leg binding after a Guardian first win, honest rematches, the summit crown, and
@@ -412,6 +399,27 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Scaffold Content Quality Audit — U5 fresh-generation gate, 2026-07-16.** Working-tree
+  learner-api (`:8899`, both supervisors, production LiteLLM) generated three mixed-domain synthetic
+  expeditions distinct from prior gates (Options/Greeks → Financial Engineering, Adaptive immune
+  response → Immunology, Fourier transforms → Signal Processing; rule 17). Detours driven over HTTP
+  through the real learner-api path so audited steps are what a learner would generate.
+  **Pre-fix sweep (15 detours / 27 generated steps):** 1 formatting artifact (raw Markdown italic
+  `*when*`) + 3 recurring (≥2/3 NO) congruence mismatches — **all confirmed genuine by human
+  inspection of the actual persisted content**, spanning three distinct sub-modes (content-drift
+  "Option pricing basics"→taught Vega itself; outline-synonym "Somatic recombination
+  mechanism"≈V(D)J recombination; question-drift "Expected value…"→tested risk-neutral). Both KTD4
+  triggers fired → both fixes applied. **Post-fix re-sweep (12 fresh detours on unused terms / 23
+  generated steps, pre-fix steps deleted first):** **0 formatting artifacts, 0 recurring congruence
+  problems** across both enrichments. The re-pick provably executed — `operation_run_stages` recorded
+  **25 `scaffold-content-congruence`** runs over the 23 accepted steps (every draft judged + ~2
+  retries after a NO), and **0/12 detours were starved**. Honest caveat: the post-fix sweep uses
+  different terms than the baseline, so it verifies non-recurrence over fresh generation (ADR-0028),
+  not a controlled A/B. Deterministic envelope: typecheck all 12 projects Done; application 680
+  (+3 congruence-re-pick tests), infrastructure-litellm/learner-api/kg-worker green; lint 0 errors.
+  Real-use quality gate **PASS**. Disposable learner + gate state removed; server stopped. Evidence
+  and evaluation note: `tmp/2026-07-16-scaffold-content-audit/EVALUATION.md`.
 
 - **Crystal Formation Reward UX — U6 production-web gate, 2026-07-15.** `pnpm e2e:web` over the
   fresh production Expo static export with the typed API intercepted by production-shaped

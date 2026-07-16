@@ -31,9 +31,8 @@ execution: code
   `navMemory` seen-bindings; before encoding any *learner-specific* signal (retries, correctness)
   into specimen appearance — species reads ADR-0024 intrinsic difficulty only; and before
   reintroducing any deleted line language (veins, seam, branch, nested bands) "for polish".
-- **Scheduling:** Executes AFTER plan
-  [2026-07-16-001](./2026-07-16-001-feat-scaffold-content-quality-audit-plan.md) finishes its U5
-  (user decision 2026-07-16).
+- **Scheduling:** Next up. The preceding Scaffold Content Quality Audit work (plan 2026-07-16-001,
+  shipped and deleted 2026-07-16 — see `TODO.md` COMPLETED) is finished (user decision 2026-07-16).
 - **Tail ownership:** Ship U1–U3, amend ADR-0032 + vocabulary (U4), pass the rule-14 gate (U5),
   fold status into `TODO.md`, and delete this plan.
 
