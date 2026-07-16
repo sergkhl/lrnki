@@ -5,14 +5,16 @@ import { buildTrailView, type RecallScopeStatus } from "@lrnki/application/proje
 import { sessionFixture } from "@/learn/sessionFixture";
 
 const mockPush = jest.fn();
+let mockIsFocused = true;
 const mockEnterGuardianScope = jest.fn<
   (...args: unknown[]) => Promise<{ entered: true; challengeId: string } | { entered: false }>
 >();
+const mockReadGuardianArrivalSeen = jest.fn(() => Promise.resolve(true));
 
-jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }), useIsFocused: () => mockIsFocused }));
 jest.mock("@/lib/guardianEntry", () => ({ enterGuardianScope: (...args: unknown[]) => mockEnterGuardianScope(...args) }));
 jest.mock("@/lib/navMemory", () => ({
-  readGuardianArrivalSeen: jest.fn(() => Promise.resolve(true)),
+  readGuardianArrivalSeen: () => mockReadGuardianArrivalSeen(),
   markGuardianArrivalSeen: jest.fn(() => Promise.resolve())
 }));
 jest.mock("./ActivitySheet", () => ({
@@ -37,7 +39,13 @@ jest.mock("./GuardianTrailNode", () => ({
   }
 }));
 jest.mock("./ConceptMarker", () => ({ ConceptMarker: () => null }));
-jest.mock("./GuardianArrivalDialog", () => ({ GuardianArrivalDialog: () => null }));
+jest.mock("./GuardianArrivalDialog", () => ({
+  GuardianArrivalDialog: ({ open }: { open: boolean }) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Text } = require("@/ui") as typeof import("@/ui");
+    return open ? <Text>guardian-arrival-open</Text> : null;
+  }
+}));
 jest.mock("./SupportPathNode", () => ({ SupportPathNode: () => null }));
 jest.mock("./SupportPathSheet", () => ({ SupportPathSheet: () => null }));
 jest.mock("./SupportPathDialog", () => ({ SupportPathDialog: () => null, dialogStateForDetour: () => ({ kind: "idle" }) }));
@@ -54,16 +62,28 @@ const recallScope: RecallScopeStatus = {
 };
 
 async function renderPath() {
-  const session = sessionFixture({
+  // Every stop complete (lesson read + both items latest-correct) so the Leg reads
+  // "complete" and the available scope is a genuine arrival candidate.
+  const base = sessionFixture({
     classification: { stateByNode: { n1: "mastered" }, selectedFrontierTarget: null },
+    lessonReadByNode: { n1: true },
+    latestOutcomeByStudyItemId: { i1: "correct", i2: "correct" },
     recallScopes: [recallScope]
   });
-  return await render(<CheckpointPath session={session} view={buildTrailView(session)} />);
+  const session = {
+    ...base,
+    expeditionPath: base.expeditionPath.map((step) => ({ ...step, state: "mastered" as const }))
+  };
+  const makeElement = () => <CheckpointPath session={session} view={buildTrailView(session)} />;
+  const utils = await render(makeElement());
+  return { ...utils, makeElement };
 }
 
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  mockIsFocused = true;
+  mockReadGuardianArrivalSeen.mockImplementation(() => Promise.resolve(true));
 });
 
 afterEach(() => { jest.useRealTimers(); });
@@ -88,4 +108,20 @@ test("failed Guardian entry leaves the Activity Sheet open and pushes nothing", 
   await act(async () => {});
   expect(screen.getByText("activity-sheet-open")).toBeTruthy();
   expect(mockPush).not.toHaveBeenCalled();
+});
+
+// Regression (plan 2026-07-16-003 U6 gate): the trail stays mounted under a pushed
+// /guardian route, so a post-win session refetch there must NOT pop the next Leg's
+// arrival dialog over the reward screen. The offer waits for the trail to regain focus.
+test("an unfocused trail never offers a Guardian arrival; focus returning offers it", async () => {
+  mockReadGuardianArrivalSeen.mockImplementation(() => Promise.resolve(false));
+  mockIsFocused = false;
+  const { rerender, makeElement } = await renderPath();
+  await act(async () => {});
+  expect(screen.queryByText("guardian-arrival-open")).toBeNull();
+
+  mockIsFocused = true;
+  await rerender(makeElement());
+  await act(async () => {});
+  expect(screen.getByText("guardian-arrival-open")).toBeTruthy();
 });

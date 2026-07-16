@@ -12,8 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-16-003 — Learner UX polish: Android overlays, reward actions, formation badge, specimen strokes, trail wave](./2026-07-16-003-fix-learner-ux-polish-plan.md) — in progress (U1–U4 done; U5 code applied, emulator verification pending; U6 remains).
-- [2026-07-16-004 — Deep Scaffold Generation and closed attribution](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) — ready after 003.
+- [2026-07-16-004 — Deep Scaffold Generation and closed attribution](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) — ready, next up (plan 003 shipped 2026-07-16).
 
 ## Ownership rules
 

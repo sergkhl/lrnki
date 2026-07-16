@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useIsFocused, useRouter } from "expo-router";
 import { Flag, Mountain } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import type { RecallScopeStatus, ScaffoldDetourView, StudySession } from "@lrnki/application/projection";
@@ -65,9 +65,14 @@ export function CheckpointPath({
   };
 
   // The arrival offer (F1): the first unacknowledged available scope whose Leg is complete
-  // (or the unlocked summit) opens the non-blocking dialog once per device.
+  // (or the unlocked summit) opens the non-blocking dialog once per device. Offered only
+  // while the trail screen is focused: the trail stays mounted under a pushed /guardian
+  // route, and a post-win session refetch there must not pop the next Leg's arrival over
+  // the reward — it waits for the learner's return to the trail.
+  const isFocused = useIsFocused();
   const [arrivalScope, setArrivalScope] = useState<RecallScopeStatus | null>(null);
   useEffect(() => {
+    if (!isFocused) return;
     let cancelled = false;
     void (async () => {
       const candidates: RecallScopeStatus[] = [
@@ -83,7 +88,7 @@ export function CheckpointPath({
       }
     })();
     return () => { cancelled = true; };
-  }, [view.sections, view.enrichmentScope, session.learnerStateRef]);
+  }, [isFocused, view.sections, view.enrichmentScope, session.learnerStateRef]);
   const acknowledgeArrival = () => {
     if (arrivalScope) void markGuardianArrivalSeen(session.learnerStateRef, arrivalScope.anchorDerivedNodeId);
     setArrivalScope(null);

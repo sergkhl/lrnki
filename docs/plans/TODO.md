@@ -2,48 +2,12 @@
 
 ## TODO
 
-### Learner UX polish (plan 2026-07-16-003 — IN PROGRESS)
+### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — READY, NEXT UP)
 
-[Plan](./2026-07-16-003-fix-learner-ux-polish-plan.md). Session handoff 2026-07-16 (session 2):
-
-- **U1 DONE.** Reward action gating deleted (`actionsReady`/`settledEventKey`/settle timer/
-  `rewardDuration`/both `disabled` props); `playedEventRef` survives only as the first-win haptic
-  one-shot; the route controller classifies only after `isFetchedAfterMount` (D1+D2). D8a jest
-  regressions added at both levels (route: pre-warmed cache never classifies before the refetch;
-  component: the exact ready→loading→ready deadlock sequence leaves actions usable). D8c e2e
-  scenario added: trail-visit pre-warmed cache → Guardian entry → win → both actions actionable.
-- **U2 DONE.** `BADGE_RADIUS` moved into `crystalFormationLayout.ts`; the emitted island frame
-  includes the 8-unit above-apex overhang (outline apex + badge shifted down, height grown), so
-  every consumer viewBox contains the whole seal. D8b containment test added across four shapes;
-  regenerated rematch screenshot shows the whole roundel.
-- **U3 DONE (code).** One 2 px `non-scaling-stroke` policy in `CrystalSpecimen` on ghost (0.55) /
-  growing (0.7, raised from 0.4) / collected-fill outlines. Final legibility judgment rides U6.
-- **U4 DONE.** `CheckpointPath` now draws one static dashed SVG serpentine (trail-muted, 0.6
-  opacity, 3 px, vertical-tangent cubics) through every checkpoint circle's measured center:
-  offsets are `56·sin(stopIndex·π/4)` (amplitude unchanged), anchors are `measureLayout`-relative
-  to the trail container (container-resize re-measures all rows, since content above a row shifts
-  it without firing its own onLayout), and `WINDING_OFFSETS` + the straight center bar are DELETED
-  (KTD4). Verified by the regenerated phone trail screenshot (wave passes through every circle,
-  cards overlay it) and the full production-export Playwright suite.
-- **U5 code APPLIED, device verification pending (see [BLOCKERS](./BLOCKERS.md)).** D6: literal
-  `scrim: "rgba(0, 0, 0, 0.4)"` token in `ui/tokens.js` (+ regenerated `tokens.css`); both
-  `bg-black/40` scrims in `Dialog`/`SideSheet` replaced with `bg-scrim` (KTD4). D7:
-  `LearnerMenuSheet.handoff` now yields a frame between closing the sheet and invoking the action
-  (jest updated to lock close-first-then-frame-yield ordering). D8d: maestro board-content step
-  appended to `android-runtime-reliability.yaml` (back out to journal → Menu → View the board →
-  assert title + fixture entry row). Emulator loop is the verification authority (KTD3).
-- **Remaining:** U5 emulator verification (user-hosted), then **U6** (rule-14 gate over a real
-  production expedition: wave/specimen/seal/reward-actions judgment at phone + desktop + reduced
-  motion + 200 % scale; emulator screenshots are the Android evidence; then fold + delete plan).
-- Validation session 2: learner jest 51 suites / 229 tests green (LearnerMenuSheet suite updated
-  for D7); full production-export Playwright 48/48 post-wave; learner-app typecheck clean; eslint
-  clean on touched files. Nothing committed (user has not asked).
-
-### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — READY)
-
-[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). Queued after plan 003 because
-both touch `CheckpointPath.tsx`. Grilling and durable ADR amendments are complete; implementation
-has not started.
+[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). Now first in execution order
+(plan 003 shipped). Grilling and durable ADR amendments are complete; implementation has not
+started. Touches `CheckpointPath.tsx` — reconcile against plan 003's shipped trail-wave +
+`useIsFocused` arrival-focus code.
 
 ### Evidence-triggered follow-up
 
@@ -53,6 +17,32 @@ has not started.
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Learner UX polish shipped (2026-07-16, plan 2026-07-16-003; plan DELETED).** Five reported
+  learner-facing UX defects fixed as pure downstream presentation/client behavior (zero API,
+  projection, or persisted-shape change). **U1** deleted the Guardian reward action gating
+  (`actionsReady`/`settledEventKey`/settle timer/`rewardDuration`/both `disabled` props) and made
+  the route controller classify only after `isFetchedAfterMount`, so `Explore formation` /
+  `Continue expedition` are always usable after first-win AND rematch while the sweep stays keyed
+  and the first-win haptic stays one-shot (KTD2). **U2** moved `BADGE_RADIUS` into
+  `crystalFormationLayout.ts` and grew the emitted island frame by the ~8-unit above-apex overhang
+  so every consumer viewBox contains the whole gold seal (containment test across four shapes).
+  **U3** applied one 2 px `non-scaling-stroke` policy in `CrystalSpecimen` (ghost 0.55 / growing
+  0.7 / collected) so uncollected specimens read beside the 2 px lucide icons at any scale. **U4**
+  replaced `CheckpointPath`'s straight center bar + `WINDING_OFFSETS` table (both DELETED, KTD4)
+  with one static dashed SVG serpentine through every checkpoint circle's measured center
+  (offsets `56·sin(stopIndex·π/4)`, `measureLayout`-relative anchors, container-resize re-measure).
+  **U5** fixed two Android-only overlay defects: a literal `scrim: "rgba(0,0,0,0.4)"` token
+  replacing both `bg-black/40` scrims the native styler dropped (D6), and a frame-yielding
+  menu→board handoff so the Board dialog's entering animation never mounts during a portal
+  teardown (D7); a D8d board-content step joined the durable maestro flow. **U6 (this gate)** found
+  and fixed one real in-gate defect — `CheckpointPath`'s Guardian-arrival effect fired while the
+  trail sat mounted under a pushed `/guardian/[id]` route, popping the next Leg's arrival over the
+  reward; conventional `useIsFocused()` gating (React Navigation "stays mounted under a push") plus
+  a red→green regression test. Both rule-14 evidence layers PASS (see VALIDATION). U1–U5 committed
+  by the user in `782d095`/`26524ba`; the U6 `useIsFocused` fix + regression are currently
+  UNCOMMITTED (user has not asked to commit). Evidence + evaluation:
+  `tmp/2026-07-16-learner-ux-polish/EVALUATION.md`.
 
 - **Crystal Formation Minimal Redesign shipped (2026-07-16, plan 2026-07-16-002; plan DELETED).**
   The Crystal Formation now uses a curated intrinsic-difficulty mineral library, compact
@@ -456,6 +446,28 @@ has not started.
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Learner UX polish — U6 rule-14 gate, 2026-07-16. PASS.** Two evidence layers over the shipped
+  U1–U5 plus the in-gate `useIsFocused` fix. **Web (real learner-api + Postgres, no interception):**
+  an existing production expedition driven server-graded at phone 390×844, desktop 1280×800,
+  reduced motion, and Chromium 200% page scale — the dashed sine wave passes through every
+  checkpoint circle with zero horizontal overflow across the full scrolled trail, uncollected
+  specimens legible beside the 2 px icon strokes, the whole gold seal in both first-win and rematch
+  reward cards, reward actions immediately usable after first-win AND rematch, and no reward replay
+  after a full reload. The gate itself caught a real defect (post-win session refetch on the
+  still-mounted trail popped the next Leg's arrival over the reward) — fixed with `useIsFocused()`
+  gating in `CheckpointPath`, regression proven red-without/green-with, full web gate re-run PASS.
+  **Android (ADR-0038 authority):** `pnpm e2e:native:maestro` against a FRESH e2e APK built from
+  the post-fix tree, emulator `Medium_Phone_API_36.1` — first run failed on a transient SystemUI
+  ANR over a correctly-rendered name gate (host flake, not app; cleared and confirmed by
+  `dumpsys window lastanr`), re-run **PASS 1m 2s** through name gate → Explore/Catalog → Theory →
+  Support Path dialog (ADOPTED geometry gate) → Menu → board-content (D8d). U5's session-3
+  screenshots remain the scrim/board visual evidence. **Envelope:** `CheckpointPath.test.tsx` 3/3
+  incl. the focus regression; full learner-app jest 51 suites / 230 tests, typecheck, lint clean
+  (prior session, tree unchanged since). Gate cleanup: 9 `*-u6gate`/`uxgate-u6-probe` learners
+  deleted FK-safely in one transaction (only pre-existing `Content Owner` remains); enrichments
+  retained. Evidence: `tmp/2026-07-16-learner-ux-polish/EVALUATION.md` (+ `u6-web/`, `u6-android/`,
+  `u5-android/`).
 
 - **Crystal Formation Minimal Redesign — U5 real-use gate, 2026-07-16.** Initial production-export
   screenshots were `FIX_FIRST`: Future islands' opaque gray fill overwhelmed the quiet state

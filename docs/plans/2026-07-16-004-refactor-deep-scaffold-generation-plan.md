@@ -26,10 +26,10 @@ execution: code
   Postgres adapters, Study Session projection, application generation/grading, LiteLLM descriptor
   registration, learner-api composition, and Support Path presentation. Reset/reinitialize the
   development database; do not add a compatibility migration, dual-read path, or transitional DTO.
-- **Scheduling:** Execute after
-  [plan 2026-07-16-003](./2026-07-16-003-fix-learner-ux-polish-plan.md), because both plans touch
-  `CheckpointPath.tsx` and that plan already owns in-progress Learner App changes. Re-read the final
-  U003 diff before U5 and preserve its trail-wave/overlay work.
+- **Scheduling:** Next up. Plan 2026-07-16-003 (Learner UX polish) shipped 2026-07-16, so its
+  `CheckpointPath.tsx` trail-wave + `useIsFocused` arrival-focus work is now in the tree (its
+  `useIsFocused` fix is uncommitted at handoff). Re-read the current `CheckpointPath.tsx` before U5
+  and preserve that trail-wave/overlay/arrival-focus behavior.
 - **Stop conditions:** Stop and re-plan if a reference cannot remain a foreign-key-backed neutral
   identity without copying payload; if the finished Study Session cannot express locked, included,
   and confidently floored reuse from one projection; if descriptor membership cannot be compared
