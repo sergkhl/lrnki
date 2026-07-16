@@ -4,7 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { ChevronDown, Gem } from "lucide-react-native";
 import type { StudySession } from "@lrnki/application/projection";
 import { clearLearnerVerdict, refreshLearnerExpedition, setLearnerVerdict } from "@/lib/actions";
-import type { TrailCluster } from "@lrnki/application/projection";
+import { difficultyBand, type TrailCluster } from "@lrnki/application/projection";
 import { learnerTerm } from "@/learn/vocabulary";
 import { Button, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
@@ -94,7 +94,7 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
 }
 
 function difficultyDiamonds(difficulty: number): string {
-  const rating = Math.min(5, Math.max(1, Math.round(difficulty * 4) + 1));
+  const rating = difficultyBand(difficulty);
   return "◆".repeat(rating) + "◇".repeat(5 - rating);
 }
 

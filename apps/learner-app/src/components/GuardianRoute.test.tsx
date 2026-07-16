@@ -26,6 +26,7 @@ jest.mock("@/components/GuardianFight", () => ({
 }));
 jest.mock("@/components/GuardianReward", () => ({
   guardianRewardPreview: (...args: unknown[]) => mockGuardianRewardPreview(...args),
+  guardianRewardSceneWidth: (windowWidth: number) => Math.min(420, Math.max(280, windowWidth - 56)),
   GuardianReward: ({
     preview,
     transitionToken,

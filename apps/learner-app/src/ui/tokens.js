@@ -3,6 +3,7 @@
 
 /** Semantic color palette. Interactive boundaries use `lineStrong` (>=3:1 on card);
  * `line` is decorative separation only. All pairs are asserted by tokens.test.ts. */
+const gemTeal = "#2f8f83";
 const colors = {
   background: "#f7f0de",
   ink: "#241f18",
@@ -12,8 +13,14 @@ const colors = {
   "line-strong": "#8d8064",
   trail: "#617a55",
   "trail-muted": "#b9ad92",
-  gem: "#2f8f83",
+  gem: gemTeal,
   "gem-soft": "#cbe7df",
+  // Mineral tier tints (plan 2026-07-16-002 D7): quartz shares the journal gem teal;
+  // amethyst is a muted violet; diamond a pale ice-blue. Gold stays reserved for
+  // earned rewards and is never a tier tint.
+  "mineral-quartz": gemTeal,
+  "mineral-amethyst": "#7d6b9e",
+  "mineral-diamond": "#9cc3d5",
   fog: "#8d887c",
   frontier: "#9c5f2b",
   "muted-panel": "#eee4cd",

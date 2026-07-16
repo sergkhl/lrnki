@@ -3,9 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import type { RecallChallengeView } from "@lrnki/application/projection";
 import { GuardianFight } from "@/components/GuardianFight";
+import { useWindowDimensions } from "react-native";
 import {
   GuardianReward,
   guardianRewardPreview,
+  guardianRewardSceneWidth,
   type GuardianRewardPreview,
   type WonGuardianView
 } from "@/components/GuardianReward";
@@ -116,6 +118,7 @@ export function GuardianRewardRoute({
   transitionToken: string | null;
   onReplace: (href: string) => void;
 }>) {
+  const { width: windowWidth } = useWindowDimensions();
   const query = expeditionQuery(challenge.enrichmentId);
   // Disabled initial execution lets this controller own one explicit invalidate/refetch,
   // including when a cached Expedition is already present.
@@ -132,7 +135,7 @@ export function GuardianRewardRoute({
   if (expedition.isPending || expedition.isFetching) preview = { status: "loading" };
   else if (expedition.isError) preview = { status: "error" };
   else if (!expedition.data) preview = { status: "inconsistent" };
-  else preview = guardianRewardPreview(challenge, expedition.data.session);
+  else preview = guardianRewardPreview(challenge, expedition.data.session, guardianRewardSceneWidth(windowWidth));
 
   const continueRoute = `/expedition/${challenge.enrichmentId}`;
   const explore = (focus: VistaFocus) => {

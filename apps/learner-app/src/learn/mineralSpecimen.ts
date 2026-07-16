@@ -1,40 +1,108 @@
-// Pure Mineral Menagerie geometry (plan 2026-07-15-002 U1, R12-R13). Exactly three
-// code-native specimen habits — prismatic quartz, cubic fluorite, rhombohedral calcite —
-// identified by SHAPE, sharing one facet/stroke/palette/growth language. Habit is
-// cosmetic only: a balanced cycle over a section-stable offset plus the concept's
-// neutral position inside its section, with minor facet variation seeded from the
-// concept id, so identical projection inputs render identically across reloads and
-// input array ordering. Nothing here reads difficulty, mastery, or correctness.
+// Pure curated mineral library (plan 2026-07-16-002 U1, D1/D7/KTD1). Exactly three
+// hand-authored real-mineral silhouettes — quartz, amethyst, diamond — as static polygon
+// data, identified by SHAPE and tier tint. Species encodes ONE neutral fact: the
+// concept's ADR-0024 intrinsic difficulty band via the shared `difficultyBand`
+// (1–2 quartz, 3–4 amethyst, 5 diamond). Progression is one visual variable: ghost
+// outline → fill rises with `growthFraction` → full color + gloss when collected.
+// Nothing here reads mastery, retries, or correctness beyond the caller's honest
+// growth/collected inputs, and there is no runtime PRNG geometry — the only per-concept
+// variation is a tiny deterministic mirror/scale so repeats don't look stamped.
 
-import type { TrailCluster } from "@lrnki/application/projection";
+import { difficultyBand, type TrailCluster } from "@lrnki/application/projection";
 
-export type MineralHabit = "quartz" | "fluorite" | "calcite";
-
-export const MINERAL_HABITS: readonly MineralHabit[] = ["quartz", "fluorite", "calcite"] as const;
+export type MineralSpecies = "quartz" | "amethyst" | "diamond";
 
 export const MINERAL_VIEWBOX = "0 0 100 100";
-export const MINERAL_SATURATION = 52;
-// Below this displayed size a specimen's facets cannot be read; compact surfaces must
-// use the universal gem/status icon + exact counts instead (R14).
+// Below this displayed size a specimen's silhouette cannot be read; compact surfaces
+// must use the universal gem/status icon + exact counts instead.
 export const MIN_SPECIMEN_PX = 40;
+// Specimens sit on this ground line inside the 0..100 viewBox; the growth cut and the
+// variation pivot both anchor here so every species grows and scales from its bedrock.
+export const MINERAL_GROUND_Y = 95;
 
-// --journal-gem #2f8f83 in HSL space (theme.css owns the canonical color).
-const BASE_HUE = 172;
-const HUE_BAND = 20;
-
-export interface MineralFacet {
-  // Closed polygon in the 0..100 viewBox; specimens sit on the y=95 ground line.
-  points: readonly (readonly [number, number])[];
-  // Per-facet lightness (%): adjacent facets differ so the form reads faceted.
-  lightness: number;
-  // Facets appear in this order as growth advances (body before termination).
-  revealIndex: number;
+// Species = intrinsic difficulty tier (D1). `difficultyBand` already breaks ties low
+// upstream, so diamonds stay scarce; this module never re-derives the banding.
+export function mineralSpeciesFor(difficulty: number | null): MineralSpecies {
+  const band = difficultyBand(difficulty);
+  if (band <= 2) return "quartz";
+  if (band <= 4) return "amethyst";
+  return "diamond";
 }
 
-export interface MineralSpecimenSpec {
-  habit: MineralHabit;
-  hue: number;
-  facets: MineralFacet[];
+export type MineralPoint = readonly [number, number];
+
+// An interior facet plane over the tinted silhouette. `shade` > 0 lightens (white
+// overlay), < 0 darkens (ink overlay) — shading is tint-independent by construction.
+export interface MineralFacetPlane {
+  points: readonly MineralPoint[];
+  shade: number;
+}
+
+export interface MineralSpeciesSpec {
+  species: MineralSpecies;
+  // Closed silhouette polygon in the 0..100 viewBox, resting on MINERAL_GROUND_Y.
+  silhouette: readonly MineralPoint[];
+  facets: readonly MineralFacetPlane[];
+  gloss: readonly MineralPoint[];
+  // Diamond carries the strongest gloss (D7).
+  glossOpacity: number;
+}
+
+// Prismatic quartz: an upright pointed column with a short companion spur — the classic
+// pointed silhouette, authored to read at 40–80 px.
+const QUARTZ: MineralSpeciesSpec = {
+  species: "quartz",
+  silhouette: [
+    [22, 95], [22, 74], [31, 60], [38, 70], [38, 56], [50, 28], [62, 56], [62, 95]
+  ],
+  facets: [
+    { points: [[38, 95], [38, 56], [50, 28], [50, 95]], shade: -0.08 },
+    { points: [[50, 95], [50, 28], [62, 56], [62, 95]], shade: 0.1 },
+    { points: [[31, 60], [38, 70], [38, 95], [31, 95]], shade: 0.07 }
+  ],
+  gloss: [[47, 40], [50, 32], [53, 40], [50, 48]],
+  glossOpacity: 0.35
+};
+
+// Amethyst: a broad twin-pointed cluster — flatter and wider than quartz, with the
+// taller point off-center right.
+const AMETHYST: MineralSpeciesSpec = {
+  species: "amethyst",
+  silhouette: [
+    [20, 95], [20, 70], [34, 44], [45, 62], [58, 34], [74, 60], [74, 95]
+  ],
+  facets: [
+    { points: [[20, 95], [20, 70], [34, 44], [34, 95]], shade: -0.08 },
+    { points: [[34, 95], [34, 44], [45, 62], [45, 95]], shade: 0.08 },
+    { points: [[58, 95], [58, 34], [74, 60], [74, 95]], shade: 0.12 }
+  ],
+  gloss: [[55, 44], [58, 36], [61, 44], [58, 52]],
+  glossOpacity: 0.4
+};
+
+// Diamond: a brilliant cut resting pavilion-down — flat table, angled crown band,
+// pointed base; unmistakably neither column nor cluster.
+const DIAMOND: MineralSpeciesSpec = {
+  species: "diamond",
+  silhouette: [
+    [50, 95], [28, 60], [34, 44], [66, 44], [72, 60]
+  ],
+  facets: [
+    { points: [[28, 60], [34, 44], [66, 44], [72, 60]], shade: 0.14 },
+    { points: [[28, 60], [50, 60], [50, 95]], shade: -0.1 }
+  ],
+  gloss: [[38, 46], [50, 46], [45, 56], [35, 54]],
+  glossOpacity: 0.55
+};
+
+const SPECS: Record<MineralSpecies, MineralSpeciesSpec> = {
+  quartz: QUARTZ,
+  amethyst: AMETHYST,
+  diamond: DIAMOND
+};
+
+export function mineralSpecimenSpec(species: MineralSpecies): MineralSpeciesSpec {
+  return SPECS[species];
 }
 
 // FNV-1a over the id string: cheap, dependency-free, and stable across runtimes.
@@ -60,130 +128,46 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+// Tiny deterministic per-concept variation (D1): an optional mirror about the vertical
+// axis and a mild scale, both about the bedrock pivot — never new geometry.
+export type MineralVariation = { mirrored: boolean; scale: number };
+
+export function mineralVariationFor(derivedNodeId: string): MineralVariation {
+  const random = mulberry32(hashSeed(`variation:${derivedNodeId}`));
+  return { mirrored: random() < 0.5, scale: round2(0.9 + random() * 0.1) };
 }
 
-// The balanced habit cycle (R13): a section-stable offset rotates which habit opens the
-// section, then consecutive section positions cycle quartz/fluorite/calcite — three
-// consecutive concepts always yield one of each, and the mapping depends only on the
-// concept's own section coordinates (never on array order).
-export function mineralHabitFor(input: { sectionIndex: number; sectionPositionIndex: number }): MineralHabit {
-  const offset = hashSeed(`section:${input.sectionIndex}`) % MINERAL_HABITS.length;
-  return MINERAL_HABITS[(offset + input.sectionPositionIndex) % MINERAL_HABITS.length];
+// --- Growth fill clip (KTD1) ----------------------------------------------------------
+//
+// Partial growth renders by clipping the silhouette/facet polygons against a horizontal
+// cut line in pure code (Sutherland–Hodgman against the single half-plane y >= cutY):
+// no <ClipPath> defs, so many specimens can share one canvas without id collisions.
+
+export function growthCutY(spec: MineralSpeciesSpec, growthFraction: number): number {
+  const top = Math.min(...spec.silhouette.map(([, y]) => y));
+  const fraction = Math.min(1, Math.max(0, growthFraction));
+  return round2(MINERAL_GROUND_Y - fraction * (MINERAL_GROUND_Y - top));
 }
 
-type Point = readonly [number, number];
-
-function polygon(points: readonly Point[]): readonly Point[] {
-  return points.map(([x, y]) => [round2(x), round2(y)] as const);
+// The polygon's region on or below the cut line (y >= cutY), closed. Empty when the
+// whole polygon sits above the line.
+export function clipPolygonBelow(points: readonly MineralPoint[], cutY: number): MineralPoint[] {
+  const output: MineralPoint[] = [];
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index];
+    const next = points[(index + 1) % points.length];
+    const currentIn = current[1] >= cutY;
+    const nextIn = next[1] >= cutY;
+    if (currentIn) output.push(current);
+    if (currentIn !== nextIn) {
+      const t = (cutY - current[1]) / (next[1] - current[1]);
+      output.push([round2(current[0] + t * (next[0] - current[0])), cutY]);
+    }
+  }
+  return output;
 }
 
-export function mineralSpecimenSpec(habit: MineralHabit, derivedNodeId: string): MineralSpecimenSpec {
-  const random = mulberry32(hashSeed(`${habit}:${derivedNodeId}`));
-  const hue = round2(BASE_HUE + (random() * 2 - 1) * HUE_BAND);
-  const facets = habit === "quartz" ? quartzFacets(random) : habit === "fluorite" ? fluoriteFacets(random) : calciteFacets(random);
-  return {
-    habit,
-    hue,
-    facets: facets.map((facet, index) => ({ ...facet, points: polygon(facet.points), lightness: round2(facet.lightness), revealIndex: index }))
-  };
-}
-
-type RawFacet = { points: readonly Point[]; lightness: number };
-
-// Prismatic quartz: a tall main prism with a pyramidal termination plus a shorter
-// companion prism — the classic pointed cluster silhouette.
-function quartzFacets(random: () => number): RawFacet[] {
-  const mainW = 16 + random() * 5;
-  const mainH = 46 + random() * 8;
-  const capH = 14 + random() * 5;
-  const tipX = 50 + (random() * 2 - 1) * 3;
-  const side = random() < 0.5 ? -1 : 1;
-  const compX = 50 + side * (mainW / 2 + 8 + random() * 4);
-  const compW = mainW * 0.62;
-  const compH = mainH * (0.5 + random() * 0.15);
-  const compCapH = capH * 0.7;
-  const base = 95;
-  const light = 34 + random() * 8;
-  return [
-    // Companion prism body + cap grow first: the cluster rises from the flank inward.
-    { points: [[compX - compW / 2, base], [compX - compW / 2, base - compH], [compX + compW / 2, base - compH], [compX + compW / 2, base]], lightness: light + 6 },
-    { points: [[compX - compW / 2, base - compH], [compX, base - compH - compCapH], [compX + compW / 2, base - compH]], lightness: light + 14 },
-    // Main prism split into two vertical body facets so the column reads faceted.
-    { points: [[50 - mainW / 2, base], [50 - mainW / 2, base - mainH], [tipX, base - mainH], [tipX, base]], lightness: light },
-    { points: [[tipX, base], [tipX, base - mainH], [50 + mainW / 2, base - mainH], [50 + mainW / 2, base]], lightness: light + 9 },
-    // Pyramidal termination facets seal the specimen last.
-    { points: [[50 - mainW / 2, base - mainH], [tipX, base - mainH - capH], [tipX, base - mainH]], lightness: light + 18 },
-    { points: [[tipX, base - mainH], [tipX, base - mainH - capH], [50 + mainW / 2, base - mainH]], lightness: light + 12 }
-  ];
-}
-
-// Cubic fluorite: an isometric cube (top rhombus + two visible faces) with a smaller
-// intergrown companion cube — blocky, flat-topped, unmistakably not pointed.
-function fluoriteFacets(random: () => number): RawFacet[] {
-  const s = 19 + random() * 4;
-  const dy = s * 0.45;
-  const h = 30 + random() * 6;
-  const base = 95;
-  const cx = 50 + (random() * 2 - 1) * 2;
-  const ty = base - 2 * dy - h;
-  const side = random() < 0.5 ? -1 : 1;
-  const cs = s * 0.55;
-  const cdy = cs * 0.45;
-  const ch = h * 0.55;
-  const ccx = cx + side * (s + cs * 0.35);
-  const cty = base - 2 * cdy - ch;
-  const light = 34 + random() * 8;
-  const cube = (x: number, top: number, half: number, halfDy: number, height: number, lift: number): RawFacet[] => [
-    { points: [[x - half, top + halfDy], [x, top + 2 * halfDy], [x, top + 2 * halfDy + height], [x - half, top + halfDy + height]], lightness: light + lift },
-    { points: [[x, top + 2 * halfDy], [x + half, top + halfDy], [x + half, top + halfDy + height], [x, top + 2 * halfDy + height]], lightness: light + lift + 9 },
-    { points: [[x, top], [x + half, top + halfDy], [x, top + 2 * halfDy], [x - half, top + halfDy]], lightness: light + lift + 18 }
-  ];
-  const companion = cube(ccx, cty, cs, cdy, ch, 6);
-  const main = cube(cx, ty, s, dy, h, 0);
-  // Companion faces, main left/right faces, then both top facets seal last.
-  return [companion[0], companion[1], main[0], main[1], companion[2], main[2]];
-}
-
-// Rhombohedral calcite: a leaning sheared block (parallelogram faces meeting at oblique
-// angles) plus a low companion rhomb — slanted where quartz is upright and fluorite square.
-function calciteFacets(random: () => number): RawFacet[] {
-  const w = 30 + random() * 6;
-  const h = 32 + random() * 6;
-  const shear = 10 + random() * 5;
-  const topDx = 8 + random() * 4;
-  const topDy = 9 + random() * 3;
-  const base = 95;
-  const lean = random() < 0.5 ? -1 : 1;
-  const x0 = 50 - (w + shear) / 2 + lean * 2;
-  const sx = lean * shear;
-  const light = 34 + random() * 8;
-  const compW = w * 0.55;
-  const compH = h * 0.5;
-  const compX = lean > 0 ? x0 - compW * 0.7 : x0 + w + compW * 0.05;
-  return [
-    // Low companion rhomb rises first at the flank.
-    { points: [[compX, base], [compX + lean * shear * 0.5, base - compH], [compX + lean * shear * 0.5 + compW, base - compH], [compX + compW, base]], lightness: light + 6 },
-    { points: [[compX + lean * shear * 0.5, base - compH], [compX + lean * shear * 0.5 + topDx * 0.6, base - compH - topDy * 0.6], [compX + lean * shear * 0.5 + compW + topDx * 0.6, base - compH - topDy * 0.6], [compX + lean * shear * 0.5 + compW, base - compH]], lightness: light + 16 },
-    // Main sheared front face, then its oblique side, then the top rhomb seals last.
-    { points: [[x0, base], [x0 + sx, base - h], [x0 + sx + w, base - h], [x0 + w, base]], lightness: light },
-    { points: [[x0 + w, base], [x0 + sx + w, base - h], [x0 + sx + w + topDx, base - h - topDy], [x0 + w + topDx, base - topDy]], lightness: light + 9 },
-    { points: [[x0 + sx, base - h], [x0 + sx + topDx, base - h - topDy], [x0 + sx + w + topDx, base - h - topDy], [x0 + sx + w, base - h]], lightness: light + 18 }
-  ];
-}
-
-// The facets grown at a given completion fraction, in reveal order. The final facet is
-// reserved for mastery itself, so a specimen never looks finished before the node is.
-export function visibleMineralFacets(spec: MineralSpecimenSpec, growthFraction: number): MineralFacet[] {
-  const ordered = [...spec.facets].sort((a, b) => a.revealIndex - b.revealIndex);
-  if (growthFraction >= 1) return ordered;
-  if (growthFraction <= 0) return [];
-  const count = Math.min(ordered.length - 1, Math.max(1, Math.round(growthFraction * ordered.length)));
-  return ordered.slice(0, count);
-}
-
-// --- Honest compact progress (R8/R14, A2) -------------------------------------------
+// --- Honest compact progress ----------------------------------------------------------
 //
 // One learner-owned derivation for every compact surface, so known ground can never
 // inflate the crystal count: a completion bar communicates completed ground, while
@@ -220,4 +204,8 @@ export function formationProgressLine(progress: FormationProgress): string {
   ];
   if (progress.knownGround > 0) parts.push(`${progress.knownGround} known`);
   return parts.join(" · ");
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

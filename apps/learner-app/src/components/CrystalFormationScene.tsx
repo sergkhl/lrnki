@@ -1,10 +1,8 @@
 import { useEffect } from "react";
-import { ScrollView, View } from "react-native";
-import Svg, { Polygon, Polyline } from "react-native-svg";
+import { View } from "react-native";
+import Svg, { Polygon, Polyline, Rect } from "react-native-svg";
 import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import {
-  SLOT_SIZE,
-  fitLegWidth,
   isNameableMineral,
   type CrystalFormationLayout,
   type FormationTerminus,
@@ -17,9 +15,13 @@ import { formationProgressLine } from "@/learn/mineralSpecimen";
 import { legStateCopy, learnerTerm } from "@/learn/vocabulary";
 import { LegFormationScene } from "./LegFormationScene";
 
+// The quiet geode ascent (plan 2026-07-16-002 U3, D5/D6): ONE smooth spine curve drawn
+// behind the islands, header bands exactly where the layout allocated them (they can
+// never overlap artwork), and the summit peak with its keystone slot. The layout packs
+// to the real available width, so everything renders at scale 1 — no fitting, no
+// horizontal overflow.
 export function CrystalFormationScene({
   layout,
-  width,
   focus,
   contextualizingRewardKey,
   cropToFocus = false,
@@ -27,28 +29,25 @@ export function CrystalFormationScene({
   onSelectNode
 }: Readonly<{
   layout: CrystalFormationLayout;
-  width: number;
   focus: VistaFocus | null;
   contextualizingRewardKey: VistaRewardKey | null;
   cropToFocus?: boolean;
   selectedNodeId: string | null;
   onSelectNode: (derivedNodeId: string) => void;
 }>) {
-  const fit = fitLegWidth(layout.width, width);
-  const scale = fit.scale;
-  const sceneWidth = layout.width * scale;
-  const sceneHeight = layout.height * scale;
   const summitNeighbor = layout.legs.at(-1) ?? null;
-  const focusedSceneHeight = cropToFocus && focus?.kind === "summit" && summitNeighbor
-    ? Math.min(sceneHeight, (summitNeighbor.frame.y + summitNeighbor.height) * scale)
-    : sceneHeight;
+  const croppedHeight = cropToFocus && focus?.kind === "summit" && summitNeighbor
+    ? Math.min(layout.height, summitNeighbor.frame.y + summitNeighbor.height)
+    : layout.height;
 
   const scene = (
-    <View style={{ width: sceneWidth, height: sceneHeight }}>
+    <View style={{ width: layout.width, height: layout.height }}>
+      {/* The one nonsemantic spine, behind every island (D5): thin, muted, gold only on
+          a bound Leg's own segment. */}
       <Svg
         pointerEvents="none"
-        width={sceneWidth}
-        height={sceneHeight}
+        width={layout.width}
+        height={layout.height}
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         style={{ position: "absolute", left: 0, top: 0 }}
       >
@@ -58,59 +57,63 @@ export function CrystalFormationScene({
             testID="formation-spine-segment"
             points={points(segment.points)}
             fill="none"
-            stroke={segment.lit ? colors.gold : colors.trail}
-            strokeWidth={segment.lit ? 5 : 4}
+            stroke={segment.lit ? colors.gold : colors["trail-muted"]}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
-            opacity={segment.lit ? 0.95 : 0.48}
+            opacity={segment.lit ? 0.95 : 0.6}
+          />
+        ))}
+        {/* The spine is one continuous underlying curve, but reserved text bands are
+            opaque reading surfaces. SVG document order paints these masks after the
+            curve, preventing decorative geometry from crossing header copy. */}
+        {layout.legs.map((leg) => (
+          <Rect
+            key={`header-mask:${leg.sectionIndex}`}
+            testID="formation-header-mask"
+            x={leg.header.x}
+            y={leg.header.y}
+            width={leg.header.width}
+            height={leg.header.height}
+            fill={colors.background}
           />
         ))}
       </Svg>
 
       {layout.legs.map((leg) => {
         const rewardKey = `leg:${leg.sectionIndex}` as const;
+        const focused = focus?.kind === "leg" && focus.sectionIndex === leg.sectionIndex;
         return (
           <FormationPiece
             key={rewardKey}
-            focused={focus?.kind === "leg" && focus.sectionIndex === leg.sectionIndex}
-            testID={focus?.kind === "leg" && focus.sectionIndex === leg.sectionIndex ? `formation-focus-leg-${leg.sectionIndex}` : undefined}
+            focused={focused}
+            testID={focused ? `formation-focus-leg-${leg.sectionIndex}` : undefined}
             contextualizing={contextualizingRewardKey === rewardKey}
-            style={{ left: leg.frame.x * scale, top: leg.frame.y * scale, width: leg.width * scale, height: leg.height * scale }}
+            style={{ left: leg.frame.x, top: leg.frame.y, width: leg.width, height: leg.height }}
           >
-            <LegFormationScene leg={leg} mode="overview" width={leg.width * scale} />
-            <MineralTargets
-              leg={leg}
-              scale={scale}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={onSelectNode}
-            />
+            <LegFormationScene leg={leg} mode="overview" />
+            <MineralTargets leg={leg} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
           </FormationPiece>
         );
       })}
 
-      {layout.legs.map((leg) => {
-        const labelWidth = Math.min(sceneWidth, Math.max(leg.width * scale, 260));
-        const centeredLeft = (leg.frame.x + leg.width / 2) * scale - labelWidth / 2;
-        return (
-          <View
-            key={`label:${leg.sectionIndex}`}
-            pointerEvents="none"
-            className="absolute rounded-control border border-line bg-card px-2 py-1"
-            style={{
-              left: clamp(centeredLeft, 0, sceneWidth - labelWidth),
-              top: Math.max(0, (leg.frame.y - 50) * scale),
-              width: labelWidth
-            }}
-          >
-            <Text variant="caption" className="font-semibold" numberOfLines={1}>
-              {learnerTerm("section")} {leg.sectionIndex + 1} · {legStateCopy(leg.structuralState, leg.guardianSubstate)}
-            </Text>
-            <Text variant="caption" color="muted" numberOfLines={2}>
-              {formationProgressLine(leg.progress)}
-            </Text>
-          </View>
-        );
-      })}
+      {/* Header bands come straight from the layout (D-headers): by construction they
+          are disjoint from every island frame and from one another. */}
+      {layout.legs.map((leg) => (
+        <View
+          key={`header:${leg.sectionIndex}`}
+          pointerEvents="none"
+          className="absolute justify-end"
+          style={{ left: leg.header.x, top: leg.header.y, width: leg.header.width, height: leg.header.height }}
+        >
+          <Text variant="caption" className="text-center font-semibold" numberOfLines={1}>
+            {learnerTerm("section")} {leg.sectionIndex + 1} · {legStateCopy(leg.structuralState, leg.guardianSubstate)}
+          </Text>
+          <Text variant="caption" color="muted" className="text-center" numberOfLines={1}>
+            {formationProgressLine(leg.progress)}
+          </Text>
+        </View>
+      ))}
 
       {layout.terminus ? (
         <FormationPiece
@@ -118,34 +121,27 @@ export function CrystalFormationScene({
           testID={focus?.kind === "summit" ? "formation-focus-summit" : undefined}
           contextualizing={contextualizingRewardKey === "summit"}
           style={{
-            left: layout.terminus.frame.x * scale,
-            top: layout.terminus.frame.y * scale,
-            width: layout.terminus.width * scale,
-            height: layout.terminus.height * scale
+            left: layout.terminus.frame.x,
+            top: layout.terminus.frame.y,
+            width: layout.terminus.width,
+            height: layout.terminus.height
           }}
         >
-          <TerminusScene terminus={layout.terminus} scale={scale} />
+          <TerminusScene terminus={layout.terminus} />
         </FormationPiece>
       ) : null}
     </View>
   );
 
-  const fittedScene = fit.horizontalOverflow ? (
-    <ScrollView horizontal contentContainerStyle={{ width: sceneWidth }} showsHorizontalScrollIndicator>
-      {scene}
-    </ScrollView>
-  ) : (
-    <View style={{ width: sceneWidth, height: sceneHeight }}>{scene}</View>
-  );
-  return focusedSceneHeight < sceneHeight ? (
+  return croppedHeight < layout.height ? (
     <View
       testID="formation-focused-viewport"
       className="overflow-hidden"
-      style={{ width: sceneWidth, height: focusedSceneHeight }}
+      style={{ width: layout.width, height: croppedHeight }}
     >
-      {fittedScene}
+      {scene}
     </View>
-  ) : fittedScene;
+  ) : scene;
 }
 
 function FormationPiece({
@@ -184,17 +180,15 @@ function FormationPiece({
 
 function MineralTargets({
   leg,
-  scale,
   selectedNodeId,
   onSelectNode
 }: Readonly<{
   leg: PlacedLeg;
-  scale: number;
   selectedNodeId: string | null;
   onSelectNode: (derivedNodeId: string) => void;
 }>) {
   return leg.slots.filter(isNameableMineral).map((slot) => {
-    const size = Math.max(44, SLOT_SIZE * scale);
+    const size = Math.max(44, slot.size);
     return (
       <PressableSurface
         key={`target-${slot.derivedNodeId}`}
@@ -202,7 +196,7 @@ function MineralTargets({
         selected={selectedNodeId === slot.derivedNodeId}
         onPress={() => onSelectNode(slot.derivedNodeId)}
         className="absolute items-center justify-center rounded-control"
-        style={{ left: slot.x * scale - size / 2, top: slot.y * scale - size / 2, width: size, height: size }}
+        style={{ left: slot.x - size / 2, top: slot.y - size / 2, width: size, height: size }}
       >
         <View />
       </PressableSurface>
@@ -210,33 +204,49 @@ function MineralTargets({
   });
 }
 
-function TerminusScene({ terminus, scale }: Readonly<{ terminus: FormationTerminus; scale: number }>) {
-  const label = terminus.crowned ? "Summit terminus — Crown seated." : "Summit terminus — Crown awaits.";
-  const cx = terminus.width / 2;
-  const crownBase = terminus.height * 0.66;
+// The summit peak (D6): a small distinct mountain silhouette whose apex holds the
+// keystone slot — a dashed empty diamond until the Expedition Guardian falls, a gold
+// faceted keystone after. Gold appears only on the earned reward.
+function TerminusScene({ terminus }: Readonly<{ terminus: FormationTerminus }>) {
+  const label = terminus.keystoneSeated ? "Summit peak — Keystone seated." : "Summit peak — Keystone awaits.";
+  const { x, y } = terminus.keystone;
   return (
     <Svg
       accessibilityRole="image"
       accessibilityLabel={label}
-      width={terminus.width * scale}
-      height={terminus.height * scale}
+      width={terminus.width}
+      height={terminus.height}
       viewBox={`0 0 ${terminus.width} ${terminus.height}`}
     >
-      <Polygon points={points(terminus.matrix)} fill={colors["muted-panel"]} stroke={colors.line} strokeWidth={2} />
-      <Polygon points={points(inset(terminus.matrix, 0.16))} fill={colors.card} stroke={colors["line-strong"]} strokeWidth={1} opacity={0.72} />
-      {terminus.crowned ? (
+      <Polygon
+        points={points(terminus.peak)}
+        fill={colors["muted-panel"]}
+        stroke={colors["line-strong"]}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      {terminus.keystoneSeated ? (
         <>
           <Polygon
-            testID="formation-summit-crown"
-            points={`${cx - 34},${crownBase} ${cx - 26},${crownBase - 34} ${cx - 8},${crownBase - 16} ${cx},${crownBase - 42} ${cx + 10},${crownBase - 16} ${cx + 28},${crownBase - 34} ${cx + 34},${crownBase} `}
+            testID="formation-summit-keystone"
+            points={`${x},${y - 14} ${x + 11},${y} ${x},${y + 14} ${x - 11},${y}`}
             fill={colors.gold}
-            stroke={colors.frontier}
-            strokeWidth={2}
+            stroke={colors["line-strong"]}
+            strokeWidth={1.5}
           />
-          <Polyline points={`${cx - 34},${crownBase} ${cx + 34},${crownBase}`} stroke={colors["line-strong"]} strokeWidth={4} />
+          {/* Two facet strokes keep the keystone faceted, not a flat diamond. */}
+          <Polyline points={`${x - 11},${y} ${x},${y - 4} ${x + 11},${y}`} fill="none" stroke={colors["on-accent"]} strokeWidth={1.2} opacity={0.8} />
+          <Polyline points={`${x},${y - 4} ${x},${y + 14}`} fill="none" stroke={colors["on-accent"]} strokeWidth={1.2} opacity={0.6} />
         </>
       ) : (
-        <Polyline points={`${cx - 28},${crownBase} ${cx},${crownBase - 18} ${cx + 28},${crownBase}`} fill="none" stroke={colors.trail} strokeWidth={3} strokeDasharray="6 5" />
+        <Polygon
+          testID="formation-summit-keystone-empty"
+          points={`${x},${y - 14} ${x + 11},${y} ${x},${y + 14} ${x - 11},${y}`}
+          fill="none"
+          stroke={colors.trail}
+          strokeWidth={2}
+          strokeDasharray="4 4"
+        />
       )}
     </Svg>
   );
@@ -244,14 +254,4 @@ function TerminusScene({ terminus, scale }: Readonly<{ terminus: FormationTermin
 
 function points(value: readonly { x: number; y: number }[]): string {
   return value.map((point) => `${point.x},${point.y}`).join(" ");
-}
-
-function inset(value: readonly { x: number; y: number }[], fraction: number): { x: number; y: number }[] {
-  const cx = value.reduce((sum, point) => sum + point.x, 0) / Math.max(1, value.length);
-  const cy = value.reduce((sum, point) => sum + point.y, 0) / Math.max(1, value.length);
-  return value.map((point) => ({ x: point.x + (cx - point.x) * fraction, y: point.y + (cy - point.y) * fraction }));
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

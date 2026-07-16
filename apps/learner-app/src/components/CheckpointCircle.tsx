@@ -98,8 +98,7 @@ function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIco
     return (
       <CrystalSpecimen
         derivedNodeId={concept.derivedNodeId}
-        sectionIndex={concept.sectionIndex}
-        sectionPositionIndex={concept.sectionPositionIndex}
+        difficulty={concept.difficulty}
         growthFraction={concept.growthFraction}
         state={isGhost ? "ghost" : stop.state === "complete" ? "collected" : "growing"}
         size={40}

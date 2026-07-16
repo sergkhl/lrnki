@@ -1,43 +1,39 @@
 import { expect, test } from "@jest/globals";
 import { render, screen } from "@testing-library/react-native";
 import { CrystalSpecimen } from "./CrystalSpecimen";
-import { mineralHabitFor, mineralSpecimenSpec } from "@/learn/mineralSpecimen";
+import { mineralSpecimenSpec } from "@/learn/mineralSpecimen";
 
-// U1 rendering contract (test scenarios 2, 5): which facets render grown vs pending vs
-// ghost is the observable state language — never color alone.
+// U1 rendering contract (D1): ghost outline → rising fill → full color + gloss is the
+// observable state language — never color alone. (Jest gotcha: one render per test.)
 
 const NODE = "node-specimen";
-const SECTION = { sectionIndex: 0, sectionPositionIndex: 0 };
-const SPEC = mineralSpecimenSpec(mineralHabitFor(SECTION), NODE);
 
-test("a collected specimen renders every facet grown with the shared highlight", async () => {
-  await render(<CrystalSpecimen derivedNodeId={NODE} {...SECTION} growthFraction={1} state="collected" />);
-  expect(screen.getAllByTestId("facet-grown")).toHaveLength(SPEC.facets.length);
-  expect(screen.queryAllByTestId("facet-pending")).toHaveLength(0);
-  expect(screen.getByTestId("facet-highlight")).toBeTruthy();
+test("a collected specimen renders the full fill, every facet, and the gloss", async () => {
+  await render(<CrystalSpecimen derivedNodeId={NODE} difficulty={0.9} growthFraction={1} state="collected" />);
+  expect(screen.getByTestId("specimen-fill")).toBeTruthy();
+  expect(screen.getAllByTestId("specimen-facet")).toHaveLength(mineralSpecimenSpec("diamond").facets.length);
+  expect(screen.getByTestId("specimen-gloss")).toBeTruthy();
   expect(screen.getByLabelText("Collected crystal")).toBeTruthy();
 });
 
-test("a partially grown specimen shows grown facets over the faint pending silhouette", async () => {
-  await render(<CrystalSpecimen derivedNodeId={NODE} {...SECTION} growthFraction={0.5} state="growing" />);
-  const grown = screen.getAllByTestId("facet-grown");
-  const pending = screen.getAllByTestId("facet-pending");
-  expect(grown.length).toBeGreaterThan(0);
-  expect(grown.length).toBeLessThan(SPEC.facets.length);
-  expect(grown.length + pending.length).toBe(SPEC.facets.length);
-  expect(screen.queryAllByTestId("facet-highlight")).toHaveLength(0);
+test("a growing specimen shows the faint full outline with a partial fill and no gloss", async () => {
+  await render(<CrystalSpecimen derivedNodeId={NODE} difficulty={0.1} growthFraction={0.5} state="growing" />);
+  expect(screen.getByTestId("specimen-outline")).toBeTruthy();
+  expect(screen.getByTestId("specimen-fill")).toBeTruthy();
+  expect(screen.queryAllByTestId("specimen-gloss")).toHaveLength(0);
+  expect(screen.getByLabelText("Growing crystal")).toBeTruthy();
 });
 
-test("a ghost slot renders outline-only facets and never a collected fill or highlight", async () => {
-  await render(<CrystalSpecimen derivedNodeId={NODE} {...SECTION} growthFraction={1} state="ghost" ariaLabel="Known ground" />);
-  expect(screen.getAllByTestId("facet-ghost")).toHaveLength(SPEC.facets.length);
-  expect(screen.queryAllByTestId("facet-grown")).toHaveLength(0);
-  expect(screen.queryAllByTestId("facet-highlight")).toHaveLength(0);
+test("a ghost slot renders outline-only and never a fill or gloss", async () => {
+  await render(<CrystalSpecimen derivedNodeId={NODE} difficulty={0.1} growthFraction={1} state="ghost" ariaLabel="Known ground" />);
+  expect(screen.getByTestId("specimen-ghost")).toBeTruthy();
+  expect(screen.queryAllByTestId("specimen-fill")).toHaveLength(0);
+  expect(screen.queryAllByTestId("specimen-gloss")).toHaveLength(0);
   expect(screen.getByLabelText("Known ground")).toBeTruthy();
 });
 
-test("growth zero renders only the pending silhouette", async () => {
-  await render(<CrystalSpecimen derivedNodeId={NODE} {...SECTION} growthFraction={0} state="growing" />);
-  expect(screen.queryAllByTestId("facet-grown")).toHaveLength(0);
-  expect(screen.getAllByTestId("facet-pending")).toHaveLength(SPEC.facets.length);
+test("growth zero renders only the teasing outline — the fill region is degenerate", async () => {
+  await render(<CrystalSpecimen derivedNodeId={NODE} difficulty={0.1} growthFraction={0} state="growing" />);
+  expect(screen.getByTestId("specimen-outline")).toBeTruthy();
+  expect(screen.queryAllByTestId("specimen-fill")).toHaveLength(0);
 });

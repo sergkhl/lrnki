@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, View, useWindowDimensions } from "react-native";
+import { ScrollView, View } from "react-native";
 import { Sparkles } from "lucide-react-native";
 import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import type { RecallChallengeView, RecallScopeStatus, StudySession } from "@lrnki/application/projection";
 import { buildTrailView } from "@lrnki/application/projection";
 import {
   buildCrystalFormationLayout,
+  MIN_ISLAND_WIDTH,
   type CrystalFormationLayout,
   type VistaFocus
 } from "@/learn/crystalFormationLayout";
@@ -37,11 +38,18 @@ export type GuardianRewardPreview =
       layout: CrystalFormationLayout;
     };
 
+// The one reward-scene width policy: the card crops nothing, so the preview layout is
+// built at exactly the width the scene will render.
+export function guardianRewardSceneWidth(windowWidth: number): number {
+  return Math.max(MIN_ISLAND_WIDTH, Math.min(420, windowWidth - 56));
+}
+
 // Reward classification is a projection read, never local award state. A mismatched
 // challenge is a rematch only after a matching scope exposes a durable first-win id.
 export function guardianRewardPreview(
   challenge: WonGuardianView,
-  session: StudySession
+  session: StudySession,
+  availableWidth: number
 ): GuardianRewardPreview {
   const trail = buildTrailView(session);
   let focus: VistaFocus | null = null;
@@ -61,7 +69,7 @@ export function guardianRewardPreview(
     }
   }
   if (!focus || !scope?.wonChallengeId) return { status: "inconsistent" };
-  const layout = buildCrystalFormationLayout(session, trail);
+  const layout = buildCrystalFormationLayout(session, trail, availableWidth);
   if (focus.kind === "leg" && !layout.legs.some((leg) => leg.sectionIndex === focus.sectionIndex)) {
     return { status: "inconsistent" };
   }
@@ -90,7 +98,6 @@ export function GuardianReward({
   onExplore: (focus: VistaFocus) => void;
 }>) {
   const reduceMotion = useReducedMotion();
-  const { width } = useWindowDimensions();
   const eventKey = preview.status === "ready" && transitionToken
     ? `${transitionToken}:${preview.rewardKind}:${preview.focus.kind}`
     : null;
@@ -164,13 +171,11 @@ export function GuardianReward({
                 <LegFormationScene
                   leg={rewardLeg}
                   mode="binding"
-                  width={Math.min(420, Math.max(280, width - 56))}
                   bindingEventId={first ? eventKey : null}
                 />
               ) : (
                 <CrystalFormationScene
                   layout={ready.layout}
-                  width={Math.min(440, Math.max(280, width - 56))}
                   focus={ready.focus}
                   contextualizingRewardKey={first && eventKey ? "summit" : null}
                   cropToFocus
