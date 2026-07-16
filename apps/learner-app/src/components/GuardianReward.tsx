@@ -6,6 +6,7 @@ import type { RecallChallengeView, RecallScopeStatus, StudySession } from "@lrnk
 import { buildTrailView } from "@lrnki/application/projection";
 import {
   buildCrystalFormationLayout,
+  MIN_ISLAND_WIDTH,
   type CrystalFormationLayout,
   type VistaFocus
 } from "@/learn/crystalFormationLayout";
@@ -40,7 +41,7 @@ export type GuardianRewardPreview =
 // The one reward-scene width policy: the card crops nothing, so the preview layout is
 // built at exactly the width the scene will render.
 export function guardianRewardSceneWidth(windowWidth: number): number {
-  return Math.min(420, Math.max(280, windowWidth - 56));
+  return Math.max(MIN_ISLAND_WIDTH, Math.min(420, windowWidth - 56));
 }
 
 // Reward classification is a projection read, never local award state. A mismatched

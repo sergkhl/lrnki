@@ -35,7 +35,7 @@ const MIN_HEADER_WIDTH = 240;
 // Vertical gap between stacked islands and the small alternating lateral offset (D5).
 const LEG_GAP = 36;
 const ASCENT_OFFSET_X = 24;
-const MIN_ISLAND_WIDTH = 140;
+export const MIN_ISLAND_WIDTH = 140;
 const PEAK_WIDTH = 104;
 const PEAK_HEIGHT = 88;
 const OUTLINE_SAMPLES = 16;

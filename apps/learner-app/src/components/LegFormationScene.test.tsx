@@ -135,6 +135,7 @@ test("reduced motion skips the binding overlay and shows the sealed bound rim di
 test("a future leg ghosts every slot with no fill", async () => {
   const future = buildLegModel(section({ state: "locked" }), [concept("a", { state: "locked" }), concept("b", { state: "locked", sectionPositionIndex: 1 })], WIDTH);
   await render(<LegFormationScene leg={future} mode="overview" />);
+  expect(screen.getByTestId("island-rim-future").props.opacity).toBeUndefined();
   expect(screen.queryAllByTestId("specimen-fill")).toHaveLength(0);
   expect(screen.getAllByTestId("specimen-ghost").length).toBe(2);
 });

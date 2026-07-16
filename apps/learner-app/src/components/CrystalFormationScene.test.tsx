@@ -52,6 +52,8 @@ test("the full scene renders islands, laid-out headers, the spine, and the empty
   expect(screen.getByText("Leg 1 · Guardian has nothing to test yet")).toBeTruthy();
   expect(screen.getByText("1 of 1 ground complete · 1 crystal")).toBeTruthy();
   expect(screen.getAllByTestId("formation-spine-segment")).toHaveLength(2);
+  const headerMasks = screen.getAllByTestId("formation-header-mask");
+  expect(headerMasks).toHaveLength(layout.legs.length);
   expect(screen.getByTestId("formation-focus-leg-0")).toBeTruthy();
 });
 

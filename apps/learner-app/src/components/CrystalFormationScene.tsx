@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { View } from "react-native";
-import Svg, { Polygon, Polyline } from "react-native-svg";
+import Svg, { Polygon, Polyline, Rect } from "react-native-svg";
 import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import {
   isNameableMineral,
@@ -62,6 +62,20 @@ export function CrystalFormationScene({
             strokeLinecap="round"
             strokeLinejoin="round"
             opacity={segment.lit ? 0.95 : 0.6}
+          />
+        ))}
+        {/* The spine is one continuous underlying curve, but reserved text bands are
+            opaque reading surfaces. SVG document order paints these masks after the
+            curve, preventing decorative geometry from crossing header copy. */}
+        {layout.legs.map((leg) => (
+          <Rect
+            key={`header-mask:${leg.sectionIndex}`}
+            testID="formation-header-mask"
+            x={leg.header.x}
+            y={leg.header.y}
+            width={leg.header.width}
+            height={leg.header.height}
+            fill={colors.background}
           />
         ))}
       </Svg>

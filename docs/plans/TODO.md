@@ -2,22 +2,6 @@
 
 ## TODO
 
-### Active implementation
-
-- **Crystal Formation Minimal Redesign** — IN PROGRESS, plan
-  [2026-07-16-002](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md): **U1–U4
-  implemented 2026-07-16 (uncommitted)** — curated difficulty-tiered mineral library
-  (`difficultyBand` re-exported via the projection barrel; tier tint tokens; half-plane fill
-  clip), width-driven mound-packing layout (headers/badges/one sampled spine/peak+keystone;
-  sphere-grid/veins/seam/branch/`fitLegWidth` deleted), scene + composition-point rewrite
-  (`guardianRewardSceneWidth` feeds the preview layout width), ADR-0032 formation section
-  rewritten, crown→keystone everywhere. Deterministic envelope green (workspace typecheck, lint 0
-  errors, learner-app jest 225, application suite, intercepted `pnpm e2e` 46/46 with evidence
-  screenshots under `tmp/2026-07-16-crystal-formation-minimal-redesign/`). **NEXT = U5 rule-14
-  live-browser gate** over a real synthetic expedition (then fold status here and delete the
-  plan). Screenshot notes for the gate: the future island's `fog` fill reads heavy, and the spine
-  crosses the header band text on offset islands — judge/tune in U5.
-
 ### Evidence-triggered follow-up
 
 - **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a
@@ -26,6 +10,27 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Crystal Formation Minimal Redesign shipped (2026-07-16, plan 2026-07-16-002; plan DELETED).**
+  The Crystal Formation now uses a curated intrinsic-difficulty mineral library, compact
+  width-driven mound islands, one smooth nonsemantic ascent spine, junction badges, and a peak-held
+  summit keystone; the former procedural habits, Sphere Grid, veins, seam, branch, nested contours,
+  fit/overflow path, crop-to-focus, and crown wording are deleted. U5's first screenshot judgment
+  found two genuine visual-composition defects: the spine crossed reserved header text and Future
+  islands read as heavy gray panels. Conventional paint-order masks now protect each layout-owned
+  header band while preserving one continuous underlying spine, and Future islands use the quiet
+  scene surface with dashed rim + ghost silhouettes. Final review also caught and fixed a
+  narrow-screen sizing defect where the Guardian reward's former floor plus container padding
+  overflowed 320 px; one shared formation minimum now governs the responsive scene. A real
+  production-generated Signal Processing expedition (13 concepts / 9 Legs) passed the real
+  API/Postgres browser gate at phone, desktop, reduced motion, and 200% page scale: all structural
+  states, real available→engaged Guardian copy, memory-door content, one-time contextualization,
+  64–80 px specimens, zero horizontal overflow, and earned-only gold were inspected; the disposable
+  learner was deleted. The 32-scenario production-export matrix separately re-proved collection /
+  binding / rematch / keystone choreography, Guardian substates, and 320 px reward containment.
+  Deterministic envelope green; commit `8c58877` owns U1–U4 and the U5/review fixes are currently
+  uncommitted. Evidence + evaluation:
+  `tmp/2026-07-16-crystal-formation-minimal-redesign/EVALUATION.md`.
 
 - **Scaffold Content Quality Audit shipped (2026-07-16, plan 2026-07-16-001; plan DELETED).**
   Generated Support Step content now has a standing quality instrument AND two generation-time
@@ -408,6 +413,26 @@
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Crystal Formation Minimal Redesign — U5 real-use gate, 2026-07-16.** Initial production-export
+  screenshots were `FIX_FIRST`: Future islands' opaque gray fill overwhelmed the quiet state
+  hierarchy, and the decorative ascent spine visibly crossed multiple header labels. Added
+  proof-first component contracts, then fixed the root paint-order/state-surface issues with one
+  background-token SVG mask per reserved header and a quiet-background Future island. Final review
+  then found the 280 px Guardian reward floor could overflow a 320 px viewport after its 56 px
+  container padding; a red sizing contract led to the shared 140 px formation minimum, and the
+  production browser now asserts zero overflow at 320×568. Focused tests pass; the regenerated
+  phone/desktop screenshots are clean; Crystal Formation production-export Playwright is **32/32
+  PASS** with zero unexpected runtime errors. Real-backend gate: existing
+  production-generated “Fourier transform” (Signal Processing) expedition, 13 concepts / 18 current
+  Study Items / 9 Legs; real learner API + Postgres, no interception, one real won Recall Challenge.
+  Phone 390×844, desktop 1280×800, reduced-motion, and Chromium 200% page scale all PASS: Bound /
+  Guardian-ready / Collecting / Future states, available→engaged copy, real lesson memory door,
+  first-open-only contextualization, 9 masks + 9 spine segments, specimen sizes 64–80 px, 0
+  horizontal overflow, and gold only in the earned Bound Leg. Full learner Jest 51 suites / 226
+  tests; workspace typecheck all 12 projects; lint 0 errors / 8 pre-existing warnings. Disposable
+  learner removed by exact-name cleanup; local servers stopped. Real-use quality **PASS**. Evidence:
+  `tmp/2026-07-16-crystal-formation-minimal-redesign/EVALUATION.md`.
 
 - **Scaffold Content Quality Audit — U5 fresh-generation gate, 2026-07-16.** Working-tree
   learner-api (`:8899`, both supervisors, production LiteLLM) generated three mixed-domain synthetic

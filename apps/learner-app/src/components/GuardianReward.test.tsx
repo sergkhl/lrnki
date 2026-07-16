@@ -10,6 +10,7 @@ import { learnerTerm } from "@/learn/vocabulary";
 import {
   GuardianReward,
   guardianRewardPreview,
+  guardianRewardSceneWidth,
   type GuardianRewardPreview,
   type WonGuardianView
 } from "./GuardianReward";
@@ -80,6 +81,11 @@ beforeEach(() => {
 });
 
 afterEach(() => { jest.useRealTimers(); });
+
+test("fits the reward scene inside narrow viewport padding", () => {
+  expect(guardianRewardSceneWidth(320)).toBe(264);
+  expect(guardianRewardSceneWidth(1280)).toBe(420);
+});
 
 test("classifies only a matching durable won scope as first or rematch", () => {
   expect(guardianRewardPreview(challenge(), wonSession(), 358)).toMatchObject({ status: "ready", rewardKind: "first", focus: { kind: "leg", sectionIndex: 0 } });

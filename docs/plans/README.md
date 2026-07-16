@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-16-002 — Crystal Formation Minimal Redesign](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md)
+- None.
 
 ## Ownership rules
 

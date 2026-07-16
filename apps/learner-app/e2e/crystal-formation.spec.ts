@@ -309,6 +309,9 @@ test("a summit rematch keeps the keystone seated with endurance copy (AE8)", asy
 
 test("reduced motion binds the first Leg statically with immediate actions (AE9)", async ({ page, mock }) => {
   const challengeId = "guardian-first-ready-leg";
+  if (test.info().project.name === "phone") {
+    await page.setViewportSize({ width: 320, height: 568 });
+  }
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seedToken(page, "valid-token");
   mock.handlers = {
@@ -327,6 +330,9 @@ test("reduced motion binds the first Leg statically with immediate actions (AE9)
   await expect(page.getByTestId("island-rim-bound")).toBeVisible();
   await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Continue expedition" })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => document.documentElement.clientWidth)
+  );
   await page.screenshot({ path: u6Shot("binding-reduced-motion", test.info().project.name), fullPage: false });
 });
 

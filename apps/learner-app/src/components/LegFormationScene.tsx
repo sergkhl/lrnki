@@ -53,12 +53,11 @@ export function LegFormationScene({
       <Polygon
         testID={`island-rim-${leg.structuralState}`}
         points={toPoints(leg.outline)}
-        fill={future ? colors.fog : colors["muted-panel"]}
+        fill={future ? colors.background : colors["muted-panel"]}
         stroke={rimStroke(leg.structuralState)}
         strokeWidth={2}
         strokeLinejoin="round"
         strokeDasharray={future ? "6 5" : undefined}
-        opacity={future ? 0.55 : 1}
       />
 
       {leg.slots.map((slot) => (
