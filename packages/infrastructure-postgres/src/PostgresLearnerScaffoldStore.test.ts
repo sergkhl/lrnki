@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import test, { after } from "node:test";
 import type { ScaffoldStep } from "@lrnki/domain-core";
 import { createDatabaseClient } from "./db";
-import { PostgresLearnerScaffoldStore } from "./PostgresLearnerScaffoldStore";
+import { PostgresLearnerScaffoldStore, PostgresScaffoldReferenceActivityRead } from "./PostgresLearnerScaffoldStore";
 import { PostgresResponseLogStore } from "./PostgresLearnerLoopStores";
 import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
@@ -40,6 +40,34 @@ async function seedSubstrate(sql: Sql): Promise<{ enrichmentId: string; parentNo
     nodeIds.push(derivedNodeId);
   }
   return { enrichmentId, parentNodeId: nodeIds[0], refNodeId: nodeIds[1] };
+}
+
+async function seedReferenceAssets(sql: Sql, input: { enrichmentId: string; refNodeId: string }, label = "Reference") {
+  const conceptLessonId = randomUUID();
+  const studyItemId = randomUUID();
+  await sql`
+    INSERT INTO concept_lessons (concept_lesson_id, enrichment_id, derived_node_id, canonical_label, generating_model, config_hash)
+    VALUES (${conceptLessonId}, ${input.enrichmentId}, ${input.refNodeId}, ${label}, 'test', 'cfg')`;
+  await sql`
+    INSERT INTO concept_lesson_sections (concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, grounding_provenance)
+    VALUES (${randomUUID()}, ${conceptLessonId}, 0, 'definition', ${`${label} pinned lesson`}, 'generated')`;
+  await sql`
+    INSERT INTO study_items (study_item_id, item_type, enrichment_id, derived_node_id, grounding_provenance, question, explanation, generating_model, config_hash)
+    VALUES (${studyItemId}, 'option_select', ${input.enrichmentId}, ${input.refNodeId}, 'generated', ${`${label} pinned question?`}, 'Pinned explanation', 'test', 'cfg')`;
+  for (const [ordinal, text] of ["Correct", "Wrong A", "Wrong B", "Wrong C"].entries()) {
+    await sql`
+      INSERT INTO study_item_options (option_id, study_item_id, ordinal, option_text, is_correct, provenance)
+      VALUES (${randomUUID()}, ${studyItemId}, ${ordinal}, ${text}, ${ordinal === 0}, 'generated')`;
+  }
+  return { conceptLessonId, studyItemId };
+}
+
+async function claimDetour(sql: Sql, store: PostgresLearnerScaffoldStore, detourId: string): Promise<string> {
+  await sql`UPDATE learner_scaffold_detours SET status = 'hidden' WHERE status = 'generating' AND detour_id <> ${detourId}`;
+  const claimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() + 60_000), maxAttempts: 3 });
+  assert.equal(claimed?.detourId, detourId);
+  assert.ok(claimed.claimToken);
+  return claimed.claimToken;
 }
 
 function generatedStep(ordinal: number): ScaffoldStep {
@@ -87,8 +115,7 @@ maybe("upsertPending is idempotent per (learner, enrichment, parent, term); hide
     assert.notEqual(other.detourId, first.detourId);
 
     // Publish content, then hide and restore: the same ready steps come back.
-    const claimToken = randomUUID();
-    assert.equal(await store.claim({ detourId: first.detourId, operationId: randomUUID(), claimToken }), true);
+    const claimToken = await claimDetour(sql, store, first.detourId);
     const step = generatedStep(0);
     assert.equal(await store.publishReady({ detourId: first.detourId, claimToken, steps: [step] }), true);
     assert.equal(await store.hide({ detourId: first.detourId, learnerStateRef: learner }), true);
@@ -103,20 +130,142 @@ maybe("upsertPending is idempotent per (learner, enrichment, parent, term); hide
 });
 
 // Covers U2 scenario 3: the DB CHECK rejects a step that is both/neither, and a bad lifecycle.
-maybe("the schema rejects a mixed step shape and an invalid lifecycle value", async () => {
+maybe("the schema requires all pinned ids, rejects mixed payloads and non-option-select references", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const { enrichmentId, parentNodeId, refNodeId } = await seedSubstrate(sql);
+    const assets = await seedReferenceAssets(sql, { enrichmentId, refNodeId });
     const learner = await seedLearner(sql, `L-${randomUUID()}`);
     const store = new PostgresLearnerScaffoldStore(sql);
     const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "x", normalizedTerm: "x" });
 
     await assert.rejects(() => sql`
-      INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, payload)
-      VALUES (${randomUUID()}, ${detour.detourId}, 0, 'reference', ${refNodeId}, '{"x":1}'::jsonb)`, /violates check|check constraint/i, "a reference step with a payload is rejected");
+      INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id, payload)
+      VALUES (${randomUUID()}, ${detour.detourId}, 0, 'reference', ${refNodeId}, ${assets.conceptLessonId}, ${assets.studyItemId}, '{"x":1}'::jsonb)`, /violates check|check constraint/i, "a reference step with a payload is rejected");
+
+    await assert.rejects(() => sql`
+      INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id)
+      VALUES (${randomUUID()}, ${detour.detourId}, 0, 'reference', ${refNodeId})`, /violates check|check constraint/i, "a reference step cannot omit either pinned asset id");
+
+    const matchingItemId = randomUUID();
+    await sql`
+      INSERT INTO study_items (study_item_id, item_type, enrichment_id, derived_node_id, grounding_provenance, question, generating_model, config_hash)
+      VALUES (${matchingItemId}, 'matching', ${enrichmentId}, ${refNodeId}, 'generated', 'Match these', 'test', 'cfg')`;
+    await assert.rejects(() => sql`
+      INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id)
+      VALUES (${randomUUID()}, ${detour.detourId}, 0, 'reference', ${refNodeId}, ${assets.conceptLessonId}, ${matchingItemId})`, /foreign key|constraint/i, "a pinned Study Item must be option-select");
 
     await assert.rejects(() => sql`
       UPDATE learner_scaffold_detours SET status = 'bogus' WHERE detour_id = ${detour.detourId}`, /violates check|check constraint/i, "an unknown lifecycle value is rejected");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("a pinned reference replays exact superseded lesson and item assets without copied payload", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, parentNodeId, refNodeId } = await seedSubstrate(sql);
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const store = new PostgresLearnerScaffoldStore(sql);
+    const first = await seedReferenceAssets(sql, { enrichmentId, refNodeId }, "First generation");
+    const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "Reference", normalizedTerm: "reference" });
+    const token = await claimDetour(sql, store, detour.detourId);
+    const step: ScaffoldStep = {
+      scaffoldStepId: randomUUID(),
+      ordinal: 0,
+      kind: "reference",
+      referencedDerivedNodeId: refNodeId,
+      referencedConceptLessonId: first.conceptLessonId,
+      referencedStudyItemId: first.studyItemId
+    };
+    assert.equal(await store.publishReady({ detourId: detour.detourId, claimToken: token, steps: [step] }), true);
+
+    await sql`UPDATE concept_lessons SET superseded_at = now() WHERE concept_lesson_id = ${first.conceptLessonId}`;
+    await sql`UPDATE study_items SET superseded_at = now() WHERE study_item_id = ${first.studyItemId}`;
+    const replacement = await seedReferenceAssets(sql, { enrichmentId, refNodeId }, "Replacement generation");
+
+    const [activity] = await new PostgresScaffoldReferenceActivityRead(sql).listForLearnerEnrichment({ learnerStateRef: learner, enrichmentId });
+    assert.equal(activity.lesson.conceptLessonId, first.conceptLessonId);
+    assert.equal(activity.lesson.sections[0].text, "First generation pinned lesson");
+    assert.equal(activity.item.studyItemId, first.studyItemId);
+    assert.equal(activity.item.question, "First generation pinned question?");
+    assert.notEqual(activity.lesson.conceptLessonId, replacement.conceptLessonId);
+    assert.notEqual(activity.item.studyItemId, replacement.studyItemId);
+    const [stored] = await sql<{ payload: unknown }[]>`SELECT payload FROM learner_scaffold_steps WHERE scaffold_step_id = ${step.scaffoldStepId}`;
+    assert.equal(stored.payload, null, "the scaffold row stores identities, never copied neutral payload bytes");
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("publication rejects pinned assets outside the detour layer or parent Declared Domain", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const own = await seedSubstrate(sql);
+    const foreign = await seedSubstrate(sql);
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const store = new PostgresLearnerScaffoldStore(sql);
+    const foreignAssets = await seedReferenceAssets(sql, { enrichmentId: foreign.enrichmentId, refNodeId: foreign.refNodeId });
+    const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId: own.enrichmentId, parentDerivedNodeId: own.parentNodeId, term: "Foreign", normalizedTerm: "foreign" });
+    const token = await claimDetour(sql, store, detour.detourId);
+    await assert.rejects(
+      () => store.publishReady({
+        detourId: detour.detourId,
+        claimToken: token,
+        steps: [{
+          scaffoldStepId: randomUUID(),
+          ordinal: 0,
+          kind: "reference",
+          referencedDerivedNodeId: foreign.refNodeId,
+          referencedConceptLessonId: foreignAssets.conceptLessonId,
+          referencedStudyItemId: foreignAssets.studyItemId
+        }]
+      }),
+      /same-layer, same-domain/,
+      "a cross-layer pin cannot publish"
+    );
+    assert.equal((await store.getById(detour.detourId))?.status, "generating");
+    const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM learner_scaffold_steps WHERE detour_id = ${detour.detourId}`;
+    assert.equal(n, 0, "the rejected publication rolls back every child row");
+
+    const ownAssets = await seedReferenceAssets(sql, { enrichmentId: own.enrichmentId, refNodeId: own.refNodeId });
+    await sql`UPDATE derived_graph_nodes SET declared_domain = 'mathematics' WHERE derived_node_id = ${own.refNodeId}`;
+    await assert.rejects(
+      () => store.publishReady({
+        detourId: detour.detourId,
+        claimToken: token,
+        steps: [{
+          scaffoldStepId: randomUUID(), ordinal: 0, kind: "reference",
+          referencedDerivedNodeId: own.refNodeId,
+          referencedConceptLessonId: ownAssets.conceptLessonId,
+          referencedStudyItemId: ownAssets.studyItemId
+        }]
+      }),
+      /same-layer, same-domain/,
+      "a cross-domain pin cannot publish"
+    );
+  } finally {
+    await sql.end();
+  }
+});
+
+maybe("releaseClaim is fenced and leaves only the active attempt reclaimable", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  try {
+    const { enrichmentId, parentNodeId } = await seedSubstrate(sql);
+    const learner = await seedLearner(sql, `L-${randomUUID()}`);
+    const store = new PostgresLearnerScaffoldStore(sql);
+    const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "x", normalizedTerm: "x" });
+    const token = await claimDetour(sql, store, detour.detourId);
+    assert.equal(await store.releaseClaim({ detourId: detour.detourId, claimToken: randomUUID() }), false, "a stale fence cannot release");
+    assert.equal((await store.getById(detour.detourId))?.claimToken, token);
+    assert.equal(await store.releaseClaim({ detourId: detour.detourId, claimToken: token }), true);
+    assert.equal((await store.getById(detour.detourId))?.claimToken, null);
+    const reclaimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() + 60_000), maxAttempts: 3 });
+    assert.equal(reclaimed?.detourId, detour.detourId);
+    assert.notEqual(reclaimed?.claimToken, token);
+    assert.equal(await store.markFailed({ detourId: detour.detourId, claimToken: token }), false, "the released stale fence cannot fail the new attempt");
   } finally {
     await sql.end();
   }
@@ -171,10 +320,10 @@ maybe("listGeneratedStepsForAudit returns generated steps with context and exclu
     const learner = await seedLearner(sql, `L-${randomUUID()}`);
     const store = new PostgresLearnerScaffoldStore(sql);
     const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "Affine type", normalizedTerm: "affine type" });
-    const token = randomUUID();
-    await store.claim({ detourId: detour.detourId, operationId: token, claimToken: token });
+    const token = await claimDetour(sql, store, detour.detourId);
     const gen = generatedStep(0);
-    const ref: ScaffoldStep = { scaffoldStepId: randomUUID(), ordinal: 1, kind: "reference", referencedDerivedNodeId: refNodeId };
+    const assets = await seedReferenceAssets(sql, { enrichmentId, refNodeId });
+    const ref: ScaffoldStep = { scaffoldStepId: randomUUID(), ordinal: 1, kind: "reference", referencedDerivedNodeId: refNodeId, referencedConceptLessonId: assets.conceptLessonId, referencedStudyItemId: assets.studyItemId };
     assert.equal(await store.publishReady({ detourId: detour.detourId, claimToken: token, steps: [gen, ref] }), true);
 
     const scoped = await store.listGeneratedStepsForAudit(enrichmentId);
@@ -207,13 +356,12 @@ maybe("scaffold and neutral responses share one attempt sequence; a claimed deto
     const detour = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "x", normalizedTerm: "x" });
 
     // Only the first claim on a generating detour wins; the second is rejected.
-    assert.equal(await store.claim({ detourId: detour.detourId, operationId: randomUUID(), claimToken: randomUUID() }), true);
-    assert.equal(await store.claim({ detourId: detour.detourId, operationId: randomUUID(), claimToken: randomUUID() }), false);
+    await claimDetour(sql, store, detour.detourId);
+    assert.equal(await store.claimNextGenerating({ staleBefore: new Date(Date.now() - 60_000), maxAttempts: 3 }), undefined);
 
     // Publish a generated step, then append a scaffold response against it.
     const detour2 = await store.upsertPending({ learnerStateRef: learner, enrichmentId, parentDerivedNodeId: parentNodeId, term: "y", normalizedTerm: "y" });
-    const token = randomUUID();
-    await store.claim({ detourId: detour2.detourId, operationId: randomUUID(), claimToken: token });
+    const token = await claimDetour(sql, store, detour2.detourId);
     const step = generatedStep(0);
     await store.publishReady({ detourId: detour2.detourId, claimToken: token, steps: [step] });
 

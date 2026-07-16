@@ -349,7 +349,8 @@ test("a node whose lesson grounds an option-select that passes the guard persist
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: lessonStore.store,
     studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
-    studyItemBankStore: store
+    studyItemBankStore: store,
+    newConceptLessonId: () => "lesson-node-c1"
   });
 
   // All three stages run: the node carries option-select, matching, AND impostor items (KTD7).
@@ -361,6 +362,7 @@ test("a node whose lesson grounds an option-select that passes the guard persist
   assert.deepEqual(persistedRejected, []);
   // The lesson is persisted through the lesson store, with a source-cited definition section.
   assert.equal(lessonStore.lessons.length, 1);
+  assert.equal(lessonStore.lessons[0].conceptLessonId, "lesson-node-c1", "the application mints the stable lesson identity before persistence");
   assert.ok(lessonStore.lessons[0].sections.some((s) => s.kind === "definition" && s.groundingProvenance === "source_cep"));
 });
 

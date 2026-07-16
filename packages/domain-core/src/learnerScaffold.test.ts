@@ -16,7 +16,7 @@ test("neutralResponses keeps neutral rows and drops scaffold rows", () => {
 });
 
 test("a reference step reports content; a generated step reports content only with options", () => {
-  const reference: ScaffoldStep = { scaffoldStepId: "s1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n-9" };
+  const reference: ScaffoldStep = { scaffoldStepId: "s1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n-9", referencedConceptLessonId: "l-9", referencedStudyItemId: "i-9" };
   assert.equal(scaffoldStepHasContent(reference), true);
   const generated: ScaffoldStep = {
     scaffoldStepId: "s2",
@@ -39,5 +39,5 @@ test("scaffoldDetourHasPublishedContent is true only when the detour carries ste
     status: "ready", latestOperationId: null, claimToken: null, steps: []
   };
   assert.equal(scaffoldDetourHasPublishedContent(base), false);
-  assert.equal(scaffoldDetourHasPublishedContent({ ...base, steps: [{ scaffoldStepId: "s", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n" }] }), true);
+  assert.equal(scaffoldDetourHasPublishedContent({ ...base, steps: [{ scaffoldStepId: "s", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n", referencedConceptLessonId: "l", referencedStudyItemId: "i" }] }), true);
 });

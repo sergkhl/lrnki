@@ -128,7 +128,9 @@ maybe("cleanupReservedLearners removes only the exact reserved refs and preserve
     const unrelated = `realuse-probe-${runIdChars()}`; // reserved-shaped but a DIFFERENT run
     seeded.add(unrelated);
     await seedLearner(sql, unrelated);
-    const [{ n: enrBefore }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM graph_enrichments`;
+    // Snapshot identities, not a global count: other test files legitimately create shared
+    // enrichments concurrently under Node's test runner.
+    const enrichmentsBefore = await sql<{ enrichment_id: string }[]>`SELECT enrichment_id FROM graph_enrichments`;
 
     const deleted = await cleanupReservedLearners(sql, [refs.probe, refs.phone, refs.desktop]);
     assert.deepEqual(deleted.sort(), [refs.desktop, refs.phone, refs.probe].sort());
@@ -139,9 +141,13 @@ maybe("cleanupReservedLearners removes only the exact reserved refs and preserve
       seeded.delete(ref);
     }
     const [{ n: unrel }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM learners WHERE learner_ref = ${unrelated}`;
-    const [{ n: enrAfter }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM graph_enrichments`;
     assert.equal(unrel, 1, "an unrelated (different-run) reserved learner is NOT deleted");
-    assert.equal(enrAfter, enrBefore, "shared enrichments are untouched");
+    if (enrichmentsBefore.length > 0) {
+      const [{ n: preserved }] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM graph_enrichments
+        WHERE enrichment_id IN ${sql(enrichmentsBefore.map((row) => row.enrichment_id))}`;
+      assert.equal(preserved, enrichmentsBefore.length, "every pre-existing shared enrichment is untouched");
+    }
   } finally {
     await sql.end();
   }

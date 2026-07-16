@@ -19,6 +19,8 @@ export type ScaffoldReuseCandidate = {
   declaredDomain: string;
   hasLesson: boolean;
   hasOptionSelect: boolean;
+  conceptLessonId: string | null;
+  studyItemId: string | null;
   // A locked/included node in the active trail cannot be referenced as support (R10).
   isLocked: boolean;
 };
@@ -56,7 +58,7 @@ export type ScaffoldGenerationDeps = {
 };
 
 type ExactMatch =
-  | { kind: "reference"; derivedNodeId: string }
+  | { kind: "reference"; derivedNodeId: string; conceptLessonId: string; studyItemId: string }
   | { kind: "none" }
   | { kind: "unusable" };
 
@@ -75,8 +77,8 @@ export function resolveExactMatch(term: string, candidates: readonly ScaffoldReu
   const match = matches[0];
   if (match.derivedNodeId === parentDerivedNodeId) return { kind: "unusable" };
   if (match.isLocked) return { kind: "unusable" };
-  if (!match.hasLesson || !match.hasOptionSelect) return { kind: "unusable" };
-  return { kind: "reference", derivedNodeId: match.derivedNodeId };
+  if (!match.hasLesson || !match.hasOptionSelect || !match.conceptLessonId || !match.studyItemId) return { kind: "unusable" };
+  return { kind: "reference", derivedNodeId: match.derivedNodeId, conceptLessonId: match.conceptLessonId, studyItemId: match.studyItemId };
 }
 
 // Validate a content draft's option shape and build a persistable scaffold node payload, or
@@ -119,16 +121,23 @@ export async function runScaffoldGeneration(
 
   const usedNodeIds = new Set<string>();
   const steps: ScaffoldStep[] = [];
-  const pushReference = (derivedNodeId: string): void => {
-    if (usedNodeIds.has(derivedNodeId)) return;
-    usedNodeIds.add(derivedNodeId);
-    steps.push({ scaffoldStepId: newId(), ordinal: steps.length, kind: "reference", referencedDerivedNodeId: derivedNodeId });
+  const pushReference = (reference: Extract<ExactMatch, { kind: "reference" }>): void => {
+    if (usedNodeIds.has(reference.derivedNodeId)) return;
+    usedNodeIds.add(reference.derivedNodeId);
+    steps.push({
+      scaffoldStepId: newId(),
+      ordinal: steps.length,
+      kind: "reference",
+      referencedDerivedNodeId: reference.derivedNodeId,
+      referencedConceptLessonId: reference.conceptLessonId,
+      referencedStudyItemId: reference.studyItemId
+    });
   };
 
   // 1. Direct selected-term reuse: a unique usable exact match bypasses ALL new LLM calls (AE3).
   const direct = resolveExactMatch(detour.term, context.reuseCandidates, context.parentDerivedNodeId);
   if (direct.kind === "reference") {
-    pushReference(direct.derivedNodeId);
+    pushReference(direct);
     return publishSteps(deps, input, steps);
   }
 
@@ -151,7 +160,7 @@ export async function runScaffoldGeneration(
     // reference and is never cloned (AE4).
     const match = resolveExactMatch(proposed.label, context.reuseCandidates, context.parentDerivedNodeId);
     if (match.kind === "reference") {
-      pushReference(match.derivedNodeId);
+      pushReference(match);
       continue;
     }
     // 2b. Generate a genuinely lower-level scaffold node. Boundary concepts are dropped (R22).

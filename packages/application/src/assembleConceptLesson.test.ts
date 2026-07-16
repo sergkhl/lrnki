@@ -28,7 +28,7 @@ const generatedGrounding: NodeGrounding = {
 };
 
 function assemble(draft: ConceptLessonDraft, grounding: NodeGrounding) {
-  return assembleConceptLesson({ node, generatingModel: "test-model", configHash: "cfg", grounding, draft });
+  return assembleConceptLesson({ conceptLessonId: "lesson-1", node, generatingModel: "test-model", configHash: "cfg", grounding, draft });
 }
 
 // Covers AE2, R6/R7/R8. A definition whose quote verifies verbatim against a source passage
@@ -46,6 +46,7 @@ test("a verbatim-verifying definition is source-cited; the intuition is generate
   const result = assemble(draft, sourceGrounding);
   assert.equal(result.kind, "lesson");
   if (result.kind !== "lesson") return;
+  assert.equal(result.lesson.conceptLessonId, "lesson-1");
   const definition = result.lesson.sections.find((s) => s.kind === "definition")!;
   assert.equal(definition.groundingProvenance, "source_cep");
   assert.ok(definition.citation && definition.citation.provenance === "source");

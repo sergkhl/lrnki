@@ -31,6 +31,7 @@ export const SUBSTANTIVE_KINDS: ConceptLessonSectionKind[] = ["definition", "exa
 const LIST_SECTION_KINDS: ConceptLessonSectionKind[] = ["examples", "applications"];
 
 export type AssembleConceptLessonInput = {
+  conceptLessonId: string;
   node: { derivedNodeId: string; canonicalLabel: string; graphVersionId: string | null; enrichmentId: string };
   generatingModel: string;
   configHash: string;
@@ -145,6 +146,7 @@ export function assembleConceptLesson(input: AssembleConceptLessonInput): Assemb
   return {
     kind: "lesson",
     lesson: {
+      conceptLessonId: input.conceptLessonId,
       derivedNodeId: node.derivedNodeId,
       graphVersionId: node.graphVersionId,
       enrichmentId: node.enrichmentId,

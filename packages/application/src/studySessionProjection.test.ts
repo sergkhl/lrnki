@@ -157,6 +157,7 @@ function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verd
 
 function lessonFor(derivedNodeId: string): ConceptLesson {
   return {
+    conceptLessonId: `lesson-${derivedNodeId}`,
     derivedNodeId, graphVersionId: "g", enrichmentId: "e", generatingModel: "deepseek", configHash: "cfg",
     canonicalLabel: labelByNode[derivedNodeId],
     explorableTerms: [],
@@ -595,7 +596,7 @@ test("composeStudySession — a ready reference detour completes in lockstep wit
   const detour: ScaffoldDetour = {
     detourId: "d-ref", learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: "move", term: "Scope", normalizedTerm: "scope",
     status: "ready", latestOperationId: null, claimToken: null,
-    steps: [{ scaffoldStepId: "s-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope" }]
+    steps: [{ scaffoldStepId: "s-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope", referencedConceptLessonId: "lesson-scope", referencedStudyItemId: "item-scope" }]
   };
   const session = compose({
     studyItems: [optionItem("scope")],
@@ -620,7 +621,7 @@ function readyDetour(parent: string, term: string): ScaffoldDetour {
   return {
     detourId: `d-${parent}-${term}`, learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: parent,
     term, normalizedTerm: term.toLowerCase(), status: "ready", latestOperationId: null, claimToken: null,
-    steps: [{ scaffoldStepId: `s-${term}`, ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope" }]
+    steps: [{ scaffoldStepId: `s-${term}`, ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope", referencedConceptLessonId: "lesson-scope", referencedStudyItemId: "item-scope" }]
   };
 }
 

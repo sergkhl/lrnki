@@ -61,6 +61,7 @@ test("a source-cited definition section reuses the source citation arm", () => {
 // section. The ConceptLesson shape carries ordered sections keyed to the node.
 test("a minimal valid lesson carries gist + application + one substantive section", () => {
   const lesson: ConceptLesson = {
+    conceptLessonId: "lesson-1",
     derivedNodeId: "node-1",
     graphVersionId: "gv-1",
     enrichmentId: "enr-1",

@@ -145,6 +145,7 @@ export const studyItemBlueprintDescriptor: NeuralStageDescriptor<
     declaredDomain: "sentinel domain",
     node: { derivedNodeId: "sentinel_node", canonicalLabel: "Sentinel node", aliases: ["Sentinel alias"] },
     lesson: {
+      conceptLessonId: "sentinel_lesson",
       derivedNodeId: "sentinel_node",
       graphVersionId: null,
       enrichmentId: "sentinel_enrichment",

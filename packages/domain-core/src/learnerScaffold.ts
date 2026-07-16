@@ -53,6 +53,10 @@ export type ScaffoldReferenceStep = {
   // The existing neutral node this step studies (R8/R9). Its lesson-read and option-select
   // evidence are NEUTRAL responses; canonical mastery is unchanged.
   referencedDerivedNodeId: string;
+  // The exact neutral assets promised when this immutable step was published. Regeneration
+  // may supersede either asset, but these identities remain foreign-key-backed and replayable.
+  referencedConceptLessonId: string;
+  referencedStudyItemId: string;
 };
 
 export type ScaffoldGeneratedStep = {

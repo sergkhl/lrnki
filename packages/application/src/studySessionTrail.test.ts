@@ -60,7 +60,7 @@ test("latest incorrect after correct reopens the generated step (neutral latest-
 });
 
 test("a reference step's completion is the neutral lesson-read + option-select subset", () => {
-  const step: ScaffoldStep = { scaffoldStepId: "ref-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n-9" };
+  const step: ScaffoldStep = { scaffoldStepId: "ref-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n-9", referencedConceptLessonId: "lesson-9", referencedStudyItemId: "item-9" };
   const complete = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [],

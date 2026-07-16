@@ -2,12 +2,13 @@
 
 ## TODO
 
-### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — READY, NEXT UP)
+### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U2 NEXT)
 
-[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). Now first in execution order
-(plan 003 shipped). Grilling and durable ADR amendments are complete; implementation has not
-started. Touches `CheckpointPath.tsx` — reconcile against plan 003's shipped trail-wave +
-`useIsFocused` arrival-focus code.
+[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). U1 is complete and uncommitted:
+versioned Concept Lesson identities, pinned reference persistence/hydration, and fenced release are
+in place on a fresh schema. U2 is next; U3 is also unblocked after U1 and may follow if the session
+budget permits. Preserve plan 003's shipped `CheckpointPath` trail-wave + arrival-focus behavior
+when U5 begins.
 
 ### Evidence-triggered follow-up
 
@@ -446,6 +447,18 @@ started. Touches `CheckpointPath.tsx` — reconcile against plan 003's shipped t
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Deep Scaffold Generation — U1 persistence gate, 2026-07-16. PASS.** Hard-reset the development
+  database with repo-root `.env` loaded and applied the single initial migration cleanly. Stable
+  application-minted Concept Lesson ids now supersede instead of delete; ordinary reads return only
+  current rows, while the learner-scoped reference adapter replays exact pinned lesson +
+  option-select content after both asset families regenerate. Composite foreign keys and the
+  fenced publisher reject incomplete/mixed, non-option-select, cross-node, cross-layer, and
+  cross-domain references; scaffold rows carry no copied neutral payload. Direct claim is deleted;
+  stale release/fail/publish fences cannot affect a new attempt. Final envelope: domain-core 39/39,
+  application 680/680, infrastructure-postgres 91/91 (two consecutive final full-package passes),
+  workspace typecheck 12/12, lint 0 errors / 8 pre-existing warnings. The test-support global-count
+  assertion was made concurrency-safe by checking preservation of snapshotted shared identities.
 
 - **Learner UX polish — U6 rule-14 gate, 2026-07-16. PASS.** Two evidence layers over the shipped
   U1–U5 plus the in-gate `useIsFocused` fix. **Web (real learner-api + Postgres, no interception):**

@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-16-004 — Deep Scaffold Generation and closed attribution](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) — ready, next up (plan 003 shipped 2026-07-16).
+- [2026-07-16-004 — Deep Scaffold Generation and closed attribution](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) — in progress; U1 complete, U2 next.
 
 ## Ownership rules
 

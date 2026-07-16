@@ -436,13 +436,12 @@ export class PostgresEnrichmentLayerPurposeStore implements EnrichmentLayerPurpo
 export class PostgresConceptLessonStore implements ConceptLessonStorePort {
   constructor(private readonly sql: Sql) {}
 
-  async persist(input: { graphVersionId: string; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void> {
+  async persist(input: { graphVersionId: string | null; enrichmentId: string; configHash: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }): Promise<void> {
     const { graphVersionId, enrichmentId, configHash, lessons, absent } = input;
     await this.sql.begin(async (tx) => {
-      // Regeneration is replay, not mutation: delete the enrichment's prior lessons
-      // (sections + citations cascade) and prior absences, then re-insert. Done even when
-      // 0 lessons survive so an all-absent regeneration still clears stale lessons.
-      await tx`DELETE FROM concept_lessons WHERE enrichment_id = ${enrichmentId}`;
+      // Regeneration is replay, not mutation: retain prior lessons and their child rows as
+      // pinned history, retire only the current generation, and replace unreferenced absences.
+      await tx`UPDATE concept_lessons SET superseded_at = now() WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL`;
       await tx`DELETE FROM lesson_absent_nodes WHERE enrichment_id = ${enrichmentId}`;
       for (const node of absent) {
         await tx`
@@ -450,23 +449,22 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
           VALUES (${randomUUID()}, ${graphVersionId}, ${enrichmentId}, ${node.derivedNodeId}, ${node.reason}, ${configHash})`;
       }
       for (const lesson of lessons) {
-        const lessonId = randomUUID();
         await tx`
           INSERT INTO concept_lessons (concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash)
-          VALUES (${lessonId}, ${lesson.graphVersionId}, ${lesson.enrichmentId}, ${lesson.derivedNodeId}, ${lesson.canonicalLabel}, ${this.sql.json(lesson.explorableTerms)}, ${lesson.generatingModel}, ${lesson.configHash})`;
+          VALUES (${lesson.conceptLessonId}, ${lesson.graphVersionId}, ${lesson.enrichmentId}, ${lesson.derivedNodeId}, ${lesson.canonicalLabel}, ${this.sql.json(lesson.explorableTerms)}, ${lesson.generatingModel}, ${lesson.configHash})`;
         for (const [ordinal, section] of lesson.sections.entries()) {
           const sectionId = randomUUID();
           await tx`
             INSERT INTO concept_lesson_sections (concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, items, grounding_provenance, diagram_caption, diagram_spec)
-            VALUES (${sectionId}, ${lessonId}, ${ordinal}, ${section.kind}, ${section.text}, ${section.items ?? null}, ${section.groundingProvenance}, ${section.diagram?.caption ?? null}, ${section.diagram?.spec ?? null})`;
+            VALUES (${sectionId}, ${lesson.conceptLessonId}, ${ordinal}, ${section.kind}, ${section.text}, ${section.items ?? null}, ${section.groundingProvenance}, ${section.diagram?.caption ?? null}, ${section.diagram?.spec ?? null})`;
           if (section.citation) await this.insertCitation(tx, sectionId, section.citation);
         }
       }
 
-      const artifact: ArtifactEnvelope<{ graphVersionId: string; enrichmentId: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }> = {
+      const artifact: ArtifactEnvelope<{ graphVersionId: string | null; enrichmentId: string; lessons: ConceptLesson[]; absent: LessonAbsentNode[] }> = {
         artifactId: randomUUID(),
         artifactType: "concept_lesson_bank",
-        graphVersionId,
+        ...(graphVersionId ? { graphVersionId } : {}),
         producer: CONCEPT_LESSON_PRODUCER,
         producerVersion: CONCEPT_LESSON_PRODUCER_VERSION,
         configHash,
@@ -492,17 +490,17 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
   async getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined> {
     const rows = await this.sql<LessonRow[]>`
       SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash
-      FROM concept_lessons WHERE derived_node_id = ${derivedNodeId} LIMIT 1`;
+      FROM concept_lessons WHERE derived_node_id = ${derivedNodeId} AND superseded_at IS NULL LIMIT 1`;
     if (rows.length === 0) return undefined;
-    const [lesson] = await this.hydrate(rows);
+    const [lesson] = await hydrateConceptLessonRows(this.sql, rows);
     return lesson;
   }
 
   async listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]> {
     const rows = await this.sql<LessonRow[]>`
       SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash
-      FROM concept_lessons WHERE enrichment_id = ${enrichmentId} ORDER BY derived_node_id`;
-    return this.hydrate(rows);
+      FROM concept_lessons WHERE enrichment_id = ${enrichmentId} AND superseded_at IS NULL ORDER BY derived_node_id`;
+    return hydrateConceptLessonRows(this.sql, rows);
   }
 
   async listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]> {
@@ -514,18 +512,22 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
     return rows.map((row) => ({ derivedNodeId: row.derived_node_id, canonicalLabel: row.canonical_label, reason: row.reason }));
   }
 
-  private async hydrate(rows: LessonRow[]): Promise<ConceptLesson[]> {
+}
+
+// Shared row stitch for ordinary current reads and the learner-scoped pinned-reference adapter.
+// This helper applies no currentness policy; callers own the selecting query.
+export async function hydrateConceptLessonRows(sql: Sql, rows: LessonRow[]): Promise<ConceptLesson[]> {
     if (rows.length === 0) return [];
     const lessonIds = rows.map((row) => row.concept_lesson_id);
-    const sectionRows = await this.sql<LessonSectionRow[]>`
+    const sectionRows = await sql<LessonSectionRow[]>`
       SELECT concept_lesson_section_id, concept_lesson_id, ordinal, kind, body_text, items, grounding_provenance, diagram_caption, diagram_spec
-      FROM concept_lesson_sections WHERE concept_lesson_id IN ${this.sql(lessonIds)}
+      FROM concept_lesson_sections WHERE concept_lesson_id IN ${sql(lessonIds)}
       ORDER BY concept_lesson_id, ordinal`;
     const sectionIds = sectionRows.map((row) => row.concept_lesson_section_id);
     const citationRows = sectionIds.length
-      ? await this.sql<LessonCitationRow[]>`
+      ? await sql<LessonCitationRow[]>`
           SELECT concept_lesson_section_id, provenance, source_resource_id, source_block_id, evidence_quote, match_kind, derived_node_id, generated_passage_text
-          FROM concept_lesson_section_citations WHERE concept_lesson_section_id IN ${this.sql(sectionIds)}`
+          FROM concept_lesson_section_citations WHERE concept_lesson_section_id IN ${sql(sectionIds)}`
       : [];
 
     const citationBySection = new Map<string, LessonCitationRow>();
@@ -536,6 +538,7 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
     }
 
     return rows.map((row) => ({
+      conceptLessonId: row.concept_lesson_id,
       derivedNodeId: row.derived_node_id,
       graphVersionId: row.graph_version_id,
       enrichmentId: row.enrichment_id,
@@ -558,12 +561,11 @@ export class PostgresConceptLessonStore implements ConceptLessonStorePort {
       }),
       explorableTerms: row.explorable_terms ?? []
     }));
-  }
 }
 
-type LessonRow = {
+export type LessonRow = {
   concept_lesson_id: string;
-  graph_version_id: string;
+  graph_version_id: string | null;
   enrichment_id: string;
   derived_node_id: string;
   canonical_label: string;

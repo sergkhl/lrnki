@@ -86,6 +86,7 @@ export async function generateStudyItemBank(input: {
   conceptLessonStore: ConceptLessonStorePort;
   studyItemGeneration: StudyItemGenerationPort;
   studyItemBankStore: StudyItemBankStorePort;
+  newConceptLessonId?: () => string;
   newStudyItemId?: () => string;
   newOptionId?: () => string;
   newPairId?: () => string;
@@ -97,6 +98,7 @@ export async function generateStudyItemBank(input: {
   // keyed by enrichmentId (ADR-0017 split). Absent → no-op (unchanged behavior).
   reporter?: RunProgressReporterPort;
 }): Promise<StudyItemBankGenerationResult> {
+  const newConceptLessonId = input.newConceptLessonId ?? randomUUID;
   const newStudyItemId = input.newStudyItemId ?? randomUUID;
   const newOptionId = input.newOptionId ?? randomUUID;
   const newPairId = input.newPairId ?? randomUUID;
@@ -158,6 +160,7 @@ export async function generateStudyItemBank(input: {
       return { absent: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, reason: "no usable grounding passages" } };
     }
     try {
+      const conceptLessonId = newConceptLessonId();
       const neighbors = selectLessonNeighborhood(node, layer);
       const initialDraft = await input.conceptLessonGeneration.generate({
         declaredDomain: node.declaredDomain,
@@ -167,6 +170,7 @@ export async function generateStudyItemBank(input: {
         neighbors
       });
       let assembled = assembleConceptLesson({
+        conceptLessonId,
         node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
         generatingModel: input.conceptLessonGeneration.model,
         configHash: input.configHash,
@@ -188,6 +192,7 @@ export async function generateStudyItemBank(input: {
           ].filter(Boolean).join(" ")
         });
         const retryAssembled = assembleConceptLesson({
+          conceptLessonId,
           node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, graphVersionId: graphVersionId, enrichmentId: layer.enrichmentId },
           generatingModel: input.conceptLessonGeneration.model,
           configHash: input.configHash,

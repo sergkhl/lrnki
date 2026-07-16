@@ -304,7 +304,7 @@ test("gradeScaffoldOptionSelect grades against the step's embedded key and appen
 
 test("gradeScaffoldOptionSelect refuses a reference step and another learner's step (no row)", async () => {
   const log = fakeResponseLog();
-  const referenceStep: ScaffoldStep = { scaffoldStepId: "ref-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n1" };
+  const referenceStep: ScaffoldStep = { scaffoldStepId: "ref-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n1", referencedConceptLessonId: "lesson-1", referencedStudyItemId: "item-1" };
   const notGradable = await gradeScaffoldOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "ref-1", chosenOptionId: "x" }, { scaffoldStore: fakeScaffoldStore(referenceStep).store, responseLog: log.store });
   assert.deepEqual(notGradable, { graded: false, refused: "step_not_gradable" });
   const notOwned = await gradeScaffoldOptionSelect({ learnerStateRef: "intruder", scaffoldStepId: "step-1", chosenOptionId: "so-1" }, { scaffoldStore: fakeScaffoldStore(generatedStep()).store, responseLog: log.store });

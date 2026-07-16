@@ -94,6 +94,10 @@ async function loadParentContext(
   const nodesWithOptionSelect = new Set(
     studyItems.filter((item) => item.itemType === "option_select").map((item) => item.derivedNodeId)
   );
+  const lessonByNode = new Map(lessons.map((lesson) => [lesson.derivedNodeId, lesson]));
+  const optionSelectByNode = new Map(
+    studyItems.filter((item) => item.itemType === "option_select").map((item) => [item.derivedNodeId, item])
+  );
 
   // Reuse is scoped to the parent's OWN layer + Declared Domain (KTD3, R8). `isLocked` marks the
   // trail-included/locked case (R10); the finished Derived Graph Detail does not carry per-learner
@@ -109,6 +113,8 @@ async function loadParentContext(
       declaredDomain: node.declaredDomain,
       hasLesson: nodesWithLesson.has(node.derivedNodeId),
       hasOptionSelect: nodesWithOptionSelect.has(node.derivedNodeId),
+      conceptLessonId: lessonByNode.get(node.derivedNodeId)?.conceptLessonId ?? null,
+      studyItemId: optionSelectByNode.get(node.derivedNodeId)?.studyItemId ?? null,
       isLocked: false
     }));
 

@@ -425,12 +425,13 @@ WHERE a.artifact_type = 'study_item_bank';
 -- its derived node, label, and section count, for Admin Lab inspection (ADR-0031). Reads the
 -- immutable `concept_lesson_bank` artifact the Concept Lesson store writes beside its rows.
 CREATE VIEW artifact_concept_lessons AS
-SELECT a.graph_version_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count, cl.sections
+SELECT a.graph_version_id, cl.concept_lesson_id, cl.derived_node_id, cl.enrichment_id, cl.canonical_label, cl.section_count, cl.sections
 FROM artifact_versions a,
 JSON_TABLE(
   a.payload,
   '$.lessons[*]'
   COLUMNS (
+    concept_lesson_id text PATH '$.conceptLessonId',
     derived_node_id text PATH '$.derivedNodeId',
     enrichment_id text PATH '$.enrichmentId',
     canonical_label text PATH '$.canonicalLabel',
@@ -726,7 +727,8 @@ CREATE TABLE study_items (
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  superseded_at timestamptz
+  superseded_at timestamptz,
+  UNIQUE (study_item_id, item_type, derived_node_id)
 );
 
 -- Uniqueness holds only among CURRENT items — the same partial-index idiom as
@@ -895,8 +897,8 @@ CREATE TABLE rejected_study_items (
 -- derived node: an ordered set of typed, independently-optional sections that TEACH a
 -- concept before it is tested. Option-select derives FROM this substrate (rule 18), so a
 -- lesson is the single source of grounding for downstream study assets. Like the Study
--- Item Bank, lessons are a learner-NEUTRAL regenerable derived asset: regeneration is
--- replace-by-enrichment (delete-then-insert), never mutation of learner state, and never
+-- Item Bank, lessons are a learner-NEUTRAL regenerable derived asset: regeneration
+-- supersedes the current generation while retaining pinned history, never mutation of learner state, and never
 -- a write to the asserted graph. The normalized rows are the query surface; the immutable
 -- `concept_lesson_bank` artifact is the inspection trace `artifact_concept_lessons` flattens.
 -- ---------------------------------------------------------------------------
@@ -924,8 +926,17 @@ CREATE TABLE concept_lessons (
   generating_model text NOT NULL,
   config_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (derived_node_id)
+  superseded_at timestamptz,
+  UNIQUE (concept_lesson_id, derived_node_id)
 );
+
+CREATE UNIQUE INDEX concept_lessons_one_current_per_node
+  ON concept_lessons (derived_node_id)
+  WHERE superseded_at IS NULL;
+
+CREATE INDEX concept_lessons_enrichment_current_idx
+  ON concept_lessons (enrichment_id)
+  WHERE superseded_at IS NULL;
 
 -- Ordered teaching sections (R2). `ordinal` preserves the render order; a section that
 -- does not apply is simply ABSENT (no placeholder row, R3). `grounding_provenance` records
@@ -1075,6 +1086,13 @@ CREATE TABLE learner_scaffold_steps (
   -- A `reference` step points at an existing neutral node (R8/R9); its lesson-read and
   -- option-select evidence are NEUTRAL response_log rows and canonical mastery is unchanged.
   referenced_derived_node_id uuid REFERENCES derived_graph_nodes(derived_node_id),
+  referenced_concept_lesson_id uuid,
+  referenced_study_item_id uuid,
+  -- A constant discriminator lets a declarative composite FK prove that every pinned item
+  -- is option-select; generated steps keep it NULL through the shape CHECK below.
+  referenced_study_item_type text GENERATED ALWAYS AS (
+    CASE WHEN referenced_study_item_id IS NULL THEN NULL ELSE 'option_select' END
+  ) STORED,
   -- A `generated` step's whole content home (payload-on-step): the micro-lesson + one
   -- option-select item, with stable scaffold node/item/option ids inside. Citation-free and
   -- labeled generated (R11, KTD10). Immutable once published.
@@ -1084,9 +1102,17 @@ CREATE TABLE learner_scaffold_steps (
   -- Exactly one of the two shapes (KTD2): a reference carries a node id and no payload; a
   -- generated step carries a payload and no reference.
   CHECK (
-    (kind = 'reference' AND referenced_derived_node_id IS NOT NULL AND payload IS NULL)
-    OR (kind = 'generated' AND referenced_derived_node_id IS NULL AND payload IS NOT NULL)
+    (kind = 'reference' AND referenced_derived_node_id IS NOT NULL
+      AND referenced_concept_lesson_id IS NOT NULL AND referenced_study_item_id IS NOT NULL
+      AND payload IS NULL AND lesson_read_at IS NULL)
+    OR (kind = 'generated' AND referenced_derived_node_id IS NULL
+      AND referenced_concept_lesson_id IS NULL AND referenced_study_item_id IS NULL
+      AND payload IS NOT NULL)
   ),
+  FOREIGN KEY (referenced_concept_lesson_id, referenced_derived_node_id)
+    REFERENCES concept_lessons(concept_lesson_id, derived_node_id),
+  FOREIGN KEY (referenced_study_item_id, referenced_study_item_type, referenced_derived_node_id)
+    REFERENCES study_items(study_item_id, item_type, derived_node_id),
   UNIQUE (detour_id, ordinal)
 );
 

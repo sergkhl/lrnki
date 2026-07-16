@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { ScaffoldDetour, ScaffoldNodePayload, ScaffoldStep } from "@lrnki/domain-core";
-import type { GeneratedScaffoldStepForAudit, ScaffoldDetourStorePort } from "@lrnki/ports";
+import type { GeneratedScaffoldStepForAudit, ScaffoldDetourStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort } from "@lrnki/ports";
 import type { Sql, TransactionSql } from "postgres";
+import { hydrateConceptLessonRows, hydrateStudyItemRows, type LessonRow, type StudyItemRow } from "./PostgresLearnerLoopStores";
 
 // Learner-Scoped Scaffold Detour persistence (plan 2026-07-12-002 U2, KTD2, ADR-0037). The
 // aggregate lives across two tables: `learner_scaffold_detours` (identity + lifecycle +
@@ -31,13 +32,22 @@ type StepRow = {
   ordinal: number;
   kind: "reference" | "generated";
   referenced_derived_node_id: string | null;
+  referenced_concept_lesson_id: string | null;
+  referenced_study_item_id: string | null;
   payload: ScaffoldNodePayload | null;
   lesson_read_at: string | null;
 };
 
 function toStep(row: StepRow): ScaffoldStep {
   if (row.kind === "reference") {
-    return { scaffoldStepId: row.scaffold_step_id, ordinal: row.ordinal, kind: "reference", referencedDerivedNodeId: row.referenced_derived_node_id as string };
+    return {
+      scaffoldStepId: row.scaffold_step_id,
+      ordinal: row.ordinal,
+      kind: "reference",
+      referencedDerivedNodeId: row.referenced_derived_node_id as string,
+      referencedConceptLessonId: row.referenced_concept_lesson_id as string,
+      referencedStudyItemId: row.referenced_study_item_id as string
+    };
   }
   return {
     scaffoldStepId: row.scaffold_step_id,
@@ -70,7 +80,7 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
 
   private async stepsFor(tx: Sql | TransactionSql, detourId: string): Promise<ScaffoldStep[]> {
     const rows = await tx<StepRow[]>`
-      SELECT scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, payload, lesson_read_at
+      SELECT scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id, payload, lesson_read_at
       FROM learner_scaffold_steps WHERE detour_id = ${detourId} ORDER BY ordinal`;
     return rows.map(toStep);
   }
@@ -121,19 +131,6 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
     const detours: ScaffoldDetour[] = [];
     for (const row of rows) detours.push(toDetour(row, await this.stepsFor(this.sql, row.detour_id)));
     return detours;
-  }
-
-  async claim(input: { detourId: string; operationId: string; claimToken: string }): Promise<boolean> {
-    // Only an UNCLAIMED `generating` detour is claimable; installing a fresh operation id + token
-    // fences the terminal write (KTD7/KTD9). Requiring `claim_token IS NULL` makes the claim
-    // single-winner: a second concurrent claim finds the row already claimed and fails. A retry
-    // (restartGenerating) clears the token, so the next attempt can claim again.
-    const rows = await this.sql`
-      UPDATE learner_scaffold_detours
-      SET latest_operation_id = ${input.operationId}, claim_token = ${input.claimToken}, updated_at = now()
-      WHERE detour_id = ${input.detourId} AND status = 'generating' AND claim_token IS NULL
-      RETURNING detour_id`;
-    return rows.length === 1;
   }
 
   // ONE staleness predicate, shared by claim-next and fail-exhausted (only the attempts
@@ -213,9 +210,29 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
       if (!row || row.status !== "generating" || row.claim_token !== input.claimToken) return false;
       for (const step of input.steps) {
         if (step.kind === "reference") {
+          const [valid] = await tx<{ valid: boolean }[]>`
+            SELECT EXISTS (
+              SELECT 1
+              FROM learner_scaffold_detours d
+              JOIN derived_graph_nodes parent ON parent.derived_node_id = d.parent_derived_node_id
+              JOIN concept_lessons cl
+                ON cl.concept_lesson_id = ${step.referencedConceptLessonId}
+               AND cl.derived_node_id = ${step.referencedDerivedNodeId}
+              JOIN study_items si
+                ON si.study_item_id = ${step.referencedStudyItemId}
+               AND si.derived_node_id = ${step.referencedDerivedNodeId}
+               AND si.item_type = 'option_select'
+              JOIN derived_graph_nodes target ON target.derived_node_id = ${step.referencedDerivedNodeId}
+              WHERE d.detour_id = ${input.detourId}
+                AND cl.enrichment_id = d.enrichment_id
+                AND si.enrichment_id = d.enrichment_id
+                AND target.enrichment_id = d.enrichment_id
+                AND target.declared_domain = parent.declared_domain
+            ) AS valid`;
+          if (!valid?.valid) throw new Error(`reference step ${step.scaffoldStepId} does not pin same-layer, same-domain option-select assets`);
           await tx`
-            INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id)
-            VALUES (${step.scaffoldStepId}, ${input.detourId}, ${step.ordinal}, 'reference', ${step.referencedDerivedNodeId})`;
+            INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, referenced_derived_node_id, referenced_concept_lesson_id, referenced_study_item_id)
+            VALUES (${step.scaffoldStepId}, ${input.detourId}, ${step.ordinal}, 'reference', ${step.referencedDerivedNodeId}, ${step.referencedConceptLessonId}, ${step.referencedStudyItemId})`;
         } else {
           await tx`
             INSERT INTO learner_scaffold_steps (scaffold_step_id, detour_id, ordinal, kind, payload, lesson_read_at)
@@ -225,6 +242,15 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
       await tx`UPDATE learner_scaffold_detours SET status = 'ready', claim_token = NULL, updated_at = now() WHERE detour_id = ${input.detourId}`;
       return true;
     });
+  }
+
+  async releaseClaim(input: { detourId: string; claimToken: string }): Promise<boolean> {
+    const rows = await this.sql`
+      UPDATE learner_scaffold_detours
+      SET claim_token = NULL, claimed_at = NULL, updated_at = now()
+      WHERE detour_id = ${input.detourId} AND status = 'generating' AND claim_token = ${input.claimToken}
+      RETURNING detour_id`;
+    return rows.length === 1;
   }
 
   async markFailed(input: { detourId: string; claimToken: string }): Promise<boolean> {
@@ -256,7 +282,7 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
 
   async getStep(input: { scaffoldStepId: string; learnerStateRef: string }): Promise<{ step: ScaffoldStep; detourId: string } | undefined> {
     const [row] = await this.sql<StepRow[]>`
-      SELECT s.scaffold_step_id, s.detour_id, s.ordinal, s.kind, s.referenced_derived_node_id, s.payload, s.lesson_read_at
+      SELECT s.scaffold_step_id, s.detour_id, s.ordinal, s.kind, s.referenced_derived_node_id, s.referenced_concept_lesson_id, s.referenced_study_item_id, s.payload, s.lesson_read_at
       FROM learner_scaffold_steps s
       JOIN learner_scaffold_detours d ON d.detour_id = s.detour_id
       WHERE s.scaffold_step_id = ${input.scaffoldStepId} AND d.learner_state_ref = ${input.learnerStateRef}`;
@@ -300,6 +326,72 @@ export class PostgresLearnerScaffoldStore implements ScaffoldDetourStorePort {
     }));
   }
 }
+
+export class PostgresScaffoldReferenceActivityRead implements ScaffoldReferenceActivityReadPort {
+  constructor(private readonly sql: Sql) {}
+
+  async listForLearnerEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<ScaffoldReferenceActivity[]> {
+    const rows = await this.sql<PinnedReferenceRow[]>`
+      SELECT s.scaffold_step_id, s.detour_id, s.referenced_derived_node_id, s.referenced_concept_lesson_id, s.referenced_study_item_id
+      FROM learner_scaffold_steps s
+      JOIN learner_scaffold_detours d ON d.detour_id = s.detour_id
+      WHERE s.kind = 'reference' AND d.learner_state_ref = ${input.learnerStateRef}
+        AND d.enrichment_id = ${input.enrichmentId} AND d.status <> 'hidden'
+      ORDER BY d.created_at, s.ordinal`;
+    return this.hydrate(rows);
+  }
+
+  async getForLearnerStep(input: { learnerStateRef: string; scaffoldStepId: string }): Promise<ScaffoldReferenceActivity | undefined> {
+    const rows = await this.sql<PinnedReferenceRow[]>`
+      SELECT s.scaffold_step_id, s.detour_id, s.referenced_derived_node_id, s.referenced_concept_lesson_id, s.referenced_study_item_id
+      FROM learner_scaffold_steps s
+      JOIN learner_scaffold_detours d ON d.detour_id = s.detour_id
+      WHERE s.kind = 'reference' AND s.scaffold_step_id = ${input.scaffoldStepId}
+        AND d.learner_state_ref = ${input.learnerStateRef} AND d.status = 'ready'`;
+    const [activity] = await this.hydrate(rows);
+    return activity;
+  }
+
+  private async hydrate(rows: PinnedReferenceRow[]): Promise<ScaffoldReferenceActivity[]> {
+    if (rows.length === 0) return [];
+    const lessonIds = [...new Set(rows.map((row) => row.referenced_concept_lesson_id))];
+    const itemIds = [...new Set(rows.map((row) => row.referenced_study_item_id))];
+    const [lessonRows, itemRows] = await Promise.all([
+      this.sql<LessonRow[]>`
+        SELECT concept_lesson_id, graph_version_id, enrichment_id, derived_node_id, canonical_label, explorable_terms, generating_model, config_hash
+        FROM concept_lessons WHERE concept_lesson_id IN ${this.sql(lessonIds)}`,
+      this.sql<StudyItemRow[]>`
+        SELECT study_item_id, item_type, graph_version_id, enrichment_id, derived_node_id, grounding_provenance, question, explanation, facet, explorable_terms, generating_model, config_hash
+        FROM study_items WHERE study_item_id IN ${this.sql(itemIds)} AND item_type = 'option_select'`
+    ]);
+    const [lessons, items] = await Promise.all([
+      hydrateConceptLessonRows(this.sql, lessonRows),
+      hydrateStudyItemRows(this.sql, itemRows)
+    ]);
+    const lessonById = new Map(lessons.map((lesson) => [lesson.conceptLessonId, lesson]));
+    const itemById = new Map(items.filter((item) => item.itemType === "option_select").map((item) => [item.studyItemId, item]));
+    return rows.map((row) => {
+      const lesson = lessonById.get(row.referenced_concept_lesson_id);
+      const item = itemById.get(row.referenced_study_item_id);
+      if (!lesson || !item) throw new Error(`pinned scaffold reference ${row.scaffold_step_id} could not be hydrated`);
+      return {
+        scaffoldStepId: row.scaffold_step_id,
+        detourId: row.detour_id,
+        referencedDerivedNodeId: row.referenced_derived_node_id,
+        lesson,
+        item
+      };
+    });
+  }
+}
+
+type PinnedReferenceRow = {
+  scaffold_step_id: string;
+  detour_id: string;
+  referenced_derived_node_id: string;
+  referenced_concept_lesson_id: string;
+  referenced_study_item_id: string;
+};
 
 type AuditStepRow = {
   scaffold_step_id: string;

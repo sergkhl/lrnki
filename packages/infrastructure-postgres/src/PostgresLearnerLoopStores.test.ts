@@ -588,6 +588,7 @@ maybe("clearLearner of verdicts plus a graded-row delete leaves the learner with
 
 function lessonFor(s: Substrate): ConceptLesson {
   return {
+    conceptLessonId: randomUUID(),
     derivedNodeId: s.derivedNodeId,
     explorableTerms: [],
     graphVersionId: s.graphVersionId,
@@ -626,19 +627,28 @@ maybe("Covers R1: persists a two-section lesson; it round-trips by derivedNodeId
   }
 });
 
-maybe("regenerating an enrichment replaces its prior lessons and absences rather than appending", async () => {
+maybe("regenerating lessons supersedes prior identities while ordinary reads return only the new current lesson", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const s = await seedSubstrate(sql);
     const store = new PostgresConceptLessonStore(sql);
-    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [lessonFor(s)], absent: [] });
-    // Re-persist with no lesson and an absence.
-    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg", lessons: [], absent: [{ derivedNodeId: s.derivedNodeId, canonicalLabel: "Ownership", reason: "no usable grounding passages" }] });
+    const first = lessonFor(s);
+    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg-1", lessons: [first], absent: [] });
+    const replacement = { ...lessonFor(s), canonicalLabel: "Ownership (regenerated)", configHash: "cfg-2" };
+    await store.persist({ graphVersionId: s.graphVersionId, enrichmentId: s.enrichmentId, configHash: "cfg-2", lessons: [replacement], absent: [] });
 
-    assert.equal((await store.listLessonsForEnrichment(s.enrichmentId)).length, 0);
-    const [{ sections }] = await sql<{ sections: number }[]>`
-      SELECT count(*)::int AS sections FROM concept_lesson_sections WHERE concept_lesson_id IN (SELECT concept_lesson_id FROM concept_lessons WHERE enrichment_id = ${s.enrichmentId})`;
-    assert.equal(sections, 0, "orphaned sections are cascade-cleared");
+    const current = await store.getLesson(s.derivedNodeId);
+    assert.equal(current?.conceptLessonId, replacement.conceptLessonId);
+    assert.equal(current?.canonicalLabel, "Ownership (regenerated)");
+    assert.deepEqual((await store.listLessonsForEnrichment(s.enrichmentId)).map((lesson) => lesson.conceptLessonId), [replacement.conceptLessonId]);
+    const [prior] = await sql<{ superseded_at: string | null; sections: number }[]>`
+      SELECT cl.superseded_at, count(cls.*)::int AS sections
+      FROM concept_lessons cl
+      LEFT JOIN concept_lesson_sections cls ON cls.concept_lesson_id = cl.concept_lesson_id
+      WHERE cl.concept_lesson_id = ${first.conceptLessonId}
+      GROUP BY cl.superseded_at`;
+    assert.ok(prior.superseded_at, "the prior stable identity is retained as superseded history");
+    assert.equal(prior.sections, first.sections.length, "the prior lesson remains fully hydratable");
   } finally {
     await sql.end();
   }

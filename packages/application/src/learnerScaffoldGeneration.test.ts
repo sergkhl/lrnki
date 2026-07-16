@@ -5,19 +5,19 @@ import type { ScaffoldContentDraft } from "@lrnki/ports";
 import { buildScaffoldNodePayload, resolveExactMatch, runScaffoldGeneration, type ScaffoldGenerationDeps, type ScaffoldParentContext, type ScaffoldReuseCandidate } from "./learnerScaffoldGeneration";
 
 function candidate(overrides: Partial<ScaffoldReuseCandidate> & { derivedNodeId: string; canonicalLabel: string }): ScaffoldReuseCandidate {
-  return { aliases: [], declaredDomain: "cs", hasLesson: true, hasOptionSelect: true, isLocked: false, ...overrides };
+  return { aliases: [], declaredDomain: "cs", hasLesson: true, hasOptionSelect: true, conceptLessonId: "lesson-1", studyItemId: "item-1", isLocked: false, ...overrides };
 }
 
 // --- resolveExactMatch (KTD3, R8/R10) ---------------------------------------
 
 test("resolveExactMatch: a unique usable non-parent match becomes a reference", () => {
   const result = resolveExactMatch("Borrow checker", [candidate({ derivedNodeId: "n-1", canonicalLabel: "Borrow Checker" })], "parent");
-  assert.deepEqual(result, { kind: "reference", derivedNodeId: "n-1" });
+  assert.deepEqual(result, { kind: "reference", derivedNodeId: "n-1", conceptLessonId: "lesson-1", studyItemId: "item-1" });
 });
 
 test("resolveExactMatch: an alias match resolves too", () => {
   const result = resolveExactMatch("BC", [candidate({ derivedNodeId: "n-1", canonicalLabel: "Borrow Checker", aliases: ["BC"] })], "parent");
-  assert.deepEqual(result, { kind: "reference", derivedNodeId: "n-1" });
+  assert.deepEqual(result, { kind: "reference", derivedNodeId: "n-1", conceptLessonId: "lesson-1", studyItemId: "item-1" });
 });
 
 test("resolveExactMatch: the parent, a locked node, a payload-incomplete node, and ambiguity are all unusable (AE4)", () => {
@@ -74,9 +74,9 @@ function makeDeps(context: ScaffoldParentContext, overrides: Partial<ScaffoldGen
       markFailed: async () => { failed += 1; return true; },
       upsertPending: async () => { throw new Error("unused"); },
       listActiveForLearnerEnrichment: async () => [],
-      claim: async () => true,
       claimNextGenerating: async () => undefined,
       failExhaustedGenerating: async () => 0,
+      releaseClaim: async () => true,
       restartGenerating: async () => undefined,
       hide: async () => true,
       getStep: async () => undefined,

@@ -91,6 +91,7 @@ function lessonReadStore(reads: string[] = []) {
 }
 
 const scopeLesson: ConceptLesson = {
+  conceptLessonId: "lesson-scope",
   derivedNodeId: "scope", graphVersionId: "g", enrichmentId: "e", generatingModel: "deepseek", configHash: "cfg",
   canonicalLabel: "Variable scope",
   sections: [

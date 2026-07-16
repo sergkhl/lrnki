@@ -1615,11 +1615,12 @@ export type ExplorableTerm = {
   sectionKind: ConceptLessonSectionKind;
 };
 
-// A persisted lesson, keyed like the Study Item Bank so a regeneration replaces the
-// prior asset cleanly (replace-by-enrichment). `sections` is ordered and meets the R3
+// A persisted lesson with a stable application-minted identity. Regeneration supersedes
+// the prior asset while retaining it for learner-owned references. `sections` is ordered and meets the R3
 // minimum (a gist, ≥1 application, and ≥1 substantive section). `explorableTerms` is the
 // zero-to-five validated affordance list (may be empty).
 export type ConceptLesson = {
+  conceptLessonId: string;
   derivedNodeId: string;
   // NULL for a synthetic (source-less) layer's lessons; non-null for source-derived layers.
   graphVersionId: string | null;

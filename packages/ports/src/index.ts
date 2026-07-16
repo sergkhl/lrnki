@@ -701,7 +701,7 @@ export interface StudyItemBankStorePort {
 // lessons, their ordered sections + per-section grounded citations, AND its lesson-absent
 // nodes atomically, plus the immutable `concept_lesson_bank` artifact, in one transaction
 // (no authoritative relational state without its artifact, matching the Study Item Bank
-// store). Regeneration replaces an enrichment's lessons and absences (delete-then-insert).
+// store). Regeneration supersedes current lessons and replaces absences.
 // `getLesson` returns a node's lesson (absences are NOT returned); `listLessonsForEnrichment`
 // powers the Study Session ride-down and the operator visibility surface. A learner-NEUTRAL
 // derived asset: this port imports no graph/enrichment write port (R9).
@@ -710,6 +710,21 @@ export interface ConceptLessonStorePort {
   getLesson(derivedNodeId: string): Promise<ConceptLesson | undefined>;
   listLessonsForEnrichment(enrichmentId: string): Promise<ConceptLesson[]>;
   listAbsentForEnrichment(enrichmentId: string): Promise<LessonAbsentNode[]>;
+}
+
+export type ScaffoldReferenceActivity = {
+  scaffoldStepId: string;
+  detourId: string;
+  referencedDerivedNodeId: string;
+  lesson: ConceptLesson;
+  item: Extract<StudyItem, { itemType: "option_select" }>;
+};
+
+// The only read seam for pinned neutral Support Path activities. It is learner-owned and
+// detour-scoped, so callers cannot browse arbitrary superseded neutral assets.
+export interface ScaffoldReferenceActivityReadPort {
+  listForLearnerEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<ScaffoldReferenceActivity[]>;
+  getForLearnerStep(input: { learnerStateRef: string; scaffoldStepId: string }): Promise<ScaffoldReferenceActivity | undefined>;
 }
 
 // Layer-purpose persistence (plan 2026-07-10-001 U1). One plain-register capability
@@ -898,10 +913,6 @@ export interface ScaffoldDetourStorePort {
   getById(detourId: string): Promise<ScaffoldDetour | undefined>;
   // Active (non-hidden) detours for one learner's expedition — the U4 projection input.
   listActiveForLearnerEnrichment(learnerStateRef: string, enrichmentId: string): Promise<ScaffoldDetour[]>;
-  // Claim a `generating` detour for one attempt: install a fresh operation id + fencing token
-  // and clear any prior failed pointer (R14, KTD7). Returns false when the detour is not
-  // claimable (already ready/hidden or mismatched). The claim token fences the terminal write.
-  claim(input: { detourId: string; operationId: string; claimToken: string }): Promise<boolean>;
   // Process-level supervisor claim (KTD7): atomically select ONE stale-or-unclaimed `generating`
   // detour under the attempt budget and claim it, minting a fresh operation id that also acts as
   // the fencing token (KTD7). Returns the claimed aggregate (its `latestOperationId` ==
@@ -914,6 +925,9 @@ export interface ScaffoldDetourStorePort {
   // Atomic publish (R16, KTD9): write the ordered steps + generated payloads and transition to
   // `ready`, guarded by the claim token. A stale token is rejected and nothing is written.
   publishReady(input: { detourId: string; claimToken: string; steps: ScaffoldStep[] }): Promise<boolean>;
+  // Release an infrastructure-transient attempt under the same fence. The aggregate remains
+  // generating and becomes eligible for the supervisor's bounded retry budget.
+  releaseClaim(input: { detourId: string; claimToken: string }): Promise<boolean>;
   markFailed(input: { detourId: string; claimToken: string }): Promise<boolean>;
   // Retry: clear the failed pointer and return the detour to `generating` for a fresh claim.
   restartGenerating(input: { detourId: string; learnerStateRef: string }): Promise<ScaffoldDetour | undefined>;
