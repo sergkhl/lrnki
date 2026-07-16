@@ -143,7 +143,7 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           closeOnPress={!dismissBlocked}
-          className="absolute inset-0 items-center justify-center bg-black/40 p-4"
+          className="absolute inset-0 items-center justify-center bg-scrim p-4"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
           {/* The bounded dialog column (KTD5/KTD9): Content caps the height with ONE
@@ -228,7 +228,7 @@ export function SideSheet({ open, onOpenChange, dismissBlocked = false, children
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           closeOnPress={!dismissBlocked}
-          className="absolute inset-0 bg-black/40"
+          className="absolute inset-0 bg-scrim"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
           <DialogPrimitive.Content className="absolute bottom-0 right-0 top-0 w-80 max-w-[85%] border-l border-line bg-card">

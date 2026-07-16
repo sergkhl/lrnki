@@ -1,5 +1,5 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { PortalHost } from "@rn-primitives/portal";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LearnerMenuSheet } from "./LearnerMenuSheet";
@@ -41,11 +41,13 @@ test("the menu exposes Board and logout rows", async () => {
   expect(screen.getByLabelText(learnerTerm("logoutAction"))).toBeTruthy();
 });
 
-test("opening the Board closes the menu first — no stacked overlays", async () => {
+test("opening the Board closes the menu first and yields a frame — no stacked overlays, no teardown race (D7)", async () => {
   await renderMenu();
   await fireEvent.press(screen.getByLabelText(learnerTerm("viewBoard")));
   expect(handlers.onOpenChange).toHaveBeenCalledWith(false);
-  expect(handlers.onOpenBoard).toHaveBeenCalledTimes(1);
+  // The action fires only after the frame yield, never in the sheet's closing tick.
+  expect(handlers.onOpenBoard).not.toHaveBeenCalled();
+  await waitFor(() => expect(handlers.onOpenBoard).toHaveBeenCalledTimes(1));
 });
 
 test("an unavailable board disables its row without hiding it", async () => {
@@ -60,5 +62,5 @@ test("logout hands off through the same close-first path", async () => {
   await renderMenu();
   await fireEvent.press(screen.getByLabelText(learnerTerm("logoutAction")));
   expect(handlers.onOpenChange).toHaveBeenCalledWith(false);
-  expect(handlers.onLogout).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(handlers.onLogout).toHaveBeenCalledTimes(1));
 });

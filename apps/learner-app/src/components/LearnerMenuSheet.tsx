@@ -20,8 +20,12 @@ export function LearnerMenuSheet({
   onOpenBoard: () => void;
   onLogout: () => void;
 }>) {
-  const handoff = (action: () => void) => {
+  // Sequenced handoff (plan 2026-07-16-003 D7): yield a frame between closing the sheet
+  // and invoking the action, so a Dialog's entering animation never mounts during this
+  // portal's teardown — the Android race that left the Board blank via the menu path.
+  const handoff = async (action: () => void) => {
     onOpenChange(false);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     action();
   };
   return (
@@ -36,12 +40,12 @@ export function LearnerMenuSheet({
           icon={<Trophy size={18} color={colors.ink} />}
           label={learnerTerm("viewBoard")}
           disabled={!boardAvailable}
-          onPress={() => handoff(onOpenBoard)}
+          onPress={() => void handoff(onOpenBoard)}
         />
         <MenuRow
           icon={<LogOut size={18} color={colors.ink} />}
           label={learnerTerm("logoutAction")}
-          onPress={() => handoff(onLogout)}
+          onPress={() => void handoff(onLogout)}
         />
       </View>
     </SideSheet>

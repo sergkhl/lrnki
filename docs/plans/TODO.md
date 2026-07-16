@@ -4,7 +4,7 @@
 
 ### Learner UX polish (plan 2026-07-16-003 — IN PROGRESS)
 
-[Plan](./2026-07-16-003-fix-learner-ux-polish-plan.md). Session handoff 2026-07-16:
+[Plan](./2026-07-16-003-fix-learner-ux-polish-plan.md). Session handoff 2026-07-16 (session 2):
 
 - **U1 DONE.** Reward action gating deleted (`actionsReady`/`settledEventKey`/settle timer/
   `rewardDuration`/both `disabled` props); `playedEventRef` survives only as the first-win haptic
@@ -18,12 +18,26 @@
   regenerated rematch screenshot shows the whole roundel.
 - **U3 DONE (code).** One 2 px `non-scaling-stroke` policy in `CrystalSpecimen` on ghost (0.55) /
   growing (0.7, raised from 0.4) / collected-fill outlines. Final legibility judgment rides U6.
-- **Remaining: U4** (trail sine wave in `CheckpointPath` — `WINDING_OFFSETS` + center bar still
-  present), **U5** (Android scrim token D6 + menu→board handoff D7; user-hosted emulator loop),
-  **U6** (rule-14 gate, then fold + delete plan).
-- Validation this session: learner jest 51 suites / 229 tests green; full production-export
-  Playwright 48/48 (incl. the new rematch scenario); learner-app typecheck clean; lint clean on
-  touched files. Nothing committed (user has not asked).
+- **U4 DONE.** `CheckpointPath` now draws one static dashed SVG serpentine (trail-muted, 0.6
+  opacity, 3 px, vertical-tangent cubics) through every checkpoint circle's measured center:
+  offsets are `56·sin(stopIndex·π/4)` (amplitude unchanged), anchors are `measureLayout`-relative
+  to the trail container (container-resize re-measures all rows, since content above a row shifts
+  it without firing its own onLayout), and `WINDING_OFFSETS` + the straight center bar are DELETED
+  (KTD4). Verified by the regenerated phone trail screenshot (wave passes through every circle,
+  cards overlay it) and the full production-export Playwright suite.
+- **U5 code APPLIED, device verification pending (see [BLOCKERS](./BLOCKERS.md)).** D6: literal
+  `scrim: "rgba(0, 0, 0, 0.4)"` token in `ui/tokens.js` (+ regenerated `tokens.css`); both
+  `bg-black/40` scrims in `Dialog`/`SideSheet` replaced with `bg-scrim` (KTD4). D7:
+  `LearnerMenuSheet.handoff` now yields a frame between closing the sheet and invoking the action
+  (jest updated to lock close-first-then-frame-yield ordering). D8d: maestro board-content step
+  appended to `android-runtime-reliability.yaml` (back out to journal → Menu → View the board →
+  assert title + fixture entry row). Emulator loop is the verification authority (KTD3).
+- **Remaining:** U5 emulator verification (user-hosted), then **U6** (rule-14 gate over a real
+  production expedition: wave/specimen/seal/reward-actions judgment at phone + desktop + reduced
+  motion + 200 % scale; emulator screenshots are the Android evidence; then fold + delete plan).
+- Validation session 2: learner jest 51 suites / 229 tests green (LearnerMenuSheet suite updated
+  for D7); full production-export Playwright 48/48 post-wave; learner-app typecheck clean; eslint
+  clean on touched files. Nothing committed (user has not asked).
 
 ### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — READY)
 

@@ -28,7 +28,11 @@ const colors = {
   "on-accent": "#fdfaf2",
   gold: "#d8b64c",
   award: "#b45309",
-  secured: "#3f7d4e"
+  secured: "#3f7d4e",
+  // Overlay backdrop (plan 2026-07-16-003 D6): a LITERAL rgba value, never a Tailwind
+  // opacity modifier — `bg-black/40` compiles to color-mix(), which NativeWind's native
+  // styler drops, leaving Android scrims transparent.
+  scrim: "rgba(0, 0, 0, 0.4)"
 };
 
 /** Corner radii in px: cards stay flat (<=8px per the interaction plan), controls are

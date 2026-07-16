@@ -21,6 +21,7 @@
   --color-gold: #d8b64c;
   --color-award: #b45309;
   --color-secured: #3f7d4e;
+  --color-scrim: rgba(0, 0, 0, 0.4);
   --radius-card: 8px;
   --radius-control: 12px;
   --radius-overlay: 16px;
@@ -50,6 +51,7 @@
   --color-gold: #d8b64c;
   --color-award: #b45309;
   --color-secured: #3f7d4e;
+  --color-scrim: rgba(0, 0, 0, 0.4);
   --radius-card: 8px;
   --radius-control: 12px;
   --radius-overlay: 16px;

@@ -74,3 +74,16 @@ appId: com.globesoul.lrnki
 # buttons carry a "Support paths: …" label, so that phrase is not a valid dialog-dismissed signal).
 - assertVisible: "Field notes"
 - assertNotVisible: "Add support path"
+
+# --- Board via the menu path (plan 2026-07-16-003 D8d): the sequenced menu→board handoff must
+# render dialog CONTENT, not a blank card (the Android entering-animation vs portal-teardown
+# race, H2). Back out of the Theory activity and the trail to the journal, open the menu, open
+# the board, and assert both the dialog title and a fixture-owned entry row painted. Scrim
+# dimness stays human-judged on the emulator (D8: no automated scrim assertion). ---
+- back                                    # close the Theory activity
+- back                                    # leave the trail back to the journal
+- assertVisible: "Choose an expedition"
+- tapOn: "Menu"
+- tapOn: "View the board"
+- assertVisible: "This week’s climbers"   # board dialog title painted
+- assertVisible: "Bruce.Moore"            # fixture entry row painted (content, not just the shell)

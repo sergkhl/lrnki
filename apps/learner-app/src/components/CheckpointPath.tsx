@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState, type RefObject } from "react";
 import { ScrollView, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Flag, Mountain } from "lucide-react-native";
+import Svg, { Path } from "react-native-svg";
 import type { RecallScopeStatus, ScaffoldDetourView, StudySession } from "@lrnki/application/projection";
 import { resolveReferenceStopId } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
@@ -21,8 +22,13 @@ import { Progress, Text, colors } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 import type { TrailCluster, TrailStop, TrailView } from "@lrnki/application/projection";
 
-const WINDING_OFFSETS = [0, 1, 2, 1, 0, -1, -2, -1] as const;
-const WINDING_STEP_PX = 28;
+// The trail winds as one sine wave (plan 2026-07-16-003 D5): checkpoint circles sit at
+// AMPLITUDE·sin(stopIndex·π/4) so the drawn wave passes exactly through every circle center.
+const WAVE_AMPLITUDE_PX = 56;
+const waveOffset = (stopIndex: number) => Math.round(WAVE_AMPLITUDE_PX * Math.sin((stopIndex * Math.PI) / 4));
+// A checkpoint circle's vertical center within its stop row: the row's py-1 (4px) plus half
+// the fixed 72px circle box CheckpointCircle always renders first.
+const CHECKPOINT_CENTER_FROM_ROW_TOP_PX = 40;
 
 export type TrailScrollHandle = {
   scrollToSection: (sectionIndex: number) => void;
@@ -105,6 +111,24 @@ export function CheckpointPath({
   const stopYRef = useRef<Record<string, number>>({});
   const sectionYRef = useRef<Record<number, number>>({});
 
+  // The trail wave's measured anchors (D5): each stop row measures its container-relative
+  // center into state (rounded, set only on change, so settled layouts never re-render).
+  // Rows re-measure when the container resizes — content above a row (a Support Path node
+  // appearing) shifts the row without firing its own onLayout.
+  const containerRef = useRef<View>(null);
+  const rowNodeRef = useRef<Record<string, View | null>>({});
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [waveAnchorYs, setWaveAnchorYs] = useState<Record<string, number>>({});
+  const measureWaveAnchor = (stopId: string) => {
+    const row = rowNodeRef.current[stopId];
+    const container = containerRef.current;
+    if (!row || !container) return;
+    row.measureLayout(container, (_x, y) => {
+      const center = Math.round(y + CHECKPOINT_CENTER_FROM_ROW_TOP_PX);
+      setWaveAnchorYs((prev) => (prev[stopId] === center ? prev : { ...prev, [stopId]: center }));
+    });
+  };
+
   useEffect(() => {
     if (!scrollHandleRef) return;
     scrollHandleRef.current = {
@@ -134,9 +158,16 @@ export function CheckpointPath({
   return (
     <>
       <ScrollView ref={scrollRef} className="flex-1 px-4" contentContainerClassName="py-4">
-        <View className="relative mx-auto w-full max-w-sm gap-5 px-2 py-2">
-          {/* The dashed center trail line. */}
-          <View className="absolute bottom-0 left-1/2 top-0 w-[3px] -translate-x-1/2 bg-trail-muted opacity-60" />
+        <View
+          ref={containerRef}
+          className="relative mx-auto w-full max-w-sm gap-5 px-2 py-2"
+          onLayout={(event) => {
+            setContainerWidth(Math.round(event.nativeEvent.layout.width));
+            // Container growth means rows moved without their own onLayout firing.
+            for (const stopId of Object.keys(rowNodeRef.current)) measureWaveAnchor(stopId);
+          }}
+        >
+          <TrailWave view={view} containerWidth={containerWidth} anchorYs={waveAnchorYs} />
           {view.concepts.map((concept, conceptIndex) => {
             // The Leg's Guardian node projects after its LAST concept (F5): guarding the
             // milestone the Leg builds toward, persistent across mastered/unfused, active,
@@ -160,7 +191,7 @@ export function CheckpointPath({
                     const globalStopIndex = view.concepts
                       .slice(0, conceptIndex)
                       .reduce((count, priorConcept) => count + priorConcept.stops.length, stopIndex);
-                    const offset = WINDING_OFFSETS[globalStopIndex % WINDING_OFFSETS.length] * WINDING_STEP_PX;
+                    const offset = waveOffset(globalStopIndex);
                     // Support Path nodes branch UNDER their parent, after the ordinary activity
                     // stops and just before the capstone (R12): one always-visible compact node
                     // per active detour, no step rows or disclosure state on the map.
@@ -172,7 +203,13 @@ export function CheckpointPath({
                         {conceptDetours.map((detour) => (
                           <SupportPathNode key={detour.detourId} detour={detour} onPress={openDetour} />
                         ))}
-                        <View onLayout={(event) => { stopYRef.current[stop.stopId] = event.nativeEvent.layout.y; }}>
+                        <View
+                          ref={(node) => { rowNodeRef.current[stop.stopId] = node; }}
+                          onLayout={(event) => {
+                            stopYRef.current[stop.stopId] = event.nativeEvent.layout.y;
+                            measureWaveAnchor(stop.stopId);
+                          }}
+                        >
                           <CheckpointStopRow stop={stop} concept={concept} offset={offset} onSelect={setSelectedStopId} />
                         </View>
                       </Fragment>
@@ -260,6 +297,49 @@ export function CheckpointPath({
         );
       })()}
     </>
+  );
+}
+
+// The dashed trail wave (D5): one static SVG behind the trail content drawing a smooth
+// serpentine through every measured checkpoint center — x from the same sine offset the
+// circles use, y from the measured-anchor state. Cubic segments take vertical tangents at
+// each anchor, so the curve reads as one continuous winding path. Full-width cards
+// (banners, markers, guardian nodes, terminus) simply overlay it (KTD5: no motion).
+function TrailWave({
+  view,
+  containerWidth,
+  anchorYs
+}: Readonly<{ view: TrailView; containerWidth: number; anchorYs: Record<string, number> }>) {
+  if (containerWidth === 0) return null;
+  const centerX = containerWidth / 2;
+  const points = view.concepts
+    .flatMap((concept) => concept.stops)
+    .flatMap((stop, stopIndex) => {
+      const y = anchorYs[stop.stopId];
+      return y === undefined ? [] : [{ x: centerX + waveOffset(stopIndex), y }];
+    });
+  if (points.length < 2) return null;
+  const path = points
+    .slice(1)
+    .reduce((d, point, index) => {
+      const prior = points[index];
+      const bend = (point.y - prior.y) / 2;
+      return `${d} C ${prior.x} ${prior.y + bend} ${point.x} ${point.y - bend} ${point.x} ${point.y}`;
+    }, `M ${points[0].x} ${points[0].y}`);
+  return (
+    <View className="absolute inset-0" pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Path
+          d={path}
+          fill="none"
+          stroke={colors["trail-muted"]}
+          strokeOpacity={0.6}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeDasharray="6 8"
+        />
+      </Svg>
+    </View>
   );
 }
 
