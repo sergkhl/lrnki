@@ -26,6 +26,20 @@ retry budget, and the JSON schema evaluated at the descriptor's sentinel input. 
 pass the resulting strings into unchanged application inputs such as extraction pipeline config,
 enrichment config hash, and Study Item Bank config hash.
 
+One infrastructure-owned, operation-centric registry is the descriptor-registration authority. For
+each neural operation it owns the hash seed, corresponding Operation Timeline type, and complete
+descriptor set. Operation hashes, the distinct all-descriptor inventory, descriptor-shape checks,
+and descriptor-to-timeline completeness tests derive from that registry. A descriptor shared by
+several operations is registered under every operation that executes it. The application-owned
+Operation Timeline catalog remains a separate authority and is compared mechanically rather than
+merged into infrastructure.
+
+Scaffold Generation persists that complete config hash on each `scaffold` Operation Timeline run,
+because one Scaffold Detour may have multiple claimed attempts and direct reuse or failed attempts
+may publish no generated Support Step. The operation run is the canonical attribution home for the
+attempt; the detour's operation pointer identifies its latest attempt. A hash on the detour or each
+step would either erase retry history or duplicate attribution.
+
 ## Context
 
 The prior class-per-stage pattern spread one stage's neural knowledge across adapter classes,

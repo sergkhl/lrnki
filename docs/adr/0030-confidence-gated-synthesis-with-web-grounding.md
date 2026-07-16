@@ -40,6 +40,11 @@ Current accepted scope is source-less concept synthesis:
   ([ADR-0019](0019-graph-enrichment-derived-layer.md)) — highest priority, since these are concepts
   the source never teaches.
 - Synthetic Topic Generation topic concepts, which have no curated source by construction.
+- Generated learner-scoped Support Steps in a Scaffold Detour
+  ([ADR-0037](0037-persist-learner-scoped-scaffold-detours.md)). Every non-reference step is a
+  source-less child concept, so it is probed before receiving its own Generated Grounding Bundle.
+  Verified parent definitions may provide scaffolding context to grounding generation but never
+  substitute as evidence for the child.
 
 Out of scope: option-select distractors, which must be plausibly wrong rather than factually grounded;
 any section already cited verbatim to source, which is grounded by construction and is never probed;

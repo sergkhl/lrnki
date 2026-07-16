@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { Sparkles } from "lucide-react-native";
 import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -104,30 +104,18 @@ export function GuardianReward({
   const rewardHaptic = preview.status === "ready" && preview.rewardKind === "first"
     ? (preview.focus.kind === "summit" ? "unlock" as const : "fusion" as const)
     : null;
-  const rewardDuration = preview.status === "ready" && preview.rewardKind === "first"
-    ? 1020
-    : MOTION.celebration;
+  // The one-shot guard exists only for the first-win haptic; reward actions are never
+  // gated on choreography (the sweep and binding stay purely decorative).
   const playedEventRef = useRef<string | null>(null);
-  const [settledEventKey, setSettledEventKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (eventKey === null || reduceMotion) return;
+    if (eventKey === null || reduceMotion || rewardHaptic === null) return;
     if (playedEventRef.current === eventKey) return;
     playedEventRef.current = eventKey;
-    const hapticTimer = rewardHaptic !== null
-      ? setTimeout(() => triggerHaptic(rewardHaptic), 560)
-      : null;
-    const settleTimer = setTimeout(
-      () => setSettledEventKey(eventKey),
-      rewardDuration
-    );
-    return () => {
-      if (hapticTimer !== null) clearTimeout(hapticTimer);
-      clearTimeout(settleTimer);
-    };
-  }, [eventKey, reduceMotion, rewardDuration, rewardHaptic]);
+    const hapticTimer = setTimeout(() => triggerHaptic(rewardHaptic), 560);
+    return () => clearTimeout(hapticTimer);
+  }, [eventKey, reduceMotion, rewardHaptic]);
 
-  const actionsReady = reduceMotion || eventKey === null || settledEventKey === eventKey;
   const ready = preview.status === "ready" ? preview : null;
   const rewardLegSectionIndex = ready?.focus.kind === "leg" ? ready.focus.sectionIndex : null;
   const rewardLeg = rewardLegSectionIndex === null
@@ -197,14 +185,12 @@ export function GuardianReward({
           {ready ? (
             <Button
               variant="secondary"
-              disabled={!actionsReady}
               onPress={() => onExplore(ready.focus)}
               label={learnerTerm("guardianRewardExplore")}
             />
           ) : null}
           <Button
             variant="primary"
-            disabled={!actionsReady}
             onPress={onContinue}
             label={learnerTerm("guardianRewardContinue")}
           />

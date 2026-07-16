@@ -223,6 +223,32 @@ test("a Guardian rematch keeps the formation settled and uses endurance copy", a
   await page.screenshot({ path: guardianShot("rematch", test.info().project.name), fullPage: false });
 });
 
+test("a rematch entered from the trail leaves both reward actions immediately usable", async ({ page, mock }) => {
+  // Regression (plan 2026-07-16-003 U1): visiting the trail first pre-warms the expedition
+  // query cache, which used to classify the reward from the STALE session, deadlocking the
+  // settle-timer gating when the controller's refetch flipped the preview back to loading.
+  const challengeId = "guardian-rematch-cached";
+  await seedToken(page, "valid-token");
+  mock.handlers = {
+    "GET /me": () => ok({ learnerStateRef: "gate-explorer", displayName: "Gate Explorer" }),
+    "GET /expedition/*": () => ok(guardianLegRewardExpedition("guardian-original-first-win")),
+    "POST /challenge/create": () => ok({ created: true, view: guardianChallenge(challengeId) }),
+    "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
+    "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId))
+  };
+  await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
+  await page.getByTestId("guardian-node-v1m").click();
+  await page.getByRole("button", { name: "The keyed route marker" }).click();
+  await page.getByRole("button", { name: "See your formation" }).click();
+  await expect(page.getByText("Formation holds strong")).toBeVisible();
+  await expect(page.getByTestId("guardian-reward-rematch")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Explore formation" })).toBeEnabled();
+  const continueButton = page.getByRole("button", { name: "Continue expedition" });
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
+  await expect(page).toHaveURL(new RegExp(`/expedition/${FORMATION_ENRICHMENT_ID}$`));
+});
+
 test("the first Expedition Guardian win seats the summit keystone", async ({ page, mock }) => {
   const challengeId = "guardian-first-summit";
   await seedToken(page, "valid-token");

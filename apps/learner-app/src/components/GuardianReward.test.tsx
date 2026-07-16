@@ -94,19 +94,17 @@ test("classifies only a matching durable won scope as first or rematch", () => {
   expect(guardianRewardPreview(challenge({ anchorDerivedNodeId: "other" }), wonSession(), 358)).toEqual({ status: "inconsistent" });
 });
 
-test("a mounted first Leg win binds once, gates actions, and emits one fusion haptic", async () => {
+test("a mounted first Leg win binds once, keeps actions live, and emits one fusion haptic", async () => {
   const preview = guardianRewardPreview(challenge(), wonSession(), 358);
   const rendered = await renderReward(preview, { transitionToken: "win-event" });
   expect(screen.getByText(learnerTerm("guardianRewardFirstLegTitle"))).toBeTruthy();
   expect(screen.getByTestId("leg-binding-event")).toBeTruthy();
+  // Actions are never choreography-gated: Continue works during the binding reveal.
   await fireEvent.press(screen.getByText(learnerTerm("guardianRewardContinue")));
-  expect(rendered.onContinue).not.toHaveBeenCalled();
+  expect(rendered.onContinue).toHaveBeenCalledTimes(1);
 
   await act(async () => { jest.advanceTimersByTime(560); });
   expect(impactAsync).toHaveBeenCalledWith(ImpactFeedbackStyle.Medium);
-  await act(async () => { jest.advanceTimersByTime(500); });
-  await fireEvent.press(screen.getByText(learnerTerm("guardianRewardContinue")));
-  expect(rendered.onContinue).toHaveBeenCalledTimes(1);
 
   await rendered.rerender(
     <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
@@ -122,6 +120,38 @@ test("a mounted first Leg win binds once, gates actions, and emits one fusion ha
   );
   await act(async () => { jest.advanceTimersByTime(1200); });
   expect(impactAsync).toHaveBeenCalledTimes(1);
+});
+
+test("the rematch preview flip sequence leaves actions immediately usable (deadlock regression)", async () => {
+  // Reproduces the exact killer sequence the old settle-timer gating deadlocked on:
+  // cached ready(rematch) → controller refetch flips loading → refetch lands ready.
+  const current = challenge({ challengeId: "rematch" });
+  const ready = guardianRewardPreview(current, wonSession(), 358);
+  const rendered = await renderReward(ready, { challenge: current, transitionToken: "rematch-event" });
+  const props = {
+    challenge: current,
+    transitionToken: "rematch-event",
+    onContinue: rendered.onContinue,
+    onExplore: rendered.onExplore,
+    onRetry: rendered.onRetry
+  };
+  await rendered.rerender(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <GuardianReward {...props} preview={{ status: "loading" }} />
+    </SafeAreaProvider>
+  );
+  expect(screen.getByText(learnerTerm("guardianRewardLoading"))).toBeTruthy();
+  await rendered.rerender(
+    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      <GuardianReward {...props} preview={ready} />
+    </SafeAreaProvider>
+  );
+  await fireEvent.press(screen.getByText(learnerTerm("guardianRewardExplore")));
+  await fireEvent.press(screen.getByText(learnerTerm("guardianRewardContinue")));
+  expect(rendered.onExplore).toHaveBeenCalledTimes(1);
+  expect(rendered.onContinue).toHaveBeenCalledTimes(1);
+  await act(async () => { jest.advanceTimersByTime(1200); });
+  expect(impactAsync).not.toHaveBeenCalled();
 });
 
 test("a rematch uses endurance copy and never emits a reward haptic", async () => {

@@ -2,6 +2,35 @@
 
 ## TODO
 
+### Learner UX polish (plan 2026-07-16-003 — IN PROGRESS)
+
+[Plan](./2026-07-16-003-fix-learner-ux-polish-plan.md). Session handoff 2026-07-16:
+
+- **U1 DONE.** Reward action gating deleted (`actionsReady`/`settledEventKey`/settle timer/
+  `rewardDuration`/both `disabled` props); `playedEventRef` survives only as the first-win haptic
+  one-shot; the route controller classifies only after `isFetchedAfterMount` (D1+D2). D8a jest
+  regressions added at both levels (route: pre-warmed cache never classifies before the refetch;
+  component: the exact ready→loading→ready deadlock sequence leaves actions usable). D8c e2e
+  scenario added: trail-visit pre-warmed cache → Guardian entry → win → both actions actionable.
+- **U2 DONE.** `BADGE_RADIUS` moved into `crystalFormationLayout.ts`; the emitted island frame
+  includes the 8-unit above-apex overhang (outline apex + badge shifted down, height grown), so
+  every consumer viewBox contains the whole seal. D8b containment test added across four shapes;
+  regenerated rematch screenshot shows the whole roundel.
+- **U3 DONE (code).** One 2 px `non-scaling-stroke` policy in `CrystalSpecimen` on ghost (0.55) /
+  growing (0.7, raised from 0.4) / collected-fill outlines. Final legibility judgment rides U6.
+- **Remaining: U4** (trail sine wave in `CheckpointPath` — `WINDING_OFFSETS` + center bar still
+  present), **U5** (Android scrim token D6 + menu→board handoff D7; user-hosted emulator loop),
+  **U6** (rule-14 gate, then fold + delete plan).
+- Validation this session: learner jest 51 suites / 229 tests green; full production-export
+  Playwright 48/48 (incl. the new rematch scenario); learner-app typecheck clean; lint clean on
+  touched files. Nothing committed (user has not asked).
+
+### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — READY)
+
+[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). Queued after plan 003 because
+both touch `CheckpointPath.tsx`. Grilling and durable ADR amendments are complete; implementation
+has not started.
+
 ### Evidence-triggered follow-up
 
 - **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a

@@ -4,9 +4,13 @@ Status: Accepted
 
 ## Decision
 
-Every derived node carries at most one **Concept Lesson**: an ordered, source-grounded teaching
-artifact generated alongside the Study Item Bank as a learner-neutral, regenerable asset keyed to
-`derived_node_id`. A lesson is an ordered set of typed, independently-optional sections — gist,
+Every derived node carries at most one current **Concept Lesson**: an ordered, source-grounded
+teaching artifact generated alongside the Study Item Bank as a learner-neutral, regenerable asset
+keyed to `derived_node_id`. Regeneration supersedes and retains prior lesson identities rather than
+deleting them, because an immutable reference Support Step may pin the exact neutral lesson it made
+playable ([ADR-0037](0037-persist-learner-scoped-scaffold-detours.md)). Ordinary Study Session reads
+select the current lesson; reference hydration may select a pinned superseded lesson by identity. A
+lesson is an ordered set of typed, independently-optional sections — gist,
 intuition, definition, examples, applications, formulas/methods — that *teach* the concept before it
 is tested.
 
@@ -83,6 +87,8 @@ lesson and its option-select projection are produced in the same per-node pass.
 
 - One canonical teaching artifact per node, regenerable and learner-neutral, that all item types and
   Learner App projections consume.
+- Superseded Concept Lessons remain hydratable only for durable identity references; current Study
+  Session and generation reads continue to select one current lesson per node.
 - A second per-node LLM call roughly doubles per-node generation work; the dedicated stage tag makes
   the cost regression immediately visible at the real-use gate owned by [AGENTS.md](../../AGENTS.md).
 - Option-select quality now depends on the lesson's source citations; the assembler demotes any

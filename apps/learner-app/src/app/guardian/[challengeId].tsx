@@ -131,8 +131,10 @@ export function GuardianRewardRoute({
     void expedition.refetch();
   }, [expedition, query.queryKey]);
 
+  // Never classify from a stale cache: the preview stays loading until this
+  // controller's own refetch has landed (isFetchedAfterMount), then during retries.
   let preview: GuardianRewardPreview;
-  if (expedition.isPending || expedition.isFetching) preview = { status: "loading" };
+  if (!expedition.isFetchedAfterMount || expedition.isFetching) preview = { status: "loading" };
   else if (expedition.isError) preview = { status: "error" };
   else if (!expedition.data) preview = { status: "inconsistent" };
   else preview = guardianRewardPreview(challenge, expedition.data.session, guardianRewardSceneWidth(windowWidth));

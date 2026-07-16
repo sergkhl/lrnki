@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Svg, { Circle, G, Polygon } from "react-native-svg";
 import Animated, { Easing, useAnimatedProps, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
 import { MineralSpecimenGroup } from "./CrystalSpecimen";
-import type { LegFormationModel, MineralSlot } from "@/learn/crystalFormationLayout";
+import { BADGE_RADIUS, type LegFormationModel, type MineralSlot } from "@/learn/crystalFormationLayout";
 import { MINERAL_GROUND_Y, formationProgressLine, mineralSpeciesFor } from "@/learn/mineralSpecimen";
 import { legStateCopy, learnerTerm } from "@/learn/vocabulary";
 import { MOTION, colors, useReducedMotion } from "@/ui";
@@ -94,7 +94,7 @@ function rimStroke(state: LegFormationModel["structuralState"]): string {
 // star; the guardian badge is a neutral roundel holding the ward diamond.
 function JunctionBadge({ leg, kind }: Readonly<{ leg: LegFormationModel; kind: "guardian" | "seal" }>) {
   const { x, y } = leg.badge;
-  const r = 13;
+  const r = BADGE_RADIUS;
   return (
     <G testID={`island-badge-${kind}`}>
       <Circle

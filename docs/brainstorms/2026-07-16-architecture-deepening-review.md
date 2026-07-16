@@ -1,6 +1,8 @@
 # Architecture deepening review
 
-Date: 2026-07-16. Status: **review findings; no candidate accepted yet**.
+Date: 2026-07-16. Status: **Candidates 1 and 2 accepted for implementation in
+[plan 2026-07-16-004](../plans/2026-07-16-004-refactor-deep-scaffold-generation-plan.md); Candidate 3
+remains unselected**.
 
 This review applies the architecture vocabulary in
 [the architecture skill](../../.agents/skills/improve-codebase-architecture/LANGUAGE.md) and the
@@ -82,7 +84,8 @@ Derive locked status from the same learner-stateful Study Session facts that own
 the finished generation module once per process, as Topic Expedition generation already is, so one
 call represents one claimed Scaffold Detour and tests cross the same interface as production.
 
-No public interface shape is selected here; that belongs in the grilling pass.
+The completed grilling decisions below select the public interface and durable edge-case behavior;
+the linked implementation plan owns the execution design.
 
 ### Benefits
 
@@ -126,6 +129,61 @@ flowchart LR
 [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md), and
 [ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md). It does not move Scaffold
 Detours, Support Steps, or Learner State into the learner-neutral graph.
+
+### Accepted grilling decisions
+
+- **G1 — Stable claim-time eligibility.** Each claimed generation attempt composes one opening Study
+  Session and uses it as the exact-reuse snapshot. A node locked in that snapshot is ineligible. A
+  reference that is subsequently published remains playable even if later Learner State changes
+  would lock its target again; the access is scoped to the Support Step and changes neither neutral
+  mastery nor prerequisite gating elsewhere.
+- **G2 — Preserve confidently floored reuse.** Currently playable included references route to their
+  canonical neutral checkpoints. A confidently floored reference opens a Support-Path-only neutral
+  activity projected from the existing Concept Lesson and option-select, records neutral evidence,
+  and remains absent from the Expedition Trail and its gating and progress mechanics. No copied
+  content is introduced.
+- **G3 — One process-lived generation callable.** Construction binds persistence, Study Session
+  reading, neural adapters, operation reporting, and configuration once. Each invocation carries
+  only the claimed-detour identity and fence. The module owns the eligibility snapshot, exact reuse,
+  grounding, generation, congruence, validation, stage ordering, and fenced terminal write; the
+  supervisor cannot call or reorder those internal phases.
+- **G4 — Read the finished Study Session.** The generation callable receives one authoritative Study
+  Session through a construction-bound reader instead of raw learner-state rows or an app-assembled
+  parent context. The projection gains the reference-only neutral activity needed by confidently
+  floored nodes, so locking, flooring, and reusable payload availability are decided once and shared
+  with the learner flow.
+- **G5 — Only readiness resolves successfully.** The callable returns `Promise<void>` and owns
+  failure classification. Claim loss performs no detour write; infrastructure-transient exhaustion
+  releases the claim for the bounded attempt budget; deterministic or no-safe-step failure records
+  `failed`. Every non-ready attempt rejects, keeping the operation timeline honest while the
+  supervisor remains a scheduler that only logs the rejection.
+- **G6 — Close Scaffold Generation attribution in the same plan.** Candidate 1 includes Candidate
+  2's closed Neural Stage Descriptor registration and a complete persisted Scaffold Generation
+  configuration identity. Candidate 3 and unrelated operation behavior remain outside this plan.
+- **G7 — Attribute every claimed attempt.** Persist the complete Scaffold Generation config hash on
+  its Operation Timeline run. This covers direct reuse, successful generation, deterministic
+  failure, transient retry, and claim loss without duplicating the hash across Support Steps; the
+  Scaffold Detour's operation pointer already identifies its latest attempt.
+- **G8 — Ground every generated child specifically.** Every non-reference Support Step passes the
+  Knowledge-Boundary Probe and then receives its own Generated Grounding Bundle. Verified parent
+  definitions may scaffold that generation but never count as evidence for a different child
+  concept. The unmeasured 200-character sufficiency shortcut is deleted, not moved inward.
+- **G9 — Register descriptors by neural operation.** One infrastructure-owned operation registry
+  supplies each neural operation's hash seed, timeline operation type, and complete descriptor set.
+  Operation hashes, the distinct descriptor inventory, shape checks, and catalog-completeness tests
+  derive from it; shared descriptors are members of every operation that executes them.
+- **G10 — Test only through the deep public seam.** The application package exposes the construction
+  factory and claimed-attempt callable, while exact matching, context assembly, grounding, retries,
+  payload validation, and terminal writes remain internal. Focused tests drive that same callable
+  through narrow in-memory adapters; superseded helper, context, outcome, and dependency exports are
+  deleted.
+- **G11 — Pin neutral assets without copying them.** A reference Support Step persists the concrete
+  neutral node, Concept Lesson, and option-select identities selected by its opening Study Session.
+  Concept Lesson regeneration retains superseded identities as Study Item regeneration already does.
+  An included reference uses its canonical checkpoint while it remains playable and the pinned
+  assets are current; a floored, later-locked, or superseded reference uses a Support-Path-only
+  activity hydrated by pinned identity. Both paths record ordinary neutral evidence, and no lesson
+  or item payload is copied into the step.
 
 ---
 
@@ -188,10 +246,8 @@ Keep the application-owned Operation Timeline catalog separate as ADR-0034 requi
 two authorities mechanically so every neural operation has complete stage ownership.
 
 Make Scaffold Generation consume a hash over every behavior-affecting descriptor and operation knob,
-then persist that identity at one canonical attribution point attached to the generated result or
-its operation. The grilling pass should choose that persisted home; this review deliberately does
-not select an interface or data shape. Measurement-only descriptors should be explicitly classified
-as such rather than omitted ad hoc.
+then persist that identity on each Scaffold Generation Operation Timeline run, as selected by G7.
+Measurement-only descriptors should be explicitly classified as such rather than omitted ad hoc.
 
 ### Benefits
 
@@ -367,14 +423,13 @@ touched. This is worthwhile cleanup, not a deepening candidate by itself.
 
 ---
 
-## Top recommendation
+## Selected implementation
 
-Start with **Candidate 1**. It is the only finding where the current seam makes an accepted learner
+**Candidate 1** is selected. It is the only finding where the current seam makes an accepted learner
 behavior impossible to express: production marks every exact-reuse candidate unlocked while the
 application test suite proves only the unreachable locked-candidate branch. Deepening Scaffold
 Generation fixes that locality failure and makes the production interface the test surface.
 
-Candidate 2 should be resolved in the same implementation plan or immediately after it, because a
-reworked Scaffold Generation operation should not ship another behavior change without correct
-mechanical attribution. Candidate 3 is independent and can follow without touching neural or
-learner-neutral graph behavior.
+**Candidate 2** is included in the same implementation plan because a reworked Scaffold Generation
+operation must not ship another behavior change without correct mechanical attribution. Candidate 3
+is independent and remains outside the selected scope.

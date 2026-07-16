@@ -113,7 +113,7 @@ beforeEach(() => {
 
 test("a direct won route renders static reward and refetches the Expedition projection", async () => {
   const refetch = jest.fn(() => Promise.resolve());
-  mockUseQuery.mockReturnValue({ isPending: false, isFetching: false, isError: false, data: { session: {} }, refetch });
+  mockUseQuery.mockReturnValue({ isFetchedAfterMount: true, isFetching: false, isError: false, data: { session: {} }, refetch });
   await render(
     <GuardianResolvedRoute
       view={wonView()}
@@ -129,7 +129,7 @@ test("a direct won route renders static reward and refetches the Expedition proj
 });
 
 test("the final reveal token survives the same-route transition into reward", async () => {
-  mockUseQuery.mockReturnValue({ isPending: true, isFetching: true, isError: false, data: null, refetch: jest.fn() });
+  mockUseQuery.mockReturnValue({ isFetchedAfterMount: false, isFetching: true, isError: false, data: null, refetch: jest.fn() });
   const { rerender } = await render(
     <GuardianResolvedRoute
       view={activeView()}
@@ -152,10 +152,25 @@ test("the final reveal token survives the same-route transition into reward", as
   expect(screen.getByText("reward:loading:route-win-token")).toBeTruthy();
 });
 
+test("a pre-warmed cached expedition never classifies before the route's own refetch lands", async () => {
+  // Regression: a trail visit leaves cached expedition data, so a rematch reward used to
+  // classify ready from the STALE session before the controller's explicit refetch.
+  mockUseQuery.mockReturnValue({ isFetchedAfterMount: false, isFetching: false, isError: false, data: { session: {} }, refetch: jest.fn() });
+  const { rerender } = await render(
+    <GuardianRewardRoute challenge={wonView()} transitionToken="event" onReplace={jest.fn()} />
+  );
+  expect(screen.getByText("reward:loading:event")).toBeTruthy();
+  expect(mockGuardianRewardPreview).not.toHaveBeenCalled();
+
+  mockUseQuery.mockReturnValue({ isFetchedAfterMount: true, isFetching: false, isError: false, data: { session: {} }, refetch: jest.fn() });
+  await rerender(<GuardianRewardRoute challenge={wonView()} transitionToken="event" onReplace={jest.fn()} />);
+  expect(screen.getByText("reward:ready:event")).toBeTruthy();
+});
+
 test("loading and error previews preserve plain Continue while Retry remains preview-only", async () => {
   const replace = jest.fn();
   const refetch = jest.fn();
-  mockUseQuery.mockReturnValue({ isPending: false, isFetching: false, isError: true, data: null, refetch });
+  mockUseQuery.mockReturnValue({ isFetchedAfterMount: true, isFetching: false, isError: true, data: null, refetch });
   await render(<GuardianRewardRoute challenge={wonView()} transitionToken="event" onReplace={replace} />);
   expect(screen.getByText("reward:error:event")).toBeTruthy();
   await fireEvent.press(screen.getByText("Route retry"));
@@ -166,7 +181,7 @@ test("loading and error previews preserve plain Continue while Retry remains pre
 
 test("Explore replaces the Guardian route with explicit Vista focus intent", async () => {
   const replace = jest.fn();
-  mockUseQuery.mockReturnValue({ isPending: false, isFetching: false, isError: false, data: { session: {} }, refetch: jest.fn() });
+  mockUseQuery.mockReturnValue({ isFetchedAfterMount: true, isFetching: false, isError: false, data: { session: {} }, refetch: jest.fn() });
   await render(<GuardianRewardRoute challenge={wonView()} transitionToken={null} onReplace={replace} />);
   await fireEvent.press(screen.getByText("Route explore"));
   expect(replace).toHaveBeenCalledWith("/expedition/e1?vista=1&formationFocus=leg:0");

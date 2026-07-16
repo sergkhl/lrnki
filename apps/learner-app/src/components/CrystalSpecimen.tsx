@@ -15,6 +15,12 @@ import { colors } from "@/ui";
 
 export type SpecimenState = "ghost" | "growing" | "collected";
 
+// One specimen-wide stroke policy (plan 2026-07-16-003 U3, D4): a constant 2 px outline
+// matching the lucide icon weight on every state, immune to size props, mound-slot
+// scale, and cosmetic variation via non-scaling stroke.
+const SPECIMEN_STROKE = 2;
+const NON_SCALING = { vectorEffect: "non-scaling-stroke" } as const;
+
 // One mineral specimen (plan 2026-07-16-002 U1, D1): renders the curated species
 // geometry at readable sizes (>= 40 px). Rendering only — species mapping, silhouettes,
 // and the growth clip live in `@/learn/mineralSpecimen`; event-bound motion belongs to
@@ -82,9 +88,10 @@ export function MineralSpecimenGroup({
           points={toPoints(spec.silhouette)}
           fill="transparent"
           stroke={tint}
-          strokeWidth={2.5}
+          strokeWidth={SPECIMEN_STROKE}
+          {...NON_SCALING}
           strokeLinejoin="round"
-          opacity={0.6}
+          opacity={0.55}
         />
       </G>
     );
@@ -108,9 +115,10 @@ export function MineralSpecimenGroup({
         points={toPoints(spec.silhouette)}
         fill="transparent"
         stroke={tint}
-        strokeWidth={1.5}
+        strokeWidth={SPECIMEN_STROKE}
+        {...NON_SCALING}
         strokeLinejoin="round"
-        opacity={0.4}
+        opacity={0.7}
       />
       <FilledBody spec={spec} tint={tint} cutY={growthCutY(spec, growthFraction)} />
     </G>
@@ -132,7 +140,8 @@ function FilledBody({ spec, tint, cutY }: Readonly<{ spec: MineralSpeciesSpec; t
         fill={tint}
         stroke={colors.ink}
         strokeOpacity={0.25}
-        strokeWidth={1}
+        strokeWidth={SPECIMEN_STROKE}
+        {...NON_SCALING}
         strokeLinejoin="round"
       />
       {spec.facets.map((facet, index) => {

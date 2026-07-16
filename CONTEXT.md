@@ -257,10 +257,11 @@ publication are owned by [ADR-0037](docs/adr/0037-persist-learner-scoped-scaffol
 _Avoid_: sub-expedition, generated prerequisite edge, second trail
 
 **Support Step**:
-One ordered element of a Scaffold Detour: either a reference to an existing node in the parent's own
-layer and Declared Domain, or a generated learner-scoped node carrying a citation-free micro-lesson
-and one option-select item. Reference steps record normal neutral evidence; generated steps record
-learner-scoped evidence that never enters neutral mastery.
+One ordered element of a Scaffold Detour: either a reference that pins an existing node's concrete
+neutral Concept Lesson and option-select identities in the parent's own layer and Declared Domain
+without copying their payloads, or a generated learner-scoped node carrying a citation-free
+micro-lesson and one option-select item. Reference steps record normal neutral evidence; generated
+steps record learner-scoped evidence that never enters neutral mastery.
 _Avoid_: cloned concept, Study Item Bank item, locked stop
 
 **Explorable Term**:

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "@jest/globals";
 import type { RecallScopeStatus } from "@lrnki/application/projection";
 import {
+  BADGE_RADIUS,
   HERO_SLOT_PX,
   MILESTONE_SCALE,
   buildLegModel,
@@ -143,6 +144,30 @@ test("a dense Leg wraps to raised back rows and never exceeds the available widt
   // Paint order: back rows first so the front mound overlaps them.
   const rowsInPaintOrder = model.slots.map((slot) => slot.row);
   assert.deepEqual(rowsInPaintOrder, [...rowsInPaintOrder].sort((a, b) => b - a));
+});
+
+// D3 (plan 2026-07-16-003 U2): the straddling junction badge is part of the island's own
+// geometry — its full roundel (radius + stroke) stays inside the emitted frame at every
+// shape, so no consumer viewBox can crop the gold seal.
+test("the junction badge roundel is contained by the island frame across shapes", () => {
+  const shapes = [
+    buildLegModel(section(0), [concept("solo", { isMilestone: true })], WIDTH),
+    buildLegModel(
+      section(0),
+      Array.from({ length: 10 }, (_, index) =>
+        concept(`w${index}`, { sectionPositionIndex: index, isMilestone: index === 0 })
+      ),
+      WIDTH
+    ),
+    buildLegModel(section(0), [], WIDTH),
+    buildLegModel(section(0), [concept("narrow", { isMilestone: true })], 160)
+  ];
+  for (const model of shapes) {
+    const overhang = BADGE_RADIUS + 1; // radius plus the seal's stroke half-width, rounded up
+    assert.ok(model.badge.y - overhang >= 0, "badge top inside the frame");
+    assert.ok(model.badge.y + overhang <= model.height, "badge bottom inside the frame");
+    assert.ok(model.badge.x - overhang >= 0 && model.badge.x + overhang <= model.width, "badge sides inside the frame");
+  }
 });
 
 // Headers are part of the geometry: bands sit above their island and never intersect

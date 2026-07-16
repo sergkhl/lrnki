@@ -36,6 +36,13 @@ const MIN_HEADER_WIDTH = 240;
 const LEG_GAP = 36;
 const ASCENT_OFFSET_X = 24;
 export const MIN_ISLAND_WIDTH = 140;
+// The junction badge straddles the island apex (D3): the layout owns the roundel radius
+// and includes its above-apex overhang in the emitted frame, so every consumer's
+// `0 0 w h` viewBox contains the whole seal with no per-component special-casing.
+export const BADGE_RADIUS = 13;
+const BADGE_STROKE = 1.5;
+const OUTLINE_APEX_Y = 6;
+const BADGE_OVERHANG = Math.ceil(BADGE_RADIUS + BADGE_STROKE / 2 - OUTLINE_APEX_Y);
 const PEAK_WIDTH = 104;
 const PEAK_HEIGHT = 88;
 const OUTLINE_SAMPLES = 16;
@@ -250,7 +257,7 @@ export function buildLegModel(
   const width = Math.min(availableWidth, Math.max(MIN_ISLAND_WIDTH, contentWidth + 2 * ISLAND_PAD_X));
   const tallestBack = Math.max(0, ...backRows.map((row, index) => (index + 1) * ROW_RAISE + Math.max(0, ...row.map((entry) => entry.size))));
   const tallest = Math.max(concepts.length > 0 ? heroSize : 0, tallestBack);
-  const frontBaseline = ISLAND_PAD_TOP + tallest;
+  const frontBaseline = BADGE_OVERHANG + ISLAND_PAD_TOP + tallest;
   const height = Math.max(72, frontBaseline + ISLAND_PAD_BOTTOM);
 
   // Paint order: back rows first so front-row specimens overlap them like a mound.
@@ -309,20 +316,21 @@ export function buildLegModel(
     progress: formationProgress(concepts),
     slots,
     outline: moundOutline(width, height),
-    badge: { x: round2(width / 2), y: 6 },
+    badge: { x: round2(width / 2), y: OUTLINE_APEX_Y + BADGE_OVERHANG },
     width,
     height
   };
 }
 
 // ONE smooth organic outline (D2): a flat-bottomed dome sampled from a flattened sine —
-// deterministic from the island dimensions alone, no jitter, no nested bands.
+// deterministic from the island dimensions alone, no jitter, no nested bands. The dome
+// apex sits BADGE_OVERHANG below the frame top so the straddling badge stays contained.
 function moundOutline(width: number, height: number): Point[] {
   const points: Point[] = [{ x: 6, y: height }];
   for (let index = 0; index <= OUTLINE_SAMPLES; index += 1) {
     const angle = (Math.PI * index) / OUTLINE_SAMPLES;
     const x = width / 2 - (width / 2 - 6) * Math.cos(angle);
-    const y = height - 4 - (height - 10) * Math.pow(Math.sin(angle), 0.3);
+    const y = height - 4 - (height - 10 - BADGE_OVERHANG) * Math.pow(Math.sin(angle), 0.3);
     points.push({ x: round2(x), y: round2(y) });
   }
   points.push({ x: width - 6, y: height });

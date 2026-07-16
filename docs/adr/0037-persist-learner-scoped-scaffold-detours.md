@@ -22,10 +22,15 @@ gating, crystals, leaderboard points, or base expedition progress
   steps, and commits the one-to-three surviving steps and the `ready` transition in one
   claim-token-fenced transaction, or records `failed` with no partial visible branch. Retry reuses
   the identity and returns to `generating`; hide/dismiss preserves content and evidence; reselecting
-  a hidden term restores `ready` when complete content exists and `generating` otherwise.
+  a hidden term restores `ready` when complete content exists and `generating` otherwise. A claimed
+  generation attempt resolves successfully only after that fenced `ready` transition. Claim loss
+  writes no detour state; infrastructure-transient exhaustion releases the claim to the bounded
+  attempt budget; deterministic or no-safe-step failure records `failed`. Every non-ready attempt
+  rejects so its Operation Timeline cannot report success for a failed detour.
 
-- **Support Steps are payload-on-step.** A step is EITHER a reference to an existing neutral node or a
-  generated learner-scoped node whose whole content (a citation-free micro-lesson and one four-option
+- **Support Steps are payload-on-step.** A step is EITHER a reference that pins an existing neutral
+  node, Concept Lesson, and option-select identity without copying their payloads, or a generated
+  learner-scoped node whose whole content (a citation-free micro-lesson and one four-option
   option-select) lives inline on the step; a database CHECK enforces exactly one of the two shapes.
   Generated steps are immutable once published, so the neutral tables' supersede lifecycle, partial
   unique indexes, and citation CHECKs are deliberately not mirrored; the option-shape invariants
@@ -41,7 +46,18 @@ gating, crystals, leaderboard points, or base expedition progress
   ambiguous or unusable collision is never cloned — a genuinely lower-level concept is generated
   instead, or the detour fails if no safe step survives. A reference is not a second concept identity
   and studies the existing node through its own lesson and option-select, recording normal neutral
-  evidence; the node's canonical mastery rule is unchanged.
+  evidence; the node's canonical mastery rule is unchanged. Pinning the concrete lesson and item
+  identities makes the immutable Support Step replayable across neutral asset regeneration;
+  superseded Concept Lessons and Study Items remain hydratable by those identities. Each claimed
+  generation attempt samples exact-reuse eligibility once from its opening Study Session. A node
+  that is locked in that snapshot is ineligible; once a reference is atomically published, it
+  remains playable even if later Learner State recomputation would lock the referenced node again.
+  That stable support access does not mark the node mastered or relax prerequisite gating elsewhere.
+  An included, currently playable reference routes to its canonical neutral checkpoint while its
+  pinned lesson and item remain current. A confidently floored, later-locked, or superseded
+  reference instead opens a Support-Path-only neutral activity hydrated by the pinned identities.
+  The response retains its neutral identity and evidence semantics; this access does not insert the
+  node into the trail or change gating, crystals, or base expedition progress.
 
 - **One scoped response identity.** A Response Log observation's subject/item identity is a
   discriminated neutral-or-scaffold reference over mutually exclusive foreign keys: the neutral
@@ -51,10 +67,12 @@ gating, crystals, leaderboard points, or base expedition progress
   journal — consumes neutral observations only; shared grading mechanics handle both scopes; one
   append-only monotonic sequence per learner spans both.
 
-- **Grounding and observability.** Generated steps reuse verified parent/layer grounding when
-  sufficient and pass the existing Knowledge-Boundary Probe before synthesizing source-less concepts
-  ([ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md)); boundary steps are omitted and
-  generation fails when none survive. Scaffold generation reuses the shared operation-timeline and
+- **Grounding and observability.** Every generated step is a source-less child concept, so it passes
+  the existing Knowledge-Boundary Probe and receives its own Generated Grounding Bundle
+  ([ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md)). Verified parent definitions
+  may scaffold that generation but never substitute as evidence for the child; no text-length
+  shortcut establishes relevance. Boundary steps are omitted and generation fails when none
+  survive. Scaffold generation reuses the shared operation-timeline and
   spend infrastructure ([ADR-0029](0029-persist-shared-operation-stage-timelines.md)) — the
   Knowledge-Boundary Probe and grounding-generation stages are shared, owned by both `enrichment` and
   `scaffold`, and the Study Session projection maps internal stages to broad learner phases without
@@ -72,8 +90,10 @@ question stem in graded activities); both open one state-aware dialog, the reque
 and an active detour's term is suppressed from the panel while a hidden detour's term returns and
 restores the same durable detour (plan 2026-07-13-002). On the trail each active detour is one
 always-visible compact side-branch node under its parent, and its ordered Support Steps play inside
-one full-screen Support Path flow; reference steps route back to the canonical neutral checkpoint
-rather than rendering copied content.
+one full-screen Support Path flow. Reference steps never render copied content: an included node
+routes to its canonical neutral checkpoint while it is playable and its pinned assets are current;
+a confidently floored, later-locked, or superseded reference uses the Support-Path-only neutral
+activity defined above.
 
 The tension this ADR resolves is keeping learner-scoped generated support fully replayable and
 studyable while the Learner-Neutral Core Concept Graph and neutral Study Item Bank remain untouched.
@@ -90,7 +110,8 @@ than merely discouraged.
   [ADR-0032](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 - Neutral mastery, prerequisite semantics, crystals, leaderboard points, Recall Challenge behavior,
   and expedition progress are provably unaffected by generated scaffold work; existing-node
-  references behave exactly like studying that node elsewhere.
+  references retain the same neutral evidence identity and canonical mastery semantics even when
+  stable Support Path access hydrates pinned assets.
 - Admin learner-response inspection must resolve neutral versus scaffold subjects without assuming
   every observation joins `study_items`.
 - Development data is reset rather than migrated when the single initial schema gains the detour and
