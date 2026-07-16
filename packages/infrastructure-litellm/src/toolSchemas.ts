@@ -607,6 +607,19 @@ export const discoveryCoverageAuditValidator = z.object({
 
 export const discoveryCoverageAuditSchema: JsonSchema = toForcedToolSchema(discoveryCoverageAuditValidator);
 
+// --- Scaffold-content congruence audit: submit_scaffold_content_congruence (plan 2026-07-16-001) ---
+// ONE sample of the cross-family judge over ONE generated Support Step (KTD3): does the content
+// teach its named step label, and is it a genuinely simpler prerequisite of the term? Runs on
+// gpt-oss-120b (kg-independent-judge), not the generator, so the generator never grades itself.
+// Every field is required prose/boolean so the object closes without a trailing nullable.
+export const scaffoldContentCongruenceValidator = z.object({
+  teachesStepLabel: z.boolean().describe("True if the micro-lesson, question, and options actually teach the named step label; false if the content is about something else (a label↔content mismatch)."),
+  isSimplerPrerequisite: z.boolean().describe("True if the taught content is a genuinely simpler prerequisite that helps reach the term — not the term itself, and not the parent concept."),
+  rationale: z.string().min(1).describe("One or two sentences grounding both judgments in the specific content shown.")
+}).strict();
+
+export const scaffoldContentCongruenceSchema: JsonSchema = toForcedToolSchema(scaffoldContentCongruenceValidator);
+
 // --- Learner-Scoped Scaffold outline: submit_scaffold_outline (plan 2026-07-12-002 U3) ---
 // Proposes the smallest useful ordered set of STRICTLY-SIMPLER prerequisite sub-concepts a
 // learner needs before the target term. Exact reuse of existing nodes is resolved by the
@@ -643,6 +656,7 @@ export const toolValidators = [
   scaffoldContentValidator,
   layerPurposeValidator,
   discoveryCoverageAuditValidator,
+  scaffoldContentCongruenceValidator,
   conceptDiscoveryValidator,
   conceptAdmissionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),
   conceptCoreSelectionValidatorForCandidateKeys(["candidate_a", "candidate_b"]),

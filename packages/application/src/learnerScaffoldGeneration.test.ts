@@ -79,7 +79,8 @@ function makeDeps(context: ScaffoldParentContext, overrides: Partial<ScaffoldGen
       restartGenerating: async () => undefined,
       hide: async () => true,
       getStep: async () => undefined,
-      markLessonRead: async () => {}
+      markLessonRead: async () => {},
+      listGeneratedStepsForAudit: async () => []
     },
     loadParentContext: async () => context,
     outline: { model: "m", propose: async () => { outlineCalls += 1; return { steps: [{ label: "Affine types", rationale: "needed" }] }; } },

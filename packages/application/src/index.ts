@@ -20,6 +20,19 @@ export {
   type DiscoveryCoverageAggregatedMiss,
   type DiscoveryCoverageSample
 } from "./auditDiscoveryCoverage";
+export {
+  auditScaffoldContent,
+  detectFormattingArtifacts,
+  scaffoldMicroLessonText,
+  SCAFFOLD_CONTENT_CONGRUENCE_RECURRENCE_THRESHOLD,
+  type ScaffoldContentAuditReport,
+  type ScaffoldContentStepAudit,
+  type ScaffoldContentCongruenceSample,
+  type ScaffoldContentAuditSampleProgress,
+  type FormattingArtifactFinding,
+  type FormattingArtifactType,
+  type ScaffoldContentField
+} from "./auditScaffoldContent";
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export {
   composeScaffoldDetours,

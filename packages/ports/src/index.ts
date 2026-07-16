@@ -31,6 +31,7 @@ import type {
   DerivedGraphLayer,
   DiscoveredCandidate,
   DiscoveryCoverageMiss,
+  ScaffoldContentCongruenceVerdict,
   EnrichmentRunTrace,
   ExtractedEvidenceProfile,
   ExtractionQualityIssue,
@@ -91,6 +92,28 @@ export interface DiscoveryCoverageAuditPort {
     blocks: { blockType: string; headingPath: string[]; text: string }[];
     admittedConcepts: DiscoveryCoverageAuditConcept[];
   }): Promise<DiscoveryCoverageMiss[]>;
+}
+
+// Scaffold-content congruence judge (plan 2026-07-16-001, KTD3). ONE sample of the cross-family
+// independent judge over ONE generated Support Step: it sees the Declared Domain, the detour term,
+// the parent concept label, the step label, and the step's content (correct answer NOT flagged),
+// and answers whether the content teaches the named step label and whether it is a genuinely
+// simpler prerequisite of the term. K-sample orchestration and per-step recurrence aggregation
+// live in the application audit module, not this transport (mirrors DiscoveryCoverageAuditPort).
+export interface ScaffoldContentCongruencePort {
+  model: string;
+  judge(input: {
+    declaredDomain: string;
+    term: string;
+    parentLabel: string;
+    stepLabel: string;
+    microLesson: string;
+    question: string;
+    explanation: string;
+    // Every option text, correct answer NOT distinguished — the judge grades the teaching, not
+    // the answer key.
+    options: string[];
+  }): Promise<ScaffoldContentCongruenceVerdict>;
 }
 
 // Concept-conditioned Concept Evidence Profile extraction (ADR-0007 reset). For
@@ -900,6 +923,26 @@ export interface ScaffoldDetourStorePort {
   getStep(input: { scaffoldStepId: string; learnerStateRef: string }): Promise<{ step: ScaffoldStep; detourId: string } | undefined>;
   // Mark a generated step's micro-lesson read (R12). No-op for a reference step.
   markLessonRead(input: { scaffoldStepId: string; learnerStateRef: string; readAt: string }): Promise<void>;
+  // Scaffold-content audit read seam (plan 2026-07-16-001 U1, KTD1). Every GENERATED step with
+  // the context the audit judges it against: the detour's advertised term, the parent derived
+  // node's canonical label, and the Declared Domain. Read-only and measurement-only — the
+  // command reads persisted learner output exactly as it shipped, never regenerating (rule 18).
+  // Scoped to one enrichment when given, else every generated step. Reference steps are excluded
+  // (they carry no generated content — their neutral node was already quality-gated).
+  listGeneratedStepsForAudit(enrichmentId?: string): Promise<GeneratedScaffoldStepForAudit[]>;
+}
+
+// One persisted generated Support Step presented for content audit (plan 2026-07-16-001 U1). The
+// whole `payload` (micro-lesson + item) travels so both classifiers see exactly what the learner
+// saw; `term`/`parentLabel`/`declaredDomain` are the contract the content is judged against.
+export interface GeneratedScaffoldStepForAudit {
+  detourId: string;
+  scaffoldStepId: string;
+  enrichmentId: string;
+  declaredDomain: string;
+  term: string;
+  parentLabel: string;
+  payload: ScaffoldNodePayload;
 }
 
 // The generated payloads a publish attempt commits, alongside their step ordering. Reference

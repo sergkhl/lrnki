@@ -4,15 +4,46 @@
 
 ### Active implementation
 
-- None.
+- **Scaffold Content Quality Audit** — IN PROGRESS, plan
+  [2026-07-16-001](./2026-07-16-001-feat-scaffold-content-quality-audit-plan.md). **U1–U4 built +
+  deterministic envelope GREEN (uncommitted, 2026-07-16); U5 is the remaining real-use gate.** The
+  durable `kg-worker audit-scaffold-content <enrichmentId> [--k <n>] [--out <dir>]` command exists
+  end to end: **U1** read seam `ScaffoldDetourStorePort.listGeneratedStepsForAudit(enrichmentId?)`
+  (clean `learner_scaffold_steps`→`learner_scaffold_detours`→`derived_graph_nodes` join returning
+  term + parent label + Declared Domain; reference steps excluded; postgres test passes vs the live
+  migration); **U2** pure `packages/application/src/auditScaffoldContent.ts` (deterministic markdown
+  artifact classifier — report-only, never a gate, rule 16 — plus K-sample congruence orchestration
+  over `ScaffoldContentCongruencePort`, per-step recurrence at `SCAFFOLD_CONTENT_CONGRUENCE_RECURRENCE_THRESHOLD=2`,
+  one typed `ScaffoldContentAuditReport`; 7 unit tests); **U3** `scaffold-content-congruence.prompt`
+  (`kg-independent-judge`, forced tool `submit_scaffold_content_congruence`, KTD3 fields, options
+  sorted so correct-first order leaks nothing) + `createScaffoldContentCongruencePort` + validator +
+  new `scaffoldContentCongruence` STAGE_TAG claimed under the `scaffold` catalog arm (measurement,
+  no `operation_id`); **U4** worker command wired like `audit-discovery-coverage` (JSON + markdown to
+  `tmp/2026-07-16-scaffold-content-audit/`, per-sample progress, usage string updated). Envelope:
+  `pnpm typecheck` all 12 projects Done; `lint` 0 errors (8 pre-existing warnings, none new); tests
+  green — domain-core 39, application 677, infrastructure-litellm 151, infrastructure-postgres 88
+  (vs live migration), kg-worker 8, learner-api 18, admin-lab 62; command smoke-tested against an
+  empty enrichment (reads seam, dispatches, "nothing to audit"). **NOTHING COMMITTED** (user did not
+  ask). **U5 — NEXT SESSION (rule-14 gate + docs):** the live DB currently holds ZERO generated
+  Support Steps (post-gate resets wiped them), so recurrence must be measured against fresh
+  generation. Generate ≥3 mixed-domain synthetic expeditions over production LiteLLM, drive ≥10 real
+  detours through the real learner-api path (2026-07-13 scale: 131 terms / 8 detours / 16 steps), run
+  `audit-scaffold-content <enrichmentId>`, then human-inspect the report against the actual generated
+  content (ADR-0013). Apply ONLY the KTD4-licensed fixes: defect (a) recurs ≥1 artifact-bearing step
+  → add one plain-prose/no-markup sentence to `learner-scaffold-content-generation.prompt` system
+  block (currently has NO output-format constraint) and re-sweep; defect (b) shows ≥1 human-confirmed
+  recurring (≥2-of-K) mismatch → add the generation-time congruence check as one bounded re-pick
+  inside `runScaffoldGeneration`'s content loop. Neither firing → record the negative result. Then
+  amend [ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md) Consequences to name the
+  command as the standing scaffold-content quality instrument, fold status into COMPLETED here, and
+  delete the plan. Evidence + evaluation note under `tmp/2026-07-16-scaffold-content-audit/`.
+
+- **Crystal Formation Minimal Redesign** — READY (queued after 2026-07-16-001), plan
+  [2026-07-16-002](./2026-07-16-002-feat-crystal-formation-minimal-redesign-plan.md): curated
+  difficulty-tiered mineral library + quiet single-outline geode ascent replacing the noisy
+  2026-07-15 visuals; design decisions locked in the plan's ledger 2026-07-16 — don't re-ask.
 
 ### Evidence-triggered follow-up
-
-- **Scaffold step content polish (measure-first).** Two model-variance observations from the
-  2026-07-13 U6 gate, in the scaffold content generator (not the Support Path UX contract): a
-  micro-lesson emitted literal `**bold**` markdown rendered raw, and one step's label mismatched
-  its own (accurate, easier) lesson/question. If real use shows these recur, address them in the
-  scaffold generation prompt or an ADR-0028-style congruence judge — not a lexical gate (rule 16).
 
 - **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a
   richer learner-scoped typed Study Item set and passed-item semantics for Support Steps, then extend

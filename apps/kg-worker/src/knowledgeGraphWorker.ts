@@ -22,7 +22,9 @@ import {
   calibrateKnowledgeBoundaryProbe,
   parseKnowledgeBoundaryLadder,
   auditDiscoveryCoverage,
-  type DiscoveryCoverageAuditReport
+  type DiscoveryCoverageAuditReport,
+  auditScaffoldContent,
+  type ScaffoldContentAuditReport
 } from "@lrnki/application";
 import { identityCandidatesFromBuildInputs } from "./identityCandidateMapping";
 import { parseGenerateStudyItemsArgs } from "./workerArgs";
@@ -47,6 +49,7 @@ import {
   createImpostorLieValidityJudgmentPort,
   createConceptDiscoveryPort,
   createDiscoveryCoverageAuditPort,
+  createScaffoldContentCongruencePort,
   LiteLlmForcedToolClient,
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
@@ -72,6 +75,7 @@ import {
   PostgresEnrichmentRunStore,
   PostgresExtractionRunStore,
   PostgresStudyItemBankStore,
+  PostgresLearnerScaffoldStore,
   PostgresConceptLessonStore,
   PostgresEnrichmentLayerPurposeStore,
   PostgresResponseLogStore,
@@ -159,6 +163,12 @@ function buildContext() {
     // sampling diversity for recurrence to separate stable judgments from judge
     // noise (ADR-0028); greedy decoding would collapse the draws.
     discoveryCoverageAudit: createDiscoveryCoverageAuditPort(probeClient),
+    // Scaffold-content congruence audit (plan 2026-07-16-001 KTD1/KTD3): the read seam over
+    // persisted generated Support Steps plus the SAME cross-family independent judge on the
+    // MODERATE-temperature client — the K samples need sampling diversity for recurrence to
+    // separate stable label↔content mismatches from judge noise (ADR-0028).
+    scaffoldStore: new PostgresLearnerScaffoldStore(sql),
+    scaffoldContentCongruence: createScaffoldContentCongruencePort(probeClient),
     discovery: createConceptDiscoveryPort(discoveryClient),
     admission: createConceptAdmissionPort(deterministicClient),
     evidenceProfileExtraction: createEvidenceProfileExtractionPort(deterministicClient),
@@ -536,6 +546,7 @@ async function calibrateBoundaryProbeCommand(ctx: Context, ladderFile: string | 
 }
 
 const DEFAULT_DISCOVERY_COVERAGE_AUDIT_DIR = "tmp/2026-07-10-mimo-extraction-follow-ups";
+const DEFAULT_SCAFFOLD_CONTENT_AUDIT_DIR = "tmp/2026-07-16-scaffold-content-audit";
 
 // Discovery-coverage audit (plan 2026-07-10-004 U1): durable measurement command, the
 // `calibrate-boundary-probe` precedent — every future extractor swap needs this same
@@ -618,6 +629,104 @@ function discoveryCoverageMarkdown(report: DiscoveryCoverageAuditReport): string
   lines.push("## Admitted set the judge saw", "");
   for (const concept of report.admittedConcepts) {
     lines.push(`- [${concept.tier}] ${concept.label}${concept.gist ? ` — ${concept.gist}` : ""}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+async function auditScaffoldContentCommand(ctx: Context, enrichmentId: string | undefined, flags: string[]) {
+  if (!enrichmentId) {
+    console.error("! audit-scaffold-content requires <enrichmentId>.");
+    process.exitCode = 1;
+    return;
+  }
+  let k = 3;
+  let outDir = DEFAULT_SCAFFOLD_CONTENT_AUDIT_DIR;
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i];
+    const next = () => {
+      const value = flags[++i];
+      if (!value) throw new Error(`${flag} requires a value.`);
+      return value;
+    };
+    switch (flag) {
+      case "--k":
+        k = Math.trunc(Number(next()));
+        break;
+      case "--out":
+        outDir = next();
+        break;
+      default:
+        throw new Error(`unknown audit-scaffold-content flag: ${flag}`);
+    }
+  }
+  // Audit-over-persisted-output (KTD1): read the generated Support Steps exactly as learners saw
+  // them; the production learner-api generation path is never re-run here (rule 18).
+  const steps = await ctx.scaffoldStore.listGeneratedStepsForAudit(enrichmentId);
+  console.log(`\n>> scaffold-content audit enrichment=${enrichmentId} generated-steps=${steps.length} k=${k}`);
+  if (steps.length === 0) {
+    console.log("   no generated Support Steps for this enrichment — nothing to audit.");
+    return;
+  }
+  const report = await auditScaffoldContent({
+    enrichmentId,
+    steps,
+    k,
+    judge: ctx.scaffoldContentCongruence,
+    onSample: (progress) =>
+      console.log(
+        `   step ${progress.stepIndex + 1}/${progress.stepCount} sample ${progress.sampleIndex + 1}/${k}: ` +
+          `teaches=${progress.verdict.teachesStepLabel} simpler=${progress.verdict.isSimplerPrerequisite}`
+      )
+  });
+  const resolvedOutDir = path.resolve(REPO_ROOT, outDir);
+  await mkdir(resolvedOutDir, { recursive: true });
+  const baseName = `scaffold-content-${enrichmentId}`;
+  const jsonPath = path.join(resolvedOutDir, `${baseName}.json`);
+  await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  const markdownPath = path.join(resolvedOutDir, `${baseName}.md`);
+  await writeFile(markdownPath, scaffoldContentMarkdown(report), "utf8");
+  const artifactTotal = Object.values(report.artifactTotals).reduce((sum, count) => sum + count, 0);
+  console.log(
+    `   steps=${report.stepCount} artifact-steps=${report.artifactStepCount} (${artifactTotal} tokens) ` +
+      `congruence-recurring-steps=${report.congruenceRecurringStepCount}`
+  );
+  for (const step of report.steps.filter((entry) => entry.congruenceRecurring)) {
+    console.log(`   recurring mismatch step "${step.stepLabel}" (term "${step.term}"): teach-no=${step.notTeachingCount}/${k} simpler-no=${step.notSimplerCount}/${k}`);
+  }
+  console.log(`   wrote ${path.relative(REPO_ROOT, jsonPath)} and ${path.relative(REPO_ROOT, markdownPath)}`);
+}
+
+function scaffoldContentMarkdown(report: ScaffoldContentAuditReport): string {
+  const artifactTotal = Object.values(report.artifactTotals).reduce((sum, count) => sum + count, 0);
+  const artifactBreakdown =
+    Object.entries(report.artifactTotals).filter(([, count]) => count > 0).map(([type, count]) => `${type}=${count}`).join(", ") || "none";
+  const lines = [
+    `# Scaffold-content audit — enrichment ${report.enrichmentId ?? "(all)"}`,
+    "",
+    `- Judge: \`${report.judgeModel}\`, K=${report.k}, generated ${report.generatedAt}`,
+    `- Generated steps audited: ${report.stepCount}`,
+    `- Formatting artifacts: ${artifactTotal} token(s) across ${report.artifactStepCount} step(s) — ${artifactBreakdown}`,
+    `- Recurring congruence problems (≥${report.k >= 2 ? 2 : 1}/${report.k} NO): ${report.congruenceRecurringStepCount} step(s)`,
+    "",
+    "Artifacts are objectively-decidable format-contract violations (reported, never a gate — rule 16).",
+    "Congruence verdicts are judge PROPOSALS for human inspection against the content (ADR-0013), not verdicts.",
+    ""
+  ];
+  for (const step of report.steps) {
+    const flags = [
+      step.artifacts.length > 0 ? `${step.artifacts.length} artifact(s)` : null,
+      step.congruenceRecurring ? "RECURRING congruence problem" : null
+    ].filter(Boolean);
+    lines.push(`## "${step.stepLabel}" — term "${step.term}" under "${step.parentLabel}"${flags.length ? ` — ${flags.join(", ")}` : ""}`);
+    lines.push(`- domain: ${step.declaredDomain} · step ${step.scaffoldStepId} · detour ${step.detourId}`);
+    lines.push(`- congruence: teaches-step-label NO ${step.notTeachingCount}/${report.k}, simpler-prerequisite NO ${step.notSimplerCount}/${report.k}`);
+    for (const finding of step.artifacts) {
+      lines.push(`- artifact [${finding.field}/${finding.tokenType}]: \`${finding.excerpt}\``);
+    }
+    for (const sample of step.samples) {
+      lines.push(`  - sample ${sample.sampleIndex + 1}: teaches=${sample.verdict.teachesStepLabel} simpler=${sample.verdict.isSimplerPrerequisite} — ${sample.verdict.rationale}`);
+    }
+    lines.push("");
   }
   return `${lines.join("\n")}\n`;
 }
@@ -843,6 +952,9 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
     case "audit-discovery-coverage":
       await auditDiscoveryCoverageCommand(ctx, arg, rest);
       break;
+    case "audit-scaffold-content":
+      await auditScaffoldContentCommand(ctx, arg, rest);
+      break;
     case "generate-study-items":
       await generateStudyItemsCommand(ctx, arg, rest);
       break;
@@ -859,7 +971,7 @@ async function dispatch(ctx: Context, command: string | undefined, arg: string |
       await journeyCostReportCommand(ctx, arg, rest);
       break;
     default:
-      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | audit-discovery-coverage <runId> [--k <n>] [--out <dir>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
+      console.log("Usage: worker:kg <register-from-manifest [path] | run-extraction [--all|<sourceResourceId>] | build-graph-version <runId> [<runId> ...] | enrich-graph-version [<graphVersionId>] | generate-synthetic-layer <topic> <declaredDomain> | calibrate-boundary-probe <ladder-file> [--out <dir>] [--deployments <csv>] [--temperatures <csv>] [--k <csv>] [--thresholds <csv>] [--sample-count <n>] [--draw-concurrency <n>] [--concept-concurrency <n>] | audit-discovery-coverage <runId> [--k <n>] [--out <dir>] | audit-scaffold-content <enrichmentId> [--k <n>] [--out <dir>] | generate-study-items <enrichmentId> [--concurrency <positiveInteger>] | synthesize-responses <enrichmentId> <targetDerivedNodeId> <learnerStateRef> | list-sources | cost-timing-report <operationId> [--json] [--ranked] | journey-cost-report <enrichmentId> [--json] [--ranked]>");
   }
 }
 
