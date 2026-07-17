@@ -44,16 +44,13 @@ export {
   type ProjectedScaffoldReference
 } from "./studySessionTrail";
 export {
-  runScaffoldGeneration,
-  resolveExactMatch,
-  buildScaffoldNodePayload,
+  createScaffoldGeneration,
   DEFAULT_SCAFFOLD_GENERATION_CONFIG,
+  type ScaffoldGeneration,
   type ScaffoldGenerationConfig,
-  type ScaffoldGenerationDeps,
-  type ScaffoldReuseCandidate,
-  type ScaffoldParentContext,
-  type ScaffoldGroundResult,
-  type ScaffoldGenerationOutcome
+  type ScaffoldGenerationConstruction,
+  type ScaffoldGenerationRequest,
+  type ScaffoldOpeningStudySession
 } from "./learnerScaffoldGeneration";
 export {
   createTopicExpeditionGeneration,

@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-16-004 — Deep Scaffold Generation and closed attribution](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) — in progress; U1–U3 complete, U4 next.
+- [2026-07-16-004 — Deep Scaffold Generation and closed attribution](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) — in progress; U1–U4 complete (U4 uncommitted), U5 next.
 - [2026-07-17-001 — Dead module cleanup and durable keep decisions](./2026-07-17-001-refactor-dead-module-cleanup-plan.md) — ready; queued after 2026-07-16-004.
 
 ## Ownership rules

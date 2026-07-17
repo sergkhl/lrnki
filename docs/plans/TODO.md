@@ -2,10 +2,38 @@
 
 ## TODO
 
-### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U4 NEXT)
+### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U5 NEXT)
 
 [Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). U1 committed `9391169`, U2
-committed `64c0ce4`. U3 (KTD7) is complete and UNCOMMITTED: one `neuralOperationRegistry` in
+committed `64c0ce4`, U3 committed `3e11f3b`. **U4 (KTD1/5/6/8) is complete and UNCOMMITTED:**
+`learnerScaffoldGeneration.ts` is now one process-lived `createScaffoldGeneration(construction)`
+factory returning `(request: {detourId, operationId}) => Promise<void>`; the old
+`runScaffoldGeneration`/`resolveExactMatch`/`buildScaffoldNodePayload`/`ScaffoldGenerationDeps`/
+`ScaffoldParentContext`/`ScaffoldReuseCandidate`/`ScaffoldGroundResult`/`ScaffoldGenerationOutcome`
+exports are DELETED (helpers are module-private; a barrel test asserts their absence). The callable
+verifies the claim (`claimToken === operationId`) before any neural spend, reads ONE opening Study
+Session (`ScaffoldOpeningStudySession` = a structural `Pick` of the finished projection — the
+learner-api binds `getStudySession` straight through), and derives exact-reuse eligibility from
+`classification.stateByNode` + `flooredNodeIds` + `neutralReferenceAssetsByNode` (frontier,
+mastered, AND confidently floored are eligible; locked/parent/cross-domain/ambiguous/payload-
+incomplete are collisions). The bounded `retryFeedback` re-outline is ACTIVE — `outlineAttempts`
+is now **2** (new hash `learner-scaffold-generation-19f397f70cd0`); a colliding/duplicate proposal
+feeds one feedback re-outline, then remaining collisions drop. The parent-grounding character
+threshold (`SUFFICIENT_PARENT_GROUNDING_CHARS`) is DELETED — every generated label is probed then
+child-grounded, with the parent's definition passages passed only as `scaffoldedAnchors`. Failure
+is fenced+honest (KTD6): claim-loss/false-publish writes nothing, all-transient exhaustion
+`releaseClaim`s, deterministic/no-safe-step `markFailed`s, and `runInstrumentedOperation` gives a
+FAILED timeline on any non-ready outcome. The transient classifier moved to package-internal
+`generationFailureClassification.ts` (shared with Topic Expedition, not barrel-exported). The
+learner-api composition is construction-only (`createLearnerScaffoldGeneration(sql)`), lazily
+cached in the supervisor, which now passes only `{detourId, operationId}`. **U5 (KTD8 finish +
+KTD9) is next**: render the projected `support_activity` reference destinations in the Learner App
+(`CheckpointPath` → `SupportPathSheet`, reuse `LessonSections`/`OptionSelectBody`), route current
+references through the projected checkpoint, and add the learner-owned reference option-select
+route — preserving plan 003's shipped `CheckpointPath` trail-wave + `useIsFocused` arrival-focus.
+No live learner played the detours in-app yet; U6 is the full DB/real-use/browser/cleanup gate.
+
+U3 (KTD7) history: one `neuralOperationRegistry` in
 `configHashes.ts` (seed + timeline type + descriptors + embedding stages per Neural Operation;
 Graph Enrichment and Synthetic Topic Generation stay separate entries both mapping to
 `enrichment`) replaces the five manual descriptor arrays; the MiMo shape test consumes the derived
@@ -21,11 +49,8 @@ through `OperationTimelineSummary.configHash`; a no-stage direct-reference attem
 it. Attribution fix found by the union test: scaffold's probe embeds K answers tagged
 `node-embedding` under the scaffold operation id, previously unclaimed by the catalog and dropped
 from scaffold cost reports — `node-embedding` is now a third SHARED_STAGE claimed by both
-enrichment and scaffold. U4 (deep process-lived module, KTD1/5/6) is next; it consumes
-`ScaffoldGenerationConfig` through the factory, activates the feedback re-outline, deletes the
-parent-grounding character threshold, and ends with a MANDATORY real-use quality gate before U5.
-U5 must finish rendering `support_activity` destinations; preserve plan 003's shipped
-`CheckpointPath` trail-wave + arrival-focus behavior there.
+enrichment and scaffold. (The current scaffold hash noted above, `…-89e141fc75e2`, was superseded
+by U4's `outlineAttempts: 2` bump to `…-19f397f70cd0`.)
 
 ### Dead module cleanup (plan 2026-07-17-001 — READY, queued after 2026-07-16-004)
 
@@ -287,6 +312,31 @@ symbol exports, test suite) — do not re-propose those removals.
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Deep Scaffold Generation — U4 deep-module behavior + real-use quality gate, 2026-07-17. PASS.**
+  Two fresh mixed-domain synthetic expeditions were generated end to end by the real supervisors on
+  `:8899` against production LiteLLM + Postgres (TCP congestion control / Networking,
+  `0948bb4a…`, 15 concepts; Enzyme kinetics / Biochemistry, `d7a7eb63…`, 16 concepts), then 12
+  detours were driven over the real HTTP `/scaffold/request` path — every one reached `ready` with
+  zero failures. **Exact reuse proved across all three inclusion states**: included-frontier (Fast
+  Recovery, Michaelis constant (Km)) AND the new confidently-floored capability (slow start,
+  maximum reaction velocity (Vmax), sawtooth→cwnd) each pinned a reference whose lesson/item FKs
+  resolve to a CURRENT `concept_lessons` row and an `option_select` `study_items` row with no copied
+  payload. **13 generated Support Steps** across 7 detours were human-inspected and are genuinely
+  simpler, child-specific (each teaches its own prerequisite, not the parent term), coherent,
+  plain-prose (no markdown artifacts), with numerically-correct recall items (e.g. RTT 150 ms; pKa
+  4.2 at pH 7.0 → deprotonated). The standing `kg-worker audit-scaffold-content` instrument (K=1)
+  independently scored **all 13 teaches=true simpler=true, 0 artifact-steps, 0 congruence-recurring**
+  (artifacts under `tmp/2026-07-16-deep-scaffold-generation/u4-realuse/`). **Closed attribution
+  (KTD7 live)**: all 12 scaffold operations carry the current hash
+  `learner-scaffold-generation-19f397f70cd0` (the `outlineAttempts: 2` bump), 0 scaffold rows have
+  a null `config_hash`, and direct-reference reuse ops record the hash while opening zero LLM
+  stages. Deterministic envelope: `packages/application` 694/694 (rewritten
+  `learnerScaffoldGeneration.test.ts` — 20 factory-callable tests incl. removed-export barrel
+  assertion), `infrastructure-litellm` + `learner-api` green (1 opt-in DB skip); workspace typecheck
+  all 12 projects; lint 0 errors / 8 pre-existing warnings. Disposable learner removed FK-safely;
+  server stopped. U4 is UNCOMMITTED. Evidence:
+  `tmp/2026-07-16-deep-scaffold-generation/EVALUATION.md` (U4 section).
 
 - **Deep Scaffold Generation — U3 closed-registry/attribution gate, 2026-07-17. PASS.** Hard-reset
   the development database with repo-root `.env` loaded and applied the amended single migration

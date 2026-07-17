@@ -1,8 +1,8 @@
-import { operationStaleBefore } from "@lrnki/application";
+import { operationStaleBefore, type ScaffoldGeneration } from "@lrnki/application";
 import { PostgresLearnerScaffoldStore, PostgresRunProgressReporter } from "@lrnki/infrastructure-postgres";
 import { sharedSql } from "./db";
 import { createGenerationSupervisor } from "./generationSupervisor";
-import { runLearnerScaffoldGeneration } from "./learnerScaffoldGeneration";
+import { createLearnerScaffoldGeneration } from "./learnerScaffoldGeneration";
 
 const SUPERVISOR_INTERVAL_MS = 15 * 1000;
 const MAX_GENERATION_ATTEMPTS = 3;
@@ -10,10 +10,13 @@ const MAX_GENERATION_ATTEMPTS = 3;
 // full topic expedition, so a slightly higher per-process cap keeps requested detours responsive.
 const MAX_CONCURRENT_GENERATIONS = 3;
 
-// The scaffold-detour queue over the shared scheduler (KTD7): reap stale operations + exhausted
-// detours, claim the next generating detour (minting its fresh operation/fencing UUID inside the
-// store), and run the deep generation module. The detour ID survives retries; the operation id is
-// the fence.
+// The scaffold-detour queue over the shared scheduler (KTD7/KTD8): reap stale operations +
+// exhausted detours, claim the next generating detour (minting its fresh operation/fencing UUID
+// inside the store), and run the process-lived deep generation callable. The detour ID survives
+// retries; the operation id is the fence. Constructed lazily at process scope (matching Topic
+// Expedition generation) so DB-free imports remain hermetic.
+let generation: ScaffoldGeneration | undefined;
+
 const supervisor = createGenerationSupervisor({
   intervalMs: SUPERVISOR_INTERVAL_MS,
   maxConcurrent: MAX_CONCURRENT_GENERATIONS,
@@ -32,12 +35,11 @@ const supervisor = createGenerationSupervisor({
       maxAttempts: MAX_GENERATION_ATTEMPTS
     }),
   run: (claimed) => {
-    // claimNextGenerating installed both — the operation id equals the fencing token (KTD7).
-    if (!claimed.latestOperationId || !claimed.claimToken) return Promise.resolve();
-    return runLearnerScaffoldGeneration(
-      { detourId: claimed.detourId, operationId: claimed.latestOperationId, claimToken: claimed.claimToken },
-      sharedSql()
-    );
+    // A claimed row contributes only its identity — claimNextGenerating installed the fresh
+    // operation id, which IS the fencing token the deep callable re-verifies (KTD7/KTD8).
+    if (!claimed.latestOperationId) return Promise.resolve();
+    generation ??= createLearnerScaffoldGeneration(sharedSql());
+    return generation({ detourId: claimed.detourId, operationId: claimed.latestOperationId });
   }
 });
 

@@ -1,9 +1,24 @@
 import { randomUUID } from "node:crypto";
-import { normalizeConceptLabel, type ScaffoldNodePayload, type ScaffoldStep } from "@lrnki/domain-core";
-import type { ScaffoldContentDraft, ScaffoldContentPort, ScaffoldContentCongruencePort, ScaffoldDetourStorePort, ScaffoldOutlinePort } from "@lrnki/ports";
+import { normalizeConceptLabel, STAGE_TAGS, type ScaffoldNodePayload, type ScaffoldStep } from "@lrnki/domain-core";
+import type {
+  DerivedGraphNode,
+  GroundingGenerationPort,
+  KnowledgeBoundaryProbePort,
+  NodeEmbeddingPort,
+  RunProgressReporterPort,
+  ScaffoldContentCongruencePort,
+  ScaffoldContentDraft,
+  ScaffoldContentPort,
+  ScaffoldDetourStorePort,
+  ScaffoldOutlinePort,
+  ScaffoldOutlineStep
+} from "@lrnki/ports";
 import { scaffoldMicroLessonText } from "./auditScaffoldContent";
-import { DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG, type KnowledgeBoundaryProbeConfig } from "./knowledgeBoundaryProbe";
+import { isTransientGenerationError } from "./generationFailureClassification";
+import { DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG, probeKnowledgeBoundary, type KnowledgeBoundaryProbeConfig } from "./knowledgeBoundaryProbe";
 import { normalizeOptionText } from "./optionSelectGuard";
+import { runInstrumentedOperation, type StageBracket } from "./runProgressReporter";
+import type { StudySession } from "./studySessionProjection";
 
 // The operation-level behavior knobs of Scaffold Generation (plan 2026-07-16-004 KTD7). This is
 // the application half of the operation's config identity: the infrastructure
@@ -14,9 +29,9 @@ import { normalizeOptionText } from "./optionSelectGuard";
 export type ScaffoldGenerationConfig = {
   // Upper bound on published Support Steps per detour (references + generated combined).
   maxSupportSteps: number;
-  // Total outline proposals per attempt: the initial outline plus bounded
-  // `retryFeedback` re-outlines after an unusable collision/duplicate (KTD5). The
-  // feedback re-outline activates with the deep module (U4); until then one proposal runs.
+  // Total outline proposals per attempt: the initial outline plus bounded `retryFeedback`
+  // re-outlines after an unusable collision/duplicate (KTD5). After the final proposal a
+  // still-colliding label is dropped rather than re-outlined.
   outlineAttempts: number;
   // Content drafts per outline step: each draft is shape-validated then judged by the
   // label↔content congruence re-pick; a NO drops the draft and retries within this bound.
@@ -27,96 +42,377 @@ export type ScaffoldGenerationConfig = {
 
 export const DEFAULT_SCAFFOLD_GENERATION_CONFIG: ScaffoldGenerationConfig = {
   maxSupportSteps: 3,
-  outlineAttempts: 1,
+  outlineAttempts: 2,
   contentDraftAttempts: 2,
   knowledgeBoundaryProbe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG
 };
 
-// Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3, KTD6/KTD9). A deep application
-// module: a claimed pending detour becomes one to three safe existing references or generated
-// scaffold nodes, or fails without a partial visible branch. Exact reuse, the minimal outline,
-// grounding (probe + generation are injected as `groundConcept`), compact content generation,
-// option-shape validation, and the atomic fenced publish are bound here. The neutral Study Item
-// Bank and Derived Graph Layer are NEVER written — no such port is reachable from the deps.
+// Learner-Scoped Scaffold Generation — the deep process-lived module (plan 2026-07-16-004
+// KTD1/KTD5/KTD6). Constructed ONCE per process with lifecycle-shaped adapters and invoked with
+// only one claimed detour's identity: the operation id IS the attempt identity and fencing value.
+// The callable owns the complete post-claim lifecycle — claim verification, ONE opening Study
+// Session read, exact reuse, bounded feedback re-outline, Knowledge-Boundary Probe + child
+// grounding, content generation, congruence re-pick, validation, failure classification, stage
+// ordering, and the fenced terminal write. It resolves only after a fenced `ready` publish;
+// every other outcome rejects after the correct fenced action. The neutral Study Item Bank and
+// Derived Graph Layer are NEVER written — no such port is reachable from the construction.
 
-// A candidate node in the parent's own layer + Declared Domain that a term could reuse (KTD3).
-export type ScaffoldReuseCandidate = {
-  derivedNodeId: string;
-  canonicalLabel: string;
-  aliases: string[];
-  declaredDomain: string;
-  hasLesson: boolean;
-  hasOptionSelect: boolean;
-  conceptLessonId: string | null;
-  studyItemId: string | null;
-  // A locked/included node in the active trail cannot be referenced as support (R10).
-  isLocked: boolean;
-};
+// The opening Study Session facts generation reads (KTD2). Production passes the finished
+// `getStudySession` projection straight through — this is a structural subset, never an
+// app-assembled context DTO: parent/aliases/same-layer membership from `detail`, included-node
+// state from `classification.stateByNode`, confidently floored membership from `flooredNodeIds`,
+// and current reusable neutral lesson/item identities from `neutralReferenceAssetsByNode`.
+export type ScaffoldOpeningStudySession = Pick<
+  StudySession,
+  "detail" | "classification" | "neutralReferenceAssetsByNode" | "flooredNodeIds"
+>;
 
-export type ScaffoldParentContext = {
-  declaredDomain: string;
-  parentLabel: string;
-  parentDerivedNodeId: string;
-  // Exact-reuse is scoped to the parent's OWN layer + Declared Domain (KTD3); cross-layer reuse
-  // is out of scope. Candidates are pre-filtered to the parent node's Declared Domain.
-  reuseCandidates: ScaffoldReuseCandidate[];
-  // Verified parent/layer grounding text reused when sufficient (R21); may be null.
-  parentGroundingText: string | null;
-};
+export type ScaffoldGenerationRequest = { detourId: string; operationId: string };
 
-// Encapsulates the Knowledge-Boundary Probe + grounding-generation SHARED_STAGES (KTD7): reuse
-// verified grounding when sufficient, otherwise probe before synthesizing a source-less concept.
-// Returns grounded text, or a boundary verdict that DROPS the step (R21/R22).
-export type ScaffoldGroundResult =
-  | { kind: "grounded"; groundingText: string }
-  | { kind: "boundary" };
+export type ScaffoldGeneration = (request: ScaffoldGenerationRequest) => Promise<void>;
 
-export type ScaffoldGenerationDeps = {
-  scaffoldStore: ScaffoldDetourStorePort;
-  loadParentContext: (input: { enrichmentId: string; parentDerivedNodeId: string }) => Promise<ScaffoldParentContext>;
+export type ScaffoldGenerationConstruction = {
+  // The lifecycle-shaped store subset (KTD1): claimed-read plus the three fenced terminal
+  // capabilities. Tests never implement unrelated request/hide/audit/grading/supervisor methods.
+  detours: Pick<ScaffoldDetourStorePort, "getById" | "publishReady" | "releaseClaim" | "markFailed">;
+  // The construction-bound Study Session reader (KTD2). ONE call per attempt: the opening
+  // projection is retained for the whole attempt even if learner state changes during neural
+  // work; publication never recomputes eligibility.
+  readStudySession: (input: { enrichmentId: string; learnerStateRef: string }) => Promise<ScaffoldOpeningStudySession | undefined>;
   outline: ScaffoldOutlinePort;
   content: ScaffoldContentPort;
   // Generation-time label↔content congruence re-pick (plan 2026-07-16-001 U5, KTD4b). The SAME
   // cross-family independent judge the audit uses, called K=1 per drafted step: the scaffold
-  // generator never grades its own output. A quality re-pick, not a provable gate — it fails OPEN
-  // on judge infra error (rule 16) so a flaky judge call never drops otherwise-valid support.
+  // generator never grades its own output. A quality re-pick, not a provable gate — it fails
+  // OPEN on judge infra error (rule 16) so a flaky judge call never drops otherwise-valid support.
   congruence: ScaffoldContentCongruencePort;
-  groundConcept: (input: { label: string; declaredDomain: string; parentGroundingText: string | null }) => Promise<ScaffoldGroundResult>;
+  // Every generated label is probed then child-grounded (KTD5): no character threshold can
+  // bypass the Knowledge-Boundary Probe, and parent definitions appear only as anchors.
+  knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
+  nodeEmbedding: NodeEmbeddingPort;
+  groundingGeneration: GroundingGenerationPort;
+  reporter: RunProgressReporterPort;
+  config: ScaffoldGenerationConfig;
+  // The complete operation config identity (KTD7), computed by the composition's infrastructure
+  // half and persisted with the operation begin — even when direct reuse opens no neural stage.
+  configHash: string;
   newId?: () => string;
 };
 
-type ExactMatch =
-  | { kind: "reference"; derivedNodeId: string; conceptLessonId: string; studyItemId: string }
-  | { kind: "none" }
-  | { kind: "unusable" };
+// Thrown when the claimed attempt is missing/mismatched or a fenced write affects no row:
+// another attempt owns the detour, so this run writes NOTHING further (KTD6). Internal — the
+// supervisor only needs the rejection.
+class ScaffoldClaimLostError extends Error {
+  constructor(detourId: string) {
+    super(`Scaffold generation claim lost for detour ${detourId}.`);
+    this.name = "ScaffoldClaimLostError";
+  }
+}
 
-// Resolve ONE unambiguous, usable exact match within the parent's layer (KTD3, R8/R10). PURE.
-// A unique non-parent, non-locked match with a lesson + option-select becomes a reference; an
-// ambiguous or unusable collision is `unusable` (never cloned, never a reference); no match is
-// `none`.
-export function resolveExactMatch(term: string, candidates: readonly ScaffoldReuseCandidate[], parentDerivedNodeId: string): ExactMatch {
+// Deterministic "no safe Support Step survived" — records `failed` under the fence (KTD6).
+class ScaffoldNoSafeStepError extends Error {
+  constructor(term: string) {
+    super(`No safe Support Step survived for term "${term}".`);
+    this.name = "ScaffoldNoSafeStepError";
+  }
+}
+
+export function createScaffoldGeneration(construction: ScaffoldGenerationConstruction): ScaffoldGeneration {
+  const newId = construction.newId ?? randomUUID;
+  return async (request) => {
+    await runInstrumentedOperation(construction.reporter, "scaffold", request.operationId, async (runStage) => {
+      // Claim verification before any neural spend (KTD1/KTD6): the store's claim installed the
+      // operation id as the fencing token, so a generating detour whose claim token is this
+      // request's operation id is the one active attempt this call owns.
+      const detour = await construction.detours.getById(request.detourId);
+      if (!detour || detour.status !== "generating" || detour.claimToken !== request.operationId) {
+        throw new ScaffoldClaimLostError(request.detourId);
+      }
+      const fence = { detourId: request.detourId, claimToken: request.operationId };
+      try {
+        const session = await construction.readStudySession({
+          enrichmentId: detour.enrichmentId,
+          learnerStateRef: detour.learnerStateRef
+        });
+        if (!session) throw new Error(`Scaffold generation: enrichment ${detour.enrichmentId} has no Study Session.`);
+        const parent = session.detail.nodes.find((node) => node.derivedNodeId === detour.parentDerivedNodeId);
+        if (!parent) throw new Error(`Scaffold generation: parent node ${detour.parentDerivedNodeId} not in enrichment.`);
+
+        const steps = await generateSteps({ construction, session, parent, detour: { term: detour.term }, runStage, newId });
+        if (steps.length === 0) throw new ScaffoldNoSafeStepError(detour.term);
+        const published = await construction.detours.publishReady({ ...fence, steps });
+        if (!published) throw new ScaffoldClaimLostError(request.detourId);
+      } catch (error) {
+        // Lost claim: another attempt owns the detour — write nothing (KTD6).
+        if (error instanceof ScaffoldClaimLostError) throw error;
+        if (isTransientGenerationError(error)) {
+          // Infrastructure-transient exhaustion: release under the fence so the supervisor's
+          // bounded attempt budget governs the retry; the detour stays `generating`.
+          await bestEffortFencedWrite(() => construction.detours.releaseClaim(fence));
+          throw error;
+        }
+        // Deterministic model/schema/content failure or no-safe-step: record `failed` under the
+        // fence, then reject so the operation timeline is honestly failed.
+        await bestEffortFencedWrite(() => construction.detours.markFailed(fence));
+        throw error;
+      }
+    }, construction.configHash);
+  };
+}
+
+// A terminal write after losing the fence must not overwrite the original error or the new
+// owner's state (KTD6): a thrown store error is swallowed and a 0-row (false) result ignored —
+// the caught generation error stays the meaningful rejection.
+async function bestEffortFencedWrite(write: () => Promise<boolean>): Promise<void> {
+  try {
+    await write();
+  } catch {
+    // Swallowed: the original generation error is rethrown by the caller.
+  }
+}
+
+type ReferencePin = { derivedNodeId: string; conceptLessonId: string; studyItemId: string };
+
+type ExactMatch =
+  | { kind: "reference"; pin: ReferencePin }
+  | { kind: "none" }
+  | { kind: "collision" };
+
+// Resolve ONE unambiguous, eligible exact match against the opening Study Session (KTD2/KTD5).
+// A unique same-domain, non-parent match that is frontier, mastered, or confidently floored AND
+// carries current lesson + option-select identities pins a reference. Any parent, locked,
+// ambiguous, cross-domain, or payload-incomplete collision is unusable: never referenced, never
+// cloned as a generated node. No match at all is `none` (safe to generate).
+function resolveExactMatch(term: string, session: ScaffoldOpeningStudySession, parent: DerivedGraphNode): ExactMatch {
   const normalized = normalizeConceptLabel(term);
   if (normalized.length === 0) return { kind: "none" };
-  const matches = candidates.filter((candidate) =>
-    normalizeConceptLabel(candidate.canonicalLabel) === normalized ||
-    candidate.aliases.some((alias) => normalizeConceptLabel(alias) === normalized));
+  const matches = session.detail.nodes.filter((node) =>
+    normalizeConceptLabel(node.label) === normalized ||
+    node.aliases.some((alias) => normalizeConceptLabel(alias) === normalized));
   if (matches.length === 0) return { kind: "none" };
-  if (matches.length > 1) return { kind: "unusable" };
+  if (matches.length > 1) return { kind: "collision" };
   const match = matches[0];
-  if (match.derivedNodeId === parentDerivedNodeId) return { kind: "unusable" };
-  if (match.isLocked) return { kind: "unusable" };
-  if (!match.hasLesson || !match.hasOptionSelect || !match.conceptLessonId || !match.studyItemId) return { kind: "unusable" };
-  return { kind: "reference", derivedNodeId: match.derivedNodeId, conceptLessonId: match.conceptLessonId, studyItemId: match.studyItemId };
+  if (match.derivedNodeId === parent.derivedNodeId) return { kind: "collision" };
+  if (match.declaredDomain !== parent.declaredDomain) return { kind: "collision" };
+  const assets = session.neutralReferenceAssetsByNode[match.derivedNodeId];
+  if (!assets) return { kind: "collision" };
+  const state = session.classification.stateByNode[match.derivedNodeId];
+  if (state === "locked") return { kind: "collision" };
+  const eligible = state === "frontier" || state === "mastered" || session.flooredNodeIds.includes(match.derivedNodeId);
+  if (!eligible) return { kind: "collision" };
+  return {
+    kind: "reference",
+    pin: { derivedNodeId: match.derivedNodeId, conceptLessonId: assets.conceptLessonId, studyItemId: assets.studyItemId }
+  };
+}
+
+type PlannedStep =
+  | { kind: "reference"; pin: ReferencePin }
+  | { kind: "generate"; label: string };
+
+// Partition one outline proposal into safe planned steps and rejected labels (KTD5). A usable
+// exact match becomes a reference; a fresh label becomes a generation candidate; a collision or
+// a duplicate of another proposed step is rejected — rejected labels feed the bounded feedback
+// re-outline and are NEVER generated under the same normalized label.
+function planOutline(
+  proposals: readonly ScaffoldOutlineStep[],
+  session: ScaffoldOpeningStudySession,
+  parent: DerivedGraphNode,
+  maxSupportSteps: number
+): { planned: PlannedStep[]; rejected: string[] } {
+  const planned: PlannedStep[] = [];
+  const rejected: string[] = [];
+  const seenLabels = new Set<string>();
+  const usedNodeIds = new Set<string>();
+  for (const proposed of proposals) {
+    if (planned.length >= maxSupportSteps) break;
+    const normalized = normalizeConceptLabel(proposed.label);
+    if (normalized.length === 0) continue;
+    if (seenLabels.has(normalized)) {
+      rejected.push(proposed.label);
+      continue;
+    }
+    seenLabels.add(normalized);
+    const match = resolveExactMatch(proposed.label, session, parent);
+    if (match.kind === "collision") {
+      rejected.push(proposed.label);
+      continue;
+    }
+    if (match.kind === "reference") {
+      if (usedNodeIds.has(match.pin.derivedNodeId)) {
+        rejected.push(proposed.label);
+        continue;
+      }
+      usedNodeIds.add(match.pin.derivedNodeId);
+      planned.push({ kind: "reference", pin: match.pin });
+      continue;
+    }
+    planned.push({ kind: "generate", label: proposed.label });
+  }
+  return { planned, rejected };
+}
+
+// The whole step pipeline for one claimed attempt: direct selected-term reuse, the settled
+// outline plan (with the bounded feedback re-outline), then probe → child grounding → content →
+// congruence per generated label. Returns the ordered surviving steps; the caller owns the
+// fenced terminal write.
+async function generateSteps(input: {
+  construction: ScaffoldGenerationConstruction;
+  session: ScaffoldOpeningStudySession;
+  parent: DerivedGraphNode;
+  detour: { term: string };
+  runStage: StageBracket;
+  newId: () => string;
+}): Promise<ScaffoldStep[]> {
+  const { construction, session, parent, runStage, newId } = input;
+  const { config } = construction;
+
+  // 1. Direct selected-term reuse: a unique eligible exact match publishes one pinned reference
+  // and makes ZERO neural calls (frontier, mastered, and confidently floored alike).
+  const direct = resolveExactMatch(input.detour.term, session, parent);
+  if (direct.kind === "reference") {
+    return [referenceStep(direct.pin, 0, newId)];
+  }
+
+  // 2. Settle the outline plan. The initial proposal plus bounded feedback re-outlines when a
+  // proposal collides unusably or duplicates another proposed step (KTD5); after the final
+  // proposal, colliding labels are dropped.
+  const existingLabels = session.detail.nodes
+    .filter((node) => node.declaredDomain === parent.declaredDomain)
+    .map((node) => node.label);
+  const proposeInput = {
+    declaredDomain: parent.declaredDomain,
+    parentLabel: parent.label,
+    term: input.detour.term,
+    existingLabels
+  };
+  let outline = await runStage(STAGE_TAGS.scaffoldOutlineGeneration, () => construction.outline.propose(proposeInput));
+  let plan = planOutline(outline.steps, session, parent, config.maxSupportSteps);
+  for (let attempt = 1; attempt < config.outlineAttempts && plan.rejected.length > 0; attempt++) {
+    const retryFeedback =
+      `These proposed labels were rejected: ${plan.rejected.map((label) => `"${label}"`).join(", ")}. ` +
+      `Each one collides with an existing concept in this layer or duplicates another proposed step. ` +
+      `Propose distinct, strictly simpler prerequisites of "${input.detour.term}" with different labels.`;
+    outline = await runStage(STAGE_TAGS.scaffoldOutlineGeneration, () => construction.outline.propose({ ...proposeInput, retryFeedback }));
+    plan = planOutline(outline.steps, session, parent, config.maxSupportSteps);
+  }
+
+  // 3. Execute the settled plan. Verified parent definition passages travel ONLY as grounding
+  // anchors (KTD5) — every generated label is probed, then grounded with its OWN generated
+  // definitions; boundary verdicts and empty generated definitions drop the step.
+  const parentAnchors = scaffoldedAnchorsFor(parent);
+  const steps: ScaffoldStep[] = [];
+  for (const item of plan.planned) {
+    if (item.kind === "reference") {
+      steps.push(referenceStep(item.pin, steps.length, newId));
+      continue;
+    }
+    const verdict = await runStage(STAGE_TAGS.knowledgeBoundaryProbe, () =>
+      probeKnowledgeBoundary({
+        conceptLabel: item.label,
+        declaredDomain: parent.declaredDomain,
+        probe: construction.knowledgeBoundaryProbe,
+        embedding: construction.nodeEmbedding,
+        config: config.knowledgeBoundaryProbe
+      })
+    );
+    if (verdict.disposition === "boundary") continue;
+    const bundle = await runStage(STAGE_TAGS.groundingGeneration, () =>
+      construction.groundingGeneration.generate({
+        derivedNodeId: newId(),
+        declaredDomain: parent.declaredDomain,
+        nodeLabel: item.label,
+        scaffoldedAnchors: parentAnchors,
+        topic: item.label
+      })
+    );
+    const groundingText = bundle.definitions.map((passage) => passage.text).join("\n\n").trim();
+    if (groundingText.length === 0) continue;
+    const accepted = await generateCongruentStep({ construction, parent, term: input.detour.term, stepLabel: item.label, groundingText, runStage, newId });
+    if (!accepted) continue;
+    steps.push({ scaffoldStepId: newId(), ordinal: steps.length, kind: "generated", payload: accepted, lessonReadAt: null });
+  }
+  return steps;
+}
+
+function referenceStep(pin: ReferencePin, ordinal: number, newId: () => string): ScaffoldStep {
+  return {
+    scaffoldStepId: newId(),
+    ordinal,
+    kind: "reference",
+    referencedDerivedNodeId: pin.derivedNodeId,
+    referencedConceptLessonId: pin.conceptLessonId,
+    referencedStudyItemId: pin.studyItemId
+  };
+}
+
+// The parent's verified definition passages as grounding-generation anchors (KTD5). They steer
+// the child bundle but are never returned directly as child grounding.
+function scaffoldedAnchorsFor(parent: DerivedGraphNode): { conceptId: string; canonicalLabel: string; definitionQuotes: string[] }[] {
+  const definitionQuotes = (parent.grounding?.passages ?? [])
+    .filter((passage) => passage.passageType === "definition")
+    .map((passage) => passage.text.trim())
+    .filter((text) => text.length > 0);
+  if (definitionQuotes.length === 0) return [];
+  return [{ conceptId: parent.derivedNodeId, canonicalLabel: parent.label, definitionQuotes }];
+}
+
+// Draft one lower-level scaffold node for `stepLabel` and gate it with the congruence re-pick
+// (KTD4b). Up to `contentDraftAttempts` content attempts: each builds a valid four-option
+// payload, then the judge checks that the content teaches its own label AND is a simpler
+// prerequisite of `term`. The FIRST accepted payload wins; a NO drops it and retries within the
+// bound; all NO → null (step skipped). The judge grades the teaching not the answer key, so
+// option order is normalized before it sees them. A judge infra error accepts the current draft
+// (fail-open, rule 16); a content-generation error consumes the attempt and retries.
+async function generateCongruentStep(input: {
+  construction: ScaffoldGenerationConstruction;
+  parent: DerivedGraphNode;
+  term: string;
+  stepLabel: string;
+  groundingText: string;
+  runStage: StageBracket;
+  newId: () => string;
+}): Promise<ScaffoldNodePayload | null> {
+  const { construction, runStage } = input;
+  for (let attempt = 0; attempt < construction.config.contentDraftAttempts; attempt++) {
+    let draft: ScaffoldContentDraft;
+    try {
+      draft = await runStage(STAGE_TAGS.scaffoldContentGeneration, () =>
+        construction.content.generate({ declaredDomain: input.parent.declaredDomain, label: input.stepLabel, groundingText: input.groundingText })
+      );
+    } catch {
+      continue;
+    }
+    const payload = buildScaffoldNodePayload(input.stepLabel, draft, input.newId);
+    if (!payload) continue;
+    let verdict;
+    try {
+      verdict = await runStage(STAGE_TAGS.scaffoldContentCongruence, () =>
+        construction.congruence.judge({
+          declaredDomain: input.parent.declaredDomain,
+          term: input.term,
+          parentLabel: input.parent.label,
+          stepLabel: input.stepLabel,
+          microLesson: scaffoldMicroLessonText(payload),
+          question: payload.item.question,
+          explanation: payload.item.explanation,
+          options: payload.item.options.map((option) => option.text).sort((a, b) => a.localeCompare(b))
+        })
+      );
+    } catch {
+      // The judge is a quality re-pick, not a provable guarantee — infra failure never drops
+      // otherwise-valid support (rule 16). Accept this draft.
+      return payload;
+    }
+    if (verdict.teachesStepLabel && verdict.isSimplerPrerequisite) return payload;
+  }
+  return null;
 }
 
 // Validate a content draft's option shape and build a persistable scaffold node payload, or
 // return null when the four-option one-correct-server-keyed invariant fails (KTD10). Citation-
 // free and labeled generated end to end (the lesson section provenance is always "generated").
-export function buildScaffoldNodePayload(
-  label: string,
-  draft: ScaffoldContentDraft,
-  newId: () => string
-): ScaffoldNodePayload | null {
+function buildScaffoldNodePayload(label: string, draft: ScaffoldContentDraft, newId: () => string): ScaffoldNodePayload | null {
   const optionTexts = [draft.correctAnswer, ...draft.distractors];
   if (optionTexts.length !== 4) return null;
   if (optionTexts.some((text) => text.trim().length === 0)) return null;
@@ -130,141 +426,4 @@ export function buildScaffoldNodePayload(
     lesson: [{ kind: "definition", text: draft.microLesson, groundingProvenance: "generated" }],
     item: { scaffoldItemId: newId(), question: draft.question, explanation: draft.explanation, options }
   };
-}
-
-export type ScaffoldGenerationOutcome =
-  | { kind: "published"; stepCount: number }
-  | { kind: "failed"; reason: string };
-
-// Run generation for ONE already-claimed detour under its fencing token. Publishes one to three
-// surviving safe steps atomically or records failure; never leaves a partial visible branch.
-export async function runScaffoldGeneration(
-  input: { detourId: string; claimToken: string },
-  deps: ScaffoldGenerationDeps
-): Promise<ScaffoldGenerationOutcome> {
-  const newId = deps.newId ?? randomUUID;
-  const detour = await deps.scaffoldStore.getById(input.detourId);
-  if (!detour) return { kind: "failed", reason: "detour not found" };
-  const context = await deps.loadParentContext({ enrichmentId: detour.enrichmentId, parentDerivedNodeId: detour.parentDerivedNodeId });
-
-  const usedNodeIds = new Set<string>();
-  const steps: ScaffoldStep[] = [];
-  const pushReference = (reference: Extract<ExactMatch, { kind: "reference" }>): void => {
-    if (usedNodeIds.has(reference.derivedNodeId)) return;
-    usedNodeIds.add(reference.derivedNodeId);
-    steps.push({
-      scaffoldStepId: newId(),
-      ordinal: steps.length,
-      kind: "reference",
-      referencedDerivedNodeId: reference.derivedNodeId,
-      referencedConceptLessonId: reference.conceptLessonId,
-      referencedStudyItemId: reference.studyItemId
-    });
-  };
-
-  // 1. Direct selected-term reuse: a unique usable exact match bypasses ALL new LLM calls (AE3).
-  const direct = resolveExactMatch(detour.term, context.reuseCandidates, context.parentDerivedNodeId);
-  if (direct.kind === "reference") {
-    pushReference(direct);
-    return publishSteps(deps, input, steps);
-  }
-
-  // 2. Otherwise request the minimal lower-level outline.
-  let outline;
-  try {
-    outline = await deps.outline.propose({
-      declaredDomain: context.declaredDomain,
-      parentLabel: context.parentLabel,
-      term: detour.term,
-      existingLabels: context.reuseCandidates.map((candidate) => candidate.canonicalLabel)
-    });
-  } catch (error) {
-    await deps.scaffoldStore.markFailed({ detourId: input.detourId, claimToken: input.claimToken });
-    return { kind: "failed", reason: `outline generation failed: ${error instanceof Error ? error.message : String(error)}` };
-  }
-
-  for (const proposed of outline.steps.slice(0, DEFAULT_SCAFFOLD_GENERATION_CONFIG.maxSupportSteps)) {
-    // 2a. Each outline label passes the same exact-match rule; a usable match becomes a
-    // reference and is never cloned (AE4).
-    const match = resolveExactMatch(proposed.label, context.reuseCandidates, context.parentDerivedNodeId);
-    if (match.kind === "reference") {
-      pushReference(match);
-      continue;
-    }
-    // 2b. Generate a genuinely lower-level scaffold node. Boundary concepts are dropped (R22).
-    const grounded = await deps.groundConcept({ label: proposed.label, declaredDomain: context.declaredDomain, parentGroundingText: context.parentGroundingText });
-    if (grounded.kind === "boundary") continue;
-    // Bounded congruence re-pick (KTD4b): a drafted step must TEACH its own label AND be a
-    // genuinely SIMPLER prerequisite of the term. A congruence NO drops the draft and retries
-    // once; a second NO skips the step (it falls into the "no safe step survived" path). A
-    // content-generation error or judge infra error never blocks — the former retries, the latter
-    // accepts the draft (fail-open, rule 16).
-    const accepted = await generateCongruentStep(deps, context, detour.term, proposed.label, grounded.groundingText, newId);
-    if (!accepted) continue;
-    steps.push({ scaffoldStepId: newId(), ordinal: steps.length, kind: "generated", payload: accepted, lessonReadAt: null });
-    if (steps.length >= DEFAULT_SCAFFOLD_GENERATION_CONFIG.maxSupportSteps) break;
-  }
-
-  return publishSteps(deps, input, steps);
-}
-
-// Draft one lower-level scaffold node for `stepLabel` and gate it with the congruence re-pick
-// (KTD4b). Up to two content attempts: each builds a valid four-option payload, then the judge
-// checks that the content teaches its own label AND is a simpler prerequisite of `term`. The
-// FIRST accepted payload wins; a NO drops it and retries once; both NO -> null (step skipped).
-// The judge grades the teaching not the answer key, so option order is normalized before it sees
-// them. A judge infra error accepts the current draft (fail-open, rule 16). PURE except its deps.
-async function generateCongruentStep(
-  deps: ScaffoldGenerationDeps,
-  context: ScaffoldParentContext,
-  term: string,
-  stepLabel: string,
-  groundingText: string,
-  newId: () => string
-): Promise<ScaffoldNodePayload | null> {
-  for (let attempt = 0; attempt < DEFAULT_SCAFFOLD_GENERATION_CONFIG.contentDraftAttempts; attempt++) {
-    let draft: ScaffoldContentDraft;
-    try {
-      draft = await deps.content.generate({ declaredDomain: context.declaredDomain, label: stepLabel, groundingText });
-    } catch {
-      continue;
-    }
-    const payload = buildScaffoldNodePayload(stepLabel, draft, newId);
-    if (!payload) continue;
-    let verdict;
-    try {
-      verdict = await deps.congruence.judge({
-        declaredDomain: context.declaredDomain,
-        term,
-        parentLabel: context.parentLabel,
-        stepLabel,
-        microLesson: scaffoldMicroLessonText(payload),
-        question: payload.item.question,
-        explanation: payload.item.explanation,
-        options: payload.item.options.map((option) => option.text).sort((a, b) => a.localeCompare(b))
-      });
-    } catch {
-      // The judge is a quality re-pick, not a provable guarantee — infra failure never drops
-      // otherwise-valid support (rule 16). Accept this draft.
-      return payload;
-    }
-    if (verdict.teachesStepLabel && verdict.isSimplerPrerequisite) return payload;
-  }
-  return null;
-}
-
-// Atomic terminal write: publish one to three surviving steps guarded by the claim token, or
-// fail when none survive / the fence is lost (R16/R22, KTD9).
-async function publishSteps(
-  deps: ScaffoldGenerationDeps,
-  input: { detourId: string; claimToken: string },
-  steps: ScaffoldStep[]
-): Promise<ScaffoldGenerationOutcome> {
-  if (steps.length === 0) {
-    await deps.scaffoldStore.markFailed({ detourId: input.detourId, claimToken: input.claimToken });
-    return { kind: "failed", reason: "no safe support step survived" };
-  }
-  const published = await deps.scaffoldStore.publishReady({ detourId: input.detourId, claimToken: input.claimToken, steps });
-  if (!published) return { kind: "failed", reason: "publish fence rejected (stale claim)" };
-  return { kind: "published", stepCount: steps.length };
 }
