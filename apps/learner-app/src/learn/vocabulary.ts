@@ -204,7 +204,11 @@ export const LEARNER_VOCABULARY = {
   supportOverviewHint: "Revisit any step, or hide this path.",
   supportReferenceTitle: "Continue on the trail",
   supportReferenceBody: "This step is a real stop on your trail. Study it there — finishing it completes this step too.",
-  supportReferenceAction: "Go to the trail stop"
+  supportReferenceAction: "Go to the trail stop",
+  // A pinned reference the learner can't reach on the trail right now (kept below their current
+  // reach, re-locked, or its lesson refreshed): the SAME real concept is studied here, in place,
+  // and finishing it completes this step. Never generated content — no "Extra support" badge.
+  supportReferencePinnedNote: "From your map — study it here to finish this step."
 } as const;
 
 export type LearnerVocabularyKey = keyof typeof LEARNER_VOCABULARY;

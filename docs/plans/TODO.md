@@ -2,10 +2,10 @@
 
 ## TODO
 
-### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U5 NEXT)
+### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U6 NEXT)
 
 [Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). U1 committed `9391169`, U2
-committed `64c0ce4`, U3 committed `3e11f3b`. **U4 (KTD1/5/6/8) is complete and UNCOMMITTED:**
+committed `64c0ce4`, U3 committed `3e11f3b`. **U4 (KTD1/5/6/8) committed `9aa4f7e`:**
 `learnerScaffoldGeneration.ts` is now one process-lived `createScaffoldGeneration(construction)`
 factory returning `(request: {detourId, operationId}) => Promise<void>`; the old
 `runScaffoldGeneration`/`resolveExactMatch`/`buildScaffoldNodePayload`/`ScaffoldGenerationDeps`/
@@ -26,12 +26,29 @@ is fenced+honest (KTD6): claim-loss/false-publish writes nothing, all-transient 
 FAILED timeline on any non-ready outcome. The transient classifier moved to package-internal
 `generationFailureClassification.ts` (shared with Topic Expedition, not barrel-exported). The
 learner-api composition is construction-only (`createLearnerScaffoldGeneration(sql)`), lazily
-cached in the supervisor, which now passes only `{detourId, operationId}`. **U5 (KTD8 finish +
-KTD9) is next**: render the projected `support_activity` reference destinations in the Learner App
-(`CheckpointPath` → `SupportPathSheet`, reuse `LessonSections`/`OptionSelectBody`), route current
-references through the projected checkpoint, and add the learner-owned reference option-select
-route — preserving plan 003's shipped `CheckpointPath` trail-wave + `useIsFocused` arrival-focus.
-No live learner played the detours in-app yet; U6 is the full DB/real-use/browser/cleanup gate.
+cached in the supervisor, which now passes only `{detourId, operationId}`. `9aa4f7e` also carried
+KTD8's server half: the `/scaffold/reference-option-select` route, `gradeScaffoldReferenceOptionSelect`,
+and `PostgresScaffoldReferenceActivityRead` wiring were already present. **U5 (KTD9 client render)
+is COMPLETE and UNCOMMITTED:** the Learner App now consumes the projected reference `destination`
+union exhaustively. `SupportPathSheet` routes a reference step by `destination.kind` — a
+`checkpoint` keeps the existing map-transition `ReferenceStepBody` + `onOpenReference` (CheckpointPath
+already scrolls to `destination.stopId` and opens the ordinary `ActivitySheet`, no trail search); a
+`support_activity` now renders the PINNED neutral lesson + key-free option-select IN PLACE. Both
+generated and reference activities share one new presentational `StudyStepBody` (lesson → mark read
+→ key-free `OptionSelectBody` → grade → continue) differing ONLY in injected behavior: generated
+steps mark the scaffold read + grade scaffold-scoped + carry the "Extra support" badge; reference
+activities mark the NODE-scoped neutral lesson read (`markLearnerLessonRead`) + grade through the
+new `submitScaffoldReferenceOptionSelect` action (server resolves the pinned/superseded key and
+appends neutral evidence) + carry a "From your map" pinned note, never the generated badge. New
+vocabulary token `supportReferencePinnedNote`. Plan 003's `CheckpointPath` trail-wave +
+`useIsFocused` arrival-focus are preserved untouched. Deterministic envelope: learner-app jest
+**51 suites / 232 tests** (2 new KTD9 tests — support_activity inline study + overview
+checkpoint-vs-activity routing), learner-app + learner-api typecheck clean, lint clean. Removed-symbol
+sweep clean (`resolveReferenceStopId`/`runScaffoldGeneration`/`claimToken` gone outside the
+barrel-absence assertion). **U6 is next**: the full DB/real-use/browser/cleanup gate — no live
+learner has played the `support_activity` arm in-app yet, and the KTD8 supervisor
+concurrency/DB-free-import assertions (U5 plan items 1–2) are guaranteed structurally by the lazy
+`generation ??= …` construction but have no dedicated focused test; fold or prove them in U6.
 
 U3 (KTD7) history: one `neuralOperationRegistry` in
 `configHashes.ts` (seed + timeline type + descriptors + embedding stages per Neural Operation;

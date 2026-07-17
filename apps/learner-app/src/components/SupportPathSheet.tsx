@@ -3,8 +3,9 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckCircle2, ChevronRight, Circle, EyeOff, GitBranchPlus, MapPin } from "lucide-react-native";
 import type { ConceptLessonView, ScaffoldDetourView, ScaffoldStepView, StudyOptionSelectView } from "@lrnki/application/projection";
+import type { ReactNode } from "react";
 import type { LearnerGradingResult } from "@/lib/api";
-import { markScaffoldLessonRead, submitScaffoldOptionSelect } from "@/lib/actions";
+import { markLearnerLessonRead, markScaffoldLessonRead, submitScaffoldOptionSelect, submitScaffoldReferenceOptionSelect } from "@/lib/actions";
 import { Badge, Button, FullScreenDialog, OverlayHeader, PressableSurface, Text, colors, triggerHaptic } from "@/ui";
 import { OptionSelectBody } from "./ActivityCards";
 import { LessonSections } from "./LessonSections";
@@ -88,6 +89,12 @@ function PathController({
   const doneCount = steps.filter(isDone).length;
   const currentStep = stepId !== null ? steps.find((step) => step.scaffoldStepId === stepId) ?? null : null;
   const nextIncomplete = steps.find((step) => !isDone(step) && step.scaffoldStepId !== stepId) ?? null;
+  const markLocallyDone = (id: string) => setLocallyDone((done) => new Set([...done, id]));
+  // Only a CHECKPOINT reference leaves the sheet for the trail (KTD9). A confidently-floored,
+  // re-locked, or superseded reference is a `support_activity` destination studied in place, so
+  // it opens inside the path like a generated step.
+  const routesToTrail = (step: ScaffoldStepView) => step.kind === "reference" && step.destination.kind === "checkpoint";
+  const openStep = (step: ScaffoldStepView) => (routesToTrail(step) ? onOpenReference(step as ReferenceStep) : setStepId(step.scaffoldStepId));
 
   return (
     <>
@@ -122,15 +129,29 @@ function PathController({
           steps={steps}
           isDone={isDone}
           referenceLabelFor={referenceLabelFor}
-          onOpenStep={(step) => (step.kind === "reference" ? onOpenReference(step) : setStepId(step.scaffoldStepId))}
+          onOpenStep={openStep}
           onHide={() => onHide(detour.detourId)}
         />
       ) : currentStep.kind === "reference" ? (
-        <ReferenceStepBody
-          referencedLabel={referenceLabelFor(currentStep.referencedDerivedNodeId)}
-          complete={isDone(currentStep)}
-          onGo={() => onOpenReference(currentStep)}
-        />
+        currentStep.destination.kind === "checkpoint" ? (
+          <ReferenceStepBody
+            referencedLabel={referenceLabelFor(currentStep.referencedDerivedNodeId)}
+            complete={isDone(currentStep)}
+            onGo={() => onOpenReference(currentStep)}
+          />
+        ) : (
+          <ReferenceActivityBody
+            key={currentStep.scaffoldStepId}
+            enrichmentId={enrichmentId}
+            step={currentStep}
+            destination={currentStep.destination}
+            complete={isDone(currentStep)}
+            hasNext={nextIncomplete !== null}
+            onCorrect={() => markLocallyDone(currentStep.scaffoldStepId)}
+            onContinue={() => (nextIncomplete ? setStepId(nextIncomplete.scaffoldStepId) : onClose())}
+            onPendingChange={onPendingChange}
+          />
+        )
       ) : (
         <GeneratedStepBody
           key={currentStep.scaffoldStepId}
@@ -138,7 +159,7 @@ function PathController({
           step={currentStep}
           complete={isDone(currentStep)}
           hasNext={nextIncomplete !== null}
-          onCorrect={() => setLocallyDone((done) => new Set([...done, currentStep.scaffoldStepId]))}
+          onCorrect={() => markLocallyDone(currentStep.scaffoldStepId)}
           onContinue={() => (nextIncomplete ? setStepId(nextIncomplete.scaffoldStepId) : onClose())}
           onPendingChange={onPendingChange}
         />
@@ -235,28 +256,39 @@ function ReferenceStepBody({
   );
 }
 
-// A generated Support Step: the retired ScaffoldStepSheet's exact study behavior — read the
-// generated micro-lesson, mark it read, reveal the key-free option-select, grade through the
-// scaffold-scoped path — now advancing to the next incomplete step in the same flow (F2).
-function GeneratedStepBody({
-  enrichmentId,
-  step,
+// The shared key-free study body (KTD9): read the lesson, mark it read, reveal the KEY-FREE
+// option-select, grade, then advance. A generated Support Step and a pinned reference activity
+// render IDENTICALLY through this — they differ ONLY in their injected read/grade behavior
+// (scaffold-scoped vs. neutral node-scoped) and header slot, never in what the learner sees. The
+// answer key never ships in either mode; `onGrade` resolves it server-side.
+function StudyStepBody({
+  lesson,
+  item,
+  headerSlot,
+  initialLessonRead,
   complete,
   hasNext,
+  onMarkRead,
+  onGrade,
   onCorrect,
   onContinue,
   onPendingChange
 }: Readonly<{
-  enrichmentId: string;
-  step: GeneratedStep;
+  lesson: ConceptLessonView;
+  item: StudyOptionSelectView;
+  headerSlot: ReactNode;
+  initialLessonRead: boolean;
   complete: boolean;
   hasNext: boolean;
+  onMarkRead: () => Promise<void>;
+  onGrade: (optionId: string) => Promise<LearnerGradingResult>;
   onCorrect: () => void;
   onContinue: () => void;
   onPendingChange: (pending: boolean) => void;
 }>) {
-  // Start on the question when the lesson was already read (revisiting); otherwise read first.
-  const [phase, setPhase] = useState<"lesson" | "question">(step.lessonRead ? "question" : "lesson");
+  const hasLesson = lesson.sections.length > 0;
+  // Start on the question when the lesson was already read (revisiting) or absent; otherwise read first.
+  const [phase, setPhase] = useState<"lesson" | "question">(initialLessonRead || !hasLesson ? "question" : "lesson");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [result, setResult] = useState<LearnerGradingResult | null>(null);
   const [pending, setPending] = useState(false);
@@ -273,7 +305,7 @@ function GeneratedStepBody({
 
   const advanceToQuestion = () => {
     run(async () => {
-      await markScaffoldLessonRead({ enrichmentId, scaffoldStepId: step.scaffoldStepId });
+      await onMarkRead();
       setPhase("question");
     });
   };
@@ -282,7 +314,7 @@ function GeneratedStepBody({
     if (pending || graded) return;
     setSelectedId(optionId);
     run(async () => {
-      const outcome = await submitScaffoldOptionSelect({ enrichmentId, scaffoldStepId: step.scaffoldStepId, chosenOptionId: optionId });
+      const outcome = await onGrade(optionId);
       setResult(outcome);
       if (outcome.graded) {
         triggerHaptic(outcome.correct ? "success" : "warning");
@@ -291,34 +323,20 @@ function GeneratedStepBody({
     });
   };
 
-  const optionView: StudyOptionSelectView = {
-    studyItemId: step.scaffoldStepId,
-    derivedNodeId: "",
-    question: step.item.question,
-    explanation: step.item.explanation,
-    groundingProvenance: "generated",
-    options: step.item.options.map((option) => ({ optionId: option.optionId, text: option.text, provenance: "generated" as const })),
-    explorableTerms: []
-  };
-  const lessonView: ConceptLessonView = { derivedNodeId: step.scaffoldStepId, canonicalLabel: step.label, sections: step.lesson, explorableTerms: [] };
-
   return (
     <>
       <ScrollView className="flex-1">
         <View className="mx-auto w-full max-w-3xl gap-4 p-4">
-          <View className="flex-row">
-            {/* Generated content stays labeled generated end to end (R14/ADR-0037). */}
-            <Badge>{learnerTerm("supportGeneratedBadge")}</Badge>
-          </View>
+          <View className="flex-row">{headerSlot}</View>
           {complete ? (
             <View className="flex-row items-center gap-2 self-start rounded-card border border-line bg-gem-soft px-3 py-2">
               <CheckCircle2 size={16} color={colors.ink} />
               <Text variant="label">{learnerTerm("supportStepDone")}</Text>
             </View>
           ) : null}
-          {lessonView.sections.length ? <LessonSections lesson={lessonView} /> : null}
+          {hasLesson ? <LessonSections lesson={lesson} /> : null}
           {phase === "question" ? (
-            <OptionSelectBody item={optionView} selectedId={selectedId} result={result} disabled={pending} onSelect={submit} />
+            <OptionSelectBody item={item} selectedId={selectedId} result={result} disabled={pending} onSelect={submit} />
           ) : null}
         </View>
       </ScrollView>
@@ -337,5 +355,99 @@ function GeneratedStepBody({
         </View>
       </View>
     </>
+  );
+}
+
+// A generated Support Step (F2, R17): its inline generated micro-lesson + key-free option-select,
+// graded through the SCAFFOLD-scoped path (never neutral mastery) and badged generated end to end.
+function GeneratedStepBody({
+  enrichmentId,
+  step,
+  complete,
+  hasNext,
+  onCorrect,
+  onContinue,
+  onPendingChange
+}: Readonly<{
+  enrichmentId: string;
+  step: GeneratedStep;
+  complete: boolean;
+  hasNext: boolean;
+  onCorrect: () => void;
+  onContinue: () => void;
+  onPendingChange: (pending: boolean) => void;
+}>) {
+  const lesson: ConceptLessonView = { derivedNodeId: step.scaffoldStepId, canonicalLabel: step.label, sections: step.lesson, explorableTerms: [] };
+  const item: StudyOptionSelectView = {
+    studyItemId: step.scaffoldStepId,
+    derivedNodeId: "",
+    question: step.item.question,
+    explanation: step.item.explanation,
+    groundingProvenance: "generated",
+    options: step.item.options.map((option) => ({ optionId: option.optionId, text: option.text, provenance: "generated" as const })),
+    explorableTerms: []
+  };
+  return (
+    <StudyStepBody
+      lesson={lesson}
+      item={item}
+      // Generated content stays labeled generated end to end (R14/ADR-0037).
+      headerSlot={<Badge>{learnerTerm("supportGeneratedBadge")}</Badge>}
+      initialLessonRead={step.lessonRead}
+      complete={complete}
+      hasNext={hasNext}
+      onMarkRead={() => markScaffoldLessonRead({ enrichmentId, scaffoldStepId: step.scaffoldStepId })}
+      onGrade={(optionId) => submitScaffoldOptionSelect({ enrichmentId, scaffoldStepId: step.scaffoldStepId, chosenOptionId: optionId })}
+      onCorrect={onCorrect}
+      onContinue={onContinue}
+      onPendingChange={onPendingChange}
+    />
+  );
+}
+
+// A reference Support Step whose projected destination is a `support_activity` (KTD9): the PINNED
+// neutral Concept Lesson + option-select, studied in place because the referenced node is kept
+// below the learner's reach, has re-locked, or its assets were superseded. The lesson read is the
+// ordinary node-scoped fact; grading resolves the pinned (possibly superseded) key SERVER-SIDE and
+// appends the SAME neutral evidence the referenced trail stop would record — no scaffold scope, no
+// generated badge, no copied answer key.
+function ReferenceActivityBody({
+  enrichmentId,
+  step,
+  destination,
+  complete,
+  hasNext,
+  onCorrect,
+  onContinue,
+  onPendingChange
+}: Readonly<{
+  enrichmentId: string;
+  step: ReferenceStep;
+  destination: Extract<ReferenceStep["destination"], { kind: "support_activity" }>;
+  complete: boolean;
+  hasNext: boolean;
+  onCorrect: () => void;
+  onContinue: () => void;
+  onPendingChange: (pending: boolean) => void;
+}>) {
+  return (
+    <StudyStepBody
+      lesson={destination.lesson}
+      item={destination.item}
+      headerSlot={
+        <View className="flex-row items-center gap-2 self-start rounded-card border border-line bg-card px-3 py-2">
+          <MapPin size={14} color={colors.ink} />
+          <Text variant="caption" color="muted" className="min-w-0 flex-1">{learnerTerm("supportReferencePinnedNote")}</Text>
+        </View>
+      }
+      initialLessonRead={step.lessonRead}
+      complete={complete}
+      hasNext={hasNext}
+      onMarkRead={() => markLearnerLessonRead({ enrichmentId, derivedNodeId: step.referencedDerivedNodeId })}
+      onGrade={(optionId) => submitScaffoldReferenceOptionSelect({ enrichmentId, scaffoldStepId: step.scaffoldStepId, chosenOptionId: optionId })}
+      onCorrect={onCorrect}
+      onContinue={onContinue}
+      onPendingChange={onPendingChange}
+    />
   );
 }

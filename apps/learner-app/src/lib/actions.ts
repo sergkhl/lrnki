@@ -169,3 +169,15 @@ export async function markScaffoldLessonRead(input: { enrichmentId: string; scaf
   await api.scaffold["lesson-read"].$post({ json: { scaffoldStepId: input.scaffoldStepId } });
   await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
 }
+
+// Grade a learner-owned reference Support Step against its PINNED (possibly superseded) neutral
+// option-select (KTD9). The server resolves the answer key from the reference step's immutable
+// item identity and appends ordinary neutral `(study_item_id, derived_node_id)` evidence — the
+// client never sees or stores a key. Refreshing lets the authoritative pinned completion replace
+// the sheet's optimistic marker.
+export async function submitScaffoldReferenceOptionSelect(input: { enrichmentId: string; scaffoldStepId: string; chosenOptionId: string }): Promise<LearnerGradingResult> {
+  const res = await api.scaffold["reference-option-select"].$post({ json: { scaffoldStepId: input.scaffoldStepId, chosenOptionId: input.chosenOptionId } });
+  const result = (await res.json()) as LearnerGradingResult;
+  await refreshLearnerExpedition({ enrichmentId: input.enrichmentId });
+  return result;
+}
