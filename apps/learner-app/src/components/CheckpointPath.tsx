@@ -4,7 +4,7 @@ import { useIsFocused, useRouter } from "expo-router";
 import { Flag, Mountain } from "lucide-react-native";
 import Svg, { Path } from "react-native-svg";
 import type { RecallScopeStatus, ScaffoldDetourView, StudySession } from "@lrnki/application/projection";
-import { resolveReferenceStopId } from "@lrnki/application/projection";
+import type { ScaffoldStepView } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
 import { ConceptMarker } from "./ConceptMarker";
@@ -99,10 +99,10 @@ export function CheckpointPath({
   // A reference step studies the referenced neutral node through its own trail stops (R15, F3):
   // the path closes, the trail focuses the referenced Concept Marker, and the ordinary Activity
   // Sheet opens the application-resolved first incomplete ordinary stop (KTD8).
-  const openReferenceStep = (referencedDerivedNodeId: string) => {
+  const openReferenceStep = (step: Extract<ScaffoldStepView, { kind: "reference" }>) => {
+    if (step.destination.kind !== "checkpoint") return;
     setPathDetourId(null);
-    const stopId = resolveReferenceStopId(session, referencedDerivedNodeId);
-    if (!stopId) return;
+    const stopId = step.destination.stopId;
     const y = stopYRef.current[stopId];
     if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - 220), animated: true });
     setSelectedStopId(stopId);

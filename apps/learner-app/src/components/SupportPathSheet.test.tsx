@@ -106,12 +106,21 @@ test("a generated step reads the lesson, grades scaffold-scoped, then advances t
 });
 
 test("Covers AE7: a reference step renders a map transition, never copied neutral content, and routes to the trail (F3)", async () => {
-  const refStep: ScaffoldStepView = { scaffoldStepId: "r1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "n-9", complete: false };
+  const refStep: ScaffoldStepView = {
+    scaffoldStepId: "r1",
+    ordinal: 0,
+    kind: "reference",
+    referencedDerivedNodeId: "n-9",
+    lessonRead: false,
+    itemCorrect: false,
+    complete: false,
+    destination: { kind: "checkpoint", stopId: "n-9:theory:main" }
+  };
   const { onOpenReference } = await renderSheet(detour({ steps: [refStep, genStep("s2", 1, false)], completedStepCount: 0, totalStepCount: 2, firstIncompleteStepId: "r1" }));
   expect(screen.getByText("Node n-9")).toBeTruthy();
   expect(screen.getByText(learnerTerm("supportReferenceBody"))).toBeTruthy();
   await fireEvent.press(screen.getByTestId("support-path-reference-go"));
-  expect(onOpenReference).toHaveBeenCalledWith("n-9");
+  expect(onOpenReference).toHaveBeenCalledWith(refStep);
 });
 
 test("hide lives in the overview and hides the whole path (F4)", async () => {

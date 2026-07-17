@@ -32,6 +32,12 @@ test("authenticated routes refuse a missing bearer token", async () => {
     body: JSON.stringify({ topic: "Tides" })
   });
   assert.equal(write.status, 401);
+  const referenceGrade = await app.request("/scaffold/reference-option-select", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scaffoldStepId: "step-1", chosenOptionId: "option-1" })
+  });
+  assert.equal(referenceGrade.status, 401);
 });
 
 test("session route validates its body", async () => {

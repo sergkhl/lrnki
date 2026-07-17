@@ -36,12 +36,12 @@ export {
 export { generateStudyItemBank } from "./generateStudyItemBank";
 export {
   composeScaffoldDetours,
-  resolveReferenceStopId,
   type ScaffoldDetourView,
   type ScaffoldStepView,
+  type ScaffoldReferenceDestination,
   type ScaffoldGeneratingPhase,
   type ComposeScaffoldDetoursInput,
-  type ReferencedNodeCompletion
+  type ProjectedScaffoldReference
 } from "./studySessionTrail";
 export {
   runScaffoldGeneration,
@@ -156,6 +156,7 @@ export {
   recordLearnerVerdict,
   recordLessonRead,
   gradeScaffoldOptionSelect,
+  gradeScaffoldReferenceOptionSelect,
   recordScaffoldLessonRead,
   type StudyResponseSubmission,
   type GradeStudyResponseResult,
@@ -222,6 +223,7 @@ export {
   type StudyImpostorView,
   type StudyItemView,
   type StudyMatchingView,
+  type NeutralReferenceAssets,
   type StudyOptionSelectView,
   type StudySession
 } from "./studySessionProjection";

@@ -7,6 +7,7 @@ import type {
   LessonReadStorePort,
   ResponseLogStorePort,
   ScaffoldDetourStorePort,
+  ScaffoldReferenceActivityReadPort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
 import { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, keyedCorrectIdFor, keyedMatchIdFor, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
@@ -161,6 +162,48 @@ export async function gradeScaffoldOptionSelect(
     responseLog: ports.responseLog
   });
   return { graded: true, chosenId: input.chosenOptionId, keyedCorrectId: keyed.optionId, correct: input.chosenOptionId === keyed.optionId };
+}
+
+// A reference Support Step keeps ordinary neutral evidence even when its pinned item has been
+// superseded. Resolve the learner-owned step through the narrow reference read seam, validate the
+// pinned activity shape, then append the same neutral selection row as canonical study grading.
+// No broad "read superseded item" capability and no answer key crosses the application boundary.
+export async function gradeScaffoldReferenceOptionSelect(
+  input: { learnerStateRef: string; scaffoldStepId: string; chosenOptionId: string },
+  ports: { referenceActivityRead: ScaffoldReferenceActivityReadPort; responseLog: ResponseLogStorePort }
+): Promise<GradeScaffoldOptionSelectResult> {
+  if (!input.learnerStateRef || !input.scaffoldStepId || !input.chosenOptionId) {
+    return { graded: false, refused: "invalid_input" };
+  }
+  const activity = await ports.referenceActivityRead.getForLearnerStep({
+    learnerStateRef: input.learnerStateRef,
+    scaffoldStepId: input.scaffoldStepId
+  });
+  if (!activity) return { graded: false, refused: "step_not_found" };
+  if (
+    activity.item.itemType !== "option_select"
+    || activity.item.derivedNodeId !== activity.referencedDerivedNodeId
+    || activity.lesson.derivedNodeId !== activity.referencedDerivedNodeId
+    || activity.item.enrichmentId !== activity.lesson.enrichmentId
+  ) {
+    return { graded: false, refused: "step_not_gradable" };
+  }
+  const keyedCorrectId = keyedCorrectIdFor(activity.item);
+  if (!keyedCorrectId) return { graded: false, refused: "step_not_gradable" };
+  await appendGradedSelectionOutcome({
+    learnerStateRef: input.learnerStateRef,
+    item: { studyItemId: activity.item.studyItemId, derivedNodeId: activity.referencedDerivedNodeId },
+    chosenId: input.chosenOptionId,
+    keyedCorrectId,
+    responseSource: "human",
+    responseLog: ports.responseLog
+  });
+  return {
+    graded: true,
+    chosenId: input.chosenOptionId,
+    keyedCorrectId,
+    correct: input.chosenOptionId === keyedCorrectId
+  };
 }
 
 // Mark a generated Scaffold Step's micro-lesson read (R12). A reference step's lesson-read rides

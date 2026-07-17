@@ -27,6 +27,7 @@ export {
   type StudyImpostorView,
   type StudyItemView,
   type StudyMatchingView,
+  type NeutralReferenceAssets,
   type StudyOptionSelectView,
   type StudySession
 } from "./studySessionProjection";
@@ -36,11 +37,11 @@ export {
 // reconstructing mastery maps client-side. Runtime-pure (no node: builtins).
 export {
   buildTrailView,
-  resolveReferenceStopId,
   resolveStopActivity,
   sectionAnchorId,
   type ScaffoldDetourView,
   type ScaffoldGeneratingPhase,
+  type ScaffoldReferenceDestination,
   type ScaffoldStepItemView,
   type ScaffoldStepView,
   type StopActivity,

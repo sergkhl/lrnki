@@ -2,13 +2,14 @@
 
 ## TODO
 
-### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U2 NEXT)
+### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U3 NEXT)
 
-[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). U1 is complete and uncommitted:
-versioned Concept Lesson identities, pinned reference persistence/hydration, and fenced release are
-in place on a fresh schema. U2 is next; U3 is also unblocked after U1 and may follow if the session
-budget permits. Preserve plan 003's shipped `CheckpointPath` trail-wave + arrival-focus behavior
-when U5 begins.
+[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). U1 is committed in `9391169`.
+U2 is complete and UNCOMMITTED: the Study Session now owns current reusable neutral identities,
+pinned completion, and checkpoint-or-support-activity destinations; learner-owned reference grading
+appends neutral evidence through the pinned read seam; `resolveReferenceStopId` is deleted. U3 is
+next and remains independent/unblocked. U5 must finish rendering `support_activity` destinations;
+preserve plan 003's shipped `CheckpointPath` trail-wave + arrival-focus behavior there.
 
 ### Evidence-triggered follow-up
 
@@ -447,6 +448,19 @@ when U5 begins.
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 ## VALIDATION
+
+- **Deep Scaffold Generation — U2 finished-reference projection/grading gate, 2026-07-16. PASS.**
+  One serialized mixed Study Session proved a current playable reference resolves to its exact first
+  incomplete checkpoint while confidently floored and superseded references carry pinned key-free
+  lesson/option-select activities. Pinned latest-correct completed the Support Step; a later pinned
+  incorrect reopened it; a replacement-current correct response did not complete the pin. Reference
+  grading appended ordinary neutral `(study_item_id, derived_node_id)` evidence and rejected foreign,
+  generated/non-reference, malformed, and invalid requests. No `isCorrect` or pinned lesson identity
+  serialized. Application **687/687**, learner-api **17 pass / 1 unrelated opt-in DB skip**, focused
+  Learner App **9/9**, real Postgres pinned-reference suite with `.env` **8/8**, workspace typecheck
+  pass, lint **0 errors / 8 pre-existing warnings**. Real-use quality **PASS**; no model call applies
+  to this deterministic projection/grading milestone. Evidence:
+  `tmp/2026-07-16-deep-scaffold-generation/EVALUATION.md`.
 
 - **Deep Scaffold Generation — U1 persistence gate, 2026-07-16. PASS.** Hard-reset the development
   database with repo-root `.env` loaded and applied the single initial migration cleanly. Stable

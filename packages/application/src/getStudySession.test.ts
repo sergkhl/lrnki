@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, StudyItem } from "@lrnki/domain-core";
+import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, ResponseLogRow, ScaffoldDetour, StudyItem } from "@lrnki/domain-core";
 import type {
   CalibrationVerdictStorePort,
   ConceptLessonStorePort,
@@ -8,6 +8,8 @@ import type {
   EnrichmentInspectionReadPort,
   RecallChallengeStorePort,
   ResponseLogStorePort,
+  ScaffoldDetourStorePort,
+  ScaffoldReferenceActivityReadPort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
 import { getStudySession } from "./getStudySession";
@@ -208,4 +210,60 @@ test("getStudySession without a challenge store composes empty recall scopes", a
   const session = await callGetStudySession({});
   assert.ok(session);
   assert.deepEqual(session.recallScopes, []);
+});
+
+test("getStudySession loads learner-owned pinned reference activities into the finished projection", async () => {
+  const detour: ScaffoldDetour = {
+    detourId: "d-ref",
+    learnerStateRef: "L1",
+    enrichmentId: "e",
+    parentDerivedNodeId: "ownership",
+    term: "Variable scope",
+    normalizedTerm: "variable scope",
+    status: "ready",
+    latestOperationId: null,
+    claimToken: null,
+    steps: [{
+      scaffoldStepId: "step-ref",
+      ordinal: 0,
+      kind: "reference",
+      referencedDerivedNodeId: "scope",
+      referencedConceptLessonId: scopeLesson.conceptLessonId,
+      referencedStudyItemId: optionItem.studyItemId
+    }]
+  };
+  const scaffoldStore = {
+    async listActiveForLearnerEnrichment() { return [detour]; }
+  } as unknown as ScaffoldDetourStorePort;
+  const scaffoldReferenceRead: ScaffoldReferenceActivityReadPort = {
+    async listForLearnerEnrichment() {
+      return [{
+        scaffoldStepId: "step-ref",
+        detourId: "d-ref",
+        referencedDerivedNodeId: "scope",
+        lesson: scopeLesson,
+        item: optionItem
+      }];
+    },
+    async getForLearnerStep() { throw new Error("not used"); }
+  };
+  const session = await getStudySession({
+    enrichmentId: "e",
+    learnerStateRef: "L1",
+    enrichmentRead: enrichmentRead({ e: detail() }),
+    studyItemStore: studyItemStore([optionItem]),
+    conceptLessonStore: conceptLessonStore([scopeLesson]),
+    lessonReadStore: lessonReadStore(),
+    responseLog: responseLog([]),
+    verdictStore: verdictStore([]),
+    scaffoldStore,
+    scaffoldReferenceRead
+  });
+  assert.ok(session);
+  const step = session.detours[0].steps[0];
+  assert.equal(step.kind === "reference" && step.destination.kind, "checkpoint");
+  assert.deepEqual(session.neutralReferenceAssetsByNode.scope, {
+    conceptLessonId: scopeLesson.conceptLessonId,
+    studyItemId: optionItem.studyItemId
+  });
 });

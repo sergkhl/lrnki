@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ImpostorItem, MatchingItem, NewResponseLogRow, OptionSelectItem, ResponseLogRow, StudyItem, Verdict } from "@lrnki/domain-core";
-import type { CalibrationVerdictStorePort, EnrichmentInspectionReadPort, LearnerExpedition, LearnerExpeditionStorePort, LessonRead, LessonReadStorePort, ResponseLogStorePort, StudyItemBankStorePort } from "@lrnki/ports";
+import type { CalibrationVerdictStorePort, EnrichmentInspectionReadPort, LearnerExpedition, LearnerExpeditionStorePort, LessonRead, LessonReadStorePort, ResponseLogStorePort, ScaffoldReferenceActivity, ScaffoldReferenceActivityReadPort, StudyItemBankStorePort } from "@lrnki/ports";
 import type { ScaffoldDetourStorePort } from "@lrnki/ports";
 import type { ScaffoldStep } from "@lrnki/domain-core";
-import { checkMatchingAttempt, gradeScaffoldOptionSelect, gradeStudyResponse, recordLearnerVerdict, recordLessonRead, recordScaffoldLessonRead } from "./gradeStudyResponse";
+import { checkMatchingAttempt, gradeScaffoldOptionSelect, gradeScaffoldReferenceOptionSelect, gradeStudyResponse, recordLearnerVerdict, recordLessonRead, recordScaffoldLessonRead } from "./gradeStudyResponse";
 
 const EN = "en-1";
 const LEARNER = "L1";
@@ -309,6 +309,76 @@ test("gradeScaffoldOptionSelect refuses a reference step and another learner's s
   assert.deepEqual(notGradable, { graded: false, refused: "step_not_gradable" });
   const notOwned = await gradeScaffoldOptionSelect({ learnerStateRef: "intruder", scaffoldStepId: "step-1", chosenOptionId: "so-1" }, { scaffoldStore: fakeScaffoldStore(generatedStep()).store, responseLog: log.store });
   assert.deepEqual(notOwned, { graded: false, refused: "step_not_found" });
+  assert.equal(log.rows.length, 0);
+});
+
+function fakeReferenceRead(activity: ScaffoldReferenceActivity | undefined): ScaffoldReferenceActivityReadPort {
+  return {
+    async listForLearnerEnrichment() { throw new Error("not used"); },
+    async getForLearnerStep(input) {
+      return input.learnerStateRef === "owner" && input.scaffoldStepId === activity?.scaffoldStepId ? activity : undefined;
+    }
+  };
+}
+
+const referenceLesson = {
+  conceptLessonId: "lesson-old",
+  derivedNodeId: "node-1",
+  graphVersionId: null,
+  enrichmentId: EN,
+  generatingModel: "m",
+  configHash: "c",
+  canonicalLabel: "Node",
+  sections: [{ kind: "definition" as const, text: "Definition", groundingProvenance: "generated" as const }],
+  explorableTerms: []
+};
+
+test("gradeScaffoldReferenceOptionSelect resolves a pinned key and appends ordinary neutral evidence", async () => {
+  const log = fakeResponseLog();
+  const activity: ScaffoldReferenceActivity = {
+    scaffoldStepId: "ref-1",
+    detourId: "d-1",
+    referencedDerivedNodeId: "node-1",
+    lesson: referenceLesson,
+    item: optionItem
+  };
+  const result = await gradeScaffoldReferenceOptionSelect(
+    { learnerStateRef: "owner", scaffoldStepId: "ref-1", chosenOptionId: "o-correct" },
+    { referenceActivityRead: fakeReferenceRead(activity), responseLog: log.store }
+  );
+  assert.deepEqual(result, { graded: true, chosenId: "o-correct", keyedCorrectId: "o-correct", correct: true });
+  assert.equal(log.rows.length, 1);
+  assert.equal(log.rows[0].scope, "neutral");
+  assert.equal(log.rows[0].scope === "neutral" && log.rows[0].studyItemId, "os-1");
+  assert.equal(log.rows[0].scope === "neutral" && log.rows[0].derivedNodeId, "node-1");
+});
+
+test("reference grading rejects foreign, generated/non-reference, malformed, and invalid requests without writing", async () => {
+  const log = fakeResponseLog();
+  const missingRead = fakeReferenceRead(undefined); // foreign, generated, and unknown steps are absent from the narrow seam
+  assert.deepEqual(
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "intruder", scaffoldStepId: "ref-1", chosenOptionId: "o-correct" }, { referenceActivityRead: missingRead, responseLog: log.store }),
+    { graded: false, refused: "step_not_found" }
+  );
+  assert.deepEqual(
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "generated-1", chosenOptionId: "o-correct" }, { referenceActivityRead: missingRead, responseLog: log.store }),
+    { graded: false, refused: "step_not_found" }
+  );
+  const malformed: ScaffoldReferenceActivity = {
+    scaffoldStepId: "ref-bad",
+    detourId: "d-1",
+    referencedDerivedNodeId: "other-node",
+    lesson: referenceLesson,
+    item: optionItem
+  };
+  assert.deepEqual(
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "owner", scaffoldStepId: "ref-bad", chosenOptionId: "o-correct" }, { referenceActivityRead: fakeReferenceRead(malformed), responseLog: log.store }),
+    { graded: false, refused: "step_not_gradable" }
+  );
+  assert.deepEqual(
+    await gradeScaffoldReferenceOptionSelect({ learnerStateRef: "", scaffoldStepId: "", chosenOptionId: "" }, { referenceActivityRead: missingRead, responseLog: log.store }),
+    { graded: false, refused: "invalid_input" }
+  );
   assert.equal(log.rows.length, 0);
 });
 

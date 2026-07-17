@@ -11,6 +11,7 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
     target: { derivedNodeId: "n1", label: "Ownership" },
     studyItemCount: 2,
     flooredNodeIds: [],
+    neutralReferenceAssetsByNode: {},
     detail: {
       summary: {
         enrichmentId: "e1",

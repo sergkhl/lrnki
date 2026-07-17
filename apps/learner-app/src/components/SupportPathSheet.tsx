@@ -11,6 +11,7 @@ import { LessonSections } from "./LessonSections";
 import { learnerTerm, supportStepsDoneCopy } from "@/learn/vocabulary";
 
 type GeneratedStep = Extract<ScaffoldStepView, { kind: "generated" }>;
+type ReferenceStep = Extract<ScaffoldStepView, { kind: "reference" }>;
 
 // The full-screen Support Path flow (plan 2026-07-13-002 U5, R13-R16, KTD6). ONE sheet owns the
 // whole ready path: an incomplete path opens at its projected first incomplete Support Step, a
@@ -35,7 +36,7 @@ export function SupportPathSheet({
   onHide: (detourId: string) => void;
   // Reference routing (F3): the parent closes this sheet, focuses the referenced Concept
   // Marker, and opens its application-resolved ordinary stop.
-  onOpenReference: (referencedDerivedNodeId: string) => void;
+  onOpenReference: (step: ReferenceStep) => void;
   referenceLabelFor: (derivedNodeId: string) => string;
 }>) {
   const insets = useSafeAreaInsets();
@@ -73,7 +74,7 @@ function PathController({
   detour: ScaffoldDetourView;
   onClose: () => void;
   onHide: (detourId: string) => void;
-  onOpenReference: (referencedDerivedNodeId: string) => void;
+  onOpenReference: (step: ReferenceStep) => void;
   referenceLabelFor: (derivedNodeId: string) => string;
   onPendingChange: (pending: boolean) => void;
 }>) {
@@ -121,14 +122,14 @@ function PathController({
           steps={steps}
           isDone={isDone}
           referenceLabelFor={referenceLabelFor}
-          onOpenStep={(step) => (step.kind === "reference" ? onOpenReference(step.referencedDerivedNodeId) : setStepId(step.scaffoldStepId))}
+          onOpenStep={(step) => (step.kind === "reference" ? onOpenReference(step) : setStepId(step.scaffoldStepId))}
           onHide={() => onHide(detour.detourId)}
         />
       ) : currentStep.kind === "reference" ? (
         <ReferenceStepBody
           referencedLabel={referenceLabelFor(currentStep.referencedDerivedNodeId)}
           complete={isDone(currentStep)}
-          onGo={() => onOpenReference(currentStep.referencedDerivedNodeId)}
+          onGo={() => onOpenReference(currentStep)}
         />
       ) : (
         <GeneratedStepBody

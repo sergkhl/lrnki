@@ -9,6 +9,7 @@ import {
   getExpeditionCatalog,
   getExpeditionJournal,
   getStudySession,
+  gradeScaffoldReferenceOptionSelect,
   gradeScaffoldOptionSelect,
   gradeStudyResponse,
   hideLearnerScaffold,
@@ -28,6 +29,7 @@ import {
   PostgresLearnerExpeditionStore,
   PostgresLearnerRecallChallengeStore,
   PostgresLearnerScaffoldStore,
+  PostgresScaffoldReferenceActivityRead,
   PostgresLearnerSessionStore,
   PostgresLearnerStore,
   PostgresLessonReadStore,
@@ -135,6 +137,10 @@ export function createLearnerApp(sql: DatabaseClient) {
     scaffoldStore: new PostgresLearnerScaffoldStore(sql),
     responseLog: new PostgresResponseLogStore(sql)
   });
+  const scaffoldReferenceGradeDeps = () => ({
+    referenceActivityRead: new PostgresScaffoldReferenceActivityRead(sql),
+    responseLog: new PostgresResponseLogStore(sql)
+  });
 
   const app = new Hono<AuthEnv>()
     .use("*", cors({
@@ -234,6 +240,7 @@ export function createLearnerApp(sql: DatabaseClient) {
           responseLog: new PostgresResponseLogStore(sql),
           verdictStore: new PostgresCalibrationVerdictStore(sql),
           scaffoldStore: new PostgresLearnerScaffoldStore(sql),
+          scaffoldReferenceRead: new PostgresScaffoldReferenceActivityRead(sql),
           // Guardian scope views ride down with the session (plan 2026-07-13-003 U4, KTD3).
           challengeStore: new PostgresLearnerRecallChallengeStore(sql)
         }),
@@ -453,6 +460,20 @@ export function createLearnerApp(sql: DatabaseClient) {
       const result = await gradeScaffoldOptionSelect(
         { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
         scaffoldGradeDeps()
+      );
+      if (!result.graded) return c.json<LearnerGradingResult>({ kind: "selection", graded: false, message: "This answer could not be recorded." });
+      return c.json<LearnerGradingResult>({ kind: "selection", graded: true, chosenId: result.chosenId, keyedCorrectId: result.keyedCorrectId, correct: result.correct });
+    })
+
+    // Grade a learner-owned reference step against its pinned (possibly superseded) neutral
+    // option-select. The application resolves the key and appends ordinary neutral evidence.
+    .post("/scaffold/reference-option-select", auth, zValidator("json", z.object({
+      scaffoldStepId: z.string(),
+      chosenOptionId: z.string()
+    })), async (c) => {
+      const result = await gradeScaffoldReferenceOptionSelect(
+        { learnerStateRef: c.get("learnerStateRef"), ...c.req.valid("json") },
+        scaffoldReferenceGradeDeps()
       );
       if (!result.graded) return c.json<LearnerGradingResult>({ kind: "selection", graded: false, message: "This answer could not be recorded." });
       return c.json<LearnerGradingResult>({ kind: "selection", graded: true, chosenId: result.chosenId, keyedCorrectId: result.keyedCorrectId, correct: result.correct });

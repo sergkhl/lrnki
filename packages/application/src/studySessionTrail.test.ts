@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ResponseLogRow, ScaffoldDetour, ScaffoldStep } from "@lrnki/domain-core";
-import { composeScaffoldDetours, type ReferencedNodeCompletion } from "./studySessionTrail";
+import { composeScaffoldDetours, type ProjectedScaffoldReference } from "./studySessionTrail";
 
 let seq = 0;
 function scaffoldResponse(scaffoldStepId: string, outcome: "correct" | "incorrect"): ResponseLogRow {
@@ -16,13 +16,17 @@ function detour(overrides: Partial<ScaffoldDetour> & { steps: ScaffoldStep[] }):
   return { detourId: "d-1", learnerStateRef: "L", enrichmentId: "e", parentDerivedNodeId: "parent", term: "borrow checker", normalizedTerm: "borrow checker", status: "ready", latestOperationId: null, claimToken: null, ...overrides };
 }
 
-const noNeutral = (): ReferencedNodeCompletion => ({ lessonRead: false, optionSelectCorrect: false });
+const noReference = (): ProjectedScaffoldReference => ({
+  lessonRead: false,
+  itemCorrect: false,
+  destination: { kind: "checkpoint", stopId: "unused" }
+});
 
 test("a generating detour projects a broad phase, no child completion, no resume target", () => {
   const [view] = composeScaffoldDetours({
     detours: [detour({ status: "generating", steps: [] })],
     responses: [],
-    referencedNodeCompletion: noNeutral,
+    projectReference: noReference,
     generatingPhase: () => "building"
   });
   assert.equal(view.status, "generating");
@@ -32,7 +36,7 @@ test("a generating detour projects a broad phase, no child completion, no resume
 });
 
 test("a failed detour projects its status with no phase and no resume target", () => {
-  const [view] = composeScaffoldDetours({ detours: [detour({ status: "failed", steps: [] })], responses: [], referencedNodeCompletion: noNeutral });
+  const [view] = composeScaffoldDetours({ detours: [detour({ status: "failed", steps: [] })], responses: [], projectReference: noReference });
   assert.equal(view.status, "failed");
   assert.equal(view.phase, null);
   assert.equal(view.firstIncompleteStepId, null);
@@ -43,7 +47,7 @@ test("a generated step completes only when its lesson is read AND its latest res
   const [view] = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [scaffoldResponse("s1", "correct")],
-    referencedNodeCompletion: noNeutral
+    projectReference: noReference
   });
   assert.equal(view.steps[0].complete, true);
   assert.equal(view.complete, true);
@@ -54,7 +58,7 @@ test("latest incorrect after correct reopens the generated step (neutral latest-
   const [view] = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [scaffoldResponse("s1", "correct"), scaffoldResponse("s1", "incorrect")],
-    referencedNodeCompletion: noNeutral
+    projectReference: noReference
   });
   assert.equal(view.steps[0].complete, false);
 });
@@ -64,13 +68,15 @@ test("a reference step's completion is the neutral lesson-read + option-select s
   const complete = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [],
-    referencedNodeCompletion: (id) => (id === "n-9" ? { lessonRead: true, optionSelectCorrect: true } : noNeutral())
+    projectReference: (candidate) => candidate.referencedDerivedNodeId === "n-9"
+      ? { lessonRead: true, itemCorrect: true, destination: { kind: "checkpoint", stopId: "n-9:capstone:main" } }
+      : noReference()
   })[0];
   assert.equal(complete.steps[0].complete, true);
   const incomplete = composeScaffoldDetours({
     detours: [detour({ steps: [step] })],
     responses: [],
-    referencedNodeCompletion: () => ({ lessonRead: true, optionSelectCorrect: false })
+    projectReference: () => ({ lessonRead: true, itemCorrect: false, destination: { kind: "checkpoint", stopId: "n-9:option_select:item-9" } })
   })[0];
   assert.equal(incomplete.steps[0].complete, false);
 });
@@ -83,7 +89,7 @@ test("a partial ready detour reports completed/total counts and resumes at the o
   const [view] = composeScaffoldDetours({
     detours: [detour({ steps: [open3, done, open2] })],
     responses: [scaffoldResponse("s1", "correct")],
-    referencedNodeCompletion: noNeutral
+    projectReference: noReference
   });
   assert.equal(view.completedStepCount, 1);
   assert.equal(view.totalStepCount, 3);
@@ -97,7 +103,7 @@ test("a complete ready detour has no resume step (the overview is the entry)", (
   const [view] = composeScaffoldDetours({
     detours: [detour({ steps: [done] })],
     responses: [scaffoldResponse("s1", "correct")],
-    referencedNodeCompletion: noNeutral
+    projectReference: noReference
   });
   assert.equal(view.complete, true);
   assert.equal(view.completedStepCount, 1);
@@ -144,6 +150,7 @@ function trailSession(opts: { withoutLesson?: boolean; includeLocked?: boolean; 
     target: { derivedNodeId: "n1", label: "Ownership" },
     studyItemCount: 2,
     flooredNodeIds: [],
+    neutralReferenceAssetsByNode: {},
     detail: {
       summary: {
         enrichmentId: "e1",
@@ -354,7 +361,7 @@ test("a generated step view carries its micro-lesson and key-free option-select 
   const [view] = composeScaffoldDetours({
     detours: [detour({ status: "ready", steps: [step] })],
     responses: [],
-    referencedNodeCompletion: noNeutral
+    projectReference: noReference
   });
   const stepView = view.steps[0];
   assert.equal(stepView.kind, "generated");
@@ -377,7 +384,7 @@ test("generated step option-select options are sorted by id so the answer is not
       { optionId: "o2", text: "b", isCorrect: false }
     ] } }
   };
-  const [view] = composeScaffoldDetours({ detours: [detour({ status: "ready", steps: [step] })], responses: [], referencedNodeCompletion: noNeutral });
+  const [view] = composeScaffoldDetours({ detours: [detour({ status: "ready", steps: [step] })], responses: [], projectReference: noReference });
   const stepView = view.steps[0];
   assert.equal(stepView.kind, "generated");
   if (stepView.kind !== "generated") return;

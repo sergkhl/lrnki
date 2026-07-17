@@ -6,6 +6,7 @@ import type {
   LessonReadStorePort,
   RecallChallengeStorePort,
   ResponseLogStorePort,
+  ScaffoldReferenceActivityReadPort,
   ScaffoldDetourStorePort,
   StudyItemBankStorePort
 } from "@lrnki/ports";
@@ -35,6 +36,9 @@ export async function getStudySession(input: {
   // callers compose a session with no detours unchanged; the learner API wires it so the finished
   // Study Session carries active detours and the `generatingDetours` polling flag.
   scaffoldStore?: ScaffoldDetourStorePort;
+  // Learner-owned pinned neutral activities for reference Support Steps. Wired alongside the
+  // scaffold store in production; optional callers with no detours remain unchanged.
+  scaffoldReferenceRead?: ScaffoldReferenceActivityReadPort;
   // The Recall Challenge store (plan 2026-07-13-003 U4). Optional so existing callers compose
   // with empty `recallScopes` unchanged; the learner API wires it so the finished session
   // carries the server-owned Guardian scope views. Only the three cheap challenge reads are
@@ -46,7 +50,7 @@ export async function getStudySession(input: {
   if (!detail) return undefined;
   const challengeScope = { learnerStateRef: input.learnerStateRef, enrichmentId: input.enrichmentId };
 
-  const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts, layerPurpose, detours, challenges, wonScopes, exposure] = await Promise.all([
+  const [studyItems, lessons, lessonAbsent, lessonReads, rows, verdicts, layerPurpose, detours, referenceActivities, challenges, wonScopes, exposure] = await Promise.all([
     input.studyItemStore.listStudyItemsForEnrichment(input.enrichmentId),
     input.conceptLessonStore.listLessonsForEnrichment(input.enrichmentId),
     input.conceptLessonStore.listAbsentForEnrichment(input.enrichmentId),
@@ -55,6 +59,7 @@ export async function getStudySession(input: {
     input.verdictStore.listForLearner(input.learnerStateRef),
     input.layerPurposeStore ? input.layerPurposeStore.get(input.enrichmentId) : Promise.resolve(undefined),
     input.scaffoldStore ? input.scaffoldStore.listActiveForLearnerEnrichment(input.learnerStateRef, input.enrichmentId) : Promise.resolve([]),
+    input.scaffoldReferenceRead ? input.scaffoldReferenceRead.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
     input.challengeStore ? input.challengeStore.listForLearnerEnrichment(challengeScope) : Promise.resolve([]),
     input.challengeStore ? input.challengeStore.listWonScopes(challengeScope) : Promise.resolve([]),
     input.challengeStore ? input.challengeStore.priorExposure(challengeScope) : Promise.resolve({})
@@ -89,6 +94,7 @@ export async function getStudySession(input: {
     verdicts,
     layerPurpose: layerPurpose ?? null,
     detours,
+    referenceActivities,
     recallScopes
   });
 }

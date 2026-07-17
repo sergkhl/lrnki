@@ -1,5 +1,5 @@
 import { neutralResponses, normalizeConceptLabel, type CalibrationVerdict, type ConceptLesson, type ConceptLessonSectionKind, type LessonAbsentNode, type ResponseLogRow, type ScaffoldDetour, type StudyItem, type StudyItemGroundingProvenance, type Verdict } from "@lrnki/domain-core";
-import type { DerivedGraphDetail, LearnerStatePort } from "@lrnki/ports";
+import type { DerivedGraphDetail, LearnerStatePort, ScaffoldReferenceActivity } from "@lrnki/ports";
 import { composeScaffoldDetours, type ScaffoldDetourView, type ScaffoldGeneratingPhase } from "./studySessionTrail";
 // Type-only (plan 2026-07-13-003 U4): the defining module pulls node:crypto at runtime, but
 // type imports are erased, so the client-safe projection closure stays Node-builtin-free.
@@ -330,6 +330,11 @@ export type RestorationSuggestion = {
 
 export type StudyItemOutcome = "correct" | "incorrect";
 
+export type NeutralReferenceAssets = {
+  conceptLessonId: string;
+  studyItemId: string;
+};
+
 export type StudySession = {
   enrichmentId: string;
   learnerStateRef: string;
@@ -382,6 +387,10 @@ export type StudySession = {
   lessonByNode: Record<string, ConceptLessonView>;
   lessonReadByNode: Record<string, boolean>;
   lessonAbsent: LessonAbsentView[];
+  // Current reusable neutral identities, projected only when a node has exactly the required
+  // Concept Lesson + option-select substrate. Stable ids are safe to serialize; answer keys and
+  // learner-specific eligibility remain outside this map.
+  neutralReferenceAssetsByNode: Record<string, NeutralReferenceAssets>;
   // Composed learner-scoped Scaffold Detours under their parent Concept Marker (plan
   // 2026-07-13-002 U2): per-step + whole-detour completion, step counts, resume target, and the broad
   // generating phase. `generatingDetours` is the polling flag — a finished session with a
@@ -426,6 +435,10 @@ export function composeStudySession(input: {
   // authority; absent/empty leaves `detours` empty and `generatingDetours` false (unchanged
   // behavior for callers that do not wire the scaffold store).
   detours?: readonly ScaffoldDetour[];
+  // Pinned neutral activities loaded through the learner-owned reference read seam. These may
+  // contain superseded assets; composition converts them to key-free views only when a Support
+  // Path fallback destination needs them.
+  referenceActivities?: readonly ScaffoldReferenceActivity[];
   // Finished Recall Challenge scope statuses for this learner/enrichment (plan 2026-07-13-003
   // U4). Already projected by the Recall Challenge module; attached verbatim. Absent/empty
   // composes an unchanged session — and by construction the neutral fold below cannot read
@@ -465,60 +478,32 @@ export function composeStudySession(input: {
     latestOutcomeByStudyItemId[row.studyItemId] = row.judgedOutcome === "correct" ? "correct" : "incorrect";
   }
 
-  // Learner-scoped Scaffold Detour composition (plan 2026-07-13-002 U2, KTD1/KTD6). Composed
-  // BEFORE the lesson/item view conversion so every projected Explorable Term can carry its
-  // finished support state. A reference step's completion is the referenced node's neutral
-  // lesson-read + option-select subset (in lockstep with that node's own stop, from the raw
-  // study items so no view ordering is required); generated-step evidence is scoped inside
-  // `composeScaffoldDetours`.
-  const referencedNodeCompletion = (derivedNodeId: string) => {
-    const lessonRead = lessonReadByNode[derivedNodeId] === true || lessonAbsentNodeIds.has(derivedNodeId);
-    const optionSelect = floor.includedNodeIds.has(derivedNodeId)
-      ? input.studyItems.find((item) => item.itemType === "option_select" && item.derivedNodeId === derivedNodeId)
-      : undefined;
-    const optionSelectCorrect = optionSelect ? latestOutcomeByStudyItemId[optionSelect.studyItemId] === "correct" : false;
-    return { lessonRead, optionSelectCorrect };
-  };
-  const detours = composeScaffoldDetours({
-    detours: input.detours ?? [],
-    responses: input.rows,
-    referencedNodeCompletion,
-    // The broad, honest phase at the projection level; the fine stage→phase refinement is a
-    // progress-dialog concern. The client renders one indeterminate bar and a phase sentence.
-    generatingPhase: () => "preparing"
-  });
-  const generatingDetours = detours.some((detour) => detour.status === "generating");
-
-  // The (parent node, normalized term) support index (KTD1, R3): an ACTIVE detour in any
-  // lifecycle state claims its term; everything else projects `available`. Hidden detours are
-  // absent from the active read, so their terms fall back to `available` (restorable, R3/AE4).
-  const supportByTermKey = new Map<string, ExplorableTermSupport>();
-  for (const detour of detours) {
-    const support: ExplorableTermSupport =
-      detour.status === "generating"
-        ? { kind: "generating", detourId: detour.detourId, phase: detour.phase ?? "preparing" }
-        : detour.status === "failed"
-          ? { kind: "failed", detourId: detour.detourId }
-          : { kind: "ready", detourId: detour.detourId, complete: detour.complete };
-    supportByTermKey.set(`${detour.parentDerivedNodeId}\u0000${normalizeConceptLabel(detour.term)}`, support);
-  }
-  const supportFor: ExplorableTermSupportLookup = (parentDerivedNodeId, term) =>
-    supportByTermKey.get(`${parentDerivedNodeId}\u0000${normalizeConceptLabel(term)}`) ?? { kind: "available" };
-
-  const itemViews = input.studyItems.map((item) => studyItemToView(item, supportFor));
-  // Group a node's items into its ordered segment list (R10, KTD7): option_select, then
-  // impostor. A node with one type lists one segment. A floored node contributes no
-  // activity segments (R5).
-  const studySegmentsByNode: Record<string, StudyItemView[]> = {};
-  for (const view of itemViews) {
+  // Build support-neutral views first. Classification and completion depend on lesson/item
+  // identities and outcomes, never on Explorable Term presentation state. After reference
+  // destinations are known, final views are rebuilt with the finished detour support index.
+  const baseItemViews = input.studyItems.map((item) => studyItemToView(item));
+  const baseStudySegmentsByNode: Record<string, StudyItemView[]> = {};
+  for (const view of baseItemViews) {
     if (!floor.includedNodeIds.has(view.item.derivedNodeId)) continue;
-    (studySegmentsByNode[view.item.derivedNodeId] ??= []).push(view);
+    (baseStudySegmentsByNode[view.item.derivedNodeId] ??= []).push(view);
   }
-  for (const segments of Object.values(studySegmentsByNode)) {
+  for (const segments of Object.values(baseStudySegmentsByNode)) {
     segments.sort((a, b) => STUDY_ITEM_TYPE_ORDER[a.kind] - STUDY_ITEM_TYPE_ORDER[b.kind]);
   }
-  const lessonByNode: Record<string, ConceptLessonView> = {};
-  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson, supportFor);
+  const baseLessonByNode: Record<string, ConceptLessonView> = {};
+  for (const lesson of input.lessons ?? []) baseLessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson);
+
+  const currentLessonByNode = new Map((input.lessons ?? []).map((lesson) => [lesson.derivedNodeId, lesson] as const));
+  const currentOptionByNode = new Map(
+    input.studyItems
+      .filter((item): item is Extract<StudyItem, { itemType: "option_select" }> => item.itemType === "option_select")
+      .map((item) => [item.derivedNodeId, item] as const)
+  );
+  const neutralReferenceAssetsByNode: Record<string, NeutralReferenceAssets> = {};
+  for (const [derivedNodeId, lesson] of currentLessonByNode) {
+    const item = currentOptionByNode.get(derivedNodeId);
+    if (item) neutralReferenceAssetsByNode[derivedNodeId] = { conceptLessonId: lesson.conceptLessonId, studyItemId: item.studyItemId };
+  }
 
   // Calibration ∘ graded composition (R12): the trusted-edge down-closure of the `known`
   // verdicts is mastered via calibration; un-pruned nodes take their graded mastery; the
@@ -535,10 +520,10 @@ export function composeStudySession(input: {
   // verdicts keep instant mastery via `composeMastery`; partial graded progress folds to 0, so
   // it stays below `ADAPTIVE_MASTERY_THRESHOLD` and the node stays frontier.
   const nodeIsComplete = (derivedNodeId: string): boolean => {
-    const lessonPresent = Boolean(lessonByNode[derivedNodeId]);
+    const lessonPresent = Boolean(baseLessonByNode[derivedNodeId]);
     const lessonRead = lessonReadByNode[derivedNodeId] === true;
     if (lessonPresent && !lessonRead) return false; // an unread lesson always blocks completion
-    const segments = studySegmentsByNode[derivedNodeId] ?? [];
+    const segments = baseStudySegmentsByNode[derivedNodeId] ?? [];
     if (segments.length > 0) return segments.every((segment) => latestOutcomeByStudyItemId[segment.item.studyItemId] === "correct");
     // Itemless carve-outs (preserved): a read lesson masters a lesson-only node; an explicitly
     // lesson-absent node auto-masters so it never blocks. An itemless node with no lesson and no
@@ -571,6 +556,97 @@ export function composeStudySession(input: {
   const expedition = projectExpeditionSections({ detail: { nodes: trailNodes, edges: trailEdges }, stateByNode: classification.stateByNode });
   const summitId = expedition.summit?.derivedNodeId ?? null;
   const hiddenNodeIds = adaptedHiddenNodeIds(knownClosure, summitId);
+
+  const referenceActivityByStep = new Map((input.referenceActivities ?? []).map((activity) => [activity.scaffoldStepId, activity] as const));
+  const checkpointStopId = (derivedNodeId: string): string => {
+    if (baseLessonByNode[derivedNodeId] && lessonReadByNode[derivedNodeId] !== true) {
+      return `${derivedNodeId}:theory:main`;
+    }
+    const firstIncomplete = (baseStudySegmentsByNode[derivedNodeId] ?? [])
+      .find((segment) => latestOutcomeByStudyItemId[segment.item.studyItemId] !== "correct");
+    return firstIncomplete
+      ? `${derivedNodeId}:${firstIncomplete.kind}:${firstIncomplete.item.studyItemId}`
+      : `${derivedNodeId}:capstone:main`;
+  };
+
+  // Reference destinations are decided from the SAME classification and floor that own the
+  // neutral trail. A canonical checkpoint is valid only while both pinned assets remain current
+  // and the included node is playable; every other valid reference uses its pinned key-free
+  // activity without changing neutral trail inclusion or gating.
+  const detours = composeScaffoldDetours({
+    detours: input.detours ?? [],
+    responses: input.rows,
+    projectReference: (step, detour) => {
+      const activity = referenceActivityByStep.get(step.scaffoldStepId);
+      if (
+        !activity
+        || activity.detourId !== detour.detourId
+        || activity.referencedDerivedNodeId !== step.referencedDerivedNodeId
+        || activity.lesson.conceptLessonId !== step.referencedConceptLessonId
+        || activity.item.studyItemId !== step.referencedStudyItemId
+        || activity.lesson.derivedNodeId !== step.referencedDerivedNodeId
+        || activity.item.derivedNodeId !== step.referencedDerivedNodeId
+        || activity.lesson.enrichmentId !== input.enrichmentId
+        || activity.item.enrichmentId !== input.enrichmentId
+      ) {
+        throw new Error(`pinned scaffold reference ${step.scaffoldStepId} is missing or inconsistent`);
+      }
+      const lessonRead = lessonReadByNode[step.referencedDerivedNodeId] === true;
+      const itemCorrect = latestOutcomeByStudyItemId[step.referencedStudyItemId] === "correct";
+      const current = neutralReferenceAssetsByNode[step.referencedDerivedNodeId];
+      const state = classification.stateByNode[step.referencedDerivedNodeId];
+      const pinnedItemView = studyItemToView(activity.item);
+      if (pinnedItemView.kind !== "option_select") {
+        throw new Error(`pinned scaffold reference ${step.scaffoldStepId} is not option-select`);
+      }
+      const usesCheckpoint =
+        (state === "frontier" || state === "mastered")
+        && current?.conceptLessonId === step.referencedConceptLessonId
+        && current.studyItemId === step.referencedStudyItemId;
+      return {
+        lessonRead,
+        itemCorrect,
+        destination: usesCheckpoint
+          ? { kind: "checkpoint", stopId: checkpointStopId(step.referencedDerivedNodeId) }
+          : {
+              kind: "support_activity",
+              lesson: conceptLessonToView(activity.lesson),
+              item: pinnedItemView.item
+            }
+      };
+    },
+    // The broad, honest phase at the projection level; the fine stage→phase refinement is a
+    // progress-dialog concern. The client renders one indeterminate bar and a phase sentence.
+    generatingPhase: () => "preparing"
+  });
+  const generatingDetours = detours.some((detour) => detour.status === "generating");
+
+  // The (parent node, normalized term) support index is presentation state only. Build it after
+  // the authoritative reference fold, then decorate the final neutral lesson/item views.
+  const supportByTermKey = new Map<string, ExplorableTermSupport>();
+  for (const detour of detours) {
+    const support: ExplorableTermSupport =
+      detour.status === "generating"
+        ? { kind: "generating", detourId: detour.detourId, phase: detour.phase ?? "preparing" }
+        : detour.status === "failed"
+          ? { kind: "failed", detourId: detour.detourId }
+          : { kind: "ready", detourId: detour.detourId, complete: detour.complete };
+    supportByTermKey.set(`${detour.parentDerivedNodeId}\u0000${normalizeConceptLabel(detour.term)}`, support);
+  }
+  const supportFor: ExplorableTermSupportLookup = (parentDerivedNodeId, term) =>
+    supportByTermKey.get(`${parentDerivedNodeId}\u0000${normalizeConceptLabel(term)}`) ?? { kind: "available" };
+
+  const studySegmentsByNode: Record<string, StudyItemView[]> = {};
+  for (const item of input.studyItems) {
+    if (!floor.includedNodeIds.has(item.derivedNodeId)) continue;
+    const view = studyItemToView(item, supportFor);
+    (studySegmentsByNode[item.derivedNodeId] ??= []).push(view);
+  }
+  for (const segments of Object.values(studySegmentsByNode)) {
+    segments.sort((a, b) => STUDY_ITEM_TYPE_ORDER[a.kind] - STUDY_ITEM_TYPE_ORDER[b.kind]);
+  }
+  const lessonByNode: Record<string, ConceptLessonView> = {};
+  for (const lesson of input.lessons ?? []) lessonByNode[lesson.derivedNodeId] = conceptLessonToView(lesson, supportFor);
 
   const labelByNode = new Map(detail.nodes.map((node) => [node.derivedNodeId, node.label] as const));
   const verdictByNode = new Map(input.verdicts.map((verdict) => [verdict.derivedNodeId, verdict.verdict] as const));
@@ -633,6 +709,7 @@ export function composeStudySession(input: {
     lessonByNode,
     lessonReadByNode,
     lessonAbsent,
+    neutralReferenceAssetsByNode,
     detours,
     generatingDetours,
     recallScopes: [...(input.recallScopes ?? [])],

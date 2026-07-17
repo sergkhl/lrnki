@@ -1,4 +1,4 @@
-import { neutralResponses, type ResponseLogRow, type ScaffoldDetour, type ScaffoldStep } from "@lrnki/domain-core";
+import { neutralResponses, type ResponseLogRow, type ScaffoldDetour, type ScaffoldReferenceStep, type ScaffoldStep } from "@lrnki/domain-core";
 import { conceptLessonSectionToView } from "./conceptLessonSectionView";
 // Type-only (plan 2026-07-13-003 U4): erased at runtime, keeping this module client-safe.
 import type { RecallScopeStatus } from "./recallChallenge";
@@ -31,8 +31,27 @@ export type ScaffoldStepItemView = {
   options: { optionId: string; text: string }[];
 };
 
+export type ScaffoldReferenceDestination =
+  | { kind: "checkpoint"; stopId: string }
+  | { kind: "support_activity"; lesson: ConceptLessonView; item: StudyOptionSelectView };
+
+export type ProjectedScaffoldReference = {
+  lessonRead: boolean;
+  itemCorrect: boolean;
+  destination: ScaffoldReferenceDestination;
+};
+
 export type ScaffoldStepView =
-  | { scaffoldStepId: string; ordinal: number; kind: "reference"; referencedDerivedNodeId: string; complete: boolean }
+  | {
+      scaffoldStepId: string;
+      ordinal: number;
+      kind: "reference";
+      referencedDerivedNodeId: string;
+      lessonRead: boolean;
+      itemCorrect: boolean;
+      complete: boolean;
+      destination: ScaffoldReferenceDestination;
+    }
   | {
       scaffoldStepId: string;
       ordinal: number;
@@ -68,19 +87,13 @@ export type ScaffoldDetourView = {
   phase: ScaffoldGeneratingPhase | null;
 };
 
-// Neutral completion facts for a referenced node: the subset a reference step needs. Derived by
-// the caller from the same neutral evidence the node's own stop uses.
-export type ReferencedNodeCompletion = {
-  lessonRead: boolean;
-  optionSelectCorrect: boolean;
-};
-
 export type ComposeScaffoldDetoursInput = {
   detours: readonly ScaffoldDetour[];
   // All of the learner's response rows (neutral + scaffold); the fold narrows per scope.
   responses: readonly ResponseLogRow[];
-  // Neutral completion for each referenced node id a reference step may point at.
-  referencedNodeCompletion: (derivedNodeId: string) => ReferencedNodeCompletion;
+  // Finished pinned completion and destination for each reference step. The caller resolves
+  // this by the step's immutable lesson/item identities, never by whichever assets are current.
+  projectReference: (step: ScaffoldReferenceStep, detour: ScaffoldDetour) => ProjectedScaffoldReference;
   // Broad phase for a generating detour, mapped from its operation stage by the caller.
   generatingPhase?: (detour: ScaffoldDetour) => ScaffoldGeneratingPhase;
 };
@@ -106,11 +119,20 @@ function latestScaffoldItemCorrect(responses: readonly ResponseLogRow[], stepByI
   return correct;
 }
 
-function stepView(step: ScaffoldStep, input: ComposeScaffoldDetoursInput, scaffoldCorrectByStep: Map<string, boolean>): ScaffoldStepView {
+function stepView(step: ScaffoldStep, detour: ScaffoldDetour, input: ComposeScaffoldDetoursInput, scaffoldCorrectByStep: Map<string, boolean>): ScaffoldStepView {
   if (step.kind === "reference") {
-    const neutral = input.referencedNodeCompletion(step.referencedDerivedNodeId);
-    const complete = neutral.lessonRead && neutral.optionSelectCorrect;
-    return { scaffoldStepId: step.scaffoldStepId, ordinal: step.ordinal, kind: "reference", referencedDerivedNodeId: step.referencedDerivedNodeId, complete };
+    const projected = input.projectReference(step, detour);
+    const complete = projected.lessonRead && projected.itemCorrect;
+    return {
+      scaffoldStepId: step.scaffoldStepId,
+      ordinal: step.ordinal,
+      kind: "reference",
+      referencedDerivedNodeId: step.referencedDerivedNodeId,
+      lessonRead: projected.lessonRead,
+      itemCorrect: projected.itemCorrect,
+      complete,
+      destination: projected.destination
+    };
   }
   const lessonRead = step.lessonReadAt !== null;
   const itemCorrect = scaffoldCorrectByStep.get(step.scaffoldStepId) ?? false;
@@ -138,12 +160,12 @@ function stepView(step: ScaffoldStep, input: ComposeScaffoldDetoursInput, scaffo
 export function composeScaffoldDetours(input: ComposeScaffoldDetoursInput): ScaffoldDetourView[] {
   const scaffoldCorrectByStep = latestScaffoldItemCorrect(input.responses, new Map());
   // A scaffold response also has a neutral analog for reference steps; those are neutral rows
-  // consumed by referencedNodeCompletion, so we only touch scaffold rows above. Keeping the
+  // consumed by projectReference, so we only touch scaffold rows above. Keeping the
   // neutral narrow here documents the boundary.
   void neutralResponses(input.responses);
 
   return input.detours.map((detour): ScaffoldDetourView => {
-    const steps = [...detour.steps].sort((a, b) => a.ordinal - b.ordinal).map((step) => stepView(step, input, scaffoldCorrectByStep));
+    const steps = [...detour.steps].sort((a, b) => a.ordinal - b.ordinal).map((step) => stepView(step, detour, input, scaffoldCorrectByStep));
     const complete = steps.length > 0 && steps.every((step) => step.complete);
     const completedStepCount = steps.filter((step) => step.complete).length;
     // The resume target (R13): the ordinal-first incomplete step of a READY path. A complete
@@ -389,22 +411,6 @@ function stateForStop(input: {
   }
   if (!input.studyItemId) return "available";
   return input.session.latestOutcomeByStudyItemId[input.studyItemId] === "correct" ? "complete" : "available";
-}
-
-// --- Reference-step destination (plan 2026-07-13-002 U2, KTD8; R15, F3) -------
-//
-// A reference Support Step routes back to the CANONICAL neutral surface: the referenced
-// node's first incomplete ordinary (non-capstone) stop, so the learner studies the one real
-// concept and its normal evidence completes the step. When every ordinary stop is already
-// complete, fall back to the node's capstone — the review entry — so the tap still lands
-// somewhere meaningful. Returns null when the node is not on the trail (e.g. floored).
-export function resolveReferenceStopId(session: StudySession, referencedDerivedNodeId: string): string | null {
-  const cluster = buildTrailView(session).concepts.find((candidate) => candidate.derivedNodeId === referencedDerivedNodeId);
-  if (!cluster) return null;
-  const ordinaryStops = cluster.stops.filter((stop) => stop.kind !== "capstone");
-  const firstIncomplete = ordinaryStops.find((stop) => stop.state !== "complete");
-  if (firstIncomplete) return firstIncomplete.stopId;
-  return cluster.stops.find((stop) => stop.kind === "capstone")?.stopId ?? null;
 }
 
 // --- Activity lookup (former client `activityProgress.ts`, KTD5) --------------

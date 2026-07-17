@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CalibrationVerdict, ConceptLesson, LessonAbsentNode, MatchingItem, NeutralResponseLogRow, ResponseLogRow, ScaffoldDetour, StudyItem } from "@lrnki/domain-core";
-import type { DerivedGraphDetail } from "@lrnki/ports";
+import type { DerivedGraphDetail, ScaffoldReferenceActivity } from "@lrnki/ports";
 import {
   adaptedHiddenNodeIds,
   composeStudySession,
@@ -49,7 +49,7 @@ function detail(): DerivedGraphDetail {
   };
 }
 
-function optionItem(derivedNodeId: string): StudyItem {
+function optionItem(derivedNodeId: string): Extract<StudyItem, { itemType: "option_select" }> {
   return {
     studyItemId: `os-${derivedNodeId}`,
     graphVersionId: "g",
@@ -139,11 +139,21 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
-function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[]; detours?: ScaffoldDetour[]; recallScopes?: RecallScopeStatus[] } = {}) {
+function compose(args: { detail?: DerivedGraphDetail; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[]; detours?: ScaffoldDetour[]; referenceActivities?: ScaffoldReferenceActivity[]; recallScopes?: RecallScopeStatus[] } = {}) {
+  const referenceActivities = args.referenceActivities ?? (args.detours ?? []).flatMap((detour) => detour.steps.flatMap((step): ScaffoldReferenceActivity[] => {
+    if (step.kind !== "reference") return [];
+    return [{
+      scaffoldStepId: step.scaffoldStepId,
+      detourId: detour.detourId,
+      referencedDerivedNodeId: step.referencedDerivedNodeId,
+      lesson: { ...lessonFor(step.referencedDerivedNodeId), conceptLessonId: step.referencedConceptLessonId },
+      item: { ...optionItem(step.referencedDerivedNodeId), studyItemId: step.referencedStudyItemId }
+    }];
+  }));
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    detail: detail(),
+    detail: args.detail ?? detail(),
     studyItems: args.studyItems ?? [],
     rows: args.rows ?? [],
     verdicts: args.verdicts ?? [],
@@ -151,6 +161,7 @@ function compose(args: { studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verd
     lessonReads: args.lessonReads,
     lessonAbsent: args.lessonAbsent,
     detours: args.detours,
+    referenceActivities,
     recallScopes: args.recallScopes
   });
 }
@@ -596,7 +607,7 @@ test("composeStudySession — a ready reference detour completes in lockstep wit
   const detour: ScaffoldDetour = {
     detourId: "d-ref", learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: "move", term: "Scope", normalizedTerm: "scope",
     status: "ready", latestOperationId: null, claimToken: null,
-    steps: [{ scaffoldStepId: "s-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope", referencedConceptLessonId: "lesson-scope", referencedStudyItemId: "item-scope" }]
+    steps: [{ scaffoldStepId: "s-1", ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope", referencedConceptLessonId: "lesson-scope", referencedStudyItemId: "os-scope" }]
   };
   const session = compose({
     studyItems: [optionItem("scope")],
@@ -615,13 +626,11 @@ test("composeStudySession — a ready reference detour completes in lockstep wit
 
 // --- Explorable Term support state (plan 2026-07-13-002 U2, KTD1/KTD2; R3, AE3/AE8) ---------
 
-import { resolveReferenceStopId } from "./studySessionTrail";
-
 function readyDetour(parent: string, term: string): ScaffoldDetour {
   return {
     detourId: `d-${parent}-${term}`, learnerStateRef: "L1", enrichmentId: "e", parentDerivedNodeId: parent,
     term, normalizedTerm: term.toLowerCase(), status: "ready", latestOperationId: null, claimToken: null,
-    steps: [{ scaffoldStepId: `s-${term}`, ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope", referencedConceptLessonId: "lesson-scope", referencedStudyItemId: "item-scope" }]
+    steps: [{ scaffoldStepId: `s-${term}`, ordinal: 0, kind: "reference", referencedDerivedNodeId: "scope", referencedConceptLessonId: "lesson-scope", referencedStudyItemId: "os-scope" }]
   };
 }
 
@@ -681,17 +690,184 @@ test("AE4 — a hidden detour is absent from the active read, so its term projec
 
 // --- Reference-step destination (plan 2026-07-13-002 U2, KTD8; R15, AE7) --------------------
 
-test("AE7 — resolveReferenceStopId picks the referenced node's first incomplete ordinary stop, then falls back to the capstone review", () => {
-  const fresh = compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")] });
-  assert.equal(resolveReferenceStopId(fresh, "scope"), "scope:theory:main");
+test("a current playable reference projects its concrete first-incomplete checkpoint, then capstone review", () => {
+  const detour = readyDetour("move", "scope");
+  const destination = (session: ReturnType<typeof compose>) => {
+    const step = session.detours[0].steps[0];
+    assert.equal(step.kind, "reference");
+    return step.kind === "reference" ? step.destination : null;
+  };
+  assert.deepEqual(
+    destination(compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], detours: [detour] })),
+    { kind: "checkpoint", stopId: "scope:theory:main" }
+  );
+  assert.deepEqual(
+    destination(compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], lessonReads: ["scope"], detours: [detour] })),
+    { kind: "checkpoint", stopId: "scope:option_select:os-scope" }
+  );
+  assert.deepEqual(
+    destination(compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], lessonReads: ["scope"], rows: [graded("scope", "correct", 1)], detours: [detour] })),
+    { kind: "checkpoint", stopId: "scope:capstone:main" }
+  );
+});
 
-  const lessonReadOnly = compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], lessonReads: ["scope"] });
-  assert.equal(resolveReferenceStopId(lessonReadOnly, "scope"), "scope:option_select:os-scope");
+function referenceDetour(input: { referencedNodeId: string; lessonId: string; itemId: string; parentNodeId?: string }): ScaffoldDetour {
+  return {
+    detourId: `d-ref-${input.referencedNodeId}`,
+    learnerStateRef: "L1",
+    enrichmentId: "e",
+    parentDerivedNodeId: input.parentNodeId ?? "move",
+    term: labelByNode[input.referencedNodeId],
+    normalizedTerm: labelByNode[input.referencedNodeId].toLowerCase(),
+    status: "ready",
+    latestOperationId: null,
+    claimToken: null,
+    steps: [{
+      scaffoldStepId: `step-ref-${input.referencedNodeId}`,
+      ordinal: 0,
+      kind: "reference",
+      referencedDerivedNodeId: input.referencedNodeId,
+      referencedConceptLessonId: input.lessonId,
+      referencedStudyItemId: input.itemId
+    }]
+  };
+}
 
-  const complete = compose({ studyItems: [optionItem("scope")], lessons: [lessonFor("scope")], lessonReads: ["scope"], rows: [graded("scope", "correct", 1)] });
-  assert.equal(resolveReferenceStopId(complete, "scope"), "scope:capstone:main");
+function neutralRow(input: { itemId: string; nodeId: string; outcome: "correct" | "incorrect"; attemptSeq: number }): NeutralResponseLogRow {
+  return {
+    ...graded(input.nodeId, input.outcome, input.attemptSeq),
+    responseId: `r-${input.itemId}-${input.attemptSeq}`,
+    studyItemId: input.itemId
+  };
+}
 
-  assert.equal(resolveReferenceStopId(fresh, "not-on-trail"), null);
+test("Study Session exposes current neutral reference identities without keys and keeps locked/floored state authoritative", () => {
+  const lessons = [lessonFor("scope"), lessonFor("ownership")];
+  const items = [optionItem("scope"), optionItem("ownership")];
+  const locked = compose({ studyItems: items, lessons });
+  assert.deepEqual(locked.neutralReferenceAssetsByNode, {
+    scope: { conceptLessonId: "lesson-scope", studyItemId: "os-scope" },
+    ownership: { conceptLessonId: "lesson-ownership", studyItemId: "os-ownership" }
+  });
+  assert.equal(locked.classification.stateByNode.scope, "frontier");
+  assert.equal(locked.classification.stateByNode.ownership, "locked");
+
+  const flooredDetail = detail();
+  flooredDetail.nodes = flooredDetail.nodes.map((candidate) => candidate.derivedNodeId === "scope"
+    ? { ...candidate, difficultyBand: 1, difficultyContested: false }
+    : candidate);
+  const floored = compose({ detail: flooredDetail, studyItems: items, lessons });
+  assert.ok(floored.flooredNodeIds.includes("scope"));
+  assert.equal(floored.classification.stateByNode.scope, undefined);
+  assert.deepEqual(floored.neutralReferenceAssetsByNode.scope, { conceptLessonId: "lesson-scope", studyItemId: "os-scope" });
+  assert.equal(JSON.stringify(locked).includes("isCorrect"), false);
+});
+
+test("floored, later-locked, and superseded references project pinned key-free support activities", () => {
+  const flooredDetail = detail();
+  flooredDetail.nodes = flooredDetail.nodes.map((candidate) => candidate.derivedNodeId === "scope"
+    ? { ...candidate, difficultyBand: 1, difficultyContested: false }
+    : candidate);
+  const scopeRef = referenceDetour({ referencedNodeId: "scope", lessonId: "lesson-scope", itemId: "os-scope" });
+  const floored = compose({
+    detail: flooredDetail,
+    studyItems: [optionItem("scope")],
+    lessons: [lessonFor("scope")],
+    detours: [scopeRef]
+  });
+  const flooredStep = floored.detours[0].steps[0];
+  assert.equal(flooredStep.kind === "reference" && flooredStep.destination.kind, "support_activity");
+
+  const ownershipRef = referenceDetour({ referencedNodeId: "ownership", lessonId: "lesson-ownership", itemId: "os-ownership" });
+  const locked = compose({
+    studyItems: [optionItem("ownership")],
+    lessons: [lessonFor("ownership")],
+    detours: [ownershipRef]
+  });
+  const lockedStep = locked.detours[0].steps[0];
+  assert.equal(lockedStep.kind === "reference" && lockedStep.destination.kind, "support_activity");
+
+  const oldLesson = { ...lessonFor("scope"), conceptLessonId: "lesson-scope-old" };
+  const oldItem = { ...optionItem("scope"), studyItemId: "os-scope-old" };
+  const supersededRef = referenceDetour({ referencedNodeId: "scope", lessonId: oldLesson.conceptLessonId, itemId: oldItem.studyItemId });
+  const superseded = compose({
+    studyItems: [optionItem("scope")],
+    lessons: [lessonFor("scope")],
+    detours: [supersededRef],
+    referenceActivities: [{
+      scaffoldStepId: supersededRef.steps[0].scaffoldStepId,
+      detourId: supersededRef.detourId,
+      referencedDerivedNodeId: "scope",
+      lesson: oldLesson,
+      item: oldItem
+    }]
+  });
+  const supersededStep = superseded.detours[0].steps[0];
+  assert.equal(supersededStep.kind === "reference" && supersededStep.destination.kind, "support_activity");
+  assert.equal(JSON.stringify(supersededStep).includes("isCorrect"), false);
+});
+
+test("pinned reference completion follows only the pinned lesson/node and latest pinned item outcome", () => {
+  const oldLesson = { ...lessonFor("scope"), conceptLessonId: "lesson-scope-old" };
+  const oldItem = { ...optionItem("scope"), studyItemId: "os-scope-old" };
+  const detour = referenceDetour({ referencedNodeId: "scope", lessonId: oldLesson.conceptLessonId, itemId: oldItem.studyItemId });
+  const referenceActivities: ScaffoldReferenceActivity[] = [{
+    scaffoldStepId: detour.steps[0].scaffoldStepId,
+    detourId: detour.detourId,
+    referencedDerivedNodeId: "scope",
+    lesson: oldLesson,
+    item: oldItem
+  }];
+  const base = {
+    studyItems: [{ ...optionItem("scope"), studyItemId: "os-scope-new" }],
+    lessons: [{ ...lessonFor("scope"), conceptLessonId: "lesson-scope-new" }],
+    lessonReads: ["scope"],
+    detours: [detour],
+    referenceActivities
+  };
+  const passed = compose({ ...base, rows: [neutralRow({ itemId: oldItem.studyItemId, nodeId: "scope", outcome: "correct", attemptSeq: 1 })] });
+  assert.equal(passed.detours[0].steps[0].complete, true);
+
+  const reopened = compose({ ...base, rows: [
+    neutralRow({ itemId: oldItem.studyItemId, nodeId: "scope", outcome: "correct", attemptSeq: 1 }),
+    neutralRow({ itemId: oldItem.studyItemId, nodeId: "scope", outcome: "incorrect", attemptSeq: 2 }),
+    neutralRow({ itemId: "os-scope-new", nodeId: "scope", outcome: "correct", attemptSeq: 3 })
+  ] });
+  assert.equal(reopened.detours[0].steps[0].complete, false);
+});
+
+test("serialized mixed reference fixture is key-free across current, floored, and superseded destinations", () => {
+  const mixedDetail = detail();
+  mixedDetail.nodes = mixedDetail.nodes.map((candidate) => candidate.derivedNodeId === "scope"
+    ? { ...candidate, difficultyBand: 1, difficultyContested: false }
+    : candidate);
+  const current = referenceDetour({ referencedNodeId: "borrow", lessonId: "lesson-borrow", itemId: "os-borrow" });
+  const floored = referenceDetour({ referencedNodeId: "scope", lessonId: "lesson-scope", itemId: "os-scope" });
+  const oldLesson = { ...lessonFor("ownership"), conceptLessonId: "lesson-ownership-old" };
+  const oldItem = { ...optionItem("ownership"), studyItemId: "os-ownership-old" };
+  const superseded = referenceDetour({ referencedNodeId: "ownership", lessonId: oldLesson.conceptLessonId, itemId: oldItem.studyItemId });
+  const referenceActivities: ScaffoldReferenceActivity[] = [
+    { scaffoldStepId: current.steps[0].scaffoldStepId, detourId: current.detourId, referencedDerivedNodeId: "borrow", lesson: lessonFor("borrow"), item: optionItem("borrow") },
+    { scaffoldStepId: floored.steps[0].scaffoldStepId, detourId: floored.detourId, referencedDerivedNodeId: "scope", lesson: lessonFor("scope"), item: optionItem("scope") },
+    { scaffoldStepId: superseded.steps[0].scaffoldStepId, detourId: superseded.detourId, referencedDerivedNodeId: "ownership", lesson: oldLesson, item: oldItem }
+  ];
+  const session = compose({
+    detail: mixedDetail,
+    studyItems: [optionItem("borrow"), optionItem("scope"), optionItem("ownership")],
+    lessons: [lessonFor("borrow"), lessonFor("scope"), lessonFor("ownership")],
+    detours: [current, floored, superseded],
+    referenceActivities
+  });
+  const destinations = Object.fromEntries(session.detours.map((detour) => {
+    const step = detour.steps[0];
+    if (step.kind !== "reference") throw new Error("expected reference fixture");
+    return [step.referencedDerivedNodeId, step.destination.kind];
+  }));
+  assert.deepEqual(destinations, { borrow: "checkpoint", scope: "support_activity", ownership: "support_activity" });
+  const serialized = JSON.stringify(session);
+  assert.equal(serialized.includes("isCorrect"), false);
+  assert.equal(serialized.includes("o-borrow-1"), true, "safe option ids remain renderable");
+  assert.equal(serialized.includes("lesson-ownership-old"), false, "pinned lesson identity stays server-side");
 });
 
 // --- Recall Challenge scope threading (plan 2026-07-13-003 U4; KTD3/KTD4) -----
