@@ -1,13 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  extractionNeuralStageDescriptors,
-  graphEnrichmentNeuralStageDescriptors,
-  scaffoldGenerationNeuralStageDescriptors,
-  studyItemBankNeuralStageDescriptors,
-  syntheticGenerationNeuralStageDescriptors
-} from "./configHashes";
-import { discoveryCoverageAuditDescriptor } from "./discoveryCoverageAuditAdapters";
+import { allNeuralOperationDescriptors, measurementNeuralStageDescriptors } from "./configHashes";
 import type { AnyNeuralStageDescriptor } from "./forcedToolStage";
 import type { JsonSchema } from "./LiteLlmForcedToolClient";
 import { mimoRoutedAliases, readLitellmProxyConfig } from "./litellmProxyConfig";
@@ -22,13 +15,12 @@ import { readPromptFile } from "./promptFile";
 // AGENTS rule 5) — never restated here. Mid-object nullables and nested arrays
 // demonstrably work on MiMo and stay allowed (recorded scope decision).
 
+// Everything a model can be sent: the registry-derived runtime inventory (KTD7 — no manual
+// per-operation spread to fall out of date) plus the explicitly classified measurement
+// descriptors, whose calls carry no operation_id but still cross the same wire.
 const allDescriptors: readonly AnyNeuralStageDescriptor[] = [
-  ...extractionNeuralStageDescriptors,
-  ...graphEnrichmentNeuralStageDescriptors,
-  ...syntheticGenerationNeuralStageDescriptors,
-  ...studyItemBankNeuralStageDescriptors,
-  ...scaffoldGenerationNeuralStageDescriptors,
-  discoveryCoverageAuditDescriptor as AnyNeuralStageDescriptor
+  ...allNeuralOperationDescriptors,
+  ...measurementNeuralStageDescriptors.map((entry) => entry.descriptor)
 ];
 
 function descriptorAlias(descriptor: AnyNeuralStageDescriptor): string {

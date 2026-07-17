@@ -158,10 +158,6 @@ trusted learner surfaces). Probe mechanism and rationale are owned by
 [ADR-0030](docs/adr/0030-confidence-gated-synthesis-with-web-grounding.md).
 _Avoid_: verbalized confidence, lexical overlap, new judge
 
-**Learner Path**:
-A projection of one Derived Graph Layer for a target `derived_node_id` and Learner State.
-_Avoid_: course, personalized graph, concept-keyed learner state
-
 **Study Session**:
 A learner-stateful projection over one whole Derived Graph Layer that gates each derived node into
 locked / frontier / mastered and carries its study payload. It is layer-wide, not goal-scoped: the

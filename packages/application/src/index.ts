@@ -47,6 +47,8 @@ export {
   runScaffoldGeneration,
   resolveExactMatch,
   buildScaffoldNodePayload,
+  DEFAULT_SCAFFOLD_GENERATION_CONFIG,
+  type ScaffoldGenerationConfig,
   type ScaffoldGenerationDeps,
   type ScaffoldReuseCandidate,
   type ScaffoldParentContext,
@@ -104,6 +106,8 @@ export {
 } from "./operationRunLiveness";
 export {
   NON_LLM_STAGES,
+  OPERATION_TIMELINE_CATALOG,
+  SHARED_STAGES,
   operationTimelineLlmSpendStageTags,
   stageBelongsToOperation,
   spendStageBelongsToOperation

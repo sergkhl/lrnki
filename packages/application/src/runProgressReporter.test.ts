@@ -119,6 +119,25 @@ test("runInstrumentedOperation begins before stages, completes succeeded, return
   ]);
 });
 
+// KTD7 (plan 2026-07-16-004 U3): the operation config identity rides the begin write, and a
+// no-stage run (a direct-reference scaffold reuse makes zero neural calls) still records it
+// and completes succeeded.
+test("runInstrumentedOperation passes the config hash to beginOperation even with zero stages", async () => {
+  const begins: { operationType: string; configHash?: string }[] = [];
+  const reporter = recordingReporter();
+  const recordingBegin: RunProgressReporterPort = {
+    ...reporter,
+    async beginOperation(input) { begins.push({ operationType: input.operationType, configHash: input.configHash }); reporter.events.push("begin"); }
+  };
+  const result = await runInstrumentedOperation(recordingBegin, "scaffold", "op-1", async () => "reused", "learner-scaffold-generation-abc123");
+  assert.equal(result, "reused");
+  assert.deepEqual(begins, [{ operationType: "scaffold", configHash: "learner-scaffold-generation-abc123" }]);
+  assert.deepEqual(reporter.events, ["begin", "operation:succeeded"]);
+  // Operations that keep their identity on artifact rows simply omit the hash.
+  await runInstrumentedOperation(recordingBegin, "extraction", "op-2", async () => 1);
+  assert.equal(begins[1].configHash, undefined);
+});
+
 test("runInstrumentedOperation marks failed after an in-stage throw and propagates the error", async () => {
   const reporter = recordingReporter();
   const carried: StageErrorDetail = { kind: "forced_tool_exhaustion", message: "exhausted", toolName: "submit_thing" };

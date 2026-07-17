@@ -1449,7 +1449,10 @@ export interface StageErrorReporting {
 export interface RunProgressReporterPort {
   // Insert the parent `running` row at operation entry — the fix for "no row
   // until done": a polling client sees `running` immediately, not no row.
-  beginOperation(input: { operationType: OperationType; operationId: string }): Promise<void>;
+  // `configHash` is the operation-level neural/config identity written at start
+  // (KTD7); REQUIRED for `scaffold` (DB CHECK) whose attempts have no other
+  // artifact row to carry provenance, optional elsewhere.
+  beginOperation(input: { operationType: OperationType; operationId: string; configHash?: string }): Promise<void>;
   // Open a stage: insert a child row, set the parent's current_stage. `total` is
   // the item count for a stage that iterates, enabling an N-of-M heartbeat.
   // `operationType` is REQUIRED to scope the parent: `operation_id` is not unique
@@ -1507,6 +1510,9 @@ export interface OperationTimelineSummary {
   // A long-stale lastProgressAt on a `running` row is the "hung run" signal.
   elapsedMs: number;
   stageCount: number;
+  // The operation config identity persisted at start (KTD7); non-null for every scaffold
+  // attempt, null for operation types whose identity lives on their artifact rows.
+  configHash: string | null;
 }
 
 export interface OperationTimelineDetail {

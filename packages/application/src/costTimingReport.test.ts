@@ -27,7 +27,8 @@ function detail(operationId: string, operationType: OperationType, stages: Array
       startedAt: "2026-06-25T00:00:00.000Z",
       completedAt: "2026-06-25T00:01:00.000Z",
       elapsedMs: 60000,
-      stageCount: stages.length
+      stageCount: stages.length,
+      configHash: null
     },
     stages: stages.map(([stage, durationMs]) => ({
       stage,

@@ -79,6 +79,10 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.scaffoldContentGeneration),
     llm(STAGE_TAGS.knowledgeBoundaryProbe),
     llm(STAGE_TAGS.groundingGeneration),
+    // The probe's K-answer agreement embeds through the embedding client, which tags spend
+    // `node-embedding` under the ambient scaffold operation id (plan 2026-07-16-004 U3): before
+    // this claim, that real spend was silently dropped from the scaffold cost report.
+    llm(STAGE_TAGS.nodeEmbedding),
     // Label↔content congruence judge (plan 2026-07-16-001). Two call sites share ONE descriptor:
     // the scaffold operation runs it as a generation-time re-pick (KTD4b) — those calls carry this
     // operation_id and DO aggregate under the scaffold cost report — while the standing
@@ -90,10 +94,12 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
 } as const;
 
 // The LLM stages deliberately claimed by more than one operation (KTD7). Exactly the two
-// descriptors scaffold reuses from enrichment; every other LLM stage keeps a single owner.
+// descriptors scaffold reuses from enrichment plus the embedding stage the probe drives under
+// both operations; every other LLM stage keeps a single owner.
 export const SHARED_STAGES: ReadonlySet<string> = new Set<string>([
   STAGE_TAGS.knowledgeBoundaryProbe,
-  STAGE_TAGS.groundingGeneration
+  STAGE_TAGS.groundingGeneration,
+  STAGE_TAGS.nodeEmbedding
 ]);
 
 const knownNonLlmStages = new Set<string>(Object.values(NON_LLM_STAGES));

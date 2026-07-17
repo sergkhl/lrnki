@@ -39,15 +39,18 @@ export type StageBracket = <T>(stage: string, fn: () => Promise<T>, total?: numb
 
 // Instrumented operation wrapper shared by every operation (ADR-0029). It owns the
 // operation lifecycle: ambient operation tag, begin-at-entry, exactly one terminal
-// status, and propagation of the original result/error.
+// status, and propagation of the original result/error. `configHash` is the optional
+// operation config identity persisted with the begin write (KTD7) — required for
+// `scaffold` operations, which have no artifact row of their own to carry provenance.
 export async function runInstrumentedOperation<T>(
   reporter: RunProgressReporterPort,
   operationType: OperationType,
   operationId: string,
-  fn: (runStage: StageBracket) => Promise<T>
+  fn: (runStage: StageBracket) => Promise<T>,
+  configHash?: string
 ): Promise<T> {
   return runWithOperationTag(operationId, async () => {
-    await reporter.beginOperation({ operationType, operationId });
+    await reporter.beginOperation({ operationType, operationId, ...(configHash !== undefined ? { configHash } : {}) });
     const runStage = bracketStage(reporter, operationType, operationId);
     // Liveness heartbeat while the operation is open: stage boundaries alone leave
     // last_progress_at frozen through one long LLM call, which the expedition

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-  DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
+  DEFAULT_SCAFFOLD_GENERATION_CONFIG,
   probeKnowledgeBoundary,
   runInstrumentedOperation,
   runScaffoldGeneration,
@@ -18,7 +18,8 @@ import {
   createScaffoldContentCongruencePort,
   createScaffoldContentPort,
   createScaffoldOutlinePort,
-  LiteLlmNodeEmbeddingAdapter
+  LiteLlmNodeEmbeddingAdapter,
+  scaffoldGenerationConfigHash
 } from "@lrnki/infrastructure-litellm";
 import {
   PostgresConceptLessonStore,
@@ -140,7 +141,7 @@ function groundConcept(ctx: ScaffoldContext, runStage: StageBracket) {
         declaredDomain: input.declaredDomain,
         probe: ctx.knowledgeBoundaryProbe,
         embedding: ctx.nodeEmbedding,
-        config: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG
+        config: DEFAULT_SCAFFOLD_GENERATION_CONFIG.knowledgeBoundaryProbe
       })
     );
     if (verdict.disposition === "boundary") return { kind: "boundary" };
@@ -166,6 +167,10 @@ export async function runLearnerScaffoldGeneration(
   sql: DatabaseClient
 ): Promise<void> {
   const ctx = buildScaffoldContext(sql);
+  // The complete operation config identity (KTD7): all five runtime descriptors + application
+  // knobs + embedding model, persisted on the operation_runs row at begin — even when a direct
+  // reference reuse opens no neural stage.
+  const configHash = scaffoldGenerationConfigHash(DEFAULT_SCAFFOLD_GENERATION_CONFIG);
   await runInstrumentedOperation(ctx.reporter, "scaffold", input.operationId, async (runStage) => {
     const deps: ScaffoldGenerationDeps = {
       scaffoldStore: ctx.scaffoldStore,
@@ -185,5 +190,5 @@ export async function runLearnerScaffoldGeneration(
       groundConcept: groundConcept(ctx, runStage)
     };
     await runScaffoldGeneration({ detourId: input.detourId, claimToken: input.claimToken }, deps);
-  });
+  }, configHash);
 }

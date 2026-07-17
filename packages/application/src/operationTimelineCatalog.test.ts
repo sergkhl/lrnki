@@ -55,12 +55,13 @@ test("catalog LLM stages are exactly the closed stage-tag vocabulary, owned once
   assert.deepEqual(unknownStages, [], `catalog LLM stages absent from STAGE_TAGS: ${unknownStages.join(", ")}`);
 });
 
-// KTD7: SHARED_STAGES is EXACTLY the probe + grounding-generation descriptors, claimed by
-// EXACTLY enrichment and scaffold; every other LLM stage keeps a single owner.
-test("SHARED_STAGES is exactly the probe + grounding stages, owned by exactly enrichment and scaffold", () => {
+// KTD7: SHARED_STAGES is EXACTLY the probe + grounding-generation descriptors plus the probe's
+// node-embedding spend stage, claimed by EXACTLY enrichment and scaffold; every other LLM stage
+// keeps a single owner.
+test("SHARED_STAGES is exactly the probe + grounding + node-embedding stages, owned by exactly enrichment and scaffold", () => {
   assert.deepEqual(
     [...SHARED_STAGES].sort(),
-    [STAGE_TAGS.groundingGeneration, STAGE_TAGS.knowledgeBoundaryProbe].sort()
+    [STAGE_TAGS.groundingGeneration, STAGE_TAGS.knowledgeBoundaryProbe, STAGE_TAGS.nodeEmbedding].sort()
   );
   for (const stage of SHARED_STAGES) {
     assert.equal(stageBelongsToOperation(stage, "enrichment"), true, `${stage} belongs to enrichment`);

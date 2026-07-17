@@ -2,7 +2,35 @@ import { randomUUID } from "node:crypto";
 import { normalizeConceptLabel, type ScaffoldNodePayload, type ScaffoldStep } from "@lrnki/domain-core";
 import type { ScaffoldContentDraft, ScaffoldContentPort, ScaffoldContentCongruencePort, ScaffoldDetourStorePort, ScaffoldOutlinePort } from "@lrnki/ports";
 import { scaffoldMicroLessonText } from "./auditScaffoldContent";
+import { DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG, type KnowledgeBoundaryProbeConfig } from "./knowledgeBoundaryProbe";
 import { normalizeOptionText } from "./optionSelectGuard";
+
+// The operation-level behavior knobs of Scaffold Generation (plan 2026-07-16-004 KTD7). This is
+// the application half of the operation's config identity: the infrastructure
+// `scaffoldGenerationConfigHash(config)` folds these knobs together with every runtime forced-tool
+// descriptor and the embedding model, so a knob change changes the persisted operation identity.
+// The retired parent-text sufficiency threshold is deliberately NOT a knob — no character count
+// may bypass the Knowledge-Boundary Probe (KTD5).
+export type ScaffoldGenerationConfig = {
+  // Upper bound on published Support Steps per detour (references + generated combined).
+  maxSupportSteps: number;
+  // Total outline proposals per attempt: the initial outline plus bounded
+  // `retryFeedback` re-outlines after an unusable collision/duplicate (KTD5). The
+  // feedback re-outline activates with the deep module (U4); until then one proposal runs.
+  outlineAttempts: number;
+  // Content drafts per outline step: each draft is shape-validated then judged by the
+  // label↔content congruence re-pick; a NO drops the draft and retries within this bound.
+  contentDraftAttempts: number;
+  // The Knowledge-Boundary Probe every non-reference outline label must pass (KTD5).
+  knowledgeBoundaryProbe: KnowledgeBoundaryProbeConfig;
+};
+
+export const DEFAULT_SCAFFOLD_GENERATION_CONFIG: ScaffoldGenerationConfig = {
+  maxSupportSteps: 3,
+  outlineAttempts: 1,
+  contentDraftAttempts: 2,
+  knowledgeBoundaryProbe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG
+};
 
 // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3, KTD6/KTD9). A deep application
 // module: a claimed pending detour becomes one to three safe existing references or generated
@@ -155,7 +183,7 @@ export async function runScaffoldGeneration(
     return { kind: "failed", reason: `outline generation failed: ${error instanceof Error ? error.message : String(error)}` };
   }
 
-  for (const proposed of outline.steps.slice(0, 3)) {
+  for (const proposed of outline.steps.slice(0, DEFAULT_SCAFFOLD_GENERATION_CONFIG.maxSupportSteps)) {
     // 2a. Each outline label passes the same exact-match rule; a usable match becomes a
     // reference and is never cloned (AE4).
     const match = resolveExactMatch(proposed.label, context.reuseCandidates, context.parentDerivedNodeId);
@@ -174,7 +202,7 @@ export async function runScaffoldGeneration(
     const accepted = await generateCongruentStep(deps, context, detour.term, proposed.label, grounded.groundingText, newId);
     if (!accepted) continue;
     steps.push({ scaffoldStepId: newId(), ordinal: steps.length, kind: "generated", payload: accepted, lessonReadAt: null });
-    if (steps.length >= 3) break;
+    if (steps.length >= DEFAULT_SCAFFOLD_GENERATION_CONFIG.maxSupportSteps) break;
   }
 
   return publishSteps(deps, input, steps);
@@ -194,7 +222,7 @@ async function generateCongruentStep(
   groundingText: string,
   newId: () => string
 ): Promise<ScaffoldNodePayload | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < DEFAULT_SCAFFOLD_GENERATION_CONFIG.contentDraftAttempts; attempt++) {
     let draft: ScaffoldContentDraft;
     try {
       draft = await deps.content.generate({ declaredDomain: context.declaredDomain, label: stepLabel, groundingText });

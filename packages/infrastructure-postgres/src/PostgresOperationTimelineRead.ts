@@ -28,6 +28,7 @@ type SummaryRow = {
   completed_at: string | null;
   elapsed_ms: number;
   stage_count: number;
+  config_hash: string | null;
 };
 
 type StageRow = {
@@ -43,7 +44,7 @@ type StageRow = {
 
 const summaryColumns = (sql: Sql) => sql`
   r.operation_run_id, r.operation_type, r.operation_id, r.status, r.current_stage,
-  r.progress_done, r.progress_total, r.last_progress_at, r.started_at, r.completed_at,
+  r.progress_done, r.progress_total, r.last_progress_at, r.started_at, r.completed_at, r.config_hash,
   (EXTRACT(EPOCH FROM (COALESCE(r.completed_at, now()) - r.started_at)) * 1000)::bigint AS elapsed_ms,
   (SELECT count(*) FROM operation_run_stages s WHERE s.operation_run_id = r.operation_run_id)::int AS stage_count`;
 
@@ -99,7 +100,8 @@ function toSummary(row: SummaryRow): OperationTimelineSummary {
     startedAt: row.started_at,
     completedAt: row.completed_at,
     elapsedMs: Number(row.elapsed_ms),
-    stageCount: Number(row.stage_count)
+    stageCount: Number(row.stage_count),
+    configHash: row.config_hash
   };
 }
 

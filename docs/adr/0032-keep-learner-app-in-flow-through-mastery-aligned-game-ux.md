@@ -1,11 +1,6 @@
 # Keep the Learner App in flow through mastery-aligned game UX
 
-Status: Accepted. Amended 2026-07-11 with the app-owned interaction system, overlay, motion, and
-haptic contract; amended 2026-07-12 with learner-requested Scaffold Detour support; amended
-2026-07-14 with the durable Recall Challenge (Crystal Guardian) recall-challenge path superseding
-Crystal Duel; amended 2026-07-15 with the Crystal Formation reward-presentation contract, and
-2026-07-16 with the minimal-redesign visual language (difficulty-tier species, quiet geode ascent,
-summit keystone).
+Status: Accepted (last amended 2026-07-16).
 
 ## Decision
 

@@ -35,7 +35,8 @@ function detail(input: {
       startedAt: input.startedAt,
       completedAt,
       elapsedMs: completedAt ? Date.parse(completedAt) - Date.parse(input.startedAt) : 0,
-      stageCount: 0
+      stageCount: 0,
+      configHash: null
     },
     stages: []
   };

@@ -152,10 +152,12 @@ export {
   graphEnrichmentConfigHash,
   syntheticGenerationConfigHash,
   studyItemBankConfigHash,
+  scaffoldGenerationConfigHash,
   withGraphEnrichmentConfigHash,
   withSyntheticGenerationConfigHash,
-  extractionNeuralStageDescriptors,
-  graphEnrichmentNeuralStageDescriptors,
-  syntheticGenerationNeuralStageDescriptors,
-  studyItemBankNeuralStageDescriptors
+  neuralOperationRegistry,
+  allNeuralOperationDescriptors,
+  measurementNeuralStageDescriptors,
+  type NeuralOperationName,
+  type NeuralOperationRegistryEntry
 } from "./configHashes";

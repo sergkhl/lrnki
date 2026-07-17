@@ -261,6 +261,72 @@ maybe("failStaleOperations marks only stale running operation rows failed", asyn
   }
 });
 
+// KTD7 (plan 2026-07-16-004 U3): the scaffold operation's config identity is REQUIRED at begin
+// (DB CHECK) — a scaffold attempt has no artifact row of its own to carry provenance.
+maybe("the database rejects a scaffold operation begun without a config hash", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
+  try {
+    await assert.rejects(
+      () => new PostgresRunProgressReporter(sql).beginOperation({ operationType: "scaffold", operationId }),
+      /check|config_hash/i
+    );
+    const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM operation_runs WHERE operation_id = ${operationId}`;
+    assert.equal(count, 0, "the rejected begin persisted no row");
+  } finally {
+    await purgeOperationRun(sql, operationId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
+maybe("a no-stage scaffold operation records its config hash at begin and succeeds; separate attempts each keep their own hash", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const firstAttemptId = randomUUID();
+  const secondAttemptId = randomUUID();
+  try {
+    const reporter = new PostgresRunProgressReporter(sql);
+    // Direct-reference reuse: begin → complete with ZERO stages (no neural call happens).
+    await reporter.beginOperation({ operationType: "scaffold", operationId: firstAttemptId, configHash: "learner-scaffold-generation-aaa111" });
+    await reporter.completeOperation({ operationType: "scaffold", operationId: firstAttemptId, status: "succeeded" });
+    // A later attempt (fresh operation id) under a changed config keeps its own identity.
+    await reporter.beginOperation({ operationType: "scaffold", operationId: secondAttemptId, configHash: "learner-scaffold-generation-bbb222" });
+    // A racing re-begin with a different hash must NOT overwrite the attempt's recorded identity.
+    await reporter.beginOperation({ operationType: "scaffold", operationId: secondAttemptId, configHash: "learner-scaffold-generation-ccc333" });
+    await reporter.completeOperation({ operationType: "scaffold", operationId: secondAttemptId, status: "failed" });
+
+    const read = new PostgresOperationTimelineRead(sql);
+    const first = await read.getOperationTimeline(firstAttemptId, "scaffold");
+    assert.equal(first?.summary.status, "succeeded");
+    assert.equal(first?.summary.configHash, "learner-scaffold-generation-aaa111");
+    assert.equal(first?.summary.stageCount, 0);
+    assert.deepEqual(first?.stages, []);
+    const second = await read.getOperationTimeline(secondAttemptId, "scaffold");
+    assert.equal(second?.summary.configHash, "learner-scaffold-generation-bbb222");
+    // The hash also rides the list read the Admin Lab polls.
+    const summaries = await read.listOperationTimelines();
+    assert.equal(summaries.find((summary) => summary.operationId === firstAttemptId)?.configHash, "learner-scaffold-generation-aaa111");
+  } finally {
+    await purgeOperationRun(sql, firstAttemptId);
+    await purgeOperationRun(sql, secondAttemptId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
+maybe("non-scaffold operations keep a null config hash (their identities live on artifact rows)", async () => {
+  const sql = createDatabaseClient(databaseUrl);
+  const operationId = randomUUID();
+  try {
+    const reporter = new PostgresRunProgressReporter(sql);
+    await reporter.beginOperation({ operationType: "enrichment", operationId });
+    await reporter.completeOperation({ operationType: "enrichment", operationId, status: "succeeded" });
+    const detail = await new PostgresOperationTimelineRead(sql).getOperationTimeline(operationId, "enrichment");
+    assert.equal(detail?.summary.configHash, null);
+  } finally {
+    await purgeOperationRun(sql, operationId);
+    await sql.end({ timeout: 5 });
+  }
+});
+
 maybe("two stages in sequence produce two child rows with independently recoverable durations (R5 join shape)", async () => {
   const sql = createDatabaseClient(databaseUrl);
   const operationId = randomUUID();

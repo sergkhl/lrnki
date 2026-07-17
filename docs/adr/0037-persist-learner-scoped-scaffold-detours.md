@@ -88,7 +88,7 @@ support is discovered through server-advertised **Explorable Term** metadata ren
 first-occurrence cue in theory prose plus a compact post-content Support Paths panel (below the
 question stem in graded activities); both open one state-aware dialog, the request stays optional,
 and an active detour's term is suppressed from the panel while a hidden detour's term returns and
-restores the same durable detour (plan 2026-07-13-002). On the trail each active detour is one
+restores the same durable detour. On the trail each active detour is one
 always-visible compact side-branch node under its parent, and its ordered Support Steps play inside
 one full-screen Support Path flow. Reference steps never render copied content: an included node
 routes to its canonical neutral checkpoint while it is playable and its pinned assets are current;

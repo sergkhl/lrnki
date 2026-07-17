@@ -22,11 +22,12 @@ export class PostgresRunProgressReporter implements RunProgressReporterPort {
   constructor(private readonly sql: Sql) {}
 
   // Insert the parent `running` row at entry. Idempotent-tolerant: a re-begin for
-  // the same operation leaves the existing row untouched.
-  async beginOperation(input: { operationType: OperationType; operationId: string }): Promise<void> {
+  // the same operation leaves the existing row (including its config_hash) untouched.
+  // The DB CHECK requires config_hash for `scaffold` rows (KTD7).
+  async beginOperation(input: { operationType: OperationType; operationId: string; configHash?: string }): Promise<void> {
     await this.sql`
-      INSERT INTO operation_runs (operation_run_id, operation_type, operation_id, status, started_at, last_progress_at)
-      VALUES (${randomUUID()}, ${input.operationType}, ${input.operationId}, 'running', now(), now())
+      INSERT INTO operation_runs (operation_run_id, operation_type, operation_id, status, config_hash, started_at, last_progress_at)
+      VALUES (${randomUUID()}, ${input.operationType}, ${input.operationId}, 'running', ${input.configHash ?? null}, now(), now())
       ON CONFLICT (operation_type, operation_id) DO NOTHING`;
   }
 

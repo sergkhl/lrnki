@@ -507,7 +507,8 @@ function timeline(input: {
       startedAt: "2026-01-01T00:00:00.000Z",
       completedAt: null,
       elapsedMs: 0,
-      stageCount: input.stages.length
+      stageCount: input.stages.length,
+      configHash: null
     },
     stages: input.stages
   };

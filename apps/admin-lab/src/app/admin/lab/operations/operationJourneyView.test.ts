@@ -28,7 +28,8 @@ function detail(
       startedAt: input.startedAt ?? "2026-07-08T00:00:00.000Z",
       completedAt: input.completedAt ?? "2026-07-08T00:00:01.000Z",
       elapsedMs: input.elapsedMs ?? 1000,
-      stageCount: 0
+      stageCount: 0,
+      configHash: null
     },
     stages: []
   };

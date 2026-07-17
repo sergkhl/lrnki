@@ -1270,6 +1270,13 @@ CREATE TABLE operation_runs (
   last_progress_at timestamptz,
   started_at timestamptz NOT NULL DEFAULT now(),
   completed_at timestamptz,
+  -- Operation-level neural/config identity (plan 2026-07-16-004 KTD7): the registry-derived
+  -- operation config hash written at operation start. REQUIRED for scaffold — its attempts have
+  -- no other artifact row to carry provenance (a direct-reference attempt opens no neural
+  -- stage). Other operation types may stay NULL because their canonical config identities live
+  -- on their owning run/artifact rows.
+  config_hash text,
+  CHECK (operation_type <> 'scaffold' OR config_hash IS NOT NULL),
   UNIQUE (operation_type, operation_id)
 );
 

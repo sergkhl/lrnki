@@ -1356,17 +1356,6 @@ export type DerivedGraphLayer = {
 };
 
 // ---------------------------------------------------------------------------
-// Learner Path steps — live Study Session quest-ladder output.
-// ---------------------------------------------------------------------------
-
-export type LearnerPathStep = {
-  position: number;
-  derivedNodeId: string;
-  difficulty: number;
-  includedReason: "prerequisite" | "target";
-};
-
-// ---------------------------------------------------------------------------
 // Learner Study Loop — Typed Study Item Bank (R7–R15, ADR-0026). A learner-NEUTRAL
 // derived asset: per Derived Graph Layer node, the bank holds whichever typed study
 // items the build could ground, conditioned on that node's grounding and keyed to the
