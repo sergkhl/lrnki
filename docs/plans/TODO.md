@@ -2,76 +2,9 @@
 
 ## TODO
 
-### Deep Scaffold Generation and closed attribution (plan 2026-07-16-004 — IN PROGRESS, U6 NEXT)
+### Dead module cleanup (plan 2026-07-17-001 — READY, now unblocked)
 
-[Plan](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md). U1 committed `9391169`, U2
-committed `64c0ce4`, U3 committed `3e11f3b`. **U4 (KTD1/5/6/8) committed `9aa4f7e`:**
-`learnerScaffoldGeneration.ts` is now one process-lived `createScaffoldGeneration(construction)`
-factory returning `(request: {detourId, operationId}) => Promise<void>`; the old
-`runScaffoldGeneration`/`resolveExactMatch`/`buildScaffoldNodePayload`/`ScaffoldGenerationDeps`/
-`ScaffoldParentContext`/`ScaffoldReuseCandidate`/`ScaffoldGroundResult`/`ScaffoldGenerationOutcome`
-exports are DELETED (helpers are module-private; a barrel test asserts their absence). The callable
-verifies the claim (`claimToken === operationId`) before any neural spend, reads ONE opening Study
-Session (`ScaffoldOpeningStudySession` = a structural `Pick` of the finished projection — the
-learner-api binds `getStudySession` straight through), and derives exact-reuse eligibility from
-`classification.stateByNode` + `flooredNodeIds` + `neutralReferenceAssetsByNode` (frontier,
-mastered, AND confidently floored are eligible; locked/parent/cross-domain/ambiguous/payload-
-incomplete are collisions). The bounded `retryFeedback` re-outline is ACTIVE — `outlineAttempts`
-is now **2** (new hash `learner-scaffold-generation-19f397f70cd0`); a colliding/duplicate proposal
-feeds one feedback re-outline, then remaining collisions drop. The parent-grounding character
-threshold (`SUFFICIENT_PARENT_GROUNDING_CHARS`) is DELETED — every generated label is probed then
-child-grounded, with the parent's definition passages passed only as `scaffoldedAnchors`. Failure
-is fenced+honest (KTD6): claim-loss/false-publish writes nothing, all-transient exhaustion
-`releaseClaim`s, deterministic/no-safe-step `markFailed`s, and `runInstrumentedOperation` gives a
-FAILED timeline on any non-ready outcome. The transient classifier moved to package-internal
-`generationFailureClassification.ts` (shared with Topic Expedition, not barrel-exported). The
-learner-api composition is construction-only (`createLearnerScaffoldGeneration(sql)`), lazily
-cached in the supervisor, which now passes only `{detourId, operationId}`. `9aa4f7e` also carried
-KTD8's server half: the `/scaffold/reference-option-select` route, `gradeScaffoldReferenceOptionSelect`,
-and `PostgresScaffoldReferenceActivityRead` wiring were already present. **U5 (KTD9 client render)
-is COMPLETE and UNCOMMITTED:** the Learner App now consumes the projected reference `destination`
-union exhaustively. `SupportPathSheet` routes a reference step by `destination.kind` — a
-`checkpoint` keeps the existing map-transition `ReferenceStepBody` + `onOpenReference` (CheckpointPath
-already scrolls to `destination.stopId` and opens the ordinary `ActivitySheet`, no trail search); a
-`support_activity` now renders the PINNED neutral lesson + key-free option-select IN PLACE. Both
-generated and reference activities share one new presentational `StudyStepBody` (lesson → mark read
-→ key-free `OptionSelectBody` → grade → continue) differing ONLY in injected behavior: generated
-steps mark the scaffold read + grade scaffold-scoped + carry the "Extra support" badge; reference
-activities mark the NODE-scoped neutral lesson read (`markLearnerLessonRead`) + grade through the
-new `submitScaffoldReferenceOptionSelect` action (server resolves the pinned/superseded key and
-appends neutral evidence) + carry a "From your map" pinned note, never the generated badge. New
-vocabulary token `supportReferencePinnedNote`. Plan 003's `CheckpointPath` trail-wave +
-`useIsFocused` arrival-focus are preserved untouched. Deterministic envelope: learner-app jest
-**51 suites / 232 tests** (2 new KTD9 tests — support_activity inline study + overview
-checkpoint-vs-activity routing), learner-app + learner-api typecheck clean, lint clean. Removed-symbol
-sweep clean (`resolveReferenceStopId`/`runScaffoldGeneration`/`claimToken` gone outside the
-barrel-absence assertion). **U6 is next**: the full DB/real-use/browser/cleanup gate — no live
-learner has played the `support_activity` arm in-app yet, and the KTD8 supervisor
-concurrency/DB-free-import assertions (U5 plan items 1–2) are guaranteed structurally by the lazy
-`generation ??= …` construction but have no dedicated focused test; fold or prove them in U6.
-
-U3 (KTD7) history: one `neuralOperationRegistry` in
-`configHashes.ts` (seed + timeline type + descriptors + embedding stages per Neural Operation;
-Graph Enrichment and Synthetic Topic Generation stay separate entries both mapping to
-`enrichment`) replaces the five manual descriptor arrays; the MiMo shape test consumes the derived
-deduplicated inventory plus explicitly classified measurement descriptors; registry↔catalog LLM
-stage sets are union-EQUAL per timeline type with shared-stage owners exactly
-{enrichment, scaffold}. Typed `ScaffoldGenerationConfig` (maxSupportSteps 3, outlineAttempts 1 —
-U4 raises it when activating `retryFeedback`, contentDraftAttempts 2, probe config) +
-`scaffoldGenerationConfigHash(config)` covering all five runtime descriptors
-(outline/probe/grounding/content/congruence) + knobs + embedding model; current hash
-`learner-scaffold-generation-89e141fc75e2`. `operation_runs.config_hash` (CHECK: required for
-`scaffold`) written via `beginOperation`/`runInstrumentedOperation` trailing param and read
-through `OperationTimelineSummary.configHash`; a no-stage direct-reference attempt still records
-it. Attribution fix found by the union test: scaffold's probe embeds K answers tagged
-`node-embedding` under the scaffold operation id, previously unclaimed by the catalog and dropped
-from scaffold cost reports — `node-embedding` is now a third SHARED_STAGE claimed by both
-enrichment and scaffold. (The current scaffold hash noted above, `…-89e141fc75e2`, was superseded
-by U4's `outlineAttempts: 2` bump to `…-19f397f70cd0`.)
-
-### Dead module cleanup (plan 2026-07-17-001 — READY, queued after 2026-07-16-004)
-
-[Plan](./2026-07-17-001-refactor-dead-module-cleanup-plan.md). Purely subtractive: four verified
+[Plan](./2026-07-17-001-refactor-dead-module-cleanup-plan.md). Now unblocked (Deep Scaffold Generation shipped 2026-07-17). Purely subtractive: four verified
 zero-consumer targets plus one dead test block, with ADR-0008/ADR-0032 keep-decision amendments.
 The plan's interview-locked ledger records what was deliberately KEPT (leaderboard, sphere grid,
 symbol exports, test suite) — do not re-propose those removals.
@@ -84,6 +17,32 @@ symbol exports, test suite) — do not re-propose those removals.
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Deep Scaffold Generation and closed attribution shipped (2026-07-16→17, plan 2026-07-16-004;
+  plan + accepted brainstorm DELETED).** One process-lived `createScaffoldGeneration(construction)`
+  factory now owns the entire claimed Scaffold Generation lifecycle behind a
+  `(request: {detourId, operationId}) => Promise<void>` callable (KTD1): the opening Study Session
+  is the sole exact-reuse authority (KTD2), neutral reference assets are pinned by three non-null
+  FKs and never copied — Concept Lessons gained an application-minted `conceptLessonId` +
+  supersede-and-insert history so a ready reference survives lesson/item regeneration (KTD3), the
+  finished projection emits a `checkpoint`|`support_activity` reference `destination` union (KTD4),
+  exact collisions/child grounding stay internal policy with the bounded `retryFeedback` re-outline
+  and always-probe/child-ground path (KTD5), failure is fenced-and-honest with a shared transient
+  classifier and a fenced `releaseClaim` replacing the deleted direct `claim` (KTD6), one
+  `neuralOperationRegistry` + `scaffoldGenerationConfigHash` close descriptor/config attribution
+  with a `operation_runs.config_hash` CHECK required for `scaffold` (KTD7), the learner-api
+  composition is construction-only + lazily cached in the supervisor (KTD8), and the Learner App
+  consumes the projected destinations exhaustively — the new `support_activity` arm renders the
+  pinned neutral lesson + key-free option-select in place with a "From your map" note and neutral
+  node-scoped grading, while generated steps keep the "Extra support" badge and scaffold-scoped
+  grading (KTD9). Deleted in their replacement units: `ScaffoldGenerationDeps`/`ScaffoldParentContext`/
+  `ScaffoldReuseCandidate`/`ScaffoldGroundResult`/`ScaffoldGenerationOutcome`/`resolveExactMatch`/
+  `buildScaffoldNodePayload`/`runScaffoldGeneration`/`resolveReferenceStopId`, the direct scaffold
+  `claim`, the parent-text grounding threshold, and the five manual descriptor arrays. U1–U5
+  committed `9391169`/`64c0ce4`/`3e11f3b`/`9aa4f7e`/`31f821e`. Durable decisions live in ADR-0030/
+  0031/0034/0037 and the initial migration; U6 changed no code. All rule-14 gates PASS (U1
+  persistence, U2 projection/grading, U3 registry/attribution, U4 generation behavior, U6 full gate
+  — see VALIDATION). Evidence: `tmp/2026-07-16-deep-scaffold-generation/EVALUATION.md`.
 
 - **Learner UX polish shipped (2026-07-16, plan 2026-07-16-003; plan DELETED).** Five reported
   learner-facing UX defects fixed as pure downstream presentation/client behavior (zero API,
@@ -329,6 +288,50 @@ symbol exports, test suite) — do not re-propose those removals.
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Deep Scaffold Generation — U6 database/real-use/browser/cleanup gate, 2026-07-17. PASS.** U6 is
+  a verification-only gate (zero source changes; working tree clean). **Deterministic envelope** on a
+  hard-reset, freshly migrated database with `.env` loaded: `pnpm typecheck` all 12 projects clean;
+  full `pnpm test` green — domain-core 39, infrastructure-postgres 94, application **694**,
+  infrastructure-litellm 155, kg-worker 8, admin-lab 62, learner-api 18, learner-app 51 suites /
+  **232**, ingestion 10, rdf-export 2; `pnpm lint` 0 errors / 8 pre-existing warnings; `pnpm build`
+  (admin-lab Next + learner-app web export) OK; intercepted `pnpm e2e:web` **48/48**.
+  **Real-use generation gate** (production LiteLLM + Postgres, learner-api `:8899`): two fresh
+  mixed-domain synthetic expeditions generated end to end — Cellular respiration / Biology
+  (`0af38412…`, 14 concepts) and Digital signal filtering / DSP (`7024fba3…`, 20 concepts). Four
+  BIO detours driven over the real HTTP `/scaffold/request` path exercised the required cases live:
+  a **frontier reference → `checkpoint`** (`electron carriers` → NADH node, destination captured
+  pre-supersession), three **generated** detours, and a live **locked collision** (`oxidative
+  phosphorylation` matched a locked node → NOT referenced, NOT cloned → two distinct simpler
+  prerequisites *Phosphorylation* + *Oxidation-reduction (redox) reactions* generated instead — the
+  live collision case U4 lacked). Human inspection: all generated micro-lessons are plain-prose,
+  child-specific, conceptually correct, with key-free four-option items; the whole projection scanned
+  **0 answer-key leaks**. Standing `kg-worker audit-scaffold-content` (K=3) independently scored
+  **6/6 steps teaches=true simpler=true, artifact-steps=0, congruence-recurring=0**. **Closed
+  attribution (KTD7 live)**: all 4 scaffold ops carry `learner-scaffold-generation-19f397f70cd0`,
+  **0** null `config_hash`, and the checkpoint-reference op recorded the hash while opening **0** LLM
+  stages. **Durability/browser gate** (production Expo web export baked against `:8899`, served on
+  the CORS-allowed `localhost:8081`, real Chromium, no interception): logged in as a disposable
+  learner, opened the real trail (all four support-path nodes present), and proved end-to-end with
+  **zero console/page errors** across desktop 1280×800, phone 390×844, and reduced motion — (a) a
+  **generated Support Step** played read→answer→grade→continue with the "Extra support" badge, and
+  its DB response is **scaffold-scoped** (`scaffold_step_id` set, item/node NULL); (b) after a real
+  `kg-worker generate-study-items` regenerated the whole BIO bank (14 lessons / 31 items;
+  supersede-and-insert confirmed: NADH node = 1 current + 1 superseded lesson), the `electron
+  carriers` reference **flipped to `support_activity`** and replayed the **pinned (superseded)**
+  neutral NADH lesson + key-free option-select in place with the "From your map" note and no
+  generated badge; its grading appended ordinary **neutral** evidence keyed to the NADH
+  `derived_node_id` + the **superseded** pinned `study_item_id` (`scaffold_step_id` NULL) — the exact
+  KTD3 pinned-fallback + neutral-identity contract, live. Honest caveats: the live in-app
+  `support-path-reference-go` checkpoint *route* was not clicked because the sole checkpoint
+  reference was intentionally superseded into `support_activity` during the regeneration scenario —
+  checkpoint routing stays proven by the pre-regen projection (`destination.kind=checkpoint`) + the
+  `SupportPathSheet` jest suite; the `support_activity` **re-locked** trigger and hide/restore share
+  the same render/route paths and stay proven by jest + U2 data-level; live boundary-omission and
+  transient/deterministic failure did not occur this run and remain covered by the 694-test
+  application factory suite (as in U4). Disposable learner + leftover test-fixture enrichments
+  cleaned FK-safely; local servers stopped. Evidence + screenshots:
+  `tmp/2026-07-16-deep-scaffold-generation/EVALUATION.md` (U6 section) and `u6/`.
 
 - **Deep Scaffold Generation — U4 deep-module behavior + real-use quality gate, 2026-07-17. PASS.**
   Two fresh mixed-domain synthetic expeditions were generated end to end by the real supervisors on

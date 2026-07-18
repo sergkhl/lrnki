@@ -22,10 +22,9 @@ execution: code
 - **Execution profile:** Purely subtractive. No runtime behavior, schema, prompt, port semantics,
   or wire shape changes; every deletion target has mechanically verified zero consumers. No
   database reset is required (no migration change). No LLM call is touched.
-- **Scheduling:** Queued strictly AFTER plan
-  [2026-07-16-004](./2026-07-16-004-refactor-deep-scaffold-generation-plan.md) completes — the
-  working tree carries its uncommitted U2/U3 work at planning time, and this plan's envelope must
-  not confound that plan's gate.
+- **Scheduling:** Now unblocked — the Deep Scaffold Generation work (former plan 2026-07-16-004)
+  shipped and its rule-14 gate passed on 2026-07-17 (see `TODO.md`), so this plan's subtractive
+  envelope no longer confounds that plan's gate.
 - **Stop conditions:** Re-verify zero-consumer evidence at execution time (plan -004 executes in
   between); stop and re-scope if any target has gained a live consumer, i.e. a typecheck/test
   failure traces to a real import rather than a stale re-export.
@@ -75,7 +74,8 @@ scans, `git log -S`, and route/UI tracing. Re-run the same checks at execution t
 
 ### U1 — Delete dead application modules and the per-Leg test block
 
-- **Depends on:** plan 2026-07-16-004 completion; re-verified zero-consumer evidence.
+- **Depends on:** Deep Scaffold Generation completion (shipped 2026-07-17); re-verified
+  zero-consumer evidence.
 - **Primary files:** `packages/application/src/verifyEvidenceQuote.ts`,
   `targetCandidates.ts` + `.test.ts`, `calibrationList.ts` + `.test.ts`,
   `packages/application/src/index.ts` (the two export blocks named in the inventory),
