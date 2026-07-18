@@ -2,13 +2,6 @@
 
 ## TODO
 
-### Dead module cleanup (plan 2026-07-17-001 — READY, now unblocked)
-
-[Plan](./2026-07-17-001-refactor-dead-module-cleanup-plan.md). Now unblocked (Deep Scaffold Generation shipped 2026-07-17). Purely subtractive: four verified
-zero-consumer targets plus one dead test block, with ADR-0008/ADR-0032 keep-decision amendments.
-The plan's interview-locked ledger records what was deliberately KEPT (leaderboard, sphere grid,
-symbol exports, test suite) — do not re-propose those removals.
-
 ### Evidence-triggered follow-up
 
 - **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a
@@ -17,6 +10,22 @@ symbol exports, test suite) — do not re-propose those removals.
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Dead module cleanup and durable keep decisions shipped (2026-07-17, plan 2026-07-17-001; plan
+  DELETED).** Purely subtractive (rule 18) with zero-consumer evidence re-verified at execution
+  time: deleted `verifyEvidenceQuote.ts`, `targetCandidates.ts` + test + barrel block,
+  `calibrationList.ts` + test + barrel block, the whole `packages/infrastructure-rdf-export`
+  package (README line removed, lockfile settled), the per-Leg sphere-grid test block whose
+  subject died with the Crystal Formation minimal redesign (the whole-enrichment regression and
+  its real-shape fixture stay), the stale `composeCalibrationSession` comment reference in
+  `studySessionProjection.ts`, and the empty untracked `apps/admin-lab/src/app/learn/` directories.
+  Durable keep decisions recorded: ADR-0008 now owns the stable-IRI-only boundary (no standing
+  JSON-LD exporter until a real consumer exists); ADR-0032 now owns the provisional
+  leaderboard-MVP decision (simulated rivals stay presentation-side fiction; beta learner response
+  decides retention; real multiplayer post-beta). The plan's interview-locked KEPT ledger
+  (leaderboard stack, `sphereGridLayout.ts` in application, symbol-level exports, test suite) is
+  final — do not re-propose those removals. No runtime behavior, schema, prompt, port semantics,
+  or wire shape changed. Validation in VALIDATION below.
 
 - **Deep Scaffold Generation and closed attribution shipped (2026-07-16→17, plan 2026-07-16-004;
   plan + accepted brainstorm DELETED).** One process-lived `createScaffoldGeneration(construction)`
@@ -288,6 +297,22 @@ symbol exports, test suite) — do not re-propose those removals.
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Dead module cleanup — deterministic envelope + explorer smoke, 2026-07-17. PASS.** Full
+  envelope on the post-deletion tree: `pnpm typecheck` all 11 remaining projects clean (proves
+  nothing imported the deleted symbols); full `pnpm test` green — application **677/677** (down
+  from 694 by exactly the deleted `targetCandidates`/`calibrationList` suites and the per-Leg
+  sphere-grid block), learner-app 51 suites / 232, all other packages green with rdf-export gone;
+  `pnpm lint` 0 errors / 8 pre-existing warnings; `pnpm build` (admin-lab Next + learner-app web
+  export) OK; intercepted `pnpm e2e:web` **48/48**. Manual Admin Lab smoke (headless Chromium
+  against the dev server + real Postgres): the derived-graph explorer rendered sphere-grid
+  positions (right-angle tracks, one dashed domain region, zero crossings) on an existing
+  3-concept enrichment, and a Nodes-and-edges row click recentered the viewport with the drawer
+  closing and **zero console/page errors**; the flagged-loop banner path is code-untouched and
+  stays locked by the surviving whole-enrichment regression. **No rule-14 LLM gate applies**: a
+  zero-consumer deletion is not a behavior-changing milestone — no model call, no projection
+  change, no persisted shape change (per the plan's validation bar). Dev server stopped;
+  no database change.
 
 - **Deep Scaffold Generation — U6 database/real-use/browser/cleanup gate, 2026-07-17. PASS.** U6 is
   a verification-only gate (zero source changes; working tree clean). **Deterministic envelope** on a

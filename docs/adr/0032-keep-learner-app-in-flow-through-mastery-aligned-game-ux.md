@@ -81,6 +81,12 @@ postponed (the challenge gates the *reward*, never the *learning*). Version one 
 concept Study Items only; extending fixed-budget selection to completed learner-scoped Support Paths
 is deferred until they carry a richer typed Study Item set.
 
+The weekly cohort leaderboard — simulated seeded rivals, the division ladder, journal splash
+celebrations, and the `weekly_podium` award — is a **deliberately retained MVP motivation surface**
+(decision 2026-07-17). Rivals remain presentation-side fiction: they never touch `learners`, graded
+evidence, or any persistence. Its retention is provisional — beta learner response decides whether
+it is kept, reshaped, or removed — and real multiplayer is out of scope until after beta.
+
 Achievement sharing is an accepted future need: a learner should eventually be able to export an
 achievement — at minimum their Crystal Vista formation — as a picture fit for posting outside the app
 (for example to Instagram). Achievement surfaces therefore keep their visual composition

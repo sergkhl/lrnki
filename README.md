@@ -13,7 +13,6 @@ A minimal scaffold for building a Learner-Neutral Core Concept Graph from curate
 - `packages/infrastructure-litellm`: forced named tool-call gateway
 - `packages/infrastructure-postgres`: PostgreSQL schema and initial migration with JSONB artifacts and JSON_TABLE inspection view
 - `packages/infrastructure-storage-local`: local curated-source object store adapter
-- `packages/infrastructure-rdf-export`: JSON-LD export sidecar
 
 ## Commands
 

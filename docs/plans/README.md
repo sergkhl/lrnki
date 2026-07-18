@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-17-001 — Dead module cleanup and durable keep decisions](./2026-07-17-001-refactor-dead-module-cleanup-plan.md) — ready; now unblocked (Deep Scaffold Generation shipped 2026-07-17).
+- None. All prior plans are completed and folded into ADRs, `TODO.md`, and `CONTEXT.md`.
 
 ## Ownership rules
 

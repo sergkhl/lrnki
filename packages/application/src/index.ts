@@ -193,12 +193,6 @@ export {
 } from "./learnerLoopProjection";
 
 export {
-  buildTargetCandidates,
-  filterTargets,
-  recommendedTargets,
-  type TargetCandidate
-} from "./targetCandidates";
-export {
   getExpeditionCatalog,
   getExpeditionJournal,
   type ExpeditionCandidateCard,
@@ -241,10 +235,6 @@ export {
   type SectionedExpedition
 } from "./expeditionSections";
 
-export {
-  composeCalibrationSession,
-  type CalibrationSessionProjection
-} from "./calibrationList";
 export {
   layoutSphereGrid,
   type SphereGridEdgeInput,

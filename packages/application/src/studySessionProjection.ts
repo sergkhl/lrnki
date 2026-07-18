@@ -25,7 +25,7 @@ import { projectExpeditionSections, type ExpeditionSection, type ExpeditionSecti
 // it imports no store, port, or clock, so it structurally cannot mutate a published graph or
 // the Derived Graph Layer (R10) and is replay-testable with plain data. The `getStudySession`
 // use-case is the thin reader that loads through injected ports and calls this; the Learner
-// Application reuses both unchanged. Mirrors `composeCalibrationSession`.
+// Application reuses both unchanged.
 
 // --- View contract (rides down with the projection, KTD6) ------------------
 
