@@ -4,7 +4,7 @@ import test from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 maybe("resolves an enrichment through its graph version to every direct extraction run", async () => {

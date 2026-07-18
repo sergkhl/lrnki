@@ -57,6 +57,7 @@ export {
   type TopicExpeditionGeneration,
   type TopicExpeditionRequest
 } from "./generateTopicExpedition";
+export { GenerationClaimLostError, isGenerationClaimLostError } from "./generationClaimLost";
 export {
   registerLearner,
   enterLearnerSession,

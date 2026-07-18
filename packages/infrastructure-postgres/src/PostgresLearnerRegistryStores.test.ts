@@ -6,12 +6,12 @@ import { PostgresLearnerAwardsStore, PostgresLearnerStore } from "./PostgresLear
 import { cleanupTrackedLearners, trackLearner } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration applied.
-// Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
-const databaseUrl = process.env.DATABASE_URL;
+// Skipped when TEST_DATABASE_URL is absent so the unit suite stays hermetic.
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 // This suite creates `learners` rows via the registry `create` path; track each ref so the
-// cleanup deletes exactly those and the shared dev DB is unchanged (R2/AE2).
+// cleanup deletes exactly those and the isolated test DB is unchanged (R2/AE2).
 after(() => cleanupTrackedLearners(databaseUrl));
 
 maybe("create is unique-at-insert: a second create for the same ref is a no-op (R1/AE1)", async () => {

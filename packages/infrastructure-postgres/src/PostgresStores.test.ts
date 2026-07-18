@@ -8,8 +8,8 @@ import { PostgresEnrichmentRunStore } from "./PostgresEnrichmentStores";
 import { PostgresExtractionRunStore, PostgresGraphVersionStore, PostgresSourceRegistrationStore } from "./PostgresStores";
 
 // Integration tests against a live PostgreSQL with the single initial migration
-// applied. Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
-const databaseUrl = process.env.DATABASE_URL;
+// applied. Skipped when TEST_DATABASE_URL is absent so the unit suite stays hermetic.
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 const document: StructuredDocument = {

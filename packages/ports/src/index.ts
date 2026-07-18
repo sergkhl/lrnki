@@ -564,6 +564,14 @@ export interface LearnerExpedition {
   updatedAt: string;
 }
 
+// A supervisor claim atomically installs the fresh enrichment operation id that also
+// fences every write made by that attempt. Callers never receive a claimed expedition
+// with the ambiguous pre-token `null` state.
+export type ClaimedLearnerExpedition = Omit<LearnerExpedition, "currentOperationId" | "currentOperationType"> & {
+  currentOperationId: string;
+  currentOperationType: "enrichment";
+};
+
 export interface NewLearnerExpedition {
   learnerExpeditionId: string;
   learnerStateRef: string;
@@ -584,12 +592,12 @@ export interface LearnerExpeditionStorePort {
   getForLearner(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<LearnerExpedition | undefined>;
   getByEnrichment(input: { learnerStateRef: string; enrichmentId: string }): Promise<LearnerExpedition | undefined>;
   setActive(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
-  claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<LearnerExpedition | undefined>;
+  claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<ClaimedLearnerExpedition | undefined>;
   failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number; failureMessage: string }): Promise<number>;
   resetGeneration(input: { learnerStateRef: string; learnerExpeditionId: string }): Promise<void>;
-  // Fenced worker write (lease + fencing token): the claim clears the operation id,
-  // and every generation write must state the operation id it EXPECTS to own
-  // (`null` before the run's first write, its own enrichment id after). A write whose
+  // Fenced worker write (lease + fencing token): the claim atomically installs a fresh
+  // enrichment operation id, and every generation write must state that id as the
+  // operation it EXPECTS to own. A write whose
   // expectation no longer holds affects 0 rows — the returned count tells a stale
   // worker it lost the claim and must stop spending.
   updateProgress(input: {

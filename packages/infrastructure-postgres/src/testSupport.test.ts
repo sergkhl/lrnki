@@ -10,15 +10,15 @@ import {
 } from "./testSupport";
 
 // Integration tests for the durable real-use gate teardown (plan 2026-07-15-001 U1). Skipped when
-// DATABASE_URL is absent so the hermetic suite stays green; the explicit Verification Contract
+// TEST_DATABASE_URL is absent so the hermetic suite stays green; the explicit Verification Contract
 // command loads `.env` and MUST execute these. The initial migration is the deletion-graph
 // authority (AGENTS.md) — scenario 1 populates every learner-owned FK family so a missing table
 // (the recall_challenges / learner_sessions drift this unit fixed) fails loudly.
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 const runIdChars = () => randomUUID().replace(/-/g, ""); // 32 hex chars — a valid [0-9a-z]{6,40} run id
 
-// Every learner ref any test seeds, so `after` deletes exactly those and the shared dev DB is
+// Every learner ref any test seeds, so `after` deletes exactly those and the isolated test DB is
 // left byte-for-byte unchanged. deleteLearner is idempotent, so double-cleanup is safe.
 const seeded = new Set<string>();
 after(async () => {

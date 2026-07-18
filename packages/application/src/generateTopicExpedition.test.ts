@@ -40,6 +40,7 @@ function harness(): Harness {
 }
 
 function describeWrite(input: ProgressWrite): string {
+  if (input.status === "generating") return "write:claim";
   if (input.status === "ready") return "write:ready";
   if (input.status === "failed") return `write:failed:${input.failureMessage}`;
   if (input.declaredDomain !== undefined && input.status === undefined) return `write:domain:${input.declaredDomain}`;
@@ -49,6 +50,7 @@ function describeWrite(input: ProgressWrite): string {
 
 const request: TopicExpeditionRequest = {
   learnerExpeditionId: "expedition",
+  enrichmentId: "enrichment-1",
   topic: "Rust ownership",
   declaredDomain: "software engineering"
 };
@@ -63,7 +65,6 @@ function generator(h: Harness, overrides?: Partial<Parameters<typeof createTopic
     studyItemBankGeneration: async () => {
       h.calls.push("study");
     },
-    newEnrichmentId: () => "enrichment-1",
     ...overrides
   });
 }
@@ -73,16 +74,13 @@ test("a claimed expedition with a Declared Domain records enrichment, study item
   const result = await generator(h)(request);
 
   assert.equal(result, undefined);
-  assert.deepEqual(h.calls, ["write:enrichment", "synthetic", "write:study_items", "study", "write:ready"]);
-  // The first write installs the fence against the cleared claim; every later write
-  // expects this run's enrichment id.
-  assert.deepEqual(h.writes.map((write) => write.expectedOperationId), [null, "enrichment-1", "enrichment-1"]);
+  assert.deepEqual(h.calls, ["write:claim", "synthetic", "write:study_items", "study", "write:ready"]);
+  // The claim already installed this run's enrichment id; every write expects it.
+  assert.deepEqual(h.writes.map((write) => write.expectedOperationId), ["enrichment-1", "enrichment-1", "enrichment-1"]);
   assert.deepEqual(h.writes[0], {
     learnerExpeditionId: "expedition",
-    expectedOperationId: null,
-    status: "generating",
-    currentOperationId: "enrichment-1",
-    currentOperationType: "enrichment"
+    expectedOperationId: "enrichment-1",
+    status: "generating"
   });
   assert.deepEqual(h.writes[2], {
     learnerExpeditionId: "expedition",
@@ -107,7 +105,7 @@ test("a null Declared Domain reaches the synthetic adapter unchanged, persists t
   })({ ...request, declaredDomain: null });
 
   assert.deepEqual(h.calls, [
-    "write:enrichment",
+    "write:claim",
     "synthetic:null",
     "write:domain:software engineering",
     "write:study_items",
@@ -143,7 +141,7 @@ test("a zero concept count fails before the study adapter with the bounded failu
     () => generator(h, { syntheticGeneration: async () => ({ conceptCount: 0 }) })(request),
     /no concepts/
   );
-  assert.deepEqual(h.calls, ["write:enrichment", "write:failed:Scouting produced no concepts."]);
+  assert.deepEqual(h.calls, ["write:claim", "write:failed:Scouting produced no concepts."]);
 });
 
 test("infrastructure-only attempt trails release the claim, stay generating, and reject the original error", async () => {
@@ -164,7 +162,7 @@ test("infrastructure-only attempt trails release the claim, stay generating, and
     );
     // No failed write: the operation fields are cleared under the current fence and the
     // row stays `generating` for the supervisor's attempt budget to re-claim.
-    assert.deepEqual(h.calls, ["write:enrichment", "write:release"]);
+    assert.deepEqual(h.calls, ["write:claim", "write:release"]);
     assert.deepEqual(h.writes[1], {
       learnerExpeditionId: "expedition",
       expectedOperationId: "enrichment-1",
@@ -191,7 +189,7 @@ test("plain errors, non-429 client errors, schema deviations, and mixed trails w
       () => generator(h, { syntheticGeneration: async () => { throw error; } })(request),
       (rejected: unknown) => rejected === error
     );
-    assert.deepEqual(h.calls, ["write:enrichment", `write:failed:${error.message}`]);
+    assert.deepEqual(h.calls, ["write:claim", `write:failed:${error.message}`]);
     assert.equal(h.writes[1].status, "failed");
   }
 });
@@ -215,21 +213,21 @@ test("losing the domain fence stops the run before any further activity or lifec
       return { conceptCount: 1 };
     }
   })({ ...request, declaredDomain: null }), /claim lost/i);
-  assert.deepEqual(h.calls, ["write:enrichment", "synthetic"]);
+  assert.deepEqual(h.calls, ["write:claim", "synthetic"]);
 });
 
 test("losing the study-items phase fence prevents bank generation and any terminal write", async () => {
   const h = harness();
   h.setWriteResult((write) => (write.currentOperationType === "study_items" ? 0 : 1));
   await assert.rejects(() => generator(h)(request), /claim lost/i);
-  assert.deepEqual(h.calls, ["write:enrichment", "synthetic"]);
+  assert.deepEqual(h.calls, ["write:claim", "synthetic"]);
 });
 
 test("losing the ready fence rejects claim loss without a failure write", async () => {
   const h = harness();
   h.setWriteResult((write) => (write.status === "ready" ? 0 : 1));
   await assert.rejects(() => generator(h)(request), /claim lost/i);
-  assert.deepEqual(h.calls, ["write:enrichment", "synthetic", "write:study_items", "study"]);
+  assert.deepEqual(h.calls, ["write:claim", "synthetic", "write:study_items", "study"]);
 });
 
 test("a rejected best-effort failure or release write still rethrows the original error", async () => {
@@ -270,11 +268,9 @@ test("failure messages are redacted: control characters removed, whitespace comp
 
 test("two interleaved calls through one constructed generator keep isolated identity, fence, domain, and terminal state", async () => {
   const h = harness();
-  let nextId = 0;
   const gates = new Map<string, () => void>();
   const blocked = (key: string) => new Promise<void>((resolve) => gates.set(key, resolve));
   const generate = generator(h, {
-    newEnrichmentId: () => `enrichment-${++nextId}`,
     syntheticGeneration: async (activity) => {
       h.calls.push(`synthetic:${activity.enrichmentId}:${activity.topic}`);
       await blocked(activity.enrichmentId);
@@ -286,8 +282,8 @@ test("two interleaved calls through one constructed generator keep isolated iden
     }
   });
 
-  const first = generate({ learnerExpeditionId: "expedition-a", topic: "Rust ownership", declaredDomain: null });
-  const second = generate({ learnerExpeditionId: "expedition-b", topic: "Cell biology", declaredDomain: null });
+  const first = generate({ learnerExpeditionId: "expedition-a", enrichmentId: "enrichment-1", topic: "Rust ownership", declaredDomain: null });
+  const second = generate({ learnerExpeditionId: "expedition-b", enrichmentId: "enrichment-2", topic: "Cell biology", declaredDomain: null });
   // Let both installs and synthetic starts happen, then finish them in reverse order.
   await new Promise((resolve) => setImmediate(resolve));
   gates.get("enrichment-2")?.();
@@ -303,9 +299,9 @@ test("two interleaved calls through one constructed generator keep isolated iden
     // install → domain → study_items phase → ready, all fenced on this call's own id.
     assert.deepEqual(
       writes.map((write) => write.expectedOperationId),
-      [null, enrichmentId, enrichmentId, enrichmentId]
+      [enrichmentId, enrichmentId, enrichmentId, enrichmentId]
     );
-    assert.equal(writes[0].currentOperationId, enrichmentId);
+    assert.equal(writes[0].status, "generating");
     assert.equal(writes[1].declaredDomain, `domain for ${topic}`);
     const ready = writes.at(-1);
     assert.equal(ready?.status, "ready");

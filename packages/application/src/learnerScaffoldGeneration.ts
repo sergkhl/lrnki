@@ -15,6 +15,7 @@ import type {
 } from "@lrnki/ports";
 import { scaffoldMicroLessonText } from "./auditScaffoldContent";
 import { isTransientGenerationError } from "./generationFailureClassification";
+import { GenerationClaimLostError } from "./generationClaimLost";
 import { DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG, probeKnowledgeBoundary, type KnowledgeBoundaryProbeConfig } from "./knowledgeBoundaryProbe";
 import { normalizeOptionText } from "./optionSelectGuard";
 import { runInstrumentedOperation, type StageBracket } from "./runProgressReporter";
@@ -102,13 +103,6 @@ export type ScaffoldGenerationConstruction = {
 // Thrown when the claimed attempt is missing/mismatched or a fenced write affects no row:
 // another attempt owns the detour, so this run writes NOTHING further (KTD6). Internal — the
 // supervisor only needs the rejection.
-class ScaffoldClaimLostError extends Error {
-  constructor(detourId: string) {
-    super(`Scaffold generation claim lost for detour ${detourId}.`);
-    this.name = "ScaffoldClaimLostError";
-  }
-}
-
 // Deterministic "no safe Support Step survived" — records `failed` under the fence (KTD6).
 class ScaffoldNoSafeStepError extends Error {
   constructor(term: string) {
@@ -126,7 +120,7 @@ export function createScaffoldGeneration(construction: ScaffoldGenerationConstru
       // request's operation id is the one active attempt this call owns.
       const detour = await construction.detours.getById(request.detourId);
       if (!detour || detour.status !== "generating" || detour.claimToken !== request.operationId) {
-        throw new ScaffoldClaimLostError(request.detourId);
+        throw new GenerationClaimLostError(`Scaffold generation claim lost for detour ${request.detourId}.`);
       }
       const fence = { detourId: request.detourId, claimToken: request.operationId };
       try {
@@ -141,10 +135,10 @@ export function createScaffoldGeneration(construction: ScaffoldGenerationConstru
         const steps = await generateSteps({ construction, session, parent, detour: { term: detour.term }, runStage, newId });
         if (steps.length === 0) throw new ScaffoldNoSafeStepError(detour.term);
         const published = await construction.detours.publishReady({ ...fence, steps });
-        if (!published) throw new ScaffoldClaimLostError(request.detourId);
+        if (!published) throw new GenerationClaimLostError(`Scaffold generation claim lost for detour ${request.detourId}.`);
       } catch (error) {
         // Lost claim: another attempt owns the detour — write nothing (KTD6).
-        if (error instanceof ScaffoldClaimLostError) throw error;
+        if (error instanceof GenerationClaimLostError) throw error;
         if (isTransientGenerationError(error)) {
           // Infrastructure-transient exhaustion: release under the fence so the supervisor's
           // bounded attempt budget governs the retry; the detour stays `generating`.

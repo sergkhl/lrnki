@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type {
+  ClaimedLearnerExpedition,
   LearnerExpedition,
   LearnerExpeditionKind,
   LearnerExpeditionStatus,
@@ -123,9 +125,8 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
   // but the operation_runs row was never inserted: the expedition's own updated_at
   // stands in for the missing heartbeat, so no row is permanently untouchable.
   // claimed_at alone (not `current_operation_id IS NULL`) gates re-claims: the claim
-  // clears the operation id as the fence, so a freshly-claimed row must not look
-  // immediately reclaimable, and a transiently-released row keeps its claimed_at as
-  // natural backoff.
+  // atomically replaces the operation id with a fresh fence, while a transiently-released
+  // row clears it but keeps claimed_at as natural backoff.
   private generatingStaleness(staleBefore: Date) {
     return this.sql`
       le.status = 'generating'
@@ -138,7 +139,10 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
       )`;
   }
 
-  async claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<LearnerExpedition | undefined> {
+  async claimNextGenerating(input: { staleBefore: Date; maxAttempts: number }): Promise<ClaimedLearnerExpedition | undefined> {
+    // The enrichment operation id is also the fencing token. Installing it in the
+    // claim statement removes the ambiguous claim-with-null crash/race window.
+    const token = randomUUID();
     const rows = await this.sql<LearnerExpeditionRow[]>`
       WITH candidate AS (
         SELECT le.learner_expedition_id
@@ -155,13 +159,14 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
       UPDATE learner_expeditions le
       SET claimed_at = now(),
           generation_attempts = le.generation_attempts + 1,
-          current_operation_id = null,
-          current_operation_type = null,
+          current_operation_id = ${token},
+          current_operation_type = 'enrichment',
           updated_at = now()
       FROM candidate
       WHERE le.learner_expedition_id = candidate.learner_expedition_id
       RETURNING ${learnerExpeditionColumnsFromAlias(this.sql, this.sql`le`)}`;
-    return rows[0] ? toLearnerExpedition(rows[0]) : undefined;
+    if (!rows[0]) return undefined;
+    return toClaimedLearnerExpedition(rows[0]);
   }
 
   async failExhaustedGenerating(input: { staleBefore: Date; maxAttempts: number; failureMessage: string }): Promise<number> {
@@ -244,6 +249,18 @@ export class PostgresLearnerExpeditionStore implements LearnerExpeditionStorePor
       RETURNING learner_expedition_id`;
     return rows.length;
   }
+}
+
+function toClaimedLearnerExpedition(row: LearnerExpeditionRow): ClaimedLearnerExpedition {
+  const expedition = toLearnerExpedition(row);
+  if (!expedition.currentOperationId || expedition.currentOperationType !== "enrichment") {
+    throw new Error(`Claimed expedition ${expedition.learnerExpeditionId} has no enrichment operation token.`);
+  }
+  return {
+    ...expedition,
+    currentOperationId: expedition.currentOperationId,
+    currentOperationType: expedition.currentOperationType
+  };
 }
 
 const learnerExpeditionColumns = (sql: Sql) => sql`

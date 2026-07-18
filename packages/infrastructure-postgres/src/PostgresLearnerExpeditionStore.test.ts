@@ -5,10 +5,10 @@ import { createDatabaseClient } from "./db";
 import { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
 import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
-// Delete the learners this suite seeds so the shared dev DB is unchanged (R2/AE2).
+// Delete the learners this suite seeds so later isolated DB suites see no residue (R2/AE2).
 after(() => cleanupTrackedLearners(databaseUrl));
 
 maybe("learner expeditions round-trip and stay scoped per learner", async () => {
@@ -119,6 +119,8 @@ maybe("claimNextGenerating claims fresh rows and increments attempts", async () 
     assert.equal(claimed?.learnerExpeditionId, learnerExpeditionId);
     assert.equal(claimed?.generationAttempts, 1);
     assert.ok(claimed?.claimedAt);
+    assert.match(claimed?.currentOperationId ?? "", /^[0-9a-f-]{36}$/);
+    assert.equal(claimed?.currentOperationType, "enrichment");
   } finally {
     await sql.end();
   }
@@ -159,8 +161,9 @@ maybe("claimNextGenerating relaunches stale operation heartbeats and failExhaust
 
     const claimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() - 120000), maxAttempts: 3 });
     assert.equal(claimed?.generationAttempts, 3);
-    // The claim fences the row by clearing its operation id.
-    assert.equal(claimed?.currentOperationId, null);
+    // Reclaim atomically replaces the stale operation with a fresh fence.
+    assert.notEqual(claimed?.currentOperationId, operationId);
+    assert.equal(claimed?.currentOperationType, "enrichment");
 
     // Age both the claim and the row's own heartbeat stand-in past the stale window.
     await sql`
@@ -298,7 +301,7 @@ maybe("a crash-window row (operation id set, no operation_runs row) is reclaimab
   }
 });
 
-maybe("updateProgress is fenced: a write expecting a lost operation id affects 0 rows", async () => {
+maybe("updateProgress is fenced: a stale claimed token cannot write after a newer claim", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const store = new PostgresLearnerExpeditionStore(sql);
@@ -313,25 +316,31 @@ maybe("updateProgress is fenced: a write expecting a lost operation id affects 0
       status: "generating"
     });
 
-    // First write installs the run's fence token (claim left the operation id null).
-    const installed = await store.updateProgress({
-      learnerExpeditionId,
-      expectedOperationId: null,
-      currentOperationId: "11111111-1111-4111-8111-111111111111",
-      currentOperationType: "enrichment"
-    });
-    assert.equal(installed, 1);
-
-    // A competing claim clears the operation id — the old worker's fenced write is a no-op.
     await sql`
-      UPDATE learner_expeditions SET current_operation_id = null, current_operation_type = null
+      UPDATE learner_expeditions SET created_at = now() - interval '100 years'
+      WHERE learner_expedition_id = ${learnerExpeditionId}`;
+    const claimed = await store.claimNextGenerating({ staleBefore: new Date(Date.now() - 120000), maxAttempts: 3 });
+    assert.equal(claimed?.learnerExpeditionId, learnerExpeditionId);
+    const staleToken = claimed?.currentOperationId;
+    assert.ok(staleToken);
+
+    // Simulate a newer claim replacing the token — the old worker's write is a no-op.
+    const newerToken = randomUUID();
+    await sql`
+      UPDATE learner_expeditions SET current_operation_id = ${newerToken}, current_operation_type = 'enrichment'
       WHERE learner_expedition_id = ${learnerExpeditionId}`;
     const stale = await store.updateProgress({
       learnerExpeditionId,
-      expectedOperationId: "11111111-1111-4111-8111-111111111111",
+      expectedOperationId: staleToken,
       status: "ready"
     });
     assert.equal(stale, 0);
+    const current = await store.updateProgress({
+      learnerExpeditionId,
+      expectedOperationId: newerToken,
+      declaredDomain: "test"
+    });
+    assert.equal(current, 1);
     const rows = await store.listForLearner(learnerStateRef);
     assert.equal(rows[0].status, "generating");
   } finally {

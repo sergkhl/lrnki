@@ -8,8 +8,8 @@ import { PostgresStudyItemBankStore } from "./PostgresLearnerLoopStores";
 import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the recall challenge tables applied.
-// Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
-const databaseUrl = process.env.DATABASE_URL;
+// Skipped when TEST_DATABASE_URL is absent so the unit suite stays hermetic.
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 after(async () => {

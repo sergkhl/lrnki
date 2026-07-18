@@ -41,6 +41,7 @@ const supervisor = createGenerationSupervisor({
     topicGeneration ??= createLearnerTopicExpeditionGeneration(sharedSql());
     return topicGeneration({
       learnerExpeditionId: claimed.learnerExpeditionId,
+      enrichmentId: claimed.currentOperationId,
       topic: claimed.title,
       declaredDomain: claimed.declaredDomain
     });

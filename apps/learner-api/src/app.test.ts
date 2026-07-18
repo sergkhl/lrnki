@@ -100,8 +100,8 @@ test("challenge routes refuse a missing bearer token", async () => {
 
 // End-to-end challenge lifecycle against the live database: create → misses into Last Stand →
 // recovery win, exact resume, replay idempotency, retreat/resume, and the KTD4 neutrality
-// checksum. Skipped without DATABASE_URL (the unit suite stays hermetic).
-const databaseUrl = process.env.DATABASE_URL;
+// checksum. Skipped without TEST_DATABASE_URL (the unit suite stays hermetic and never touches dev data).
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybeDb = databaseUrl ? test : test.skip;
 
 maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempotent replay, response_log untouched", async () => {

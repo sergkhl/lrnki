@@ -55,7 +55,9 @@ definitions and repair their references in the same change.
     `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
     `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
     (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer
-    a real-use gate by claiming `DATABASE_URL` is unavailable.
+    a real-use gate by claiming `DATABASE_URL` is unavailable. DB-backed automated tests are the
+    exception: run `pnpm test:db`, which resets and targets only `lrnki_test`; test files must opt
+    in through `TEST_DATABASE_URL` and must never use the development `DATABASE_URL`.
 
 15. Admin Lab web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph
     visualization uses Cytoscape. The learner surface is React Native primitives styled with

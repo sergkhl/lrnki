@@ -1,3 +1,5 @@
+import { isGenerationClaimLostError } from "@lrnki/application";
+
 // Shared process-level claim/top-up scheduler (plan 2026-07-12-002 U3, KTD7). Both the topic
 // expedition and the scaffold detour queues are drained by the SAME loop: a `reap` step fails
 // stale/exhausted rows, then a bounded top-up claims rows until the in-flight cap or an empty
@@ -64,7 +66,7 @@ export function createGenerationSupervisor<T>(hooks: GenerationSupervisorHooks<T
         const run: Promise<void> = hooks
           .run(unit)
           .catch((error) => {
-            console.error(`${hooks.label} generation attempt failed.`, error);
+            reportGenerationAttemptError(hooks.label, error);
           })
           .finally(() => {
             state.inFlight.delete(run);
@@ -78,4 +80,12 @@ export function createGenerationSupervisor<T>(hooks: GenerationSupervisorHooks<T
   }
 
   return { start, wake, runOnce };
+}
+
+export function reportGenerationAttemptError(label: string, error: unknown): void {
+  if (isGenerationClaimLostError(error)) {
+    console.warn(`${label} generation claim lost; a newer attempt is authoritative.`);
+    return;
+  }
+  console.error(`${label} generation attempt failed.`, error);
 }

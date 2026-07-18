@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
 import type { LearnerExpeditionStorePort } from "@lrnki/ports";
+import { GenerationClaimLostError } from "./generationClaimLost";
 import { isTransientGenerationError } from "./generationFailureClassification";
 
 // Topic Expedition generation — the deep post-claim lifecycle module (plan 2026-07-13-001,
@@ -13,21 +13,12 @@ import { isTransientGenerationError } from "./generationFailureClassification";
 
 export type TopicExpeditionRequest = {
   learnerExpeditionId: string;
+  enrichmentId: string;
   topic: string;
   declaredDomain: string | null;
 };
 
 export type TopicExpeditionGeneration = (request: TopicExpeditionRequest) => Promise<void>;
-
-// Thrown when a fenced write affects 0 rows: another worker re-claimed the row, so
-// this run no longer owns it and must stop spending. The row is left untouched — the
-// new owner's writes are authoritative. Internal: the supervisor only needs a rejection.
-class GenerationClaimLostError extends Error {
-  constructor(learnerExpeditionId: string) {
-    super(`Generation claim lost for expedition ${learnerExpeditionId}.`);
-    this.name = "GenerationClaimLostError";
-  }
-}
 
 export function createTopicExpeditionGeneration(construction: {
   // The one store capability the lifecycle needs — the fenced progress write. Store
@@ -44,26 +35,24 @@ export function createTopicExpeditionGeneration(construction: {
   // Study Item Bank generation, completion-only. Readiness needs no item threshold:
   // a sparse valid bank is still ready (ADR-0026).
   studyItemBankGeneration: (activity: { enrichmentId: string }) => Promise<void>;
-  newEnrichmentId?: () => string;
 }): TopicExpeditionGeneration {
-  const newEnrichmentId = construction.newEnrichmentId ?? randomUUID;
   return async (request) => {
     // Per-call lifecycle state: nothing below outlives this invocation, so the
     // supervisor's concurrent calls through one constructed generator cannot share
     // enrichment identity, fence, or domain state.
-    const enrichmentId = newEnrichmentId();
-    // Fencing token (lease pattern): the claim cleared current_operation_id, so the
-    // first write expects null and installs this run's enrichment id; every later
-    // write expects that id. A 0-row fenced write means a competing claim took the
-    // row — abort instead of double-running.
-    let fenceToken: string | null = null;
+    const enrichmentId = request.enrichmentId;
+    // The store atomically installed this enrichment id while claiming the row. Every
+    // write verifies that same token; 0 rows means a competing claim took ownership.
+    const fenceToken = enrichmentId;
     const fencedUpdate = async (update: Omit<Parameters<LearnerExpeditionStorePort["updateProgress"]>[0], "learnerExpeditionId" | "expectedOperationId">): Promise<void> => {
       const affected = await construction.expeditionProgress.updateProgress({
         learnerExpeditionId: request.learnerExpeditionId,
         expectedOperationId: fenceToken,
         ...update
       });
-      if (affected === 0) throw new GenerationClaimLostError(request.learnerExpeditionId);
+      if (affected === 0) {
+        throw new GenerationClaimLostError(`Generation claim lost for expedition ${request.learnerExpeditionId}.`);
+      }
     };
     // A best-effort terminal write: losing the fence (0 rows) or a store rejection here
     // just means someone else owns the row — the caught generation error stays the
@@ -81,11 +70,8 @@ export function createTopicExpeditionGeneration(construction: {
     };
     try {
       await fencedUpdate({
-        status: "generating",
-        currentOperationId: enrichmentId,
-        currentOperationType: "enrichment"
+        status: "generating"
       });
-      fenceToken = enrichmentId;
       let resolvedDeclaredDomain = request.declaredDomain?.trim() ?? "";
       const { conceptCount } = await construction.syntheticGeneration({
         enrichmentId,

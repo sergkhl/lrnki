@@ -1,10 +1,8 @@
 import type { Sql } from "postgres";
 
-// Test-only cleanup for the reporter's autocommit rows. The live integration tests
-// for PostgresRunProgressReporter / PostgresOperationTimelineRead write committed
-// operation_runs (+ child operation_run_stages) into the shared dev DB, which the
-// Admin Lab reads. Each test must purge what it created so no orphaned "running"
-// row survives to surface as a phantom stalled/failed operation in the operator UI.
+// Test-only cleanup for the reporter's autocommit rows. The DB integration suites run
+// only against TEST_DATABASE_URL, but still purge their committed operation timelines
+// so assertions within the same isolated test run never observe orphaned rows.
 //
 // The FK operation_run_stages.operation_run_id → operation_runs is NO ACTION (no
 // cascade), so child stage rows are deleted before their parents. Scoping by

@@ -18,6 +18,7 @@
     "start": "pnpm --filter @lrnki/admin-lab start",
     "lint": "eslint .",
     "test": "pnpm -r --sort --if-present run test",
+    "test:db": "scripts/test-db.sh",
     "typecheck": "pnpm -r --sort --if-present run typecheck",
     "check": "pnpm run tmp:clean && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build && pnpm run e2e:web",
     "e2e:web": "pnpm --filter @lrnki/learner-app e2e",

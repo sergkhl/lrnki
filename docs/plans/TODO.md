@@ -11,6 +11,16 @@
 
 ## COMPLETED
 
+- **Topic-generation claim reliability and DB-test isolation shipped (2026-07-18).** Topic claims
+  now mint and persist the enrichment operation/fencing UUID atomically in the queue claim;
+  lifecycle generation receives that claimed identity and verifies it before neural spend, so the
+  former claim-with-NULL handoff window is gone. Topic and Scaffold claim loss share one expected
+  cancellation signal, which the shared supervisor reports without a failure stack. DB integration
+  suites now opt in through `TEST_DATABASE_URL`; `pnpm test:db` serializes, validates, resets, and
+  migrates only `lrnki_test`, preventing a live learner-api from consuming or losing test fixtures.
+  No schema or prompt changed. Rule-14 gate PASS; evidence and caveat:
+  `tmp/2026-07-18-topic-claim-fix/EVALUATION.md`. Validation in VALIDATION below.
+
 - **Dead module cleanup and durable keep decisions shipped (2026-07-17, plan 2026-07-17-001; plan
   DELETED).** Purely subtractive (rule 18) with zero-consumer evidence re-verified at execution
   time: deleted `verifyEvidenceQuote.ts`, `targetCandidates.ts` + test + barrel block,
@@ -297,6 +307,18 @@
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Topic-generation claim reliability — isolated DB + real-use gate, 2026-07-18. PASS.** Focused
+  lifecycle **13/13** and learner-api **20/20** green; guarded `pnpm test:db` reset/migrated only
+  `lrnki_test` and all workspace suites passed while the live `lrnki` expedition queue stayed
+  unchanged and the deployed API logged no claim loss. Repository-wide `pnpm typecheck`,
+  `pnpm lint`, and `pnpm build` passed. A fresh production-model “Binary search invariants” run
+  lasted beyond the two-minute stale window with a fresh heartbeat, retained one claim/enrichment
+  UUID, completed in one attempt, and published 6 concepts, 5 certain edges, 6 lessons, and 10 study
+  items. The disposable learner was removed. Human inspection found a coherent, useful trail and
+  one pre-existing content caveat: sorted input appeared in an example but not as its own
+  prerequisite. No fixture-specific tuning was introduced. Evidence:
+  `tmp/2026-07-18-topic-claim-fix/EVALUATION.md`.
 
 - **Dead module cleanup — deterministic envelope + explorer smoke, 2026-07-17. PASS.** Full
   envelope on the post-deletion tree: `pnpm typecheck` all 11 remaining projects clean (proves

@@ -9,10 +9,10 @@ import { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
 import { purgeOperationRun } from "./testSupport";
 
 // Integration tests against a live PostgreSQL with the single initial migration
-// applied. Skipped when DATABASE_URL is absent so the unit suite stays hermetic.
+// applied. Skipped when TEST_DATABASE_URL is absent so the unit suite stays hermetic.
 // Each test purges the operation_runs it commits (see purgeOperationRun) so the
-// shared dev DB the Admin Lab reads is left exactly as it was found.
-const databaseUrl = process.env.DATABASE_URL;
+// isolated test database is left exactly as it was found.
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
 maybe("beginOperation commits a running parent row visible to a SEPARATE connection (KTD3 autocommit)", async () => {

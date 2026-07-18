@@ -5,10 +5,10 @@ import { createDatabaseClient } from "./db";
 import { PostgresLearnerLoopRead } from "./PostgresLearnerLoopRead";
 import { cleanupTrackedLearners, seedLearner } from "./testSupport";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 
-// Delete the learners this suite seeds so the shared dev DB is unchanged (R2/AE2).
+// Delete the learners this suite seeds so later isolated DB suites see no residue (R2/AE2).
 after(() => cleanupTrackedLearners(databaseUrl));
 
 // Seed an enrichment with one node, one study item, and a graded response.
