@@ -142,8 +142,8 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
 // either default operation identity for unchanged inputs. A legitimate behavior change may update
 // these values deliberately — never as a side effect of a type refactor.
 test("default operation config hashes are stable across the registry derivation", () => {
-  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-1886ba82e2e5");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-47040dd9508a");
+  assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-913d1ab4584f");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-28288308e450");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {
@@ -152,6 +152,11 @@ test("synthetic execution widths do not change identity while probe behavior sti
     syntheticGenerationConfigHash({ ...DEFAULT_SYNTHETIC_GENERATION_CONFIG, conceptConcurrency: 1 }),
     base,
     "concept fan-out is execution policy"
+  );
+  assert.equal(
+    syntheticGenerationConfigHash({ ...DEFAULT_SYNTHETIC_GENERATION_CONFIG, verificationConcurrency: 1 }),
+    base,
+    "verification fan-out is execution policy"
   );
   assert.equal(
     syntheticGenerationConfigHash({
@@ -176,5 +181,13 @@ test("synthetic execution widths do not change identity while probe behavior sti
     }),
     base,
     "probe admission threshold remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      groundingDraftAttempts: DEFAULT_SYNTHETIC_GENERATION_CONFIG.groundingDraftAttempts + 1
+    }),
+    base,
+    "bounded grounding rejection sampling remains behavioral identity"
   );
 });

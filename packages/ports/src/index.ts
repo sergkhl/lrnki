@@ -418,13 +418,55 @@ export interface GroundingGenerationPort {
     // the originating topic instead of scaffolded anchors; absent/empty for the
     // enrichment-minting path, which keeps scaffolding on its anchors unchanged.
     topic?: string;
+    // Present only for a bounded replacement attempt after an exact-span-grounded
+    // factuality rejection. The generator may produce a fresh draft in response;
+    // it never edits or admits the rejected text, and the replacement is re-verified.
+    rejectionFeedback?: string;
   }): Promise<GeneratedGroundingBundle>;
 }
 
-// Synthetic Generated Grounding Bundle factuality revision. The K probe answers are
-// sampled BEFORE the grounding draft exists, so this cross-family port receives an
-// independent parametric check rather than asking the grounding generator to grade its
-// own completion. It revises the complete bundle; it does not mint source provenance.
+export type GroundingVerificationQuestion = {
+  passageIndex: number;
+  question: string;
+};
+
+export type GroundingVerificationAnswer = GroundingVerificationQuestion & {
+  answer: string;
+};
+
+export type GroundingFactualityRevisionResult =
+  | { disposition: "accepted"; bundle: GeneratedGroundingBundle }
+  | { disposition: "rejected"; rationale: string };
+
+// Claim-targeted verification for a synthetic Generated Grounding Bundle. Planning sees
+// the draft so it can atomize every passage into self-contained factual questions. The
+// answering port deliberately cannot receive the draft; the application joins its answers
+// back to the plan only after that isolated call completes.
+export interface GroundingVerificationQuestionPlanningPort {
+  readonly model: string;
+  plan(input: {
+    declaredDomain: string;
+    topic: string;
+    nodeLabel: string;
+    draft: GeneratedGroundingBundle;
+  }): Promise<GroundingVerificationQuestion[]>;
+}
+
+export interface GroundingVerificationAnsweringPort {
+  readonly model: string;
+  answer(input: {
+    declaredDomain: string;
+    topic: string;
+    nodeLabel: string;
+    questions: string[];
+  }): Promise<string[]>;
+}
+
+// The final cross-family comparison can revise the complete bundle only by removing an
+// original passage whose false verdict contains an exact span. It cannot mint source
+// provenance or author replacement learner-facing facts. A draft with no surviving
+// definition is rejected as a whole so the application can perform bounded rejection
+// sampling without admitting an undefined concept.
 export interface GroundingFactualityRevisionPort {
   readonly model: string;
   revise(input: {
@@ -432,8 +474,8 @@ export interface GroundingFactualityRevisionPort {
     topic: string;
     nodeLabel: string;
     draft: GeneratedGroundingBundle;
-    independentProbeAnswers: string[];
-  }): Promise<GeneratedGroundingBundle>;
+    verificationAnswers: GroundingVerificationAnswer[];
+  }): Promise<GroundingFactualityRevisionResult>;
 }
 
 // ---------------------------------------------------------------------------

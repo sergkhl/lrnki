@@ -14,6 +14,10 @@ import type {
   EnrichmentRunStorePort,
   GroundingFactualityRevisionPort,
   GroundingGenerationPort,
+  GroundingVerificationAnswer,
+  GroundingVerificationAnsweringPort,
+  GroundingVerificationQuestion,
+  GroundingVerificationQuestionPlanningPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort,
   PrerequisiteOrderingPort,
@@ -45,6 +49,12 @@ export type SyntheticGenerationConfig = DerivedGraphCompletionConfig & {
   // Bounded fan-out ACROSS concepts for the probe stage (each concept itself fans K
   // draws inside probeKnowledgeBoundary) and for the grounding stage.
   conceptConcurrency: number;
+  // Verification calls are one per concept with no nested K fan-out, so they can use
+  // a wider execution-only lane without increasing the probe burst width.
+  verificationConcurrency: number;
+  // Total generated-grounding draft attempts per admitted concept. A draft whose
+  // factuality review removes every definition is rejected and selectively redrafted.
+  groundingDraftAttempts: number;
 };
 
 export const DEFAULT_SYNTHETIC_GENERATION_CONFIG: SyntheticGenerationConfig = {
@@ -53,7 +63,9 @@ export const DEFAULT_SYNTHETIC_GENERATION_CONFIG: SyntheticGenerationConfig = {
   // Synthetic sets are small and single-domain, so the ordering budget is generous.
   ...DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
   probe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
-  conceptConcurrency: 8
+  conceptConcurrency: 8,
+  verificationConcurrency: 16,
+  groundingDraftAttempts: 2
 };
 
 // Synthetic topic generation — the SECOND pipeline arm (ADR-0019 amended, plan
@@ -80,6 +92,8 @@ export async function runSyntheticGeneration(input: {
   knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
   embedding: NodeEmbeddingPort;
   groundingGeneration: GroundingGenerationPort;
+  groundingVerificationQuestionPlanning: GroundingVerificationQuestionPlanningPort;
+  groundingVerificationAnswering: GroundingVerificationAnsweringPort;
   groundingFactualityRevision: GroundingFactualityRevisionPort;
   prerequisiteOrdering: PrerequisiteOrderingPort;
   difficulty: DifficultyPort;
@@ -95,6 +109,9 @@ export async function runSyntheticGeneration(input: {
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
   const newNodeId = input.newNodeId ?? randomUUID;
+  if (!Number.isInteger(config.groundingDraftAttempts) || config.groundingDraftAttempts < 1) {
+    throw new Error("Synthetic generation groundingDraftAttempts must be a positive integer.");
+  }
 
   return runInstrumentedOperation(reporter, "enrichment", operationId, async (runStage) => {
     // The synthetic operation persists a DerivedGraphLayer through the enrichment store, so
@@ -134,34 +151,90 @@ export async function runSyntheticGeneration(input: {
     const coreNodeIdByConceptKey = new Map<string, string>(
       coreVerdicts.map((entry) => [entry.concept.conceptKey, newNodeId()] as const)
     );
-    const groundingDrafts = await runStage(STAGE_TAGS.groundingGeneration, () =>
-      mapWithConcurrency(coreVerdicts, config.conceptConcurrency, async (entry) => {
-        const derivedNodeId = coreNodeIdByConceptKey.get(entry.concept.conceptKey)!;
-        const draft = await input.groundingGeneration.generate({
-          derivedNodeId,
-          declaredDomain,
-          nodeLabel: entry.concept.canonicalLabel,
-          scaffoldedAnchors: [],
-          topic: input.topic
-        });
-        return { entry, draft };
-      })
-    );
+    const groundedNodeByConceptKey = new Map<string, LlmGroundedEnrichmentNode>();
+    const rejectionByConceptKey = new Map<string, string>();
+    let pending = coreVerdicts;
 
-    // Stage 4 — revise every draft through a deterministic cross-family factuality pass
-    // before admission. Probe answers were sampled before any draft existed, so they are
-    // independent checks rather than the grounding generator grading its own completion.
-    // The revision is monotonic/drop-only: no new passage text may cross this boundary.
-    // It stays `llm_grounded` and never invents source-backed provenance.
-    const groundedNodes = await runStage(STAGE_TAGS.groundingFactualityRevision, () =>
-      mapWithConcurrency(groundingDrafts, config.conceptConcurrency, async ({ entry, draft }): Promise<LlmGroundedEnrichmentNode> => {
-        const groundingBundle = await input.groundingFactualityRevision.revise({
-          declaredDomain,
-          topic: input.topic,
-          nodeLabel: entry.concept.canonicalLabel,
+    // A claim-level veto that removes every definition rejects the whole draft. Use
+    // bounded rejection sampling to regenerate only those concepts, then repeat the
+    // same context-isolated verification. The reviewer still cannot author text, and
+    // exhausting the draft budget fails the operation without persistence.
+    for (let attempt = 0; attempt < config.groundingDraftAttempts && pending.length > 0; attempt += 1) {
+      const groundingDrafts = await runStage(STAGE_TAGS.groundingGeneration, () =>
+        mapWithConcurrency(pending, config.conceptConcurrency, async (entry) => {
+          const derivedNodeId = coreNodeIdByConceptKey.get(entry.concept.conceptKey)!;
+          const draft = await input.groundingGeneration.generate({
+            derivedNodeId,
+            declaredDomain,
+            nodeLabel: entry.concept.canonicalLabel,
+            scaffoldedAnchors: [],
+            topic: input.topic,
+            rejectionFeedback: rejectionByConceptKey.get(entry.concept.conceptKey)
+          });
+          return { entry, draft };
+        }), pending.length
+      );
+
+      // Plan claim-targeted verification questions FROM each draft. Every passage
+      // must be covered before the source-less bundle can advance.
+      const verificationPlans = await runStage(STAGE_TAGS.groundingVerificationQuestionPlanning, () =>
+        mapWithConcurrency(groundingDrafts, config.verificationConcurrency, async ({ entry, draft }) => {
+          const questions = await input.groundingVerificationQuestionPlanning.plan({
+            declaredDomain,
+            topic: input.topic,
+            nodeLabel: entry.concept.canonicalLabel,
+            draft
+          });
+          validateVerificationPlan(draft, questions);
+          return { entry, draft, questions };
+        }), groundingDrafts.length
+      );
+
+      // Answer only the planned question text in a separate call. The answer port's
+      // input has no draft field, making isolation an application-boundary contract.
+      const verifiedDrafts = await runStage(STAGE_TAGS.groundingVerificationAnswering, () =>
+        mapWithConcurrency(verificationPlans, config.verificationConcurrency, async ({ entry, draft, questions }) => {
+          const answers = await input.groundingVerificationAnswering.answer({
+            declaredDomain,
+            topic: input.topic,
+            nodeLabel: entry.concept.canonicalLabel,
+            questions: questions.map((question) => question.question)
+          });
+          if (answers.length !== questions.length) {
+            throw new Error(`Grounding verification returned ${answers.length} answers for ${questions.length} questions on ${draft.derivedNodeId}.`);
+          }
+          const verificationAnswers: GroundingVerificationAnswer[] = questions.map((question, index) => ({
+            ...question,
+            answer: answers[index]
+          }));
+          return { entry, draft, verificationAnswers };
+        }), verificationPlans.length
+      );
+
+      // Compare every original passage to its draft-blind answers. Accepted output
+      // remains monotonic/drop-only; rejected drafts become the next attempt's input.
+      const reviewed = await runStage(STAGE_TAGS.groundingFactualityRevision, () =>
+        mapWithConcurrency(verifiedDrafts, config.verificationConcurrency, async ({ entry, draft, verificationAnswers }) => ({
+          entry,
           draft,
-          independentProbeAnswers: entry.verdict.answers
-        });
+          revision: await input.groundingFactualityRevision.revise({
+            declaredDomain,
+            topic: input.topic,
+            nodeLabel: entry.concept.canonicalLabel,
+            draft,
+            verificationAnswers
+          })
+        })), verifiedDrafts.length
+      );
+
+      const rejected: typeof coreVerdicts = [];
+      for (const { entry, draft, revision } of reviewed) {
+        if (revision.disposition === "rejected") {
+          rejectionByConceptKey.set(entry.concept.conceptKey, revision.rationale);
+          rejected.push(entry);
+          continue;
+        }
+        const groundingBundle = revision.bundle;
         if (groundingBundle.derivedNodeId !== draft.derivedNodeId) {
           throw new Error(`Grounding factuality revision changed derivedNodeId ${draft.derivedNodeId}.`);
         }
@@ -171,7 +244,7 @@ export async function runSyntheticGeneration(input: {
         if (introduced) {
           throw new Error(`Grounding factuality revision introduced new passage text for ${draft.derivedNodeId}.`);
         }
-        return {
+        groundedNodeByConceptKey.set(entry.concept.conceptKey, {
           nodeKind: "enrichment",
           derivedNodeId: draft.derivedNodeId,
           groundingOrigin: "llm_grounded",
@@ -184,9 +257,18 @@ export async function runSyntheticGeneration(input: {
           declaredDomain,
           aliases: entry.concept.aliases,
           groundingBundle
-        };
-      })
-    );
+        });
+      }
+      pending = rejected;
+    }
+
+    if (pending.length > 0) {
+      const rejected = pending.map((entry) =>
+        `${entry.concept.canonicalLabel}: ${rejectionByConceptKey.get(entry.concept.conceptKey) ?? "all definitions rejected"}`
+      );
+      throw new Error(`Grounding factuality revision exhausted ${config.groundingDraftAttempts} draft attempts: ${rejected.join("; ")}`);
+    }
+    const groundedNodes = coreVerdicts.map((entry) => groundedNodeByConceptKey.get(entry.concept.conceptKey)!);
 
     // Verbatim floor by grounding: every synthetic node is `llm_grounded`, so the floor
     // exempts it and RECORDS the `not_applicable_by_grounding` disposition — never silent
@@ -240,6 +322,26 @@ export async function runSyntheticGeneration(input: {
       }
     });
   });
+}
+
+function validateVerificationPlan(
+  draft: { definitions: readonly unknown[]; mentions: readonly unknown[]; derivedNodeId: string },
+  questions: readonly GroundingVerificationQuestion[]
+): void {
+  const passageCount = draft.definitions.length + draft.mentions.length;
+  const covered = new Set<number>();
+  for (const question of questions) {
+    if (!Number.isInteger(question.passageIndex) || question.passageIndex < 0 || question.passageIndex >= passageCount) {
+      throw new Error(`Grounding verification planned an invalid passage index for ${draft.derivedNodeId}.`);
+    }
+    if (!question.question.trim()) {
+      throw new Error(`Grounding verification planned an empty question for ${draft.derivedNodeId}.`);
+    }
+    covered.add(question.passageIndex);
+  }
+  if (questions.length === 0 || covered.size !== passageCount) {
+    throw new Error(`Grounding verification did not cover every passage for ${draft.derivedNodeId}.`);
+  }
 }
 
 async function resolveDeclaredDomain(

@@ -35,15 +35,28 @@ selection, grounding acceptance rules, persistence shape, and learner-surface po
 `web_grounded` content are unresolved and must be planned before implementation.
 
 For Synthetic Topic Generation, `core_knowledge` is necessary but not sufficient for bundle
-admission. The Knowledge-Boundary Probe's K factual answers are sampled before the grounding draft
-exists. After Grounding Generation, one deterministic `kg-independent-judge` pass atomizes each
-passage's claims and checks them against recurring content in those pre-draft answers plus the
-judge's established domain knowledge. The correction boundary is monotonic and drop-only: a false
-verdict must copy an exact problematic span from the passage, the adapter may remove that complete
-passage, and no verifier-authored learner-facing fact may enter the bundle. An ungrounded veto
-preserves the passage; rejecting every definition fails the operation without partial persistence.
-Only the surviving original passages enter the Derived Graph Layer, still `llm_grounded`.
-Parametric cross-family checking does not create source evidence or `web_grounded` provenance.
+admission. After Grounding Generation, a deterministic `kg-independent-judge` call plans
+self-contained, non-leading verification questions that cover every atomic factual claim in every
+draft passage. Coordinated subjects, predicates, and lists are decomposed into their distributive
+member-to-predicate claims so a collectively true summary cannot mask one false pairing. A separate
+mandatory open-ended check asks for the concept's necessary defining features and its distinction
+from the closest commonly confused concepts; this identity check is guaranteed by the adapter even
+if neural planning omits it. A separate call receives only those questions plus
+topic/domain/concept context — never the draft or passage indices — and answers from established
+domain knowledge. A final
+cross-family comparison joins those draft-blind answers back to their original passages. The
+correction boundary is monotonic and drop-only: a false verdict must copy an exact problematic span
+from the passage, the adapter may remove that complete passage, and no verifier-authored
+learner-facing fact may enter the bundle. An ungrounded veto preserves the passage; rejecting every
+definition rejects the whole draft. Synthetic Topic Generation then performs bounded rejection
+sampling: it regenerates and re-verifies only the rejected concept once, preserving the concept's
+allocated node identity and canonical output order. The replacement generator receives the bounded
+rejection rationale so it can avoid reproducing the same defect, but no verifier-authored passage;
+the fresh bundle must pass the complete independent verification again. A second whole-draft
+rejection fails the operation without partial persistence. Only the surviving original passages from an accepted draft
+enter the Derived Graph Layer, still `llm_grounded`. Parametric cross-family checking does not create
+source evidence or `web_grounded` provenance. The Knowledge-Boundary Probe's K answers remain only
+an admission-agreement signal and do not substitute for claim-targeted verification evidence.
 
 Current accepted scope is source-less concept synthesis:
 
@@ -72,25 +85,44 @@ facts; Chain-of-Verification finds that independently answering verification que
 revision reduces copying the original hallucination; RARR researches then minimally revises
 unsupported content. See [FActScore](https://aclanthology.org/2023.emnlp-main.741/),
 [Chain-of-Verification](https://arxiv.org/abs/2309.11495), and
-[RARR](https://aclanthology.org/2023.acl-long.910/). The implemented pass adapts that conventional
-shape to the existing source-less contract by reusing independently sampled probe answers. A first
-real-use attempt allowed the verifier to rewrite the bundle and reproduced the established warning
+[RARR](https://aclanthology.org/2023.acl-long.910/). The implemented pass adapts Chain-of-Verification's
+question-planning and draft-blind answering shape to the existing source-less contract while keeping
+the final action abstention-only. A first real-use attempt allowed the verifier to rewrite the bundle
+and reproduced the established warning
 that intrinsic correction can degrade a correct response: it replaced a correct quantitative claim
 with an outdated one. See [Large Language Models Cannot Self-Correct Reasoning
 Yet](https://deepmind.google/research/publications/48252/) and
 [CRITIC](https://proceedings.iclr.cc/paper_files/paper/2024/hash/fef126561bbf9d4467dbb8d27334b8fe-Abstract-Conference.html).
 Therefore the source-less fallback can only abstain by removing an exact-span-grounded problematic
-passage, never author a correction. It does not adopt RARR/CRITIC's external-tool branch because
-retrieval acceptance, provenance, and learner-surface policy remain deliberately unresolved for
-`web_grounded`.
+passage, never author a correction. When abstention removes every definition, bounded rejection
+sampling discards that generated sample and gives its rationale to the owning generator for one
+fresh attempt; this is conventional critique-guided generate-then-verify while the final verifier
+remains unable to write learner-facing text. It does not adopt RARR/CRITIC's external-tool branch
+because retrieval acceptance, provenance, and learner-surface policy remain deliberately unresolved
+for `web_grounded`.
 
 A second real-use attempt established that the Knowledge-Boundary Probe's generic concept
 characterizations are not substitutes for Chain-of-Verification's claim-targeted questions. Ten
 highly consistent checks repeated the same shallow misconception as the grounding draft, and the
-reviewer preserved the false passage. The monotonic boundary remains required, but the active plan
-must add question planning followed by a separate answer call that does not receive the draft before
-the reviewer may apply an exact-span veto. Model-family separation without claim-targeted context
-separation is insufficient quality evidence.
+reviewer preserved the false passage. The current question-planning and draft-blind answer stages
+replace that rejected path while preserving the monotonic boundary. Model-family separation without
+claim-targeted context separation is insufficient quality evidence.
+
+Subsequent real-use inspection exposed two more established verification failure classes. First,
+an ambiguously scoped quantitative question substituted a historical theoretical bookkeeping value
+for a current scoped estimate; quantitative questions and answers now preserve referent, system,
+conditions, units, and accounting convention, and the final judge cannot treat a different-scope
+value as a contradiction. Second, a question bundled two entities across a list of stages and the
+collective answer hid a false entity-to-stage pairing. Planning, answering, and final comparison now
+make collective-versus-distributive scope explicit and verify each asserted pairing independently.
+Both corrections are domain-neutral atomization policy, not fixture-specific facts.
+
+A later ready-artifact trace established that open-endedness is also load-bearing. The planner had
+emitted leading yes/no checks which the answerer affirmed one by one, even though the same production
+model stated the correct distinction when directly asked to define the concept and contrast it with
+nearby alternatives. Every bundle therefore carries the mandatory contrastive identity question in
+addition to its draft-derived atomic checks; final comparison gives that answer priority for
+conflation judgments. This is a generic verification question, not a domain fact or lexical veto.
 
 The accepted calibration from the 2026-07-07 measurement pass is K=10, probe temperature 0.7, and
 mean-pairwise embedding agreement threshold 0.89. The calibration harness is the `kg-worker`

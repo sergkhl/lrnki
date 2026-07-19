@@ -5,11 +5,14 @@ import { toForcedToolSchema } from "./forcedToolSchema";
 import {
   buildPrerequisiteOrderingSchema,
   buildPrerequisiteOrderingValidator,
+  buildGroundingVerificationAnsweringValidator,
+  buildGroundingVerificationQuestionPlanningValidator,
   conceptAdmissionSchemaForCandidateKeys,
   conceptAdmissionValidatorForCandidateKeys,
   conceptCoreSelectionSchemaForCandidateKeys,
   conceptCoreSelectionValidatorForCandidateKeys,
   conceptEvidenceProfileSchema,
+  conceptSetSynthesisValidator,
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
@@ -21,6 +24,17 @@ import {
   scaffoldOutlineValidator,
   toolValidators
 } from "./toolSchemas";
+
+test("concept-set synthesis enforces the operation's at-most-16 concept budget", () => {
+  const concepts = Array.from({ length: 17 }, (_, index) => ({
+    conceptKey: `concept_${index}`,
+    canonicalLabel: `Concept ${index}`,
+    aliases: []
+  }));
+
+  assert.throws(() => conceptSetSynthesisValidator.parse({ concepts }));
+  assert.doesNotThrow(() => conceptSetSynthesisValidator.parse({ concepts: concepts.slice(0, 16) }));
+});
 
 test("all forced-tool schemas satisfy strict object invariants", () => {
   for (const validator of toolValidators) {
@@ -89,6 +103,32 @@ test("prerequisite ordering schema keeps numeric bounds while refine remains val
   assert.throws(() => buildPrerequisiteOrderingValidator(3).parse({
     edges: [{ prerequisiteNumber: 2, dependentNumber: 2, confidence: 0.5, rationale: "r" }]
   }));
+});
+
+test("grounding verification schemas require complete question and answer coverage", () => {
+  const plan = buildGroundingVerificationQuestionPlanningValidator(2);
+  assert.doesNotThrow(() => plan.parse({
+    questions: [
+      { passageIndex: 0, question: "What establishes the first atomic claim?" },
+      { passageIndex: 1, question: "What establishes the second atomic claim?" }
+    ]
+  }));
+  assert.throws(() => plan.parse({
+    questions: [
+      { passageIndex: 0, question: "What establishes one claim?" },
+      { passageIndex: 0, question: "What establishes another claim in the same passage?" }
+    ]
+  }), /missing verification question/);
+
+  const answers = buildGroundingVerificationAnsweringValidator(2);
+  assert.doesNotThrow(() => answers.parse({ answers: [
+    { questionIndex: 1, answer: "The second answer." },
+    { questionIndex: 0, answer: "The first answer." }
+  ] }));
+  assert.throws(() => answers.parse({ answers: [
+    { questionIndex: 0, answer: "The first answer." },
+    { questionIndex: 0, answer: "A duplicate answer." }
+  ] }), /duplicate question index/);
 });
 
 test("concept evidence profile emits nullable literalValue in forced-tool dialect", () => {

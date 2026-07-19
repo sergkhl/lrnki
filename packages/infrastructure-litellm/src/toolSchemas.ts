@@ -202,7 +202,7 @@ export const conceptSetSynthesisValidator = z.object({
     conceptKey: z.string().min(1).describe("Short stable slug unique within this concept set, e.g. 'topic_x'."),
     canonicalLabel: z.string().min(1).describe("Precise, domain-qualified label naming one durable, independently-teachable concept within the topic."),
     aliases: z.array(z.string().min(1)).describe("Exact alternative surface forms for the same concept; empty when there are none.")
-  }).strict()).describe("A bounded set of durable, independently-teachable concepts a learner would study to understand the topic within the Declared Domain. Name concepts, not propositions or claims.")
+  }).strict()).max(16).describe("At most 16 durable, independently-teachable concepts a learner would study to understand the topic within the Declared Domain. Name concepts, not propositions or claims.")
 }).strict();
 
 export const conceptSetSynthesisSchema: JsonSchema = toForcedToolSchema(conceptSetSynthesisValidator);
@@ -232,6 +232,54 @@ export const generatedGroundingBundleValidator = z.object({
 }).strict();
 
 export const generatedGroundingBundleSchema: JsonSchema = toForcedToolSchema(generatedGroundingBundleValidator);
+
+// --- Synthetic grounding verification questions: submit_grounding_verification_questions ---
+// The planner sees the draft and turns every passage into one or more self-contained,
+// non-leading questions. Runtime refinement proves complete passage coverage; the answer
+// stage receives only the resulting question strings.
+export function buildGroundingVerificationQuestionPlanningValidator(passageCount: number) {
+  return z.object({
+    questions: z.array(z.object({
+      passageIndex: z.number().int().min(0).max(Math.max(0, passageCount - 1)).describe("The zero-based passage index whose atomic factual claim this question verifies."),
+      question: z.string().min(1).describe("One self-contained, non-leading factual question that can be answered without seeing the generated draft.")
+    }).strict()).min(passageCount).describe("Claim-targeted verification questions covering every listed passage at least once and every independently verifiable atomic claim within it.")
+  }).strict().superRefine((value, ctx) => {
+    const covered = new Set(value.questions.map((question) => question.passageIndex));
+    for (let passageIndex = 0; passageIndex < passageCount; passageIndex++) {
+      if (!covered.has(passageIndex)) {
+        ctx.addIssue({ code: "custom", message: `missing verification question for passage index ${passageIndex}` });
+      }
+    }
+  });
+}
+
+export const groundingVerificationQuestionPlanningValidator = buildGroundingVerificationQuestionPlanningValidator(1);
+export function buildGroundingVerificationQuestionPlanningSchema(passageCount: number): JsonSchema {
+  return toForcedToolSchema(buildGroundingVerificationQuestionPlanningValidator(passageCount));
+}
+
+// --- Synthetic grounding verification answers: submit_grounding_verification_answers ---
+// One answer per planned question. The answerer sees no draft or passage index and returns
+// only independently generated parametric answers keyed to the displayed question number.
+export function buildGroundingVerificationAnsweringValidator(questionCount: number) {
+  return z.object({
+    answers: z.array(z.object({
+      questionIndex: z.number().int().min(0).max(Math.max(0, questionCount - 1)).describe("The zero-based verification-question index exactly as listed."),
+      answer: z.string().min(1).describe("A direct, self-contained factual answer from established domain knowledge; state that the answer is uncertain when it cannot be established reliably.")
+    }).strict()).length(questionCount).describe("Exactly one independent answer for every listed verification-question index.")
+  }).strict().superRefine((value, ctx) => {
+    const seen = new Set<number>();
+    for (const answer of value.answers) {
+      if (seen.has(answer.questionIndex)) ctx.addIssue({ code: "custom", message: `duplicate question index ${answer.questionIndex}` });
+      seen.add(answer.questionIndex);
+    }
+  });
+}
+
+export const groundingVerificationAnsweringValidator = buildGroundingVerificationAnsweringValidator(1);
+export function buildGroundingVerificationAnsweringSchema(questionCount: number): JsonSchema {
+  return toForcedToolSchema(buildGroundingVerificationAnsweringValidator(questionCount));
+}
 
 // --- Synthetic grounding factuality revision: submit_grounding_factuality_judgments ---
 // One verdict per listed passage. The judge may identify a false atomic claim only by
@@ -698,6 +746,8 @@ export const toolValidators = [
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
+  groundingVerificationQuestionPlanningValidator,
+  groundingVerificationAnsweringValidator,
   groundingFactualityRevisionValidator,
   missingPrerequisiteProposalValidator,
   buildDifficultyBandsValidator(3),

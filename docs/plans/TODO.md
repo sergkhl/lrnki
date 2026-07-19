@@ -2,29 +2,19 @@
 
 ## TODO
 
-- **Speed up Topic Expedition generation.** Active plan
-  [2026-07-18-002](./2026-07-18-002-speed-up-expedition-generation.md) — In progress: U1–U4 are
-  complete. U6 now enforces a monotonic exact-span veto: the reviewer can remove an original
-  passage but cannot write a replacement, and the application rejects introduced text before
-  persistence. Two live correction gates remain `FIX_FIRST`: verifier-authored rewriting first
-  fixed the conflation but introduced an outdated ATP claim; the monotonic run then preserved the
-  correct 30–32 ATP claim but missed the original conflation. Its trace shows why: all ten generic
-  pre-draft checks repeated the same shallow misconception and the reviewer explicitly accepted it.
-  Do not start the Treasure-map plan. Resume U6 by implementing conventional claim-targeted
-  verification-question planning, a separate draft-blind answer pass, and exact-span comparison
-  while preserving the no-rewrite boundary. Re-run the full U5 gate; evidence:
-  `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
-
 - **Treasure-map trail restyle.** Active plan
-  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — Ready, not started.
+  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — Ready, not started. Next-session
+  handoff: this is now first in execution order; begin with U1's React Native map tokens, bundled
+  display-font bootstrap, `map-title` text variant, and QuestHeader trim. The Topic Expedition
+  speed/factuality plan is complete and deleted.
 
 ### Evidence-triggered follow-up
 
 - **Progressive readiness / keep the learner busy under ~1 minute.** If ~3-minute full-ready
-  generation (plan 2026-07-18-002) still feels slow in real use, design one of: earliest-section
+  generation still feels slow in real use, design one of: earliest-section
   readiness (learner enters while later sections still generate; owns the readiness-rule and
-  Study Session composition change), enrichment/study-items phase overlap (the in-memory handoff
-  seam plan 2026-07-18-002 KTD4 deliberately rejected), or an engaging waiting surface (e.g.
+  Study Session composition change), enrichment/study-items phase overlap (the shipped sequential
+  operation boundary has no in-memory handoff seam), or an engaging waiting surface (e.g.
   calibration or topic preview during generation). Real-use judgment after the speedup ships
   triggers this, not a timer.
 
@@ -35,17 +25,21 @@
 
 ## COMPLETED
 
-- **Topic Expedition scheduling and execution-policy speedups implemented (2026-07-19, active plan
-  2026-07-18-002 U2–U4; uncommitted).** The shared Derived Graph Layer completion now runs its
-  intact ordering chain concurrently with intrinsic difficulty and joins before coverage proof /
-  atomic persistence; Study Item Bank generation raises lesson + blueprint fan-out to 8, launches
-  option-select / matching / impostor as three concurrent degree-4 brackets, and merges results only
-  after the join in canonical type order; Synthetic Topic Generation raises concept fan-out to 8,
-  while `conceptConcurrency` and nested `probeConcurrency` are removed from behavioral config
-  identity. Focused regressions prove overlap, deterministic merge, and zero persistence when either
-  or both Derived Graph Layer branches fail. No prompt, K, threshold, guard, schema, readiness rule,
-  supervisor, or persisted artifact shape changed. Deterministic validation is green; U5 quality is
-  `FIX_FIRST`, so the active plan is deliberately not closed. Validation in VALIDATION below.
+- **Topic Expedition speed and generated-grounding reliability shipped (2026-07-19, plan
+  2026-07-18-002; plan DELETED; uncommitted).** Groq is the forced-tool-compatible gpt-oss-120b
+  provider lock; Derived Graph ordering overlaps difficulty; lesson/blueprint and concept fan-out
+  are 8; all three Study Item families run concurrent degree-4 brackets and merge canonically.
+  Source-less grounding admission now uses claim-targeted question planning, structurally
+  draft-blind answering, one adapter-guaranteed open-ended identity/nearest-confusions check, and a
+  monotonic exact-span drop-only review. A wholly rejected draft receives one critique-guided
+  selective redraft and complete re-verification; exhaustion fails before persistence. Concept
+  synthesis emits atomic concepts within a 16-node operating bound, the verification waves use
+  execution-only width 16, and Concept Lesson synthesis may not infer mechanistic/universal claims
+  from graph adjacency. Durable policy lives in ADR-0030/0031 and existing ADR-0002/0019/0034; the
+  final production expedition reached ready in **183.886s**, all 20 stage brackets were `ok:true`,
+  and direct inspection classified the 16-node / 19-edge / 16-lesson / 27-item artifact **PASS**.
+  Journey cost was **$0.1450095** versus **$0.0650480** baseline. Evidence:
+  `tmp/2026-07-18-expedition-speedup/EVALUATION.md`. Validation in VALIDATION below.
 
 - **Topic-generation claim reliability and DB-test isolation shipped (2026-07-18).** Topic claims
   now mint and persist the enrichment operation/fencing UUID atomically in the queue claim;
@@ -344,40 +338,19 @@
 
 ## VALIDATION
 
-- **Generated-grounding factuality correction — two production gates, 2026-07-19. `FIX_FIRST`.**
-  Focused application and infrastructure-LiteLLM typechecks/tests pass, including regressions that
-  forbid reviewer-authored passage text, preserve an ungrounded veto, and fail before persistence
-  when every definition is rejected. Full `pnpm check` and guarded `pnpm test:db` both exit 0.
-  Rewrite-capable operation `879f6eb9…` reached ready in
-  **100.871s** and fixed the target distinction but introduced an outdated 36–38 ATP claim.
-  Monotonic operation `fe0e9655…` reached ready in one attempt in **108.824s**; all stages were
-  `ok:true`, factuality review took **8.715s**, and the 14-node / 17-edge / 14-lesson / 25-item
-  journey cost **$0.1014705** (**+$0.0364226** versus baseline). It retained the correct 30–32 ATP
-  grounding but also retained the foundational anaerobic-respiration/fermentation conflation.
-  Durable request/response inspection showed ten generic checks and the reviewer shared the same
-  misconception, so generic checks are rejected as a substitute for claim-targeted draft-blind
-  verification. The disposable learners were removed; immutable enrichments remain. Evidence:
-  `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
-
-- **Speed Up Topic Expedition Generation — U2–U5 implementation + live gate, 2026-07-19. Timing
-  PASS; real-use quality `FIX_FIRST`.** Repository `pnpm check` passed: workspace typechecks and
-  suites (application **681/681**, learner app **232/232**), lint (0 errors),
-  Admin Lab + Learner App production builds, and web E2E **48/48**. Guarded `pnpm test:db` reset /
-  migrated only `lrnki_test` and passed, including learner-api DB tests **20/20**. A disposable
-  learner requested the baseline topic “Cellular Respiration” through the live learner-api
-  supervisor on production LiteLLM/Postgres: ready in **84.100s**, one attempt, all timeline stages
-  `ok:true`, **12** nodes / **13** edges / **12** lessons / **27** current items. Ordering (**9.936s**)
-  overlapped difficulty (**5.696s**); option-select (**17.282s**), matching (**24.389s**), and
-  impostor (**22.655s**) shared one start window. Journey cost was **$0.0780379** versus baseline
-  **$0.0650480** (**+$0.0129899**; current run had 12 nodes versus baseline 15). The DAG and three
-  lessons plus one item of every type were inspected; coherent core paths and plausible 12-core /
-  1-boundary probe separation were present. Inspection also found a foundational factual defect
-  already present in the Generated Grounding Bundle: its aerobic/anaerobic definition assigns the
-  fermentation-specific 2-ATP/byproduct behavior to anaerobic respiration generally and a lesson
-  then says the electron transport chain is exclusive to aerobic respiration. That propagated into
-  a misleading matching pair. No fixture-specific or out-of-plan quality tuning was made; the
-  disposable learner and session were deleted, while the immutable quality evidence remains.
-  Evidence: `tmp/2026-07-18-expedition-speedup/EVALUATION.md` plus captured CSV/JSON alongside it.
+- **Topic Expedition speed + factuality final gate, 2026-07-19. PASS.** The live learner-api
+  supervisor generated the baseline topic “Cellular Respiration” as operation `97ddffe4…` in
+  **183.886s** request-to-ready: enrichment **128.999s**, Study Item generation **54.754s**, all 20
+  durable stage brackets `ok:true`. Claim planning / draft-blind answering / exact-span review took
+  **18.101s / 9.510s / 5.524s** for 16 concepts; ordering **47.688s** overlapped difficulty
+  **53.810s**. Journey attribution: 392 calls, 707,988 tokens, **$0.1450095** total
+  (**+$0.0799616** versus baseline; extra factuality stages explain the delta). Human inspection
+  confirmed separate correct Anaerobic Respiration and Fermentation definitions, a modern 30–32 Net
+  ATP estimate, adjacency-safe lesson applications, coherent committed DAG paths, and useful
+  examples of all three Study Item families; 27 items admitted and 21 rejected explicitly. Final
+  real-use quality **PASS**. `pnpm check` exits 0 (workspace suites/typechecks, lint 0 errors,
+  production builds, web E2E **48/48**); isolated `pnpm test:db` reset/migrated only `lrnki_test` and
+  exits 0. Evidence: `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
 
 - **Speed Up Topic Expedition Generation — U1 provider-lock experiment + live alias gate,
   2026-07-18. PASS.** Baseline operation `9b67cd64…` supplied the full persisted 15-node Cellular

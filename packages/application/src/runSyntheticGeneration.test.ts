@@ -16,6 +16,8 @@ import type {
   EnrichmentRunStorePort,
   GroundingFactualityRevisionPort,
   GroundingGenerationPort,
+  GroundingVerificationAnsweringPort,
+  GroundingVerificationQuestionPlanningPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort,
   PrerequisiteOrderingPort,
@@ -84,6 +86,33 @@ function fakeGrounding(): GroundingGenerationPort {
   };
 }
 
+function fakeVerificationQuestionPlanning(
+  inspect?: (input: Parameters<GroundingVerificationQuestionPlanningPort["plan"]>[0]) => void
+): GroundingVerificationQuestionPlanningPort {
+  return {
+    model: "fake-independent-planner",
+    async plan(input) {
+      inspect?.(input);
+      return [...input.draft.definitions, ...input.draft.mentions].map((_, passageIndex) => ({
+        passageIndex,
+        question: `What fact establishes passage ${passageIndex} for ${input.nodeLabel}?`
+      }));
+    }
+  };
+}
+
+function fakeVerificationAnswering(
+  inspect?: (input: Parameters<GroundingVerificationAnsweringPort["answer"]>[0]) => void
+): GroundingVerificationAnsweringPort {
+  return {
+    model: "fake-independent-answerer",
+    async answer(input) {
+      inspect?.(input);
+      return input.questions.map((question) => `Independent answer to: ${question}`);
+    }
+  };
+}
+
 function fakeGroundingRevision(
   inspect?: (input: Parameters<GroundingFactualityRevisionPort["revise"]>[0]) => void
 ): GroundingFactualityRevisionPort {
@@ -92,8 +121,11 @@ function fakeGroundingRevision(
     async revise(input) {
       inspect?.(input);
       return {
-        ...input.draft,
-        rationale: "atomic facts reviewed against pre-draft checks; no passage added"
+        disposition: "accepted",
+        bundle: {
+          ...input.draft,
+          rationale: "atomic facts reviewed against draft-blind answers; no passage added"
+        }
       };
     }
   };
@@ -144,6 +176,8 @@ function baseInput(overrides: Partial<Parameters<typeof runSyntheticGeneration>[
     knowledgeBoundaryProbe: fakeProbe(new Set()),
     embedding: fakeEmbedding(),
     groundingGeneration: fakeGrounding(),
+    groundingVerificationQuestionPlanning: fakeVerificationQuestionPlanning(),
+    groundingVerificationAnswering: fakeVerificationAnswering(),
     groundingFactualityRevision: fakeGroundingRevision(),
     prerequisiteOrdering: fakeOrdering(),
     difficulty: fakeDifficulty(),
@@ -206,20 +240,126 @@ test("no node carries a source citation; every node carries a Grounding Bundle (
   }
 });
 
-test("grounding is reviewed from pre-draft probe answers without adding passage text", async () => {
-  const seen: Parameters<GroundingFactualityRevisionPort["revise"]>[0][] = [];
+test("grounding is reviewed through claim-targeted questions answered without draft context", async () => {
+  const planned: Parameters<GroundingVerificationQuestionPlanningPort["plan"]>[0][] = [];
+  const answered: Parameters<GroundingVerificationAnsweringPort["answer"]>[0][] = [];
+  const reviewed: Parameters<GroundingFactualityRevisionPort["revise"]>[0][] = [];
   const layer = await runSyntheticGeneration(baseInput({
-    groundingFactualityRevision: fakeGroundingRevision((input) => seen.push(input))
+    groundingVerificationQuestionPlanning: fakeVerificationQuestionPlanning((input) => planned.push(input)),
+    groundingVerificationAnswering: fakeVerificationAnswering((input) => answered.push(input)),
+    groundingFactualityRevision: fakeGroundingRevision((input) => reviewed.push(input))
   }));
 
-  assert.equal(seen.length, 2);
-  assert.equal(seen[0].independentProbeAnswers.length, 10, "all K pre-draft answers reach revision");
-  assert.equal(seen[0].draft.generatingModel, "fake-grounding");
+  assert.equal(planned.length, 2);
+  assert.equal(planned[0].draft.generatingModel, "fake-grounding", "planning sees the draft");
+  assert.equal(answered.length, 2);
+  assert.deepEqual(Object.keys(answered[0]).sort(), ["declaredDomain", "nodeLabel", "questions", "topic"], "answering has no draft field");
+  assert.equal(answered[0].questions.length, 2);
+  assert.equal(reviewed.length, 2);
+  assert.equal(reviewed[0].verificationAnswers.length, 2);
+  assert.equal(reviewed[0].verificationAnswers[0].passageIndex, 0);
+  assert.match(reviewed[0].verificationAnswers[0].answer, /Independent answer/);
   for (const node of layer.derivedNodes) {
     assert.equal(node.groundingOrigin, "llm_grounded");
     assert.equal(node.groundingBundle.generatingModel, "fake-grounding");
     assert.match(node.groundingBundle.definitions[0].text, /means X/);
   }
+});
+
+test("a wholly rejected draft is selectively regenerated and accepted nodes keep canonical concept order", async () => {
+  const generationCounts = new Map<string, number>();
+  const generationFeedback = new Map<string, Array<string | undefined>>();
+  const planned: string[] = [];
+  const answered: string[] = [];
+  const groundingGeneration: GroundingGenerationPort = {
+    model: "fake-redrafting-grounding",
+    async generate(input) {
+      generationFeedback.set(input.nodeLabel, [...(generationFeedback.get(input.nodeLabel) ?? []), input.rejectionFeedback]);
+      const attempt = (generationCounts.get(input.nodeLabel) ?? 0) + 1;
+      generationCounts.set(input.nodeLabel, attempt);
+      const draft = await fakeGrounding().generate(input);
+      return {
+        ...draft,
+        definitions: draft.definitions.map((passage) => ({
+          ...passage,
+          text: `${passage.text} Draft attempt ${attempt}.`
+        }))
+      };
+    }
+  };
+  const groundingFactualityRevision: GroundingFactualityRevisionPort = {
+    model: "fake-selective-reviser",
+    async revise(input) {
+      if (input.nodeLabel === "Concept A" && input.draft.definitions[0].text.includes("attempt 1")) {
+        return { disposition: "rejected", rationale: "every definition contained an exact-span-grounded defect" };
+      }
+      return { disposition: "accepted", bundle: input.draft };
+    }
+  };
+
+  const layer = await runSyntheticGeneration(baseInput({
+    groundingGeneration,
+    groundingVerificationQuestionPlanning: fakeVerificationQuestionPlanning((input) => planned.push(input.nodeLabel)),
+    groundingVerificationAnswering: fakeVerificationAnswering((input) => answered.push(input.nodeLabel)),
+    groundingFactualityRevision
+  }));
+
+  assert.deepEqual(Object.fromEntries(generationCounts), { "Concept A": 2, "Concept B": 1 });
+  assert.deepEqual(generationFeedback.get("Concept A"), [undefined, "every definition contained an exact-span-grounded defect"]);
+  assert.deepEqual(generationFeedback.get("Concept B"), [undefined]);
+  assert.deepEqual(planned, ["Concept A", "Concept B", "Concept A"]);
+  assert.deepEqual(answered, ["Concept A", "Concept B", "Concept A"]);
+  assert.deepEqual(layer.derivedNodes.map((node) => node.canonicalLabel), ["Concept A", "Concept B"]);
+  const conceptA = layer.derivedNodes[0];
+  assert.ok(conceptA.groundingOrigin === "llm_grounded" && "groundingBundle" in conceptA);
+  assert.match(conceptA.groundingBundle.definitions[0].text, /Draft attempt 2/);
+});
+
+test("exhausting the grounding draft budget fails without persistence", async () => {
+  const { store, persisted } = capturingStore();
+  let revisionCalls = 0;
+  const rejectingRevision: GroundingFactualityRevisionPort = {
+    model: "fake-rejecting-reviser",
+    async revise() {
+      revisionCalls += 1;
+      return { disposition: "rejected", rationale: "every definition was rejected" };
+    }
+  };
+
+  await assert.rejects(
+    () => runSyntheticGeneration(baseInput({
+      conceptSetSynthesis: fakeSynthesis([{ conceptKey: "a", canonicalLabel: "Concept A", aliases: [] }]),
+      groundingFactualityRevision: rejectingRevision,
+      enrichmentStore: store
+    })),
+    /exhausted 2 draft attempts/
+  );
+
+  assert.equal(revisionCalls, 2);
+  assert.equal(persisted.length, 0);
+});
+
+test("an incomplete verification plan fails before answering or persistence", async () => {
+  const { store, persisted } = capturingStore();
+  let answeringCalled = false;
+  const incompletePlanning: GroundingVerificationQuestionPlanningPort = {
+    model: "fake-incomplete-planner",
+    async plan() {
+      return [{ passageIndex: 0, question: "What establishes the definition?" }];
+    }
+  };
+
+  await assert.rejects(
+    () => runSyntheticGeneration(baseInput({
+      enrichmentStore: store,
+      groundingVerificationQuestionPlanning: incompletePlanning,
+      groundingVerificationAnswering: fakeVerificationAnswering(() => { answeringCalled = true; })
+    })),
+    /did not cover every passage/
+  );
+
+  assert.equal(answeringCalled, false);
+  assert.equal(persisted.length, 0);
 });
 
 test("a factuality reviewer cannot introduce learner-facing passage text or persist a partial layer", async () => {
@@ -228,11 +368,14 @@ test("a factuality reviewer cannot introduce learner-facing passage text or pers
     model: "fake-rewriting-reviewer",
     async revise(input) {
       return {
-        ...input.draft,
-        definitions: [{
-          ...input.draft.definitions[0],
-          text: "A verifier-authored replacement claim."
-        }]
+        disposition: "accepted",
+        bundle: {
+          ...input.draft,
+          definitions: [{
+            ...input.draft.definitions[0],
+            text: "A verifier-authored replacement claim."
+          }]
+        }
       };
     }
   };

@@ -32,6 +32,12 @@ export {
   buildRescuedNodeLabelingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
+  groundingVerificationQuestionPlanningValidator,
+  buildGroundingVerificationQuestionPlanningSchema,
+  buildGroundingVerificationQuestionPlanningValidator,
+  groundingVerificationAnsweringValidator,
+  buildGroundingVerificationAnsweringSchema,
+  buildGroundingVerificationAnsweringValidator,
   groundingFactualityRevisionValidator,
   buildGroundingFactualityRevisionSchema,
   buildGroundingFactualityRevisionValidator,
@@ -130,8 +136,12 @@ export {
 export {
   createGroundingFactualityRevisionPort,
   createGroundingGenerationPort,
+  createGroundingVerificationAnsweringPort,
+  createGroundingVerificationQuestionPlanningPort,
   groundingFactualityRevisionDescriptor,
-  groundingGenerationDescriptor
+  groundingGenerationDescriptor,
+  groundingVerificationAnsweringDescriptor,
+  groundingVerificationQuestionPlanningDescriptor
 } from "./groundingGenerationAdapters";
 export {
   createConceptSetSynthesisPort,

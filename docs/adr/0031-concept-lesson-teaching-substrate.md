@@ -48,7 +48,10 @@ LiteLLM spend tag (`concept-lesson-generation`) so its cost and wall-clock are s
 ([ADR-0029](0029-persist-shared-operation-stage-timelines.md)).
 
 Synthesized sections are generated only when the current lesson grounding supports them and are
-labeled `generated`. `gist`, `intuition`, and `applications` appear only when they add distinct
+labeled `generated`. Every factual claim in synthesized prose or list items must be entailed by a
+provided grounding passage or the displayed neighbor snippet. Graph adjacency establishes only the
+typed prerequisite/dependent/sibling relation; it cannot by itself justify claims that a neighbor is
+used, bypassed, absent, exclusive, causal, or universal. `gist`, `intuition`, and `applications` appear only when they add distinct
 instructional information rather than repeating the substantive section. A cross-family redundancy
 judge checks section distinctness after assembly. If a non-substantive section is redundant, lesson
 generation retries once with named feedback; if the retry still repeats, the redundant

@@ -42,6 +42,7 @@ test("synthesis port parses a forced-tool concept-set payload into candidate con
   assert.deepEqual(concepts[1]?.aliases, ["B-prime"]);
   assert.equal(capture.lastCall?.toolName, "submit_synthesized_concepts");
   assert.deepEqual(capture.lastCall?.tags, ["concept-set-synthesis"]);
+  assert.ok(capture.lastCall?.messages?.some((message) => message.content.includes("coordinated comparison label")));
 });
 
 test("probe port parses a forced-tool factual-answer payload", async () => {

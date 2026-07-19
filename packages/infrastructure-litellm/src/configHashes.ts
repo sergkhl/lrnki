@@ -5,7 +5,12 @@ import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, concept
 import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNodeLabelingDescriptor, rescueDurabilityDescriptor } from "./enrichmentAdapters";
 import { nodeMergeAdjudicationDescriptor, NODE_EMBEDDING_MODEL } from "./dedupAdapters";
 import { missingPrerequisiteProposalDescriptor } from "./missingPrerequisiteProposalAdapters";
-import { groundingFactualityRevisionDescriptor, groundingGenerationDescriptor } from "./groundingGenerationAdapters";
+import {
+  groundingFactualityRevisionDescriptor,
+  groundingGenerationDescriptor,
+  groundingVerificationAnsweringDescriptor,
+  groundingVerificationQuestionPlanningDescriptor
+} from "./groundingGenerationAdapters";
 import { intrinsicDifficultyBandingDescriptor, intrinsicDifficultyComparisonDescriptor } from "./intrinsicDifficultyAdapters";
 import { conceptSetSynthesisDescriptor, knowledgeBoundaryProbeDescriptor } from "./syntheticGenerationAdapters";
 import { declaredDomainInferenceDescriptor } from "./domainInferenceAdapters";
@@ -79,6 +84,8 @@ export const neuralOperationRegistry = {
       conceptSetSynthesisDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      groundingVerificationQuestionPlanningDescriptor,
+      groundingVerificationAnsweringDescriptor,
       groundingFactualityRevisionDescriptor,
       prerequisiteOrderingDescriptor,
       intrinsicDifficultyBandingDescriptor,
@@ -195,9 +202,15 @@ function withoutEnrichmentConfigHash<T extends { enrichmentConfigHash: string }>
 // the operation identity lets execution tuning reuse the same Derived Graph Layer
 // behavioral identity while every neural-policy knob remains hashed (ADR-0019).
 function syntheticBehaviorConfig(config: SyntheticGenerationConfig) {
-  const { conceptConcurrency: _conceptConcurrency, probe, ...behavior } = withoutEnrichmentConfigHash(config);
+  const {
+    conceptConcurrency: _conceptConcurrency,
+    verificationConcurrency: _verificationConcurrency,
+    probe,
+    ...behavior
+  } = withoutEnrichmentConfigHash(config);
   const { probeConcurrency: _probeConcurrency, ...probeBehavior } = probe;
   void _conceptConcurrency;
+  void _verificationConcurrency;
   void _probeConcurrency;
   return { ...behavior, probe: probeBehavior };
 }

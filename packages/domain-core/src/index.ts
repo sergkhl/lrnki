@@ -1776,9 +1776,11 @@ export const STAGE_TAGS = {
   mintingDurability: "minting-durability",
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
   groundingGeneration: "grounding-generation",
-  // Synthetic grounding factuality correction. This cross-family revision consumes
-  // K probe answers sampled before the grounding draft, then atomically checks and
-  // minimally revises the draft before it can enter a trusted Derived Graph Layer.
+  // Synthetic grounding factuality correction. Planning atomizes the draft into
+  // claim-targeted questions; a separate draft-blind call answers them; the final
+  // cross-family comparison may only drop an exact-span-grounded original passage.
+  groundingVerificationQuestionPlanning: "grounding-verification-question-planning",
+  groundingVerificationAnswering: "grounding-verification-answering",
   groundingFactualityRevision: "grounding-factuality-revision",
   intrinsicDifficulty: "intrinsic-difficulty",
   declaredDomainInference: "declared-domain-inference",

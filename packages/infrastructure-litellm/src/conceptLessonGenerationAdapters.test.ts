@@ -104,6 +104,7 @@ test("the system prompt names no domain and asserts no section is mandatory (R4)
   assert.ok(/default compact shape/i.test(system));
   assert.ok(/at most two short sentences/i.test(system));
   assert.ok(/Every definition, examples, or formulas section must carry both citation fields/i.test(system));
+  assert.ok(/neighbor's presence proves only the displayed graph relationship/i.test(system));
   // No fixture term leaks into the system instruction.
   for (const term of ["ownership", "rust", "market"]) {
     assert.equal(system.toLowerCase().includes(term), false);

@@ -56,6 +56,8 @@ import {
   createNodeMergeAdjudicationPort,
   createGroundingFactualityRevisionPort,
   createGroundingGenerationPort,
+  createGroundingVerificationAnsweringPort,
+  createGroundingVerificationQuestionPlanningPort,
   createConceptSetSynthesisPort,
   createKnowledgeBoundaryProbePort,
   createIntrinsicDifficultyJudgmentPort,
@@ -200,6 +202,8 @@ function buildContext() {
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
     groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    groundingVerificationQuestionPlanning: createGroundingVerificationQuestionPlanningPort(deterministicClient),
+    groundingVerificationAnswering: createGroundingVerificationAnsweringPort(deterministicClient),
     groundingFactualityRevision: createGroundingFactualityRevisionPort(deterministicClient),
     // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
     // amended). Concept-set synthesis stays DeepSeek-family with deterministic decoding
@@ -467,6 +471,8 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
     // The probe's semantic-agreement signal reuses the existing embedding port (ADR-0012).
     embedding: ctx.nodeEmbedding,
     groundingGeneration: ctx.groundingGeneration,
+    groundingVerificationQuestionPlanning: ctx.groundingVerificationQuestionPlanning,
+    groundingVerificationAnswering: ctx.groundingVerificationAnswering,
     groundingFactualityRevision: ctx.groundingFactualityRevision,
     prerequisiteOrdering: ctx.prerequisiteOrdering,
     difficulty: ctx.difficulty,

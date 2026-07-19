@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   createGroundingFactualityRevisionPort,
-  createGroundingGenerationPort
+  createGroundingGenerationPort,
+  createGroundingVerificationAnsweringPort,
+  createGroundingVerificationQuestionPlanningPort
 } from "./groundingGenerationAdapters";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 
@@ -28,7 +30,8 @@ test("generates an llm-grounded bundle conditioned on scaffolded anchors", async
     derivedNodeId: "dn-stack-allocation",
     declaredDomain: "software engineering",
     nodeLabel: "Stack allocation",
-    scaffoldedAnchors: [{ conceptId: "copy", canonicalLabel: "Copy Trait", definitionQuotes: ["Types such as integers that have a known size at compile time implement Copy."] }]
+    scaffoldedAnchors: [{ conceptId: "copy", canonicalLabel: "Copy Trait", definitionQuotes: ["Types such as integers that have a known size at compile time implement Copy."] }],
+    rejectionFeedback: "A prior definition contained a scope conflation."
   });
 
   assert.equal(bundle.derivedNodeId, "dn-stack-allocation");
@@ -44,6 +47,7 @@ test("generates an llm-grounded bundle conditioned on scaffolded anchors", async
   assert.equal(call.toolName, "submit_generated_grounding_bundle");
   assert.ok(call.messages.some((message) => message.content.includes("Copy Trait")));
   assert.ok(call.messages.some((message) => message.content.includes("Types such as integers")));
+  assert.ok(call.messages.some((message) => message.content.includes("prior definition contained a scope conflation")));
 });
 
 test("malformed tool arguments fail closed through the forced-tool validator", async () => {
@@ -63,6 +67,72 @@ test("malformed tool arguments fail closed through the forced-tool validator", a
     }),
     /definition/
   );
+});
+
+test("plans claim-targeted questions from the draft, then answers them without draft context", async () => {
+  const calls: Array<{ toolName: string; messages: { content: string }[] }> = [];
+  const client = {
+    async call(input: { toolName: string; messages: { content: string }[] }) {
+      calls.push(input);
+      if (input.toolName === "submit_grounding_verification_questions") {
+        return {
+          questions: [
+            { passageIndex: 0, question: "What distinguishes the two mechanisms?" },
+            { passageIndex: 1, question: "What role does the mechanism have in the topic?" }
+          ]
+        };
+      }
+      return {
+        answers: [
+          { questionIndex: 2, answer: "It has a specific established role." },
+          { questionIndex: 0, answer: "The named concept has distinct necessary features." },
+          { questionIndex: 1, answer: "The mechanisms differ in their defining process." }
+        ]
+      };
+    }
+  } as unknown as LiteLlmForcedToolClient;
+  const draft = await adapterReturning({
+    definitions: [{ text: "Draft-only marker defines the mechanism." }],
+    mentions: [{ text: "The mechanism contributes to the topic." }],
+    rationale: "draft"
+  }).adapter.generate({
+    derivedNodeId: "dn-context-isolation",
+    declaredDomain: "general",
+    nodeLabel: "Mechanism contrast",
+    scaffoldedAnchors: [],
+    topic: "A broad topic"
+  });
+
+  const questions = await createGroundingVerificationQuestionPlanningPort(client).plan({
+    declaredDomain: "general",
+    topic: "A broad topic",
+    nodeLabel: "Mechanism contrast",
+    draft
+  });
+  const answers = await createGroundingVerificationAnsweringPort(client).answer({
+    declaredDomain: "general",
+    topic: "A broad topic",
+    nodeLabel: "Mechanism contrast",
+    questions: questions.map((question) => question.question)
+  });
+
+  assert.equal(calls[0].toolName, "submit_grounding_verification_questions");
+  assert.ok(calls[0].messages.some((message) => message.content.includes("Draft-only marker")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("nearest-alternative check")));
+  assert.match(questions[0].question, /necessary defining features/);
+  assert.ok(calls[0].messages.some((message) => message.content.includes("accounting convention")));
+  assert.ok(calls[0].messages.some((message) => message.content.includes("coordinated subjects")));
+  assert.equal(calls[1].toolName, "submit_grounding_verification_answers");
+  assert.ok(calls[1].messages.some((message) => message.content.includes("closest commonly confused concepts")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("What distinguishes the two mechanisms?")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("historical bookkeeping")));
+  assert.ok(calls[1].messages.some((message) => message.content.includes("each member individually")));
+  assert.equal(calls[1].messages.some((message) => message.content.includes("Draft-only marker")), false);
+  assert.deepEqual(answers, [
+    "The named concept has distinct necessary features.",
+    "The mechanisms differ in their defining process.",
+    "It has a specific established role."
+  ], "answers are restored to question order before the application joins them");
 });
 
 test("drops an exact-span-grounded false passage and keeps generated provenance", async () => {
@@ -100,19 +170,31 @@ test("drops an exact-span-grounded false passage and keeps generated provenance"
     topic: "Energy pathways",
     nodeLabel: "Respiration contrast",
     draft,
-    independentProbeAnswers: ["Independent characterization one.", "Independent characterization two."]
+    verificationAnswers: [{
+      passageIndex: 0,
+      question: "What distinguishes the relevant processes?",
+      answer: "Independent characterization of the distinction."
+    }, {
+      passageIndex: 1,
+      question: "What is the accurate definition?",
+      answer: "Independent characterization of the accurate definition."
+    }]
   });
 
-  assert.equal(revised.derivedNodeId, draft.derivedNodeId);
-  assert.equal(revised.generatingModel, "kg-claim-extraction");
-  assert.equal(revised.groundingOrigin, "llm_grounded");
-  assert.deepEqual(revised.definitions.map((passage) => passage.text), ["Accurate definition."]);
+  assert.equal(revised.disposition, "accepted");
+  assert.equal(revised.disposition === "accepted" && revised.bundle.derivedNodeId, draft.derivedNodeId);
+  assert.equal(revised.disposition === "accepted" && revised.bundle.generatingModel, "kg-claim-extraction");
+  assert.equal(revised.disposition === "accepted" && revised.bundle.groundingOrigin, "llm_grounded");
+  assert.deepEqual(revised.disposition === "accepted" ? revised.bundle.definitions.map((passage) => passage.text) : [], ["Accurate definition."]);
   const call = calls[0] as { model: string; toolName: string; tags: string[]; messages: { content: string }[] };
   assert.equal(call.model, "kg-independent-judge");
   assert.equal(call.toolName, "submit_grounding_factuality_judgments");
   assert.deepEqual(call.tags, ["grounding-factuality-revision"]);
-  assert.ok(call.messages.some((message) => message.content.includes("Independent characterization one.")));
+  assert.ok(call.messages.some((message) => message.content.includes("What distinguishes the relevant processes?")));
+  assert.ok(call.messages.some((message) => message.content.includes("Independent characterization of the distinction.")));
   assert.ok(call.messages.some((message) => message.content.includes("Draft definition.")));
+  assert.ok(call.messages.some((message) => message.content.includes("different-scope or historical value")));
+  assert.ok(call.messages.some((message) => message.content.includes("collective versus distributive scope")));
 });
 
 test("preserves a passage when a false verdict does not quote an exact span", async () => {
@@ -144,13 +226,13 @@ test("preserves a passage when a false verdict does not quote an exact span", as
     topic: "Review behavior",
     nodeLabel: "Monotonic review",
     draft,
-    independentProbeAnswers: ["An independent check."]
+    verificationAnswers: [{ passageIndex: 0, question: "What is the original definition?", answer: "An independent check." }]
   });
 
-  assert.deepEqual(reviewed.definitions.map((passage) => passage.text), ["The original definition remains intact."]);
+  assert.deepEqual(reviewed.disposition === "accepted" ? reviewed.bundle.definitions.map((passage) => passage.text) : [], ["The original definition remains intact."]);
 });
 
-test("fails closed when exact-span verdicts reject every definition", async () => {
+test("rejects a whole draft when exact-span verdicts remove every definition", async () => {
   const client = {
     async call() {
       return {
@@ -174,14 +256,14 @@ test("fails closed when exact-span verdicts reject every definition", async () =
     scaffoldedAnchors: []
   });
 
-  await assert.rejects(
-    () => createGroundingFactualityRevisionPort(client).revise({
-      declaredDomain: "general",
-      topic: "Review behavior",
-      nodeLabel: "Rejected concept",
-      draft,
-      independentProbeAnswers: ["An independent check."]
-    }),
-    /rejected every definition/
-  );
+  const reviewed = await createGroundingFactualityRevisionPort(client).revise({
+    declaredDomain: "general",
+    topic: "Review behavior",
+    nodeLabel: "Rejected concept",
+    draft,
+    verificationAnswers: [{ passageIndex: 0, question: "Is the definition established?", answer: "An independent check." }]
+  });
+
+  assert.equal(reviewed.disposition, "rejected");
+  assert.match(reviewed.disposition === "rejected" ? reviewed.rationale : "", /rejected every definition/);
 });
