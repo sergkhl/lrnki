@@ -1,6 +1,6 @@
 # Keep the Learner App in flow through mastery-aligned game UX
 
-Status: Accepted (last amended 2026-07-16).
+Status: Accepted (last amended 2026-07-19).
 
 ## Decision
 
@@ -198,6 +198,30 @@ displayed bound snapshot is marked seen so stale animations cannot queue; local 
 whether contextualization was viewed, while reward existence always derives from the server
 projection. Reduced motion renders every reward's final state immediately with equivalent copy and
 static emphasis. There is no ambient formation motion or audio.
+
+## Trail map presentation
+
+The Expedition trail screen renders as **one explorer's field-chart**: a single parchment map
+artifact behind the whole trail column (aged ground wash, one seeded SVG `<Pattern>` grain tile, and
+an edge/border weathering treatment), not a list of cards on the app background. All decoration is
+**procedural, deterministic, and nonsemantic**: a pure jest-tested layout module seeds every route
+jitter, grain parameter, and margin doodle from the `enrichmentId`, so a learner's map always looks
+the same, decoration cost stays O(stops + sections), and no doodle is ever positioned where it could
+read as graph structure, an edge, or progress (compass rose and contour/peak glyphs live only in the
+side margins with a center-column exclusion). The route is one continuous hand-drawn line through
+every measured checkpoint center: **progressive inking** draws segments behind the learner as solid
+ink and segments ahead as faint irregular dashes — a shape distinction, never color alone, never
+gold, with no route-drawing motion (the mastery beat stays on the capstone). Checkpoints remain
+pressable circles restyled ink-on-parchment; **X is reserved for the single terminus cartouche**;
+uncharted (fogged/locked) legs read as not-yet-charted parchment rather than plain opacity dimming,
+with per-stop state still carried by shape **and** text (WCAG F73). A single bundled display font
+(IM Fell English via `expo-font`, exposed through the app-owned `Text` boundary) applies **only to
+map-surface headings** — cartouche titles, terminus, and the expedition title — while body and
+interaction text keep the current face. This is pure downstream presentation: it changes no API,
+projection, persisted shape, copy, or motion, keeps **gold exclusively on earned rewards**, and
+renders identically on web and Android (no SVG filters; grain via `<Pattern>`; literal color tokens,
+never `color-mix()` opacity modifiers the native styler drops). Trail structure and state semantics
+come unchanged from the Study Session projection (`buildTrailView`).
 
 ## Context
 

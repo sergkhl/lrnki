@@ -2,24 +2,8 @@
 
 ## TODO
 
-- **Treasure-map trail restyle.** Active plan
-  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — In progress: **U1–U3 shipped in commit
-  `ce807e3`; U4 web gate + deterministic envelope PASS 2026-07-19; only the native regression
-  remains, blocked on emulator tooling** (see [BLOCKERS.md](./BLOCKERS.md)). U4 changed no source.
-  The rule-14 real-use browser gate ran a production Expo web export against a supervisor-free
-  learner-api over real Postgres (nothing intercepted) on one long (19-concept/8-Leg Biology
-  "Uncoupling Proteins") and one short (6-concept CS "Postcondition of binary search") real
-  expedition at phone/desktop/reduced-motion/200%: the screen reads as one parchment map artifact;
-  the seeded route passes through every measured checkpoint with solid `map-ink` behind the learner
-  and faint `map-ink-soft` dashes splitting exactly at the first incomplete stop; Leg headings are
-  double-rule display-font cartouches; deeper locked legs render as uncharted `map-parchment-deep`
-  bands with faded lock circles; the terminus is one X+peak cartouche; no horizontal overflow at
-  200%; margin-only doodles imply no structure; gold stays earned-only; zero console/page errors.
-  Deterministic envelope green (typecheck, learner-app jest 52/242 — one unrelated D7 `rAF` flake
-  green on re-run, lint 0 errors, build, intercepted `pnpm e2e` **48/48**). Evidence + reproducible
-  harness: `tmp/2026-07-18-treasure-map-trail/`. **Remaining:** run `pnpm e2e:native:maestro` + an
-  emulator trail parity screenshot on an emulator host; on PASS amend ADR-0032 with the "Trail map
-  presentation" paragraph, delete the plan, and fold the outcome here.
+_No active plan. See the evidence-triggered follow-ups below and
+[plans/README.md](./README.md)._
 
 ### Evidence-triggered follow-up
 
@@ -37,6 +21,25 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Treasure-map trail restyle shipped (2026-07-19, plan 2026-07-18-001; plan DELETED).** The
+  Expedition trail screen is now one explorer's field-chart: a single parchment map artifact behind
+  the whole trail column (aged wash, one seeded SVG `<Pattern>` grain tile, edge/border weathering),
+  a continuous hand-drawn route through every measured checkpoint center with progressive inking
+  (solid `map-ink` behind the learner, faint `map-ink-soft` irregular dashes ahead — shape, never
+  color, never gold, no route motion), ink-ring-on-parchment checkpoint circles, double-rule
+  display-font (`@expo-google-fonts/im-fell-english` via `expo-font`) Leg cartouches, uncharted
+  `map-parchment-deep` bands + faded lock circles for fogged/locked legs, one X+peak terminus
+  cartouche, and sparse seeded margin-only doodles. Pure downstream presentation: **zero API,
+  projection, persisted-shape, copy, or motion change**; gold stays earned-only; trail structure and
+  state come unchanged from `buildTrailView`. U1–U3 committed `ce807e3`; U4 changed no source. New
+  map tokens + contrast assertions, the pure `treasureMap.ts` layout module, `MapGround`, `TrailRoute`
+  (replacing `TrailWave`, superseded constants deleted), and the restyled `CheckpointCircle` /
+  `SectionDivider` cartouche / `TrailTerminus` / uncharted fog / panel surfaces all ship with updated
+  suites. Durable policy folded into [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md)
+  ("Trail map presentation"). All three validation layers PASS (deterministic envelope + rule-14
+  browser gate 2026-07-19; native emulator regression + parity screenshots 2026-07-19 — see
+  VALIDATION). Evidence: `tmp/2026-07-18-treasure-map-trail/EVALUATION.md`.
 
 - **Topic Expedition speed and generated-grounding reliability shipped (2026-07-19, plan
   2026-07-18-002; plan DELETED; uncommitted).** Groq is the forced-tool-compatible gpt-oss-120b
@@ -351,8 +354,8 @@
 
 ## VALIDATION
 
-- **Treasure-map trail restyle — U4 deterministic + real-use web gate, 2026-07-19. WEB PASS;
-  native regression pending (BLOCKERS.md).** Deterministic envelope green: `pnpm check` typecheck
+- **Treasure-map trail restyle — U4 full gate (deterministic + real-use web + native), 2026-07-19.
+  ALL PASS.** Deterministic envelope green: `pnpm check` typecheck
   clean, learner-app jest 52 suites / **242** (one `LearnerMenuSheet` D7 `requestAnimationFrame`
   flake — unrelated to this change — green on isolated + full re-run), lint 0 errors / 8
   pre-existing warnings, admin-lab + learner-app web builds OK, intercepted `pnpm e2e:web`
@@ -371,8 +374,19 @@
   `pnpm e2e:native:maestro` + emulator trail parity screenshot could NOT run — this environment has
   no Android SDK/emulator/adb/Maestro — and is tracked in BLOCKERS.md; the change is parity-safe by
   construction (no SVG filters, `<Pattern>` grain, literal color tokens, no forked styling or
-  interaction/testID change). Evidence + reproducible harness:
-  `tmp/2026-07-18-treasure-map-trail/EVALUATION.md`.
+  interaction/testID change). **Native regression PASS (emulator `Medium_Phone_API_36.1`, Android
+  36.1/arm64, Maestro 2.6.1, JDK 17):** a fresh e2e-profile APK built from the post-restyle tree
+  (`scripts/build-learner-android.sh e2e`, commit `ac082d9`, `LRNKI_E2E_BUILD=1`) ran
+  `pnpm e2e:native:maestro` → **1/1 Flow Passed (44s)** through the restyled map trail (name gate →
+  Explore/Catalog → Field-notes Theory checkpoint → long-Theory device scroll → ADOPTED Support Path
+  dialog geometry gate → menu → board content), no app ANR. Emulator trail parity screenshots
+  (`native/emulator-trail-{top,mid,deep}.png`) confirm the two historically Android-divergent
+  react-native-svg features render: the `<Pattern>` grain fills paint across the parchment ground,
+  and the bundled IM Fell English display font renders on the Leg cartouches — plus route-through-
+  centers, all-dashed ahead-of-progress split, ink-ring circles, orange next-stop halo, teal peak
+  terminus, uncharted `map-parchment-deep` locked bands, margin-only doodle, no gold, no horizontal
+  overflow. Web/native visual parity of ground, route, and markers confirmed. Evidence + reproducible
+  harness: `tmp/2026-07-18-treasure-map-trail/EVALUATION.md`.
 
 - **Topic Expedition speed + factuality final gate, 2026-07-19. PASS.** The live learner-api
   supervisor generated the baseline topic “Cellular Respiration” as operation `97ddffe4…` in

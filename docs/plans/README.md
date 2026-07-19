@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-18-001 — Treasure-Map Trail Restyle](./2026-07-18-001-treasure-map-trail.md) — Ready.
+_None active. See [TODO](./TODO.md) for current work and evidence-triggered follow-ups._
 
 ## Ownership rules
 
