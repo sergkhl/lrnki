@@ -3,30 +3,23 @@
 ## TODO
 
 - **Treasure-map trail restyle.** Active plan
-  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — In progress: **U1–U3 implemented
-  2026-07-19 (uncommitted), only U4 remains.** U1: `map-parchment`/`map-parchment-deep`/`map-ink`/
-  `map-ink-soft` tokens + regenerated `tokens.css` + extended contrast assertions;
-  `@expo-google-fonts/im-fell-english` 0.4.0 + `expo-font` in the expo catalog; font readiness
-  joined the `_layout.tsx` bootstrap gate (load error falls back to system face); `map-title`
-  `TextVariant` applies the family via style-only through `AppText` (kept out of the Tailwind
-  theme on purpose); QuestHeader parchment trim + display title; expo-font/google-fonts jest
-  mocks in `jest.setup.js`. U2: pure seeded `src/learn/treasureMap.ts` (reuses
-  `mineralSpecimen.ts` `hashSeed`/`mulberry32`; route jitter ≤10px so the line passes through
-  measured centers, irregular dash rhythm, one grain `<Pattern>` tile, weathered edge path,
-  margin-only doodles capped 2/section with a 104px center exclusion; 7 tests incl. 17-Leg-scale
-  caps) + `MapGround` component + `TrailRoute` replacing `TrailWave` in `CheckpointPath.tsx`
-  (solid `map-ink` behind the learner through the last leading-complete stop, `map-ink-soft`
-  irregular dashes ahead; uniform `6 8` dash deleted; container height now measured). U3:
-  ink-ring/uncharted `CheckpointCircle` (locked = faded ink on `map-parchment-deep`, lock icon
-  recolored from `on-accent`), fogged rows use the deep wash + `opacity-60` instead of
-  `opacity-55`, double-rule `section-cartouche` + `map-title` Leg heading, `terminus-cartouche`
-  with the map's single drawn-X (`terminus-x`), and ink-border panel restyles on ConceptMarker /
-  GuardianTrailNode / SupportPathNode. Envelope this session: learner-app jest 52 suites / 242
-  green, typecheck clean, workspace lint 0 errors, intercepted `pnpm e2e` **48/48** on a fresh
-  production web export. **Next session: U4 only** — full deterministic envelope, then the plan's
-  rule-14 real-use browser gate (long + short real expedition, phone/desktop/reduced-motion/200%)
-  and `pnpm e2e:native:maestro` + emulator trail screenshot; on PASS amend ADR-0032 with the
-  "Trail map presentation" paragraph, delete the plan, and fold the outcome here.
+  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — In progress: **U1–U3 shipped in commit
+  `ce807e3`; U4 web gate + deterministic envelope PASS 2026-07-19; only the native regression
+  remains, blocked on emulator tooling** (see [BLOCKERS.md](./BLOCKERS.md)). U4 changed no source.
+  The rule-14 real-use browser gate ran a production Expo web export against a supervisor-free
+  learner-api over real Postgres (nothing intercepted) on one long (19-concept/8-Leg Biology
+  "Uncoupling Proteins") and one short (6-concept CS "Postcondition of binary search") real
+  expedition at phone/desktop/reduced-motion/200%: the screen reads as one parchment map artifact;
+  the seeded route passes through every measured checkpoint with solid `map-ink` behind the learner
+  and faint `map-ink-soft` dashes splitting exactly at the first incomplete stop; Leg headings are
+  double-rule display-font cartouches; deeper locked legs render as uncharted `map-parchment-deep`
+  bands with faded lock circles; the terminus is one X+peak cartouche; no horizontal overflow at
+  200%; margin-only doodles imply no structure; gold stays earned-only; zero console/page errors.
+  Deterministic envelope green (typecheck, learner-app jest 52/242 — one unrelated D7 `rAF` flake
+  green on re-run, lint 0 errors, build, intercepted `pnpm e2e` **48/48**). Evidence + reproducible
+  harness: `tmp/2026-07-18-treasure-map-trail/`. **Remaining:** run `pnpm e2e:native:maestro` + an
+  emulator trail parity screenshot on an emulator host; on PASS amend ADR-0032 with the "Trail map
+  presentation" paragraph, delete the plan, and fold the outcome here.
 
 ### Evidence-triggered follow-up
 
@@ -357,6 +350,29 @@
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Treasure-map trail restyle — U4 deterministic + real-use web gate, 2026-07-19. WEB PASS;
+  native regression pending (BLOCKERS.md).** Deterministic envelope green: `pnpm check` typecheck
+  clean, learner-app jest 52 suites / **242** (one `LearnerMenuSheet` D7 `requestAnimationFrame`
+  flake — unrelated to this change — green on isolated + full re-run), lint 0 errors / 8
+  pre-existing warnings, admin-lab + learner-app web builds OK, intercepted `pnpm e2e:web`
+  **48/48**. Rule-14 real-use gate: a production Expo web export baked to a supervisor-free
+  learner-api over the real development Postgres (nothing intercepted), driven in Chromium at phone
+  390×844, desktop 1280×800, reduced motion, and 200% page zoom on two real production-generated
+  expeditions — long `87c2e793…` (Biology, 19 concepts / 8 Legs / 39 items, driven to 2 completed
+  Leg-1 stops) and short `a320cb5b…` (CS, 6 concepts / 1 Leg). Human screenshot judgment confirmed:
+  one parchment map artifact with `<Pattern>` grain + weathered edge; the seeded route through every
+  measured checkpoint with solid `map-ink` behind the learner and `map-ink-soft` dashes splitting at
+  the first incomplete stop; double-rule display-font Leg cartouches; uncharted `map-parchment-deep`
+  bands with faded lock circles for deeper locked legs; the single terminus X+peak cartouche;
+  margin-only nonsemantic doodles; no horizontal overflow at any condition incl. 200%; gold reserved
+  to earned rewards (teal gem on completed stops). **Zero unexpected console/page errors** across all
+  captures; the disposable reserved learner was FK-safely deleted each run. The required
+  `pnpm e2e:native:maestro` + emulator trail parity screenshot could NOT run — this environment has
+  no Android SDK/emulator/adb/Maestro — and is tracked in BLOCKERS.md; the change is parity-safe by
+  construction (no SVG filters, `<Pattern>` grain, literal color tokens, no forked styling or
+  interaction/testID change). Evidence + reproducible harness:
+  `tmp/2026-07-18-treasure-map-trail/EVALUATION.md`.
 
 - **Topic Expedition speed + factuality final gate, 2026-07-19. PASS.** The live learner-api
   supervisor generated the baseline topic “Cellular Respiration” as operation `97ddffe4…` in
