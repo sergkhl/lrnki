@@ -34,9 +34,9 @@ import {
 } from "./knowledgeBoundaryProbe";
 
 // The shared completion fields (config authority in completeDerivedGraphLayer.ts) plus
-// the synthetic front half's producer-specific knobs. The flat runtime shape and field
-// names are unchanged, so the operation's config-hash identity is stable (plan
-// 2026-07-11-001 AE6).
+// the synthetic front half's producer-specific knobs. Concurrency fields are execution
+// policy and are deliberately excluded from derived-layer identity (ADR-0019); all
+// behavioral fields remain mechanically hashed.
 export type SyntheticGenerationConfig = DerivedGraphCompletionConfig & {
   // The knowledge-boundary probe knobs (K, per-concept draw concurrency, agreement
   // threshold). Calibrated by real-use inspection in U8, never assumed (ADR-0013).
@@ -52,7 +52,7 @@ export const DEFAULT_SYNTHETIC_GENERATION_CONFIG: SyntheticGenerationConfig = {
   // Synthetic sets are small and single-domain, so the ordering budget is generous.
   ...DEFAULT_DERIVED_GRAPH_COMPLETION_CONFIG,
   probe: DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG,
-  conceptConcurrency: 4
+  conceptConcurrency: 8
 };
 
 // Synthetic topic generation — the SECOND pipeline arm (ADR-0019 amended, plan
@@ -247,4 +247,3 @@ function dedupeConcepts(concepts: SynthesizedConcept[]): SynthesizedConcept[] {
   }
   return kept;
 }
-

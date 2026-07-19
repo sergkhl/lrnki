@@ -12,7 +12,7 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Active implementation plans (execution order)
 
-- [2026-07-18-002 — Speed Up Topic Expedition Generation](./2026-07-18-002-speed-up-expedition-generation.md) — In progress (U1 complete; U2 next).
+- [2026-07-18-002 — Speed Up Topic Expedition Generation](./2026-07-18-002-speed-up-expedition-generation.md) — In progress (U1–U4 complete; U5 timing passed, quality `FIX_FIRST`).
 - [2026-07-18-001 — Treasure-Map Trail Restyle](./2026-07-18-001-treasure-map-trail.md) — Ready.
 
 ## Ownership rules

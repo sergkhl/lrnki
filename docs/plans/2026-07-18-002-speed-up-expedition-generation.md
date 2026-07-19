@@ -1,7 +1,9 @@
 # Speed Up Topic Expedition Generation
 
-Status: In progress (2026-07-18). U1 complete; U2 next. Interview-locked with the user. Prioritized
-FIRST in the active plan order.
+Status: In progress (2026-07-19). U1–U4 complete; U5 timing/cost gate passed but real-use quality is
+`FIX_FIRST` on a generated-grounding factual-conflation defect. Resume from the handoff and evidence
+in [TODO](./TODO.md); do not begin the next plan. Interview-locked with the user. Prioritized FIRST
+in the active plan order.
 
 Topic Expedition generation (Synthetic Topic Generation + Study Item Bank) currently takes
 **~8.6 minutes** request→ready for a ~15-node topic. This plan brings it to **~3 minutes** with

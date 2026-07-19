@@ -35,9 +35,10 @@ import { selectNodeGrounding, type GroundingPassage } from "./selectNodeGroundin
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 
-// Bounded concurrency for independent per-node study-item generation. Degree 4 matches
-// the synthetic generation concept fan-out while mapWithConcurrency keeps persisted
-// outputs in input order.
+// Lessons and blueprints are the sequential front half and can use wider per-node
+// fan-out. The three item-type stages run beside one another, so each keeps the more
+// modest degree 4; mapWithConcurrency preserves input order within every stage.
+export const DEFAULT_LESSON_CONCURRENCY = 8;
 export const DEFAULT_STUDY_ITEM_CONCURRENCY = 4;
 export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
 export const MATCHING_GENERATION_ATTEMPTS = 2;
@@ -58,16 +59,13 @@ export type StudyItemBankGenerationResult = {
 };
 
 // Study Item Bank generation (U5, R7/R12/R13, ADR-0026) + Concept Lesson generation
-// (ADR-0031). For each Derived Graph Layer node this runs three stages in one operation:
-// first a Concept Lesson stage (generate a grounded teaching lesson, verify citations
-// verbatim, enforce the minimum, persist as the learner-neutral substrate), then an
-// option-select stage (a grounded correct answer + sibling-flavored distractors through the
-// deterministic guard), then an impostor stage (three lesson-grounded truths + one
-// sibling-or-generated lie through the impostor guard). Both item stages derive from the one
-// lesson substrate (rule 18). A node that yields no lesson is recorded lesson-absent; a node
-// that yields no item of a type is a RejectedStudyItem keyed by item type with the exact
-// reason. Learner-neutral and regenerable; never touches the asserted graph or imports a
-// graph/enrichment write port (R9).
+// (ADR-0031). The sequential front half generates and persists the grounded Concept Lesson
+// substrate, then plans each node's item-type coverage. Option-select, matching, and impostor
+// generation run as three concurrent stage brackets over that same lesson substrate; their
+// input-ordered results merge after the join in canonical type order. A node that yields no
+// lesson is recorded lesson-absent; a node that yields no item of a type is a
+// RejectedStudyItem keyed by item type with the exact reason. Learner-neutral and regenerable;
+// never touches the asserted graph or imports a graph/enrichment write port (R9).
 export async function generateStudyItemBank(input: {
   enrichmentId: string;
   configHash: string;
@@ -91,8 +89,8 @@ export async function generateStudyItemBank(input: {
   newOptionId?: () => string;
   newPairId?: () => string;
   newStatementId?: () => string;
-  // Bounded degree over the independent per-node units. The default is intentionally
-  // parallel; tests and mapWithConcurrency preserve deterministic output order.
+  // Optional operator override over every per-node stage. Defaults split lesson /
+  // blueprint fan-out from the three concurrently running item-stage fan-outs.
   concurrency?: number;
   // Run-progress reporter seam (ADR-0029). Study-item generation is its own operation_type
   // keyed by enrichmentId (ADR-0017 split). Absent → no-op (unchanged behavior).
@@ -105,6 +103,8 @@ export async function generateStudyItemBank(input: {
   const newStatementId = input.newStatementId ?? randomUUID;
   const reporter = input.reporter ?? noopRunProgressReporter;
   const operationId = input.enrichmentId;
+  const lessonConcurrency = input.concurrency ?? DEFAULT_LESSON_CONCURRENCY;
+  const studyItemConcurrency = input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY;
   return runInstrumentedOperation(reporter, "study_items", operationId, async (studyStage) => {
     const { layer, graphVersionId, snapshot } = await studyStage(NON_LLM_STAGES.load, async () => {
       const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
@@ -218,7 +218,7 @@ export async function generateStudyItemBank(input: {
   const perNodeLessons = await studyStage(
     STAGE_TAGS.conceptLessonGeneration,
     () =>
-      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+      mapWithConcurrency(layer.derivedNodes, lessonConcurrency, async (node) => {
         const result = await generateLessonForNode(node);
         lessonDone += 1;
         await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.conceptLessonGeneration, done: lessonDone });
@@ -263,7 +263,7 @@ export async function generateStudyItemBank(input: {
   const blueprintResults = await studyStage(
     STAGE_TAGS.studyItemBlueprint,
     () =>
-      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+      mapWithConcurrency(layer.derivedNodes, lessonConcurrency, async (node) => {
         const lesson = lessonByNode.get(node.derivedNodeId);
         if (!lesson) {
           blueprintDone += 1;
@@ -371,10 +371,10 @@ export async function generateStudyItemBank(input: {
       }]
     };
   };
-  const perNode = await studyStage(
+  const optionSelectStage = studyStage(
     STAGE_TAGS.studyItemGeneration,
     () =>
-      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+      mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
         const result = await generateForNode(node);
         studyDone += 1;
         await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
@@ -382,13 +382,6 @@ export async function generateStudyItemBank(input: {
       }),
     layer.derivedNodes.length
   );
-
-  // Flatten per-node results in input order so the persisted item/rejected order is
-  // deterministic and unchanged from the prior sequential path.
-  for (const result of perNode) {
-    studyItems.push(...result.items);
-    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
-  }
 
   // --- Stage 4: matching items ---------------------------------------------------
   let matchingDone = 0;
@@ -440,10 +433,10 @@ export async function generateStudyItemBank(input: {
     }
     return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: failureReason ?? "no matching item could be grounded" }] };
   };
-  const perNodeMatching = await studyStage(
+  const matchingStage = studyStage(
     STAGE_TAGS.matchingGeneration,
     () =>
-      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+      mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
         const result = await generateMatchingForNode(node);
         matchingDone += 1;
         await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.matchingGeneration, done: matchingDone });
@@ -451,11 +444,6 @@ export async function generateStudyItemBank(input: {
       }),
     layer.derivedNodes.length
   );
-  for (const result of perNodeMatching) {
-    studyItems.push(...result.items);
-    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
-  }
-
   // --- Stage 5: impostor items (R3/R4/R7/R8/R9) ---------------------------------
   // A node's impostor derives its three truths from the SAME lesson grounding the
   // option-select stage used (studyItemGroundingFromLesson, rule 18) and reads the
@@ -554,10 +542,10 @@ export async function generateStudyItemBank(input: {
       }]
     };
   };
-  const perNodeImpostor = await studyStage(
+  const impostorStage = studyStage(
     STAGE_TAGS.impostorGeneration,
     () =>
-      mapWithConcurrency(layer.derivedNodes, input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY, async (node) => {
+      mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
         const result = await generateImpostorForNode(node);
         impostorDone += 1;
         await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.impostorGeneration, done: impostorDone });
@@ -565,9 +553,20 @@ export async function generateStudyItemBank(input: {
       }),
     layer.derivedNodes.length
   );
-  for (const result of perNodeImpostor) {
-    studyItems.push(...result.items);
-    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
+
+  // The stages launch together after blueprint, but their results merge only after the
+  // join in the canonical type order. Each mapper is itself input-ordered, so neither
+  // response timing nor stage completion timing can perturb persisted order (R4).
+  const [perNode, perNodeMatching, perNodeImpostor] = await Promise.all([
+    optionSelectStage,
+    matchingStage,
+    impostorStage
+  ]);
+  for (const stageResults of [perNode, perNodeMatching, perNodeImpostor]) {
+    for (const result of stageResults) {
+      studyItems.push(...result.items);
+      for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
+    }
   }
 
   const rejected = [...rejectedByNodeType.values()];

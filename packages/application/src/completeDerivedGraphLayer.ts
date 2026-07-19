@@ -99,9 +99,9 @@ export type SourceGroundedContribution = {
   rescuedDefinitionDispositions: DefinitionPassageDisposition[];
   mintingDispositions: MintingDisposition[];
   nodeMerges: NodeMergeRecord[];
-  // Graph Enrichment's K-sampling ordering summary hook, invoked at its existing
-  // position: after consensus/reduction, before difficulty. The worker formats the
-  // structured line — no console I/O here.
+  // Graph Enrichment's K-sampling ordering summary hook, invoked inside the ordering
+  // branch after consensus/reduction. Difficulty runs independently in parallel; the
+  // worker formats the structured line — no console I/O here.
   onOrderingSummary?: (summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number }) => void;
 };
 
@@ -193,57 +193,61 @@ export function createDerivedGraphLayerCompletion(ports: {
       }
 
       const K = Math.max(1, Math.trunc(config.orderingSampleCount));
-      const {
-        orderings: orderingTraces,
-        certainEdges,
-        uncertainEdges,
-        weakEdges
-      } = await request.stage(STAGE_TAGS.prerequisiteOrdering, () =>
-        deriveConsensusOrdering({
-          domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({ declaredDomain, nodes: members })),
-          prerequisiteOrdering: ports.prerequisiteOrdering,
-          orderingSampleCount: config.orderingSampleCount,
-          directionContestMinorityFraction: config.directionContestMinorityFraction,
-          minEdgeConfidence: config.minEdgeConfidence,
-          maxDomainPromptChars: config.maxDomainPromptChars
-        })
-      );
+      const [ordering, difficulties] = await Promise.all([
+        (async () => {
+          const {
+            orderings: orderingTraces,
+            certainEdges,
+            uncertainEdges,
+            weakEdges
+          } = await request.stage(STAGE_TAGS.prerequisiteOrdering, () =>
+            deriveConsensusOrdering({
+              domains: [...byDomain.entries()].map(([declaredDomain, members]) => ({ declaredDomain, nodes: members })),
+              prerequisiteOrdering: ports.prerequisiteOrdering,
+              orderingSampleCount: config.orderingSampleCount,
+              directionContestMinorityFraction: config.directionContestMinorityFraction,
+              minEdgeConfidence: config.minEdgeConfidence,
+              maxDomainPromptChars: config.maxDomainPromptChars
+            })
+          );
 
-      // Symbolic reduction over the acyclic CERTAIN edges. Pure and fast, but bracketed
-      // so its share of the run is visible in the timing split. The weak-edge cut already
-      // ran per domain BEFORE cycle-routing; acyclicity is enforced upstream by
-      // cycle-routing.
-      const { reducedEdges, transitiveEdges } = await request.stage(NON_LLM_STAGES.symbolicDisposal, async () => {
-        const { edges, removed } = transitiveReduction(certainEdges);
-        return { reducedEdges: edges, transitiveEdges: removed };
-      });
-      const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
-      // Edge endpoints are validated after ordering/reduction, before any further neural
-      // spend (KTD7): every retained edge must connect two surviving derived nodes.
-      for (const edge of prerequisiteEdges) {
-        for (const endpoint of [edge.prerequisiteDerivedNodeId, edge.dependentDerivedNodeId]) {
-          if (!surviving.has(endpoint)) {
-            throw new Error(`completeDerivedGraphLayer: prerequisite edge endpoint "${endpoint}" is not a surviving derived node; failing closed without persistence (R8).`);
+          // Symbolic reduction over the acyclic CERTAIN edges. Pure and fast, but
+          // bracketed so its share of the run is visible in the timing split. The
+          // ordering branch keeps consensus → reduction → endpoint validation intact
+          // while intrinsic difficulty runs independently beside it.
+          const { reducedEdges, transitiveEdges } = await request.stage(NON_LLM_STAGES.symbolicDisposal, async () => {
+            const { edges, removed } = transitiveReduction(certainEdges);
+            return { reducedEdges: edges, transitiveEdges: removed };
+          });
+          const prerequisiteEdges = [...reducedEdges, ...uncertainEdges];
+          for (const edge of prerequisiteEdges) {
+            for (const endpoint of [edge.prerequisiteDerivedNodeId, edge.dependentDerivedNodeId]) {
+              if (!surviving.has(endpoint)) {
+                throw new Error(`completeDerivedGraphLayer: prerequisite edge endpoint "${endpoint}" is not a surviving derived node; failing closed without persistence (R8).`);
+              }
+            }
           }
-        }
-      }
 
-      if (contribution.kind === "source_grounded") {
-        contribution.onOrderingSummary?.({
-          k: K,
-          committed: reducedEdges.length,
-          contested: orderingTraces.reduce((sum, trace) => sum + trace.pairVotes.filter((vote) => vote.classification === "direction_contested").length, 0),
-          weakCut: weakEdges.length,
-          cycleRouted: orderingTraces.reduce((sum, trace) => sum + trace.cycleRoutedEdges.length, 0)
-        });
-      }
+          if (contribution.kind === "source_grounded") {
+            contribution.onOrderingSummary?.({
+              k: K,
+              committed: reducedEdges.length,
+              contested: orderingTraces.reduce((sum, trace) => sum + trace.pairVotes.filter((vote) => vote.classification === "direction_contested").length, 0),
+              weakCut: weakEdges.length,
+              cycleRouted: orderingTraces.reduce((sum, trace) => sum + trace.cycleRoutedEdges.length, 0)
+            });
+          }
 
-      // Comparative banded intrinsic difficulty from node evidence contexts only
-      // (ADR-0024). Scores ALL derived nodes — including evidence-excluded ones; the DAG
-      // is not an input.
-      const difficulties = await request.stage(STAGE_TAGS.intrinsicDifficulty, () =>
-        ports.difficulty.score({ nodes: difficultyNodes })
-      );
+          return { orderingTraces, uncertainEdges, weakEdges, reducedEdges, transitiveEdges, prerequisiteEdges };
+        })(),
+        // Comparative banded intrinsic difficulty from node evidence contexts only
+        // (ADR-0024). It scores every derived node, including evidence-excluded ones,
+        // and deliberately takes no prerequisite DAG input.
+        request.stage(STAGE_TAGS.intrinsicDifficulty, () =>
+          ports.difficulty.score({ nodes: difficultyNodes })
+        )
+      ]);
+      const { orderingTraces, uncertainEdges, weakEdges, reducedEdges, transitiveEdges, prerequisiteEdges } = ordering;
       // Exact difficulty coverage is proved BEFORE artifact assembly (KTD7): every
       // surviving node exactly once, no unknown or duplicate IDs.
       const scored = new Set<string>();

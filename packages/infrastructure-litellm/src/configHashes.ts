@@ -153,7 +153,7 @@ export function graphEnrichmentConfigHash(config: GraphEnrichmentConfig): string
 export function syntheticGenerationConfigHash(config: SyntheticGenerationConfig): string {
   const entry = neuralOperationRegistry.syntheticTopicGeneration;
   return operationConfigHash(entry.configSeed, entry.descriptors, {
-    ...withoutEnrichmentConfigHash(config),
+    ...syntheticBehaviorConfig(config),
     nodeEmbeddingModel: NODE_EMBEDDING_MODEL
   });
 }
@@ -185,7 +185,20 @@ export function withSyntheticGenerationConfigHash(config: SyntheticGenerationCon
 
 function withoutEnrichmentConfigHash<T extends { enrichmentConfigHash: string }>(config: T): Omit<T, "enrichmentConfigHash"> {
   const { enrichmentConfigHash: _hash, ...rest } = config;
+  void _hash;
   return rest;
+}
+
+// Synthetic concept fan-out and the per-concept probe draw width alter scheduling,
+// never the prompts, samples, thresholds, or artifact semantics. Keeping them out of
+// the operation identity lets execution tuning reuse the same Derived Graph Layer
+// behavioral identity while every neural-policy knob remains hashed (ADR-0019).
+function syntheticBehaviorConfig(config: SyntheticGenerationConfig) {
+  const { conceptConcurrency: _conceptConcurrency, probe, ...behavior } = withoutEnrichmentConfigHash(config);
+  const { probeConcurrency: _probeConcurrency, ...probeBehavior } = probe;
+  void _conceptConcurrency;
+  void _probeConcurrency;
+  return { ...behavior, probe: probeBehavior };
 }
 
 // Two registry entries may hold the same descriptor value (probe/grounding are SHARED_STAGES) or

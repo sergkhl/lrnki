@@ -143,5 +143,38 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
 // these values deliberately — never as a side effect of a type refactor.
 test("default operation config hashes are stable across the registry derivation", () => {
   assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-1886ba82e2e5");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-978cefbca6ed");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-41e732730802");
+});
+
+test("synthetic execution widths do not change identity while probe behavior still does", () => {
+  const base = syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG);
+  assert.equal(
+    syntheticGenerationConfigHash({ ...DEFAULT_SYNTHETIC_GENERATION_CONFIG, conceptConcurrency: 1 }),
+    base,
+    "concept fan-out is execution policy"
+  );
+  assert.equal(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      probe: { ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe, probeConcurrency: 1 }
+    }),
+    base,
+    "within-concept probe fan-out is execution policy"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      probe: { ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe, sampleCount: DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe.sampleCount + 1 }
+    }),
+    base,
+    "probe K remains behavioral identity"
+  );
+  assert.notEqual(
+    syntheticGenerationConfigHash({
+      ...DEFAULT_SYNTHETIC_GENERATION_CONFIG,
+      probe: { ...DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe, agreementThreshold: DEFAULT_SYNTHETIC_GENERATION_CONFIG.probe.agreementThreshold + 0.01 }
+    }),
+    base,
+    "probe admission threshold remains behavioral identity"
+  );
 });

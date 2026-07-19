@@ -148,7 +148,7 @@ function presentEdges(input: OrderInput, edges: { prerequisiteLabel: string; dep
 
 function buildHarness(options: {
   responder?: Responder;
-  rawOrdering?: (input: OrderInput) => WholeSetOrdering;
+  rawOrdering?: (input: OrderInput) => WholeSetOrdering | Promise<WholeSetOrdering>;
   difficulty?: DifficultyPort;
   onEvent?: (event: string) => void;
 } = {}) {
@@ -387,7 +387,7 @@ test("certain edges are reduced, uncertain edges retained, and each common dispo
   assert.equal(ordering.pairVotes.filter((vote) => vote.classification === "direction_contested").length, 1);
 });
 
-test("the source-grounded ordering summary fires after reduction and before difficulty with the trace-consistent counts", async () => {
+test("the source-grounded ordering summary fires after reduction with trace-consistent counts while difficulty runs independently", async () => {
   const harness = buildHarness();
   let summary: { k: number; committed: number; contested: number; weakCut: number; cycleRouted: number } | undefined;
   await buildHarness({ responder: ae3Responder }).completion.complete(request({
@@ -400,7 +400,7 @@ test("the source-grounded ordering summary fires after reduction and before diff
     })
   }));
   assert.deepEqual(summary, { k: K, committed: 2, contested: 1, weakCut: 1, cycleRouted: 0 });
-  // Timing: the hook observes a world where difficulty has not yet run.
+  // Difficulty starts without waiting for the ordering branch's summary.
   const events: string[] = [];
   const timed = buildHarness({ responder: ae3Responder, onEvent: (event) => events.push(event) });
   await timed.completion.complete(request({
@@ -410,11 +410,11 @@ test("the source-grounded ordering summary fires after reduction and before diff
       onOrderingSummary: () => events.push("orderingSummary")
     })
   }));
-  assert.deepEqual(events, ["orderingSummary", "difficulty", "persist"]);
+  assert.deepEqual(events, ["difficulty", "orderingSummary", "persist"]);
   assert.ok(harness, "silence the unused base harness");
 });
 
-test("an ordering-summary hook error propagates before difficulty and persists nothing", async () => {
+test("an ordering-summary hook error propagates after difficulty has started and persists nothing", async () => {
   const harness = buildHarness({ responder: ae3Responder });
   await assert.rejects(
     () => harness.completion.complete(request({
@@ -429,7 +429,7 @@ test("an ordering-summary hook error propagates before difficulty and persists n
     /summary sink failed/
   );
   assert.equal(harness.getPersistCalls(), 0);
-  assert.ok(!harness.events.includes("difficulty"));
+  assert.ok(harness.events.includes("difficulty"));
 });
 
 // --- Synthetic variant (AE2) -------------------------------------------------------
@@ -537,7 +537,7 @@ test("a valid request persists exactly once with producer metadata and returns t
   assert.equal(persisted.artifact.configHash, "test-config-hash");
 });
 
-test("completion brackets ordering, symbolic disposal, difficulty, and persist onto the caller's stage bracket", async () => {
+test("completion starts ordering and difficulty brackets before symbolic disposal, then persists after their join", async () => {
   const harness = buildHarness();
   await harness.completion.complete(request({
     nodes: [anchor("n1", "c1", "Alpha")],
@@ -546,10 +546,47 @@ test("completion brackets ordering, symbolic disposal, difficulty, and persist o
   }));
   assert.deepEqual(harness.stages, [
     STAGE_TAGS.prerequisiteOrdering,
-    NON_LLM_STAGES.symbolicDisposal,
     STAGE_TAGS.intrinsicDifficulty,
+    NON_LLM_STAGES.symbolicDisposal,
     NON_LLM_STAGES.persist
   ]);
+});
+
+test("ordering and difficulty overlap and persistence waits for both branches", async () => {
+  let releaseOrdering!: () => void;
+  let releaseDifficulty!: () => void;
+  const orderingGate = new Promise<void>((resolve) => { releaseOrdering = resolve; });
+  const difficultyGate = new Promise<void>((resolve) => { releaseDifficulty = resolve; });
+  const started: string[] = [];
+  const harness = buildHarness({
+    rawOrdering: async () => {
+      started.push("ordering");
+      await orderingGate;
+      return { edges: [] };
+    },
+    difficulty: {
+      method: "fake-difficulty",
+      async score({ nodes }) {
+        started.push("difficulty");
+        await difficultyGate;
+        return nodes.map((node) => ({ derivedNodeId: node.derivedNodeId, score: 0.5, method: "fake-difficulty", components: {}, neuralRationale: "mock" }));
+      }
+    }
+  });
+  const completion = harness.completion.complete(request({
+    nodes: [anchor("n1", "c1", "Alpha"), anchor("n2", "c2", "Beta")],
+    config: { ...config, orderingSampleCount: 1 },
+    contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha def"]), profile("c2", ["Beta def"])] })
+  }));
+
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(started, ["ordering", "difficulty"], "both independent neural branches start before either finishes");
+  releaseDifficulty();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.getPersistCalls(), 0, "a completed difficulty branch cannot persist before ordering finishes");
+  releaseOrdering();
+  await completion;
+  assert.equal(harness.getPersistCalls(), 1);
 });
 
 // --- Structural request validation (R8/R9, AE5) -------------------------------------
@@ -734,17 +771,28 @@ test("difficulty output that omits, duplicates, or invents a node id fails close
   }
 });
 
-test("ordering and difficulty port errors propagate unchanged and persist zero times", async () => {
+test("an ordering-only failure still starts difficulty and persists zero times", async () => {
+  let difficultyCalls = 0;
   const orderingBoom = buildHarness({
     rawOrdering: () => {
       throw new Error("forced-tool retry budget exhausted");
+    },
+    difficulty: {
+      method: "fake-difficulty",
+      async score() {
+        difficultyCalls += 1;
+        return [];
+      }
     }
   });
   await rejectsWithoutPersist(orderingBoom, request({
     nodes: [anchor("n1", "c1", "Alpha"), anchor("n2", "c2", "Beta")],
     contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha def"]), profile("c2", ["Beta def"])] })
   }), /retry budget exhausted/);
+  assert.equal(difficultyCalls, 1);
+});
 
+test("a difficulty-only failure still starts ordering and persists zero times", async () => {
   const difficultyBoom = buildHarness({
     difficulty: {
       method: "fake-difficulty",
@@ -754,7 +802,33 @@ test("ordering and difficulty port errors propagate unchanged and persist zero t
     }
   });
   await rejectsWithoutPersist(difficultyBoom, request({
-    nodes: [anchor("n1", "c1", "Alpha")],
-    contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha def"])] })
+    nodes: [anchor("n1", "c1", "Alpha"), anchor("n2", "c2", "Beta")],
+    contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha def"]), profile("c2", ["Beta def"])] })
   }), /difficulty judge unavailable/);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(difficultyBoom.orderCalls.length, K);
+  assert.equal(difficultyBoom.getPersistCalls(), 0, "the ordering branch finishing after rejection still cannot persist");
+});
+
+test("simultaneous ordering and difficulty failures persist zero times", async () => {
+  let difficultyCalls = 0;
+  const bothBoom = buildHarness({
+    rawOrdering: () => {
+      throw new Error("ordering unavailable");
+    },
+    difficulty: {
+      method: "fake-difficulty",
+      async score() {
+        difficultyCalls += 1;
+        throw new Error("difficulty unavailable");
+      }
+    }
+  });
+  await assert.rejects(() => bothBoom.completion.complete(request({
+    nodes: [anchor("n1", "c1", "Alpha"), anchor("n2", "c2", "Beta")],
+    contribution: sourceContribution({ evidenceProfiles: [profile("c1", ["Alpha def"]), profile("c2", ["Beta def"])] })
+  })), /ordering unavailable|difficulty unavailable/);
+  assert.equal(difficultyCalls, 1);
+  assert.equal(bothBoom.orderCalls.length, K);
+  assert.equal(bothBoom.getPersistCalls(), 0);
 });

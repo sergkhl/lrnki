@@ -219,7 +219,7 @@ const idByLabel = (layer: DerivedGraphLayer) =>
 // U5: the reporter sees the enrichment timeline lifecycle. The anchor-only run (no
 // minting/dedup ports) skips rescue-mint + dedup; ordering and difficulty carry their
 // STAGE_TAGS so the R5 cost join keys hold; persist is the non-LLM tail.
-test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages → completeOperation succeeded", async () => {
+test("U5: reports concurrent ordering/difficulty → symbolic/persist stages → completeOperation succeeded", async () => {
   const ports = buildPorts();
   const { reporter, calls } = recordingReporter();
   await run(ports, { reporter });
@@ -229,8 +229,8 @@ test("U5: reports beginOperation → ordering/symbolic/difficulty/persist stages
   const entered = calls.filter((c) => c.startsWith("enter:")).map((c) => c.slice("enter:".length));
   assert.deepEqual(entered, [
     STAGE_TAGS.prerequisiteOrdering,
-    NON_LLM_STAGES.symbolicDisposal,
     STAGE_TAGS.intrinsicDifficulty,
+    NON_LLM_STAGES.symbolicDisposal,
     NON_LLM_STAGES.persist
   ]);
   // Every entered stage is closed ok:true on a clean run; no failed status is emitted.

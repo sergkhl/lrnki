@@ -532,6 +532,56 @@ test("concurrent per-node generation persists items and rejections in input orde
   ]);
 });
 
+test("option-select, matching, and impostor stages overlap and still persist in canonical type order", async () => {
+  const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
+  const { store, persisted } = capturingStore();
+  let releaseOptionSelect!: () => void;
+  let releaseMatching!: () => void;
+  let releaseImpostor!: () => void;
+  const optionSelectGate = new Promise<void>((resolve) => { releaseOptionSelect = resolve; });
+  const matchingGate = new Promise<void>((resolve) => { releaseMatching = resolve; });
+  const impostorGate = new Promise<void>((resolve) => { releaseImpostor = resolve; });
+  const started: string[] = [];
+  const generation: StudyItemGenerationPort = {
+    model: "mock-gen",
+    async generateOptionSelect() {
+      started.push("option_select");
+      await optionSelectGate;
+      return osDraft("rules that govern memory");
+    },
+    async generateMatching(input) {
+      started.push("matching");
+      await matchingGate;
+      return matchingDraftFrom(input.groundingPassages);
+    },
+    async generateImpostor(input) {
+      started.push("impostor");
+      await impostorGate;
+      return impDraftFrom(input.groundingPassages);
+    }
+  };
+  const generationPromise = generateStudyItemBank({
+    enrichmentId: "enr-1",
+    configHash: "cfg-1",
+    graphStore: graphStoreReturning(snapshot),
+    enrichmentStore: enrichmentStoreReturning(layerWith([anchorNode("c1")])),
+    conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef) } }),
+    impostorLieValidityJudge: lieJudgePassing(),
+    conceptLessonStore: capturingLessonStore().store,
+    studyItemGeneration: generation,
+    studyItemBankStore: store
+  });
+
+  await new Promise((resolve) => setImmediate(resolve));
+  const allStagesStarted = [...started];
+  releaseImpostor();
+  releaseMatching();
+  releaseOptionSelect();
+  assert.deepEqual(allStagesStarted, ["option_select", "matching", "impostor"]);
+  await generationPromise;
+  assert.deepEqual(persisted.map((item) => item.itemType), ["option_select", "matching", "impostor"]);
+});
+
 test("an option-select guard rejection records the node as rejected", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();

@@ -3,8 +3,15 @@
 ## TODO
 
 - **Speed up Topic Expedition generation.** Active plan
-  [2026-07-18-002](./2026-07-18-002-speed-up-expedition-generation.md) — In progress: U1 provider
-  lock complete and live; resume at U2 parallel back half, then U3→U5 in plan order.
+  [2026-07-18-002](./2026-07-18-002-speed-up-expedition-generation.md) — In progress: U1–U4 are
+  complete. U5's live timing/cost gate passed at **84.1s** request→ready, but its real-use quality
+  judgment is `FIX_FIRST`: the generated grounding for “Aerobic versus Anaerobic Respiration”
+  conflated anaerobic respiration with fermentation, and the error propagated into a lesson and
+  matching item. Do not start the Treasure-map plan. Resume by applying rule 21 to the established
+  factual-conflation / generated-grounding hallucination problem class, research recognized
+  factuality-verification practice, and design the conventional root-cause correction without
+  fixture terms or weakening the learner-neutral contract. Re-run U5 after that separately scoped
+  correction; evidence: `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
 
 - **Treasure-map trail restyle.** Active plan
   [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — Ready, not started.
@@ -25,6 +32,18 @@
   not treat the current single inline generated option as equivalent to the neutral Study Item Bank.
 
 ## COMPLETED
+
+- **Topic Expedition scheduling and execution-policy speedups implemented (2026-07-19, active plan
+  2026-07-18-002 U2–U4; uncommitted).** The shared Derived Graph Layer completion now runs its
+  intact ordering chain concurrently with intrinsic difficulty and joins before coverage proof /
+  atomic persistence; Study Item Bank generation raises lesson + blueprint fan-out to 8, launches
+  option-select / matching / impostor as three concurrent degree-4 brackets, and merges results only
+  after the join in canonical type order; Synthetic Topic Generation raises concept fan-out to 8,
+  while `conceptConcurrency` and nested `probeConcurrency` are removed from behavioral config
+  identity. Focused regressions prove overlap, deterministic merge, and zero persistence when either
+  or both Derived Graph Layer branches fail. No prompt, K, threshold, guard, schema, readiness rule,
+  supervisor, or persisted artifact shape changed. Deterministic validation is green; U5 quality is
+  `FIX_FIRST`, so the active plan is deliberately not closed. Validation in VALIDATION below.
 
 - **Topic-generation claim reliability and DB-test isolation shipped (2026-07-18).** Topic claims
   now mint and persist the enrichment operation/fencing UUID atomically in the queue claim;
@@ -322,6 +341,26 @@
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Speed Up Topic Expedition Generation — U2–U5 implementation + live gate, 2026-07-19. Timing
+  PASS; real-use quality `FIX_FIRST`.** Repository `pnpm check` passed: workspace typechecks and
+  suites (application **681/681**, learner app **232/232**), lint (0 errors),
+  Admin Lab + Learner App production builds, and web E2E **48/48**. Guarded `pnpm test:db` reset /
+  migrated only `lrnki_test` and passed, including learner-api DB tests **20/20**. A disposable
+  learner requested the baseline topic “Cellular Respiration” through the live learner-api
+  supervisor on production LiteLLM/Postgres: ready in **84.100s**, one attempt, all timeline stages
+  `ok:true`, **12** nodes / **13** edges / **12** lessons / **27** current items. Ordering (**9.936s**)
+  overlapped difficulty (**5.696s**); option-select (**17.282s**), matching (**24.389s**), and
+  impostor (**22.655s**) shared one start window. Journey cost was **$0.0780379** versus baseline
+  **$0.0650480** (**+$0.0129899**; current run had 12 nodes versus baseline 15). The DAG and three
+  lessons plus one item of every type were inspected; coherent core paths and plausible 12-core /
+  1-boundary probe separation were present. Inspection also found a foundational factual defect
+  already present in the Generated Grounding Bundle: its aerobic/anaerobic definition assigns the
+  fermentation-specific 2-ATP/byproduct behavior to anaerobic respiration generally and a lesson
+  then says the electron transport chain is exclusive to aerobic respiration. That propagated into
+  a misleading matching pair. No fixture-specific or out-of-plan quality tuning was made; the
+  disposable learner and session were deleted, while the immutable quality evidence remains.
+  Evidence: `tmp/2026-07-18-expedition-speedup/EVALUATION.md` plus captured CSV/JSON alongside it.
 
 - **Speed Up Topic Expedition Generation — U1 provider-lock experiment + live alias gate,
   2026-07-18. PASS.** Baseline operation `9b67cd64…` supplied the full persisted 15-node Cellular
