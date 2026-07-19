@@ -123,7 +123,20 @@ pnpm build:android       # preview profile
 pnpm build:android:dev   # development profile
 ```
 
-iOS local builds require macOS + Xcode — future work.
+**Native dev loop** — build, install, and launch a development build on a connected device (else
+the emulator/simulator) and start Metro with the dev client:
+
+```bash
+pnpm dev:android    # needs Java 17 + Android SDK
+pnpm dev:ios        # needs macOS + Xcode
+```
+
+`expo run:*` generates `apps/learner-app/android/` and `ios/` in-tree (gitignored); no
+`EXPO_TOKEN` needed. Builds default to the live API; to target a local `pnpm dev:api`, set
+`EXPO_PUBLIC_LEARNER_API_URL=http://10.0.2.2:8787` (Android emulator) or `http://localhost:8787`
+(iOS simulator) — debug builds permit cleartext HTTP, so no config change is needed.
+
+EAS iOS builds (distributable artifacts) — future work.
 
 ## Scope
 

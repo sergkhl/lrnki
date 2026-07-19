@@ -20,6 +20,9 @@ const config: ExpoConfig = {
   android: {
     package: "com.globesoul.lrnki"
   },
+  ios: {
+    bundleIdentifier: "com.globesoul.lrnki"
+  },
   web: {
     output: "static"
   },

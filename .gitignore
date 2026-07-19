@@ -27,3 +27,7 @@ fixtures/pptx/
 
 # Disposable local e2e/preview APKs — never committed or distributed (cleartext e2e artifact)
 apps/learner-app/lrnki-learner-*.apk
+
+# Native projects are generated in-tree by `expo run:android` / `expo run:ios` (prebuild)
+apps/learner-app/android/
+apps/learner-app/ios/
