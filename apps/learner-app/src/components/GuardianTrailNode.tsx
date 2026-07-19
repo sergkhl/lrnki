@@ -40,10 +40,10 @@ export function GuardianTrailNode({
       : scope.state === "active"
         ? { icon: <Swords size={18} color={colors.ink} />, border: "border-frontier", subline: learnerTerm("guardianResume"), disabled: false }
         : scope.state === "available"
-          ? { icon: <Swords size={18} color={colors.ink} />, border: "border-line-strong", subline: learnerTerm("guardianFace"), disabled: false }
+          ? { icon: <Swords size={18} color={colors.ink} />, border: "border-map-ink", subline: learnerTerm("guardianFace"), disabled: false }
           : scope.state === "locked"
-            ? { icon: <Lock size={18} color={colors.fog} />, border: "border-line", subline: learnerTerm("guardianSummitLocked"), disabled: true }
-            : { icon: <ShieldQuestion size={18} color={colors.fog} />, border: "border-line", subline: learnerTerm("guardianUnavailable"), disabled: true };
+            ? { icon: <Lock size={18} color={colors.fog} />, border: "border-map-ink-soft", subline: learnerTerm("guardianSummitLocked"), disabled: true }
+            : { icon: <ShieldQuestion size={18} color={colors.fog} />, border: "border-map-ink-soft", subline: learnerTerm("guardianUnavailable"), disabled: true };
 
   return (
     <View className="items-center">

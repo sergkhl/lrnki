@@ -7,6 +7,8 @@ import type { RecallScopeStatus, ScaffoldDetourView, StudySession } from "@lrnki
 import type { ScaffoldStepView } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
+import { MapGround } from "./MapGround";
+import { buildTreasureRoute } from "@/learn/treasureMap";
 import { ConceptMarker } from "./ConceptMarker";
 import { GuardianArrivalDialog } from "./GuardianArrivalDialog";
 import { GuardianTrailNode } from "./GuardianTrailNode";
@@ -123,6 +125,7 @@ export function CheckpointPath({
   const containerRef = useRef<View>(null);
   const rowNodeRef = useRef<Record<string, View | null>>({});
   const [containerWidth, setContainerWidth] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [waveAnchorYs, setWaveAnchorYs] = useState<Record<string, number>>({});
   const measureWaveAnchor = (stopId: string) => {
     const row = rowNodeRef.current[stopId];
@@ -168,11 +171,25 @@ export function CheckpointPath({
           className="relative mx-auto w-full max-w-sm gap-5 px-2 py-2"
           onLayout={(event) => {
             setContainerWidth(Math.round(event.nativeEvent.layout.width));
+            setContainerHeight(Math.round(event.nativeEvent.layout.height));
             // Container growth means rows moved without their own onLayout firing.
             for (const stopId of Object.keys(rowNodeRef.current)) measureWaveAnchor(stopId);
           }}
         >
-          <TrailWave view={view} containerWidth={containerWidth} anchorYs={waveAnchorYs} />
+          {/* The parchment ground under everything, then the progressively inked route
+              over it (plan 2026-07-18-001 U2); trail content overlays both. */}
+          <MapGround
+            seed={session.enrichmentId}
+            width={containerWidth}
+            height={containerHeight}
+            stopAnchors={view.concepts.flatMap((concept) =>
+              concept.stops.flatMap((stop) => {
+                const y = waveAnchorYs[stop.stopId];
+                return y === undefined ? [] : [{ y, sectionIndex: concept.sectionIndex }];
+              })
+            )}
+          />
+          <TrailRoute view={view} seed={session.enrichmentId} containerWidth={containerWidth} anchorYs={waveAnchorYs} />
           {view.concepts.map((concept, conceptIndex) => {
             // The Leg's Guardian node projects after its LAST concept (F5): guarding the
             // milestone the Leg builds toward, persistent across mastered/unfused, active,
@@ -305,44 +322,59 @@ export function CheckpointPath({
   );
 }
 
-// The dashed trail wave (D5): one static SVG behind the trail content drawing a smooth
-// serpentine through every measured checkpoint center — x from the same sine offset the
-// circles use, y from the measured-anchor state. Cubic segments take vertical tangents at
-// each anchor, so the curve reads as one continuous winding path. Full-width cards
-// (banners, markers, guardian nodes, terminus) simply overlay it (KTD5: no motion).
-function TrailWave({
+// The progressively inked route (plan 2026-07-18-001 U2, KTD5): one static SVG behind
+// the trail content, keeping TrailWave's measured-anchor serpentine — x from the same
+// sine offset the circles use, y from the measured-anchor state — with treasureMap's
+// seeded hand-drawn jitter. Segments through the last completed stop draw as solid ink;
+// segments ahead stay faint irregular dashes — a shape distinction, never color alone,
+// never gold, and no route motion (the mastery beat stays on the capstone).
+function TrailRoute({
   view,
+  seed,
   containerWidth,
   anchorYs
-}: Readonly<{ view: TrailView; containerWidth: number; anchorYs: Record<string, number> }>) {
+}: Readonly<{ view: TrailView; seed: string; containerWidth: number; anchorYs: Record<string, number> }>) {
   if (containerWidth === 0) return null;
   const centerX = containerWidth / 2;
-  const points = view.concepts
-    .flatMap((concept) => concept.stops)
-    .flatMap((stop, stopIndex) => {
-      const y = anchorYs[stop.stopId];
-      return y === undefined ? [] : [{ x: centerX + waveOffset(stopIndex), y }];
-    });
-  if (points.length < 2) return null;
-  const path = points
-    .slice(1)
-    .reduce((d, point, index) => {
-      const prior = points[index];
-      const bend = (point.y - prior.y) / 2;
-      return `${d} C ${prior.x} ${prior.y + bend} ${point.x} ${point.y - bend} ${point.x} ${point.y}`;
-    }, `M ${points[0].x} ${points[0].y}`);
+  const stops = view.concepts.flatMap((concept) => concept.stops);
+  const measured = stops.flatMap((stop, stopIndex) => {
+    const y = anchorYs[stop.stopId];
+    return y === undefined ? [] : [{ x: centerX + waveOffset(stopIndex), y, state: stop.state }];
+  });
+  if (measured.length < 2) return null;
+  // Solid ink runs through the last completed stop of the leading complete run; the
+  // uncharted rhythm takes over at the first incomplete stop.
+  const firstIncomplete = measured.findIndex((point) => point.state !== "complete");
+  const completedCount = firstIncomplete === -1 ? measured.length : firstIncomplete;
+  const route = buildTreasureRoute({
+    seed,
+    points: measured.map(({ x, y }) => ({ x, y })),
+    completedCount
+  });
   return (
     <View className="absolute inset-0" pointerEvents="none">
       <Svg width="100%" height="100%">
-        <Path
-          d={path}
-          fill="none"
-          stroke={colors["trail-muted"]}
-          strokeOpacity={0.6}
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeDasharray="6 8"
-        />
+        {route.inkedPath ? (
+          <Path
+            d={route.inkedPath}
+            fill="none"
+            stroke={colors["map-ink"]}
+            strokeOpacity={0.85}
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        ) : null}
+        {route.unchartedPath ? (
+          <Path
+            d={route.unchartedPath}
+            fill="none"
+            stroke={colors["map-ink-soft"]}
+            strokeOpacity={0.65}
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeDasharray={route.unchartedDash}
+          />
+        ) : null}
       </Svg>
     </View>
   );
@@ -356,36 +388,55 @@ function SectionDivider({ concept, sectionConcepts }: Readonly<{ concept: TrailC
   const masteredCount = sectionConcepts.filter((candidate) => candidate.state === "mastered").length;
   const secured = masteredCount >= sectionConcepts.length;
   const progress = formationProgress(sectionConcepts);
+  // Region cartouche (plan 2026-07-18-001 U3): a double-rule ink frame with the Leg
+  // heading in the map display face; the Progress bar and its copy are unchanged.
   return (
-    <View className="gap-1.5 rounded-card border border-line bg-card px-3 py-2">
-      <View className="flex-row items-center gap-2">
-        <Flag size={16} color={secured ? colors.secured : colors.frontier} />
-        <Text variant="label" className="min-w-0 flex-1 font-semibold" numberOfLines={2}>
-          {legBannerLine({
-            sectionIndex: concept.sectionIndex,
-            conceptCount: sectionConcepts.length,
-            masteredCount,
-            milestoneLabel: concept.milestoneLabel
-          })}
-        </Text>
+    <View className="rounded-card border border-map-ink bg-card p-1" testID="section-cartouche">
+      <View className="gap-1.5 rounded-[6px] border border-map-ink-soft px-3 py-2">
+        <View className="flex-row items-center gap-2">
+          <Flag size={16} color={secured ? colors.secured : colors.frontier} />
+          <Text variant="map-title" className="min-w-0 flex-1" numberOfLines={2}>
+            {legBannerLine({
+              sectionIndex: concept.sectionIndex,
+              conceptCount: sectionConcepts.length,
+              masteredCount,
+              milestoneLabel: concept.milestoneLabel
+            })}
+          </Text>
+        </View>
+        <Progress fraction={progress.completionFraction} accessibilityLabel={formationProgressLine(progress)} />
+        <Text variant="caption" color="muted">{formationProgressLine(progress)}</Text>
       </View>
-      <Progress fraction={progress.completionFraction} accessibilityLabel={formationProgressLine(progress)} />
-      <Text variant="caption" color="muted">{formationProgressLine(progress)}</Text>
     </View>
   );
 }
 
-// The trail terminus (U2): the summit made visible from anywhere on the trail — a fixed
-// end-of-trail marker with the remaining-crystal count, flipping to the reached state.
+// The trail terminus: the summit made visible from anywhere on the trail, now the map's
+// one "X marks the summit" cartouche (plan 2026-07-18-001 KTD6 — the X appears exactly
+// here) — a drawn ink X beside the peak glyph, with the existing summit/remaining copy;
+// reached vs not-reached stays a text + icon-color distinction, never color alone.
 function TrailTerminus({ view, summitLabel }: Readonly<{ view: TrailView; summitLabel: string }>) {
   const reached = view.masteredCount >= view.totalClusters;
   return (
-    <View className="items-center gap-1.5 rounded-card border border-line bg-card px-3 py-4">
-      <Mountain size={28} color={reached ? colors.secured : colors.frontier} />
-      <Text variant="label" className="font-semibold" numberOfLines={2}>
-        {reached ? learnerTerm("summit") : `${learnerTerm("summitPrefix")}: ${summitLabel}`}
-      </Text>
-      <Text variant="caption" color="muted" className="text-center" numberOfLines={2}>{terminusLine(view)}</Text>
+    <View className="rounded-card border border-map-ink bg-card p-1" testID="terminus-cartouche">
+      <View className="items-center gap-1.5 rounded-[6px] border border-map-ink-soft px-3 py-4">
+        <View className="flex-row items-center gap-2">
+          <Svg width={24} height={24} testID="terminus-x">
+            <Path
+              d="M 5 5 C 9 10 15 14 19 19 M 19 5 C 15 10 9 14 5 19"
+              fill="none"
+              stroke={colors["map-ink"]}
+              strokeWidth={3}
+              strokeLinecap="round"
+            />
+          </Svg>
+          <Mountain size={28} color={reached ? colors.secured : colors.frontier} />
+        </View>
+        <Text variant="map-title" numberOfLines={2}>
+          {reached ? learnerTerm("summit") : `${learnerTerm("summitPrefix")}: ${summitLabel}`}
+        </Text>
+        <Text variant="caption" color="muted" className="text-center" numberOfLines={2}>{terminusLine(view)}</Text>
+      </View>
     </View>
   );
 }
@@ -398,11 +449,13 @@ function CheckpointStopRow({
 }: Readonly<{ stop: TrailStop; concept: TrailCluster; offset: number; onSelect: (stopId: string) => void }>) {
   return (
     <View
-      className={`min-h-24 items-center rounded-xl py-1 ${stop.isFogged ? "opacity-55" : ""}`}
+      className={`min-h-24 items-center rounded-xl py-1 ${stop.isFogged ? "bg-map-parchment-deep" : ""}`}
     >
-      {/* Per-stop lock dimming (U5): every fogged stop dims individually, so section
-          boundaries read as steps rather than one wall. */}
-      <View style={{ transform: [{ translateX: offset }] }}>
+      {/* Uncharted parchment (plan 2026-07-18-001 KTD7): every fogged stop reads as
+          not-yet-charted map — a quiet deep wash plus faded ink — per stop, so section
+          boundaries read as steps rather than one wall. Lock semantics and the stop's
+          text labels are unchanged (state = shape + text). */}
+      <View className={stop.isFogged ? "opacity-60" : ""} style={{ transform: [{ translateX: offset }] }}>
         <CheckpointCircle stop={stop} concept={concept} onSelect={onSelect} />
       </View>
     </View>

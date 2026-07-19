@@ -27,7 +27,11 @@ const NORMAL_TEXT_PAIRS: [string, string][] = [
   [colors.muted, colors["muted-panel"]],
   [colors["on-accent"], colors.trail],
   [colors["on-accent"], colors.destructive],
-  [colors.destructive, colors.card]
+  [colors.destructive, colors.card],
+  [colors.ink, colors["map-parchment"]],
+  [colors.muted, colors["map-parchment"]],
+  [colors["map-ink"], colors["map-parchment"]],
+  [colors["map-ink"], colors["map-parchment-deep"]]
 ];
 
 const LARGE_OR_ICON_PAIRS: [string, string][] = [
@@ -38,7 +42,12 @@ const LARGE_OR_ICON_PAIRS: [string, string][] = [
   [colors["line-strong"], colors.card],
   [colors.gem, colors.card],
   [colors.award, colors.card],
-  [colors.secured, colors.card]
+  [colors.secured, colors.card],
+  [colors["map-ink-soft"], colors["map-parchment"]],
+  [colors["map-ink-soft"], colors["map-parchment-deep"]],
+  [colors["line-strong"], colors["map-parchment"]],
+  [colors.gem, colors["map-parchment"]],
+  [colors.frontier, colors["map-parchment"]]
 ];
 
 test("normal-text token pairs meet 4.5:1", () => {

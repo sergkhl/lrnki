@@ -43,7 +43,8 @@ export function ConceptMarker({ concept, session }: Readonly<{ concept: TrailClu
   };
 
   return (
-    <View className="rounded-card border border-line bg-card shadow-sm">
+    // Parchment panel + ink border (plan 2026-07-18-001 U3): surface restyle only.
+    <View className="rounded-card border border-map-ink-soft bg-card shadow-sm">
       <PressableSurface
         accessibilityLabel={concept.label}
         expanded={open}

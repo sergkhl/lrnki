@@ -41,6 +41,13 @@ test("the vista door shows the exact crystal count and no miniature specimen", a
   expect(screen.queryAllByTestId("facet-grown")).toHaveLength(0);
 });
 
+test("the expedition title renders in the bundled map display face", async () => {
+  await renderHeader();
+  const title = screen.getByText("Rust ownership");
+  const styles = [title.props.style].flat(Infinity).filter(Boolean);
+  expect(styles).toContainEqual(expect.objectContaining({ fontFamily: "IMFellEnglish_400Regular" }));
+});
+
 test("the door keeps its accessible open action", async () => {
   const { onOpenVista } = await renderHeader();
   await fireEvent.press(screen.getByLabelText(learnerTerm("vistaOpen")));

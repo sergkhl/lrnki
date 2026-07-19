@@ -42,11 +42,13 @@ export function QuestHeader({
   }, [boundRewards, reduceMotion, pulse]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.12 * pulse.get() }] }));
   return (
-    <View className="border-b border-line bg-card px-4 py-3">
+    // Parchment trim (plan 2026-07-18-001 U1): the header sits on the map artifact's
+    // ground so the screen reads as one field-chart; controls keep their card surface.
+    <View className="border-b border-map-ink-soft bg-map-parchment px-4 py-3">
       <View className="mx-auto w-full max-w-3xl flex-row items-center justify-between gap-3">
         <View className="min-w-0 flex-1">
           <Text variant="caption" color="muted">{isSummitPush(trail) ? learnerTerm("summitPushEyebrow") : "Expedition"}</Text>
-          <Text variant="title" numberOfLines={1}>{title}</Text>
+          <Text variant="map-title" numberOfLines={1}>{title}</Text>
           {session.target.label ? (
             <Text variant="caption" color="muted" numberOfLines={2}>
               {summitLine({

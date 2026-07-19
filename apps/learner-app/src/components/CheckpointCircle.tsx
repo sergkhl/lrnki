@@ -26,6 +26,9 @@ export function CheckpointCircle({
   const presentation = checkpointPresentation(stop);
   const disabled = stop.state === "locked";
   const size = stop.isNext ? 72 : 64;
+  // Ink-ring-on-parchment (plan 2026-07-18-001 KTD6/KTD7): the next stop keeps its
+  // frontier guidance ring, complete keeps the gem fill language, available reads as a
+  // drawn ink ring, and locked adopts the uncharted parchment treatment.
   const box = stop.isNext
     ? "border-frontier bg-card"
     : stop.state === "complete"
@@ -33,8 +36,8 @@ export function CheckpointCircle({
         ? "border-gem bg-gem-soft"
         : "border-gem bg-gem"
       : stop.state === "available"
-        ? "border-line-strong bg-card"
-        : "border-fog bg-fog opacity-75";
+        ? "border-map-ink bg-card"
+        : "border-map-ink-soft bg-map-parchment-deep opacity-75";
   return (
     <View className="w-24 items-center gap-2">
       {/* The fixed halo layer marks the guided next stop (its one-shot emphasis lives in
@@ -106,7 +109,9 @@ function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIco
     );
   }
   const solidComplete = stop.state === "complete" && stop.kind !== "capstone";
-  const color = stop.state === "locked" || solidComplete ? colors["on-accent"] : colors.ink;
+  // Locked sits on the light uncharted wash now, so its lock draws in faded ink
+  // (>=3:1 on map-parchment-deep) instead of the light-on-dark fog treatment.
+  const color = solidComplete ? colors["on-accent"] : stop.state === "locked" ? colors["map-ink-soft"] : colors.ink;
   const Icon = CIRCLE_ICONS[icon];
   return <Icon size={22} color={color} />;
 }

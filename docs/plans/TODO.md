@@ -3,10 +3,30 @@
 ## TODO
 
 - **Treasure-map trail restyle.** Active plan
-  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — Ready, not started. Next-session
-  handoff: this is now first in execution order; begin with U1's React Native map tokens, bundled
-  display-font bootstrap, `map-title` text variant, and QuestHeader trim. The Topic Expedition
-  speed/factuality plan is complete and deleted.
+  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — In progress: **U1–U3 implemented
+  2026-07-19 (uncommitted), only U4 remains.** U1: `map-parchment`/`map-parchment-deep`/`map-ink`/
+  `map-ink-soft` tokens + regenerated `tokens.css` + extended contrast assertions;
+  `@expo-google-fonts/im-fell-english` 0.4.0 + `expo-font` in the expo catalog; font readiness
+  joined the `_layout.tsx` bootstrap gate (load error falls back to system face); `map-title`
+  `TextVariant` applies the family via style-only through `AppText` (kept out of the Tailwind
+  theme on purpose); QuestHeader parchment trim + display title; expo-font/google-fonts jest
+  mocks in `jest.setup.js`. U2: pure seeded `src/learn/treasureMap.ts` (reuses
+  `mineralSpecimen.ts` `hashSeed`/`mulberry32`; route jitter ≤10px so the line passes through
+  measured centers, irregular dash rhythm, one grain `<Pattern>` tile, weathered edge path,
+  margin-only doodles capped 2/section with a 104px center exclusion; 7 tests incl. 17-Leg-scale
+  caps) + `MapGround` component + `TrailRoute` replacing `TrailWave` in `CheckpointPath.tsx`
+  (solid `map-ink` behind the learner through the last leading-complete stop, `map-ink-soft`
+  irregular dashes ahead; uniform `6 8` dash deleted; container height now measured). U3:
+  ink-ring/uncharted `CheckpointCircle` (locked = faded ink on `map-parchment-deep`, lock icon
+  recolored from `on-accent`), fogged rows use the deep wash + `opacity-60` instead of
+  `opacity-55`, double-rule `section-cartouche` + `map-title` Leg heading, `terminus-cartouche`
+  with the map's single drawn-X (`terminus-x`), and ink-border panel restyles on ConceptMarker /
+  GuardianTrailNode / SupportPathNode. Envelope this session: learner-app jest 52 suites / 242
+  green, typecheck clean, workspace lint 0 errors, intercepted `pnpm e2e` **48/48** on a fresh
+  production web export. **Next session: U4 only** — full deterministic envelope, then the plan's
+  rule-14 real-use browser gate (long + short real expedition, phone/desktop/reduced-motion/200%)
+  and `pnpm e2e:native:maestro` + emulator trail screenshot; on PASS amend ADR-0032 with the
+  "Trail map presentation" paragraph, delete the plan, and fold the outcome here.
 
 ### Evidence-triggered follow-up
 

@@ -54,6 +54,18 @@ jest.mock("nativewind", () => ({
   useColorScheme: () => ({ colorScheme: "light" })
 }));
 
+// Fonts resolve as instantly loaded (plan 2026-07-18-001 KTD4): components assert the
+// family name, never real glyph loading; the google-fonts module is mocked so jest
+// never requires its bundled .ttf asset.
+jest.mock("expo-font", () => ({
+  useFonts: jest.fn(() => [true, null]),
+  loadAsync: jest.fn(() => Promise.resolve()),
+  isLoaded: jest.fn(() => true)
+}));
+jest.mock("@expo-google-fonts/im-fell-english", () => ({
+  IMFellEnglish_400Regular: "IMFellEnglish_400Regular"
+}));
+
 // Haptics are asserted by call, never executed, in tests.
 jest.mock("expo-haptics", () => ({
   selectionAsync: jest.fn(() => Promise.resolve()),

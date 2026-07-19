@@ -18,6 +18,7 @@
     "e2e:native:maestro": "tsx e2e-native/run.ts"
   },
   "dependencies": {
+    "@expo-google-fonts/im-fell-english": "catalog:expo",
     "@expo/ui": "catalog:expo",
     "@lrnki/application": "workspace:*",
     "@lrnki/domain-core": "workspace:*",
@@ -31,6 +32,7 @@
     "expo-build-properties": "catalog:",
     "expo-constants": "catalog:expo",
     "expo-dev-client": "catalog:expo",
+    "expo-font": "catalog:expo",
     "expo-haptics": "catalog:expo",
     "expo-linking": "catalog:expo",
     "expo-router": "catalog:expo",

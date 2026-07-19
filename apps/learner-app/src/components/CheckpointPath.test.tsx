@@ -110,6 +110,15 @@ test("failed Guardian entry leaves the Activity Sheet open and pushes nothing", 
   expect(mockPush).not.toHaveBeenCalled();
 });
 
+test("the trail renders region cartouches and exactly one X-marked terminus", async () => {
+  await renderPath();
+  // Field-chart furniture (plan 2026-07-18-001 U3): every section opens with a
+  // double-rule cartouche, and the map's only X lives at the terminus (KTD6).
+  expect(screen.getAllByTestId("section-cartouche").length).toBeGreaterThan(0);
+  expect(screen.getByTestId("terminus-cartouche")).toBeTruthy();
+  expect(screen.getByTestId("terminus-x")).toBeTruthy();
+});
+
 // Regression (plan 2026-07-16-003 U6 gate): the trail stays mounted under a pushed
 // /guardian route, so a post-win session refetch there must NOT pop the next Leg's
 // arrival dialog over the reward screen. The offer waits for the trail to regain focus.

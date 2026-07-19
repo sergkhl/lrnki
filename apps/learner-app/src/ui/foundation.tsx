@@ -25,13 +25,17 @@ import { useEffect } from "react";
 import { colors } from "./tokens";
 import { AnimatedView, useReducedMotion } from "./motion";
 
-export type TextVariant = "display" | "heading" | "title" | "label" | "body" | "caption";
+export type TextVariant = "display" | "heading" | "title" | "map-title" | "label" | "body" | "caption";
 export type TextColor = "ink" | "muted" | "destructive" | "on-accent" | "trail" | "award";
 
 const TEXT_VARIANT_CLASS: Record<TextVariant, string> = {
   display: "text-3xl font-semibold tracking-tight",
   heading: "text-xl font-semibold",
   title: "text-base font-semibold",
+  // Map-surface headings only (plan 2026-07-18-001 KTD4): cartouche titles, terminus,
+  // and the QuestHeader expedition title. No weight class — IM Fell English ships one
+  // regular cut and faux-bolding it would differ across web and Android.
+  "map-title": "text-lg tracking-wide",
   label: "text-sm font-medium",
   body: "text-base leading-7",
   caption: "text-xs"
@@ -58,11 +62,20 @@ export type AppTextProps = TextProps &
 export function AppText({ variant = "body", color, className, children, ...rest }: AppTextProps) {
   const colorClass = color ? TEXT_COLOR_CLASS[color] : color === undefined && variant === "caption" ? "text-muted" : "text-ink";
   return (
-    <RNText {...rest} className={`${TEXT_VARIANT_CLASS[variant]} ${colorClass} ${className ?? ""}`}>
+    <RNText
+      {...rest}
+      className={`${TEXT_VARIANT_CLASS[variant]} ${colorClass} ${className ?? ""}`}
+      style={variant === "map-title" ? [MAP_TITLE_FONT, rest.style] : rest.style}
+    >
       {children}
     </RNText>
   );
 }
+
+/** The bundled display face loaded in the root layout's bootstrap gate; the family name
+ * is expo-font's key for `IMFellEnglish_400Regular`. Style (not class) keeps the font
+ * out of the Tailwind theme so no other utility can reach it. */
+const MAP_TITLE_FONT: TextStyle = { fontFamily: "IMFellEnglish_400Regular" };
 
 /** Safe-area route shell: every screen gets the journal background and top inset. */
 export function Screen({

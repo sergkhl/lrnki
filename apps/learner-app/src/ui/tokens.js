@@ -21,6 +21,14 @@ const colors = {
   "mineral-quartz": gemTeal,
   "mineral-amethyst": "#7d6b9e",
   "mineral-diamond": "#9cc3d5",
+  // Treasure-map trail surfaces (plan 2026-07-18-001 KTD2/KTD7): parchment ground,
+  // deeper edge/uncharted wash, and two sepia inks. Values clear the tokens.test.ts
+  // contrast floors (map-ink text >= 4.5:1 on both parchments; map-ink-soft
+  // boundaries >= 3:1). Gold stays earned-only and is never map decoration.
+  "map-parchment": "#f1e5c9",
+  "map-parchment-deep": "#e5d4af",
+  "map-ink": "#3f2f1c",
+  "map-ink-soft": "#846c47",
   fog: "#8d887c",
   frontier: "#9c5f2b",
   "muted-panel": "#eee4cd",

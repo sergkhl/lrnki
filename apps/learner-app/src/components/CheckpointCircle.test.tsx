@@ -18,6 +18,21 @@ test("a locked checkpoint is inert and announces its locked state", async () => 
   expect(circle.props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(circle);
   expect(onSelect).not.toHaveBeenCalled();
+  // Uncharted parchment treatment (plan 2026-07-18-001 KTD7): faded ink ring on the
+  // deep wash, never the legacy dark fog fill.
+  expect(circle.props.className).toContain("border-map-ink-soft");
+  expect(circle.props.className).toContain("bg-map-parchment-deep");
+  expect(circle.props.className).not.toContain("bg-fog");
+});
+
+test("an available checkpoint reads as an ink ring on parchment", async () => {
+  const view = trail();
+  const concept = view.concepts[0];
+  const available = { ...concept.stops[0], state: "available" as const, isNext: false };
+  await render(<CheckpointCircle stop={available} concept={concept} onSelect={() => {}} />);
+  const circle = screen.getByLabelText(/Field notes/);
+  expect(circle.props.className).toContain("border-map-ink");
+  expect(circle.props.className).toContain("bg-card");
 });
 
 test("the guided next stop carries its label and opens on press", async () => {

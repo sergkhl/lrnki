@@ -20,8 +20,9 @@ export function SupportPathNode({
   return (
     <ReadyReveal status={detour.status} announcement={`${learnerTerm("supportReadyTitle")}. ${detour.term}`}>
       <View className="ml-8 flex-row items-center">
-        {/* The side-branch connector: a short elbow off the center trail line. */}
-        <View className="h-6 w-4 rounded-bl-lg border-b-2 border-l-2 border-trail-muted opacity-70" />
+        {/* The side-branch connector: a short elbow off the center trail line, drawn in
+            faded map ink (plan 2026-07-18-001 U3). */}
+        <View className="h-6 w-4 rounded-bl-lg border-b-2 border-l-2 border-map-ink-soft opacity-70" />
         <PressableSurface
           accessibilityLabel={`${learnerTerm("supportPathNode")}: “${detour.term}”. ${state.a11y}`}
           onPress={() => onPress(detour)}
@@ -47,7 +48,7 @@ export function SupportPathNode({
 function nodeState(detour: ScaffoldDetourView): { icon: React.ReactNode; border: string; subline: string; a11y: string } {
   if (detour.status === "generating") {
     const phase = scaffoldPhaseCopy(detour.phase);
-    return { icon: <Compass size={16} color={colors.ink} />, border: "border-line", subline: phase, a11y: phase };
+    return { icon: <Compass size={16} color={colors.ink} />, border: "border-map-ink-soft", subline: phase, a11y: phase };
   }
   if (detour.status === "failed") {
     return {
@@ -66,7 +67,7 @@ function nodeState(detour: ScaffoldDetourView): { icon: React.ReactNode; border:
     };
   }
   const progress = supportStepsDoneCopy(detour.completedStepCount, detour.totalStepCount);
-  return { icon: <Route size={16} color={colors.ink} />, border: "border-line", subline: progress, a11y: progress };
+  return { icon: <Route size={16} color={colors.ink} />, border: "border-map-ink-soft", subline: progress, a11y: progress };
 }
 
 // The visible `n/m` progress: one dot per Support Step (filled = done) plus the compact
