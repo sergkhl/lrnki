@@ -2,7 +2,22 @@
 
 ## TODO
 
+- **Speed up Topic Expedition generation.** Active plan
+  [2026-07-18-002](./2026-07-18-002-speed-up-expedition-generation.md) — In progress: U1 provider
+  lock complete and live; resume at U2 parallel back half, then U3→U5 in plan order.
+
+- **Treasure-map trail restyle.** Active plan
+  [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — Ready, not started.
+
 ### Evidence-triggered follow-up
+
+- **Progressive readiness / keep the learner busy under ~1 minute.** If ~3-minute full-ready
+  generation (plan 2026-07-18-002) still feels slow in real use, design one of: earliest-section
+  readiness (learner enters while later sections still generate; owns the readiness-rule and
+  Study Session composition change), enrichment/study-items phase overlap (the in-memory handoff
+  seam plan 2026-07-18-002 KTD4 deliberately rejected), or an engaging waiting surface (e.g.
+  calibration or topic preview during generation). Real-use judgment after the speedup ships
+  triggers this, not a timer.
 
 - **Support Path Study Items in Guardian selection.** After real use justifies the breadth, define a
   richer learner-scoped typed Study Item set and passed-item semantics for Support Steps, then extend
@@ -307,6 +322,24 @@
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Speed Up Topic Expedition Generation — U1 provider-lock experiment + live alias gate,
+  2026-07-18. PASS.** Baseline operation `9b67cd64…` supplied the full persisted 15-node Cellular
+  Respiration/Biology ordering fixture. Both price-locked candidates were probed with a live forced
+  named tool before representative spend: Groq passed; Baseten returned OpenRouter 404 “No
+  endpoints found that support the provided `tool_choice` value” despite endpoint metadata
+  advertising support, so ADR-0006 correctly disqualified it. Groq's direct representative draw
+  completed in **6.944s**, returned 31 parsed edges, and cost **$0.0026412** (5,420 input / 3,047
+  output). After the single-host/no-fallback lock and proxy restart, the production
+  `kg-prerequisite-ordering` alias reported provider **Groq**, completed the same draw in **8.147s**,
+  returned a parsed 28-edge forced call, and its durable LiteLLM spend row recorded **8.100s / 5,420
+  input / 3,680 output / $0.003021**. Human inspection found a coherent acyclic draw: Glycolysis →
+  Pyruvate oxidation → Acetyl-CoA → Citric acid cycle; NADH and FADH₂ → Electron transport chain →
+  Proton-motive force → Chemiosmosis/ATP synthase → Oxidative phosphorylation; mitochondrial
+  compartments precede the compartment-dependent mechanisms. This is a stochastic single draw,
+  not a published DAG—the unchanged K=8 consensus remains the quality authority. The proxy is
+  healthy; infrastructure-LiteLLM **155/155** passed. Evidence:
+  `tmp/2026-07-18-gptoss-provider-lock/EVALUATION.md`.
 
 - **Topic-generation claim reliability — isolated DB + real-use gate, 2026-07-18. PASS.** Focused
   lifecycle **13/13** and learner-api **20/20** green; guarded `pnpm test:db` reset/migrated only

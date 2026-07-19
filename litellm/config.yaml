@@ -109,12 +109,21 @@ model_list:
       output_cost_per_token: 0.0000012
 
   # Independent production judge (kg-independent-judge, ADR-0007/0005). gpt-oss-120b
-  # is cross-family independent of the MiMo extractor, forced tool_choice works,
-  # and it is the cheapest option ($0.039/$0.18 per Mtok). Replaces Mistral Small (free-tier rate-limited).
+  # is cross-family independent of the MiMo extractor and forced tool_choice works.
+  # Provider lock measured 2026-07-18 against the real 15-node Biology ordering draw
+  # (tmp/2026-07-18-gptoss-provider-lock): Groq returned the forced named tool in
+  # 6.944s for $0.0026412 (5,420 input / 3,047 output tokens). Baseten was cheaper in
+  # endpoint metadata but failed the live forced-tool probe with OpenRouter 404 despite
+  # advertising tool_choice support, so ADR-0006 disqualifies it. Groq is deliberately
+  # single-host/no-fallback: an outage must surface, never silently reach an unverified
+  # slow or forced-tool-incompatible host. Replaces Mistral Small (free-tier rate-limited).
   - model_name: "openrouter/openai/gpt-oss-120b"
     litellm_params:
       model: "openrouter/openai/gpt-oss-120b"
       api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000015
+      output_cost_per_token: 0.0000006
+      cache_read_input_token_cost: 0.000000075
       # Forced-tool alias backing model: OpenRouter must only route to providers that
       # honor every request parameter (tool_choice). Without this, provider failover
       # (e.g. Groq 429 → Google Vertex) lands on a provider that rejects forced
@@ -124,6 +133,11 @@ model_list:
       extra_body:
         provider:
           require_parameters: true
+          only:
+            - "groq"
+          order:
+            - "groq"
+          allow_fallbacks: false
           ignore:
             - "google-vertex"
             - "google-ai-studio"
