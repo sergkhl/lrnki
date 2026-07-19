@@ -143,7 +143,7 @@ test("the all-descriptor inventory deduplicates shared descriptors", () => {
 // these values deliberately — never as a side effect of a type refactor.
 test("default operation config hashes are stable across the registry derivation", () => {
   assert.equal(graphEnrichmentConfigHash(DEFAULT_ENRICHMENT_CONFIG), "graph-enrichment-1886ba82e2e5");
-  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-41e732730802");
+  assert.equal(syntheticGenerationConfigHash(DEFAULT_SYNTHETIC_GENERATION_CONFIG), "synthetic-topic-generation-47040dd9508a");
 });
 
 test("synthetic execution widths do not change identity while probe behavior still does", () => {

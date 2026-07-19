@@ -12,6 +12,7 @@ import type {
   DeclaredDomainInferencePort,
   DifficultyPort,
   EnrichmentRunStorePort,
+  GroundingFactualityRevisionPort,
   GroundingGenerationPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort,
@@ -79,6 +80,7 @@ export async function runSyntheticGeneration(input: {
   knowledgeBoundaryProbe: KnowledgeBoundaryProbePort;
   embedding: NodeEmbeddingPort;
   groundingGeneration: GroundingGenerationPort;
+  groundingFactualityRevision: GroundingFactualityRevisionPort;
   prerequisiteOrdering: PrerequisiteOrderingPort;
   difficulty: DifficultyPort;
   enrichmentStore: EnrichmentRunStorePort;
@@ -132,19 +134,46 @@ export async function runSyntheticGeneration(input: {
     const coreNodeIdByConceptKey = new Map<string, string>(
       coreVerdicts.map((entry) => [entry.concept.conceptKey, newNodeId()] as const)
     );
-    const groundedNodes = await runStage(STAGE_TAGS.groundingGeneration, () =>
-      mapWithConcurrency(coreVerdicts, config.conceptConcurrency, async (entry): Promise<LlmGroundedEnrichmentNode> => {
+    const groundingDrafts = await runStage(STAGE_TAGS.groundingGeneration, () =>
+      mapWithConcurrency(coreVerdicts, config.conceptConcurrency, async (entry) => {
         const derivedNodeId = coreNodeIdByConceptKey.get(entry.concept.conceptKey)!;
-        const groundingBundle = await input.groundingGeneration.generate({
+        const draft = await input.groundingGeneration.generate({
           derivedNodeId,
           declaredDomain,
           nodeLabel: entry.concept.canonicalLabel,
           scaffoldedAnchors: [],
           topic: input.topic
         });
+        return { entry, draft };
+      })
+    );
+
+    // Stage 4 — revise every draft through a deterministic cross-family factuality pass
+    // before admission. Probe answers were sampled before any draft existed, so they are
+    // independent checks rather than the grounding generator grading its own completion.
+    // The revision is monotonic/drop-only: no new passage text may cross this boundary.
+    // It stays `llm_grounded` and never invents source-backed provenance.
+    const groundedNodes = await runStage(STAGE_TAGS.groundingFactualityRevision, () =>
+      mapWithConcurrency(groundingDrafts, config.conceptConcurrency, async ({ entry, draft }): Promise<LlmGroundedEnrichmentNode> => {
+        const groundingBundle = await input.groundingFactualityRevision.revise({
+          declaredDomain,
+          topic: input.topic,
+          nodeLabel: entry.concept.canonicalLabel,
+          draft,
+          independentProbeAnswers: entry.verdict.answers
+        });
+        if (groundingBundle.derivedNodeId !== draft.derivedNodeId) {
+          throw new Error(`Grounding factuality revision changed derivedNodeId ${draft.derivedNodeId}.`);
+        }
+        const draftTexts = new Set([...draft.definitions, ...draft.mentions].map((passage) => passage.text));
+        const introduced = [...groundingBundle.definitions, ...groundingBundle.mentions]
+          .find((passage) => !draftTexts.has(passage.text));
+        if (introduced) {
+          throw new Error(`Grounding factuality revision introduced new passage text for ${draft.derivedNodeId}.`);
+        }
         return {
           nodeKind: "enrichment",
-          derivedNodeId,
+          derivedNodeId: draft.derivedNodeId,
           groundingOrigin: "llm_grounded",
           // No mintingReason: a synthetic_primary node is a first-class topic concept, not a
           // prerequisite minted to fill a source gap (KTD3).

@@ -233,6 +233,38 @@ export const generatedGroundingBundleValidator = z.object({
 
 export const generatedGroundingBundleSchema: JsonSchema = toForcedToolSchema(generatedGroundingBundleValidator);
 
+// --- Synthetic grounding factuality revision: submit_grounding_factuality_judgments ---
+// One verdict per listed passage. The judge may identify a false atomic claim only by
+// copying its exact span; the adapter grounds that veto and can only DROP the whole
+// passage. It can never rewrite correct text into a new unsupported claim.
+export function buildGroundingFactualityRevisionValidator(passageCount: number) {
+  return z.object({
+    judgments: z.array(z.object({
+      index: z.number().int().min(0).max(Math.max(0, passageCount - 1)).describe("The zero-based passage index exactly as listed."),
+      factual: z.boolean().describe("True only when every atomic factual claim in the passage is accurate within the stated concept and Declared Domain."),
+      problematicSpan: z.string().describe("When factual is false, copy the minimal exact false or conflating substring from the passage; otherwise return the empty string."),
+      rationale: z.string().min(1).describe("One terse sentence explaining the factual judgment, including any scope distinction or conflict with the independent checks.")
+    }).strict()).length(passageCount).describe("Exactly one factuality judgment for every listed passage index.")
+  }).strict().superRefine((value, ctx) => {
+    const seen = new Set<number>();
+    for (const judgment of value.judgments) {
+      if (seen.has(judgment.index)) ctx.addIssue({ code: "custom", message: `duplicate passage index ${judgment.index}` });
+      seen.add(judgment.index);
+      if (judgment.factual && judgment.problematicSpan.length > 0) {
+        ctx.addIssue({ code: "custom", message: `factual passage ${judgment.index} must carry an empty problematicSpan` });
+      }
+      if (!judgment.factual && judgment.problematicSpan.length === 0) {
+        ctx.addIssue({ code: "custom", message: `non-factual passage ${judgment.index} requires a problematicSpan` });
+      }
+    }
+  });
+}
+
+export const groundingFactualityRevisionValidator = buildGroundingFactualityRevisionValidator(1);
+export function buildGroundingFactualityRevisionSchema(passageCount: number): JsonSchema {
+  return toForcedToolSchema(buildGroundingFactualityRevisionValidator(passageCount));
+}
+
 // --- Missing-prerequisite proposal: submit_missing_prerequisites ----------
 // The explicit, inspectable node-IDENTITY operation (R7, KTD6, handoff): for one
 // anchor, propose prerequisite concepts the source assumes but never teaches. The
@@ -666,6 +698,7 @@ export const toolValidators = [
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeValidator,
   generatedGroundingBundleValidator,
+  groundingFactualityRevisionValidator,
   missingPrerequisiteProposalValidator,
   buildDifficultyBandsValidator(3),
   difficultyComparisonValidator,

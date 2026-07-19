@@ -11,6 +11,7 @@ import {
   createConceptLessonGenerationPort,
   createConceptLessonRedundancyJudgmentPort,
   createConceptSetSynthesisPort,
+  createGroundingFactualityRevisionPort,
   createGroundingGenerationPort,
   createImpostorLieValidityJudgmentPort,
   createIntrinsicDifficultyJudgmentPort,
@@ -63,6 +64,7 @@ export function createLearnerTopicExpeditionGeneration(sql: DatabaseClient): Top
         knowledgeBoundaryProbe: createKnowledgeBoundaryProbePort(probeClient),
         embedding: new LiteLlmNodeEmbeddingAdapter(embeddingClient),
         groundingGeneration: createGroundingGenerationPort(deterministicClient),
+        groundingFactualityRevision: createGroundingFactualityRevisionPort(deterministicClient),
         prerequisiteOrdering: createPrerequisiteOrderingPort(deterministicClient),
         difficulty: createIntrinsicDifficultyPort(
           createIntrinsicDifficultyJudgmentPort(deterministicClient),

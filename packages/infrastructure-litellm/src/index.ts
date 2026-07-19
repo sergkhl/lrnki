@@ -32,6 +32,9 @@ export {
   buildRescuedNodeLabelingValidator,
   generatedGroundingBundleSchema,
   generatedGroundingBundleValidator,
+  groundingFactualityRevisionValidator,
+  buildGroundingFactualityRevisionSchema,
+  buildGroundingFactualityRevisionValidator,
   conceptSetSynthesisSchema,
   conceptSetSynthesisValidator,
   knowledgeBoundaryProbeSchema,
@@ -125,7 +128,9 @@ export {
   mintingDurabilityDescriptor
 } from "./enrichmentAdapters";
 export {
+  createGroundingFactualityRevisionPort,
   createGroundingGenerationPort,
+  groundingFactualityRevisionDescriptor,
   groundingGenerationDescriptor
 } from "./groundingGenerationAdapters";
 export {

@@ -4,14 +4,16 @@
 
 - **Speed up Topic Expedition generation.** Active plan
   [2026-07-18-002](./2026-07-18-002-speed-up-expedition-generation.md) — In progress: U1–U4 are
-  complete. U5's live timing/cost gate passed at **84.1s** request→ready, but its real-use quality
-  judgment is `FIX_FIRST`: the generated grounding for “Aerobic versus Anaerobic Respiration”
-  conflated anaerobic respiration with fermentation, and the error propagated into a lesson and
-  matching item. Do not start the Treasure-map plan. Resume by applying rule 21 to the established
-  factual-conflation / generated-grounding hallucination problem class, research recognized
-  factuality-verification practice, and design the conventional root-cause correction without
-  fixture terms or weakening the learner-neutral contract. Re-run U5 after that separately scoped
-  correction; evidence: `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
+  complete. U6 now enforces a monotonic exact-span veto: the reviewer can remove an original
+  passage but cannot write a replacement, and the application rejects introduced text before
+  persistence. Two live correction gates remain `FIX_FIRST`: verifier-authored rewriting first
+  fixed the conflation but introduced an outdated ATP claim; the monotonic run then preserved the
+  correct 30–32 ATP claim but missed the original conflation. Its trace shows why: all ten generic
+  pre-draft checks repeated the same shallow misconception and the reviewer explicitly accepted it.
+  Do not start the Treasure-map plan. Resume U6 by implementing conventional claim-targeted
+  verification-question planning, a separate draft-blind answer pass, and exact-span comparison
+  while preserving the no-rewrite boundary. Re-run the full U5 gate; evidence:
+  `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
 
 - **Treasure-map trail restyle.** Active plan
   [2026-07-18-001](./2026-07-18-001-treasure-map-trail.md) — Ready, not started.
@@ -341,6 +343,21 @@
   `tmp/2026-07-02-*/` … `tmp/2026-07-09-*/`.
 
 ## VALIDATION
+
+- **Generated-grounding factuality correction — two production gates, 2026-07-19. `FIX_FIRST`.**
+  Focused application and infrastructure-LiteLLM typechecks/tests pass, including regressions that
+  forbid reviewer-authored passage text, preserve an ungrounded veto, and fail before persistence
+  when every definition is rejected. Full `pnpm check` and guarded `pnpm test:db` both exit 0.
+  Rewrite-capable operation `879f6eb9…` reached ready in
+  **100.871s** and fixed the target distinction but introduced an outdated 36–38 ATP claim.
+  Monotonic operation `fe0e9655…` reached ready in one attempt in **108.824s**; all stages were
+  `ok:true`, factuality review took **8.715s**, and the 14-node / 17-edge / 14-lesson / 25-item
+  journey cost **$0.1014705** (**+$0.0364226** versus baseline). It retained the correct 30–32 ATP
+  grounding but also retained the foundational anaerobic-respiration/fermentation conflation.
+  Durable request/response inspection showed ten generic checks and the reviewer shared the same
+  misconception, so generic checks are rejected as a substitute for claim-targeted draft-blind
+  verification. The disposable learners were removed; immutable enrichments remain. Evidence:
+  `tmp/2026-07-18-expedition-speedup/EVALUATION.md`.
 
 - **Speed Up Topic Expedition Generation — U2–U5 implementation + live gate, 2026-07-19. Timing
   PASS; real-use quality `FIX_FIRST`.** Repository `pnpm check` passed: workspace typechecks and

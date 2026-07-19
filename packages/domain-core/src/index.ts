@@ -1776,6 +1776,10 @@ export const STAGE_TAGS = {
   mintingDurability: "minting-durability",
   missingPrerequisiteProposal: "missing-prerequisite-proposal",
   groundingGeneration: "grounding-generation",
+  // Synthetic grounding factuality correction. This cross-family revision consumes
+  // K probe answers sampled before the grounding draft, then atomically checks and
+  // minimally revises the draft before it can enter a trusted Derived Graph Layer.
+  groundingFactualityRevision: "grounding-factuality-revision",
   intrinsicDifficulty: "intrinsic-difficulty",
   declaredDomainInference: "declared-domain-inference",
   // Derived-node semantic deduplication. The embedding PROPOSE signal and the

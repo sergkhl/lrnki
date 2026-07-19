@@ -14,6 +14,7 @@ import type {
   ConceptSetSynthesisPort,
   DifficultyPort,
   EnrichmentRunStorePort,
+  GroundingFactualityRevisionPort,
   GroundingGenerationPort,
   KnowledgeBoundaryProbePort,
   NodeEmbeddingPort,
@@ -83,6 +84,21 @@ function fakeGrounding(): GroundingGenerationPort {
   };
 }
 
+function fakeGroundingRevision(
+  inspect?: (input: Parameters<GroundingFactualityRevisionPort["revise"]>[0]) => void
+): GroundingFactualityRevisionPort {
+  return {
+    model: "fake-independent-reviser",
+    async revise(input) {
+      inspect?.(input);
+      return {
+        ...input.draft,
+        rationale: "atomic facts reviewed against pre-draft checks; no passage added"
+      };
+    }
+  };
+}
+
 // Orders the two sorted nodes as 1 -> 2 (a single certain edge) when there are >=2 nodes.
 function fakeOrdering(): PrerequisiteOrderingPort {
   return {
@@ -128,6 +144,7 @@ function baseInput(overrides: Partial<Parameters<typeof runSyntheticGeneration>[
     knowledgeBoundaryProbe: fakeProbe(new Set()),
     embedding: fakeEmbedding(),
     groundingGeneration: fakeGrounding(),
+    groundingFactualityRevision: fakeGroundingRevision(),
     prerequisiteOrdering: fakeOrdering(),
     difficulty: fakeDifficulty(),
     enrichmentStore: capturingStore().store,
@@ -187,6 +204,48 @@ test("no node carries a source citation; every node carries a Grounding Bundle (
   for (const disposition of persisted[0].artifact.payload.groundingDispositions) {
     assert.equal(disposition.outcome, "not_applicable_by_grounding");
   }
+});
+
+test("grounding is reviewed from pre-draft probe answers without adding passage text", async () => {
+  const seen: Parameters<GroundingFactualityRevisionPort["revise"]>[0][] = [];
+  const layer = await runSyntheticGeneration(baseInput({
+    groundingFactualityRevision: fakeGroundingRevision((input) => seen.push(input))
+  }));
+
+  assert.equal(seen.length, 2);
+  assert.equal(seen[0].independentProbeAnswers.length, 10, "all K pre-draft answers reach revision");
+  assert.equal(seen[0].draft.generatingModel, "fake-grounding");
+  for (const node of layer.derivedNodes) {
+    assert.equal(node.groundingOrigin, "llm_grounded");
+    assert.equal(node.groundingBundle.generatingModel, "fake-grounding");
+    assert.match(node.groundingBundle.definitions[0].text, /means X/);
+  }
+});
+
+test("a factuality reviewer cannot introduce learner-facing passage text or persist a partial layer", async () => {
+  const { store, persisted } = capturingStore();
+  const rewritingRevision: GroundingFactualityRevisionPort = {
+    model: "fake-rewriting-reviewer",
+    async revise(input) {
+      return {
+        ...input.draft,
+        definitions: [{
+          ...input.draft.definitions[0],
+          text: "A verifier-authored replacement claim."
+        }]
+      };
+    }
+  };
+
+  await assert.rejects(
+    () => runSyntheticGeneration(baseInput({
+      enrichmentStore: store,
+      groundingFactualityRevision: rewritingRevision
+    })),
+    /introduced new passage text/
+  );
+
+  assert.equal(persisted.length, 0);
 });
 
 // The one handoff contract (plan 2026-07-11-001 U4/R11): the synthetic facts the front

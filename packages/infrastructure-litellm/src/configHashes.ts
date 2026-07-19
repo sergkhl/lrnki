@@ -5,7 +5,7 @@ import { admissionDecisionsDescriptor, admissionLabelJudgmentDescriptor, concept
 import { mintingDurabilityDescriptor, prerequisiteOrderingDescriptor, rescuedNodeLabelingDescriptor, rescueDurabilityDescriptor } from "./enrichmentAdapters";
 import { nodeMergeAdjudicationDescriptor, NODE_EMBEDDING_MODEL } from "./dedupAdapters";
 import { missingPrerequisiteProposalDescriptor } from "./missingPrerequisiteProposalAdapters";
-import { groundingGenerationDescriptor } from "./groundingGenerationAdapters";
+import { groundingFactualityRevisionDescriptor, groundingGenerationDescriptor } from "./groundingGenerationAdapters";
 import { intrinsicDifficultyBandingDescriptor, intrinsicDifficultyComparisonDescriptor } from "./intrinsicDifficultyAdapters";
 import { conceptSetSynthesisDescriptor, knowledgeBoundaryProbeDescriptor } from "./syntheticGenerationAdapters";
 import { declaredDomainInferenceDescriptor } from "./domainInferenceAdapters";
@@ -79,6 +79,7 @@ export const neuralOperationRegistry = {
       conceptSetSynthesisDescriptor,
       knowledgeBoundaryProbeDescriptor,
       groundingGenerationDescriptor,
+      groundingFactualityRevisionDescriptor,
       prerequisiteOrderingDescriptor,
       intrinsicDifficultyBandingDescriptor,
       intrinsicDifficultyComparisonDescriptor

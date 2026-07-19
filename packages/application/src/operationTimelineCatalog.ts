@@ -51,6 +51,7 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.mintingDurability),
     llm(STAGE_TAGS.missingPrerequisiteProposal),
     llm(STAGE_TAGS.groundingGeneration),
+    llm(STAGE_TAGS.groundingFactualityRevision),
     llm(STAGE_TAGS.intrinsicDifficulty),
     llm(STAGE_TAGS.nodeEmbedding),
     llm(STAGE_TAGS.nodeMergeAdjudication),

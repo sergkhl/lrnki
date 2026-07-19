@@ -54,6 +54,7 @@ import {
   LiteLlmSpendLogsReadAdapter,
   LiteLlmNodeEmbeddingAdapter,
   createNodeMergeAdjudicationPort,
+  createGroundingFactualityRevisionPort,
   createGroundingGenerationPort,
   createConceptSetSynthesisPort,
   createKnowledgeBoundaryProbePort,
@@ -199,6 +200,7 @@ function buildContext() {
     // anchor-conditioned grounding generation, both DeepSeek-family (AGENTS rule 5).
     missingPrerequisiteProposal: createMissingPrerequisiteProposalPort(deterministicClient),
     groundingGeneration: createGroundingGenerationPort(deterministicClient),
+    groundingFactualityRevision: createGroundingFactualityRevisionPort(deterministicClient),
     // Synthetic topic generation, second pipeline arm (plan 2026-06-30-001, ADR-0019
     // amended). Concept-set synthesis stays DeepSeek-family with deterministic decoding
     // for a stable concept set (AGENTS rule 5); the knowledge-boundary probe rides the
@@ -465,6 +467,7 @@ async function generateSyntheticLayer(ctx: Context, topic?: string, declaredDoma
     // The probe's semantic-agreement signal reuses the existing embedding port (ADR-0012).
     embedding: ctx.nodeEmbedding,
     groundingGeneration: ctx.groundingGeneration,
+    groundingFactualityRevision: ctx.groundingFactualityRevision,
     prerequisiteOrdering: ctx.prerequisiteOrdering,
     difficulty: ctx.difficulty,
     enrichmentStore: ctx.enrichmentStore,

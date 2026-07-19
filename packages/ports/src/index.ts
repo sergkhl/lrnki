@@ -421,6 +421,21 @@ export interface GroundingGenerationPort {
   }): Promise<GeneratedGroundingBundle>;
 }
 
+// Synthetic Generated Grounding Bundle factuality revision. The K probe answers are
+// sampled BEFORE the grounding draft exists, so this cross-family port receives an
+// independent parametric check rather than asking the grounding generator to grade its
+// own completion. It revises the complete bundle; it does not mint source provenance.
+export interface GroundingFactualityRevisionPort {
+  readonly model: string;
+  revise(input: {
+    declaredDomain: string;
+    topic: string;
+    nodeLabel: string;
+    draft: GeneratedGroundingBundle;
+    independentProbeAnswers: string[];
+  }): Promise<GeneratedGroundingBundle>;
+}
+
 // ---------------------------------------------------------------------------
 // Synthetic topic generation ports (ADR-0019 amended, plan 2026-06-30-001). The
 // source-less front half of the second pipeline arm: concept-set synthesis is the

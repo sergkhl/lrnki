@@ -1,9 +1,10 @@
 # Speed Up Topic Expedition Generation
 
-Status: In progress (2026-07-19). U1–U4 complete; U5 timing/cost gate passed but real-use quality is
-`FIX_FIRST` on a generated-grounding factual-conflation defect. Resume from the handoff and evidence
-in [TODO](./TODO.md); do not begin the next plan. Interview-locked with the user. Prioritized FIRST
-in the active plan order.
+Status: In progress (2026-07-19). U1–U4 complete; every U5 timing/cost gate passed but real-use
+quality remains `FIX_FIRST` on a generated-grounding factual-conflation defect. U6 established a
+monotonic no-rewrite boundary, but generic pre-draft checks missed the same misconception as the
+reviewer. Finish U6 with claim-targeted, draft-blind verification and rerun U5 before closing. Do not begin the next plan.
+Interview-locked with the user. Prioritized FIRST in the active plan order.
 
 Topic Expedition generation (Synthetic Topic Generation + Study Item Bank) currently takes
 **~8.6 minutes** request→ready for a ~15-node topic. This plan brings it to **~3 minutes** with
@@ -87,9 +88,11 @@ identity), [ADR-0029](../adr/0029-persist-shared-operation-stage-timelines.md) (
 
 - **R1** A ~15-node Topic Expedition generates request→ready in ≤ 3.5 min (hard gate), ~3 min
   expected, measured on the live learner-api supervisor path via the ADR-0029 timeline.
-- **R2** No quality-policy change: prompts, K values, thresholds, guards, judges, readiness rule,
-  and persisted artifact shapes are byte-identical. Only host routing, stage scheduling, fan-out
-  widths, and the hash-input set change.
+- **R2** For the speed implementation U1–U4, no quality-policy change: existing prompts, K values,
+  thresholds, guards, judges, readiness rule, and persisted artifact shapes are byte-identical.
+  Only host routing, stage scheduling, fan-out widths, and the hash-input set change. U6 is the
+  separately scoped correction licensed by the first U5 `FIX_FIRST`; it adds one new descriptor and
+  stage without editing those existing prompts or weakening any existing policy.
 - **R3** The gpt-oss-120b lock is empirical per the standing forced-tool policy: forced
   `tool_choice` verified against each candidate provider before locking (never trust provider
   metadata — the Vertex 400 incident), plus a real ordering-draw latency and spend-log cost
@@ -166,7 +169,24 @@ hard gate without touching any quality knob.
   still persist nothing).
 - **U3** Concurrent item stages + deterministic-merge unit tests.
 - **U4** Synthetic fan-out raise + hash-input trim + hash tests.
-- **U5** Rule-14 real-use gate (below), evidence in `tmp/2026-07-18-expedition-speedup/`.
+- **U5** Rule-14 real-use gate (below), evidence in `tmp/2026-07-18-expedition-speedup/`. The first
+  run passed timing/cost and exposed a foundational factual-conflation defect, so it remains open.
+- **U6** Generated-grounding factuality correction, separately scoped from the speed-only U1–U4:
+  preserve the pre-draft K probe answers in memory; after Grounding Generation, run one
+  deterministic cross-family atomic factuality review per core concept. The correction is
+  monotonic/drop-only: only an exact-span-grounded false verdict removes a complete original
+  passage; the verifier cannot author learner-facing facts; rejecting every definition fails the
+  operation. It does not claim source provenance. Its descriptor, forced-tool schema, timeline stage, operation config
+  identity, production composition, and focused regressions ship together. Recognized practice and
+  the reason retrieval is not introduced here are recorded in
+  [ADR-0030](../adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+- **U6 follow-up from the second real-use gate:** generic Knowledge-Boundary Probe answers are not
+  claim-targeted verification evidence. Preserve the shipped monotonic/no-rewrite boundary, but
+  plan verification questions from the draft, answer those questions in a separate call that does
+  not receive the draft, then use those answers for the exact-span veto. The question/answer prompts,
+  forced-tool schemas, descriptors, operation identity, and focused regressions change together.
+- **U5 rerun** Repeat the complete rule-14 gate after U6. Timing still must satisfy R1 with the new
+  required stage, and direct artifact inspection must classify quality `PASS` before plan closure.
 
 ## Validation contract
 

@@ -34,6 +34,17 @@ remains a reserved Grounding Origin in
 selection, grounding acceptance rules, persistence shape, and learner-surface policy for
 `web_grounded` content are unresolved and must be planned before implementation.
 
+For Synthetic Topic Generation, `core_knowledge` is necessary but not sufficient for bundle
+admission. The Knowledge-Boundary Probe's K factual answers are sampled before the grounding draft
+exists. After Grounding Generation, one deterministic `kg-independent-judge` pass atomizes each
+passage's claims and checks them against recurring content in those pre-draft answers plus the
+judge's established domain knowledge. The correction boundary is monotonic and drop-only: a false
+verdict must copy an exact problematic span from the passage, the adapter may remove that complete
+passage, and no verifier-authored learner-facing fact may enter the bundle. An ungrounded veto
+preserves the passage; rejecting every definition fails the operation without partial persistence.
+Only the surviving original passages enter the Derived Graph Layer, still `llm_grounded`.
+Parametric cross-family checking does not create source evidence or `web_grounded` provenance.
+
 Current accepted scope is source-less concept synthesis:
 
 - Generated Grounding Bundles for `llm_grounded` minted Enrichment Nodes
@@ -54,6 +65,32 @@ retrieval branch is designed.
 The probe prompt is domain-neutral and never tuned with expected concepts. Probe quality is validated
 by real-source inspection ([ADR-0013](0013-verify-quality-by-real-source-inspection.md)), not
 deterministic proxies.
+
+The factuality correction follows established post-generation verification practice. FActScore
+shows why whole-passage plausibility is insufficient and evaluates long-form generations as atomic
+facts; Chain-of-Verification finds that independently answering verification questions before
+revision reduces copying the original hallucination; RARR researches then minimally revises
+unsupported content. See [FActScore](https://aclanthology.org/2023.emnlp-main.741/),
+[Chain-of-Verification](https://arxiv.org/abs/2309.11495), and
+[RARR](https://aclanthology.org/2023.acl-long.910/). The implemented pass adapts that conventional
+shape to the existing source-less contract by reusing independently sampled probe answers. A first
+real-use attempt allowed the verifier to rewrite the bundle and reproduced the established warning
+that intrinsic correction can degrade a correct response: it replaced a correct quantitative claim
+with an outdated one. See [Large Language Models Cannot Self-Correct Reasoning
+Yet](https://deepmind.google/research/publications/48252/) and
+[CRITIC](https://proceedings.iclr.cc/paper_files/paper/2024/hash/fef126561bbf9d4467dbb8d27334b8fe-Abstract-Conference.html).
+Therefore the source-less fallback can only abstain by removing an exact-span-grounded problematic
+passage, never author a correction. It does not adopt RARR/CRITIC's external-tool branch because
+retrieval acceptance, provenance, and learner-surface policy remain deliberately unresolved for
+`web_grounded`.
+
+A second real-use attempt established that the Knowledge-Boundary Probe's generic concept
+characterizations are not substitutes for Chain-of-Verification's claim-targeted questions. Ten
+highly consistent checks repeated the same shallow misconception as the grounding draft, and the
+reviewer preserved the false passage. The monotonic boundary remains required, but the active plan
+must add question planning followed by a separate answer call that does not receive the draft before
+the reviewer may apply an exact-span veto. Model-family separation without claim-targeted context
+separation is insufficient quality evidence.
 
 The accepted calibration from the 2026-07-07 measurement pass is K=10, probe temperature 0.7, and
 mean-pairwise embedding agreement threshold 0.89. The calibration harness is the `kg-worker`
