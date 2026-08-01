@@ -13,7 +13,9 @@ export type HapticIntent =
   | "unlock";
 
 const PLAYERS: Record<HapticIntent, () => Promise<void>> = {
-  selection: () => Haptics.selectionAsync(),
+  // Apple's selection tick is easy to miss in the hand. A light impact keeps ordinary
+  // choices restrained while making the acknowledgement reliably perceptible.
+  selection: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
   success: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
   warning: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning),
   mastery: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),

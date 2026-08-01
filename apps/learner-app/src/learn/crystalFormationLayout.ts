@@ -1,78 +1,105 @@
-// Pure two-level Crystal Formation view-model (plan 2026-07-16-002 U2, D2–D6/KTD2).
-// Level one: each Leg (milestone-anchored section) packs its concepts into ONE compact
-// geode island — a center-out mound with the milestone specimen hero-sized front and
-// center, wrapping to raised back rows, under one smooth organic outline with a single
-// junction badge anchor. Row capacity derives from the available canvas width, so an
-// island can never exceed the viewport. Level two: islands stack on a quiet ascent with
-// a small alternating lateral offset, joined by ONE smooth nonsemantic spine curve
-// through every junction, each island owning a laid-out header band that can never
-// overlap artwork, ending in a distinct summit peak whose apex holds the keystone slot.
-// The formation renders NO graph edges — prerequisite structure stays on trail and
-// inspection surfaces. No React, no store, no clock — renderers consume finished
-// geometry. Structural-state derivations are untouched (KTD3): `bound` still comes only
-// from the durable first `wonChallengeId`.
+// Pure Crystal Formation view-model (plan 2026-07-30-001 U3, KTD6/KTD8). The formation is a
+// warm geode chart: ONE panel per Leg, ONE cell per concept, stacked in canonical Leg order
+// and closed by a summit strip. No islands, no mound, no spine, no summit peak, no crop.
+//
+// This module owns exactly the geometry that must be deterministic and width-bounded: how many
+// cells fit a row, where each cell sits inside its Leg's well, and how big the crystal inside a
+// cell is. The VERTICAL stack (caption rows, panel padding, the per-Leg Guardian row) is flex
+// flow in the scene component, because those bands are text-sized and must follow the reader's
+// font scale — a layout-allocated header band is exactly what the deleted spine-mask hack was
+// built to protect.
+//
+// Two fixed cell geometries only (KTD8): a charted cell and a compact locked cell. Crystal size
+// never varies by Leg, so a big Leg can never misread as an important one. Structural-state
+// derivations are untouched: `bound` still comes only from the durable first `wonChallengeId`.
+// No React, no store, no clock — renderers consume finished geometry.
 
 import type { RecallScopeStatus, StudySession, TrailCluster, TrailSectionView, TrailView } from "@lrnki/application/projection";
+import { difficultyBand } from "@lrnki/application/projection";
+import { crystalForBand, type CrystalMaterial, type CrystalSpecies } from "./crystalLibrary";
 import { formationProgress, type FormationProgress } from "./mineralSpecimen";
 
 export type Point = { x: number; y: number };
+export type Rect = { x: number; y: number; width: number; height: number };
 
-// Scene units are CSS px — the layout packs to the real available width, so renderers
-// draw at scale 1 and the old scale-floor/overflow machinery is gone (D3).
-// Hero specimen size inside an island; the milestone renders at 1.25×.
-export const HERO_SLOT_PX = 64;
-export const MILESTONE_SCALE = 1.25;
-const SLOT_GAP = 10;
-const ISLAND_PAD_X = 18;
-const ISLAND_PAD_TOP = 28;
-const ISLAND_PAD_BOTTOM = 16;
-// Each wrapped row sits this much higher than the one in front of it — the mound.
-const ROW_RAISE = 26;
-// The header band the layout allocates above each island (two caption lines).
-export const HEADER_HEIGHT = 44;
-const HEADER_GAP = 8;
-const MIN_HEADER_WIDTH = 240;
-// Vertical gap between stacked islands and the small alternating lateral offset (D5).
-const LEG_GAP = 36;
-const ASCENT_OFFSET_X = 24;
-export const MIN_ISLAND_WIDTH = 140;
-// The junction badge straddles the island apex (D3): the layout owns the roundel radius
-// and includes its above-apex overhang in the emitted frame, so every consumer's
-// `0 0 w h` viewBox contains the whole seal with no per-component special-casing.
-export const BADGE_RADIUS = 13;
-const BADGE_STROKE = 1.5;
-const OUTLINE_APEX_Y = 6;
-const BADGE_OVERHANG = Math.ceil(BADGE_RADIUS + BADGE_STROKE / 2 - OUTLINE_APEX_Y);
-const PEAK_WIDTH = 104;
-const PEAK_HEIGHT = 88;
-const OUTLINE_SAMPLES = 16;
+// Scene units are CSS px — the layout packs to the real available width, so renderers draw at
+// scale 1 and nothing needs fitting or cropping.
+export const PANEL_PAD = 12;
+const WELL_PAD = 12;
+const CELL_GAP = 10;
+// The formation ground's own inset plus the constant focus-ring border every stack member carries, so
+// the panel width the layout packs to is exactly what the scene renders inside its ground.
+export const GROUND_PAD = 12;
+export const PIECE_BORDER = 2;
+const STACK_INSET = 2 * (GROUND_PAD + PIECE_BORDER);
+
+// Rendered crystal box per cell kind (KTD8), seeded from the v4 composition mock at 390 px. Both
+// stay above MIN_SPECIMEN_PX by construction (R6) and the layout suite asserts it, turning the
+// declared floor into a guarantee.
+export const CHARTED_CRYSTAL_PX = 58;
+export const LOCKED_CRYSTAL_PX = 44;
+const CELL_TOP_PAD = 8;
+const BAR_HEIGHT = 4;
+const BAR_GAP = 4;
+const CHIP_GAP = 9;
+// The `Next` chip band a charted cell ALWAYS reserves, so the single study target can carry its
+// load-bearing text without shifting any neighbour's crystal.
+export const CELL_CHIP_HEIGHT = 15;
+export const CELL_CHIP_INSET = 6;
+
+// The two cell geometries. A charted cell carries the crystal, its growth bar, and the reserved
+// chip band; a locked cell is the compact fogged placeholder a future Leg is paved with. Heights
+// are summed from the parts, so a cell can never disagree with what it contains.
+export const CHARTED_CELL = {
+  width: 66,
+  height: CELL_TOP_PAD + CHARTED_CRYSTAL_PX + BAR_GAP + BAR_HEIGHT + CHIP_GAP + CELL_CHIP_HEIGHT + CELL_CHIP_INSET
+} as const;
+export const LOCKED_CELL = { width: 66, height: LOCKED_CRYSTAL_PX + 4 } as const;
+
+// One charted cell plus both insets: below this a panel cannot hold a single readable crystal.
+export const MIN_PANEL_WIDTH = CHARTED_CELL.width + 2 * (PANEL_PAD + WELL_PAD);
+// Below this the caption's state line and its exact counts cannot share one row without one of
+// them truncating, and truncated counts are lost information — so they stack instead.
+const CAPTION_ROW_MIN_WIDTH = 400;
+// The junction badge straddles the panel's top edge; the layout owns the roundel radius so every
+// consumer reserves the same overhang above the panel, and the ward crystal it holds.
+export const BADGE_RADIUS = 21;
+export const BADGE_CRYSTAL_PX = 32;
+// The keystone crystal in the summit strip.
+export const SUMMIT_CRYSTAL_PX = 40;
 
 export type LegStructuralState = "future" | "collecting" | "guardian_ready" | "bound";
 export type GuardianSubstate = "available" | "engaged" | "unavailable";
-export type SlotState = "collected" | "known" | "awaiting";
+export type CellState = "collected" | "known" | "awaiting";
+export type CellKind = "charted" | "locked";
 
-export type MineralSlot = {
+// One concept's cell. Geometry is well-local; `crystal` and `bar` are cell-local, so a cell
+// renders as a self-contained unit on any surface that hosts a panel.
+export type FormationCell = {
   derivedNodeId: string;
   label: string;
-  difficulty: number;
-  sectionIndex: number;
-  sectionPositionIndex: number;
+  species: CrystalSpecies;
+  material: CrystalMaterial;
   growthFraction: number;
   trailState: TrailCluster["state"];
-  state: SlotState;
+  state: CellState;
   isKnownSkipped: boolean;
   isMilestone: boolean;
   isSummit: boolean;
+  // The single study target across the whole formation (server-projected next stop).
+  isNext: boolean;
   gist: string | null;
-  // Slot center in island-local coordinates; `size` is the specimen's rendered box.
-  x: number;
-  y: number;
-  size: number;
-  // Mound row: 0 = front. Slots are emitted in paint order (back rows first).
+  sectionIndex: number;
+  sectionPositionIndex: number;
+  kind: CellKind;
   row: number;
+  rect: Rect;
+  crystal: Rect;
+  // Present only on a charted cell: the per-concept growth bar under the crystal.
+  bar: Rect | null;
 };
 
-export type LegFormationModel = {
+export type LegPanelModel = {
   sectionIndex: number;
   milestoneLabel: string;
   structuralState: LegStructuralState;
@@ -80,53 +107,37 @@ export type LegFormationModel = {
   guardianSubstate: GuardianSubstate | null;
   recallScope: RecallScopeStatus | null;
   progress: FormationProgress;
-  // Paint order: back rows first, left to right within a row.
-  slots: MineralSlot[];
-  // ONE smooth organic closed outline (D2) — no bands, seam, veins, or branch.
-  outline: Point[];
-  // The junction badge anchor at the island's apex; the spine passes through it.
+  cellKind: CellKind;
+  // Canonical intra-Leg order, row-major; cells never overlap.
+  cells: FormationCell[];
+  rowCount: number;
+  // The deeper parchment well the cell grid sits in. Cell rects are relative to this box.
+  well: { width: number; height: number };
+  // Badge center in panel coordinates: straddling the panel's top edge (y = 0).
   badge: Point;
+  // Narrow panels stack the caption's state line above its counts instead of truncating either.
+  captionStacked: boolean;
+  // Panel outer width; height is flex flow (well + padding + optional Guardian row).
   width: number;
-  height: number;
 };
 
-export type HeaderBand = { x: number; y: number; width: number; height: number };
-
-export type PlacedLeg = LegFormationModel & {
-  frame: Point;
-  // Header band in formation coordinates, allocated by the layout so labels can never
-  // overlap artwork or one another (D-headers).
-  header: HeaderBand;
-};
-
-export type SpineSegment = {
-  fromSectionIndex: number;
-  // The next Leg's section index, or null when the segment climbs to the summit peak.
-  toSectionIndex: number | null;
-  // Sampled points of the one continuous smooth curve (this segment's slice).
-  points: Point[];
-  // A bound Leg lights its own spine segment gold (D5).
-  lit: boolean;
-};
-
-export type FormationTerminus = {
-  frame: Point;
-  width: number;
-  height: number;
-  // The summit peak silhouette (local coordinates) and the keystone slot at its apex.
-  peak: Point[];
-  keystone: Point;
-  // The keystone is seated exactly when the Expedition scope has a first victory (D6).
+// The summit strip that closes the stack. The keystone is seated exactly when the Expedition
+// scope carries a durable first victory; the counts feed the honest "seal all n legs" copy.
+export type SummitStrip = {
+  species: CrystalSpecies;
   keystoneSeated: boolean;
+  crystalSize: number;
+  legCount: number;
+  sealedLegCount: number;
 };
 
 export type CrystalFormationLayout = {
-  legs: PlacedLeg[];
-  spine: SpineSegment[];
-  terminus: FormationTerminus | null;
+  panels: LegPanelModel[];
+  summit: SummitStrip | null;
   enrichmentScope: RecallScopeStatus | null;
+  // The formation ground's outer width, and the width every panel and the summit strip render at.
   width: number;
-  height: number;
+  panelWidth: number;
 };
 
 export type FormationConceptInput = Pick<
@@ -140,10 +151,12 @@ export type FormationInput = {
   concepts: FormationConceptInput[];
   sections: FormationSectionInput[];
   enrichmentScope: RecallScopeStatus | null;
+  // The concept owning the server-projected next stop — the ONE cell that reads `next`.
+  nextDerivedNodeId: string | null;
 };
 
-// The session adapter: the formation reads the SAME trail clusters and server-projected
-// scopes every other surface reads, so growth/binding can never drift from the trail.
+// The session adapter: the formation reads the SAME trail clusters, scopes, and next stop every
+// other surface reads, so growth/binding/target can never drift from the trail.
 export function formationInputFrom(session: StudySession, trail: TrailView): FormationInput {
   const stepByNode = new Map(session.expeditionPath.map((step) => [step.derivedNodeId, step] as const));
   return {
@@ -161,7 +174,8 @@ export function formationInputFrom(session: StudySession, trail: TrailView): For
       gist: lessonGist(session, concept.derivedNodeId)
     })),
     sections: trail.sections,
-    enrichmentScope: trail.enrichmentScope
+    enrichmentScope: trail.enrichmentScope,
+    nextDerivedNodeId: trail.concepts.find((concept) => concept.stops.some((stop) => stop.isNext))?.derivedNodeId ?? null
   };
 }
 
@@ -169,10 +183,10 @@ export function buildCrystalFormationLayout(session: StudySession, trail: TrailV
   return composeCrystalFormation(formationInputFrom(session, trail), availableWidth);
 }
 
-// --- Level one: one island -------------------------------------------------------------
+// --- One Leg panel ----------------------------------------------------------------------
 
-// KTD3: the four structural states map purely from section/scope facts. Binding derives
-// ONLY from the durable first-victory identity — complete mastery alone never binds.
+// The four structural states map purely from section/scope facts. Binding derives ONLY from the
+// durable first-victory identity — complete mastery alone never binds.
 export function legStructuralState(
   section: Pick<TrailSectionView, "state">,
   scope: RecallScopeStatus | null
@@ -190,266 +204,153 @@ function guardianSubstateFor(scope: RecallScopeStatus | null): GuardianSubstate 
   return "unavailable";
 }
 
-function slotStateFor(concept: FormationConceptInput): SlotState {
+function cellStateFor(concept: FormationConceptInput): CellState {
   if (concept.isKnownSkipped) return "known";
   return concept.state === "mastered" ? "collected" : "awaiting";
 }
 
-export function buildLegModel(
+// The material ladder (KTD7/KTD13). A future Leg is fogged stone throughout regardless of
+// per-concept state, and known ground stays fogged in every Leg — honest counts, no hue given
+// away. Colour never carries this alone: the growth bar and the `Next` chip ride with it.
+function cellMaterialFor(
+  concept: FormationConceptInput,
+  state: CellState,
+  structuralState: LegStructuralState,
+  isNext: boolean
+): CrystalMaterial {
+  if (structuralState === "future" || state === "known") return "fogged";
+  if (state === "collected") return "collected";
+  return isNext ? "next" : "open";
+}
+
+export function buildLegPanel(
   section: FormationSectionInput,
   conceptsInput: FormationConceptInput[],
-  availableWidth: number
-): LegFormationModel {
-  // Canonical intra-Leg order: identical projection inputs render identically across
-  // input array ordering — nothing downstream may depend on iteration order.
+  availableWidth: number,
+  nextDerivedNodeId: string | null = null
+): LegPanelModel {
+  // Canonical intra-Leg order: identical projection inputs render identically across input
+  // array ordering — nothing downstream may depend on iteration order.
   const concepts = [...conceptsInput].sort(
     (a, b) => a.sectionPositionIndex - b.sectionPositionIndex || a.derivedNodeId.localeCompare(b.derivedNodeId)
   );
+  const structuralState = legStructuralState(section, section.recallScope);
+  // KTD8: a future Leg is paved with compact locked cells; every reachable Leg is charted.
+  const cellKind: CellKind = structuralState === "future" ? "locked" : "charted";
+  const cellSize = cellKind === "charted" ? CHARTED_CELL : LOCKED_CELL;
 
-  // Center-out mound packing (D3): the milestone specimen sits hero-sized front and
-  // center; remaining concepts fill outward left/right in trail order, wrapping to
-  // raised back rows when a side reaches the width-derived capacity. The front row is
-  // modeled as two side lists around the hero so its centering is exact by construction.
-  const heroIndex = Math.max(0, concepts.findIndex((concept) => concept.isMilestone || concept.isSummit));
-  const heroSize = Math.round(HERO_SLOT_PX * MILESTONE_SCALE);
-  const usable = Math.max(heroSize, availableWidth - 2 * ISLAND_PAD_X);
-  type RowEntry = { concept: FormationConceptInput; size: number };
-  // Nearest-to-hero first on each side.
-  const left: RowEntry[] = [];
-  const right: RowEntry[] = [];
-  const backRows: RowEntry[][] = [];
-  const backRowWidths: number[] = [];
-  const sideCapacity = Math.max(0, (usable - heroSize) / 2);
-  const sideWidth = (side: RowEntry[]) => side.reduce((sum, entry) => sum + SLOT_GAP + entry.size, 0);
-  const pushToBackRows = (entry: RowEntry) => {
-    let rowIndex = 0;
-    for (;;) {
-      const row = backRows[rowIndex] ?? [];
-      const width = backRowWidths[rowIndex] ?? 0;
-      const next = width === 0 ? entry.size : width + SLOT_GAP + entry.size;
-      if (next <= usable || row.length === 0) {
-        if (row.length % 2 === 0) row.push(entry);
-        else row.unshift(entry);
-        backRows[rowIndex] = row;
-        backRowWidths[rowIndex] = next;
-        return;
-      }
-      rowIndex += 1;
-    }
-  };
-  if (concepts.length > 0) {
-    let sideTurn: "right" | "left" = "right";
-    concepts.forEach((concept, index) => {
-      if (index === heroIndex) return;
-      const entry: RowEntry = { concept, size: HERO_SLOT_PX };
-      const preferred = sideTurn === "right" ? right : left;
-      const other = sideTurn === "right" ? left : right;
-      sideTurn = sideTurn === "right" ? "left" : "right";
-      if (sideWidth(preferred) + SLOT_GAP + entry.size <= sideCapacity) preferred.push(entry);
-      else if (sideWidth(other) + SLOT_GAP + entry.size <= sideCapacity) other.push(entry);
-      else pushToBackRows(entry);
-    });
-  }
+  const width = Math.max(MIN_PANEL_WIDTH, Math.floor(availableWidth));
+  const gridWidth = width - 2 * (PANEL_PAD + WELL_PAD);
+  // Row capacity from the real available width: a panel can never exceed its canvas, and a
+  // narrow phone reduces cells per row instead of shrinking any crystal (R6/R7).
+  const capacity = Math.max(1, Math.floor((gridWidth + CELL_GAP) / (cellSize.width + CELL_GAP)));
+  const rowCount = Math.max(1, Math.ceil(concepts.length / capacity));
 
-  // The island must hold the hero symmetric: both sides get the wider side's room.
-  const frontHalf = concepts.length > 0 ? heroSize / 2 + Math.max(sideWidth(left), sideWidth(right)) : 0;
-  const contentWidth = Math.max(2 * frontHalf, ...backRowWidths.map((value) => value));
-  const width = Math.min(availableWidth, Math.max(MIN_ISLAND_WIDTH, contentWidth + 2 * ISLAND_PAD_X));
-  const tallestBack = Math.max(0, ...backRows.map((row, index) => (index + 1) * ROW_RAISE + Math.max(0, ...row.map((entry) => entry.size))));
-  const tallest = Math.max(concepts.length > 0 ? heroSize : 0, tallestBack);
-  const frontBaseline = BADGE_OVERHANG + ISLAND_PAD_TOP + tallest;
-  const height = Math.max(72, frontBaseline + ISLAND_PAD_BOTTOM);
-
-  // Paint order: back rows first so front-row specimens overlap them like a mound.
-  const slots: MineralSlot[] = [];
-  const emit = (entry: RowEntry, x: number, baseline: number, row: number) => {
-    slots.push({
-      derivedNodeId: entry.concept.derivedNodeId,
-      label: entry.concept.label,
-      difficulty: entry.concept.difficulty,
-      sectionIndex: entry.concept.sectionIndex,
-      sectionPositionIndex: entry.concept.sectionPositionIndex,
-      growthFraction: entry.concept.growthFraction,
-      trailState: entry.concept.state,
-      state: slotStateFor(entry.concept),
-      isKnownSkipped: entry.concept.isKnownSkipped,
-      isMilestone: entry.concept.isMilestone,
-      isSummit: entry.concept.isSummit,
-      gist: entry.concept.gist,
-      x: round2(x),
-      y: round2(baseline - entry.size / 2),
-      size: entry.size,
-      row
-    });
-  };
-  for (let backIndex = backRows.length - 1; backIndex >= 0; backIndex -= 1) {
-    const row = backRows[backIndex];
-    const baseline = frontBaseline - (backIndex + 1) * ROW_RAISE;
-    let cursor = (width - backRowWidths[backIndex]) / 2;
-    for (const entry of row) {
-      emit(entry, cursor + entry.size / 2, baseline, backIndex + 1);
-      cursor += entry.size + SLOT_GAP;
-    }
-  }
-  if (concepts.length > 0) {
-    let leftEdge = width / 2 - heroSize / 2;
-    const leftPlaced: { entry: RowEntry; x: number }[] = [];
-    for (const entry of left) {
-      leftPlaced.push({ entry, x: leftEdge - SLOT_GAP - entry.size / 2 });
-      leftEdge -= SLOT_GAP + entry.size;
-    }
-    for (const { entry, x } of [...leftPlaced].reverse()) emit(entry, x, frontBaseline, 0);
-    emit({ concept: concepts[heroIndex], size: heroSize }, width / 2, frontBaseline, 0);
-    let cursor = width / 2 + heroSize / 2;
-    for (const entry of right) {
-      emit(entry, cursor + SLOT_GAP + entry.size / 2, frontBaseline, 0);
-      cursor += SLOT_GAP + entry.size;
-    }
-  }
+  const cells: FormationCell[] = concepts.map((concept, index) => {
+    const row = Math.floor(index / capacity);
+    const inRow = index % capacity;
+    // The last row centers: a half-filled final row reads as one deliberate grid, not a
+    // left-aligned remainder.
+    const rowLength = Math.min(capacity, concepts.length - row * capacity);
+    const rowSpan = rowLength * cellSize.width + (rowLength - 1) * CELL_GAP;
+    const x = WELL_PAD + (gridWidth - rowSpan) / 2 + inRow * (cellSize.width + CELL_GAP);
+    const y = WELL_PAD + row * (cellSize.height + CELL_GAP);
+    const state = cellStateFor(concept);
+    const isNext = nextDerivedNodeId !== null && concept.derivedNodeId === nextDerivedNodeId;
+    return {
+      derivedNodeId: concept.derivedNodeId,
+      label: concept.label,
+      species: crystalForBand(difficultyBand(concept.difficulty)),
+      material: cellMaterialFor(concept, state, structuralState, isNext),
+      growthFraction: concept.growthFraction,
+      trailState: concept.state,
+      state,
+      isKnownSkipped: concept.isKnownSkipped,
+      isMilestone: concept.isMilestone,
+      isSummit: concept.isSummit,
+      isNext,
+      gist: concept.gist,
+      sectionIndex: concept.sectionIndex,
+      sectionPositionIndex: concept.sectionPositionIndex,
+      kind: cellKind,
+      row,
+      rect: { x: round2(x), y: round2(y), width: cellSize.width, height: cellSize.height },
+      ...cellInterior(cellKind)
+    };
+  });
 
   return {
     sectionIndex: section.sectionIndex,
     milestoneLabel: section.milestoneLabel,
-    structuralState: legStructuralState(section, section.recallScope),
-    guardianSubstate: legStructuralState(section, section.recallScope) === "guardian_ready" ? guardianSubstateFor(section.recallScope) : null,
+    structuralState,
+    guardianSubstate: structuralState === "guardian_ready" ? guardianSubstateFor(section.recallScope) : null,
     recallScope: section.recallScope,
     progress: formationProgress(concepts),
-    slots,
-    outline: moundOutline(width, height),
-    badge: { x: round2(width / 2), y: OUTLINE_APEX_Y + BADGE_OVERHANG },
-    width,
-    height
+    cellKind,
+    cells,
+    rowCount,
+    well: {
+      width: width - 2 * PANEL_PAD,
+      height: rowCount * cellSize.height + (rowCount - 1) * CELL_GAP + 2 * WELL_PAD
+    },
+    badge: { x: round2(width / 2), y: 0 },
+    captionStacked: width < CAPTION_ROW_MIN_WIDTH,
+    width
   };
 }
 
-// ONE smooth organic outline (D2): a flat-bottomed dome sampled from a flattened sine —
-// deterministic from the island dimensions alone, no jitter, no nested bands. The dome
-// apex sits BADGE_OVERHANG below the frame top so the straddling badge stays contained.
-function moundOutline(width: number, height: number): Point[] {
-  const points: Point[] = [{ x: 6, y: height }];
-  for (let index = 0; index <= OUTLINE_SAMPLES; index += 1) {
-    const angle = (Math.PI * index) / OUTLINE_SAMPLES;
-    const x = width / 2 - (width / 2 - 6) * Math.cos(angle);
-    const y = height - 4 - (height - 10 - BADGE_OVERHANG) * Math.pow(Math.sin(angle), 0.3);
-    points.push({ x: round2(x), y: round2(y) });
+// The interior of one cell, in cell-local coordinates: the crystal box, and (charted only) the
+// growth bar under it. The reserved chip band below the bar is why a charted cell is taller than
+// its crystal — the `Next` chip must not move any neighbour.
+function cellInterior(kind: CellKind): Pick<FormationCell, "crystal" | "bar"> {
+  if (kind === "locked") {
+    const inset = (LOCKED_CELL.width - LOCKED_CRYSTAL_PX) / 2;
+    return {
+      crystal: { x: round2(inset), y: round2((LOCKED_CELL.height - LOCKED_CRYSTAL_PX) / 2), width: LOCKED_CRYSTAL_PX, height: LOCKED_CRYSTAL_PX },
+      bar: null
+    };
   }
-  points.push({ x: width - 6, y: height });
-  return points;
+  const barWidth = CHARTED_CELL.width - 18;
+  return {
+    crystal: {
+      x: round2((CHARTED_CELL.width - CHARTED_CRYSTAL_PX) / 2),
+      y: CELL_TOP_PAD,
+      width: CHARTED_CRYSTAL_PX,
+      height: CHARTED_CRYSTAL_PX
+    },
+    bar: { x: round2((CHARTED_CELL.width - barWidth) / 2), y: CELL_TOP_PAD + CHARTED_CRYSTAL_PX + BAR_GAP, width: barWidth, height: BAR_HEIGHT }
+  };
 }
 
-// --- Level two: the ascent ------------------------------------------------------------
+// --- The stack --------------------------------------------------------------------------
 
 export function composeCrystalFormation(input: FormationInput, availableWidth: number): CrystalFormationLayout {
-  const canvasWidth = Math.max(MIN_ISLAND_WIDTH, availableWidth);
+  const canvasWidth = Math.max(MIN_PANEL_WIDTH + STACK_INSET, Math.floor(availableWidth));
+  const panelWidth = canvasWidth - STACK_INSET;
   const sections = [...input.sections].sort((a, b) => a.sectionIndex - b.sectionIndex);
   const bySection = new Map<number, FormationConceptInput[]>();
   for (const concept of input.concepts) {
     (bySection.get(concept.sectionIndex) ?? bySection.set(concept.sectionIndex, []).get(concept.sectionIndex)!).push(concept);
   }
-  // Islands pack against the canvas minus the ascent offset so an offset island still
-  // fits the viewport (D3/D5).
-  const models = sections.map((section) =>
-    buildLegModel(section, bySection.get(section.sectionIndex) ?? [], canvasWidth - ASCENT_OFFSET_X)
+  const panels = sections.map((section) =>
+    buildLegPanel(section, bySection.get(section.sectionIndex) ?? [], panelWidth, input.nextDerivedNodeId)
   );
 
-  const hasTerminus = models.length > 0;
-  const terminus: FormationTerminus | null = hasTerminus
-    ? {
-        frame: { x: round2((canvasWidth - PEAK_WIDTH) / 2), y: 0 },
-        width: PEAK_WIDTH,
-        height: PEAK_HEIGHT,
-        peak: peakSilhouette(PEAK_WIDTH, PEAK_HEIGHT),
-        keystone: { x: round2(PEAK_WIDTH / 2), y: 22 },
-        keystoneSeated: Boolean(input.enrichmentScope?.wonChallengeId)
-      }
-    : null;
-
-  // Quiet ascent (D5): canonical section order climbs bottom → top under the peak, each
-  // island alternating a small lateral offset, its header band allocated above it.
-  let yCursor = hasTerminus ? PEAK_HEIGHT + LEG_GAP : 0;
-  const placed: PlacedLeg[] = [];
-  for (let index = models.length - 1; index >= 0; index -= 1) {
-    const model = models[index];
-    const centered = (canvasWidth - model.width) / 2;
-    const x = clamp(centered + (index % 2 === 0 ? -ASCENT_OFFSET_X / 2 : ASCENT_OFFSET_X / 2), 0, canvasWidth - model.width);
-    const headerWidth = Math.min(canvasWidth, Math.max(model.width, MIN_HEADER_WIDTH));
-    const header: HeaderBand = {
-      x: round2(clamp(x + model.width / 2 - headerWidth / 2, 0, canvasWidth - headerWidth)),
-      y: yCursor,
-      width: headerWidth,
-      height: HEADER_HEIGHT
-    };
-    placed.unshift({ ...model, frame: { x: round2(x), y: yCursor + HEADER_HEIGHT + HEADER_GAP }, header });
-    yCursor += HEADER_HEIGHT + HEADER_GAP + model.height + LEG_GAP;
-  }
-  const height = models.length === 0 ? (hasTerminus ? PEAK_HEIGHT : 0) : yCursor - LEG_GAP;
-
   return {
-    legs: placed,
-    spine: buildSpine(placed, terminus),
-    terminus,
+    panels,
+    summit: panels.length === 0
+      ? null
+      : {
+          species: "keystone",
+          keystoneSeated: Boolean(input.enrichmentScope?.wonChallengeId),
+          crystalSize: SUMMIT_CRYSTAL_PX,
+          legCount: panels.length,
+          sealedLegCount: panels.filter((panel) => panel.structuralState === "bound").length
+        },
     enrichmentScope: input.enrichmentScope,
     width: canvasWidth,
-    height
+    panelWidth
   };
-}
-
-// The summit peak (D6): a small distinct mountain silhouette; the keystone slot sits at
-// its apex notch.
-function peakSilhouette(width: number, height: number): Point[] {
-  const cx = width / 2;
-  return [
-    { x: 4, y: height },
-    { x: round2(width * 0.24), y: round2(height * 0.5) },
-    { x: round2(width * 0.38), y: round2(height * 0.62) },
-    { x: round2(cx), y: round2(height * 0.18) },
-    { x: round2(width * 0.66), y: round2(height * 0.56) },
-    { x: round2(width * 0.8), y: round2(height * 0.44) },
-    { x: width - 4, y: height }
-  ];
-}
-
-// ONE continuous smooth curve through every junction badge up to the peak (D5), sampled
-// as a Catmull-Rom chain and sliced per Leg so a bound Leg's own segment lights gold.
-// Expedition sequence/belonging ONLY — never a graph edge.
-function buildSpine(placed: PlacedLeg[], terminus: FormationTerminus | null): SpineSegment[] {
-  if (placed.length === 0) return [];
-  const junctions: Point[] = placed.map((leg) => ({
-    x: leg.frame.x + leg.badge.x,
-    y: leg.frame.y + leg.badge.y
-  }));
-  if (terminus) {
-    junctions.push({ x: terminus.frame.x + terminus.keystone.x, y: terminus.frame.y + terminus.height });
-  }
-  return placed.map((leg, index) => ({
-    fromSectionIndex: leg.sectionIndex,
-    toSectionIndex: placed[index + 1]?.sectionIndex ?? null,
-    points: sampleCatmullRom(junctions, index, 12),
-    lit: leg.structuralState === "bound"
-  }));
-}
-
-// Catmull-Rom sample of chain segment [i, i+1] with clamped endpoints.
-function sampleCatmullRom(chain: Point[], segment: number, samples: number): Point[] {
-  const p0 = chain[Math.max(0, segment - 1)];
-  const p1 = chain[segment];
-  const p2 = chain[Math.min(chain.length - 1, segment + 1)];
-  const p3 = chain[Math.min(chain.length - 1, segment + 2)];
-  const points: Point[] = [];
-  for (let index = 0; index <= samples; index += 1) {
-    const t = index / samples;
-    const t2 = t * t;
-    const t3 = t2 * t;
-    points.push({
-      x: round2(
-        0.5 * (2 * p1.x + (p2.x - p0.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (3 * p1.x - p0.x - 3 * p2.x + p3.x) * t3)
-      ),
-      y: round2(
-        0.5 * (2 * p1.y + (p2.y - p0.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (3 * p1.y - p0.y - 3 * p2.y + p3.y) * t3)
-      )
-    });
-  }
-  return points;
 }
 
 // --- Finished Vista selectors -------------------------------------------------------
@@ -458,10 +359,10 @@ export type VistaFocus = { kind: "leg"; sectionIndex: number } | { kind: "summit
 export type VistaRewardKey = `leg:${number}` | "summit";
 
 export function vistaRewardSnapshot(layout: CrystalFormationLayout): VistaRewardKey[] {
-  const rewards: VistaRewardKey[] = layout.legs
-    .filter((leg) => leg.structuralState === "bound")
-    .map((leg) => `leg:${leg.sectionIndex}` as const);
-  if (layout.terminus?.keystoneSeated) rewards.push("summit");
+  const rewards: VistaRewardKey[] = layout.panels
+    .filter((panel) => panel.structuralState === "bound")
+    .map((panel) => `leg:${panel.sectionIndex}` as const);
+  if (layout.summit?.keystoneSeated) rewards.push("summit");
   return rewards;
 }
 
@@ -477,25 +378,25 @@ export function selectVistaFocus(
 ): VistaFocus | null {
   if (explicitFocus && focusExists(layout, explicitFocus)) return explicitFocus;
   const seen = new Set(seenBindings);
-  if (layout.terminus?.keystoneSeated && !seen.has("summit")) return { kind: "summit" };
-  const unseenLeg = [...layout.legs]
-    .filter((leg) => leg.structuralState === "bound" && !seen.has(`leg:${leg.sectionIndex}`))
+  if (layout.summit?.keystoneSeated && !seen.has("summit")) return { kind: "summit" };
+  const unseenLeg = [...layout.panels]
+    .filter((panel) => panel.structuralState === "bound" && !seen.has(`leg:${panel.sectionIndex}`))
     .sort((a, b) => b.sectionIndex - a.sectionIndex)[0];
   if (unseenLeg) return { kind: "leg", sectionIndex: unseenLeg.sectionIndex };
-  if (currentSectionIndex !== null && layout.legs.some((leg) => leg.sectionIndex === currentSectionIndex)) {
+  if (currentSectionIndex !== null && layout.panels.some((panel) => panel.sectionIndex === currentSectionIndex)) {
     return { kind: "leg", sectionIndex: currentSectionIndex };
   }
-  return layout.legs[0] ? { kind: "leg", sectionIndex: layout.legs[0].sectionIndex } : layout.terminus ? { kind: "summit" } : null;
+  return layout.panels[0] ? { kind: "leg", sectionIndex: layout.panels[0].sectionIndex } : layout.summit ? { kind: "summit" } : null;
 }
 
 function focusExists(layout: CrystalFormationLayout, focus: VistaFocus): boolean {
   return focus.kind === "summit"
-    ? layout.terminus !== null
-    : layout.legs.some((leg) => leg.sectionIndex === focus.sectionIndex);
+    ? layout.summit !== null
+    : layout.panels.some((panel) => panel.sectionIndex === focus.sectionIndex);
 }
 
-export function isNameableMineral(slot: Pick<MineralSlot, "trailState" | "state" | "isMilestone" | "isSummit">): boolean {
-  return slot.state === "collected" || slot.state === "known" || slot.trailState === "frontier" || slot.isMilestone || slot.isSummit;
+export function isNameableMineral(cell: Pick<FormationCell, "trailState" | "state" | "isMilestone" | "isSummit">): boolean {
+  return cell.state === "collected" || cell.state === "known" || cell.trailState === "frontier" || cell.isMilestone || cell.isSummit;
 }
 
 export type FormationMemoryDoor =
@@ -504,13 +405,13 @@ export type FormationMemoryDoor =
 
 export function formationMemoryDoorFor(layout: CrystalFormationLayout, selectedNodeId: string | null): FormationMemoryDoor | null {
   if (selectedNodeId === null) return null;
-  for (const leg of layout.legs) {
-    const slot = leg.slots.find((candidate) => candidate.derivedNodeId === selectedNodeId);
-    if (!slot || !isNameableMineral(slot)) continue;
-    if (slot.trailState === "locked" && slot.state !== "known") {
-      return { kind: "guarded", derivedNodeId: slot.derivedNodeId, label: slot.label, legNumber: slot.sectionIndex + 1 };
+  for (const panel of layout.panels) {
+    const cell = panel.cells.find((candidate) => candidate.derivedNodeId === selectedNodeId);
+    if (!cell || !isNameableMineral(cell)) continue;
+    if (cell.trailState === "locked" && cell.state !== "known") {
+      return { kind: "guarded", derivedNodeId: cell.derivedNodeId, label: cell.label, legNumber: cell.sectionIndex + 1 };
     }
-    return { kind: "reveal", derivedNodeId: slot.derivedNodeId, label: slot.label, gist: slot.gist };
+    return { kind: "reveal", derivedNodeId: cell.derivedNodeId, label: cell.label, gist: cell.gist };
   }
   return null;
 }
@@ -523,8 +424,4 @@ function lessonGist(session: StudySession, derivedNodeId: string): string | null
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

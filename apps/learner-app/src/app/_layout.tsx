@@ -6,7 +6,7 @@ import { IMFellEnglish_400Regular } from "@expo-google-fonts/im-fell-english";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { PortalHost } from "@rn-primitives/portal";
 import { hydrateToken, queryClient } from "@/lib/api";
 import { RouteStatus, colors } from "@/ui";
@@ -24,8 +24,11 @@ export default function RootLayout() {
   // system face rather than blocking entry.
   const [fontsLoaded, fontError] = useFonts({ IMFellEnglish_400Regular });
   const ready = hydrated && (fontsLoaded || fontError !== null);
+  // Native metrics are available synchronously at startup: without them the first frame
+  // renders with zero insets and every header visibly drops once the provider measures.
+  // The value is null on web, which the prop accepts.
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="dark" />
         {/* Token hydration is a visible bootstrap state, not a blank frame (plan

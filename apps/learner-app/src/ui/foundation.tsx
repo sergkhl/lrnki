@@ -26,7 +26,7 @@ import { colors } from "./tokens";
 import { AnimatedView, useReducedMotion } from "./motion";
 
 export type TextVariant = "display" | "heading" | "title" | "map-title" | "label" | "body" | "caption";
-export type TextColor = "ink" | "muted" | "destructive" | "on-accent" | "trail" | "award";
+export type TextColor = "ink" | "muted" | "destructive" | "on-accent" | "trail" | "award" | "cavern-ink";
 
 const TEXT_VARIANT_CLASS: Record<TextVariant, string> = {
   display: "text-3xl font-semibold tracking-tight",
@@ -47,7 +47,9 @@ const TEXT_COLOR_CLASS: Record<TextColor, string> = {
   destructive: "text-destructive",
   "on-accent": "text-on-accent",
   trail: "text-trail",
-  award: "text-award"
+  award: "text-award",
+  // Formation copy mechanically aliases the shared parchment ink; muted copy uses opacity.
+  "cavern-ink": "text-cavern-ink"
 };
 
 export type AppTextProps = TextProps &

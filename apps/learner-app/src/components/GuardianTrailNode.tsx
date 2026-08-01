@@ -3,7 +3,8 @@ import { View } from "react-native";
 import { Lock, ShieldQuestion, Swords, Trophy } from "lucide-react-native";
 import type { RecallScopeStatus } from "@lrnki/application/projection";
 import { PressableSurface, Text, colors } from "@/ui";
-import { learnerTerm } from "@/learn/vocabulary";
+import { recallScopeKey } from "@/lib/guardianEntry";
+import { guardianScopeCopy } from "@/learn/vocabulary";
 
 // The persistent Guardian node on the trail (plan 2026-07-13-003 U6, F5-F6): one compact
 // entry per Leg scope (rendered after the Leg's last concept) and one at the summit. State
@@ -23,8 +24,9 @@ export function GuardianTrailNode({
   onEnter: (scope: RecallScopeStatus) => Promise<void>;
 }>) {
   const [entering, setEntering] = useState(false);
-  const summit = scope.scopeKind === "enrichment";
-  const title = summit ? learnerTerm("guardianSummitTitle") : learnerTerm("guardianTitle");
+  // The state → copy/shape/inertness mapping is shared with the cavern panel row (KTD9), so the
+  // trail and the formation can never disagree about a scope.
+  const { title, subline, icon, disabled } = guardianScopeCopy(scope);
 
   if (scope.state === "unavailable" && !sectionComplete) return null;
 
@@ -34,16 +36,20 @@ export function GuardianTrailNode({
     void onEnter(scope).finally(() => setEntering(false));
   };
 
-  const presentation =
-    scope.state === "won"
-      ? { icon: <Trophy size={18} color={colors.award} />, border: "border-gem", subline: `${learnerTerm("guardianNodeWon")} · ${learnerTerm("guardianRematch")}`, disabled: false }
-      : scope.state === "active"
-        ? { icon: <Swords size={18} color={colors.ink} />, border: "border-frontier", subline: learnerTerm("guardianResume"), disabled: false }
-        : scope.state === "available"
-          ? { icon: <Swords size={18} color={colors.ink} />, border: "border-map-ink", subline: learnerTerm("guardianFace"), disabled: false }
-          : scope.state === "locked"
-            ? { icon: <Lock size={18} color={colors.fog} />, border: "border-map-ink-soft", subline: learnerTerm("guardianSummitLocked"), disabled: true }
-            : { icon: <ShieldQuestion size={18} color={colors.fog} />, border: "border-map-ink-soft", subline: learnerTerm("guardianUnavailable"), disabled: true };
+  const presentation = {
+    icon:
+      icon === "won" ? <Trophy size={18} color={colors.award} />
+      : icon === "locked" ? <Lock size={18} color={colors.fog} />
+      : icon === "unavailable" ? <ShieldQuestion size={18} color={colors.fog} />
+      : <Swords size={18} color={colors.ink} />,
+    border:
+      icon === "won" ? "border-gem"
+      : icon === "resume" ? "border-frontier"
+      : icon === "face" ? "border-map-ink"
+      : "border-map-ink-soft",
+    subline,
+    disabled
+  };
 
   return (
     <View className="items-center">
@@ -55,7 +61,9 @@ export function GuardianTrailNode({
         onPress={enter}
         className={`min-h-target max-w-[260px] flex-row items-center gap-2 rounded-card border-2 ${presentation.border} bg-card px-3 py-2 ${presentation.disabled ? "opacity-70" : ""}`}
         pressedClassName="bg-muted-panel"
-        testID={`guardian-node-${scope.anchorDerivedNodeId}`}
+        // Keyed by scope identity, not by anchor: the summit's anchor IS the last Leg's
+        // milestone, so an anchor-only id renders two different Guardians under one id.
+        testID={`guardian-node-${recallScopeKey(scope)}`}
       >
         {presentation.icon}
         <View className="min-w-0 shrink">

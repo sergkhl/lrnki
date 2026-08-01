@@ -7,6 +7,7 @@ import { CheckpointPath, type TrailScrollHandle } from "@/components/CheckpointP
 import { CrystalVista } from "@/components/CrystalVista";
 import { QuestHeader } from "@/components/QuestHeader";
 import { buildTrailView } from "@lrnki/application/projection";
+import { enterGuardianScope } from "@/lib/guardianEntry";
 import { expeditionQuery } from "@/lib/queries";
 import { Button, RouteStatus, Screen, buttonIconColor } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
@@ -92,6 +93,17 @@ export default function ExpeditionPage() {
           setManualVistaOpen(false);
           // Defer one tick so the trail is back on screen before scrolling to the stop.
           setTimeout(() => scrollHandleRef.current?.scrollToNode(derivedNodeId), 60);
+        }}
+        // KTD9: a Leg panel's Guardian row enters through the SAME entry rule the trail node
+        // uses, and closes the Vista only after a successful entry — a refused create leaves
+        // the formation exactly as it was.
+        onEnterGuardian={async (scope) => {
+          const result = await enterGuardianScope({ enrichmentId: session.enrichmentId, scope });
+          if (!result.entered) return;
+          setManualVistaOpen(false);
+          setRouteIntentConsumed(true);
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          router.push(`/guardian/${result.challengeId}`);
         }}
       />
     </Screen>

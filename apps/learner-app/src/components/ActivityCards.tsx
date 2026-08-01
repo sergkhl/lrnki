@@ -59,6 +59,7 @@ export function OptionSelectBody({
   selectedId,
   result,
   disabled,
+  presentedOrder,
   supportSlot,
   onSelect
 }: Readonly<{
@@ -66,12 +67,16 @@ export function OptionSelectBody({
   selectedId: string | null;
   result: ActivityResult;
   disabled: boolean;
+  // A corrective reveal is a new component mount, so its local shuffle state is new too.
+  // Callers that cross that boundary can replay the submitted presentation order.
+  presentedOrder?: readonly string[];
   // The Support Paths panel rendered between the question stem and the answer controls
   // (plan 2026-07-13-002 U3, R7): support is reachable before the learner commits.
   supportSlot?: ReactNode;
-  onSelect: (optionId: string) => void;
+  onSelect: (optionId: string, presentedOrder: readonly string[]) => void;
 }>) {
-  const { orderedIds, byId: optionById } = useShuffledLookup(item.options, (option) => option.optionId);
+  const { orderedIds: shuffledIds, byId: optionById } = useShuffledLookup(item.options, (option) => option.optionId);
+  const orderedIds = presentedOrder ?? shuffledIds;
   const graded = result?.graded === true;
   return (
     <Card className="gap-4">
@@ -92,7 +97,7 @@ export function OptionSelectBody({
               keyed={graded && result.graded && option.optionId === result.keyedCorrectId}
               graded={graded}
               disabled={disabled}
-              onPress={() => onSelect(option.optionId)}
+              onPress={() => onSelect(option.optionId, orderedIds)}
             />
           );
         })}
@@ -112,6 +117,7 @@ export function ImpostorBody({
   selectedId,
   result,
   disabled,
+  presentedOrder,
   supportSlot,
   onSelect
 }: Readonly<{
@@ -119,11 +125,13 @@ export function ImpostorBody({
   selectedId: string | null;
   result: ActivityResult;
   disabled: boolean;
+  presentedOrder?: readonly string[];
   // See OptionSelectBody: the stem-adjacent Support Paths slot (R7).
   supportSlot?: ReactNode;
-  onSelect: (statementId: string) => void;
+  onSelect: (statementId: string, presentedOrder: readonly string[]) => void;
 }>) {
-  const { orderedIds, byId: statementById } = useShuffledLookup(item.statements, (statement) => statement.statementId);
+  const { orderedIds: shuffledIds, byId: statementById } = useShuffledLookup(item.statements, (statement) => statement.statementId);
+  const orderedIds = presentedOrder ?? shuffledIds;
   const graded = result?.graded === true;
   return (
     <Card className="gap-4">
@@ -144,7 +152,7 @@ export function ImpostorBody({
               keyed={graded && result.graded && statement.statementId === result.keyedCorrectId}
               graded={graded}
               disabled={disabled}
-              onPress={() => onSelect(statement.statementId)}
+              onPress={() => onSelect(statement.statementId, orderedIds)}
             />
           );
         })}

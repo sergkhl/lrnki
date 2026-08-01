@@ -181,7 +181,7 @@ function trailSession(opts: { withoutLesson?: boolean; includeLocked?: boolean; 
       { position: 0, derivedNodeId: "n1", difficulty: opts.difficulty ?? 0, topologicalDepth: 0, state: "frontier", isSummit: !opts.includeLocked, sectionIndex: 0, sectionPositionIndex: 0, milestoneDerivedNodeId: opts.includeLocked ? "n2" : "n1", milestoneLabel: opts.includeLocked ? "Borrowing" : "Ownership", isMilestone: !opts.includeLocked },
       ...(opts.includeLocked ? [{ position: 1, derivedNodeId: "n2", difficulty: 0, topologicalDepth: 1, state: "locked" as const, isSummit: true, sectionIndex: 0, sectionPositionIndex: 1, milestoneDerivedNodeId: "n2", milestoneLabel: "Borrowing", isMilestone: true }] : [])
     ],
-    sections: [{ sectionIndex: 0, milestoneDerivedNodeId: opts.includeLocked ? "n2" : "n1", milestoneLabel: opts.includeLocked ? "Borrowing" : "Ownership", stepDerivedNodeIds: opts.includeLocked ? ["n1", "n2"] : ["n1"], meanDifficulty: opts.difficulty ?? 0 }],
+    sections: [{ sectionIndex: 0, milestoneDerivedNodeId: opts.includeLocked ? "n2" : "n1", milestoneLabel: opts.includeLocked ? "Borrowing" : "Ownership", stepDerivedNodeIds: opts.includeLocked ? ["n1", "n2"] : ["n1"], meanDifficulty: opts.difficulty ?? 0, hasStudyItems: true }],
     coexistence: [],
     restorations: [],
     sheetByNode: {},
@@ -240,8 +240,8 @@ test("buildTrailView: a second disjoint section is playable before the first is 
       { position: 1, derivedNodeId: "s1", difficulty: 0, topologicalDepth: 0, state: "frontier", isSummit: true, sectionIndex: 1, sectionPositionIndex: 0, milestoneDerivedNodeId: "s1", milestoneLabel: "Section One", isMilestone: true }
     ],
     sections: [
-      { sectionIndex: 0, milestoneDerivedNodeId: "s0", milestoneLabel: "Section Zero", stepDerivedNodeIds: ["s0"], meanDifficulty: 0 },
-      { sectionIndex: 1, milestoneDerivedNodeId: "s1", milestoneLabel: "Section One", stepDerivedNodeIds: ["s1"], meanDifficulty: 0 }
+      { sectionIndex: 0, milestoneDerivedNodeId: "s0", milestoneLabel: "Section Zero", stepDerivedNodeIds: ["s0"], meanDifficulty: 0, hasStudyItems: true },
+      { sectionIndex: 1, milestoneDerivedNodeId: "s1", milestoneLabel: "Section One", stepDerivedNodeIds: ["s1"], meanDifficulty: 0, hasStudyItems: true }
     ],
     studySegmentsByNode: {},
     lessonByNode: {},

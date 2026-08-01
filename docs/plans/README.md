@@ -7,12 +7,27 @@ completes, fold durable decisions into ADRs, current status into `TODO.md`, and 
 
 ## Live coordination
 
-- [TODO](./TODO.md) — 3–7 current tasks, 5–10 grouped completed outcomes, and latest validation.
+- [TODO](./TODO.md) — current tasks, grouped completed outcomes, and the latest validation.
 - [BLOCKERS](./BLOCKERS.md) — unresolved manual actions required from the user only.
+
+### TODO retention
+
+`TODO.md` has exactly three sections — `TODO`, `COMPLETED`, `VALIDATION` — and is bounded by every
+edit that touches it, not by a later cleanup pass. Enforce these limits in the same change that adds
+the entry:
+
+- **TODO** holds 3–7 tasks. A task is status + link + live state that exists nowhere else. A plan's
+  requirements, design, implementation units, and acceptance criteria stay in the plan.
+- **COMPLETED** holds at most 8 grouped outcomes. Adding a ninth deletes the oldest in the same edit.
+- **VALIDATION** holds exactly one entry: the latest. Adding one deletes the previous one.
+- No entry links into `tmp/` — it is gitignored and auto-pruned, so such a link is dead on arrival
+  for every other checkout.
+
+Deleted detail is not lost: git history is the provenance record for outcomes and validation runs.
 
 ## Active implementation plans (execution order)
 
-_None active. See [TODO](./TODO.md) for current work and evidence-triggered follow-ups._
+_None._
 
 ## Ownership rules
 
@@ -21,6 +36,3 @@ _None active. See [TODO](./TODO.md) for current work and evidence-triggered foll
 - Source types and the initial migration own exact interfaces and persisted shapes.
 - Keep only ready/in-progress plans here. Delete stale or completed plans immediately after their
   durable content has been consolidated.
-- Do not duplicate a plan's requirements, design, implementation units, or acceptance criteria in
-  `TODO.md`; link to the active plan with a short status note.
-- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections.

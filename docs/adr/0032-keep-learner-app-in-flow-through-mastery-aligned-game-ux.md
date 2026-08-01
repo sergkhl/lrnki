@@ -1,6 +1,6 @@
 # Keep the Learner App in flow through mastery-aligned game UX
 
-Status: Accepted (last amended 2026-07-19).
+Status: Accepted.
 
 ## Decision
 
@@ -56,43 +56,46 @@ beat and then continue to the next available stop, or return to the trail only w
 has no next stop. Every learner-facing count (progress, gems) derives from the same trail scope the
 projection walks, so counts never drift from the trail.
 
-The single durable **recall challenge** is the **Recall Challenge** defined in
-[CONTEXT.md](../../CONTEXT.md), presented as the **Crystal Guardian** (Leg) and **Expedition
-Guardian** (summit) duel; it supersedes and replaces the earlier global Crystal Duel (its timer,
-simulated rival, unlock splash, grade/win API, award/badge, navigation, vocabulary, and client-local
-unlock memory are removed in the same change; the weekly podium is unaffected). A recall challenge is
-earned, scope-shaped, and mastery-aligned: it fires only at a completed Leg or the completed
-Expedition summit, draws its lineup exclusively from that scope's *already-passed* neutral Study Item
-Bank items (coverage-first — distinct concepts and the milestone/summit concept before repeats; five
-Leg / seven Expedition rounds are maxima, never invented minimums), and grants **no** reward when no
-eligible item exists (a content-coverage defect to surface, never a silent award). Its stakes are
-**corrective, not punitive**: a miss counterattacks a learner shield and re-queues the item, shield
-exhaustion enters a Last Stand that recovery repairs, and no challenge outcome ever causes defeat,
-mastery loss, reward loss, or a restart; there is no correctness timer. The lifecycle is durable and
-idempotent (one active fight per learner+scope, exact retreat/resume, confirmed abandon). The reward
-is a **permanent, singular** Leg binding or summit keystone in the Crystal Formation earned on the
-first victory; rematches rotate coverage and receive only a restrained endurance acknowledgment —
-they never replay binding or growth, never fire a re-award haptic, and never dim, revoke,
-duplicate, or re-award the permanent reward (see the Crystal Formation contract below). Crucially, **challenge evidence is not acquisition evidence**: Guardian answers persist
-in their own durable challenge tables and never enter the neutral acquisition `response_log`, count
-toward Concept Mastery, award learning points, or alter prerequisite access — so finishing a Leg's
-normal Study Sessions keeps the next prerequisite-valid stop available even while its Guardian is
-postponed (the challenge gates the *reward*, never the *learning*). Version one challenges neutral
-concept Study Items only; extending fixed-budget selection to completed learner-scoped Support Paths
-is deferred until they carry a richer typed Study Item set.
+The project's single durable retrieval challenge is the **Recall Challenge** defined in
+[CONTEXT.md](../../CONTEXT.md), which owns its scope, lineup rule, reward, and evidence isolation.
+Three game-UX properties make it admissible under this ADR rather than a parallel objective:
 
-The weekly cohort leaderboard — simulated seeded rivals, the division ladder, journal splash
-celebrations, and the `weekly_podium` award — is a **deliberately retained MVP motivation surface**
-(decision 2026-07-17). Rivals remain presentation-side fiction: they never touch `learners`, graded
-evidence, or any persistence. Its retention is provisional — beta learner response decides whether
-it is kept, reshaped, or removed — and real multiplayer is out of scope until after beta.
+- It is **earned and mastery-aligned**. It fires only at a completed Leg or completed summit and
+  draws only on that scope's already-passed neutral items, so a learner cannot win the game layer
+  while bypassing the understanding it exists to confirm. No eligible item means no reward — a
+  content-coverage defect to surface, never a silent award.
+- Its stakes are **corrective, not punitive**. No outcome causes defeat, mastery loss, reward loss,
+  or a restart, and there is no correctness timer; a miss re-queues the item behind a recoverable
+  shield.
+- It gates the **reward, never the learning**. Because challenge evidence is isolated from
+  acquisition evidence, a postponed Guardian never blocks the next prerequisite-valid stop.
 
-Achievement sharing is an accepted future need: a learner should eventually be able to export an
-achievement — at minimum their Crystal Vista formation — as a picture fit for posting outside the app
-(for example to Instagram). Achievement surfaces therefore keep their visual composition
-self-contained: meaningful as a static image, not only through interaction. A share export carries
-only the learner's own progress imagery and themed copy, and sharing celebrates mastery without
-becoming a parallel objective.
+Two properties of the expedition loop follow, and derivation — not content luck — owns both.
+
+The loop must be **completable**. No Leg may exist that cannot be won, and no progression gate may
+depend on a precondition nothing can satisfy. Where an unwinnable unit would otherwise appear,
+derivation removes its boundary rather than auto-awarding it, and any gate that still cannot be
+satisfied reports itself honestly instead of waiting forever. Completability is a claim about
+reachability, not about content: a stop that carries neither a Study Item nor a Concept Lesson nor a
+recorded lesson-absence is not masterable, and the code does not pretend otherwise — that state is
+measured, not assumed away.
+
+The loop must be **paced**. A Leg is a milestone-shaped unit bounded by its own Guardian's ward
+budget, so the interval between reward beats is a designed property of derivation rather than an
+incidental consequence of how a layer's concepts happened to cluster. A Leg boundary may only fall
+on a recognizable intermediate outcome, never at an arbitrary depth or difficulty transition, and
+boundary rules stay learner-independent: adapting to the learner belongs to the support ladder,
+lineup rotation, and pacing, never to the trail skeleton whose stability is what makes a permanent
+reward permanent.
+
+The weekly cohort leaderboard is a motivation surface retained under one constraint: its rivals are
+presentation-side fiction that never touch `learners`, graded evidence, or any persistence. Real
+multiplayer is out of scope. Retention is provisional and reopens on beta learner response.
+
+Achievement surfaces keep their visual composition **self-contained — meaningful as a static image,
+not only through interaction** — so an achievement can be exported as a picture fit for posting
+outside the app. Any such export carries only the learner's own progress imagery and themed copy;
+sharing celebrates mastery without becoming a parallel objective.
 
 Mechanics stay mobile-first in their interaction model. Matching uses **two-column tap-pairs** —
 clue tiles on the left, match tiles on the right, each column independently shuffled — with wrapping
@@ -106,13 +109,11 @@ support content, clearly labeled generated, and never mutate the Learner-Neutral
 the Derived Graph Layer, or the neutral Study Item Bank.
 
 The support ladder governs *automatic* interventions. A learner may also *explicitly request* support
-on demand for an unfamiliar term through a quiet Explorable Term action; that request starts a
-**Scaffold Detour** immediately without climbing the ladder, because the learner has already named
-the gap. This is a one-level, optional detour that passed the Flow design gate below like any other
-mechanic and stays inside the same neutral boundary — it earns no crystals, points, or base
-progress and never becomes neutral graph knowledge. Its durable persistence, exact-reuse rule, and
-scoped-response identity are owned by
-[ADR-0037](0037-persist-learner-scoped-scaffold-detours.md).
+for an unfamiliar term through a quiet Explorable Term action; that request starts a **Scaffold
+Detour** ([ADR-0037](0037-persist-learner-scoped-scaffold-detours.md)) immediately without climbing
+the ladder, because the learner has already named the gap. Skipping the ladder is admissible here
+only because the detour earns no crystals, points, or base progress, so it cannot become a parallel
+objective.
 
 Each new Learner App mechanic must pass a Flow design gate before implementation: name the
 player-visible goal, confirm it matches the intended learning goal, identify distractions, describe
@@ -123,9 +124,8 @@ invasive affective or fine-grained behavioral telemetry is not part of the basel
 
 ## Interaction system, overlays, motion, and haptics
 
-The Learner App renders through **one app-owned component boundary** over NativeWind: `Screen`,
-`Text`, `PressableSurface`, `Button`, `IconButton`, `Card`, `Input`, `Progress`, `Dialog`,
-`BottomSheet`, `SideSheet`, `FullScreenDialog`, and `OverlayHeader`. Semantic colors, spacing,
+The Learner App renders through **one app-owned component boundary** over NativeWind, whose members
+are exactly the components exported by `apps/learner-app/src/ui/index.ts`. Semantic colors, spacing,
 typography, radii, touch sizes, interaction states, haptic intents, and motion durations have a
 single token source (no duplicate values). The boundary is lint-enforced: learner surfaces import
 the app-owned `Text` and press surfaces, never raw React Native `Pressable`/`Text`.
@@ -134,9 +134,19 @@ Every overlay carries a **circular semantic icon header**; an activity header re
 and state language of the checkpoint that opened it, so the overlay reads as a continuation of the
 trail stop. Surface kinds are fixed by role: full-screen dialogs for study and Crystal Vista, bottom
 sheets for section overview / expedition planning / the journal menu, adaptive dialogs for the Board
-and celebration splashes. One **dismissal contract** applies everywhere — dialogs support close,
+and celebration splashes; selected Crystal Vista memory detail uses a bottom sheet over the
+full-screen Vista. One **dismissal contract** applies everywhere — dialogs support close,
 system back or Escape, and backdrop; bottom sheets add pan-down; full-screen surfaces use explicit
-and system back — and a pending mutation temporarily blocks dismissal.
+and system back — and a pending mutation temporarily blocks dismissal. Learner surfaces never
+import the platform bottom-sheet primitive directly; the app-owned wrapper is the enforced
+dismissal, safe-area, and web-layer boundary.
+
+**Safe-area framing belongs to the surface that owns a device edge, never to its callers.** The
+route shell, both full-screen and drawer overlays, and the bottom sheet each apply the device
+insets themselves under the transparent system status and navigation bars; a learner surface never
+reads insets directly, and lint enforces it. Delegating the inset to callers is what let one
+full-screen surface paint its header and close control under the status bar while its siblings each
+hand-rolled the same padding.
 
 Motion is **Reanimated and event-bound only**: presses, disclosures, overlay entrances,
 indeterminate progress, next-stop attention, matching feedback, crystal growth, mastery assembly,
@@ -154,50 +164,113 @@ unlock — fired once at the transition; generic navigation never vibrates.
 
 ## Crystal Formation reward presentation
 
-The learner's expedition rewards render as **one Crystal Formation**: a quiet, vertical, scrollable
-ascent of compact per-Leg geode islands — each ONE smooth organic outline around a center-out
-specimen mound — joined by a single smooth, **nonsemantic** spine curve through every island
-junction and ended by a distinct summit peak whose apex holds the **keystone** slot. The formation
-is a downstream presentation of existing learner facts only — structural state derives from the
-section/scope projection (`future`, `collecting`, `guardian_ready` with honest
-available/engaged/unavailable copy, `bound` only from the durable first `wonChallengeId`) and lives
-on the island rim plus one junction badge (dashed muted → solid neutral → solid accent with a
-guardian glyph → solid gold with a gold seal), always a shape distinction, never color alone.
-Mineral **species is a curated, hand-authored library of three real-mineral silhouettes encoding
-exactly one neutral fact**: the concept's intrinsic difficulty band
-([ADR-0024](0024-learner-neutral-intrinsic-difficulty.md)) through the shared `difficultyBand`
-mapping (bands 1–2 quartz, 3–4 amethyst, 5 diamond); remaining per-concept variation is a tiny
-deterministic mirror/scale with no semantic meaning, and no learner-specific signal (retries,
-correctness) ever reaches specimen appearance. Progression is one visual variable — ghost outline,
-fill rising with growth, full tier tint plus gloss when collected. **The formation renders no graph
-edges at all**; prerequisite structure stays on trail and inspection surfaces. Scene chrome is
-neutral with three muted tier tints, and **gold appears exclusively on earned rewards** (seals, lit
-spine segments, the keystone). Known-calibrated concepts stay labeled ghosts and are never counted
-as collected crystals; compact surfaces speak exact progress, counts, and status language instead
-of rendering detailed specimens below a readable size. Island packing derives its row capacity from
-the available canvas width, and each island's header band is allocated by the layout geometry so
-labels can never overlap artwork.
+The learner's expedition rewards render as **one bright, warm geode Crystal Formation** reached
+from the parchment field-chart — a shared light parchment ground behind a vertical stack of
+**one panel per Leg**, each holding **one cell per concept**, ended by a summit strip that holds the
+**keystone**. The formation, Guardian rewards, activity capstones, trail capstone sockets, and
+Guardian art mechanically share the same warm parchment surface roles, so crystal art has exactly
+ONE light ground everywhere and needs no light/dark variant. The formation is a downstream
+presentation of existing learner facts only:
+structural state derives from the section/scope projection (`future`, `collecting`,
+`guardian_ready` with honest available/engaged/unavailable copy, `bound` only from the durable first
+`wonChallengeId`) and reads on the panel edge plus one junction badge straddling it (dashed muted →
+solid neutral → solid frontier with the Leg ward crystal → solid gold with the gold seal), always a
+shape distinction with text, never color alone. **The formation renders no graph edges at all**;
+prerequisite structure stays on trail and inspection surfaces.
 
-**One shared Leg scene** is the single visual boundary for a Leg's island, badge, and mound;
-capstone collection, Guardian reward, and Crystal Vista compose that scene in explicit modes rather
-than maintaining parallel drawings, and every reward moment frames the whole compact island.
-**Collection and binding are distinct event-bound rewards**: mastery raises only the newly earned
-specimen's fill into its shared slot (one mastery haptic), a first Guardian victory scales in the
-junction seal, sweeps the rim gold once, and lights the Leg's spine segment (one fusion haptic) or
-seats the summit keystone (one unlock haptic) without regrowing minerals, and a rematch receives
-only a restrained light sweep with endurance copy and no re-award haptic. Reward motion requires
-the route-local win transition observed by the mounted fight; direct loads, refreshes, and
-rerenders of an already-won challenge render the settled scene. The final keyed answer reveal
-always precedes the same-route reward stage, and a failed reward-preview refetch can never hide a
-committed victory, be classified as a rematch, or block continuing.
+Crystal species is a curated **eight-crystal library** of flat polygon silhouettes whose public
+identifiers are **art-independent role ids**, never appearance names, so a future art direction is a
+revision of the library's data module and nothing else. Five concept crystals map **one-to-one onto
+the five ADR-0024 intrinsic difficulty bands** (`band1`–`band5`) through the shared `difficultyBand`
+mapping, and three shapes are **earned-only and never a tier tint**: `keystone` (summit),
+`legWard` (Crystal Guardian), `summitWard` (Expedition Guardian). Both encoding channels run
+monotone — shape sharpens across the bands and hue walks cool→warm — with the true warm hues
+reserved for the earned trio. Species encodes exactly that one neutral fact; remaining per-concept
+variation is a tiny deterministic scale with no semantic meaning, and **no learner-specific signal
+(retries, correctness, time) ever reaches a specimen**.
+
+Each species authors ONE color 4-tuple plus per-facet ramp tones, and the four materials —
+`fogged`, `open`, `next`, `collected` — are **derived mechanically** from that single authored source
+with shared stone and per-material presentation constants, so there is no hand-maintained second
+representation of any crystal's appearance. Growth renders as the collected material **clipped below
+the growth cut over the open material**: the same geometry drawn twice at two material resolutions
+with one polygon clip, keeping the honest per-concept progress signal underneath the material
+ladder. Because saturation is the "earned" channel, it is **always paired with a non-color partner**
+(WCAG F73): state text, the rising fill height, the gloss that only collected carries, and the `Next`
+chip on the single next cell. **No `<ClipPath>`, `<Defs>`, gradient, pattern, or SVG id exists
+anywhere in the crystal library** — ids are document-global on web, so a per-instance clip would
+mis-render one concept shown at two growth values on two surfaces, and this constraint is also what
+buys identical web/Android rendering. Known-calibrated concepts stay labeled ghosts and are never
+counted as collected crystals; compact surfaces speak exact progress, counts, and status language
+instead of rendering detailed specimens below a readable size.
+
+Cell geometry is **two fixed sizes** — one charted cell and one compact locked cell — with row
+capacity derived from the panel's inner width, wrapped rows, and a centered last row; panel height
+grows with concept count. **Crystal size never varies by Leg**, so it can never misread as
+importance, and no specimen renders below the shared minimum. The layout owns every width-driven
+decision (panel width, row capacity, cell rects, crystal boxes, caption stacking) but allocates **no
+vertical band geometry**: caption and Guardian rows are text-sized, so they stack in flex flow and
+focus scrolling uses measured offsets, because a layout-allocated band cannot follow OS font scaling.
+
+**Every panel carries its own Guardian row.** A single global Guardian call to action would be
+dishonest because disjoint Legs are simultaneously available; the row and the trail's Guardian node
+share one state→copy mapping, so the two surfaces cannot disagree about a scope, and entering a
+Guardian from the cavern closes it only after a successful enter.
+
+**Collection and binding remain distinct event-bound rewards.** Mastery raises only the newly earned
+crystal's fill in its own cell (one mastery haptic); a first Guardian victory scales the gold seal
+into the junction badge and sweeps gold once along the **panel edge** (one fusion haptic); the summit
+seats the keystone in the summit strip (one unlock haptic); a rematch receives only restrained
+endurance copy with no re-award haptic. **Gold appears exclusively on earned rewards** — bright gold
+fills and sweeps carry the decorative reward effect, while `gold-ink` carries earned text, icons,
+outlines, and boundaries legibly on the light formation ground — and the `guardian_ready` ward badge
+must read as its own hue, not as gold, at real badge size. Reward motion requires the route-local win transition observed
+by the mounted fight; direct loads, refreshes, and rerenders of an already-won challenge render the
+settled scene. The final keyed answer reveal always precedes the same-route reward stage, and a
+failed reward-preview refetch can never hide a committed victory, be classified as a rematch, or
+block continuing.
+
+**The Guardian's body is one fixed Ward Obelisk.** Both duels render as a single symmetric obelisk
+standing in the cavern socket, divided into exactly `wardTotal` ordered segments — one per real
+lineup ward, anywhere from one to the five-Leg / seven-Expedition maxima, never a fixed count.
+Segments are indexed base to crown: resolved wards accumulate from the base as bare stone slots that
+never vanish, the lowest unresolved segment is the current ward carrying the scope species' full
+collected palette with its lit facet, a static gloss and a heavier boundary, and queued wards sit
+above it at the quieter open material. **Geometry is a function of the ward count alone**, so
+answering changes only a segment's material: the silhouette, its bounds and its seams never move,
+resize, reflow, or disappear mid-fight, and `unresolvedItemCount === 1` therefore makes the crown
+the Final Ward by construction. These segments are the **single visual encoding of ward count** —
+there is no separate ward arc — while the visible status line and the figure's one accessibility
+label remain the authoritative exact counts. Every state difference is carried by fill, facet,
+gloss, contour weight and ordered position before hue, and no ambient motion, filter, gradient,
+pattern, SVG id, `<Defs>` or `<ClipPath>` is introduced. The learner's three-segment shield below
+the body stays independent: a miss spends a shield and may shake the whole figure once, but never
+resolves or rearranges a ward. The body is built from **its scope's ward species** — `legWard`'s
+orange diamond and `summitWard`'s pink trident are carried as a normalized emblem cut into the
+crown, so the two duels stay shape-distinguishable without a ninth crystal species — and never from
+the anchor concept's band crystal: `RecallChallengeView` carries no intrinsic difficulty, and
+inventing a band for it would make a concept crystal encode noise as though it were the one fact
+bands stand for. The Guardian body is therefore **scope-derived, not anchor-seeded**, and carries no
+anchor identity. **The body is drawn only while a fight is in progress.** A committed victory routes
+straight to the Crystal Formation reward, which owns the whole victory beat, so the Guardian
+component has no victory state at all — its phase is the two in-fight states only. That structural
+absence, not a defensive branch, is what guarantees the corrective contract: no shatter, collapse, or
+defeat pose exists anywhere to render, and a second victory presentation on the Guardian would
+contradict the bound-formation reward that already owns it.
 
 **Crystal Vista opens only through explicit learner action** (including explicit reward-driven
 Explore intent, consumed on close). The one-time contextualization for a newly bound reward is a
-focused island settle plus spine light — never a second binding or growth replay — and the whole
+focused settle on that Leg's panel — never a second binding or growth replay — and the whole
 displayed bound snapshot is marked seen so stale animations cannot queue; local memory records only
 whether contextualization was viewed, while reward existence always derives from the server
-projection. Reduced motion renders every reward's final state immediately with equivalent copy and
-static emphasis. There is no ambient formation motion or audio.
+projection. Selecting a nameable crystal opens its memory detail in the app-owned bottom sheet over
+the still-open, still-scrollable Vista: revealed ground shows its existing gist and Examine action,
+guarded ground shows guarded copy without Examine, and unnamed locked ground stays inert. Backdrop,
+pan-down, Escape/system back, and close clear only this selection; Examine clears the selection
+before closing Vista and returning to the corresponding trail stop. The action footer keeps 16px
+content spacing in addition to the device bottom inset. Reduced motion renders every reward's final
+state immediately with equivalent copy and static emphasis. There is no ambient formation motion or
+audio.
 
 ## Trail map presentation
 
@@ -217,11 +290,10 @@ uncharted (fogged/locked) legs read as not-yet-charted parchment rather than pla
 with per-stop state still carried by shape **and** text (WCAG F73). A single bundled display font
 (IM Fell English via `expo-font`, exposed through the app-owned `Text` boundary) applies **only to
 map-surface headings** — cartouche titles, terminus, and the expedition title — while body and
-interaction text keep the current face. This is pure downstream presentation: it changes no API,
-projection, persisted shape, copy, or motion, keeps **gold exclusively on earned rewards**, and
-renders identically on web and Android (no SVG filters; grain via `<Pattern>`; literal color tokens,
-never `color-mix()` opacity modifiers the native styler drops). Trail structure and state semantics
-come unchanged from the Study Session projection (`buildTrailView`).
+interaction text keep the current face. The map is pure downstream presentation: it keeps **gold
+exclusively on earned rewards** and must render identically on web and Android (no SVG filters;
+grain via `<Pattern>`; literal color tokens, never `color-mix()` opacity modifiers the native styler
+drops). Trail structure and state semantics come unchanged from the Study Session projection.
 
 ## Context
 

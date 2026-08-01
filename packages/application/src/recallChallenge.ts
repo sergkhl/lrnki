@@ -14,6 +14,7 @@ import type {
 } from "@lrnki/ports";
 import { deriveFlooredExpedition } from "./expeditionSections";
 import { keyedCorrectIdFor, keyedMatchIdFor } from "./gradedSelectionOutcome";
+import { ENRICHMENT_LINEUP_MAX, SECTION_LINEUP_MAX } from "./recallLineupBudget";
 import { studyItemToView, type StudyItemView } from "./studySessionProjection";
 
 // The PURE half of the Recall Challenge deep module (plan 2026-07-13-003 U1; KTD1, KTD5, KTD6).
@@ -25,9 +26,9 @@ import { studyItemToView, type StudyItemView } from "./studySessionProjection";
 // `section|enrichment`, `active|recovery|won`); only the Learner App maps these to Guardian,
 // Leg/Expedition, and Last Stand language (ADR-0033).
 
-// R2 lineup maxima and the three-segment miss buffer (the crystal shield, client-side).
-export const SECTION_LINEUP_MAX = 5;
-export const ENRICHMENT_LINEUP_MAX = 7;
+// The three-segment miss buffer (the crystal shield, client-side). The R2 lineup maxima it
+// sits beside are the scope ward budget in `recallLineupBudget.ts`; the shield is the
+// learner's, not a lineup budget, so it stays here.
 export const RECALL_MISS_BUFFER = 3;
 
 // --- Selection (KTD5) -------------------------------------------------------
@@ -371,8 +372,8 @@ export type RecallChallengeDeps = {
 };
 
 // One scope's server-owned status: what the trail projection and the Guardian entry read.
-// `locked` applies only to the enrichment scope while a Leg formation is missing; a scope
-// with zero eligible items is honestly `unavailable` (never auto-won, never fabricated).
+// `locked` applies only to the enrichment scope while a winnable Leg's formation is missing; a
+// scope with zero eligible items is honestly `unavailable` (never auto-won, never fabricated).
 export type RecallScopeStatus = {
   scopeKind: RecallChallengeScopeKind;
   anchorDerivedNodeId: string;
@@ -391,12 +392,19 @@ export type RecallScopeStatus = {
 // loads through its ports and calls this; `getStudySession` reuses the rows it already loaded
 // and calls the same function, so the trail's Guardian facts cannot drift from the challenge
 // routes. Victory identity is FIRST-win-wins (KTD3): a duplicate won scope in the input never
-// re-keys the permanent formation. The enrichment scope stays `locked` until every Leg has a
-// formation — a zero-item Leg can never be won, so it honestly blocks the summit rather than
-// auto-fusing.
+// re-keys the permanent formation.
+//
+// The enrichment scope stays `locked` until every WINNABLE Leg has a formation (plan
+// 2026-07-31-003 KTD11). Winnable is `ExpeditionSection.hasStudyItems` — whether the scope can
+// ever produce a lineup — and section derivation already merges away any item-less Leg, so on a
+// real layer every Leg is winnable and the gate is the familiar "every Leg won". The exception
+// is a layer with NO Study Items at all, which no boundary edit can repair: there is no winnable
+// Leg, the summit is not locked behind an unsatisfiable precondition, and it falls through to
+// its own eligibility — honestly `unavailable` / `no_eligible_items`. Winnability is not the
+// full Guardian precondition: the Leg must also reach `complete`, which the trail owns.
 export function projectRecallScopeStatuses(input: {
   nodes: readonly { derivedNodeId: string; label: string }[];
-  sections: readonly { sectionIndex: number; milestoneDerivedNodeId: string }[];
+  sections: readonly { sectionIndex: number; milestoneDerivedNodeId: string; hasStudyItems: boolean }[];
   summit: { derivedNodeId: string } | null;
   eligible: readonly RecallEligibleItem[];
   challenges: readonly Pick<RecallChallenge, "challengeId" | "status" | "scopeKind" | "scopeAnchorDerivedNodeId">[];
@@ -450,9 +458,11 @@ export function projectRecallScopeStatuses(input: {
     const count = input.eligible.filter((item) => item.sectionIndex === section.sectionIndex).length;
     return statusFor("section", section.milestoneDerivedNodeId, section.sectionIndex, count, false);
   });
-  const everyLegWon = sectionStatuses.length > 0 && sectionStatuses.every((section) => Boolean(section.wonChallengeId));
+  // Ranges over winnable Legs only, so the gate can never be unsatisfiable: with no winnable Leg
+  // there is nothing to wait for and the summit is not locked.
+  const summitLocked = sectionStatuses.some((section, index) => input.sections[index].hasStudyItems && !section.wonChallengeId);
   const summitStatuses = input.summit
-    ? [statusFor("enrichment", input.summit.derivedNodeId, null, input.eligible.length, !everyLegWon)]
+    ? [statusFor("enrichment", input.summit.derivedNodeId, null, input.eligible.length, summitLocked)]
     : [];
   return [...sectionStatuses, ...summitStatuses];
 }

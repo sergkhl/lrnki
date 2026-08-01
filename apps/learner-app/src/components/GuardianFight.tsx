@@ -52,7 +52,13 @@ import {
 // The corrective reveal held on screen until the learner continues: the ANSWERED item with
 // its post-commit feedback (the view underneath has already advanced to the next ward).
 type Reveal =
-  | { kind: "selection"; item: StudyItemView; result: LearnerGradingResult; correct: boolean }
+  | {
+      kind: "selection";
+      item: StudyItemView;
+      presentedOrder: readonly string[];
+      result: LearnerGradingResult;
+      correct: boolean;
+    }
   | { kind: "matchingRound"; clean: boolean };
 
 // A failed network submission: retrying re-invokes the SAME closure (same attemptRef /
@@ -131,7 +137,10 @@ export function GuardianFight({
       .finally(() => setBusy(false));
   };
 
-  const handleAnswerResult = (result: ChallengeAnswerResult, answered: { item: StudyItemView } | null): RecallAnswerFeedback | null => {
+  const handleAnswerResult = (
+    result: ChallengeAnswerResult,
+    answered: { item: StudyItemView; presentedOrder: readonly string[] } | null
+  ): RecallAnswerFeedback | null => {
     if (!("answered" in result) || result.answered === false) {
       // The server refused (stale turn, inactive, not found): the challenge moved on without
       // us. `not_found`/inactive ends the fight; `out_of_turn` means a concurrent commit —
@@ -152,6 +161,7 @@ export function GuardianFight({
       setReveal({
         kind: "selection",
         item: answered.item,
+        presentedOrder: answered.presentedOrder,
         correct: feedback.correct,
         result: { kind: "selection", graded: true, chosenId: feedback.chosenId, keyedCorrectId: feedback.keyedCorrectId, correct: feedback.correct }
       });
@@ -159,7 +169,7 @@ export function GuardianFight({
     return feedback;
   };
 
-  const answerSelection = (item: StudyItemView, chosenId: string) => {
+  const answerSelection = (item: StudyItemView, chosenId: string, presentedOrder: readonly string[]) => {
     const attemptRef = clientUuid();
     const responseDurationMs = durationNow();
     submit(async () => {
@@ -170,7 +180,7 @@ export function GuardianFight({
         chosenId,
         responseDurationMs
       });
-      handleAnswerResult(result, { item });
+      handleAnswerResult(result, { item, presentedOrder });
     });
   };
 
@@ -370,7 +380,7 @@ function GuardianStage({ view, title }: Readonly<{ view: Extract<RecallChallenge
       </View>
       <AnimatedView animatedStyle={shakeStyle}>
         <CrystalGuardian
-          anchorDerivedNodeId={view.anchorDerivedNodeId}
+          scopeKind={view.scopeKind}
           phase={view.state}
           wardTotal={view.wardTotal}
           wardsRemaining={view.unresolvedItemCount}
@@ -420,9 +430,23 @@ function RevealPanel({
       </Card>
       {reveal.kind === "selection" ? (
         reveal.item.kind === "option_select" ? (
-          <OptionSelectBody item={reveal.item.item} selectedId={null} result={reveal.result} disabled onSelect={() => {}} />
+          <OptionSelectBody
+            item={reveal.item.item}
+            selectedId={null}
+            result={reveal.result}
+            disabled
+            presentedOrder={reveal.presentedOrder}
+            onSelect={() => {}}
+          />
         ) : reveal.item.kind === "impostor" ? (
-          <ImpostorBody item={reveal.item.item} selectedId={null} result={reveal.result} disabled onSelect={() => {}} />
+          <ImpostorBody
+            item={reveal.item.item}
+            selectedId={null}
+            result={reveal.result}
+            disabled
+            presentedOrder={reveal.presentedOrder}
+            onSelect={() => {}}
+          />
         ) : null
       ) : null}
       <Button variant="primary" onPress={onContinue} label={won ? learnerTerm("guardianSeeFormation") : learnerTerm("guardianContinue")} />
@@ -442,15 +466,31 @@ function CurrentWard({
   view: Extract<RecallChallengeView, { state: "active" | "recovery" }>;
   busy: boolean;
   boardEpoch: number;
-  onSelect: (item: StudyItemView, chosenId: string) => void;
+  onSelect: (item: StudyItemView, chosenId: string, presentedOrder: readonly string[]) => void;
   onPair: (item: StudyMatchingView, promptId: string, matchId: string) => Promise<RecallAnswerFeedback | null>;
 }>) {
   const current = view.currentItem;
   if (current.kind === "option_select") {
-    return <OptionSelectBody item={current.item} selectedId={null} result={null} disabled={busy} onSelect={(optionId) => onSelect(current, optionId)} />;
+    return (
+      <OptionSelectBody
+        item={current.item}
+        selectedId={null}
+        result={null}
+        disabled={busy}
+        onSelect={(optionId, presentedOrder) => onSelect(current, optionId, presentedOrder)}
+      />
+    );
   }
   if (current.kind === "impostor") {
-    return <ImpostorBody item={current.item} selectedId={null} result={null} disabled={busy} onSelect={(statementId) => onSelect(current, statementId)} />;
+    return (
+      <ImpostorBody
+        item={current.item}
+        selectedId={null}
+        result={null}
+        disabled={busy}
+        onSelect={(statementId, presentedOrder) => onSelect(current, statementId, presentedOrder)}
+      />
+    );
   }
   return (
     <GuardianMatchingBoard

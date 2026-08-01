@@ -1,4 +1,4 @@
-import type { ConceptLessonSectionView } from "@lrnki/application/projection";
+import type { ConceptLessonSectionView, RecallScopeStatus } from "@lrnki/application/projection";
 
 export const LEARNER_VOCABULARY = {
   routeName: "Expedition Journal",
@@ -49,7 +49,14 @@ export const LEARNER_VOCABULARY = {
   gems: "Crystals",
   gatedBy: "Clears after",
   vistaTitle: "Crystal formation",
-  vistaHint: "Follow the spine up through each leg’s island. Tap a named crystal to remember it.",
+  // The cavern replaced the ascent spine and its islands (plan 2026-07-30-001), so the hint
+  // names what the learner can actually see and do now.
+  vistaHint: "One panel per leg, one crystal per concept. Tap a named crystal to remember it.",
+  // The summit strip that closes the panel stack. The first two lines are the strings the
+  // deleted summit peak carried inline; the count mirrors the panel captions' exact numbers.
+  keystoneSeated: "Keystone seated",
+  keystoneAwaits: "Keystone awaits",
+  keystoneLegsSealedTemplate: "{sealed} of {total} legs sealed",
   vistaBoundTemplate: "Leg {n} settles into the Crystal Formation.",
   vistaKeystoneJoined: "The summit keystone locks into the Crystal Formation.",
   vistaGuardedTemplate: "Guarded by Leg {n}.",
@@ -153,7 +160,8 @@ export const LEARNER_VOCABULARY = {
   guardianRewardFirstLegTitle: "Leg bound!",
   guardianRewardFirstSummitTitle: "Keystone seated!",
   guardianRewardRematchTitle: "Formation holds strong",
-  guardianRewardFirstLegBody: "The geode seals and this leg joins the Expedition spine.",
+  // The cavern has no spine to join: a won Leg's own panel is what seals (plan 2026-07-30-001).
+  guardianRewardFirstLegBody: "The Guardian falls and this leg's panel seals with its gold seal.",
   guardianRewardFirstSummitBody: "The keystone locks into the summit. Your Crystal Formation is complete.",
   guardianRewardRematchBody: "You bested this Guardian again. Your permanent formation stays exactly as earned.",
   guardianRewardLoading: "Your victory is secure. Reading the formation…",
@@ -235,6 +243,36 @@ export function scaffoldPhaseCopy(phase: "preparing" | "building" | "checking" |
   if (phase === "building") return learnerTerm("supportPhaseBuilding");
   if (phase === "checking") return learnerTerm("supportPhaseChecking");
   return learnerTerm("supportPhasePreparing");
+}
+
+// One Guardian affordance presentation for every surface that offers entry (plan 2026-07-30-001
+// U4, KTD9): the parchment trail node and the cavern panel row differ only in styling, so the
+// state → copy/shape/inertness mapping is defined exactly once. State comes from the
+// server-projected scope; the client formats but never decides availability.
+export type GuardianScopePresentation = {
+  title: string;
+  subline: string;
+  // A shape name, so every surface reads state as shape plus text and never colour alone.
+  icon: "won" | "resume" | "face" | "locked" | "unavailable";
+  // Locked and unavailable are honest dead ends, not entry points.
+  disabled: boolean;
+};
+
+// What a Guardian of this scope is CALLED — one owner, so the visible title, the trail node and
+// the figure's accessible label can never disagree about which Guardian the learner is facing.
+export function guardianScopeTitle(scopeKind: RecallScopeStatus["scopeKind"]): string {
+  return scopeKind === "enrichment" ? learnerTerm("guardianSummitTitle") : learnerTerm("guardianTitle");
+}
+
+export function guardianScopeCopy(scope: Pick<RecallScopeStatus, "scopeKind" | "state">): GuardianScopePresentation {
+  const title = guardianScopeTitle(scope.scopeKind);
+  if (scope.state === "won") {
+    return { title, subline: `${learnerTerm("guardianNodeWon")} · ${learnerTerm("guardianRematch")}`, icon: "won", disabled: false };
+  }
+  if (scope.state === "active") return { title, subline: learnerTerm("guardianResume"), icon: "resume", disabled: false };
+  if (scope.state === "available") return { title, subline: learnerTerm("guardianFace"), icon: "face", disabled: false };
+  if (scope.state === "locked") return { title, subline: learnerTerm("guardianSummitLocked"), icon: "locked", disabled: true };
+  return { title, subline: learnerTerm("guardianUnavailable"), icon: "unavailable", disabled: true };
 }
 
 // Theme a Leg's structural state + Guardian substate into one announced line (R7/R31).

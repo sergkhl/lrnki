@@ -1,17 +1,32 @@
-# Lrnki Greenfield Scaffold
+# Lrnki
 
-A minimal scaffold for building a Learner-Neutral Core Concept Graph from curated source resources.
+Turns curated learning resources into a Learner-Neutral Core Concept Graph, derives prerequisite
+structure and study assets from it, and serves them to a learner app as a playable expedition.
 
-## Included
+## Documentation
 
-- `apps/admin-lab`: minimal Next.js graph exploration lab
-- `apps/kg-worker`: graph-builder worker entrypoint scaffold
+- [AGENTS.md](AGENTS.md) — engineering workflow and enforcement rules
+- [CONTEXT.md](CONTEXT.md) — project language and ambiguity resolution
+- [docs/adr/](docs/adr/README.md) — durable architectural decisions
+- [docs/plans/](docs/plans/README.md) — active plans, live TODO, and blockers
+
+## Workspace
+
+Apps:
+
+- `apps/kg-worker`: extraction, graph-version build, and enrichment CLI
+- `apps/learner-api`: typed learner HTTP API (Hono)
+- `apps/learner-app`: universal Expo learner app (web + Android)
+- `apps/admin-lab`: Next.js operator inspection surface
+
+Packages:
+
 - `packages/domain-core`: learner-neutral Concepts, Concept Evidence Profiles, and graph versions
 - `packages/ports`: explicit application boundaries
-- `packages/application`: concept-first graph-build orchestration skeleton
-- `packages/infrastructure-ingestion`: structured text and HTML parser adapters
-- `packages/infrastructure-litellm`: forced named tool-call gateway
-- `packages/infrastructure-postgres`: PostgreSQL schema and initial migration with JSONB artifacts and JSON_TABLE inspection view
+- `packages/application`: use-cases, projections, and orchestration
+- `packages/infrastructure-ingestion`: structured text, HTML, and Docling parser adapters
+- `packages/infrastructure-litellm`: forced named tool-call gateway and stage descriptors
+- `packages/infrastructure-postgres`: PostgreSQL schema, initial migration, and JSON_TABLE views
 - `packages/infrastructure-storage-local`: local curated-source object store adapter
 
 ## Commands
@@ -20,13 +35,17 @@ A minimal scaffold for building a Learner-Neutral Core Concept Graph from curate
 cp .env.example .env
 docker compose up -d postgres litellm
 pnpm install
+set -a; . ./.env; set +a   # the shell does not auto-load .env; DB commands need DATABASE_URL
 pnpm db:migrate
 pnpm dev:admin      # Admin Lab (Next.js)
 pnpm dev:api        # Learner API (tsx watch)
 pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
 
-The generated scaffold intentionally does not include a lockfile. Generate it with `pnpm install` in a network-enabled environment.
+`docker compose up -d --build` starts the complete deployed stack. Compose applies the canonical
+initial application migration after PostgreSQL becomes healthy and starts the learner API only
+after that migration and LiteLLM both succeed. Changing that migration means resetting the
+application database ([AGENTS.md](AGENTS.md) rules 8 and 9).
 
 Run the quality checks:
 
@@ -47,17 +66,16 @@ The real-backend web gate needs live Postgres with at least one ready catalog en
 selects one by capability, never generates, and cleans up its disposable learners on success or
 failure. See [apps/learner-app/e2e-realuse/README.md](apps/learner-app/e2e-realuse/README.md).
 
-The native gate drives a standalone e2e-profile APK on a booted Android emulator with Maestro; it
-holds automatic authority only for the sensitivity-proven Support Path dialog scenario (the Theory
-touch-responder class stays physically owned). Prerequisites and scope:
-[apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
+The native gate drives a standalone e2e-profile APK on a booted Android emulator with Maestro.
+What a green run does and does not prove is owned by
+[ADR-0038](docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md); prerequisites and
+setup are in [apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
 
 ## Deployment
 
-Target topology ([ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md)): the
-learner **web** build of the Expo universal app on GitHub Pages, the learner **API** as a Docker
-Compose service behind Caddy TLS on the VPS. Admin Lab and kg-worker stay host-run and
-SSH-tunnel-private ([ADR-0011](docs/adr/0011-retain-minimal-admin-lab.md)).
+Runbook for the topology decided in
+[ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md) and
+[ADR-0011](docs/adr/0011-retain-minimal-admin-lab.md).
 
 | Surface | URL | How it deploys |
 | --- | --- | --- |
@@ -68,11 +86,10 @@ Both hostnames are stable and hardcoded in the single file that consumes each (w
 `EXPO_PUBLIC_LEARNER_API_URL`, the `apps/learner-api/src/app.ts` CORS default,
 `scripts/docker/caddy/Caddyfile`).
 
-During testing there is one shared environment
-([ADR-0036](docs/adr/0036-run-single-shared-learner-environment-during-testing.md)): the Expo
-learner-app (`apps/learner-app`) defaults to `https://api.lrnki.globesoul.com`, so `pnpm --filter
-@lrnki/learner-app start` needs no configuration. Set `EXPO_PUBLIC_LEARNER_API_URL` (e.g.
-`http://localhost:8787`) only to point it at a local API instead.
+There is one shared learner environment during testing
+([ADR-0036](docs/adr/0036-run-single-shared-learner-environment-during-testing.md)), so
+`pnpm --filter @lrnki/learner-app start` needs no configuration. Set `EXPO_PUBLIC_LEARNER_API_URL`
+(e.g. `http://localhost:8787`) only to point the app at a local API instead.
 
 **API dev loop** — Caddy's first upstream is a host-run dev API with a container fallback
 (`lb_policy first` + `/health` checks in `scripts/docker/caddy/Caddyfile`). Start
@@ -87,8 +104,9 @@ VPS setup (ufw defaults to DROP, which silently times out the container→host h
 
 ```bash
 ufw allow in on br-lrnki to any port 8787 proto tcp comment 'lrnki learner-api dev loop: caddy -> host dev process'
-``` Both
-processes may run their topic-generation supervisors concurrently; the DB-claim fencing
+```
+
+Both processes may run their topic-generation supervisors concurrently; the DB-claim fencing
 ([ADR-0029](docs/adr/0029-persist-shared-operation-stage-timelines.md)) makes that safe. The
 Caddyfile is baked into the built caddy image (bind mounts break on this VPS — the daemon's FS
 view diverges from the checkout), so a Caddy config change needs
@@ -101,14 +119,11 @@ scripts/deploy-learner-api.sh   # git pull --ff-only → compose up -d --build l
 ```
 
 The `learner-api` container reads `DATABASE_URL` and `LITELLM_BASE_URL` from compose;
-`LITELLM_API_KEY` comes from the repo-root `.env`. Before the first API deploy, ensure the VPS
-database carries the single migration (`pnpm db:migrate` against the VPS `DATABASE_URL`);
-learner sessions persist in `learner_sessions` and survive restarts.
+`LITELLM_API_KEY` comes from the repo-root `.env`. Compose applies the single initial migration
+before starting the API; learner sessions persist in `learner_sessions` and survive restarts.
 
-**Web deploy** — automatic on push to `main`. The first run lands on `sergkhl.github.io/lrnki/`
-(looks broken with `base=/` — expected); attach `lrnki.globesoul.com` as the Pages custom domain
-in repo settings afterward and Pages 301s the default URL to it. Once the custom-domain cert has
-provisioned, enable **Enforce HTTPS** in Pages settings so plain-HTTP requests 301 to HTTPS.
+**Web deploy** — automatic on push to `main`. `lrnki.globesoul.com` is attached as the Pages custom
+domain, so the default `sergkhl.github.io/lrnki/` URL 301s to it, and **Enforce HTTPS** is on.
 
 **Mobile builds (Android)** — `.github/workflows/build-learner-android.yml`
 (`workflow_dispatch`) runs `scripts/build-learner-android.sh` on a GitHub runner (`eas build
@@ -138,6 +153,6 @@ pnpm dev:ios        # needs macOS + Xcode
 
 EAS iOS builds (distributable artifacts) — future work.
 
-## Scope
+## Out of scope
 
-This scaffold intentionally excludes learner-state persistence, assessment-bank generation, course planning, learner-facing UI, OCR, multimodal interpretation, and automatic ontology import.
+Course planning, OCR, multimodal interpretation, and automatic ontology import.

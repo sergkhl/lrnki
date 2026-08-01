@@ -124,10 +124,9 @@ export {
 } from "./knowledgeBoundaryProbe";
 
 export { appendGradedMatchingOutcome, appendGradedScaffoldOutcome, appendGradedSelectionOutcome, keyedCorrectIdFor, keyedMatchIdFor, type MatchingAttemptTrace } from "./gradedSelectionOutcome";
+export { ENRICHMENT_LINEUP_MAX, SECTION_LINEUP_MAX } from "./recallLineupBudget";
 export {
-  ENRICHMENT_LINEUP_MAX,
   RECALL_MISS_BUFFER,
-  SECTION_LINEUP_MAX,
   currentTurnItemId,
   foldRecallChallenge,
   latestCorrectStudyItemIds,

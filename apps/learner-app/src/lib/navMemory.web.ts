@@ -26,19 +26,20 @@ export async function writeBoardSeen(learnerRef: string, seen: BoardSeen): Promi
 const GUARDIAN_ARRIVAL_KEY_PREFIX = "lrnki_guardian_arrival_";
 
 // Guardian arrival acknowledgement (plan 2026-07-13-003 U6, KTD3): whether this device has
-// already offered the arrival dialog for a scope, keyed by its durable anchor node. Losing
-// it re-offers the dialog at worst; the formation itself is server-owned.
-export async function readGuardianArrivalSeen(learnerRef: string, scopeAnchorId: string): Promise<boolean> {
+// already offered the arrival dialog for a scope, keyed by that scope's identity — build it with
+// `recallScopeKey`, never from the anchor alone. Losing it re-offers the dialog at worst; the
+// formation itself is server-owned.
+export async function readGuardianArrivalSeen(learnerRef: string, scopeKey: string): Promise<boolean> {
   try {
-    return window.localStorage.getItem(GUARDIAN_ARRIVAL_KEY_PREFIX + learnerRef + "_" + scopeAnchorId) === "1";
+    return window.localStorage.getItem(GUARDIAN_ARRIVAL_KEY_PREFIX + learnerRef + "_" + scopeKey) === "1";
   } catch {
     return true;
   }
 }
 
-export async function markGuardianArrivalSeen(learnerRef: string, scopeAnchorId: string): Promise<void> {
+export async function markGuardianArrivalSeen(learnerRef: string, scopeKey: string): Promise<void> {
   try {
-    window.localStorage.setItem(GUARDIAN_ARRIVAL_KEY_PREFIX + learnerRef + "_" + scopeAnchorId, "1");
+    window.localStorage.setItem(GUARDIAN_ARRIVAL_KEY_PREFIX + learnerRef + "_" + scopeKey, "1");
   } catch {
     // Non-fatal: the arrival offer may re-fire.
   }

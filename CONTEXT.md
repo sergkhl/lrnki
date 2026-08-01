@@ -155,7 +155,7 @@ _Avoid_: minted prerequisite, `source_mentioned`, published concept
 The per-concept gate for source-less synthesis that classifies a concept as `core_knowledge`
 (synthesize) or `boundary` (an `uncertain` disposition, retained and inspectable but held out of
 trusted learner surfaces). Probe mechanism and rationale are owned by
-[ADR-0030](docs/adr/0030-confidence-gated-synthesis-with-web-grounding.md).
+[ADR-0030](docs/adr/0030-confidence-gated-synthesis.md).
 _Avoid_: verbalized confidence, lexical overlap, new judge
 
 **Study Session**:
@@ -176,7 +176,12 @@ A milestone-anchored contiguous stretch of the Expedition Trail. A section ancho
 concept (no dependents on the trusted contracted edge set) and claims all its not-yet-claimed
 trusted ancestors, so every prerequisite lands in the earliest section needing it. Sections are
 ordered easiest-first (ascending mean difficulty); their concatenation is a topological order of the
-whole floored layer. Sections are derived during generation, never persisted.
+whole floored layer. Sections are then a **boundary partition** over that fixed order: derivation
+splits a section at its sub-terminal milestones when it holds more Study-Item-carrying concepts than
+a Leg Guardian has wards, and merges a section carrying no Study Item into its neighbour, the later
+milestone winning. Both edits only insert or delete a boundary — the concatenated stop order, the
+summit, and trail membership are identical before and after — so a Leg is always winnable and always
+ends on a recognizable milestone. Sections are derived during generation, never persisted.
 _Avoid_: quest, goal cone, chapter, persisted section
 
 **Expedition Journal**:
@@ -222,14 +227,16 @@ five-per-Leg / seven-per-Expedition maxima; a scope with no eligible item is una
 auto-rewarded. Grading is server-owned and shares the Study Item response semantics but its evidence
 is written only to the challenge's own durable tables: challenge answers never enter the neutral
 acquisition `response_log`, Concept Mastery, learning points, or prerequisite gating (a miss cannot
-unmaster, a recovery cannot master). The Expedition (summit) scope stays locked until every Leg is
-won. The first victory is the sole, permanent reward for a scope (a Leg **crystal formation**, or the
+unmaster, a recovery cannot master). The Expedition (summit) scope stays locked until every
+**winnable** Leg is won — winnable meaning the Leg carries at least one current Study Item, so its
+scope can ever produce a lineup. With no winnable Leg the summit is unavailable rather than locked,
+so the gate is never an unsatisfiable precondition. The first victory is the sole, permanent reward for a scope (a Leg **crystal formation**, or the
 summit **keystone** binding the formations); rematches rotate coverage but never dim, revoke,
 duplicate, or re-award it. Its learner-facing presentation is the **Crystal Guardian** (Leg) and
 **Expedition Guardian** (summit) duel — wards, a recoverable crystal shield, and Last Stand — a
 corrective, never punitive metaphor rendered through the Learner App vocabulary
-([ADR-0033](docs/adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md)); its game-UX and
-reward-isolation policy is owned by
+([ADR-0033](docs/adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md)); why this mechanic
+is admissible game UX rather than a parallel objective is owned by
 [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Support Steps
 and other non-neutral evidence are excluded from lineups.
 _Avoid_: Crystal Duel, retrieval sprint over all items, weakness-first selection, correctness timer,

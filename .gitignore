@@ -19,7 +19,7 @@ test-results/
 .DS_Store
 next-env.d.ts
 
-# Curated text fixtures are version-controlled (AGENTS rule 9). Large binary
+# Curated text fixtures are version-controlled (AGENTS rule 10). Large binary
 # formats (Gate 2 Docling sources) stay out of git; they are re-downloadable.
 fixtures/pdf/
 fixtures/docx/

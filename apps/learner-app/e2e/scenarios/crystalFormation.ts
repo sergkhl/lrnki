@@ -110,8 +110,8 @@ export function formationExpedition(phase: "collecting" | "collected") {
       isMilestone: Boolean(concept.isMilestone)
     })),
     sections: [
-      { sectionIndex: 0, milestoneDerivedNodeId: "c2", milestoneLabel: "First Ridge", stepDerivedNodeIds: ["c1", "ck", "c2"], meanDifficulty: 0.25 },
-      { sectionIndex: 1, milestoneDerivedNodeId: "c4", milestoneLabel: "Summit Ridge", stepDerivedNodeIds: ["c3", "c4"], meanDifficulty: 0.45 }
+      { sectionIndex: 0, milestoneDerivedNodeId: "c2", milestoneLabel: "First Ridge", stepDerivedNodeIds: ["c1", "ck", "c2"], meanDifficulty: 0.25, hasStudyItems: true },
+      { sectionIndex: 1, milestoneDerivedNodeId: "c4", milestoneLabel: "Summit Ridge", stepDerivedNodeIds: ["c3", "c4"], meanDifficulty: 0.45, hasStudyItems: true }
     ],
     coexistence: [],
     restorations: [],
@@ -233,10 +233,10 @@ export function formationVistaExpedition(
         isMilestone: Boolean(concept.isMilestone)
       })),
       sections: [
-        { sectionIndex: 0, milestoneDerivedNodeId: "v0m", milestoneLabel: "Bound Ridge", stepDerivedNodeIds: ["v0a", "v0k", "v0m"], meanDifficulty: 0.2 },
-        { sectionIndex: 1, milestoneDerivedNodeId: "v1m", milestoneLabel: "Ready Ridge", stepDerivedNodeIds: ["v1a", "v1m"], meanDifficulty: 0.35 },
-        { sectionIndex: 2, milestoneDerivedNodeId: "v2m", milestoneLabel: "Growing Ridge", stepDerivedNodeIds: ["v2a", "v2m"], meanDifficulty: 0.5 },
-        { sectionIndex: 3, milestoneDerivedNodeId: "v3m", milestoneLabel: "Summit Ridge", stepDerivedNodeIds: ["v3a", "v3m"], meanDifficulty: 0.7 }
+        { sectionIndex: 0, milestoneDerivedNodeId: "v0m", milestoneLabel: "Bound Ridge", stepDerivedNodeIds: ["v0a", "v0k", "v0m"], meanDifficulty: 0.2, hasStudyItems: true },
+        { sectionIndex: 1, milestoneDerivedNodeId: "v1m", milestoneLabel: "Ready Ridge", stepDerivedNodeIds: ["v1a", "v1m"], meanDifficulty: 0.35, hasStudyItems: true },
+        { sectionIndex: 2, milestoneDerivedNodeId: "v2m", milestoneLabel: "Growing Ridge", stepDerivedNodeIds: ["v2a", "v2m"], meanDifficulty: 0.5, hasStudyItems: true },
+        { sectionIndex: 3, milestoneDerivedNodeId: "v3m", milestoneLabel: "Summit Ridge", stepDerivedNodeIds: ["v3a", "v3m"], meanDifficulty: 0.7, hasStudyItems: true }
       ],
       verdictByNode: { v0k: "known" },
       latestOutcomeByStudyItemId: {},
@@ -265,35 +265,62 @@ export function formationVistaExpedition(
 
 export const GUARDIAN_LEG_ANCHOR = "v1m";
 export const GUARDIAN_SUMMIT_ANCHOR = "v3m";
+export const GUARDIAN_CORRECT_OPTION = "guardian-correct";
+export const GUARDIAN_WRONG_OPTION = "guardian-wrong";
+
+// A real lineup carries one to five Leg wards or one to seven Expedition wards behind the
+// three-segment shield (`SECTION_LINEUP_MAX` / `ENRICHMENT_LINEUP_MAX` / `RECALL_MISS_BUFFER`
+// in `packages/application/src/recallChallenge.ts`). The one-ward, one-shield DEFAULT below is
+// the smallest view the reward-handoff scenarios need — a fixture minimum, never a game rule
+// (plan 2026-07-31-002 KTD2).
+export type GuardianWards = Readonly<{
+  state: "active" | "recovery";
+  wardTotal: number;
+  unresolvedItemCount: number;
+  remainingMissBuffer: number;
+  missBufferTotal: number;
+  // Which lineup ward is in front of the learner. A miss rotates the real queue head behind the
+  // other unresolved wards, so the current ITEM can differ from the resolved count while the
+  // obelisk's current SEGMENT — a positional slot — stays exactly where it was (KTD8).
+  currentWardIndex: number;
+}>;
 
 export function guardianChallenge(
   challengeId: string,
-  scopeKind: "section" | "enrichment" = "section"
+  scopeKind: "section" | "enrichment" = "section",
+  wards: Partial<GuardianWards> = {}
 ) {
+  const anchorDerivedNodeId = scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR;
+  const wardTotal = wards.wardTotal ?? 1;
+  const unresolvedItemCount = wards.unresolvedItemCount ?? wardTotal;
+  const missBufferTotal = wards.missBufferTotal ?? 1;
+  const currentWardIndex = wards.currentWardIndex ?? wardTotal - unresolvedItemCount;
   return {
-    state: "active" as const,
+    state: wards.state ?? ("active" as const),
     challengeId,
     enrichmentId: FORMATION_ENRICHMENT_ID,
     scopeKind,
-    anchorDerivedNodeId: scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR,
-    wardTotal: 1,
-    unresolvedItemCount: 1,
-    resolvedItemCount: 0,
-    remainingMissBuffer: 1,
-    missBufferTotal: 1,
+    anchorDerivedNodeId,
+    wardTotal,
+    unresolvedItemCount,
+    resolvedItemCount: wardTotal - unresolvedItemCount,
+    remainingMissBuffer: wards.remainingMissBuffer ?? missBufferTotal,
+    missBufferTotal,
     retreated: false,
     matchingProgress: null,
     currentItem: {
       kind: "option_select" as const,
       item: {
-        studyItemId: "guardian-final-item",
-        derivedNodeId: scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR,
-        question: "Which marker completes the route?",
+        // Ward identity is the LINEUP item, not the obelisk slot: naming it here is what makes
+        // a queue rotation visible to a scenario.
+        studyItemId: `guardian-ward-${currentWardIndex}`,
+        derivedNodeId: anchorDerivedNodeId,
+        question: `Which marker completes ward ${currentWardIndex + 1}?`,
         explanation: "The keyed marker completes the route and preserves the learned relationship.",
         groundingProvenance: "generated" as const,
         options: [
-          { optionId: "guardian-correct", text: "The keyed route marker", provenance: "generated" as const },
-          { optionId: "guardian-wrong", text: "An unrelated marker", provenance: "generated" as const }
+          { optionId: GUARDIAN_CORRECT_OPTION, text: "The keyed route marker", provenance: "generated" as const },
+          { optionId: GUARDIAN_WRONG_OPTION, text: "An unrelated marker", provenance: "generated" as const }
         ],
         explorableTerms: []
       }
@@ -301,14 +328,70 @@ export function guardianChallenge(
   };
 }
 
-export function guardianWonChallenge(challengeId: string, scopeKind: "section" | "enrichment" = "section") {
+export function guardianWonChallenge(
+  challengeId: string,
+  scopeKind: "section" | "enrichment" = "section",
+  wardTotal = 1
+) {
   return {
     state: "won" as const,
     challengeId,
     enrichmentId: FORMATION_ENRICHMENT_ID,
     scopeKind,
     anchorDerivedNodeId: scopeKind === "enrichment" ? GUARDIAN_SUMMIT_ANCHOR : GUARDIAN_LEG_ANCHOR,
-    wardTotal: 1
+    wardTotal
+  };
+}
+
+// A whole multi-ward fight held as fixture state, so a scenario can PLAY a Guardian instead of
+// replaying canned views: the read serves the current view and every answer commits and returns
+// the next one, exactly as `/challenge/answer` does.
+//
+// It projects views only. The authoritative combat fold lives in
+// `packages/application/src/recallChallenge.ts` and is not duplicated here — this models the
+// three view-visible rules the obelisk gate depends on: a correct answer resolves the head ward,
+// a miss spends one shield segment and rotates the head behind the remaining wards, and the
+// correct answer that leaves Last Stand restores exactly one segment.
+export function guardianFight({
+  challengeId,
+  scopeKind = "section",
+  wardTotal,
+  missBufferTotal = 3
+}: Readonly<{ challengeId: string; scopeKind?: "section" | "enrichment"; wardTotal: number; missBufferTotal?: number }>) {
+  let queue = Array.from({ length: wardTotal }, (_, index) => index);
+  let shield = missBufferTotal;
+
+  const view = () =>
+    queue.length === 0
+      ? guardianWonChallenge(challengeId, scopeKind, wardTotal)
+      : guardianChallenge(challengeId, scopeKind, {
+          state: shield === 0 ? "recovery" : "active",
+          wardTotal,
+          unresolvedItemCount: queue.length,
+          remainingMissBuffer: shield,
+          missBufferTotal,
+          currentWardIndex: queue[0]
+        });
+
+  return {
+    view,
+    answer(postData: unknown) {
+      const chosenId = String((postData as { chosenId?: string }).chosenId);
+      const correct = chosenId === GUARDIAN_CORRECT_OPTION;
+      if (correct) {
+        queue = queue.slice(1);
+        if (shield === 0) shield = 1;
+      } else {
+        shield = Math.max(0, shield - 1);
+        if (queue.length > 1) queue = [...queue.slice(1), queue[0]];
+      }
+      return {
+        answered: true,
+        replayed: false,
+        feedback: { kind: "selection" as const, correct, chosenId, keyedCorrectId: GUARDIAN_CORRECT_OPTION },
+        view: view()
+      };
+    }
   };
 }
 
@@ -374,8 +457,8 @@ export function guardianAnswerReply(challengeId: string, scopeKind: "section" | 
     feedback: {
       kind: "selection" as const,
       correct: true,
-      chosenId: "guardian-correct",
-      keyedCorrectId: "guardian-correct"
+      chosenId: GUARDIAN_CORRECT_OPTION,
+      keyedCorrectId: GUARDIAN_CORRECT_OPTION
     },
     view: guardianWonChallenge(challengeId, scopeKind)
   };

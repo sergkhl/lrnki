@@ -139,6 +139,16 @@ function graded(derivedNodeId: string, outcome: ResponseLogRow["judgedOutcome"],
   };
 }
 
+// `hasStudyItem` is a fact about the layer, and section derivation now reads it — a Leg with no
+// current Study Item is merged into its neighbour (plan 2026-07-31-003 KTD6). So every fixture
+// derives the flag from the items it actually supplies: a node flagged item-less while an item
+// for it is passed alongside describes a layer that cannot exist in production, and a fixture
+// that cannot exist in production is not evidence.
+function withStudyItemFlags(base: DerivedGraphDetail, studyItems: StudyItem[]): DerivedGraphDetail {
+  const itemful = new Set(studyItems.map((item) => item.derivedNodeId));
+  return { ...base, nodes: base.nodes.map((node) => ({ ...node, hasStudyItem: itemful.has(node.derivedNodeId) })) };
+}
+
 function compose(args: { detail?: DerivedGraphDetail; studyItems?: StudyItem[]; rows?: ResponseLogRow[]; verdicts?: CalibrationVerdict[]; lessons?: ConceptLesson[]; lessonReads?: string[]; lessonAbsent?: LessonAbsentNode[]; detours?: ScaffoldDetour[]; referenceActivities?: ScaffoldReferenceActivity[]; recallScopes?: RecallScopeStatus[] } = {}) {
   const referenceActivities = args.referenceActivities ?? (args.detours ?? []).flatMap((detour) => detour.steps.flatMap((step): ScaffoldReferenceActivity[] => {
     if (step.kind !== "reference") return [];
@@ -153,7 +163,7 @@ function compose(args: { detail?: DerivedGraphDetail; studyItems?: StudyItem[]; 
   return composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    detail: args.detail ?? detail(),
+    detail: withStudyItemFlags(args.detail ?? detail(), args.studyItems ?? []),
     studyItems: args.studyItems ?? [],
     rows: args.rows ?? [],
     verdicts: args.verdicts ?? [],
@@ -235,7 +245,11 @@ test("composeStudySession treats a learn verdict as cleared calibration, not kno
 });
 
 test("composeStudySession rides down a layer-wide sectioned expedition path with the derived summit", () => {
-  const session = compose({ verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }] });
+  // Both milestones carry a Study Item, so both Legs are winnable and neither is merged away.
+  const session = compose({
+    studyItems: [optionItem("move"), optionItem("borrow")],
+    verdicts: [{ learnerStateRef: "L1", derivedNodeId: "scope", verdict: "known" }]
+  });
   // The whole floored layer is the trail: move's cone (scope, ownership, move) then borrow's
   // singleton section. Every non-floored node appears exactly once.
   assert.deepEqual(session.expeditionPath.map((step) => step.derivedNodeId).sort(), ["borrow", "move", "ownership", "scope"]);
@@ -464,7 +478,7 @@ test("composeStudySession renders over an anchor-less synthetic layer, gating by
   const session = composeStudySession({
     enrichmentId: "e",
     learnerStateRef: "L1",
-    detail: syntheticDetail(),
+    detail: withStudyItemFlags(syntheticDetail(), [optionItem("scope")]),
     studyItems: [optionItem("scope")],
     rows: [],
     verdicts: []

@@ -4,7 +4,9 @@ import { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "reac
 import { BookOpen, Lock, MapPin, Rows3, Search } from "lucide-react-native";
 import { CrystalSpecimen } from "./CrystalSpecimen";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
-import type { TrailCluster, TrailStop } from "@lrnki/application/projection";
+import { crystalForBand, type CrystalMaterial } from "@/learn/crystalLibrary";
+import { MIN_SPECIMEN_PX } from "@/learn/mineralSpecimen";
+import { difficultyBand, type TrailCluster, type TrailStop } from "@lrnki/application/projection";
 import { AnimatedView, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
 
 const CIRCLE_ICONS: Record<Exclude<CheckpointIcon, "crystal">, typeof Lock> = {
@@ -29,15 +31,22 @@ export function CheckpointCircle({
   // Ink-ring-on-parchment (plan 2026-07-18-001 KTD6/KTD7): the next stop keeps its
   // frontier guidance ring, complete keeps the gem fill language, available reads as a
   // drawn ink ring, and locked adopts the uncharted parchment treatment.
-  const box = stop.isNext
-    ? "border-frontier bg-card"
-    : stop.state === "complete"
-      ? stop.kind === "capstone"
-        ? "border-gem bg-gem-soft"
-        : "border-gem bg-gem"
-      : stop.state === "available"
-        ? "border-map-ink bg-card"
-        : "border-map-ink-soft bg-map-parchment-deep opacity-75";
+  // The capstone is the ONE stop that shows a crystal, and every crystal uses the shared warm
+  // ground (plan 2026-07-30-001 KTD2): its circle is a deeper parchment socket, so the
+  // library needs no second ground variant. Every other stop keeps the shipped
+  // ink-on-parchment language exactly.
+  const socket = stop.kind === "capstone";
+  const box = socket
+    ? stop.isNext
+      ? "border-frontier bg-cavern-rock"
+      : `border-cavern-edge bg-cavern-rock${stop.state === "locked" ? " opacity-75" : ""}`
+    : stop.isNext
+      ? "border-frontier bg-card"
+      : stop.state === "complete"
+        ? "border-gem bg-gem"
+        : stop.state === "available"
+          ? "border-map-ink bg-card"
+          : "border-map-ink-soft bg-map-parchment-deep opacity-75";
   return (
     <View className="w-24 items-center gap-2">
       {/* The fixed halo layer marks the guided next stop (its one-shot emphasis lives in
@@ -95,23 +104,38 @@ function NextStopHalo({ stopId }: Readonly<{ stopId: string }>) {
 
 function iconForStop(stop: TrailStop, concept: TrailCluster, icon: CheckpointIcon) {
   if (icon === "crystal") {
-    // The capstone is the concept's own mineral specimen (U1, R12/R14), mid-growth until
-    // the completion rule masters the node — 40 px is the smallest readable specimen.
-    const isGhost = concept.isKnownSkipped && stop.state === "complete";
+    // The capstone is the concept's own band crystal from the shared library, mid-growth
+    // until the completion rule masters the node — MIN_SPECIMEN_PX is the smallest readable
+    // size. Known ground stays fogged stone, so a skip never reads as a collected crystal.
+    const fogged = concept.isKnownSkipped && stop.state === "complete";
+    const material: CrystalMaterial = fogged
+      ? "fogged"
+      : stop.state === "complete"
+        ? "collected"
+        : stop.isNext
+          ? "next"
+          : "open";
     return (
       <CrystalSpecimen
+        species={crystalForBand(difficultyBand(concept.difficulty))}
         derivedNodeId={concept.derivedNodeId}
-        difficulty={concept.difficulty}
+        material={material}
         growthFraction={concept.growthFraction}
-        state={isGhost ? "ghost" : stop.state === "complete" ? "collected" : "growing"}
-        size={40}
+        size={MIN_SPECIMEN_PX}
       />
     );
   }
   const solidComplete = stop.state === "complete" && stop.kind !== "capstone";
-  // Locked sits on the light uncharted wash now, so its lock draws in faded ink
-  // (>=3:1 on map-parchment-deep) instead of the light-on-dark fog treatment.
-  const color = solidComplete ? colors["on-accent"] : stop.state === "locked" ? colors["map-ink-soft"] : colors.ink;
+  // A locked capstone keeps the deeper socket, so its lock draws in formation ink; every other
+  // stop keeps the shipped parchment treatment (faded ink on the uncharted wash).
+  const color =
+    stop.kind === "capstone"
+      ? colors["cavern-ink"]
+      : solidComplete
+        ? colors["on-accent"]
+        : stop.state === "locked"
+          ? colors["map-ink-soft"]
+          : colors.ink;
   const Icon = CIRCLE_ICONS[icon];
   return <Icon size={22} color={color} />;
 }

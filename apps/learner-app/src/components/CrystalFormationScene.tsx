@@ -1,161 +1,187 @@
 import { useEffect } from "react";
-import { View } from "react-native";
-import Svg, { Polygon, Polyline, Rect } from "react-native-svg";
+import { View, type LayoutChangeEvent } from "react-native";
 import { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import type { RecallScopeStatus } from "@lrnki/application/projection";
 import {
-  isNameableMineral,
+  GROUND_PAD,
+  PIECE_BORDER,
   type CrystalFormationLayout,
-  type FormationTerminus,
-  type PlacedLeg,
+  type LegPanelModel,
+  type SummitStrip,
   type VistaFocus,
   type VistaRewardKey
 } from "@/learn/crystalFormationLayout";
-import { AnimatedView, MOTION, PressableSurface, Text, colors, useReducedMotion } from "@/ui";
+import { AnimatedView, MOTION, Text, colors, radius, useReducedMotion } from "@/ui";
 import { formationProgressLine } from "@/learn/mineralSpecimen";
 import { legStateCopy, learnerTerm } from "@/learn/vocabulary";
+import { CrystalSpecimen } from "./CrystalSpecimen";
 import { LegFormationScene } from "./LegFormationScene";
 
-// The quiet geode ascent (plan 2026-07-16-002 U3, D5/D6): ONE smooth spine curve drawn
-// behind the islands, header bands exactly where the layout allocated them (they can
-// never overlap artwork), and the summit peak with its keystone slot. The layout packs
-// to the real available width, so everything renders at scale 1 — no fitting, no
-// horizontal overflow.
+// The formation (plan 2026-07-30-001 U4, KTD6): a warm parchment ground behind Leg panels in
+// canonical order, each under its own caption row, closed by the summit strip. The layout packs
+// every panel to the real available width, so everything renders at scale 1 — no spine, no
+// islands, no peak, no fitting, no crop, and no horizontal overflow.
+//
+// The vertical stack is flex flow, not layout-allocated geometry: caption and Guardian bands are
+// text-sized and must follow the reader's font scale. Panel scroll offsets come from each
+// wrapper's own `onLayout`, which is why the deleted header-mask hack has no successor.
 export function CrystalFormationScene({
   layout,
   focus,
   contextualizingRewardKey,
-  cropToFocus = false,
   selectedNodeId,
-  onSelectNode
+  onSelectNode,
+  onEnterGuardian,
+  onPanelOffset
 }: Readonly<{
   layout: CrystalFormationLayout;
   focus: VistaFocus | null;
   contextualizingRewardKey: VistaRewardKey | null;
-  cropToFocus?: boolean;
   selectedNodeId: string | null;
   onSelectNode: (derivedNodeId: string) => void;
+  onEnterGuardian?: (scope: RecallScopeStatus) => Promise<void>;
+  // Reported once per panel layout pass so the host can scroll to a focused Leg without the
+  // layout inventing a text-sized band it cannot measure.
+  onPanelOffset?: (key: VistaRewardKey, y: number) => void;
 }>) {
-  const summitNeighbor = layout.legs.at(-1) ?? null;
-  const croppedHeight = cropToFocus && focus?.kind === "summit" && summitNeighbor
-    ? Math.min(layout.height, summitNeighbor.frame.y + summitNeighbor.height)
-    : layout.height;
-
-  const scene = (
-    <View style={{ width: layout.width, height: layout.height }}>
-      {/* The one nonsemantic spine, behind every island (D5): thin, muted, gold only on
-          a bound Leg's own segment. */}
-      <Svg
-        pointerEvents="none"
-        width={layout.width}
-        height={layout.height}
-        viewBox={`0 0 ${layout.width} ${layout.height}`}
-        style={{ position: "absolute", left: 0, top: 0 }}
-      >
-        {layout.spine.map((segment) => (
-          <Polyline
-            key={`${segment.fromSectionIndex}:${segment.toSectionIndex ?? "summit"}`}
-            testID="formation-spine-segment"
-            points={points(segment.points)}
-            fill="none"
-            stroke={segment.lit ? colors.gold : colors["trail-muted"]}
-            strokeWidth={2.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={segment.lit ? 0.95 : 0.6}
-          />
-        ))}
-        {/* The spine is one continuous underlying curve, but reserved text bands are
-            opaque reading surfaces. SVG document order paints these masks after the
-            curve, preventing decorative geometry from crossing header copy. */}
-        {layout.legs.map((leg) => (
-          <Rect
-            key={`header-mask:${leg.sectionIndex}`}
-            testID="formation-header-mask"
-            x={leg.header.x}
-            y={leg.header.y}
-            width={leg.header.width}
-            height={leg.header.height}
-            fill={colors.background}
-          />
-        ))}
-      </Svg>
-
-      {layout.legs.map((leg) => {
-        const rewardKey = `leg:${leg.sectionIndex}` as const;
-        const focused = focus?.kind === "leg" && focus.sectionIndex === leg.sectionIndex;
+  return (
+    <View
+      testID="cavern-ground"
+      style={{
+        width: layout.width,
+        gap: 14,
+        padding: GROUND_PAD,
+        borderRadius: radius.overlay,
+        backgroundColor: colors.cavern
+      }}
+    >
+      {layout.panels.map((panel) => {
+        const rewardKey: VistaRewardKey = `leg:${panel.sectionIndex}`;
         return (
           <FormationPiece
             key={rewardKey}
-            focused={focused}
-            testID={focused ? `formation-focus-leg-${leg.sectionIndex}` : undefined}
+            focused={focus?.kind === "leg" && focus.sectionIndex === panel.sectionIndex}
+            testID={focus?.kind === "leg" && focus.sectionIndex === panel.sectionIndex ? `formation-focus-leg-${panel.sectionIndex}` : undefined}
             contextualizing={contextualizingRewardKey === rewardKey}
-            style={{ left: leg.frame.x, top: leg.frame.y, width: leg.width, height: leg.height }}
+            onLayout={onPanelOffset ? (event: LayoutChangeEvent) => onPanelOffset(rewardKey, event.nativeEvent.layout.y) : undefined}
           >
-            <LegFormationScene leg={leg} mode="overview" />
-            <MineralTargets leg={leg} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+            <PanelCaption panel={panel} />
+            <LegFormationScene
+              panel={panel}
+              mode="overview"
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              onEnterGuardian={onEnterGuardian}
+            />
           </FormationPiece>
         );
       })}
 
-      {/* Header bands come straight from the layout (D-headers): by construction they
-          are disjoint from every island frame and from one another. */}
-      {layout.legs.map((leg) => (
-        <View
-          key={`header:${leg.sectionIndex}`}
-          pointerEvents="none"
-          className="absolute justify-end"
-          style={{ left: leg.header.x, top: leg.header.y, width: leg.header.width, height: leg.header.height }}
-        >
-          <Text variant="caption" className="text-center font-semibold" numberOfLines={1}>
-            {learnerTerm("section")} {leg.sectionIndex + 1} · {legStateCopy(leg.structuralState, leg.guardianSubstate)}
-          </Text>
-          <Text variant="caption" color="muted" className="text-center" numberOfLines={1}>
-            {formationProgressLine(leg.progress)}
-          </Text>
-        </View>
-      ))}
-
-      {layout.terminus ? (
+      {layout.summit ? (
         <FormationPiece
           focused={focus?.kind === "summit"}
           testID={focus?.kind === "summit" ? "formation-focus-summit" : undefined}
           contextualizing={contextualizingRewardKey === "summit"}
-          style={{
-            left: layout.terminus.frame.x,
-            top: layout.terminus.frame.y,
-            width: layout.terminus.width,
-            height: layout.terminus.height
-          }}
+          onLayout={onPanelOffset ? (event: LayoutChangeEvent) => onPanelOffset("summit", event.nativeEvent.layout.y) : undefined}
         >
-          <TerminusScene terminus={layout.terminus} />
+          <FormationSummitStrip summit={layout.summit} width={layout.panelWidth} />
         </FormationPiece>
       ) : null}
     </View>
   );
-
-  return croppedHeight < layout.height ? (
-    <View
-      testID="formation-focused-viewport"
-      className="overflow-hidden"
-      style={{ width: layout.width, height: croppedHeight }}
-    >
-      {scene}
-    </View>
-  ) : scene;
 }
 
+// The caption row (KTD6): Leg number + honest state on the left, exact progress on the right.
+// Progress is never a bare colour — the numbers are the signal.
+function PanelCaption({ panel }: Readonly<{ panel: LegPanelModel }>) {
+  const bound = panel.structuralState === "bound";
+  return (
+    <View
+      className={
+        panel.captionStacked
+          ? "gap-0.5 px-1 pb-1"
+          : "flex-row items-end justify-between gap-2 px-1 pb-1"
+      }
+    >
+      <Text variant="caption" color="cavern-ink" numberOfLines={1} className="shrink font-semibold">
+        {learnerTerm("section")} {panel.sectionIndex + 1} · {legStateCopy(panel.structuralState, panel.guardianSubstate)}
+      </Text>
+      {/* A bound Leg's counts use earned gold ink; every other Leg stays formation ink. */}
+      <Text
+        variant="caption"
+        color="cavern-ink"
+        numberOfLines={1}
+        className={bound ? "text-[10px] font-medium" : "text-[10px] font-medium opacity-70"}
+        style={bound ? { color: colors["gold-ink"] } : undefined}
+      >
+        {formationProgressLine(panel.progress)}
+      </Text>
+    </View>
+  );
+}
+
+// The summit strip: the keystone crystal plus its honest state line. Fogged stone until the
+// Expedition Guardian falls — the keystone is earned, never previewed as gold. Exported because
+// the Guardian reward shows this exact strip when the summit is what was won.
+export function FormationSummitStrip({ summit, width }: Readonly<{ summit: SummitStrip; width: number }>) {
+  const state = summit.keystoneSeated ? learnerTerm("keystoneSeated") : learnerTerm("keystoneAwaits");
+  const body = summit.keystoneSeated ? learnerTerm("vistaKeystoneJoined") : learnerTerm("guardianSummitLocked");
+  const sealed = learnerTerm("keystoneLegsSealedTemplate")
+    .replace("{sealed}", String(summit.sealedLegCount))
+    .replace("{total}", String(summit.legCount));
+  return (
+    <View
+      testID={`cavern-summit-${summit.keystoneSeated ? "seated" : "awaiting"}`}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`${learnerTerm("summitPrefix")} — ${state}. ${body} ${sealed}.`}
+      style={{
+        width,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        padding: 10,
+        borderRadius: 18,
+        borderWidth: 1.5,
+        borderStyle: summit.keystoneSeated ? "solid" : "dashed",
+        borderColor: summit.keystoneSeated ? colors["gold-ink"] : colors["cavern-edge"],
+        backgroundColor: colors["cavern-panel"]
+      }}
+    >
+      <CrystalSpecimen
+        species="keystone"
+        derivedNodeId="summit-keystone"
+        material={summit.keystoneSeated ? "collected" : "fogged"}
+        growthFraction={summit.keystoneSeated ? 1 : 0}
+        size={summit.crystalSize}
+        ariaLabel={null}
+      />
+      <View className="min-w-0 shrink">
+        <Text variant="caption" color="cavern-ink" numberOfLines={1} className="font-semibold">
+          {learnerTerm("summitPrefix")} · {state}
+        </Text>
+        <Text variant="caption" color="cavern-ink" numberOfLines={2} className="text-[10px] opacity-70">
+          {body} {sealed}.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// One stack member. The one-time contextualization is a keyed fade-and-rise onto the settled
+// scene; reduced motion renders it settled immediately.
 function FormationPiece({
   children,
   contextualizing,
   focused,
   testID,
-  style
+  onLayout
 }: Readonly<{
   children: React.ReactNode;
   contextualizing: boolean;
   focused: boolean;
   testID?: string;
-  style: { left: number; top: number; width: number; height: number };
+  onLayout?: (event: LayoutChangeEvent) => void;
 }>) {
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(contextualizing && !reduceMotion ? 0 : 1);
@@ -169,89 +195,17 @@ function FormationPiece({
   return (
     <AnimatedView
       testID={testID}
-      className={focused ? "absolute rounded-card border-2 border-frontier" : "absolute rounded-card"}
-      style={style}
+      onLayout={onLayout}
       animatedStyle={animatedStyle}
+      // The focus ring is always present and only changes colour, so focusing a Leg can never
+      // reflow the stack (and the layout's panel width stays exact).
+      style={{
+        borderRadius: radius.overlay,
+        borderWidth: PIECE_BORDER,
+        borderColor: focused ? colors.frontier : "transparent"
+      }}
     >
       {children}
     </AnimatedView>
   );
-}
-
-function MineralTargets({
-  leg,
-  selectedNodeId,
-  onSelectNode
-}: Readonly<{
-  leg: PlacedLeg;
-  selectedNodeId: string | null;
-  onSelectNode: (derivedNodeId: string) => void;
-}>) {
-  return leg.slots.filter(isNameableMineral).map((slot) => {
-    const size = Math.max(44, slot.size);
-    return (
-      <PressableSurface
-        key={`target-${slot.derivedNodeId}`}
-        accessibilityLabel={slot.label}
-        selected={selectedNodeId === slot.derivedNodeId}
-        onPress={() => onSelectNode(slot.derivedNodeId)}
-        className="absolute items-center justify-center rounded-control"
-        style={{ left: slot.x - size / 2, top: slot.y - size / 2, width: size, height: size }}
-      >
-        <View />
-      </PressableSurface>
-    );
-  });
-}
-
-// The summit peak (D6): a small distinct mountain silhouette whose apex holds the
-// keystone slot — a dashed empty diamond until the Expedition Guardian falls, a gold
-// faceted keystone after. Gold appears only on the earned reward.
-function TerminusScene({ terminus }: Readonly<{ terminus: FormationTerminus }>) {
-  const label = terminus.keystoneSeated ? "Summit peak — Keystone seated." : "Summit peak — Keystone awaits.";
-  const { x, y } = terminus.keystone;
-  return (
-    <Svg
-      accessibilityRole="image"
-      accessibilityLabel={label}
-      width={terminus.width}
-      height={terminus.height}
-      viewBox={`0 0 ${terminus.width} ${terminus.height}`}
-    >
-      <Polygon
-        points={points(terminus.peak)}
-        fill={colors["muted-panel"]}
-        stroke={colors["line-strong"]}
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
-      {terminus.keystoneSeated ? (
-        <>
-          <Polygon
-            testID="formation-summit-keystone"
-            points={`${x},${y - 14} ${x + 11},${y} ${x},${y + 14} ${x - 11},${y}`}
-            fill={colors.gold}
-            stroke={colors["line-strong"]}
-            strokeWidth={1.5}
-          />
-          {/* Two facet strokes keep the keystone faceted, not a flat diamond. */}
-          <Polyline points={`${x - 11},${y} ${x},${y - 4} ${x + 11},${y}`} fill="none" stroke={colors["on-accent"]} strokeWidth={1.2} opacity={0.8} />
-          <Polyline points={`${x},${y - 4} ${x},${y + 14}`} fill="none" stroke={colors["on-accent"]} strokeWidth={1.2} opacity={0.6} />
-        </>
-      ) : (
-        <Polygon
-          testID="formation-summit-keystone-empty"
-          points={`${x},${y - 14} ${x + 11},${y} ${x},${y + 14} ${x - 11},${y}`}
-          fill="none"
-          stroke={colors.trail}
-          strokeWidth={2}
-          strokeDasharray="4 4"
-        />
-      )}
-    </Svg>
-  );
-}
-
-function points(value: readonly { x: number; y: number }[]): string {
-  return value.map((point) => `${point.x},${point.y}`).join(" ");
 }

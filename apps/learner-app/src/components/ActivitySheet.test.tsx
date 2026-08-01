@@ -78,7 +78,7 @@ test("a directly opened mastered capstone renders the settled shared Leg scene w
   );
   // The capstone card is a focused crop of the SHARED Leg scene (U3, R16) — settled:
   // the collected specimen is static, nothing enters, and no mastery haptic fires.
-  expect(screen.getAllByTestId("leg-slot-collected").length).toBeGreaterThan(0);
+  expect(screen.getAllByTestId("cavern-cell-collected").length).toBeGreaterThan(0);
   expect(screen.queryAllByTestId("leg-slot-entering")).toHaveLength(0);
   expect(screen.getByText("This crystal now sits in its leg's formation.")).toBeTruthy();
   const haptics = jest.requireMock("expo-haptics") as { notificationAsync: jest.Mock; impactAsync: jest.Mock; selectionAsync: jest.Mock };
@@ -98,7 +98,7 @@ test("a known-skipped capstone stays a ghost scene and never assembles a mineral
       <PortalHost />
     </SafeAreaProvider>
   );
-  expect(screen.getAllByTestId("leg-slot-known").length).toBeGreaterThan(0);
+  expect(screen.getAllByTestId("cavern-cell-known").length).toBeGreaterThan(0);
   expect(screen.queryAllByTestId("leg-slot-entering")).toHaveLength(0);
   expect(screen.getByText("Known ground is complete, but no crystal is collected.")).toBeTruthy();
 });

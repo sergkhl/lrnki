@@ -2,15 +2,21 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { answerGuardianSelection, applyGuardianLifecycle, guardianView } from "./guardianFixture";
 
 // Deterministic loopback fixture server for the native Maestro gate (plan 2026-07-15-001 U5, R15-R16).
 // It serves REAL learner-api response SHAPES — captured once from the supervisor-free API over a
 // genuine production enrichment ("Vesicular transport", Cell Biology: a 12-lesson expedition with a
 // long Theory activity and available Explorable Terms) and frozen under `scenario/`. The purpose of
-// the native gate is Android layout, touch scrolling, and Support Path dialog reachability, so the
-// upstream data is deterministic here while the APK and UI are real; the separate real-use WEB suite
-// owns live backend integration. This binds to host loopback ONLY; the Android emulator reaches it
-// through the `10.0.2.2` host alias. It is never pointed at production or the real-use database.
+// the native gate is Android layout, touch scrolling, Support Path dialog reachability, and Crystal
+// Guardian obelisk rendering, so the upstream data is deterministic here while the APK and UI are
+// real; the separate real-use WEB suite owns live backend integration. This binds to host loopback
+// ONLY; the Android emulator reaches it through the `10.0.2.2` host alias. It is never pointed at
+// production or the real-use database.
+//
+// Session reads replay those frozen captures. The Guardian challenge is the one stateful surface,
+// because the ward states this gate exists to look at are only reachable by answering — and its
+// combat rules come from the production fold, not from this file (see `guardianFixture.ts`).
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scenario = (name: string): unknown => JSON.parse(readFileSync(join(here, "scenario", `${name}.json`), "utf8"));
@@ -75,8 +81,40 @@ const server = createServer(async (req, res) => {
   // The long-Theory session is served for any expedition id the flow opens (the fixture models one).
   if (method === "GET" && pathname.startsWith("/expedition/")) return send(res, 200, EXPEDITION);
 
-  // Non-graded writes the flow may issue while traversing Theory. Deterministic acks; the fixture
-  // holds no mutable state, so a re-read returns the same session.
+  // --- Crystal Guardian (ADR-0038 / Ward Obelisk plan U4). The ONLY stateful part of this
+  // fixture: a five-ward Leg challenge whose combat state is folded by the production pure
+  // functions, so the native gate can reach entry, partial, miss, Last Stand, and Final Ward on a
+  // real APK. See `guardianFixture.ts`. ------------------------------------------------------
+  if (method === "GET" && pathname.startsWith("/challenge/")) {
+    const view = guardianView(pathname.slice("/challenge/".length));
+    if (view) return send(res, 200, { view });
+  }
+
+  if (method === "POST" && pathname === "/challenge/answer") {
+    const body = (await readBody(req)) as
+      | { challengeId?: string; attemptRef?: string; studyItemId?: string; chosenId?: string; responseDurationMs?: number }
+      | undefined;
+    if (!body?.challengeId || !body.attemptRef || !body.studyItemId || !body.chosenId) return send(res, 400, { error: "bad_request" });
+    const result = answerGuardianSelection({
+      challengeId: body.challengeId,
+      attemptRef: body.attemptRef,
+      studyItemId: body.studyItemId,
+      chosenId: body.chosenId,
+      responseDurationMs: body.responseDurationMs ?? null
+    });
+    return send(res, result.answered ? 200 : 409, result);
+  }
+
+  if (method === "POST" && (pathname === "/challenge/retreat" || pathname === "/challenge/resume" || pathname === "/challenge/abandon")) {
+    const body = (await readBody(req)) as { challengeId?: string; operationRef?: string } | undefined;
+    if (!body?.challengeId || !body.operationRef) return send(res, 400, { error: "bad_request" });
+    const kind = pathname.slice("/challenge/".length) as "retreat" | "resume" | "abandon";
+    const result = applyGuardianLifecycle({ kind, challengeId: body.challengeId, operationRef: body.operationRef });
+    return send(res, result.applied ? 200 : 404, result);
+  }
+
+  // Non-graded writes the flow may issue while traversing Theory. Deterministic acks; these leave
+  // the frozen session untouched, so a re-read returns the same session.
   if (method === "POST" && (pathname === "/study/lesson-read" || pathname === "/expedition/choose" || pathname === "/expedition/activate")) {
     await readBody(req);
     return send(res, 200, { ok: true });

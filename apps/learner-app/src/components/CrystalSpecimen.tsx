@@ -1,174 +1,202 @@
-import Svg, { G, Polygon } from "react-native-svg";
+import Svg, { G, Polygon, Polyline } from "react-native-svg";
 import {
-  MINERAL_GROUND_Y,
-  MINERAL_VIEWBOX,
-  clipPolygonBelow,
-  growthCutY,
-  mineralSpeciesFor,
-  mineralSpecimenSpec,
-  mineralVariationFor,
-  type MineralPoint,
-  type MineralSpecies,
-  type MineralSpeciesSpec
-} from "@/learn/mineralSpecimen";
-import { colors } from "@/ui";
+  CRYSTAL_VIEWBOX,
+  GLOSS_FILL,
+  GLOSS_OPACITY,
+  RIM_OPACITY,
+  crystalSpec,
+  crystalVariationFor,
+  facetFill,
+  materialFor,
+  rimStroke,
+  type CrystalMaterial,
+  type CrystalPalette,
+  type CrystalSpec,
+  type CrystalSpecies
+} from "@/learn/crystalLibrary";
+import { MINERAL_GROUND_Y, clipPolygonBelow, growthCutY, type MineralPoint } from "@/learn/mineralSpecimen";
 
-export type SpecimenState = "ghost" | "growing" | "collected";
+// One crystal from the eight-crystal library (plan 2026-07-30-001 U2, KTD7). Rendering only —
+// species roles, materials, and the growth clip live in `@/learn/crystalLibrary`;
+// event-bound motion belongs to the scenes.
+//
+// Growth is TWO PASSES over ONE geometry: the slot's own material fills the whole silhouette,
+// then the full-colour `collected` material is drawn over the region below the growth cut.
+// The honest per-concept progress signal therefore survives the material ladder, and because
+// the cut is a pure-code half-plane clip there is no <ClipPath>, <Defs>, gradient, or SVG id
+// anywhere — ids are document-global on web, so the same concept can render at two growth
+// values on two surfaces at once.
+//
+// The occlusion contour is the species' own sunk contour at a geometry-scaled width, so a
+// crystal reads as a lit solid rather than an outlined sticker at every size.
+const CONTOUR_WIDTH = 3;
+const RIM_WIDTH = 2.5;
 
-// One specimen-wide stroke policy (plan 2026-07-16-003 U3, D4): a constant 2 px outline
-// matching the lucide icon weight on every state, immune to size props, mound-slot
-// scale, and cosmetic variation via non-scaling stroke.
-const SPECIMEN_STROKE = 2;
-const NON_SCALING = { vectorEffect: "non-scaling-stroke" } as const;
-
-// One mineral specimen (plan 2026-07-16-002 U1, D1): renders the curated species
-// geometry at readable sizes (>= 40 px). Rendering only — species mapping, silhouettes,
-// and the growth clip live in `@/learn/mineralSpecimen`; event-bound motion belongs to
-// the scenes. A ghost stays an outlined slot in every state: it never fills, so known
-// ground never reads as a collected crystal.
 export function CrystalSpecimen({
+  species,
   derivedNodeId,
-  difficulty,
+  material,
   growthFraction,
-  state,
   size = 40,
   ariaLabel
 }: Readonly<{
+  species: CrystalSpecies;
   derivedNodeId: string;
-  difficulty: number | null;
+  material: CrystalMaterial;
   growthFraction: number;
-  state: SpecimenState;
   size?: number;
-  ariaLabel?: string;
+  // `null` marks the crystal decorative: the surface around it (a cavern cell, the summit strip,
+  // the junction badge) already carries the accessible name, so announcing both would double up.
+  ariaLabel?: string | null;
 }>) {
   return (
     <Svg
-      accessibilityRole="image"
-      accessibilityLabel={ariaLabel ?? defaultLabel(state)}
-      viewBox={MINERAL_VIEWBOX}
+      accessible={ariaLabel === null ? false : undefined}
+      accessibilityRole={ariaLabel === null ? undefined : "image"}
+      accessibilityLabel={ariaLabel === null ? undefined : ariaLabel ?? defaultLabel(material)}
+      viewBox={CRYSTAL_VIEWBOX}
       width={size}
       height={size}
     >
-      <MineralSpecimenGroup
-        species={mineralSpeciesFor(difficulty)}
+      <CrystalSpecimenGroup
+        species={species}
         derivedNodeId={derivedNodeId}
+        material={material}
         growthFraction={growthFraction}
-        state={state}
       />
     </Svg>
   );
 }
 
-// The specimen as an embeddable <G> (no own <Svg> root), so a Leg scene can place many
-// specimens inside ONE canvas — react-native-svg does not nest Svg roots. The tiny
-// deterministic mirror/scale variation applies here about the bedrock pivot, so the
-// growth cut line stays horizontal under it.
-export function MineralSpecimenGroup({
+// The crystal as an embeddable <G> (no own <Svg> root), so one scene can place many crystals
+// inside ONE canvas — react-native-svg does not nest Svg roots. The deterministic scale
+// variation applies here about the bedrock pivot, so the growth cut stays horizontal under
+// it; it never mirrors, because the light source is fixed upper-left.
+export function CrystalSpecimenGroup({
   species,
   derivedNodeId,
-  growthFraction,
-  state
+  material,
+  growthFraction
 }: Readonly<{
-  species: MineralSpecies;
+  species: CrystalSpecies;
   derivedNodeId: string;
+  material: CrystalMaterial;
   growthFraction: number;
-  state: SpecimenState;
 }>) {
-  const spec = mineralSpecimenSpec(species);
-  const variation = mineralVariationFor(derivedNodeId);
-  const sx = variation.mirrored ? -variation.scale : variation.scale;
-  const transform = `translate(50, ${MINERAL_GROUND_Y}) scale(${sx}, ${variation.scale}) translate(-50, -${MINERAL_GROUND_Y})`;
-  const tint = tintFor(species);
+  const spec = crystalSpec(species);
+  const { scale } = crystalVariationFor(derivedNodeId);
+  const transform = `translate(50, ${MINERAL_GROUND_Y}) scale(${scale}) translate(-50, -${MINERAL_GROUND_Y})`;
 
-  if (state === "ghost") {
-    return (
-      <G transform={transform}>
-        <Polygon
-          testID="specimen-ghost"
-          points={toPoints(spec.silhouette)}
-          fill="transparent"
-          stroke={tint}
-          strokeWidth={SPECIMEN_STROKE}
-          {...NON_SCALING}
-          strokeLinejoin="round"
-          opacity={0.55}
-        />
-      </G>
-    );
-  }
+  // A fogged slot sits in unopened ground: it shows silhouette and nothing else, so a Leg the
+  // learner has not reached can never display progress it has not made.
+  const grown = material === "fogged" ? 0 : material === "collected" ? 1 : clamp01(growthFraction);
+  const slotMaterial = material === "collected" ? "open" : material;
+  const slot = materialFor(species, slotMaterial);
+  const collected = materialFor(species, "collected");
+  // Only a fully grown crystal takes the earned white edge and the full-colour contour.
+  const capped = grown >= 1;
+  const edge = capped ? collected : slot;
+  const edgeMaterial: CrystalMaterial = capped ? "collected" : slotMaterial;
 
-  if (state === "collected") {
-    return (
-      <G transform={transform}>
-        <FilledBody spec={spec} tint={tint} cutY={growthCutY(spec, 1)} />
-        <Polygon testID="specimen-gloss" points={toPoints(spec.gloss)} fill="white" opacity={spec.glossOpacity} />
-      </G>
-    );
-  }
-
-  // Growing: the eventual form teases as a faint outline while the tinted fill rises
-  // from the bedrock to the honest growth cut — one visual variable (D1).
   return (
     <G transform={transform}>
+      <CrystalPass testID="specimen-body" spec={spec} palette={slot} material={slotMaterial} cutY={null} />
+      {grown > 0 ? (
+        <CrystalPass
+          testID="specimen-fill"
+          spec={spec}
+          palette={collected}
+          material="collected"
+          cutY={growthCutY(spec, grown)}
+        />
+      ) : null}
       <Polygon
-        testID="specimen-outline"
+        testID="specimen-contour"
         points={toPoints(spec.silhouette)}
-        fill="transparent"
-        stroke={tint}
-        strokeWidth={SPECIMEN_STROKE}
-        {...NON_SCALING}
+        fill="none"
+        stroke={edge.contour}
+        strokeWidth={CONTOUR_WIDTH}
         strokeLinejoin="round"
-        opacity={0.7}
       />
-      <FilledBody spec={spec} tint={tint} cutY={growthCutY(spec, growthFraction)} />
+      <Polyline
+        testID="specimen-rim"
+        points={toPoints(spec.rimLight)}
+        fill="none"
+        stroke={rimStroke(edge, edgeMaterial)}
+        strokeWidth={RIM_WIDTH}
+        strokeOpacity={RIM_OPACITY[edgeMaterial]}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </G>
   );
 }
 
-// The silhouette fill plus its facet planes, clipped below the growth cut. Facets shade
-// with white/ink overlays so the planes read on any tier tint.
-function FilledBody({ spec, tint, cutY }: Readonly<{ spec: MineralSpeciesSpec; tint: string; cutY: number }>) {
-  const body = clipPolygonBelow(spec.silhouette, cutY);
+// One material resolution of the geometry: body, facet planes, and gloss. `cutY === null`
+// draws the whole shape; otherwise only the region on or below the cut survives. Every fill
+// is a literal hex off the material's own ramp, so a material swap re-derives all of them.
+function CrystalPass({
+  testID,
+  spec,
+  palette,
+  material,
+  cutY
+}: Readonly<{
+  testID: string;
+  spec: CrystalSpec;
+  palette: CrystalPalette;
+  material: CrystalMaterial;
+  cutY: number | null;
+}>) {
+  const body = cutY === null ? [...spec.silhouette] : clipPolygonBelow(spec.silhouette, cutY);
   // A degenerate region (fewer than 3 points, or a flat ground-line sliver at growth 0)
   // renders nothing rather than a zero-area polygon.
   if (body.length < 3 || body.every(([, y]) => y === body[0][1])) return null;
+  const glossOpacity = GLOSS_OPACITY[material];
   return (
     <G>
-      <Polygon
-        testID="specimen-fill"
-        points={toPoints(body)}
-        fill={tint}
-        stroke={colors.ink}
-        strokeOpacity={0.25}
-        strokeWidth={SPECIMEN_STROKE}
-        {...NON_SCALING}
-        strokeLinejoin="round"
-      />
+      <Polygon testID={testID} points={toPoints(body)} fill={palette.base} />
       {spec.facets.map((facet, index) => {
-        const clipped = clipPolygonBelow(facet.points, cutY);
+        const clipped = cutY === null ? [...facet.points] : clipPolygonBelow(facet.points, cutY);
         if (clipped.length < 3) return null;
         return (
           <Polygon
             key={index}
-            testID="specimen-facet"
+            testID={`${testID}-facet`}
             points={toPoints(clipped)}
-            fill={facet.shade > 0 ? "white" : colors.ink}
-            opacity={Math.abs(facet.shade)}
+            fill={facetFill(palette, facet.tone, material)}
           />
         );
       })}
+      {glossOpacity > 0
+        ? spec.gloss.map((polygon, index) => {
+            const clipped = cutY === null ? [...polygon] : clipPolygonBelow(polygon, cutY);
+            if (clipped.length < 3) return null;
+            return (
+              <Polygon
+                key={index}
+                testID={`${testID}-gloss`}
+                points={toPoints(clipped)}
+                fill={GLOSS_FILL}
+                fillOpacity={glossOpacity}
+              />
+            );
+          })
+        : null}
     </G>
   );
 }
 
-export function tintFor(species: MineralSpecies): string {
-  return colors[`mineral-${species}`];
+// Copy is unchanged from the shipped specimen (R11): materials are a presentation ladder, not
+// new learner vocabulary.
+function defaultLabel(material: CrystalMaterial): string {
+  if (material === "collected") return "Collected crystal";
+  if (material === "fogged") return "Ghost slot";
+  return "Growing crystal";
 }
 
-function defaultLabel(state: SpecimenState): string {
-  if (state === "collected") return "Collected crystal";
-  if (state === "ghost") return "Ghost slot";
-  return "Growing crystal";
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 function toPoints(points: readonly MineralPoint[]): string {

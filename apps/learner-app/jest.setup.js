@@ -91,9 +91,13 @@ jest.mock("@expo/ui/community/bottom-sheet", () => {
       present: jest.fn(),
       dismiss: () => onClose?.()
     }));
-    return React.createElement(View, { testID: "bottom-sheet", accessibilityViewIsModal: true, ...propsForFake(rest) }, children);
+    return React.createElement(
+      View,
+      { testID: "bottom-sheet", accessibilityViewIsModal: true, onClose, ...propsForFake(rest) },
+      children
+    );
   };
   const propsForFake = ({ enablePanDownToClose }) => ({ accessibilityHint: enablePanDownToClose ? "pan-enabled" : "pan-disabled" });
-  const BottomSheetView = ({ children }) => React.createElement(View, null, children);
+  const BottomSheetView = ({ children, ...props }) => React.createElement(View, props, children);
   return { __esModule: true, default: BottomSheet, BottomSheetView };
 });

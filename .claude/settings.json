@@ -10,14 +10,14 @@
     ],
     "defaultMode": "bypassPermissions"
   },
+  "enabledPlugins": {
+    "compound-engineering@compound-engineering-plugin": true,
+    "codex@openai-codex": true
+  },
+  "outputStyle": "Explanatory",
   "sandbox": {
     "enabled": false
   },
-  "enabledPlugins": {
-    "compound-engineering@compound-engineering-plugin": true,
-    "last30days@last30days-skill": false
-  },
-  "outputStyle": "Explanatory",
   "prefersReducedMotion": true,
   "skipDangerousModePermissionPrompt": true,
   "permissionMode": "bypassPermissions",

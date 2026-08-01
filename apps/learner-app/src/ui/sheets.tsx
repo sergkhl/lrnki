@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Portal } from "@rn-primitives/portal";
 import BottomSheetPrimitive, { BottomSheetView, type BottomSheetMethods } from "@expo/ui/community/bottom-sheet";
 import type { OverlayProps } from "./overlays";
+import { BottomSheetBackdrop } from "./sheetBackdrop";
 import { colors } from "./tokens";
 
 /** Controlled bottom sheet: pan-down, backdrop, system back, and Escape all close it —
@@ -44,7 +45,7 @@ export function BottomSheet({ open, onOpenChange, dismissBlocked = false, childr
       }}
     >
       <BottomSheetView>
-        <View style={{ paddingBottom: insets.bottom }}>{children}</View>
+        <View testID="bottom-sheet-safe-area" style={{ paddingBottom: insets.bottom }}>{children}</View>
       </BottomSheetView>
     </BottomSheetPrimitive>
   );
@@ -56,7 +57,15 @@ export function BottomSheet({ open, onOpenChange, dismissBlocked = false, childr
   // surface without any consumer z-index change (KTD7, R11-R12). Native keeps Expo's in-place
   // system modal sheet and its gesture/safe-area/keyboard semantics untouched (R13).
   if (Platform.OS === "web") {
-    return <Portal name={portalName}>{sheet}</Portal>;
+    return (
+      <>
+        <BottomSheetBackdrop
+          dismissBlocked={dismissBlocked}
+          onDismiss={() => sheetRef.current?.close()}
+        />
+        <Portal name={portalName}>{sheet}</Portal>
+      </>
+    );
   }
   return sheet;
 }

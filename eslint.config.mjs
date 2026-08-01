@@ -19,7 +19,11 @@ const eslintConfig = [
       ".data/**",
       ".cache/**",
       ".local/**",
+      // `.gitignore`'s `tmp/` matches any depth, so generated artifacts legitimately land in
+      // `apps/*/tmp/` too (rule 10) — the Playwright HTML report among them. Both forms are
+      // needed here, exactly as for `dist` above.
       "tmp/**",
+      "**/tmp/**",
       "**/.tsbuildinfo",
       "pnpm-lock.yaml"
     ]
@@ -60,6 +64,19 @@ const eslintConfig = [
         "error",
         {
           paths: [
+            {
+              name: "@expo/ui/community/bottom-sheet",
+              message: "Import BottomSheet from @/ui so dismissal, safe-area, and layer behavior stay app-owned."
+            },
+            {
+              // Safe-area framing is a property of the surface that owns a device edge, not of
+              // its callers: delegating it is how the Crystal Formation header ended up under
+              // the status bar while its two sibling full-screen surfaces hand-rolled the inset.
+              // `SafeAreaProvider` stays importable — the root layout must still mount it.
+              name: "react-native-safe-area-context",
+              importNames: ["useSafeAreaInsets", "useSafeArea", "SafeAreaView", "SafeAreaInsetsContext"],
+              message: "Safe-area insets are owned by the @/ui surfaces (Screen, FullScreenDialog, SideSheet, BottomSheet). Do not hand-roll them on a consumer."
+            },
             {
               name: "react-native",
               importNames: [

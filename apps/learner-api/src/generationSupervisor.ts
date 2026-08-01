@@ -1,4 +1,5 @@
 import { isGenerationClaimLostError } from "@lrnki/application";
+import { databaseConnectivityFailureCode } from "@lrnki/infrastructure-postgres";
 
 // Shared process-level claim/top-up scheduler (plan 2026-07-12-002 U3, KTD7). Both the topic
 // expedition and the scaffold detour queues are drained by the SAME loop: a `reap` step fails
@@ -36,6 +37,10 @@ export function createGenerationSupervisor<T>(hooks: GenerationSupervisorHooks<T
   const state = {
     started: false,
     claiming: false,
+    // Edge-triggered outage reporting: an outage is a STATE, so the operator gets its two edges
+    // rather than the same stack every 15s for as long as Postgres is away. Per supervisor, so the
+    // two labels report independently.
+    databaseUnreachable: false,
     inFlight: new Set<Promise<void>>(),
     timer: null as ReturnType<typeof setInterval> | null
   };
@@ -60,6 +65,12 @@ export function createGenerationSupervisor<T>(hooks: GenerationSupervisorHooks<T
     state.claiming = true;
     try {
       await hooks.reap();
+      // Connectivity is proven HERE, and this is the one point every pass reaches — the top-up loop
+      // below can return early on an empty queue.
+      if (state.databaseUnreachable) {
+        state.databaseUnreachable = false;
+        console.log(`${hooks.label} generation resumed: database reachable.`);
+      }
       while (state.inFlight.size < hooks.maxConcurrent) {
         const unit = await hooks.claimNext();
         if (!unit) return;
@@ -73,6 +84,23 @@ export function createGenerationSupervisor<T>(hooks: GenerationSupervisorHooks<T
             void runOnce();
           });
         state.inFlight.add(run);
+      }
+    } catch (error) {
+      // A reap/claim failure must never kill the process. These hooks touch the DB before any
+      // unit is claimed, so a down/restarting Postgres surfaces HERE, and `void runOnce()` at the
+      // interval would turn it into an unhandled rejection (= uncaught exception) that takes the
+      // whole learner-api down with it. postgres.js reconnects on its own, so the next tick is
+      // the retry; nothing is lost because an unclaimed unit stays queued.
+      const unreachable = databaseConnectivityFailureCode(error);
+      if (unreachable === undefined) {
+        reportGenerationAttemptError(hooks.label, error);
+      } else if (!state.databaseUnreachable) {
+        // The falling edge only. Anything the classifier does not recognize keeps its full report
+        // above, so a real defect is never quietly reduced to an outage line.
+        state.databaseUnreachable = true;
+        console.warn(
+          `${hooks.label} generation paused: database unreachable (${unreachable}). Retrying every ${Math.round(hooks.intervalMs / 1000)}s.`
+        );
       }
     } finally {
       state.claiming = false;

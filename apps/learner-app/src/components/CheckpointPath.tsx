@@ -16,7 +16,7 @@ import { SupportPathNode } from "./SupportPathNode";
 import { SupportPathSheet } from "./SupportPathSheet";
 import { SupportPathDialog, dialogStateForDetour } from "./SupportPathDialog";
 import { hideScaffoldDetour, retryScaffoldDetour } from "@/lib/actions";
-import { enterGuardianScope } from "@/lib/guardianEntry";
+import { enterGuardianScope, recallScopeKey } from "@/lib/guardianEntry";
 import { markGuardianArrivalSeen, readGuardianArrivalSeen } from "@/lib/navMemory";
 import { legBannerLine, terminusLine } from "@/learn/goalCopy";
 import { formationProgress, formationProgressLine } from "@/learn/mineralSpecimen";
@@ -84,7 +84,7 @@ export function CheckpointPath({
         ...(view.enrichmentScope?.state === "available" ? [view.enrichmentScope] : [])
       ];
       for (const scope of candidates) {
-        if (await readGuardianArrivalSeen(session.learnerStateRef, scope.anchorDerivedNodeId)) continue;
+        if (await readGuardianArrivalSeen(session.learnerStateRef, recallScopeKey(scope))) continue;
         if (!cancelled) setArrivalScope(scope);
         return;
       }
@@ -92,7 +92,7 @@ export function CheckpointPath({
     return () => { cancelled = true; };
   }, [isFocused, view.sections, view.enrichmentScope, session.learnerStateRef]);
   const acknowledgeArrival = () => {
-    if (arrivalScope) void markGuardianArrivalSeen(session.learnerStateRef, arrivalScope.anchorDerivedNodeId);
+    if (arrivalScope) void markGuardianArrivalSeen(session.learnerStateRef, recallScopeKey(arrivalScope));
     setArrivalScope(null);
   };
 

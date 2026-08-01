@@ -16,7 +16,9 @@ and only a discovered source label replaced by a source-grounded admitted canoni
 automatically. Qualified variants and subsets require an explicit later identity decision.
 
 Concept IRIs are readable slugs minted once at first publication and never re-derived from labels;
-collisions get numeric suffixes.
+collisions get numeric suffixes. An IRI is a stable internal identifier only: no triplestore, SPARQL
+endpoint, OWL reasoner, or standing JSON-LD export utility is introduced, and an exporter appears
+only when a real consumer exists.
 
 ## Context
 

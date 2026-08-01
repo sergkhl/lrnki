@@ -3,6 +3,14 @@ import { createChallengeAction } from "./actions";
 import { queryClient } from "./api";
 import { challengeQuery } from "./queries";
 
+// A Guardian scope is identified by (kind, anchor) — the same composite the application layer
+// keys scope status by. The anchor alone is NOT an identity: the summit's anchor IS the last
+// Leg's milestone by construction, so any client-side memory keyed on the anchor collides the
+// two scopes and lets one silently answer for the other.
+export function recallScopeKey(scope: Pick<RecallScopeStatus, "scopeKind" | "anchorDerivedNodeId">): string {
+  return `${scope.scopeKind}_${scope.anchorDerivedNodeId}`;
+}
+
 // One entry rule for every Guardian affordance (plan 2026-07-13-003 U6): an active scope
 // resumes its durable challenge; anything else asks the server to create one — and a lost
 // create race (409 active_challenge_exists) resumes the winner, so two taps or two devices

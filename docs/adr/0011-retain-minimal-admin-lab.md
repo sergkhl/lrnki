@@ -4,19 +4,15 @@ Status: Accepted
 
 ## Decision
 
-Admin Lab is an operator and inspection surface, not an independent owner of domain behavior.
-
-It may:
-
-- inspect sources, Extraction Runs, graph versions, Enrichment Runs, Derived Graph Layers, learner
-  projections, study items, and recorded learner state;
-- trigger explicit versioned operations through application use-cases; and
-- expose experimental learner workflows needed to evaluate the current graph.
+Admin Lab is a read-only operator and inspection surface, not an independent owner of domain
+behavior. It inspects sources, Extraction Runs, graph versions, Enrichment Runs, Derived Graph
+Layers, learner projections, study items, and recorded learner state. Operations are triggered
+through the `kg-worker` CLI and learner writes through the learner API, so the lab holds no route
+handlers, server actions, or mutating requests.
 
 It must not embed domain decisions, own storage queries that belong behind read boundaries
-(ADR-0027), silently select or publish model output, or mutate an immutable published graph or
-Derived Graph Layer. Learner-state writes are explicit and remain downstream of the learner-neutral
-graph.
+([ADR-0027](0027-serve-inspection-through-read-model-ports.md)), silently select or publish model
+output, or mutate an immutable published graph or Derived Graph Layer.
 
 ## Context
 

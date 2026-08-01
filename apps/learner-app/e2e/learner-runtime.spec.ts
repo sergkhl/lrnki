@@ -186,15 +186,18 @@ test.describe("web planning sheet layer", () => {
     const cy = box!.y + box!.height / 2;
 
     // Before opening, the point resolves to the journal itself (sanity), not any modal layer.
-    const before = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest("[data-vaul-overlay],[data-vaul-drawer]") != null, [cx, cy]);
+    const before = await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y)?.closest("[data-testid='bottom-sheet-backdrop'],[data-vaul-drawer]") != null,
+      [cx, cy]
+    );
     expect(before).toBe(false);
 
     await page.getByRole("button", { name: "Plan a new expedition" }).click();
     await expect(page.getByLabel("Topic", { exact: true })).toBeVisible();
 
-    // The vaul scrim (Expo's web bottom-sheet overlay, relocated to the root portal by U4)
-    // covers the full viewport and out-ranks every journal stacking context.
-    const overlay = page.locator("[data-vaul-overlay]");
+    // The app-owned root scrim covers the full viewport and out-ranks every journal or
+    // already-portaled full-screen stacking context.
+    const overlay = page.locator("[data-testid='bottom-sheet-backdrop']");
     await expect(overlay).toBeVisible();
     const overlayBox = await overlay.boundingBox();
     const viewport = page.viewportSize()!;
@@ -206,7 +209,7 @@ test.describe("web planning sheet layer", () => {
     const covered = await page.evaluate(
       ([x, y]) => {
         const el = document.elementFromPoint(x, y);
-        return el != null && el.closest("[data-vaul-overlay],[data-vaul-drawer]") != null;
+        return el != null && el.closest("[data-testid='bottom-sheet-backdrop'],[data-vaul-drawer]") != null;
       },
       [cx, cy]
     );

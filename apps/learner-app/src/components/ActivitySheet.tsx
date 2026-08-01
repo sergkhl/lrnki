@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BookOpen, CheckCircle2, Gem, HelpCircle, MapPin, Rows3, Search } from "lucide-react-native";
 import type { ExplorableTermView, StudySession } from "@lrnki/application/projection";
 import type { LearnerGradingResult, LearnerMatchingResult } from "@/lib/api";
@@ -14,7 +13,7 @@ import { SupportPathDialog, type SupportPathDialogState } from "./SupportPathDia
 import { SupportPathsPanel } from "./SupportPathsPanel";
 import type { ScaffoldTermSource } from "@/lib/actions";
 import { activeStopFor, type AdvanceMemory } from "@/learn/advanceMemory";
-import { buildLegModel, formationInputFrom } from "@/learn/crystalFormationLayout";
+import { buildLegPanel, formationInputFrom } from "@/learn/crystalFormationLayout";
 import { resolveStopActivity } from "@lrnki/application/projection";
 import { checkpointPresentation, type CheckpointIcon } from "@/learn/checkpointPresentation";
 import { buildTrailView } from "@lrnki/application/projection";
@@ -45,7 +44,6 @@ export function ActivitySheet({
   // opens the detour's own surface on the trail.
   onOpenDetour?: (detourId: string) => void;
 }>) {
-  const insets = useSafeAreaInsets();
   const [localStop, setLocalStop] = useState<AdvanceMemory>(null);
   const [mutationPending, setMutationPending] = useState(false);
   // The nested state-aware Support Path dialog (KTD4/KTD5): one dialog for taps from BOTH
@@ -102,38 +100,36 @@ export function ActivitySheet({
       }}
       dismissBlocked={mutationPending}
     >
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        <OverlayHeader
-          icon={activity ? <ActivityHeaderIcon activity={activity} /> : <HelpCircle size={20} color={colors.ink} />}
-          title={title}
-          description={activity ? descriptionFor(activity.kind) : learnerTerm("nextStop")}
-          onClose={close}
-          closeDisabled={mutationPending}
-          closeLabel="Close"
+      <OverlayHeader
+        icon={activity ? <ActivityHeaderIcon activity={activity} /> : <HelpCircle size={20} color={colors.ink} />}
+        title={title}
+        description={activity ? descriptionFor(activity.kind) : learnerTerm("nextStop")}
+        onClose={close}
+        closeDisabled={mutationPending}
+        closeLabel="Close"
+      />
+      {activity ? (
+        <ActivityController
+          key={activeStopId}
+          session={session}
+          activity={activity}
+          stopId={activeStopId}
+          justAdvanced={localStop?.sourceStopId === stopId && activeStopId !== stopId}
+          supportSlot={
+            termContext ? (
+              <SupportPathsPanel
+                terms={termContext.terms}
+                busyTerm={requesting ? dialogTerm : null}
+                onSelect={openTermDialog}
+              />
+            ) : null
+          }
+          onPressTerm={openTermDialog}
+          onAdvance={(nextStopId) => setLocalStop({ sourceStopId: stopId, activeStopId: nextStopId })}
+          onDone={close}
+          onPendingChange={setMutationPending}
         />
-        {activity ? (
-          <ActivityController
-            key={activeStopId}
-            session={session}
-            activity={activity}
-            stopId={activeStopId}
-            justAdvanced={localStop?.sourceStopId === stopId && activeStopId !== stopId}
-            supportSlot={
-              termContext ? (
-                <SupportPathsPanel
-                  terms={termContext.terms}
-                  busyTerm={requesting ? dialogTerm : null}
-                  onSelect={openTermDialog}
-                />
-              ) : null
-            }
-            onPressTerm={openTermDialog}
-            onAdvance={(nextStopId) => setLocalStop({ sourceStopId: stopId, activeStopId: nextStopId })}
-            onDone={close}
-            onPendingChange={setMutationPending}
-          />
-        ) : null}
-      </View>
+      ) : null}
       {dialogTerm !== null ? (
         <SupportPathDialog
           open
@@ -385,6 +381,10 @@ function ActivityBody({
   );
 }
 
+// The formation panel inset the capstone card hosts: narrow enough to sit inside the sheet card at a
+// 320 px phone, wide enough for three charted cells per row.
+const CAPSTONE_PANEL_WIDTH = 264;
+
 // The mastery collection reward (plan 2026-07-15-002 U3, R16/KTD5-KTD6): a capstone
 // reached by advancing IN this sheet renders a focused crop of the concept's SHARED Leg
 // scene — only the new specimen rises into its deterministic slot, existing specimens
@@ -403,20 +403,26 @@ function CapstoneReveal({
     // re-render can never repeat it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const leg = useMemo(() => {
+  const panel = useMemo(() => {
     const input = formationInputFrom(session, buildTrailView(session));
     const sectionIndex = input.concepts.find((concept) => concept.derivedNodeId === activity.derivedNodeId)?.sectionIndex;
     const section = input.sections.find((candidate) => candidate.sectionIndex === sectionIndex);
     if (section === undefined) return null;
-    // The capstone frames the WHOLE compact island (D8) at a fixed card-friendly width.
-    return buildLegModel(section, input.concepts.filter((concept) => concept.sectionIndex === sectionIndex), 280);
+    // The capstone frames the concept's WHOLE Leg panel at a fixed card-friendly width.
+    return buildLegPanel(
+      section,
+      input.concepts.filter((concept) => concept.sectionIndex === sectionIndex),
+      CAPSTONE_PANEL_WIDTH,
+      input.nextDerivedNodeId
+    );
   }, [session, activity.derivedNodeId]);
   return (
     <View className="gap-3 rounded-card border border-line bg-card p-4">
-      {leg ? (
-        <View className="items-center">
+      {panel ? (
+        // The panel shares the warm formation ground used everywhere (KTD2).
+        <View className="items-center rounded-card bg-cavern p-2">
           <LegFormationScene
-            leg={leg}
+            panel={panel}
             mode="collection"
             enteringNodeId={collected ? activity.derivedNodeId : null}
           />

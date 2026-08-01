@@ -1,4 +1,5 @@
 import type { LearnerExpeditionStorePort } from "@lrnki/ports";
+import { bestEffort } from "./bestEffort";
 import { GenerationClaimLostError } from "./generationClaimLost";
 import { isTransientGenerationError } from "./generationFailureClassification";
 
@@ -57,17 +58,14 @@ export function createTopicExpeditionGeneration(construction: {
     // A best-effort terminal write: losing the fence (0 rows) or a store rejection here
     // just means someone else owns the row — the caught generation error stays the
     // meaningful rejection.
-    const bestEffortUpdate = async (update: Omit<Parameters<LearnerExpeditionStorePort["updateProgress"]>[0], "learnerExpeditionId" | "expectedOperationId">): Promise<void> => {
-      try {
-        await construction.expeditionProgress.updateProgress({
+    const bestEffortUpdate = (update: Omit<Parameters<LearnerExpeditionStorePort["updateProgress"]>[0], "learnerExpeditionId" | "expectedOperationId">): Promise<void> =>
+      bestEffort(() =>
+        construction.expeditionProgress.updateProgress({
           learnerExpeditionId: request.learnerExpeditionId,
           expectedOperationId: fenceToken,
           ...update
-        });
-      } catch {
-        // Swallowed: the original generation error is rethrown by the caller.
-      }
-    };
+        })
+      );
     try {
       await fencedUpdate({
         status: "generating"

@@ -8,13 +8,20 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Dialog, DialogBody, DialogFooter, FullScreenDialog, OverlayEntrance, OverlayHeader, SideSheet } from "./overlays";
 import { BottomSheet } from "./sheets";
 
+// A notched, gesture-navigation device, NOT a bezel-less one: every overlay test runs on
+// real insets, because a suite that only ever renders `top: 0` cannot see a surface that
+// paints under the system bars (how the Crystal Formation header regressed unnoticed).
 const SAFE_AREA_METRICS = {
-  insets: { top: 0, left: 0, right: 0, bottom: 0 },
+  insets: { top: 47, left: 0, right: 0, bottom: 34 },
   frame: { x: 0, y: 0, width: 390, height: 844 }
 };
 
+function withSafeArea(ui: React.ReactElement) {
+  return <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>{ui}</SafeAreaProvider>;
+}
+
 function withHost(ui: React.ReactElement) {
-  return (
+  return withSafeArea(
     <>
       {ui}
       <PortalHost />
@@ -159,6 +166,45 @@ test("SideSheet mounts its menu content and closes through the shared header", a
   expect(onOpenChange).toHaveBeenCalledWith(false);
 });
 
+test("a full-screen surface starts below the status bar and clears the navigation bar", async () => {
+  await render(
+    withHost(
+      <FullScreenDialog open onOpenChange={() => {}}>
+        <OverlayHeader icon={<MapIcon size={20} />} title="Trail stop" onClose={() => {}} />
+      </FullScreenDialog>
+    )
+  );
+  // Android prebuilds a fully transparent status AND navigation bar, so the surface that
+  // owns the whole canvas applies the device insets ITSELF. Delegating this to callers is
+  // what left the Crystal Formation's header and close control under the status bar while
+  // its two sibling full-screen surfaces each hand-rolled the same inset.
+  const surface = StyleSheet.flatten(screen.getByTestId("fullscreen-content").props.style) as {
+    paddingTop?: number;
+    paddingBottom?: number;
+  };
+  expect(surface.paddingTop).toBe(SAFE_AREA_METRICS.insets.top);
+  expect(surface.paddingBottom).toBe(SAFE_AREA_METRICS.insets.bottom);
+});
+
+test("the drawer paints edge to edge but starts its chrome below the status bar", async () => {
+  await render(
+    withHost(
+      <SideSheet open onOpenChange={() => {}}>
+        <OverlayHeader icon={<MapIcon size={20} />} title="Menu" onClose={() => {}} />
+      </SideSheet>
+    )
+  );
+  const drawer = screen.getByTestId("side-sheet-content");
+  const surface = StyleSheet.flatten(drawer.props.style) as { paddingTop?: number; paddingBottom?: number };
+  expect(surface.paddingTop).toBe(SAFE_AREA_METRICS.insets.top);
+  expect(surface.paddingBottom).toBe(SAFE_AREA_METRICS.insets.bottom);
+  // The inset is padding on the full-height node, not a shorter drawer: the card fill still
+  // spans the screen so no background strip shows through beside the clock.
+  const drawerClass = drawer.props.className ?? "";
+  expect(drawerClass).toContain("bg-card");
+  expect(drawerClass).toContain("top-0");
+});
+
 test("Covers AE5 anatomy (KTD9): the dialog body scrolls while the footer stays outside it", async () => {
   await render(
     withHost(
@@ -219,24 +265,29 @@ test("closed overlays mount nothing", async () => {
 test("BottomSheet closes normally but re-asserts itself while dismissal is blocked", async () => {
   const onOpenChange = jest.fn();
   const { rerender } = await render(
-    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+    withSafeArea(
       <BottomSheet open onOpenChange={onOpenChange}>
         <RNText>sheet body</RNText>
       </BottomSheet>
-    </SafeAreaProvider>
+    )
   );
   expect(screen.getByText("sheet body")).toBeTruthy();
   expect(screen.getByTestId("bottom-sheet").props.accessibilityHint).toBe("pan-enabled");
+  await fireEvent(screen.getByTestId("bottom-sheet"), "close");
+  expect(onOpenChange).toHaveBeenCalledWith(false);
+  onOpenChange.mockClear();
 
   await rerender(
-    <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+    withSafeArea(
       <BottomSheet open onOpenChange={onOpenChange} dismissBlocked>
         <RNText>sheet body</RNText>
       </BottomSheet>
-    </SafeAreaProvider>
+    )
   );
   // Pan-down is disabled while a mutation is pending (AE4).
   expect(screen.getByTestId("bottom-sheet").props.accessibilityHint).toBe("pan-disabled");
+  await fireEvent(screen.getByTestId("bottom-sheet"), "close");
+  expect(onOpenChange).not.toHaveBeenCalled();
 });
 
 test("on web the sheet mounts through the root PortalHost, escaping journal stacking (KTD7)", async () => {
@@ -246,22 +297,21 @@ test("on web the sheet mounts through the root PortalHost, escaping journal stac
     // Web relocates the whole primitive into the portal, so with no host in the tree the
     // sheet has nowhere to render — the native branch would render it in place here.
     const noHost = await render(
-      <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      withSafeArea(
         <BottomSheet open onOpenChange={() => {}}>
           <RNText>web sheet body</RNText>
         </BottomSheet>
-      </SafeAreaProvider>
+      )
     );
     expect(screen.queryByText("web sheet body")).toBeNull();
     await noHost.unmount();
     // With the single root host present it renders at the root overlay layer.
     await render(
-      <SafeAreaProvider initialMetrics={SAFE_AREA_METRICS}>
+      withHost(
         <BottomSheet open onOpenChange={() => {}}>
           <RNText>web sheet body</RNText>
         </BottomSheet>
-        <PortalHost />
-      </SafeAreaProvider>
+      )
     );
     expect(screen.getByText("web sheet body")).toBeTruthy();
   } finally {

@@ -4,37 +4,45 @@
 /** Semantic color palette. Interactive boundaries use `lineStrong` (>=3:1 on card);
  * `line` is decorative separation only. All pairs are asserted by tokens.test.ts. */
 const gemTeal = "#2f8f83";
+const mapParchment = "#f1e5c9";
+const mapParchmentDeep = "#e5d4af";
+const mapInk = "#3f2f1c";
+const mapInkSoft = "#846c47";
+const card = "#fffaf0";
 const colors = {
   background: "#f7f0de",
   ink: "#241f18",
   muted: "#6d6152",
-  card: "#fffaf0",
+  card,
   line: "#d8c8aa",
   "line-strong": "#8d8064",
   trail: "#617a55",
   "trail-muted": "#b9ad92",
   gem: gemTeal,
   "gem-soft": "#cbe7df",
-  // Mineral tier tints (plan 2026-07-16-002 D7): quartz shares the journal gem teal;
-  // amethyst is a muted violet; diamond a pale ice-blue. Gold stays reserved for
-  // earned rewards and is never a tier tint.
-  "mineral-quartz": gemTeal,
-  "mineral-amethyst": "#7d6b9e",
-  "mineral-diamond": "#9cc3d5",
   // Treasure-map trail surfaces (plan 2026-07-18-001 KTD2/KTD7): parchment ground,
   // deeper edge/uncharted wash, and two sepia inks. Values clear the tokens.test.ts
   // contrast floors (map-ink text >= 4.5:1 on both parchments; map-ink-soft
   // boundaries >= 3:1). Gold stays earned-only and is never map decoration.
-  "map-parchment": "#f1e5c9",
-  "map-parchment-deep": "#e5d4af",
-  "map-ink": "#3f2f1c",
-  "map-ink-soft": "#846c47",
+  "map-parchment": mapParchment,
+  "map-parchment-deep": mapParchmentDeep,
+  "map-ink": mapInk,
+  "map-ink-soft": mapInkSoft,
+  // Crystal Formation chrome aliases the same warm parchment system mechanically. Every
+  // crystal-bearing surface therefore has one shared LIGHT ground without a parallel palette;
+  // crystal colours remain owned by `crystalLibrary.ts`.
+  cavern: mapParchment,
+  "cavern-panel": card,
+  "cavern-rock": mapParchmentDeep,
+  "cavern-edge": mapInkSoft,
+  "cavern-ink": mapInk,
   fog: "#8d887c",
   frontier: "#9c5f2b",
   "muted-panel": "#eee4cd",
   destructive: "#a13c2e",
   "on-accent": "#fdfaf2",
   gold: "#d8b64c",
+  "gold-ink": "#875e13",
   award: "#b45309",
   secured: "#3f7d4e",
   // Overlay backdrop (plan 2026-07-16-003 D6): a LITERAL rgba value, never a Tailwind

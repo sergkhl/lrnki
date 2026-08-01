@@ -73,7 +73,8 @@ export function sessionFixture(overrides: Partial<StudySession> = {}): StudySess
         milestoneDerivedNodeId: "n1",
         milestoneLabel: "Ownership",
         stepDerivedNodeIds: ["n1"],
-        meanDifficulty: 0
+        meanDifficulty: 0,
+        hasStudyItems: true
       }
     ],
     coexistence: [],

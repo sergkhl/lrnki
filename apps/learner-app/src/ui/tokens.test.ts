@@ -31,7 +31,12 @@ const NORMAL_TEXT_PAIRS: [string, string][] = [
   [colors.ink, colors["map-parchment"]],
   [colors.muted, colors["map-parchment"]],
   [colors["map-ink"], colors["map-parchment"]],
-  [colors["map-ink"], colors["map-parchment-deep"]]
+  [colors["map-ink"], colors["map-parchment-deep"]],
+  // Formation copy shares the warm parchment system; the `Next` chip keeps its accent pairing.
+  [colors["on-accent"], colors.frontier],
+  [colors["cavern-ink"], colors.cavern],
+  [colors["cavern-ink"], colors["cavern-panel"]],
+  [colors["cavern-ink"], colors["cavern-rock"]]
 ];
 
 const LARGE_OR_ICON_PAIRS: [string, string][] = [
@@ -47,7 +52,15 @@ const LARGE_OR_ICON_PAIRS: [string, string][] = [
   [colors["map-ink-soft"], colors["map-parchment-deep"]],
   [colors["line-strong"], colors["map-parchment"]],
   [colors.gem, colors["map-parchment"]],
-  [colors.frontier, colors["map-parchment"]]
+  [colors.frontier, colors["map-parchment"]],
+  // The capstone checkpoint socket shares the deeper parchment wash, so its ring must read
+  // as a drawn boundary on both warm surfaces.
+  [colors["cavern-edge"], colors.background],
+  [colors["cavern-edge"], colors["map-parchment"]],
+  // Earned text, icons, and boundaries use the darker gold role on light formation surfaces.
+  [colors["gold-ink"], colors["cavern-panel"]],
+  [colors["gold-ink"], colors["cavern-rock"]],
+  [colors.frontier, colors["cavern-panel"]]
 ];
 
 test("normal-text token pairs meet 4.5:1", () => {
@@ -61,6 +74,19 @@ test("icon, focus, and control-boundary pairs meet 3:1", () => {
   for (const [fg, bg] of LARGE_OR_ICON_PAIRS) {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(3);
   }
+});
+
+test("formation roles mechanically alias the warm parchment system", () => {
+  expect(colors.cavern).toBe(colors["map-parchment"]);
+  expect(colors["cavern-panel"]).toBe(colors.card);
+  expect(colors["cavern-rock"]).toBe(colors["map-parchment-deep"]);
+  expect(colors["cavern-edge"]).toBe(colors["map-ink-soft"]);
+  expect(colors["cavern-ink"]).toBe(colors["map-ink"]);
+});
+
+test("bright gold shapes use gold-ink for their meaningful outline", () => {
+  expect(colors["gold-ink"]).toBe("#875e13");
+  expect(contrast(colors["gold-ink"], colors["cavern-panel"])).toBeGreaterThanOrEqual(3);
 });
 
 test("the NativeWind theme CSS is mechanically generated from the token maps", () => {

@@ -2,10 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { OptionSelectItem, ResponseLogRow } from "@lrnki/domain-core";
 import type { RecallChallengeEvent } from "@lrnki/ports";
+import { ENRICHMENT_LINEUP_MAX, SECTION_LINEUP_MAX } from "./recallLineupBudget";
 import {
-  ENRICHMENT_LINEUP_MAX,
   RECALL_MISS_BUFFER,
-  SECTION_LINEUP_MAX,
   currentTurnItemId,
   eligibleRecallItems,
   foldRecallChallenge,
@@ -313,8 +312,8 @@ const scopeNodes = [
   { derivedNodeId: "summit", label: "The Summit" }
 ];
 const scopeSections = [
-  { sectionIndex: 0, milestoneDerivedNodeId: "m-0" },
-  { sectionIndex: 1, milestoneDerivedNodeId: "m-1" }
+  { sectionIndex: 0, milestoneDerivedNodeId: "m-0", hasStudyItems: true },
+  { sectionIndex: 1, milestoneDerivedNodeId: "m-1", hasStudyItems: true }
 ];
 
 function scopeInput(overrides: Partial<Parameters<typeof projectRecallScopeStatuses>[0]> = {}) {
@@ -361,15 +360,42 @@ test("a won Leg stays won when a later acquisition miss empties its eligible poo
   assert.equal(scopes[0].reason, undefined);
 });
 
-test("a zero-item Leg is honestly unavailable and blocks the Expedition scope", () => {
+test("a winnable Leg the learner has not earned yet is unavailable and still blocks the Expedition scope", () => {
   const scopes = projectRecallScopeStatuses(scopeInput({
     eligible: [eligible("i-1", "m-0", 0)],
     wonScopes: [{ scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-won" }]
   }));
   assert.equal(scopes[1].state, "unavailable");
   assert.equal(scopes[1].reason, "no_eligible_items");
-  // Leg 1 can never be won, so the summit stays locked (never auto-fused).
+  // Leg 1 carries Study Items, so the learner can still earn it — the summit honestly waits.
+  // "No ELIGIBLE items yet" and "no items at all" are different facts with different gates.
   assert.equal(scopes[2].state, "locked");
+});
+
+test("with no winnable Leg the summit is unavailable, never locked behind an unsatisfiable gate (KTD11)", () => {
+  // The one layer no boundary edit can repair: nothing anywhere carries a Study Item, so no Leg
+  // can ever produce a lineup. Waiting for "every Leg won" would lock the summit forever.
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    sections: [
+      { sectionIndex: 0, milestoneDerivedNodeId: "m-0", hasStudyItems: false },
+      { sectionIndex: 1, milestoneDerivedNodeId: "m-1", hasStudyItems: false }
+    ],
+    eligible: []
+  }));
+  assert.deepEqual(scopes.map((scope) => scope.state), ["unavailable", "unavailable", "unavailable"]);
+  assert.equal(scopes[2].reason, "no_eligible_items");
+});
+
+test("an unwinnable Leg does not hold the summit hostage once every winnable Leg is won", () => {
+  const scopes = projectRecallScopeStatuses(scopeInput({
+    sections: [
+      { sectionIndex: 0, milestoneDerivedNodeId: "m-0", hasStudyItems: true },
+      { sectionIndex: 1, milestoneDerivedNodeId: "m-1", hasStudyItems: false }
+    ],
+    wonScopes: [{ scopeKind: "section", scopeAnchorDerivedNodeId: "m-0", challengeId: "ch-a" }]
+  }));
+  assert.equal(scopes[1].state, "available", "the Leg itself still reads from its own eligibility");
+  assert.equal(scopes[2].state, "available");
 });
 
 test("every Leg won unlocks the Expedition scope; abandoned challenges never count", () => {

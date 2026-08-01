@@ -4,10 +4,10 @@ Date: 2026-07-12. Status: accepted.
 
 ## Decision
 
-A **Scaffold Detour** is a durable, learner-owned, optional one-level support branch off one parent
-node of a Derived Graph Layer. It is persisted in learner-scoped tables that are structurally
-incapable of becoming neutral graph knowledge, and it never feeds neutral mastery, prerequisite
-gating, crystals, leaderboard points, or base expedition progress
+A **Scaffold Detour** ([CONTEXT.md](../../CONTEXT.md)) is persisted in learner-scoped tables that are
+*structurally* incapable of becoming neutral graph knowledge, rather than in neutral tables guarded by
+application rules. Structural separation, not discipline, is what keeps it out of neutral mastery,
+prerequisite gating, and rewards
 ([ADR-0032](0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md),
 [ADR-0002](0002-define-learner-neutral-core-concept-graph.md)).
 
@@ -69,7 +69,7 @@ gating, crystals, leaderboard points, or base expedition progress
 
 - **Grounding and observability.** Every generated step is a source-less child concept, so it passes
   the existing Knowledge-Boundary Probe and receives its own Generated Grounding Bundle
-  ([ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md)). Verified parent definitions
+  ([ADR-0030](0030-confidence-gated-synthesis.md)). Verified parent definitions
   may scaffold that generation but never substitute as evidence for the child; no text-length
   shortcut establishes relevance. Boundary steps are omitted and generation fails when none
   survive. Scaffold generation reuses the shared operation-timeline and
@@ -130,7 +130,7 @@ than merely discouraged.
 - Two generation-time quality guards keep fresh content clean, both licensed by the 2026-07-16
   fresh-generation sweep that measured each defect recurring: (1) the content-generation prompt now
   carries an explicit plain-prose / no-markup output contract, because the plain-text learner surface
-  renders any Markdown verbatim; (2) `runScaffoldGeneration` gates every drafted step with a bounded
+  renders any Markdown verbatim; (2) `createScaffoldGeneration` gates every drafted step with a bounded
   congruence re-pick over the SAME independent judge the audit uses (K=1) — a step whose content does
   not teach its own label or is not a genuinely simpler prerequisite of the term is dropped and
   retried once, then skipped. The re-pick fails OPEN on judge infra error (rule 16: congruence is not

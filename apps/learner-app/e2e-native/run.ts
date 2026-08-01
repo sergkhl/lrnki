@@ -1,8 +1,9 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
+import { NATIVE_CHALLENGE_ID, NATIVE_SUMMIT_CHALLENGE_ID } from "./guardianFixture";
 
 // Native Maestro runner (plan 2026-07-15-001 U5). It owns fixture-only login values, the loopback
 // fixture server lifetime, APK installation, the Maestro process, and evidence paths. It passes the
@@ -10,12 +11,21 @@ import { randomBytes } from "node:crypto";
 // YAML. It fails BEFORE UI execution when any prerequisite is missing, with an exact setup command.
 // The APK and UI are real; only the upstream data service is deterministic (KTD7). Run:
 //   pnpm e2e:native:maestro   (from repo root; requires a booted emulator + installed Maestro)
+//   pnpm e2e:native:maestro --device emulator-5554     (when more than one device is attached)
+//
+// Device selection is explicit because `adb` and Maestro disagree about ambient configuration: adb
+// honours `ANDROID_SERIAL`, Maestro does not. Rather than let the two tools silently drive different
+// devices, this runner resolves ONE serial and passes it to both, and fails closed when several are
+// attached and none was chosen — a run whose target is ambiguous is evidence about nothing.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, "..");
 const FIXTURE_PORT = process.env.NATIVE_FIXTURE_PORT ?? "8799";
 const APK = process.env.NATIVE_APK ?? join(appRoot, "lrnki-learner-e2e.apk");
-const FLOW = join(appRoot, ".maestro", "flows", "android-runtime-reliability.yaml");
+// The whole flows directory: each file is one scenario with its own ADR-0038 claim, and mixing an
+// unproven visual-evidence capture into the adopted-authority flow would blur what a green run
+// means. Maestro reports them as separate entries.
+const FLOWS = join(appRoot, ".maestro", "flows");
 const EVIDENCE = resolve(appRoot, "..", "..", "tmp", "2026-07-15-durable-learner-e2e-gates", "native");
 
 function fail(message: string): never {
@@ -33,7 +43,28 @@ function which(bin: string): string | null {
   return r.status === 0 ? r.stdout.trim() : null;
 }
 
-function preflight(): { adb: string; maestro: string } {
+// The requested serial, from `--device <serial>` / `--device=<serial>` or `NATIVE_DEVICE`.
+function requestedDevice(): string | null {
+  const argv = process.argv.slice(2);
+  const flag = argv.indexOf("--device");
+  if (flag !== -1 && argv[flag + 1]) return argv[flag + 1];
+  const inline = argv.find((arg) => arg.startsWith("--device="));
+  if (inline) return inline.slice("--device=".length);
+  return process.env.NATIVE_DEVICE ?? null;
+}
+
+// Serials in the `device` state only: `offline`, `unauthorized`, and `bootloader` entries are not
+// runnable targets, and counting them would make the multiple-device check fire spuriously.
+function readyDevices(adb: string): string[] {
+  return tool(adb, ["devices"]).out
+    .split("\n")
+    .slice(1)
+    .map((line) => line.trim().split(/\s+/))
+    .filter((parts) => parts.length >= 2 && parts[1] === "device")
+    .map((parts) => parts[0]);
+}
+
+function preflight(): { adb: string; maestro: string; device: string } {
   const sdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ?? join(process.env.HOME ?? "", "Library/Android/sdk");
   const adb = which("adb") ?? join(sdk, "platform-tools", "adb");
   if (!existsSync(adb)) fail(`adb not found. Install the Android SDK platform-tools or set ANDROID_HOME. Looked at ${adb}.`);
@@ -41,12 +72,20 @@ function preflight(): { adb: string; maestro: string } {
   const maestro = which("maestro") ?? join(process.env.HOME ?? "", ".maestro/bin/maestro");
   if (!existsSync(maestro)) fail("maestro not found. Install it: curl -fsSL https://get.maestro.mobile.dev | bash");
 
-  const devices = tool(adb, ["devices"]).out;
-  const booted = devices.split("\n").some((l) => /\bemulator-\d+\s+device\b/.test(l) || /\bdevice$/.test(l.trim()) && !l.startsWith("List"));
-  if (!booted) fail("no booted Android emulator/device. Start one: $ANDROID_HOME/emulator/emulator -avd <name>");
+  const ready = readyDevices(adb);
+  if (ready.length === 0) fail("no booted Android emulator/device. Start one: $ANDROID_HOME/emulator/emulator -avd <name>");
+
+  const requested = requestedDevice();
+  if (requested !== null && !ready.includes(requested)) {
+    fail(`requested device ${requested} is not attached and ready. Attached: ${ready.join(", ")}.`);
+  }
+  if (requested === null && ready.length > 1) {
+    fail(`${ready.length} devices attached (${ready.join(", ")}). Choose one: pnpm e2e:native:maestro --device ${ready[0]} (or set NATIVE_DEVICE).`);
+  }
+  const device = requested ?? ready[0];
 
   if (!existsSync(APK)) fail(`e2e APK not found at ${APK}. Build it: scripts/build-learner-android.sh e2e (set NATIVE_APK to override).`);
-  return { adb, maestro };
+  return { adb, maestro, device };
 }
 
 let server: ChildProcess | null = null;
@@ -78,7 +117,11 @@ function stopFixture(): void {
 }
 
 async function main(): Promise<void> {
-  const { adb, maestro } = preflight();
+  const { adb, maestro, device } = preflight();
+  console.log(`[native] device ${device}`);
+  // `takeScreenshot` writes relative to Maestro's working directory, so the flow's Guardian
+  // evidence lands beside the JUnit report instead of in the repository.
+  mkdirSync(EVIDENCE, { recursive: true });
 
   // Ephemeral fixture-only login (R18): generated here, given only to the fixture server and
   // Maestro's `-e` params, never persisted or committed.
@@ -90,17 +133,27 @@ async function main(): Promise<void> {
 
   // Emulator reaches the host fixture via 10.0.2.2; nothing else is needed for host loopback.
   console.log(`[native] installing ${APK}`);
-  const install = tool(adb, ["install", "-r", "-g", APK]);
+  const install = tool(adb, ["-s", device, "install", "-r", "-g", APK]);
   if (!install.ok) {
     stopFixture();
     fail(`adb install failed:\n${install.out}`);
   }
 
-  console.log(`[native] running Maestro flow ${FLOW}`);
-  const maestroRun = spawnSync(maestro, ["test", FLOW, "-e", `LEARNER_REF=${ref}`, "-e", `PIN=${pin}`, "--format", "junit", "--output", join(EVIDENCE, "maestro-report.xml")], {
-    stdio: "inherit",
-    env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "60000" }
-  });
+  console.log(`[native] running Maestro flows in ${FLOWS}`);
+  const maestroRun = spawnSync(
+    maestro,
+    [
+      "--device", device,
+      "test", FLOWS,
+      "-e", `LEARNER_REF=${ref}`,
+      "-e", `PIN=${pin}`,
+      "-e", `GUARDIAN_CHALLENGE_ID=${NATIVE_CHALLENGE_ID}`,
+      "-e", `SUMMIT_CHALLENGE_ID=${NATIVE_SUMMIT_CHALLENGE_ID}`,
+      "--format", "junit",
+      "--output", join(EVIDENCE, "maestro-report.xml")
+    ],
+    { stdio: "inherit", cwd: EVIDENCE, env: { ...process.env, MAESTRO_DRIVER_STARTUP_TIMEOUT: "60000" } }
+  );
 
   stopFixture();
   if (maestroRun.status !== 0) fail(`Maestro flow failed (exit ${maestroRun.status}). Evidence under ${EVIDENCE}.`);

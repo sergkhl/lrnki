@@ -194,3 +194,51 @@ test("runInstrumentedOperation does not rewrite a success-completion reporter fa
 
   assert.deepEqual(operations, ["succeeded"]);
 });
+
+// A terminal write is bookkeeping ABOUT an error and must never replace it (the lost-exception
+// antipattern). Identity, not message matching: a swapped object can still carry the same text.
+test("a failed terminal operation write does not replace the error that failed the run", async () => {
+  const reporter = recordingReporter();
+  const original = new Error("scouting produced no concepts");
+  const unreachableStore: RunProgressReporterPort = {
+    ...reporter,
+    async completeOperation(input) {
+      reporter.operations.push(input.status);
+      throw Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" });
+    }
+  };
+
+  await assert.rejects(
+    () => runInstrumentedOperation(unreachableStore, "extraction", "op-1", async () => { throw original; }),
+    (rejected: unknown) => rejected === original
+  );
+  // The write was still attempted; the staleness reap owns the row left `running`.
+  assert.deepEqual(reporter.operations, ["failed"]);
+});
+
+// The damaging one: this write sits upstream of isTransientGenerationError, which reads the caught
+// error's `stageErrorDetail`. Masking it strips the carrier and downgrades transient to
+// deterministic — a lost retry, exactly when the system is already degraded.
+test("a failed stage-close write preserves the carrier error so transience stays classifiable", async () => {
+  const reporter = recordingReporter();
+  const carried: StageErrorDetail = {
+    kind: "forced_tool_exhaustion",
+    message: "exhausted",
+    attempts: [{ attempt: 0, kind: "network" }]
+  };
+  const original = Object.assign(new Error("exhausted"), { stageErrorDetail: carried });
+  const unreachableStore: RunProgressReporterPort = {
+    ...reporter,
+    async completeStage() {
+      throw Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" });
+    }
+  };
+
+  const runStage = bracketStage(unreachableStore, "enrichment", "op-1");
+  await assert.rejects(
+    () => runStage(STAGE_TAGS.cepExtraction, async () => { throw original; }),
+    (rejected: unknown) => rejected === original
+  );
+  // The carrier survived, so downstream classification still sees a transient exhaustion.
+  assert.deepEqual((original as { stageErrorDetail: StageErrorDetail }).stageErrorDetail, carried);
+});

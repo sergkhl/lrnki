@@ -14,6 +14,7 @@ import type {
   ScaffoldOutlineStep
 } from "@lrnki/ports";
 import { scaffoldMicroLessonText } from "./auditScaffoldContent";
+import { bestEffort } from "./bestEffort";
 import { isTransientGenerationError } from "./generationFailureClassification";
 import { GenerationClaimLostError } from "./generationClaimLost";
 import { DEFAULT_KNOWLEDGE_BOUNDARY_PROBE_CONFIG, probeKnowledgeBoundary, type KnowledgeBoundaryProbeConfig } from "./knowledgeBoundaryProbe";
@@ -137,32 +138,24 @@ export function createScaffoldGeneration(construction: ScaffoldGenerationConstru
         const published = await construction.detours.publishReady({ ...fence, steps });
         if (!published) throw new GenerationClaimLostError(`Scaffold generation claim lost for detour ${request.detourId}.`);
       } catch (error) {
+        // Both terminal writes below are best-effort under the fence (KTD6): a store rejection is
+        // swallowed and a 0-row `false` return ignored, because either means this attempt no longer
+        // owns the detour — the caught generation error stays the meaningful rejection.
         // Lost claim: another attempt owns the detour — write nothing (KTD6).
         if (error instanceof GenerationClaimLostError) throw error;
         if (isTransientGenerationError(error)) {
           // Infrastructure-transient exhaustion: release under the fence so the supervisor's
           // bounded attempt budget governs the retry; the detour stays `generating`.
-          await bestEffortFencedWrite(() => construction.detours.releaseClaim(fence));
+          await bestEffort(() => construction.detours.releaseClaim(fence));
           throw error;
         }
         // Deterministic model/schema/content failure or no-safe-step: record `failed` under the
         // fence, then reject so the operation timeline is honestly failed.
-        await bestEffortFencedWrite(() => construction.detours.markFailed(fence));
+        await bestEffort(() => construction.detours.markFailed(fence));
         throw error;
       }
     }, construction.configHash);
   };
-}
-
-// A terminal write after losing the fence must not overwrite the original error or the new
-// owner's state (KTD6): a thrown store error is swallowed and a 0-row (false) result ignored —
-// the caught generation error stays the meaningful rejection.
-async function bestEffortFencedWrite(write: () => Promise<boolean>): Promise<void> {
-  try {
-    await write();
-  } catch {
-    // Swallowed: the original generation error is rethrown by the caller.
-  }
 }
 
 type ReferencePin = { derivedNodeId: string; conceptLessonId: string; studyItemId: string };

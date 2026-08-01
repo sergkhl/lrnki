@@ -1,170 +1,249 @@
 import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
 import Svg, { Circle, G, Polygon } from "react-native-svg";
-import Animated, { Easing, useAnimatedProps, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
-import { MineralSpecimenGroup } from "./CrystalSpecimen";
-import { BADGE_RADIUS, type LegFormationModel, type MineralSlot } from "@/learn/crystalFormationLayout";
-import { MINERAL_GROUND_Y, formationProgressLine, mineralSpeciesFor } from "@/learn/mineralSpecimen";
+import { useAnimatedStyle, useSharedValue, withDelay, withTiming } from "react-native-reanimated";
+import type { RecallScopeStatus } from "@lrnki/application/projection";
+import { CrystalSpecimen } from "./CrystalSpecimen";
+import { GuardianLegRow } from "./GuardianLegRow";
+import {
+  BADGE_CRYSTAL_PX,
+  BADGE_RADIUS,
+  CELL_CHIP_HEIGHT,
+  CELL_CHIP_INSET,
+  PANEL_PAD,
+  isNameableMineral,
+  type FormationCell,
+  type LegPanelModel
+} from "@/learn/crystalFormationLayout";
+import { materialFor } from "@/learn/crystalLibrary";
+import { formationProgressLine } from "@/learn/mineralSpecimen";
 import { legStateCopy, learnerTerm } from "@/learn/vocabulary";
-import { MOTION, colors, useReducedMotion } from "@/ui";
-
-const AnimatedG = Animated.createAnimatedComponent(G);
+import { AnimatedView, MOTION, PressableSurface, Text, colors, radius, useReducedMotion } from "@/ui";
 
 export type LegSceneMode = "overview" | "collection" | "binding";
 
-// The single visual boundary for a Leg's geode island (plan 2026-07-16-002 U3, D2/D4/D8):
-// ONE smooth outline, at most one junction badge, and the compact specimen mound — no
-// seam, veins, branch, or nested bands. Capstone collection, Guardian reward, and
-// Crystal Vista compose THIS scene in explicit modes — presentation inputs are explicit
-// event identities, never inferred from render changes, so rerenders and reopened
-// surfaces can never replay a reward.
+// ONE Leg as a cavern-role panel (plan 2026-07-30-001 U4, KTD6/KTD8/KTD9/KTD10): a warm well
+// holding one cell per concept, a junction badge straddling the panel's top edge, and — where a
+// surface offers Guardian entry — the Leg's own Guardian row. No island outline, no mound, no
+// spine, no crop.
 //
-// - `overview` frames the island at rest.
-// - `collection` frames the WHOLE island (D8); ONLY the slot named by `enteringNodeId`
-//   plays its fill-rise + gloss pop — every other specimen stays still.
-// - `binding` frames the whole island; the keyed one-shot seal scale-in + gold rim
-//   sweep plays exactly once per `bindingEventId`.
+// The panel is React Native views with ONE small <Svg> per crystal, not one scene-wide canvas:
+// text (the `Next` chip) then never goes through react-native-svg, which is the Android
+// divergence class the trail restyle was bitten by, and every cell is a real touch target.
+//
+// Presentation inputs stay explicit event identities, never inferred from render changes, so a
+// rerender or a reopened surface can never replay a reward:
+// - `overview` frames the panel at rest.
+// - `collection` frames the whole panel; ONLY the cell named by `enteringNodeId` plays its
+//   one-shot rise — every other crystal stays still.
+// - `binding` frames the whole panel; the keyed seal scale-in + the gold panel-edge sweep play
+//   exactly once per `bindingEventId`.
 export function LegFormationScene({
-  leg,
+  panel,
   mode,
   enteringNodeId = null,
-  bindingEventId = null
+  bindingEventId = null,
+  selectedNodeId = null,
+  onSelectNode,
+  onEnterGuardian
 }: Readonly<{
-  leg: LegFormationModel;
+  panel: LegPanelModel;
   mode: LegSceneMode;
   enteringNodeId?: string | null;
   bindingEventId?: string | null;
+  selectedNodeId?: string | null;
+  onSelectNode?: (derivedNodeId: string) => void;
+  // Provided only by surfaces that own Guardian entry (KTD9). A panel without it renders no
+  // row, so the reward card and the capstone inset stay pure presentation.
+  onEnterGuardian?: (scope: RecallScopeStatus) => Promise<void>;
 }>) {
   const reduceMotion = useReducedMotion();
-  const stateLine = legStateCopy(leg.structuralState, leg.guardianSubstate);
-  const label = `${learnerTerm("section")} ${leg.sectionIndex + 1}: ${leg.milestoneLabel} — ${stateLine}. ${formationProgressLine(leg.progress)}.`;
-  const future = leg.structuralState === "future";
-  const bound = leg.structuralState === "bound";
+  const stateLine = legStateCopy(panel.structuralState, panel.guardianSubstate);
+  const label = `${learnerTerm("section")} ${panel.sectionIndex + 1}: ${panel.milestoneLabel} — ${stateLine}. ${formationProgressLine(panel.progress)}.`;
+  const future = panel.structuralState === "future";
+  const bound = panel.structuralState === "bound";
+  const badge = panel.structuralState === "guardian_ready" ? "ward" : bound ? "seal" : null;
 
   return (
-    <Svg
-      accessibilityRole="image"
-      accessibilityLabel={label}
-      viewBox={`0 0 ${leg.width} ${leg.height}`}
-      width={leg.width}
-      height={leg.height}
-    >
-      {/* D4: the state lives on the rim — dashed muted (future), solid neutral
-          (collecting), solid accent (guardian_ready), solid gold (bound). */}
-      <Polygon
-        testID={`island-rim-${leg.structuralState}`}
-        points={toPoints(leg.outline)}
-        fill={future ? colors.background : colors["muted-panel"]}
-        stroke={rimStroke(leg.structuralState)}
-        strokeWidth={2}
-        strokeLinejoin="round"
-        strokeDasharray={future ? "6 5" : undefined}
-      />
+    // The badge straddles the panel's top edge, so the wrapper reserves its overhang instead of
+    // relying on overflow — Android clips absolutely positioned children of a rounded parent.
+    <View style={{ width: panel.width, paddingTop: BADGE_RADIUS }}>
+      <View
+        testID={`cavern-panel-${panel.structuralState}`}
+        style={{
+          width: panel.width,
+          padding: PANEL_PAD,
+          borderRadius: 26,
+          backgroundColor: future ? colors.cavern : colors["cavern-panel"],
+          borderWidth: 1.5,
+          // Shape, never colour alone (R5): a future Leg's edge is dashed.
+          borderStyle: future ? "dashed" : "solid",
+          borderColor: panelEdge(panel.structuralState)
+        }}
+      >
+        <View
+          accessible={onSelectNode ? undefined : true}
+          accessibilityRole={onSelectNode ? undefined : "image"}
+          accessibilityLabel={onSelectNode ? undefined : label}
+          style={{
+            width: panel.well.width,
+            height: panel.well.height,
+            borderRadius: radius.overlay + 4,
+            backgroundColor: colors.cavern
+          }}
+        >
+          {panel.cells.map((cell) => (
+            <CavernCell
+              key={cell.derivedNodeId}
+              cell={cell}
+              selected={selectedNodeId === cell.derivedNodeId}
+              onSelectNode={onSelectNode}
+              entering={mode === "collection" && enteringNodeId !== null && cell.derivedNodeId === enteringNodeId}
+            />
+          ))}
+        </View>
 
-      {leg.slots.map((slot) => (
-        <SlotSpecimen
-          key={slot.derivedNodeId}
-          slot={slot}
-          future={future}
-          entering={mode === "collection" && enteringNodeId !== null && slot.derivedNodeId === enteringNodeId}
-        />
-      ))}
+        {onEnterGuardian && panel.recallScope ? (
+          <GuardianLegRow
+            scope={panel.recallScope}
+            sectionComplete={panel.structuralState !== "collecting" && panel.structuralState !== "future"}
+            onEnter={onEnterGuardian}
+          />
+        ) : null}
+      </View>
 
-      {/* The single junction badge (D4): a shape distinction, never color alone —
-          guardian glyph when the Guardian is ready, gold seal once bound. */}
-      {leg.structuralState === "guardian_ready" ? <JunctionBadge leg={leg} kind="guardian" /> : null}
-      {bound ? <JunctionBadge leg={leg} kind="seal" /> : null}
+      {/* The single junction badge: the ward crystal while the Guardian stands, the gold seal
+          once the Leg is bound. Gold appears here only when it has been earned. */}
+      {badge ? <JunctionBadge panel={panel} kind={badge} /> : null}
 
-      {/* Reduced motion renders the sealed bound state directly: the binding overlay is
-          pure event emphasis, so it is skipped rather than frozen mid-fade. */}
+      {/* Reduced motion renders the sealed bound state directly: the binding overlay is pure
+          event emphasis, so it is skipped rather than frozen mid-fade. */}
       {mode === "binding" && bindingEventId !== null && !reduceMotion ? (
-        <BindingEvent key={bindingEventId} leg={leg} />
+        <BindingEvent key={bindingEventId} panel={panel} />
       ) : null}
-    </Svg>
+    </View>
   );
 }
 
-function rimStroke(state: LegFormationModel["structuralState"]): string {
-  if (state === "bound") return colors.gold;
+function panelEdge(state: LegPanelModel["structuralState"]): string {
+  if (state === "bound") return colors["gold-ink"];
   if (state === "guardian_ready") return colors.frontier;
-  if (state === "future") return colors["trail-muted"];
-  return colors["line-strong"];
+  if (state === "future") return colors["cavern-edge"];
+  return colors["cavern-edge"];
 }
 
-// The junction badge at the island apex. The seal is a gold roundel with a four-point
-// star; the guardian badge is a neutral roundel holding the ward diamond.
-function JunctionBadge({ leg, kind }: Readonly<{ leg: LegFormationModel; kind: "guardian" | "seal" }>) {
-  const { x, y } = leg.badge;
-  const r = BADGE_RADIUS;
+// The junction badge on the panel's top edge: a rock roundel holding the earned-only shape.
+// `legWard` is the Guardian's own ward crystal; the seal is the gold star of a bound Leg.
+function JunctionBadge({ panel, kind }: Readonly<{ panel: LegPanelModel; kind: "ward" | "seal" }>) {
+  const size = BADGE_RADIUS * 2;
   return (
-    <G testID={`island-badge-${kind}`}>
-      <Circle
-        cx={x}
-        cy={y}
-        r={r}
-        fill={kind === "seal" ? colors.gold : colors.card}
-        stroke={kind === "seal" ? colors["line-strong"] : colors.frontier}
-        strokeWidth={1.5}
-      />
-      {kind === "seal" ? (
-        <Polygon
-          points={`${x},${y - 7} ${x + 2.4},${y - 2.4} ${x + 7},${y} ${x + 2.4},${y + 2.4} ${x},${y + 7} ${x - 2.4},${y + 2.4} ${x - 7},${y} ${x - 2.4},${y - 2.4}`}
-          fill={colors["on-accent"]}
-          stroke={colors["line-strong"]}
-          strokeWidth={0.8}
+    <View
+      testID={`cavern-badge-${kind}`}
+      pointerEvents="none"
+      style={{ position: "absolute", left: panel.badge.x - BADGE_RADIUS, top: 0, width: size, height: size, alignItems: "center", justifyContent: "center" }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ position: "absolute" }}>
+        <Circle
+          testID="cavern-seal-roundel"
+          cx={BADGE_RADIUS}
+          cy={BADGE_RADIUS}
+          r={BADGE_RADIUS - 1}
+          fill={colors["cavern-rock"]}
+          stroke={kind === "seal" ? colors["gold-ink"] : colors.frontier}
+          strokeWidth={1.5}
         />
-      ) : (
-        <Polygon
-          points={`${x},${y - 6} ${x + 5},${y} ${x},${y + 6} ${x - 5},${y}`}
-          fill={colors.gem}
-          stroke={colors["line-strong"]}
-          strokeWidth={0.8}
-        />
-      )}
-    </G>
+        {kind === "seal" ? (
+          <G>
+            <Polygon
+              testID="cavern-seal-shape"
+              points={sealStar(BADGE_RADIUS)}
+              fill={colors.gold}
+              stroke={colors["gold-ink"]}
+              strokeWidth={0.8}
+            />
+          </G>
+        ) : null}
+      </Svg>
+      {/* Absolutely positioned on purpose: on web a positioned sibling (the roundel) paints above
+          every in-flow one regardless of document order, so an in-flow crystal would be hidden. */}
+      {kind === "ward" ? (
+        <View style={{ position: "absolute", left: (size - BADGE_CRYSTAL_PX) / 2, top: (size - BADGE_CRYSTAL_PX) / 2 }}>
+          <CrystalSpecimen
+            species="legWard"
+            derivedNodeId={`ward:${panel.sectionIndex}`}
+            material="collected"
+            growthFraction={1}
+            size={BADGE_CRYSTAL_PX}
+            ariaLabel={null}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
-// First victory traces the already-earned structure only: minerals never regrow. One
-// gold rim sweep fades onto the same bound geometry Vista shows, while the seal badge
-// scales in about the junction (D8).
-function BindingEvent({ leg }: Readonly<{ leg: LegFormationModel }>) {
+function sealStar(r: number): string {
+  const arm = r - 5;
+  const waist = arm * 0.34;
+  return [
+    [r, r - arm],
+    [r + waist, r - waist],
+    [r + arm, r],
+    [r + waist, r + waist],
+    [r, r + arm],
+    [r - waist, r + waist],
+    [r - arm, r],
+    [r - waist, r - waist]
+  ]
+    .map(([x, y]) => `${round1(x)},${round1(y)}`)
+    .join(" ");
+}
+
+// First victory traces the already-earned structure only: crystals never regrow. One gold sweep
+// fades along the panel edge (replacing the deleted island rim sweep and spine segment) while
+// the seal scales in about the junction.
+function BindingEvent({ panel }: Readonly<{ panel: LegPanelModel }>) {
   const progress = useSharedValue(0);
   useEffect(() => {
     progress.set(withTiming(1, { duration: MOTION.emphasis }));
   }, [progress]);
-  const rimProps = useAnimatedProps(() => ({ opacity: 0.95 - progress.get() * 0.55 }));
-  const badgeProps = useAnimatedProps(() => {
-    const scale = 0.4 + 0.6 * progress.get();
-    return {
-      opacity: progress.get(),
-      transform: `translate(${leg.badge.x}, ${leg.badge.y}) scale(${scale}) translate(${-leg.badge.x}, ${-leg.badge.y})`
-    };
-  });
+  const edgeStyle = useAnimatedStyle(() => ({ opacity: 0.95 - progress.get() * 0.55 }));
+  const sealStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ scale: 0.4 + 0.6 * progress.get() }]
+  }));
   return (
-    <G testID="leg-binding-event">
-      <AnimatedG animatedProps={rimProps}>
-        <Polygon
-          points={toPoints(leg.outline)}
-          fill="none"
-          stroke={colors.gold}
-          strokeWidth={5}
-          strokeLinejoin="round"
-        />
-      </AnimatedG>
-      <AnimatedG animatedProps={badgeProps}>
-        <JunctionBadge leg={leg} kind="seal" />
-      </AnimatedG>
-    </G>
+    <View testID="leg-binding-event" pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: BADGE_RADIUS, bottom: 0 }}>
+      <AnimatedView
+        animatedStyle={edgeStyle}
+        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: 26, borderWidth: 4, borderColor: colors.gold }}
+      />
+      <AnimatedView
+        animatedStyle={sealStyle}
+        style={{ position: "absolute", left: panel.badge.x - BADGE_RADIUS, top: -BADGE_RADIUS, width: BADGE_RADIUS * 2, height: BADGE_RADIUS * 2 }}
+      >
+        <JunctionBadge panel={{ ...panel, badge: { x: BADGE_RADIUS, y: 0 } }} kind="seal" />
+      </AnimatedView>
+    </View>
   );
 }
 
-// One slot's specimen at its mound position. `entering` plays the one-shot fill-rise +
-// gloss pop at the mastery reveal; the played event identity is remembered so an
-// unchanged rerender stays still, and reduced motion renders the settled slot
-// immediately.
-function SlotSpecimen({ slot, future, entering }: Readonly<{ slot: MineralSlot; future: boolean; entering: boolean }>) {
+// One concept's cell: the crystal on its deeper parchment, the growth bar under it, and — on the single
+// study target — the `Next` chip. The chip is load-bearing text, not decoration: a fully grown
+// `open` crystal is pixel-identical to a `collected` one, so the target must say so in words.
+function CavernCell({
+  cell,
+  selected,
+  entering,
+  onSelectNode
+}: Readonly<{
+  cell: FormationCell;
+  selected: boolean;
+  entering: boolean;
+  onSelectNode?: (derivedNodeId: string) => void;
+}>) {
   const reduceMotion = useReducedMotion();
-  const animate = entering && !reduceMotion && slot.state === "collected";
+  const animate = entering && !reduceMotion && cell.state === "collected";
   const playedRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   useEffect(() => {
@@ -173,60 +252,100 @@ function SlotSpecimen({ slot, future, entering }: Readonly<{ slot: MineralSlot; 
     setPlaying(true);
   }, [animate]);
 
-  const transform = `translate(${slot.x - slot.size / 2}, ${slot.y - slot.size / 2}) scale(${slot.size / 100})`;
-  // A future Leg shows unnamed ghost slots regardless of per-concept state; known
-  // ground stays a distinct labeled ghost in every mode (honest counts).
-  const specimenState = future || slot.state === "known" ? "ghost" : slot.state === "collected" ? "collected" : "growing";
+  // Only a crystal the formation would name is a tap target; an unreached concept stays an
+  // unnamed shape, exactly as the Vista's memory door rule already decides.
+  const nameable = isNameableMineral(cell);
+  const palette = materialFor(cell.species, cell.material);
   const body = (
-    <MineralSpecimenGroup
-      species={mineralSpeciesFor(slot.difficulty)}
-      derivedNodeId={slot.derivedNodeId}
-      growthFraction={slot.state === "collected" ? 1 : slot.growthFraction}
-      state={specimenState}
-    />
+    <>
+      <View style={{ position: "absolute", left: cell.crystal.x, top: cell.crystal.y }}>
+        <CrystalSpecimen
+          species={cell.species}
+          derivedNodeId={cell.derivedNodeId}
+          material={cell.material}
+          growthFraction={cell.growthFraction}
+          size={cell.crystal.width}
+          ariaLabel={null}
+        />
+      </View>
+      {cell.bar ? (
+        <View
+          testID="cavern-cell-bar"
+          style={{ position: "absolute", left: cell.bar.x, top: cell.bar.y, width: cell.bar.width, height: cell.bar.height, borderRadius: cell.bar.height / 2, backgroundColor: colors["cavern-rock"], overflow: "hidden" }}
+        >
+          <View style={{ width: `${Math.round(clamp01(cell.growthFraction) * 100)}%`, height: "100%", backgroundColor: palette.light }} />
+        </View>
+      ) : null}
+      {cell.isNext ? (
+        <View
+          testID="cavern-cell-next"
+          style={{ position: "absolute", left: 4, right: 4, bottom: CELL_CHIP_INSET, height: CELL_CHIP_HEIGHT, borderRadius: CELL_CHIP_HEIGHT / 2, backgroundColor: colors.frontier, alignItems: "center", justifyContent: "center" }}
+        >
+          <Text variant="caption" color="on-accent" className="text-[9px] font-bold" numberOfLines={1}>
+            {learnerTerm("nextStop")}
+          </Text>
+        </View>
+      ) : null}
+    </>
   );
 
-  if (playing) {
+  const frame = {
+    position: "absolute" as const,
+    left: cell.rect.x,
+    top: cell.rect.y,
+    width: cell.rect.width,
+    height: cell.rect.height,
+    borderRadius: radius.control,
+    backgroundColor: colors["cavern-rock"],
+    opacity: cell.state === "known" ? 0.8 : 1
+  };
+  const testID = `cavern-cell-${cell.state}`;
+
+  if (onSelectNode && nameable) {
     return (
-      <G testID={`leg-slot-${slot.state}`} transform={transform} opacity={slot.state === "known" ? 0.75 : 1}>
-        <EnteringGroup>{body}</EnteringGroup>
-      </G>
+      <PressableSurface
+        testID={testID}
+        accessibilityLabel={cell.isNext ? `${cell.label} — ${learnerTerm("nextStop")}` : cell.label}
+        selected={selected}
+        onPress={() => onSelectNode(cell.derivedNodeId)}
+        style={frame}
+        pressedClassName="opacity-80"
+      >
+        {playing ? <EnteringCell>{body}</EnteringCell> : body}
+      </PressableSurface>
     );
   }
   return (
-    <G testID={`leg-slot-${slot.state}`} transform={transform} opacity={slot.state === "known" ? 0.75 : 1}>
-      {body}
-    </G>
+    <View testID={testID} style={frame}>
+      {playing ? <EnteringCell>{body}</EnteringCell> : body}
+    </View>
   );
 }
 
-// The one-shot entrance (D8): the finished specimen's color rises from its bedrock —
-// opacity and a small grounded rise/settle, never a re-growth of other slots.
-// Mount-only by design — the played flag upstream owns the event identity, so
-// re-renders never replay it.
-function EnteringGroup({ children }: Readonly<{ children: React.ReactNode }>) {
+// The one-shot collection entrance: the finished crystal's colour rises from its own bedrock in
+// its own cell — never a re-growth of any neighbour. Mount-only by design; the played flag
+// upstream owns the event identity, so re-renders never replay it.
+function EnteringCell({ children }: Readonly<{ children: React.ReactNode }>) {
   const progress = useSharedValue(0);
   useEffect(() => {
-    progress.set(withDelay(80, withTiming(1, { duration: MOTION.celebration * 2, easing: Easing.out(Easing.back(1.4)) })));
+    progress.set(withDelay(80, withTiming(1, { duration: MOTION.celebration })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Pivot decomposition about the specimen bedrock (50, MINERAL_GROUND_Y):
-  // react-native-svg's `origin` helper leaks a raw transform-origin attribute on web.
-  const animatedProps = useAnimatedProps(() => {
-    const p = progress.get();
-    const s = 0.55 + 0.45 * p;
-    return {
-      opacity: p,
-      transform: `translate(0, ${(1 - p) * 10}) translate(50, ${MINERAL_GROUND_Y}) scale(${s}) translate(-50, -${MINERAL_GROUND_Y})`
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: progress.get(),
+    transform: [{ translateY: (1 - progress.get()) * 10 }]
+  }));
   return (
-    <AnimatedG testID="leg-slot-entering" animatedProps={animatedProps}>
+    <AnimatedView testID="leg-slot-entering" animatedStyle={animatedStyle} style={{ flex: 1 }}>
       {children}
-    </AnimatedG>
+    </AnimatedView>
   );
 }
 
-function toPoints(points: readonly { x: number; y: number }[]): string {
-  return points.map((point) => `${point.x},${point.y}`).join(" ");
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }

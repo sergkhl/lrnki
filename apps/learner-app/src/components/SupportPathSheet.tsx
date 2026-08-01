@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CheckCircle2, ChevronRight, Circle, EyeOff, GitBranchPlus, MapPin } from "lucide-react-native";
 import type { ConceptLessonView, ScaffoldDetourView, ScaffoldStepView, StudyOptionSelectView } from "@lrnki/application/projection";
 import type { ReactNode } from "react";
@@ -40,24 +39,21 @@ export function SupportPathSheet({
   onOpenReference: (step: ReferenceStep) => void;
   referenceLabelFor: (derivedNodeId: string) => string;
 }>) {
-  const insets = useSafeAreaInsets();
   const [pending, setPending] = useState(false);
   return (
     <FullScreenDialog open={open} onOpenChange={onOpenChange} dismissBlocked={pending}>
-      <View className="flex-1 bg-background" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
-        {detour ? (
-          <PathController
-            key={detour.detourId}
-            enrichmentId={enrichmentId}
-            detour={detour}
-            onClose={() => onOpenChange(false)}
-            onHide={onHide}
-            onOpenReference={onOpenReference}
-            referenceLabelFor={referenceLabelFor}
-            onPendingChange={setPending}
-          />
-        ) : null}
-      </View>
+      {detour ? (
+        <PathController
+          key={detour.detourId}
+          enrichmentId={enrichmentId}
+          detour={detour}
+          onClose={() => onOpenChange(false)}
+          onHide={onHide}
+          onOpenReference={onOpenReference}
+          referenceLabelFor={referenceLabelFor}
+          onPendingChange={setPending}
+        />
+      ) : null}
     </FullScreenDialog>
   );
 }

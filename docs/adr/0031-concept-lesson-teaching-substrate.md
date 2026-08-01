@@ -57,7 +57,7 @@ judge checks section distinctness after assembly. If a non-substantive section i
 generation retries once with named feedback; if the retry still repeats, the redundant
 non-substantive section is dropped before persistence. The judge may remove hooks, never cited
 substantive sections. Knowledge-boundary gating for source-less concept synthesis belongs to
-[ADR-0030](0030-confidence-gated-synthesis-with-web-grounding.md).
+[ADR-0030](0030-confidence-gated-synthesis.md).
 
 The Study Session shows a node's Concept Lesson before its Study Item Bank segments; reading a lesson
 writes no Response Log row. The lesson rides down the `composeStudySession` projection from lessons

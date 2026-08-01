@@ -223,7 +223,6 @@ export type TrailCluster = {
   difficulty: number;
   topologicalDepth: number;
   state: StudySession["expeditionPath"][number]["state"];
-  isTarget: boolean;
   isKnownSkipped: boolean;
   // Section metadata: which milestone-anchored section this concept belongs to, and whether it
   // opens that section on the trail (the first concept of the section).
@@ -322,7 +321,6 @@ export function buildTrailView(session: StudySession): TrailView {
       difficulty: step.difficulty,
       topologicalDepth: step.topologicalDepth,
       state: step.state,
-      isTarget: step.isSummit,
       isKnownSkipped,
       sectionIndex: step.sectionIndex,
       sectionPositionIndex: step.sectionPositionIndex,

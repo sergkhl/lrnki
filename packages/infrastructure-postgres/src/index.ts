@@ -1,4 +1,5 @@
 export { createDatabaseClient } from "./db";
+export { databaseConnectivityFailureCode } from "./databaseConnectivity";
 export {
   PostgresSourceRegistrationStore,
   PostgresExtractionRunStore,

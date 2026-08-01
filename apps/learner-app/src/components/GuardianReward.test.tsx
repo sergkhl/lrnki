@@ -184,7 +184,7 @@ test("a mounted first summit win emits one unlock haptic and seats the keystone"
     transitionToken: "summit-event"
   });
   expect(screen.getByText(learnerTerm("guardianRewardFirstSummitTitle"))).toBeTruthy();
-  expect(screen.getByTestId("formation-summit-keystone")).toBeTruthy();
+  expect(screen.getByTestId("cavern-summit-seated")).toBeTruthy();
   await act(async () => { jest.advanceTimersByTime(560); });
   expect(impactAsync).toHaveBeenCalledWith(ImpactFeedbackStyle.Heavy);
   await act(async () => { jest.advanceTimersByTime(700); });

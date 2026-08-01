@@ -6,7 +6,7 @@ import type { RecallChallengeView, RecallScopeStatus, StudySession } from "@lrnk
 import { buildTrailView } from "@lrnki/application/projection";
 import {
   buildCrystalFormationLayout,
-  MIN_ISLAND_WIDTH,
+  MIN_PANEL_WIDTH,
   type CrystalFormationLayout,
   type VistaFocus
 } from "@/learn/crystalFormationLayout";
@@ -22,7 +22,7 @@ import {
   triggerHaptic,
   useReducedMotion
 } from "@/ui";
-import { CrystalFormationScene } from "./CrystalFormationScene";
+import { FormationSummitStrip } from "./CrystalFormationScene";
 import { LegFormationScene } from "./LegFormationScene";
 
 export type WonGuardianView = Extract<RecallChallengeView, { state: "won" }>;
@@ -41,7 +41,7 @@ export type GuardianRewardPreview =
 // The one reward-scene width policy: the card crops nothing, so the preview layout is
 // built at exactly the width the scene will render.
 export function guardianRewardSceneWidth(windowWidth: number): number {
-  return Math.max(MIN_ISLAND_WIDTH, Math.min(420, windowWidth - 56));
+  return Math.max(MIN_PANEL_WIDTH, Math.min(420, windowWidth - 56));
 }
 
 // Reward classification is a projection read, never local award state. A mismatched
@@ -70,7 +70,7 @@ export function guardianRewardPreview(
   }
   if (!focus || !scope?.wonChallengeId) return { status: "inconsistent" };
   const layout = buildCrystalFormationLayout(session, trail, availableWidth);
-  if (focus.kind === "leg" && !layout.legs.some((leg) => leg.sectionIndex === focus.sectionIndex)) {
+  if (focus.kind === "leg" && !layout.panels.some((panel) => panel.sectionIndex === focus.sectionIndex)) {
     return { status: "inconsistent" };
   }
   return {
@@ -118,9 +118,9 @@ export function GuardianReward({
 
   const ready = preview.status === "ready" ? preview : null;
   const rewardLegSectionIndex = ready?.focus.kind === "leg" ? ready.focus.sectionIndex : null;
-  const rewardLeg = rewardLegSectionIndex === null
+  const rewardPanel = rewardLegSectionIndex === null
     ? null
-    : ready?.layout.legs.find((leg) => leg.sectionIndex === rewardLegSectionIndex) ?? null;
+    : ready?.layout.panels.find((panel) => panel.sectionIndex === rewardLegSectionIndex) ?? null;
   const first = ready?.rewardKind === "first";
   const title = first
     ? challenge.scopeKind === "enrichment"
@@ -146,7 +146,7 @@ export function GuardianReward({
       <ScrollView contentContainerClassName="mx-auto w-full max-w-lg gap-4 p-4 pb-8">
         <View className="items-center gap-2">
           <View className="flex-row items-center gap-2">
-            <Sparkles size={20} color={colors.gold} />
+            <Sparkles size={20} color={colors["gold-ink"]} />
             <Text variant="title">{title}</Text>
           </View>
           <Text variant="label" color="muted" className="text-center font-normal">{body}</Text>
@@ -154,23 +154,18 @@ export function GuardianReward({
 
         {ready ? (
           <View testID={`guardian-reward-${ready.rewardKind}`}>
-            <Card className="relative items-center overflow-hidden p-3">
-              {ready.focus.kind === "leg" && rewardLeg ? (
+            {/* The reward shows exactly the earned piece — the bound Leg's own cavern panel, or
+                the summit strip with its seated keystone. No crop, no whole-formation scroll. */}
+            <Card className="relative items-center overflow-hidden bg-cavern p-3">
+              {ready.focus.kind === "leg" && rewardPanel ? (
                 <LegFormationScene
-                  leg={rewardLeg}
+                  panel={rewardPanel}
                   mode="binding"
                   bindingEventId={first ? eventKey : null}
                 />
-              ) : (
-                <CrystalFormationScene
-                  layout={ready.layout}
-                  focus={ready.focus}
-                  contextualizingRewardKey={first && eventKey ? "summit" : null}
-                  cropToFocus
-                  selectedNodeId={null}
-                  onSelectNode={() => {}}
-                />
-              )}
+              ) : ready.layout.summit ? (
+                <FormationSummitStrip summit={ready.layout.summit} width={ready.layout.panelWidth} />
+              ) : null}
               {/* The light sweep is a translation transform — reduced motion drops it and
                   shows the settled scene immediately (R20/AE9). */}
               {eventKey && !reduceMotion ? <RewardSweep eventKey={eventKey} /> : null}

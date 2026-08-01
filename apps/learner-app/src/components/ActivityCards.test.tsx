@@ -14,7 +14,7 @@ test("an ungraded tile selects and submits once", async () => {
   const onSelect = jest.fn();
   await render(<OptionSelectBody item={optionItem()} selectedId={null} result={null} disabled={false} onSelect={onSelect} />);
   await fireEvent.press(screen.getByLabelText("Assignment"));
-  expect(onSelect).toHaveBeenCalledWith("o1");
+  expect(onSelect).toHaveBeenCalledWith("o1", expect.arrayContaining(["o1", "o2"]));
 });
 
 test("graded tiles freeze, mark the keyed answer with a check and the wrong pick with an X", async () => {

@@ -10,7 +10,8 @@ Keep one canonical definition for every fact:
 - A linked file in `docs/brainstorms/` owns accepted problem framing, requirements, and scope until
   that work is completed or abandoned.
 - A linked ready/in-progress file in `docs/plans/` owns active implementation design.
-- `docs/plans/TODO.md` owns current work, grouped completed outcomes, and latest validation.
+- `docs/plans/TODO.md` owns current work, grouped completed outcomes, and latest validation, under
+  the retention limits in [docs/plans/README.md](docs/plans/README.md).
 - `docs/plans/BLOCKERS.md` owns unresolved manual actions required from the user.
 
 Do not restate another document's content. Link to its canonical definition. Delete superseded
@@ -60,8 +61,8 @@ definitions and repair their references in the same change.
     in through `TEST_DATABASE_URL` and must never use the development `DATABASE_URL`.
 
 15. Admin Lab web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph
-    visualization uses Cytoscape. The learner surface is React Native primitives styled with
-    NativeWind ([ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md)).
+    visualization uses Cytoscape. For the learner surface, enforce
+    [ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md).
 
 16. A deterministic gate over neural output may hard-veto only a provable guarantee. Heuristic
     lexical or surface-pattern gates require an explicit measured module and must be removed when
@@ -84,9 +85,5 @@ definitions and repair their references in the same change.
     practices. Prefer a conventional root-cause solution. Record why a bespoke approach is necessary
     if established methods conflict with this architecture or the learner-neutral contract.
 
-22. Prioritize the Learner App's game UX under
-    [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Playful,
-    delightful UX is a first-class goal of learner-facing projections, but this priority lives only
-    downstream and never relaxes the learner-neutral core
-    ([ADR-0002](docs/adr/0002-define-learner-neutral-core-concept-graph.md)) or the projection
-    boundary in [CONTEXT.md](CONTEXT.md).
+22. Prioritize the Learner App's game UX and enforce
+    [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).

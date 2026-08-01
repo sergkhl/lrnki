@@ -59,7 +59,7 @@ test("a disabled surface announces disabled state and never invokes action or ha
   expect(surface.props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(surface);
   expect(onPress).not.toHaveBeenCalled();
-  expect(Haptics.selectionAsync).not.toHaveBeenCalled();
+  expect(Haptics.impactAsync).not.toHaveBeenCalled();
 });
 
 test("a busy button blocks duplicate actions, announces busy, and keeps its label mounted", async () => {
@@ -90,12 +90,14 @@ test("a compact Button retains the shared minimum target class", async () => {
   expect(screen.getByTestId("button").props.className ?? "").toContain("h-target");
 });
 
-test("a haptic intent fires exactly once per accepted press", async () => {
+test("a selection haptic fires one perceptible light impact per accepted press", async () => {
   const onPress = jest.fn();
   await render(<Button testID="button" label="Pick" haptic="selection" onPress={onPress} />);
   await fireEvent.press(screen.getByTestId("button"));
   expect(onPress).toHaveBeenCalledTimes(1);
-  expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+  expect(Haptics.impactAsync).toHaveBeenCalledWith(Haptics.ImpactFeedbackStyle.Light);
+  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
+  expect(Haptics.selectionAsync).not.toHaveBeenCalled();
 });
 
 test("selected and expanded surface states are exposed to accessibility", async () => {

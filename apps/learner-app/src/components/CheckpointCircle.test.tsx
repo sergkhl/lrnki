@@ -58,8 +58,8 @@ test("a capstone renders the concept's mineral specimen, not a generic icon", as
   await render(<CheckpointCircle stop={{ ...capstone, state: "available" }} concept={concept} onSelect={() => {}} />);
   expect(screen.getByLabelText(/Crystal/)).toBeTruthy();
   expect(screen.getByLabelText("Growing crystal")).toBeTruthy();
-  // The 40 px capstone is the smallest surface with a real specimen (U1, R14).
-  expect(screen.getByTestId("specimen-outline")).toBeTruthy();
+  // The capstone is the smallest surface carrying real crystal art (MIN_SPECIMEN_PX).
+  expect(screen.getByTestId("specimen-body")).toBeTruthy();
 });
 
 test("a known-skipped complete capstone stays a ghost slot and never a collected mineral", async () => {
@@ -67,6 +67,8 @@ test("a known-skipped complete capstone stays a ghost slot and never a collected
   const concept = { ...view.concepts[0], isKnownSkipped: true };
   const capstone = concept.stops.find((stop) => stop.kind === "capstone")!;
   await render(<CheckpointCircle stop={{ ...capstone, state: "complete" }} concept={concept} onSelect={() => {}} />);
-  expect(screen.getByTestId("specimen-ghost")).toBeTruthy();
+  // Known ground stays fogged stone: no risen fill, so a skip never reads as collected.
+  expect(screen.getByTestId("specimen-body")).toBeTruthy();
   expect(screen.queryAllByTestId("specimen-fill")).toHaveLength(0);
+  expect(screen.getByLabelText("Ghost slot")).toBeTruthy();
 });

@@ -9,12 +9,17 @@ let mockIsFocused = true;
 const mockEnterGuardianScope = jest.fn<
   (...args: unknown[]) => Promise<{ entered: true; challengeId: string } | { entered: false }>
 >();
-const mockReadGuardianArrivalSeen = jest.fn(() => Promise.resolve(true));
+const mockReadGuardianArrivalSeen = jest.fn<(...args: unknown[]) => Promise<boolean>>(() => Promise.resolve(true));
 
 jest.mock("expo-router", () => ({ useRouter: () => ({ push: mockPush }), useIsFocused: () => mockIsFocused }));
-jest.mock("@/lib/guardianEntry", () => ({ enterGuardianScope: (...args: unknown[]) => mockEnterGuardianScope(...args) }));
+jest.mock("@/lib/guardianEntry", () => ({
+  enterGuardianScope: (...args: unknown[]) => mockEnterGuardianScope(...args),
+  // The real key builder: the arrival memory's correctness IS this function, so stubbing it
+  // would make the collision test assert against the mock instead of the shipped rule.
+  recallScopeKey: jest.requireActual<typeof import("@/lib/guardianEntry")>("@/lib/guardianEntry").recallScopeKey
+}));
 jest.mock("@/lib/navMemory", () => ({
-  readGuardianArrivalSeen: () => mockReadGuardianArrivalSeen(),
+  readGuardianArrivalSeen: (...args: unknown[]) => mockReadGuardianArrivalSeen(...args),
   markGuardianArrivalSeen: jest.fn(() => Promise.resolve())
 }));
 jest.mock("./ActivitySheet", () => ({
@@ -61,14 +66,25 @@ const recallScope: RecallScopeStatus = {
   state: "available"
 };
 
-async function renderPath() {
+// The summit scope anchors on the LAST Leg's milestone — that is how derivation defines it, not
+// a fixture convenience — so the two scopes here deliberately share `anchorDerivedNodeId`.
+const summitScope: RecallScopeStatus = {
+  scopeKind: "enrichment",
+  anchorDerivedNodeId: "n1",
+  anchorLabel: "Ownership",
+  sectionIndex: null,
+  eligibleItemCount: 2,
+  state: "available"
+};
+
+async function renderPath(scopes: RecallScopeStatus[] = [recallScope]) {
   // Every stop complete (lesson read + both items latest-correct) so the Leg reads
   // "complete" and the available scope is a genuine arrival candidate.
   const base = sessionFixture({
     classification: { stateByNode: { n1: "mastered" }, selectedFrontierTarget: null },
     lessonReadByNode: { n1: true },
     latestOutcomeByStudyItemId: { i1: "correct", i2: "correct" },
-    recallScopes: [recallScope]
+    recallScopes: scopes
   });
   const session = {
     ...base,
@@ -117,6 +133,18 @@ test("the trail renders region cartouches and exactly one X-marked terminus", as
   expect(screen.getAllByTestId("section-cartouche").length).toBeGreaterThan(0);
   expect(screen.getByTestId("terminus-cartouche")).toBeTruthy();
   expect(screen.getByTestId("terminus-x")).toBeTruthy();
+});
+
+// Regression (plan 2026-07-31-003 U5 real-use gate): once the summit became reachable, a real
+// run showed the Expedition Guardian's arrival never announced. Its cause is here — the arrival
+// memory was keyed on the anchor node alone, and the summit's anchor IS the last Leg's milestone,
+// so acknowledging that Leg's arrival silently answered for the summit too. A Guardian scope's
+// identity is (kind, anchor), exactly as the application layer keys scope status.
+test("a Leg and the summit sharing an anchor are remembered under different keys", async () => {
+  await renderPath([recallScope, summitScope]);
+  await act(async () => {});
+  const keys = mockReadGuardianArrivalSeen.mock.calls.map((call) => call[1]);
+  expect(new Set(keys)).toEqual(new Set(["section_n1", "enrichment_n1"]));
 });
 
 // Regression (plan 2026-07-16-003 U6 gate): the trail stays mounted under a pushed

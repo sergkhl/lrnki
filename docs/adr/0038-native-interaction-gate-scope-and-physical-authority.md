@@ -1,6 +1,6 @@
 # 0038 — Native interaction gate scope and physical-device authority
 
-Date: 2026-07-15. Status: accepted.
+Date: 2026-07-15. Status: accepted (last amended 2026-08-01).
 
 ## Context
 
@@ -40,6 +40,14 @@ fixture, navigation, and emulator.
   a percentage height cap on the centered dialog) collapses the dialog content to zero height and
   fails the dialog-reachability assertion deterministically; the current build passes repeatedly.
   This scenario is trustworthy automatic native authority for the dialog-geometry regression class.
+- **Crystal Guardian obelisk states — VISUAL EVIDENCE ONLY, no authority (added 2026-08-01).** The
+  obelisk separates resolved / current / queued wards by fill, facet, gloss and contour weight rather
+  than hue, and Android draws those primitives through react-native-svg's native canvas rather than
+  Chromium's SVG. A flow walks a deterministic Guardian through entry, partial, miss, Last Stand and
+  Final Ward and screenshots each; its assertions prove only that the flow reached the intended
+  state, so the screenshot beside them is evidence of that state and not another. Whether the states
+  remain separable is a judgement over the captures, no negative control has been measured for it,
+  and a green run therefore carries no authority over obelisk rendering.
 - **Theory touch-responder scroll — REJECTED as automatic authority.** The regression is real on
   physical hardware, but on the emulator the responder claim races the native ScrollView through the
   JS thread and Maestro-injected swipes usually win a race a real finger loses, so the negative
@@ -54,15 +62,28 @@ correlated physical pass. Uncovered native primitives, the touch-responder class
 physical touch feel, haptics, thermals, and safe-area variants retain their physical gate until each
 is independently automated and correlated.
 
-**Real-device and emulator e2e runs are user-initiated; the agent never starts one on its own.**
-Coding sessions normally run on the VPS workspace, which has no JDK, Android SDK, emulator, or
-attached device — an agent there must not attempt, simulate, or claim a device/emulator pass, and
-web or jest evidence never stands in for one. An agent may drive the native gate only inside a
-session the user has deliberately started on the macOS host that carries the Android tooling and
-device. When a change needs device validation and no such session exists, the agent records the
-concrete manual step in [BLOCKERS.md](../plans/BLOCKERS.md) (device, build profile, scenario,
-expected observation), completes its scope on the automated layers above, and the user initiates
-the device run; the result is then folded into the validation record.
+**Emulator runs are agent-initiable on a tooling-capable host; physical-device runs stay
+user-initiated.** Who may press start is a different question from what a green run proves, and this
+rule answers only the first: it moves nothing in the scenario verdicts or the authority rules above.
+
+- **Emulator — the agent may start one.** On a host that actually carries the Android tooling, an
+  agent may run `pnpm e2e:native:maestro` on its own initiative, without waiting for the user to
+  open the session. The precondition is mechanical rather than a promise: `e2e-native/run.ts`
+  preflights `adb`, Maestro, a booted device, and the built e2e APK, and fails before any UI
+  execution with an exact setup command — so a session lacking the tooling cannot produce a run to
+  misreport. An emulator is a disposable local process that reaches only the loopback fixture, so
+  nothing about starting one needs a person in the room. The macOS workstation carrying the Android
+  SDK, JDK 17, Maestro, and an AVD is such a host; the VPS coding workspace is not.
+- **Physical device — still user-initiated.** Someone must attach, unlock, watch, and feel real
+  hardware, and no agent substitutes for that. An agent never asks for a device to be connected as a
+  side effect of unrelated work.
+
+**No session may claim native evidence it did not produce.** An agent on a host without the tooling
+must not attempt, simulate, or narrate a device or emulator pass, and web or jest evidence never
+stands in for one. When a change needs *physical* validation and no such session exists, the agent
+records the concrete manual step in [BLOCKERS.md](../plans/BLOCKERS.md) (device, build profile,
+scenario, expected observation), completes its scope on the automated layers above, and the user
+initiates the device run; the result is then folded into the validation record.
 
 **EAS Workflows is deferred.** The hosted Maestro job is alpha, couples a `type: maestro` job to a
 `type: build` job through an EAS `build_id` rather than consuming this repository's
@@ -82,9 +103,15 @@ dependency, or paid run is introduced by this decision.
   production keep the Android secure default, and the e2e APK is gitignored and never distributed.
 - **Selectors are semantic.** Flows and web specs use accessibility labels, roles, and minimal
   app-owned `testID`s — never generated prose, coordinates, or styling classes.
-- **Physical gate remains open.** `docs/plans/BLOCKERS.md` and the runtime-reliability record keep
-  the touch-responder class and all uncovered native surfaces physically owned; this ADR narrows
-  nothing automatically.
+- **An agent-started run must build the APK from the tree under test.** The gate drives an installed
+  artifact, not the working tree, so a green run against a stale APK is evidence about a build
+  nobody is asking about. Rebuild with `scripts/build-learner-android.sh e2e` whenever learner-app
+  source moved since the existing APK, and record which tree the APK came from with the result.
+- **Physical gate remains open.** This ADR and the flow header in
+  `apps/learner-app/.maestro/flows/android-runtime-reliability.yaml` keep the touch-responder class
+  and all uncovered native surfaces physically owned; agent-initiable emulator runs narrow none of
+  it. `docs/plans/BLOCKERS.md` carries only *unresolved user actions*, so a standing scope limit
+  like this one is recorded here rather than there.
 
 ## Revisit triggers
 

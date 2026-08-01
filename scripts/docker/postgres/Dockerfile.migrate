@@ -1,0 +1,8 @@
+FROM postgres:18.4-alpine
+
+# The initial migration remains the single source of truth. Baking it into this one-shot image
+# also works when the Docker daemon cannot resolve bind mounts from the checkout.
+COPY packages/infrastructure-postgres/src/migrations/0000_initial_lrnki_schema.sql /migration.sql
+COPY --chmod=755 scripts/docker/postgres/migrate-if-empty.sh /usr/local/bin/migrate-if-empty
+
+ENTRYPOINT ["migrate-if-empty"]

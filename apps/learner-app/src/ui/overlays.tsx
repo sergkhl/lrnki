@@ -6,6 +6,7 @@ import { useEffect, type ComponentType, type ReactNode } from "react";
 import { BackHandler, Platform, ScrollView, useWindowDimensions, View } from "react-native";
 import { FadeInDown, FadeInRight } from "react-native-reanimated";
 import * as DialogPrimitive from "@rn-primitives/dialog";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X } from "lucide-react-native";
 import { AppText } from "./foundation";
 import { IconButton } from "./actions";
@@ -170,6 +171,7 @@ export function Dialog({ open, onOpenChange, dismissBlocked = false, children }:
 /** Full-screen activity surface (study, Vista): explicit close and system back only —
  * there is no backdrop, so content owns the whole canvas (R9). */
 export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, children }: OverlayProps) {
+  const insets = useSafeAreaInsets();
   const requestClose = (next: boolean) => {
     if (!next && dismissBlocked) return;
     onOpenChange(next);
@@ -195,10 +197,16 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
               Native takes a bounded flex chain instead (H1): an absolute-positioned scroll
               ancestor does not propagate a definite height to the activity ScrollView, so
               Theory content grows unbounded and cannot scroll. `flex-1` under the
-              definite-height (inset-0) Overlay gives the ScrollView a real bound. */}
+              definite-height (inset-0) Overlay gives the ScrollView a real bound.
+              This surface owns the whole canvas under a transparent system status and
+              navigation bar, so IT — never its callers — applies the device insets: a
+              caller-delegated inset is remembered by some surfaces and forgotten by others.
+              `bg-background` still paints edge to edge because padding sits inside the
+              border box, and the padded content box stays definite for the flex chain. */}
           <DialogPrimitive.Content
             testID="fullscreen-content"
             className={Platform.OS === "web" ? "absolute inset-0 bg-background" : "flex-1 bg-background"}
+            style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
             // Native: the primitive hardwires `onStartShouldSetResponder: () => true` on
             // Content, claiming every touch before the activity ScrollView can win the
             // drag (the props spread after it makes this override sanctioned). The
@@ -218,6 +226,7 @@ export function FullScreenDialog({ open, onOpenChange, dismissBlocked = false, c
  * close control, Escape / system back, and backdrop press all honor `dismissBlocked` —
  * anchored to the edge its top-right trigger lives on. */
 export function SideSheet({ open, onOpenChange, dismissBlocked = false, children }: OverlayProps) {
+  const insets = useSafeAreaInsets();
   const requestClose = (next: boolean) => {
     if (!next && dismissBlocked) return;
     onOpenChange(next);
@@ -231,7 +240,15 @@ export function SideSheet({ open, onOpenChange, dismissBlocked = false, children
           className="absolute inset-0 bg-scrim"
           style={Platform.OS === "web" ? ({ position: "fixed" } as object) : undefined}
         >
-          <DialogPrimitive.Content className="absolute bottom-0 right-0 top-0 w-80 max-w-[85%] border-l border-line bg-card">
+          {/* The drawer spans the full height, so it owns the device insets exactly as the
+              full-screen surface does. Padding on Content (not a wrapper inside it) keeps
+              `bg-card` painting behind the transparent status and navigation bars while the
+              drawer's chrome starts below them. */}
+          <DialogPrimitive.Content
+            testID="side-sheet-content"
+            className="absolute bottom-0 right-0 top-0 w-80 max-w-[85%] border-l border-line bg-card"
+            style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+          >
             <OverlayEntrance className="flex-1" slideFrom="right">
               {children}
             </OverlayEntrance>

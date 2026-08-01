@@ -4,3 +4,11 @@
 
 @import "nativewind/theme";
 @import "./ui/tokens.css";
+
+/* The app-owned BottomSheet wrapper supplies the body-level web scrim. Expo's vaul overlay stays
+   mounted for its modal lifecycle but must not duplicate paint or pointer handling from a lower
+   stacking context when a sheet opens over another portaled surface. */
+[data-vaul-overlay] {
+  background-color: transparent !important;
+  pointer-events: none !important;
+}

@@ -20,6 +20,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # Apply the canonical application schema before any process can query it. This is deliberately
+  # a one-shot service: changing the greenfield schema still requires a database reset rather than
+  # an incremental compatibility migration (AGENTS rule 8).
+  migrate:
+    build:
+      context: .
+      dockerfile: scripts/docker/postgres/Dockerfile.migrate
+    container_name: lrnki-migrate
+    networks:
+      - lrnki
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: lrnki
+      PGPASSWORD: lrnki
+      PGDATABASE: lrnki
+    restart: "no"
+
   litellm:
     image: ghcr.io/berriai/litellm:v1.88.1
     container_name: lrnki-litellm
@@ -82,6 +103,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      litellm:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
       LITELLM_BASE_URL: http://litellm:4000
@@ -108,7 +133,8 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     depends_on:
-      - learner-api
+      learner-api:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"

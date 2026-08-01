@@ -1,5 +1,6 @@
 import type { OperationType, RunProgressReporterPort, StageErrorDetail } from "@lrnki/ports";
 import { runWithOperationTag } from "@lrnki/domain-core/operation-tag-context";
+import { bestEffort } from "./bestEffort";
 import { isLlmStage, NON_LLM_STAGES, type NonLlmStage } from "./operationTimelineCatalog";
 
 // The reporter seam's application-facing surface (KTD4, R7). Operations import the
@@ -64,7 +65,9 @@ export async function runInstrumentedOperation<T>(
       result = await fn(runStage);
     } catch (error) {
       clearInterval(heartbeat);
-      await reporter.completeOperation({ operationType, operationId, status: "failed" });
+      // Best-effort: a terminal write that cannot reach the store must not replace the error that
+      // actually failed the run. A row left `running` is reaped to `failed` by the staleness pass.
+      await bestEffort(() => reporter.completeOperation({ operationType, operationId, status: "failed" }));
       throw error;
     }
     clearInterval(heartbeat);
@@ -89,8 +92,11 @@ export function bracketStage(reporter: RunProgressReporterPort, operationType: O
       return result;
     } catch (error) {
       // Persist the redacted reason (ADR-0006 fail-closed, inspectable) before failing the
-      // stage. We never re-throw a different error or alter the fail-closed decision.
-      await reporter.completeStage({ operationType, operationId, stage, ok: false, errorDetail: toStageErrorDetail(error) });
+      // stage. We never re-throw a different error or alter the fail-closed decision — hence
+      // best-effort: this write sits UPSTREAM of isTransientGenerationError, which reads the
+      // caught error's `stageErrorDetail`, so letting a store failure through here would strip
+      // that carrier and downgrade a transient exhaustion into a deterministic `failed`.
+      await bestEffort(() => reporter.completeStage({ operationType, operationId, stage, ok: false, errorDetail: toStageErrorDetail(error) }));
       throw error;
     }
   };

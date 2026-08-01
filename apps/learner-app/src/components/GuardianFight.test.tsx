@@ -14,6 +14,11 @@ import {
 } from "@/lib/actions";
 import { learnerTerm } from "@/learn/vocabulary";
 
+const mockShuffleIds = jest.fn((ids: readonly unknown[]) => [...ids]);
+jest.mock("@/learn/shuffle", () => ({
+  shuffleIds: (ids: readonly unknown[]) => mockShuffleIds(ids)
+}));
+
 jest.mock("@/lib/actions", () => ({
   answerChallengeSelectionAction: jest.fn(),
   answerChallengeMatchingPairAction: jest.fn(),
@@ -162,6 +167,7 @@ async function renderFight(view: RecallChallengeView) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockShuffleIds.mockImplementation((ids) => [...ids]);
   lifecycleMock.mockImplementation(() => Promise.resolve({ applied: true, view: activeView() }));
 });
 
@@ -209,6 +215,27 @@ test("a miss keeps the ward, cracks the shield, and Last Stand appears when the 
   await fireEvent.press(screen.getByText(learnerTerm("guardianContinue")));
   expect(screen.getByText(learnerTerm("guardianLastStand"))).toBeTruthy();
   expect(screen.getByText(learnerTerm("guardianLastStandBody"))).toBeTruthy();
+});
+
+test("a selection reveal preserves the submitted option order instead of reshuffling the learner's choice", async () => {
+  mockShuffleIds
+    .mockImplementationOnce((ids) => [...ids].reverse())
+    .mockImplementationOnce((ids) => [...ids]);
+  const recovery = activeView({ state: "recovery", remainingMissBuffer: 0, currentItem: optionItem("q1", "What raises the tide?") });
+  answerMock.mockImplementation(() =>
+    Promise.resolve({
+      answered: true,
+      replayed: false,
+      feedback: { kind: "selection", correct: false, chosenId: "o-wrong", keyedCorrectId: "o-right" },
+      view: recovery
+    })
+  );
+  await renderFight(activeView({ remainingMissBuffer: 1 }));
+  const submittedOrder = screen.getAllByTestId("study-choice").map((choice) => choice.props.accessibilityLabel as string);
+  await fireEvent.press(screen.getByText("Wrong answer for q1"));
+  await waitFor(() => expect(screen.getByText(learnerTerm("guardianWardHolds"))).toBeTruthy());
+  const revealedOrder = screen.getAllByTestId("study-choice").map((choice) => choice.props.accessibilityLabel as string);
+  expect(revealedOrder).toEqual(submittedOrder);
 });
 
 test("matching pairs post individually and a dirty completed round presents the reshuffle message (KTD6)", async () => {
