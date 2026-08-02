@@ -4,17 +4,19 @@
       "ssh": "Disabled",
       "previewLimit": 50,
       "server": "localhost",
+      "port": 5433,
       "driver": "PostgreSQL",
       "name": "lrnki_review",
-      "connectString": "postgresql://lrnki:lrnki@localhost:5432/lrnki_review"
+      "connectString": "postgresql://lrnki:lrnki@localhost:5433/lrnki_review"
     },
     {
       "ssh": "Disabled",
       "previewLimit": 50,
       "server": "localhost",
+      "port": 5433,
       "driver": "PostgreSQL",
       "name": "lrnki",
-      "connectString": "postgresql://lrnki:lrnki@localhost:5432/lrnki"
+      "connectString": "postgresql://lrnki:lrnki@localhost:5433/lrnki"
     }
   ]
 }

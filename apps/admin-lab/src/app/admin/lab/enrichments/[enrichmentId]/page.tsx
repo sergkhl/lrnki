@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // Expo universal app's web build, which owns session and expedition state. The default is
 // the local Expo web dev server; set LEARNER_WEB_URL to link elsewhere (e.g. the Pages site).
 function learnerWebExpeditionUrl(enrichmentId: string): string {
-  const base = process.env.LEARNER_WEB_URL ?? "http://localhost:8081";
+  const base = process.env.LEARNER_WEB_URL ?? "http://localhost:8082";
   return `${base.replace(/\/$/, "")}/expedition/${encodeURIComponent(enrichmentId)}`;
 }
 

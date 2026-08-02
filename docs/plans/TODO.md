@@ -50,7 +50,7 @@
 Verified 2026-08-01. Load `.env` before anything touching the database:
 `set -a; . ./.env; set +a`.
 
-- **The stack runs on plain `docker compose`:** `lrnki-postgres` on 5432, `lrnki-litellm` on 4000,
+- **The stack runs on plain `docker compose`:** `lrnki-postgres` on 5433, `lrnki-litellm` on 4000,
   `lrnki-docling` on 5001, `lrnki-caddy` on 80/443, and `lrnki-learner-api` with supervisors and no
   published port — reach it with
   `docker exec lrnki-learner-api node -e '…fetch("http://127.0.0.1:8787"…)'`.

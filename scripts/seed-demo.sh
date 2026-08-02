@@ -9,8 +9,10 @@
 # rather than seeding a partial state.
 set -euo pipefail
 
-DB_URL="${DATABASE_URL:-postgresql://lrnki:lrnki@localhost:5432/lrnki}"
-export DATABASE_URL="$DB_URL"
+# shellcheck source=scripts/lib/require-database-url.sh
+. scripts/lib/require-database-url.sh
+DB_URL="$DATABASE_URL"
+export DATABASE_URL
 
 # Optional manifest override (defaults to the full curated manifest). Lets a seed run be
 # scoped to a subset of fixtures (e.g. markdown-only, to skip CPU Docling PDF conversion)
