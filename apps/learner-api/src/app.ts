@@ -146,12 +146,12 @@ export function createLearnerApp(sql: DatabaseClient) {
     .use("*", cors({
       // One shared environment (ADR-0036): the same process may serve the Pages origin
       // (prod, or a host-run dev process behind Caddy's dev-first upstream) and the local
-      // Expo web server (8082). Echo back any allowed origin so both topologies work
+      // Expo web server (8881). Echo back any allowed origin so both topologies work
       // without widening to "*", which the credentialed Authorization flow forbids.
       origin: (origin) => {
         const allowed = new Set([
           process.env.LEARNER_WEB_ORIGIN ?? "https://lrnki.globesoul.com",
-          "http://localhost:8082",
+          "http://localhost:8881",
           "http://localhost:3000"
         ]);
         return allowed.has(origin) ? origin : null;
