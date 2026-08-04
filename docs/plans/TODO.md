@@ -2,11 +2,15 @@
 
 ## TODO
 
-- **READY — Integrate Drizzle migrations.** The
-  [interview-locked plan](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md) makes one
-  internal Drizzle schema the persisted-shape authority while raw `postgres` stores remain; exact
-  catalog parity, explicit targeted resets, and one host/Compose migrator are required before the
-  shared greenfield cutover. Implementation has not started.
+- **IN PROGRESS — Integrate Drizzle migrations.**
+  [U1 is complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): the pinned stable
+  dependencies, internal lifecycle schema modules, offline config, and guarded generate/check
+  tooling are implemented. A disposable candidate has exactly 56 tables, nine views, one SQL, one
+  snapshot, and one journal entry; its relation inventory matches the handwritten baseline and
+  `drizzle-kit check` passes. The committed handwritten lineage is intentionally unchanged, so
+  `pnpm db:check` remains red on its missing snapshot and is not yet wired into `pnpm check`.
+  **Next:** execute U2 against `lrnki_test`, prove normalized catalog and all nine view probes equal,
+  then replace SQL/snapshot/journal together and wire the green drift gate into `pnpm check`.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -153,18 +157,14 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## VALIDATION
 
-- **Ward Obelisk native Android pass — 2026-08-01. PASS.** Four `pnpm e2e:native:maestro` runs on the
-  macOS tooling host (`Medium_Phone_API_36.1`, 411 dp; APK rebuilt from this tree, with no
-  `apps/learner-app/src` file newer than the artifact). **2/2 flows passed** at default width three
-  times, including the pre-existing adopted-authority Support Path scenario. All five Guardian states
-  captured and inspected: resolved renders as flat stone with **no** facet seam while queued keeps
-  its facet, a miss leaves the segmentation pixel-identical, Last Stand shows all three states at
-  once, the Final Ward IS the crown, and a committed win draws no Guardian body at all. The seven-ward
-  pink-trident Expedition Guardian holds its facet at the tightest band. Re-run at exactly 320 dp:
-  every state contained, all four answer controls in the first viewport, no horizontal scroll. Re-run
-  with animations off: the Guardian region is **pixel-identical**. `pnpm --filter @lrnki/learner-app
-  typecheck` clean, which is what proves the new fixture's `StudyItem` / `RecallChallengeView` shapes.
-  Screenshots and the full write-up are in the gitignored scratch tree under the 2026-07-31 Guardian
-  gate directory. **Two findings recorded above, neither fixed:** the shield-loss shake is
-  unreachable, and the Support Path flow taps the wrong control at 320 dp. **Not re-run this session:**
-  the full `pnpm check` suite — no product source changed, only host-side gate code.
+- **Drizzle migration U1 — 2026-08-04. PASS at the pre-cutover boundary.** Stable Drizzle generated
+  a disposable candidate with 56 tables, nine views, one `0000` SQL file, one snapshot, and one
+  journal entry; the sorted table/view inventory diff against the handwritten baseline was empty and
+  `drizzle-kit check` passed. `pnpm --filter @lrnki/infrastructure-postgres typecheck`, its 101-test
+  suite (11 run, 90 DB-opt-in skipped), focused ESLint, shell syntax, `git diff --check`, and
+  `env -u NODE_ENV pnpm check` all passed; the full browser envelope was 64/64. The ordinary lint
+  phase retains four unrelated warnings and zero errors. `pnpm db:check` was also exercised and
+  correctly rejected the still-committed legacy lineage because `meta/0000_snapshot.json` does not
+  exist. No database was reset or migrated, no production path changed, and the U3 real-use gate was
+  therefore not triggered. U2 owns catalog parity, all nine semantic view probes, generated-lineage
+  replacement, `pnpm test:db`, and activation of the drift check inside `pnpm check`.
