@@ -69,5 +69,19 @@ fi
 
 export TEST_DATABASE_URL
 export DATABASE_URL="$TEST_DATABASE_URL"
+
+# The migration state matrix owns the whole schema and must run alone before ordinary store tests.
+pnpm --filter @lrnki/infrastructure-postgres run test:migrations:db
+
+# Prove the shared reset path preserves every non-application schema in this database.
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c \
+  'CREATE SCHEMA IF NOT EXISTS migration_reset_guard; CREATE TABLE IF NOT EXISTS migration_reset_guard.survivor (value text PRIMARY KEY); INSERT INTO migration_reset_guard.survivor VALUES ('"'"'preserved'"'"') ON CONFLICT DO NOTHING;'
 scripts/reset-db.sh
+RESET_GUARD_VALUE="$(psql "$TEST_DATABASE_URL" -X -Atqc 'SELECT value FROM migration_reset_guard.survivor;')"
+if [[ "$RESET_GUARD_VALUE" != "preserved" ]]; then
+  echo "Application reset touched a non-application schema." >&2
+  exit 1
+fi
+psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -c 'DROP SCHEMA migration_reset_guard CASCADE;'
+
 pnpm -r --sort --if-present run test

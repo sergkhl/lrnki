@@ -30,6 +30,7 @@
     "db:generate": "scripts/regenerate-initial-migration.sh",
     "db:check": "scripts/check-drizzle-schema.sh",
     "db:migrate": "scripts/migrate-db.sh",
+    "db:reset": "scripts/reset-db.sh",
     "seed:demo": "scripts/seed-demo.sh",
     "worker:kg": "pnpm --filter @lrnki/kg-worker worker:kg"
   },

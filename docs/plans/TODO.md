@@ -3,14 +3,15 @@
 ## TODO
 
 - **IN PROGRESS — Integrate Drizzle migrations.**
-  [U1-U2 are complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): the internal
-  lifecycle schema is now the only hand-edited persisted-shape definition, and its generated SQL,
-  snapshot, and journal replaced the handwritten lineage together after exact catalog and all-view
-  parity on `lrnki_test`. `pnpm db:check` is green and runs near the start of `pnpm check`.
-  **Next:** execute U3 as one coherent slice: implement the internal migration module and typed state
-  classifier, advisory lock, CLI, targeted reset path, and state-matrix tests; delete the temporary
-  direct-`psql` applicator only after host and DB-test commands cross the new interface. Then run the
-  plan's real-use persistence gate on a freshly migrated development database before U4.
+  [U1-U3 are complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): host and DB-test
+  commands now cross the same programmatic Drizzle migrator; its typed classifier, reserved-connection
+  advisory lock, post-apply verification, targeted `public`/`drizzle` reset, and destructive
+  `lrnki_test` state matrix are green. The development database was explicitly reset through this
+  path and now holds the successful curated-Rust persistence gate; the shared deployment was not
+  touched. **Next:** execute U4 as one coherent slice: replace the Compose migration image/environment,
+  delete `migrate-if-empty.sh`, harden deploy migration-result checking, and run fresh/current plus
+  legacy/stale/partial negative controls through a temporary isolated Compose override. Do not use or
+  reset the named shared/local `postgres_data` volume for those controls.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -153,15 +154,18 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## VALIDATION
 
-- **Drizzle migration U2 — 2026-08-04. PASS at the generated-lineage boundary.** The committed
-  generated baseline has exactly 56 tables, nine views, one `0000` SQL, one snapshot, and one journal
-  entry. Its 1,346-record normalized PostgreSQL catalog report is byte-equal to the handwritten
-  oracle across relations, columns/types/defaults/nullability, named constraints and FK actions,
-  indexes/order/operator classes/predicates, and view definitions. Deterministic payload probes
-  returned byte-equal rows and PostgreSQL types through all nine inspection views. `pnpm db:check`,
-  the infrastructure package typecheck, `pnpm test:db` from a full `lrnki_test` reset, Compose config,
-  `git diff --check`, and `env -u NODE_ENV pnpm check` passed; the browser envelope was 64/64 and lint
-  retained four unrelated warnings with zero errors. Only `lrnki_test` was reset; the development
-  database, shared deployment, Compose migration path, and application stores were untouched. The
-  U3 real-use persistence gate remains intentionally pending until the programmatic migrator and
-  reset state machine are foundationally green.
+- **Drizzle migration U3 — 2026-08-04. PASS at the runtime-state and real-use persistence boundary.**
+  Fresh/current, two concurrent callers, legacy, partial, stale hash, stale journal time,
+  metadata-without-schema, and extra history all matched the typed state machine; failure fixtures
+  preserved public data, every migration client closed, and reset preserved a populated
+  non-application schema. `pnpm test:db`, `pnpm db:check`, the infrastructure tests/typecheck, Compose
+  config, `git diff --check`, and `env -u NODE_ENV pnpm check` passed; web E2E was 64/64 and lint kept
+  the same four unrelated warnings with zero errors. **Real-use quality evaluation: PASS.** Curated
+  Rust Markdown ran through real production LiteLLM aliases on a freshly migrated development DB:
+  26 candidates/20 profiles became six published Concepts, then 28 derived nodes/30 edges, 70
+  structurally complete Study Items, and 28 non-empty Concept Lessons. Normalized readers, all nine
+  JSON_TABLE views, five immutable artifact families, and the four-operation timeline agreed. One
+  optional profile was incomplete and 14 item variants correctly failed existing grounding or
+  distinctness checks; no neural tuning was made. The full fixture manifest also references an
+  absent PDF after registering its native fixtures. The development DB intentionally retains this
+  evidence; Compose behavior and the shared deployment remain untouched for U4.

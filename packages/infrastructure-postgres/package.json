@@ -8,6 +8,8 @@
   },
   "scripts": {
     "test": "tsx --test src/*.test.ts",
+    "test:migrations:db": "tsx --test --test-concurrency=1 src/migrations/applicationSchemaMigration.db.test.ts",
+    "db:migrate": "tsx src/migrations/applicationSchemaMigrationCli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
