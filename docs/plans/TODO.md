@@ -2,6 +2,12 @@
 
 ## TODO
 
+- **READY — Integrate Drizzle migrations.** The
+  [interview-locked plan](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md) makes one
+  internal Drizzle schema the persisted-shape authority while raw `postgres` stores remain; exact
+  catalog parity, explicit targeted resets, and one host/Compose migrator are required before the
+  shared greenfield cutover. Implementation has not started.
+
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
   the same commit that decrements the shield — so the stage unmounts on the exact edge it watches and
