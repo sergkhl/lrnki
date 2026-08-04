@@ -212,7 +212,7 @@ export const graphVersionEvidencePassages = pgTable(
   ],
 );
 
-export const graphVersionOptionalAssertions = pgTable(
+export const graphVersionOptionalAssertionEntries = pgTable(
   "graph_version_optional_assertions",
   {
     graphVersionOptionalAssertionId: uuid("graph_version_optional_assertion_id")
@@ -261,7 +261,7 @@ export const graphVersionOptionalAssertionEvidence = pgTable(
   (table) => [
     foreignKey({
       columns: [table.graphVersionOptionalAssertionId],
-      foreignColumns: [graphVersionOptionalAssertions.graphVersionOptionalAssertionId],
+      foreignColumns: [graphVersionOptionalAssertionEntries.graphVersionOptionalAssertionId],
       name: "graph_version_optional_assert_graph_version_optional_asser_fkey",
     }),
     foreignKey({

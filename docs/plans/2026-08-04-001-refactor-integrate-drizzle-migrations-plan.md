@@ -12,7 +12,7 @@ execution: code
 **Decision state:** Interview-locked. The user accepted decisions D1-D4 directly and delegated the
 remaining questions to the recommended answers recorded in D5-D11 below.
 
-**Implementation state:** U1 is complete. The live handoff and latest evidence are in
+**Implementation state:** U1 and U2 are complete. The live handoff and latest evidence are in
 [TODO.md](./TODO.md).
 
 ## Goal capsule

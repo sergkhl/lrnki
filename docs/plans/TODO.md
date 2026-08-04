@@ -3,14 +3,14 @@
 ## TODO
 
 - **IN PROGRESS — Integrate Drizzle migrations.**
-  [U1 is complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): the pinned stable
-  dependencies, internal lifecycle schema modules, offline config, and guarded generate/check
-  tooling are implemented. A disposable candidate has exactly 56 tables, nine views, one SQL, one
-  snapshot, and one journal entry; its relation inventory matches the handwritten baseline and
-  `drizzle-kit check` passes. The committed handwritten lineage is intentionally unchanged, so
-  `pnpm db:check` remains red on its missing snapshot and is not yet wired into `pnpm check`.
-  **Next:** execute U2 against `lrnki_test`, prove normalized catalog and all nine view probes equal,
-  then replace SQL/snapshot/journal together and wire the green drift gate into `pnpm check`.
+  [U1-U2 are complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): the internal
+  lifecycle schema is now the only hand-edited persisted-shape definition, and its generated SQL,
+  snapshot, and journal replaced the handwritten lineage together after exact catalog and all-view
+  parity on `lrnki_test`. `pnpm db:check` is green and runs near the start of `pnpm check`.
+  **Next:** execute U3 as one coherent slice: implement the internal migration module and typed state
+  classifier, advisory lock, CLI, targeted reset path, and state-matrix tests; delete the temporary
+  direct-`psql` applicator only after host and DB-test commands cross the new interface. Then run the
+  plan's real-use persistence gate on a freshly migrated development database before U4.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -151,20 +151,17 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   Provider lock and alias work on generation speed, plus topic-claim fencing and DB-test isolation
   against `lrnki_test`.
 
-- **Deep Scaffold Generation, content-quality audit, and dead-module cleanup (2026-07-16→17).**
-  Learner-scoped Scaffold Detours became durable with closed attribution
-  ([ADR-0037](../adr/0037-persist-learner-scoped-scaffold-detours.md)); superseded modules deleted.
-
 ## VALIDATION
 
-- **Drizzle migration U1 — 2026-08-04. PASS at the pre-cutover boundary.** Stable Drizzle generated
-  a disposable candidate with 56 tables, nine views, one `0000` SQL file, one snapshot, and one
-  journal entry; the sorted table/view inventory diff against the handwritten baseline was empty and
-  `drizzle-kit check` passed. `pnpm --filter @lrnki/infrastructure-postgres typecheck`, its 101-test
-  suite (11 run, 90 DB-opt-in skipped), focused ESLint, shell syntax, `git diff --check`, and
-  `env -u NODE_ENV pnpm check` all passed; the full browser envelope was 64/64. The ordinary lint
-  phase retains four unrelated warnings and zero errors. `pnpm db:check` was also exercised and
-  correctly rejected the still-committed legacy lineage because `meta/0000_snapshot.json` does not
-  exist. No database was reset or migrated, no production path changed, and the U3 real-use gate was
-  therefore not triggered. U2 owns catalog parity, all nine semantic view probes, generated-lineage
-  replacement, `pnpm test:db`, and activation of the drift check inside `pnpm check`.
+- **Drizzle migration U2 — 2026-08-04. PASS at the generated-lineage boundary.** The committed
+  generated baseline has exactly 56 tables, nine views, one `0000` SQL, one snapshot, and one journal
+  entry. Its 1,346-record normalized PostgreSQL catalog report is byte-equal to the handwritten
+  oracle across relations, columns/types/defaults/nullability, named constraints and FK actions,
+  indexes/order/operator classes/predicates, and view definitions. Deterministic payload probes
+  returned byte-equal rows and PostgreSQL types through all nine inspection views. `pnpm db:check`,
+  the infrastructure package typecheck, `pnpm test:db` from a full `lrnki_test` reset, Compose config,
+  `git diff --check`, and `env -u NODE_ENV pnpm check` passed; the browser envelope was 64/64 and lint
+  retained four unrelated warnings with zero errors. Only `lrnki_test` was reset; the development
+  database, shared deployment, Compose migration path, and application stores were untouched. The
+  U3 real-use persistence gate remains intentionally pending until the programmatic migrator and
+  reset state machine are foundationally green.
