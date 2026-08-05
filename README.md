@@ -26,7 +26,8 @@ Packages:
 - `packages/application`: use-cases, projections, and orchestration
 - `packages/infrastructure-ingestion`: structured text, HTML, and Docling parser adapters
 - `packages/infrastructure-litellm`: forced named tool-call gateway and stage descriptors
-- `packages/infrastructure-postgres`: PostgreSQL schema, initial migration, and JSON_TABLE views
+- `packages/infrastructure-postgres`: code-first persisted schema, its generated baseline, and the
+  one schema migrator
 - `packages/infrastructure-storage-local`: local curated-source object store adapter
 
 ## Commands
@@ -42,10 +43,9 @@ pnpm dev:api        # Learner API (tsx watch)
 pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
 
-`docker compose up -d --build` starts the complete deployed stack. Compose applies the canonical
-initial application migration after PostgreSQL becomes healthy and starts the learner API only
-after that migration and LiteLLM both succeed. Changing that migration means resetting the
-application database ([AGENTS.md](AGENTS.md) rules 8 and 9).
+`docker compose up -d --build` starts the complete deployed stack. Compose brings the application
+schema to current through the one-shot `migrate` service after PostgreSQL becomes healthy, and
+starts the learner API only after that migration and LiteLLM both succeed.
 
 Run the quality checks:
 
@@ -70,6 +70,34 @@ The native gate drives a standalone e2e-profile APK on a booted Android emulator
 What a green run does and does not prove is owned by
 [ADR-0038](docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md); prerequisites and
 setup are in [apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
+
+## Database schema
+
+Persisted shape is code-first: edit the internal Drizzle schema, regenerate the sole baseline, and
+reset rather than add a second migration
+([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)). Four commands cover
+the whole loop:
+
+```bash
+pnpm db:generate   # after editing packages/infrastructure-postgres/src/schema/ — offline
+pnpm db:check      # offline drift gate; already runs inside `pnpm check`
+pnpm db:migrate    # bring DATABASE_URL's database to current
+pnpm db:reset      # drop + recreate its public/drizzle schemas, then migrate
+```
+
+`db:migrate` and `db:reset` need `DATABASE_URL`, which the shell does not auto-load
+(`set -a; . ./.env; set +a`). `db:generate` replaces the SQL, snapshot, and journal together —
+review all three, never hand-edit them, and never apply the SQL with `psql`.
+
+The migrator applies the baseline to an empty database and is a no-op on a current one. Every other
+state stops it **before any DDL** and names itself — `legacy-schema`, `partial-schema`,
+`stale-baseline`, `metadata-without-schema`, or `unexpected-history`
+([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md) holds the normative
+state machine). The operator response is the same for all five: reset.
+
+Locally that is `pnpm db:reset`. On the shared environment it is the cutover runbook below. A deploy
+never resolves these states by itself, and no fix is ever a volume deletion — `postgres_data` also
+holds LiteLLM's database and its virtual keys.
 
 ## Deployment
 
@@ -124,6 +152,34 @@ the one-shot `migrate` service and aborts before touching the API if that contai
 so a healthy old API can never report a successful deploy over a failed migration. A migration that
 reports reset-required is never resolved by the deploy — it waits for the explicit reset runbook.
 Learner sessions persist in `learner_sessions` and survive restarts.
+
+**Shared schema cutover** — the only response to a reset-required deploy, and deliberately manual.
+It **discards the application data** in database `lrnki` (greenfield: no backup or data migration is
+an acceptance dependency) and preserves everything else. From the repo checkout on the VPS:
+
+```bash
+docker compose stop learner-api                      # stop the writers
+docker compose exec -T postgres \
+  psql -U lrnki -d lrnki -X -v ON_ERROR_STOP=1 < scripts/reset-app-schema.sql
+scripts/deploy-learner-api.sh                        # migrate applies 0000 once, then the API
+```
+
+Never pipe that `psql` into anything — a pipeline reports the last command's status, which would
+hide the guard. `scripts/reset-app-schema.sql` aborts on any database other than `lrnki`/`lrnki_test`
+(exit 3) and drops only the `public` and `drizzle` schemas, so the `litellm` database sharing the
+`postgres_data` volume survives. **Never `docker compose down -v`**: that destroys LiteLLM's virtual
+keys, and a dead `sk-…` then fails generation with `401` while `LITELLM_MASTER_KEY` still works.
+
+Then confirm the cutover, including that the separate LiteLLM database survived:
+
+```bash
+docker compose exec -T postgres psql -U lrnki -d lrnki -X -Atqc \
+  'select count(*) from drizzle.__drizzle_migrations;'          # exactly 1
+curl -fsS https://api.lrnki.globesoul.com/health
+curl -fsS -H "Authorization: Bearer ${LITELLM_API_KEY}" http://127.0.0.1:4000/models >/dev/null
+```
+
+plus one authenticated learner read/write against the API.
 
 **Web deploy** — automatic on push to `main`. `lrnki.globesoul.com` is attached as the Pages custom
 domain, so the default `sergkhl.github.io/lrnki/` URL 301s to it, and **Enforce HTTPS** is on.

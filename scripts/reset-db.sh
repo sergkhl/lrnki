@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reset only the local application schemas and reapply the single initial migration (AGENTS rule 8).
+# Reset only the local application schemas and reapply the sole generated baseline (ADR-0039).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

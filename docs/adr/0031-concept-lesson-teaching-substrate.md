@@ -16,7 +16,8 @@ is tested.
 
 Sections may carry generated list `items` for examples/applications. These fields are
 learner-neutral display structure inside the section, not separate claims or citations; source types
-and the initial migration own their exact persisted shape.
+and the internal Drizzle schema own their exact persisted shape
+([ADR-0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 
 The Concept Lesson is the **single source of grounding** for downstream study assets. Option-select
 items derive from the lesson's source-cited sections, not from raw passages; no study-item type reads
@@ -68,7 +69,9 @@ Lesson generation imports no graph or enrichment write port: it is a derived ass
 the asserted graph or the Derived Graph Layer
 ([ADR-0002](0002-define-learner-neutral-core-concept-graph.md), [AGENTS.md](../../AGENTS.md)).
 Optional diagram descriptors are learner-neutral lesson content; their exact persisted shape is owned
-by source types and the initial migration, and rendering belongs to downstream UI.
+by source types and the internal Drizzle schema
+([ADR-0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)), and rendering belongs to
+downstream UI.
 
 ## Context
 

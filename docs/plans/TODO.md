@@ -2,18 +2,16 @@
 
 ## TODO
 
-- **IN PROGRESS — Integrate Drizzle migrations.**
-  [U1-U4 are complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): host, DB-test,
-  and now Compose all cross the same programmatic migrator, and a deploy verifies the freshly created
-  `migrate` container exited zero before it recreates or polls the API. Two live states matter for
-  whoever picks this up. **The shared deployment is still on the legacy schema** and will fail the new
-  migrator with `legacy-schema` until an operator performs the explicit `lrnki`-only reset — that is
-  U5's cutover step, not something a deploy resolves. And **a genuinely fresh Compose bring-up was
-  broken before U4**: the bind-mounted Postgres initializers exited 126, which no already-initialized
-  volume could reveal, so they are now `*.sql`. **Next:** U5 — ADR-0039, move the persisted-shape
-  authority in `AGENTS.md` off the generated SQL file, root/package README workflow plus the targeted
-  cutover runbook, the full validation contract including `env -u NODE_ENV pnpm check`, then the
-  shared reset and deploy.
+- **IN PROGRESS — Integrate Drizzle migrations; one operator action left.**
+  [Everything but the shared cutover is done](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md).
+  U5 added [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md), moved
+  persisted-shape authority off the generated SQL in every document and code comment that claimed it,
+  and gave the root README the four-command workflow, the reset-required reason table, and the
+  `## Shared schema cutover` runbook. The remaining step is in [BLOCKERS](./BLOCKERS.md) because it
+  runs on the VPS. **Do not re-derive this:** the development Mac's `lrnki` is already Drizzle-current
+  (`b3350541…` / `1785857986885`), so the earlier "the shared deployment is still on the legacy
+  schema" claim applies only to the VPS — whose state cannot be read from here, and which the deploy
+  classifies safely by itself. Delete the plan in the change that closes the blocker.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -156,17 +154,16 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## VALIDATION
 
-- **Drizzle migration U4 — 2026-08-05. PASS at the Compose and deploy boundary.** The production
-  `scripts/deploy-learner-api.sh` itself was driven through an isolated Compose project — own project,
-  network, host bridge, volume, container names — across five scenarios: 33 assertions, 0 failures.
-  Fresh applied the baseline and brought the learner API to healthy; a second full startup reported
-  `current` with no DDL; legacy, stale-baseline, and partial-schema each exited nonzero with the
-  actionable reason and left public relations and a seeded application row intact. The legacy control
-  ran with the previous API container still healthy and the deploy still failed, so a failed migration
-  cannot hide behind an old healthy API. The Compose-applied metadata row matched the host-applied row
-  byte for byte (`b3350541…` / `1785857986885`), which is the direct evidence that both paths cross one
-  applicator. `docker compose config --quiet`, `pnpm db:check`, infrastructure typecheck/tests,
-  `git diff --check`, and `pnpm test:db` (9-test migration state matrix, non-application-schema reset
-  guard, and every package suite) all passed. The shared/local `postgres_data` volume was never used
-  and the running stack stayed up throughout. `env -u NODE_ENV pnpm check` is deferred to U5, which
-  owns the full contract before the shared reset.
+- **Drizzle migration U5 — 2026-08-05. PASS on the full validation contract; shared cutover NOT
+  performed.** `env -u NODE_ENV pnpm check` exited 0 — `db:check` reported the schema and committed
+  baseline in sync, then typecheck, 1019 `node:test` assertions with 0 failures (91 skipped are the
+  DB-backed ones), 290 jest, lint, build, and 64 Playwright. `pnpm test:db` (9/9 migration state
+  matrix, the non-application-schema reset guard, every package suite), `docker compose config
+  --quiet`, and `git diff --check` also passed. The cutover runbook was **proven by running its exact
+  command shape**, not asserted: `docker compose exec -T postgres psql … < scripts/reset-app-schema.sql`
+  exits 3 against `litellm` and 0 against `lrnki_test`, where it left `public` at 0 relations and
+  dropped `drizzle`, while `lrnki` kept all 65 relations and LiteLLM kept its virtual key; `lrnki_test`
+  was then reapplied from the baseline back to 65 relations and exactly one metadata row. Piping that
+  `psql` hides the guard — the status becomes `tail`'s, the same trap the deploy script documents for
+  `docker compose build`. The VPS was never contacted beyond one public `/health` probe, whose 200
+  proves nothing about its schema.

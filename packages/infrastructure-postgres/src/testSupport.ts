@@ -33,10 +33,9 @@ export function trackLearner(learnerRef: string): string {
   return learnerRef;
 }
 
-// FK-ordered delete of one learner and every learner-owned table in the current initial migration
-// (AGENTS.md: the migration is the deletion-graph authority; plan 2026-07-15-001 U1). Children
-// first, then the `learners` row. Ordering constraints, all read off the FK graph in
-// `0000_initial_lrnki_schema.sql`:
+// FK-ordered delete of one learner and every learner-owned table (ADR-0039: the deletion graph is
+// read off the schema authority, `src/schema/learnerState.ts`, never off the generated SQL).
+// Children first, then the `learners` row. Ordering constraints, all read off that FK graph:
 //   - recall_challenges cascades its lineup + events, so a plain challenge delete clears them.
 //   - response_log carries a scaffold_step_id FK into learner_scaffold_steps (which cascade from
 //     their detour), so response_log MUST be deleted before learner_scaffold_detours.

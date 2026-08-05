@@ -12,8 +12,10 @@ execution: code
 **Decision state:** Interview-locked. The user accepted decisions D1-D4 directly and delegated the
 remaining questions to the recommended answers recorded in D5-D11 below.
 
-**Implementation state:** U1 through U4 are complete; U5 is the remaining unit. The live handoff and
-latest evidence are in [TODO.md](./TODO.md).
+**Implementation state:** U1 through U4 are complete. U5's durable consolidation, documentation, and
+full validation contract are done; only its shared cutover remains, and it is unreachable from a
+development session — it is recorded in [BLOCKERS.md](./BLOCKERS.md) and is the sole reason this plan
+is not yet deleted. The live handoff and latest evidence are in [TODO.md](./TODO.md).
 
 ## Goal capsule
 
@@ -439,19 +441,24 @@ refactor.
 
 **Work**
 
-- Add ADR-0039 for the durable Drizzle code-first schema/migration decision and rationale; omit this
-  plan's implementation transcript.
-- Update the authority statement in `AGENTS.md`. Source types continue to own implemented
-  interfaces; the internal Drizzle schema owns persisted shapes; generated SQL/snapshot/journal are
-  mechanical migration artifacts.
-- Remove duplicate/stale authority wording from `docs/adr/README.md`, `docs/plans/README.md`,
-  ADR-0026, and ADR-0031, linking to the canonical authority instead.
-- Update the root README and `packages/infrastructure-postgres/README.md` with the four-command dev
-  workflow, failure semantics, and targeted shared cutover runbook.
-- Run the full validation contract before touching the shared database.
+Done:
+
+- ADR-0039 owns the durable code-first schema/migration decision and is registered in the ADR index.
+- `AGENTS.md` authority and rule 8, `docs/adr/README.md`, `docs/plans/README.md`, ADR-0003, ADR-0026,
+  and ADR-0031 now name `src/schema/` as the persisted-shape authority and link to ADR-0039 instead
+  of restating it; the `AGENTS rule 8` citations in `docker-compose.yml` and `scripts/reset-db.sh`
+  follow the same link.
+- The root README owns the four-command workflow, the reset-required reason table, and the shared
+  cutover runbook; `packages/infrastructure-postgres/README.md` owns the schema module map and the
+  migrator contract.
+- The full validation contract ran green; the latest evidence is the `TODO.md` VALIDATION entry.
+
+Remaining:
+
 - Explicitly reset only the shared `lrnki` application schemas, deploy, and run the cutover checks.
-- Fold the completed outcome and latest evidence into `TODO.md`, delete this plan, and remove its
-  active-plan link in the same closing change.
+  This is an operator action on the VPS, tracked in [BLOCKERS.md](./BLOCKERS.md).
+- Then fold the completed outcome into `TODO.md`, delete this plan, and remove its active-plan link
+  in the same closing change.
 
 **Gate**
 

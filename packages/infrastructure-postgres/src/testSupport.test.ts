@@ -11,8 +11,8 @@ import {
 
 // Integration tests for the durable real-use gate teardown (plan 2026-07-15-001 U1). Skipped when
 // TEST_DATABASE_URL is absent so the hermetic suite stays green; the explicit Verification Contract
-// command loads `.env` and MUST execute these. The initial migration is the deletion-graph
-// authority (AGENTS.md) — scenario 1 populates every learner-owned FK family so a missing table
+// command loads `.env` and MUST execute these. `src/schema/learnerState.ts` is the deletion-graph
+// authority (ADR-0039) — scenario 1 populates every learner-owned FK family so a missing table
 // (the recall_challenges / learner_sessions drift this unit fixed) fails loudly.
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;

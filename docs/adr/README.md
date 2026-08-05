@@ -7,7 +7,8 @@ ADRs are the canonical source for current durable architectural decisions and ra
   progress, plan-unit references, branch names, and validation transcripts.
 - Link to another ADR instead of restating its decision.
 - Delete a fully superseded ADR and repair inbound references. ADR numbers are never reused.
-- Source types and the initial migration remain authoritative for exact interfaces and data shapes.
+- Source types remain authoritative for exact interfaces, and the internal Drizzle schema for exact
+  persisted shapes ([0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 
 ## Current decisions
 
@@ -43,3 +44,4 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0036 — Single shared learner environment during testing](./0036-run-single-shared-learner-environment-during-testing.md)
 - [0037 — Persist learner-scoped Scaffold Detours outside the neutral graph](./0037-persist-learner-scoped-scaffold-detours.md)
 - [0038 — Native interaction gate scope and physical-device authority](./0038-native-interaction-gate-scope-and-physical-authority.md)
+- [0039 — Code-first Drizzle persisted-shape authority](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)

@@ -5,8 +5,10 @@ Keep one canonical definition for every fact:
 - `AGENTS.md` owns engineering workflow and enforcement rules.
 - `CONTEXT.md` owns project language and ambiguity resolution.
 - `docs/adr/` owns current durable architectural decisions and rationale.
-- Source types and `packages/infrastructure-postgres/src/migrations/0000_initial_lrnki_schema.sql`
-  own implemented interfaces and persisted data shapes.
+- Source types own implemented interfaces; the internal Drizzle schema in
+  `packages/infrastructure-postgres/src/schema/` owns persisted data shapes. The generated `0000`
+  migration, snapshot, and journal are mechanical artifacts and are never edited or applied by hand
+  ([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 - A linked file in `docs/brainstorms/` owns accepted problem framing, requirements, and scope until
   that work is completed or abandoned.
 - A linked ready/in-progress file in `docs/plans/` owns active implementation design.
@@ -38,7 +40,7 @@ definitions and repair their references in the same change.
 
 7. Enforce [ADR-0003](docs/adr/0003-use-postgres-json-table-artifact-store.md).
 
-8. Keep only the single initial migration; compatibility migrations are not required.
+8. Enforce [ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md).
 
 9. Database resets and re-initialization are allowed without approval during development.
 

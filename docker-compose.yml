@@ -27,7 +27,7 @@ services:
   # programmatic migrator the host uses. It applies the sole baseline to an empty database and is a
   # no-op on a current one; every legacy/partial/stale/unexpected-history state exits nonzero and
   # demands an explicit reset, because changing the greenfield schema means resetting the database
-  # rather than migrating it incrementally (AGENTS rule 8). Deliberately one-shot: never restarted,
+  # rather than migrating it incrementally (ADR-0039). Deliberately one-shot: never restarted,
   # and never destructive on its own.
   migrate:
     build:

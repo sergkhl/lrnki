@@ -28,14 +28,15 @@ Deleted detail is not lost: git history is the provenance record for outcomes an
 ## Active implementation plans (execution order)
 
 - [Integrate Drizzle Migrations](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md) —
-  in progress; U1-U4 established the code-first schema, catalog-equivalent generated lineage, and one
-  migrator behind host, test, and Compose alike; U5 consolidates durable policy and performs the
-  explicit shared cutover.
+  implementation, durable consolidation, and validation are complete. It stays open for one operator
+  action only, the shared cutover in [BLOCKERS](./BLOCKERS.md); delete it in the change that closes
+  that blocker.
 
 ## Ownership rules
 
 - ADRs own durable policy; linked brainstorms own accepted requirements and scope; plans link to both
   rather than restating them.
-- Source types and the initial migration own exact interfaces and persisted shapes.
+- Source types own exact interfaces and the internal Drizzle schema owns exact persisted shapes
+  ([ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 - Keep only ready/in-progress plans here. Delete stale or completed plans immediately after their
   durable content has been consolidated.

@@ -14,7 +14,8 @@ Implemented item payloads are `option_select`, `matching`, and `impostor`.
 A per-node Study Item Blueprint stage runs inside the existing `study_items` operation. It decides
 which item types to generate for the node and assigns each generated type a distinct assessed facet.
 Declined types are persisted as rejected study-item rows, not as a separate capability map. Exact
-payload fields and persistence shapes are owned by source types and the initial migration.
+payload fields are owned by source types and their persisted shapes by the internal Drizzle schema
+([ADR-0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 
 Blueprints have a sparse default. A deterministic structural pre-gate vetoes only provable
 impossibilities from the Concept Lesson substrate: no lesson means no item type; matching requires
