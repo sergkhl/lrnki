@@ -6,9 +6,14 @@
 
   ```bash
   ss -tlnp | grep 8787                                         # expect empty; stop anything found
+  echo 'COMPOSE_PROFILES=public' >> .env                       # this host owns the public hostname
   scripts/deploy-learner-api.sh                                # rebuilds caddy with the one upstream
   ufw delete allow in on br-lrnki to any port 8787 proto tcp   # the dev-loop hole is now unused
   ```
+
+  `caddy` now sits behind the `public` profile so development machines skip it. The deploy itself
+  does not depend on that variable — it names `caddy` explicitly, which activates the profile — but
+  set it anyway so a bare `docker compose up -d` on the VPS still brings the edge up.
 
   Confirm the deploy's container-direct probe and public poll both pass, then one authenticated
   learner round trip over real TLS (`POST /session` → `GET /me` → `/catalog` → `DELETE /session` →

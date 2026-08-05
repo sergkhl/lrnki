@@ -42,9 +42,15 @@ pnpm dev:admin      # Admin Lab (Next.js)
 pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
 
-`docker compose up -d --build` starts the complete deployed stack. Compose brings the application
-schema to current through the one-shot `migrate` service after PostgreSQL becomes healthy, and
-starts the learner API only after that migration and LiteLLM both succeed.
+`docker compose up -d --build` starts the stack. Compose brings the application schema to current
+through the one-shot `migrate` service after PostgreSQL becomes healthy, and starts the learner API
+only after that migration and LiteLLM both succeed.
+
+The `caddy` service is behind the `public` profile, so that command **skips it** on a development
+machine — Caddy only makes sense where `api.lrnki.globesoul.com` resolves, and anywhere else it
+retries ACME against the real VPS forever. The shared host opts in with `COMPOSE_PROFILES=public` in
+its `.env`; `scripts/deploy-learner-api.sh` names `caddy` explicitly, which activates the profile on
+its own, so the deploy works with or without that variable.
 
 Run the quality checks:
 

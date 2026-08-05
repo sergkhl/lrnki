@@ -146,10 +146,17 @@ services:
   # into a built image (not bind-mounted — the daemon's FS view diverges from the checkout, so
   # file binds break); config change => `docker compose up -d --build caddy`. Caddy reaches its one
   # upstream over the lrnki network, so it needs no route to the host (ADR-0040).
+  #
+  # Profiled because it is meaningful only on the host that owns the public hostname. Off that host
+  # it endlessly retries ACME for api.lrnki.globesoul.com — which cannot succeed, since Let's Encrypt
+  # validates against the VPS. So a plain `docker compose up -d` skips it, and the shared host opts
+  # in with COMPOSE_PROFILES=public in its .env. The deploy script is unaffected either way: naming a
+  # profiled service explicitly (it passes `caddy` to both build and up) activates its profile.
   caddy:
     build:
       context: ./scripts/docker/caddy
     container_name: lrnki-caddy
+    profiles: ["public"]
     networks:
       - lrnki
     restart: unless-stopped
