@@ -89,3 +89,11 @@ definitions and repair their references in the same change.
 
 22. Prioritize the Learner App's game UX and enforce
     [ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
+
+23. Run `docker compose` for the shared environment only from the deploy checkout on its host, and
+    always detached (`-d`). Never from inside an agent container that binds the workspace at a
+    different path than the host does — compose sends the daemon *its* paths, so every relative bind
+    source resolves somewhere the daemon cannot see
+    ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). The file binds
+    fail closed on that; `watch` and `down` are not protected, and an attached `up` takes the whole
+    stack down with its terminal.

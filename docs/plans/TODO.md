@@ -25,12 +25,16 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **The two reserved learners are now deletable.** `realuse-obelisk-u4` (PIN `4417`) and
-  `realuse-probe-summit0731` (PIN `7731`) each own the only `ready` `learner_expeditions` row for
-  their expedition. The native pass turned out to need neither — it runs against the loopback
-  fixture — so nothing is stranded by deleting them. Only `realuse-probe-summit0731` matches
-  `RESERVED_REF_RE` in `@lrnki/infrastructure-postgres/test-support`; the other needs the shared
-  `deleteLearner` helper.
+- **A generated impostor item can contain two false statements.** In the 2026-08-05 VPS real-use run,
+  the `Deep ocean return flow` impostor asked which statement is FALSE and designated the
+  wind-driven one (`lieSource: sibling`, `siblingLabel: Downwelling`) — a well-built lie with a
+  correct reveal. But a second option, *"Deep ocean return flow is also known as the deep western
+  boundary current"*, is also false: the DWBC is one western-intensified limb **of** the return flow,
+  not a synonym for it, and it contradicts the item's own third statement describing a basin-spanning
+  floor-hugging flow. A learner who knows the difference is marked wrong for the right answer.
+  Distractor truth is currently only constrained for the designated lie; the truth of the remaining
+  statements is not checked against the concept's own lesson. Establish the problem class and a
+  conventional check before designing one (rule 21).
 
 ### Evidence-triggered follow-up
 
@@ -104,9 +108,15 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   source and pnpm's in-image workspace symlinks are relative into `/app/packages` — the exact sync
   target. The deploy now refuses while a watch session is attached and probes the container directly
   before the public hostname, so the two claims *the artifact I deployed started* and *the public
-  hostname reaches it* are asserted separately. Durable decision in
-  [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md); the residual
-  same-basename Compose-project hazard is in [BLOCKERS](./BLOCKERS.md); the plan is deleted.
+  hostname reaches it* are asserted separately. **Deployed to the VPS the same day**, which is what
+  actually closed the hole: `COMPOSE_PROFILES=public` set on the shared host, the single-upstream
+  Caddy built and running, and the `br-lrnki → 8787` ufw rule deleted (v4 and v6) now that nothing
+  binds it. The residual — one checkout reachable at two paths through an agent container, not two
+  checkouts — is closed too: every file bind now sets `create_host_path: false`, so a caller
+  resolving a path the daemon cannot see is refused by name instead of having an empty directory
+  created and mounted over a config file, and `AGENTS.md` rule 23 states where compose may run.
+  Durable decision in
+  [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md); the plan is deleted.
 
 - **Drizzle migrations integrated and the shared deployment cut over (2026-08-05).** The whole plan
   shipped, closing with the VPS cutover that only an operator could run. The shared database
@@ -158,21 +168,37 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## VALIDATION
 
-- **Compose Watch dev loop and the single public upstream — 2026-08-05, local. PASS; VPS deploy
-  still owed.** `env -u NODE_ENV pnpm check` and `pnpm test:db` both exit 0. Watch proved in both
-  directions on real containers: an `apps/learner-api/src/app.ts` edit synced, restarted, and was
-  **served** (`{"ok":true,"watchProbe":"alpha"}`), and a `packages/domain-core` edit landed at
-  `/app/packages/…`, resolved through `node_modules/@lrnki/domain-core`, and the container returned
-  to healthy — which is the symlink proof, since no `@lrnki/*` import resolves otherwise. Those links
-  are relative (`../../../../packages/…`), so they only survive because the sync target equals the
-  in-image install path. The one-shot `migrate` was a harmless no-op under watch bring-up (exit 0,
-  `Application schema is already initialized.`). Negative control: with a real imposter bound on host
-  8787, Caddy's **live** upstream registry stayed `[{"address":"learner-api:8787"}]` and its loaded
-  config contained zero references to the host — end-to-end over TLS is deferred to the VPS, since a
-  local Caddy cannot obtain a certificate for the public hostname. Deploy guard verified both ways:
-  exit 1 before `git pull`/build with watch attached, and no false positive without it.
-  **Two findings.** A host `pnpm --filter @lrnki/learner-api dev` from 2026-08-02 was still on this
-  machine's 8787, and killing its child was not enough — the `tsx watch` parent respawned it within
-  seconds, so the whole `pnpm → tsx watch → node` tree had to go. That respawn is why the VPS process
-  survived for days. Separately, the first watch build died on `no space left on device` with 21 GB of
-  build cache; `docker builder prune -f` reclaimed 12.3 GB.
+- **Single public upstream deployed to the VPS — 2026-08-05, shared environment. PASS.**
+  - *Milestone:* `api.lrnki.globesoul.com` now resolves only to the `learner-api` container
+    (ADR-0040), with the host dev runtime and its firewall hole gone.
+  - *Fixture and source type:* a cold synthetic topic expedition, *"How thermohaline circulation
+    moves heat through the ocean"* — deliberately outside `fixtures/` so nothing was rehearsed.
+  - *Real model calls:* yes, production, through the deployed container's own LiteLLM credentials.
+  - *Useful output observed:* 14 stages, `ready` in **324 s**, `declaredDomain` inferred as
+    *Oceanography* with all 16 concepts `llm_grounded` and zero anchor/source-mentioned. The
+    prerequisite graph is scientifically sound and monotone in difficulty — temperature/salinity
+    effects → seawater density → downwelling → deep water formation → NADW/AABW — over 13 certain
+    and 2 uncertain edges, partitioned into 7 sections. Lessons are accurate (the timescales lesson
+    gives the standard 500–1 000-year loop) and option-select distractors are domain-meaningful
+    rather than filler (tidal forcing, Ekman transport, solar heating alone).
+  - *Defects observed:* one content defect, recorded in TODO — a generated impostor item carries a
+    second false statement beside its designated lie. Also **3 of 16 concepts have no study item**,
+    including `Seawater density`, the highest-degree node in the graph (two prerequisites in, two
+    dependents out), so the hub concept is unassessable. And 324 s to first playable content is
+    direct evidence for the standing *progressive readiness* follow-up above.
+  - *Changes made after inspection:* none to generation — every defect predates this milestone and
+    none is caused by the traffic-path change.
+  - *Remaining caveats:* the content defect is unfixed; the generation layer does not check the
+    truth of non-designated statements.
+  - *Safe to continue downstream:* yes.
+
+  Path evidence, separate from quality: the deploy's container-direct probe and public poll both
+  passed, and the **interception negative control now runs end-to-end over real TLS** rather than
+  against a local Caddy — with a real impostor bound on the VPS's `0.0.0.0:8787` returning
+  `{"impostor":"HOST-8787"}`, the loopback served the impostor while the public hostname served the
+  container's `{"ok":true}`. `host.docker.internal` is additionally `NXDOMAIN` inside Caddy, since
+  nothing grants it `host-gateway`. One authenticated round trip over TLS passed
+  (`POST /session` → `/me` → `/catalog` → `DELETE /session` → 401), and the probe learner was removed
+  through `cleanupReservedLearners`, leaving **0 rows in `learners`** — which also proves the two
+  reserved learners a previous TODO entry expected to delete were already destroyed by the schema
+  cutover.

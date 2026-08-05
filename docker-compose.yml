@@ -14,9 +14,28 @@ services:
       # 5432, which is what every service-name DSN on the `lrnki` network uses.
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
+      # Named volume: path-independent, so no guard applies.
       - postgres_data:/var/lib/postgresql
-      - ./scripts/docker/postgres/01-init-litellm-db.sql:/docker-entrypoint-initdb.d/01-init-litellm-db.sql:ro
-      - ./scripts/docker/postgres/02-init-test-db.sql:/docker-entrypoint-initdb.d/02-init-test-db.sql:ro
+      # Every file bind in this file is fail-closed. `create_host_path: false` is the whole point:
+      # by default Docker CREATES a missing bind source as an empty directory, so a caller whose
+      # paths this daemon cannot resolve silently gets a directory mounted over an init script or a
+      # config file. That is not hypothetical — it is how the `/workspace/lrnki` debris on the VPS
+      # was produced, by compose run inside an agent container that binds the workspace at a
+      # different path (ADR-0040). Every source below is a tracked repo file, so it exists in any
+      # valid checkout; the only state this can refuse is a caller resolving the wrong path.
+      # Guards `up`, not `watch` on already-running containers, and not `down`.
+      - type: bind
+        source: ./scripts/docker/postgres/01-init-litellm-db.sql
+        target: /docker-entrypoint-initdb.d/01-init-litellm-db.sql
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./scripts/docker/postgres/02-init-test-db.sql
+        target: /docker-entrypoint-initdb.d/02-init-test-db.sql
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lrnki -d lrnki"]
       interval: 5s
@@ -54,7 +73,13 @@ services:
       # via localhost; containers use the `litellm` service name over the lrnki network.
       - "127.0.0.1:4000:4000"
     volumes:
-      - ./litellm/config.yaml:/app/config.yaml:ro
+      # Fail-closed like the postgres binds above — reason documented there.
+      - type: bind
+        source: ./litellm/config.yaml
+        target: /app/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
     env_file:
       - .env

@@ -51,9 +51,20 @@ makes the hazard unreachable, after which there is nothing for a health check to
 - A deploy refuses while a watch session is attached, since a sync would overwrite the image just
   deployed. The deploy also probes the container directly before the public hostname, so "the
   artifact I deployed started" and "the public hostname reaches it" are asserted separately.
-- Compose projects are keyed by directory basename, so a second checkout sharing the basename
-  resolves to the same containers and can still `watch` into the deployed one. That residual is
-  host hygiene — an operator action, not a compose or Caddy setting.
+- Compose projects are keyed by directory basename, so anything that reaches the shared daemon with
+  a project directory named `lrnki` resolves to these containers. On the VPS that is not a second
+  checkout but the **same** checkout at a second path: an agent container binds the workspace at a
+  different prefix and shares the docker socket, so compose there hands the daemon paths it cannot
+  see. Docker's default is to create a missing bind source as an empty directory, which is how a
+  directory ends up mounted over `config.yaml`.
+
+  Resolved by rule plus a fail-closed mechanism, not by remapping that container: every file bind in
+  `docker-compose.yml` sets `create_host_path: false`, so a caller resolving the wrong path is
+  refused by name instead of silently corrupted, and rule 23 in `AGENTS.md` states where compose may
+  run. Remapping the agent container's workspace to the host path was considered and rejected — it
+  re-keys the path-addressed session state bind-mounted into it, for a hazard this closes more
+  cheaply. `watch` on already-running containers and `down` touch no bind source and so remain
+  governed by the rule alone.
 - This supersedes the dev-loop mechanism in
   [ADR-0036](./0036-run-single-shared-learner-environment-during-testing.md). That decision — one
   shared environment, dev equals prod — is unchanged and is in fact what this ADR enforces.

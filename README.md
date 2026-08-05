@@ -140,9 +140,17 @@ not syncing, and it dies with its terminal or SSH session. Stop it before deploy
 `scripts/deploy-learner-api.sh` refuses while one is attached, because a sync would overwrite the
 image it just deployed.
 
-The Caddyfile is baked into the built caddy image (bind mounts break on this VPS — the daemon's FS
-view diverges from the checkout), so a Caddy config change needs
+The Caddyfile is baked into the built caddy image rather than bind-mounted (reason in
+`scripts/docker/caddy/Dockerfile`), so a Caddy config change needs
 `docker compose up -d --build caddy`.
+
+**Every compose command here must be detached and must run from this checkout on the host.** A bare
+`docker compose up` is attached: it takes the whole stack down when its terminal or SSH session
+ends, which is how the shared environment went dark on 2026-08-05. Running compose from an agent
+container that binds the workspace at a different prefix is the other half of the same rule — the
+file binds set `create_host_path: false` and refuse such a caller by name, but `watch` and `down`
+are not protected ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md),
+`AGENTS.md` rule 23).
 
 **API deploy** — from the repo checkout on the VPS (drives the local Docker daemon):
 
