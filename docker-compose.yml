@@ -15,17 +15,20 @@ services:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
-      - ./scripts/docker/postgres/01-init-litellm-db.sh:/docker-entrypoint-initdb.d/01-init-litellm-db.sh:ro
-      - ./scripts/docker/postgres/02-init-test-db.sh:/docker-entrypoint-initdb.d/02-init-test-db.sh:ro
+      - ./scripts/docker/postgres/01-init-litellm-db.sql:/docker-entrypoint-initdb.d/01-init-litellm-db.sql:ro
+      - ./scripts/docker/postgres/02-init-test-db.sql:/docker-entrypoint-initdb.d/02-init-test-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lrnki -d lrnki"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # Apply the canonical application schema before any process can query it. This is deliberately
-  # a one-shot service: changing the greenfield schema still requires a database reset rather than
-  # an incremental compatibility migration (AGENTS rule 8).
+  # Bring the application schema to current before any process can query it, through the same
+  # programmatic migrator the host uses. It applies the sole baseline to an empty database and is a
+  # no-op on a current one; every legacy/partial/stale/unexpected-history state exits nonzero and
+  # demands an explicit reset, because changing the greenfield schema means resetting the database
+  # rather than migrating it incrementally (AGENTS rule 8). Deliberately one-shot: never restarted,
+  # and never destructive on its own.
   migrate:
     build:
       context: .
@@ -37,11 +40,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PGHOST: postgres
-      PGPORT: "5432"
-      PGUSER: lrnki
-      PGPASSWORD: lrnki
-      PGDATABASE: lrnki
+      DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
     restart: "no"
 
   litellm:

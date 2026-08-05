@@ -12,8 +12,8 @@ execution: code
 **Decision state:** Interview-locked. The user accepted decisions D1-D4 directly and delegated the
 remaining questions to the recommended answers recorded in D5-D11 below.
 
-**Implementation state:** U1, U2, and U3 are complete. The live handoff and latest evidence are in
-[TODO.md](./TODO.md).
+**Implementation state:** U1 through U4 are complete; U5 is the remaining unit. The live handoff and
+latest evidence are in [TODO.md](./TODO.md).
 
 ## Goal capsule
 
@@ -48,9 +48,9 @@ deployment may erase an initialized database automatically.
 - Test authority: [ADR-0038](../adr/0038-native-interaction-gate-scope-and-physical-authority.md).
 - Current persisted shape and migration path:
   [`0000_initial_lrnki_schema.sql`](../../packages/infrastructure-postgres/src/migrations/0000_initial_lrnki_schema.sql),
-  [`migrate-db.sh`](../../scripts/migrate-db.sh),
-  [`reset-db.sh`](../../scripts/reset-db.sh), and
-  [`migrate-if-empty.sh`](../../scripts/docker/postgres/migrate-if-empty.sh).
+  [`migrate-db.sh`](../../scripts/migrate-db.sh), and
+  [`reset-db.sh`](../../scripts/reset-db.sh). The Compose-side `migrate-if-empty.sh` classifier this
+  plan replaced was deleted in U4.
 
 There is no linked brainstorm for this refactor. The task, constraints, and accepted boundaries came
 directly from the planning interview; this ready plan owns their implementation design until the

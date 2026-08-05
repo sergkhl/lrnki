@@ -28,8 +28,9 @@ Deleted detail is not lost: git history is the provenance record for outcomes an
 ## Active implementation plans (execution order)
 
 - [Integrate Drizzle Migrations](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md) —
-  in progress; U1-U3 established the code-first schema, catalog-equivalent generated lineage, and
-  single host/test migrator with its reset state machine; the Compose/deploy cutover is next.
+  in progress; U1-U4 established the code-first schema, catalog-equivalent generated lineage, and one
+  migrator behind host, test, and Compose alike; U5 consolidates durable policy and performs the
+  explicit shared cutover.
 
 ## Ownership rules
 

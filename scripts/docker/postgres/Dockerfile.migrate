@@ -1,9 +1,22 @@
-FROM postgres:18.4-alpine
+# One-shot application-schema migration image. It runs the same programmatic Drizzle migrator that
+# `pnpm db:migrate` runs on the host, so Compose owns no second state classifier and no direct
+# `psql` DDL path. Build context is the repo ROOT so the pnpm workspace closure is visible:
+#   docker build -f scripts/docker/postgres/Dockerfile.migrate -t lrnki-migrate .
+FROM node:22-alpine
 
-# The initial migration remains the single source of truth. Baking it into this one-shot image
-# also works when the Docker daemon cannot resolve bind mounts from the checkout.
-COPY packages/infrastructure-postgres/src/migrations/0000_initial_lrnki_schema.sql /migration.sql
-COPY scripts/docker/postgres/migrate-if-empty.sh /usr/local/bin/migrate-if-empty
-RUN chmod 755 /usr/local/bin/migrate-if-empty
+# Pin the package manager to the root `packageManager` field so installs are reproducible.
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 
-ENTRYPOINT ["migrate-if-empty"]
+WORKDIR /app
+
+# Copy the whole workspace (`.dockerignore` strips node_modules/build outputs) and install only the
+# migrator's dependency closure. The trailing `...` on the filter pulls in every workspace package
+# infrastructure-postgres depends on. Development dependencies are installed on purpose: the CLI
+# runs from TypeScript source under tsx, exactly like the host command. This same copy carries the
+# generated `0000` migration folder, which the migrator reads as its committed manifest.
+COPY . .
+RUN pnpm install --frozen-lockfile --filter @lrnki/infrastructure-postgres...
+
+# Invoke the package's own `db:migrate` script — the single definition of how the CLI is started,
+# shared with scripts/migrate-db.sh. It reads DATABASE_URL from the container environment.
+CMD ["pnpm", "--filter", "@lrnki/infrastructure-postgres", "run", "db:migrate"]

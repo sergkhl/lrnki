@@ -3,15 +3,17 @@
 ## TODO
 
 - **IN PROGRESS — Integrate Drizzle migrations.**
-  [U1-U3 are complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): host and DB-test
-  commands now cross the same programmatic Drizzle migrator; its typed classifier, reserved-connection
-  advisory lock, post-apply verification, targeted `public`/`drizzle` reset, and destructive
-  `lrnki_test` state matrix are green. The development database was explicitly reset through this
-  path and now holds the successful curated-Rust persistence gate; the shared deployment was not
-  touched. **Next:** execute U4 as one coherent slice: replace the Compose migration image/environment,
-  delete `migrate-if-empty.sh`, harden deploy migration-result checking, and run fresh/current plus
-  legacy/stale/partial negative controls through a temporary isolated Compose override. Do not use or
-  reset the named shared/local `postgres_data` volume for those controls.
+  [U1-U4 are complete](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md): host, DB-test,
+  and now Compose all cross the same programmatic migrator, and a deploy verifies the freshly created
+  `migrate` container exited zero before it recreates or polls the API. Two live states matter for
+  whoever picks this up. **The shared deployment is still on the legacy schema** and will fail the new
+  migrator with `legacy-schema` until an operator performs the explicit `lrnki`-only reset — that is
+  U5's cutover step, not something a deploy resolves. And **a genuinely fresh Compose bring-up was
+  broken before U4**: the bind-mounted Postgres initializers exited 126, which no already-initialized
+  volume could reveal, so they are now `*.sql`. **Next:** U5 — ADR-0039, move the persisted-shape
+  authority in `AGENTS.md` off the generated SQL file, root/package README workflow plus the targeted
+  cutover runbook, the full validation contract including `env -u NODE_ENV pnpm check`, then the
+  shared reset and deploy.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -154,18 +156,17 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## VALIDATION
 
-- **Drizzle migration U3 — 2026-08-04. PASS at the runtime-state and real-use persistence boundary.**
-  Fresh/current, two concurrent callers, legacy, partial, stale hash, stale journal time,
-  metadata-without-schema, and extra history all matched the typed state machine; failure fixtures
-  preserved public data, every migration client closed, and reset preserved a populated
-  non-application schema. `pnpm test:db`, `pnpm db:check`, the infrastructure tests/typecheck, Compose
-  config, `git diff --check`, and `env -u NODE_ENV pnpm check` passed; web E2E was 64/64 and lint kept
-  the same four unrelated warnings with zero errors. **Real-use quality evaluation: PASS.** Curated
-  Rust Markdown ran through real production LiteLLM aliases on a freshly migrated development DB:
-  26 candidates/20 profiles became six published Concepts, then 28 derived nodes/30 edges, 70
-  structurally complete Study Items, and 28 non-empty Concept Lessons. Normalized readers, all nine
-  JSON_TABLE views, five immutable artifact families, and the four-operation timeline agreed. One
-  optional profile was incomplete and 14 item variants correctly failed existing grounding or
-  distinctness checks; no neural tuning was made. The full fixture manifest also references an
-  absent PDF after registering its native fixtures. The development DB intentionally retains this
-  evidence; Compose behavior and the shared deployment remain untouched for U4.
+- **Drizzle migration U4 — 2026-08-05. PASS at the Compose and deploy boundary.** The production
+  `scripts/deploy-learner-api.sh` itself was driven through an isolated Compose project — own project,
+  network, host bridge, volume, container names — across five scenarios: 33 assertions, 0 failures.
+  Fresh applied the baseline and brought the learner API to healthy; a second full startup reported
+  `current` with no DDL; legacy, stale-baseline, and partial-schema each exited nonzero with the
+  actionable reason and left public relations and a seeded application row intact. The legacy control
+  ran with the previous API container still healthy and the deploy still failed, so a failed migration
+  cannot hide behind an old healthy API. The Compose-applied metadata row matched the host-applied row
+  byte for byte (`b3350541…` / `1785857986885`), which is the direct evidence that both paths cross one
+  applicator. `docker compose config --quiet`, `pnpm db:check`, infrastructure typecheck/tests,
+  `git diff --check`, and `pnpm test:db` (9-test migration state matrix, non-application-schema reset
+  guard, and every package suite) all passed. The shared/local `postgres_data` volume was never used
+  and the running stack stayed up throughout. `env -u NODE_ENV pnpm check` is deferred to U5, which
+  owns the full contract before the shared reset.

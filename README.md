@@ -115,12 +115,15 @@ view diverges from the checkout), so a Caddy config change needs
 **API deploy** — from the repo checkout on the VPS (drives the local Docker daemon):
 
 ```bash
-scripts/deploy-learner-api.sh   # git pull --ff-only → compose up -d --build learner-api caddy → poll /health
+scripts/deploy-learner-api.sh   # git pull → build → migrate (verified) → up learner-api caddy → poll /health
 ```
 
 The `learner-api` container reads `DATABASE_URL` and `LITELLM_BASE_URL` from compose;
-`LITELLM_API_KEY` comes from the repo-root `.env`. Compose applies the single initial migration
-before starting the API; learner sessions persist in `learner_sessions` and survive restarts.
+`LITELLM_API_KEY` comes from the repo-root `.env`. The deploy brings the schema to current through
+the one-shot `migrate` service and aborts before touching the API if that container exits nonzero,
+so a healthy old API can never report a successful deploy over a failed migration. A migration that
+reports reset-required is never resolved by the deploy — it waits for the explicit reset runbook.
+Learner sessions persist in `learner_sessions` and survive restarts.
 
 **Web deploy** — automatic on push to `main`. `lrnki.globesoul.com` is attached as the Pages custom
 domain, so the default `sergkhl.github.io/lrnki/` URL 301s to it, and **Enforce HTTPS** is on.
