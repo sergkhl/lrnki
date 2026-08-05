@@ -94,6 +94,10 @@ services:
   # Learner HTTP API (U2 / ADR-0035). No published host port — only Caddy reaches it over the
   # lrnki network. The relocated topic-generation supervisor runs inside this long-lived process,
   # so these LiteLLM credentials are also its production generation credentials.
+  #
+  # This container is the ONLY process that serves the public API (ADR-0040). The dev loop syncs
+  # into it — `docker compose watch learner-api` — rather than shadowing it with a second host
+  # runtime, so there is exactly one thing that can answer on 8787 and one source of its env.
   learner-api:
     build:
       context: .
@@ -119,20 +123,35 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    # Edit-on-host / run-in-container dev loop: `docker compose watch learner-api`. WORKDIR /app +
+    # `COPY . .` map the repo root to /app, so these targets are exact and the in-image workspace
+    # symlinks stay valid under a plain file sync. The CMD runs tsx on the TypeScript source, so a
+    # sync needs no build step — only a process restart. A lockfile change is the one case a sync
+    # cannot serve: it needs a real in-image install, hence `rebuild`.
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./apps/learner-api/src
+          target: /app/apps/learner-api/src
+        - action: sync+restart
+          path: ./packages
+          target: /app/packages
+          ignore:
+            - "**/node_modules/"
+        - action: rebuild
+          path: ./pnpm-lock.yaml
 
   # Public TLS terminator (U2): owns 80/443 and reverse-proxies to the learner API. Nothing else
   # on the VPS owns those ports, so Caddy joins this compose file directly. The Caddyfile is baked
   # into a built image (not bind-mounted — the daemon's FS view diverges from the checkout, so
-  # file binds break); config change => `docker compose up -d --build caddy`. host.docker.internal
-  # lets the Caddyfile's first upstream reach a host-run dev learner-api (ADR-0036 dev loop).
+  # file binds break); config change => `docker compose up -d --build caddy`. Caddy reaches its one
+  # upstream over the lrnki network, so it needs no route to the host (ADR-0040).
   caddy:
     build:
       context: ./scripts/docker/caddy
     container_name: lrnki-caddy
     networks:
       - lrnki
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     depends_on:
       learner-api:

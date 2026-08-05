@@ -39,7 +39,6 @@ pnpm install
 set -a; . ./.env; set +a   # the shell does not auto-load .env; DB commands need DATABASE_URL
 pnpm db:migrate
 pnpm dev:admin      # Admin Lab (Next.js)
-pnpm dev:api        # Learner API (tsx watch)
 pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 ```
 
@@ -116,34 +115,33 @@ Both hostnames are stable and hardcoded in the single file that consumes each (w
 
 There is one shared learner environment during testing
 ([ADR-0036](docs/adr/0036-run-single-shared-learner-environment-during-testing.md)), so
-`pnpm --filter @lrnki/learner-app start` needs no configuration. Set `EXPO_PUBLIC_LEARNER_API_URL`
-(e.g. `http://localhost:8787`) only to point the app at a local API instead.
+`pnpm --filter @lrnki/learner-app start` needs no configuration. `EXPO_PUBLIC_LEARNER_API_URL` is
+the single opt-in override for pointing the app at some other API.
 
-**API dev loop** — Caddy's first upstream is a host-run dev API with a container fallback
-(`lb_policy first` + `/health` checks in `scripts/docker/caddy/Caddyfile`). Start
-
-```bash
-pnpm --filter @lrnki/learner-api dev   # tsx watch, reads the repo-root .env
-```
-
-and within ~5s `https://api.lrnki.globesoul.com` serves the watched process — no image rebuild
-per edit. Stop it and traffic falls back to the `learner-api` container within ~10s. One-time
-VPS setup (ufw defaults to DROP, which silently times out the container→host hop):
+**API dev loop** — the public hostname has exactly one upstream, the `learner-api` container
+([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Edit on the host,
+run in the container:
 
 ```bash
-ufw allow in on br-lrnki to any port 8787 proto tcp comment 'lrnki learner-api dev loop: caddy -> host dev process'
+docker compose watch learner-api      # foreground; syncs src/ and packages/ into the container
+docker compose logs -f learner-api    # the positive signal: one restart per edit
 ```
 
-Both processes may run their topic-generation supervisors concurrently; the DB-claim fencing
-([ADR-0029](docs/adr/0029-persist-shared-operation-stage-timelines.md)) makes that safe. The
-Caddyfile is baked into the built caddy image (bind mounts break on this VPS — the daemon's FS
+A saved edit syncs and restarts the container in ~1–3s (a brief 502 during the restart is expected);
+a `pnpm-lock.yaml` change triggers a real image rebuild instead, since a dependency change cannot be
+satisfied by copying files. **Watch is foreground and attached** — if it is not on your screen it is
+not syncing, and it dies with its terminal or SSH session. Stop it before deploying;
+`scripts/deploy-learner-api.sh` refuses while one is attached, because a sync would overwrite the
+image it just deployed.
+
+The Caddyfile is baked into the built caddy image (bind mounts break on this VPS — the daemon's FS
 view diverges from the checkout), so a Caddy config change needs
 `docker compose up -d --build caddy`.
 
 **API deploy** — from the repo checkout on the VPS (drives the local Docker daemon):
 
 ```bash
-scripts/deploy-learner-api.sh   # git pull → build → migrate (verified) → up learner-api caddy → poll /health
+scripts/deploy-learner-api.sh   # git pull → build → migrate (verified) → up learner-api caddy → probe container, then public /health
 ```
 
 The `learner-api` container reads `DATABASE_URL` and `LITELLM_BASE_URL` from compose;
@@ -206,9 +204,12 @@ pnpm dev:ios        # needs macOS + Xcode
 ```
 
 `expo run:*` generates `apps/learner-app/android/` and `ios/` in-tree (gitignored); no
-`EXPO_TOKEN` needed. Builds default to the live API; to target a local `pnpm dev:api`, set
-`EXPO_PUBLIC_LEARNER_API_URL=http://10.0.2.2:8787` (Android emulator) or `http://localhost:8787`
-(iOS simulator) — debug builds permit cleartext HTTP, so no config change is needed.
+`EXPO_TOKEN` needed. Builds default to the live API. `EXPO_PUBLIC_LEARNER_API_URL` remains the
+opt-in override for pointing a build at some other API — `http://10.0.2.2:<port>` from the Android
+emulator, `http://localhost:<port>` from the iOS simulator, and debug builds permit cleartext HTTP
+so no config change is needed. Nothing binds 8787 on a development machine anymore
+([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)), so supply that
+API yourself.
 
 EAS iOS builds (distributable artifacts) — future work.
 

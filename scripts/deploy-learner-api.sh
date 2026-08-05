@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # Manual learner-api deploy (U5). Runs ON the VPS against the local Docker daemon: fast-forward the
 # checkout, bring the application schema to current, then rebuild + restart the learner-api and
-# caddy containers and wait for the public health endpoint. Idempotent; a brief restart blip is
-# accepted (greenfield, single operator).
+# caddy containers and prove they answer. Idempotent; a brief restart blip is accepted (greenfield,
+# single operator).
+#
+# Health is asserted twice, deliberately: once against the container directly (the artifact just
+# deployed actually started) and once against the public hostname (TLS and Caddy routing reach it).
 #
 # The migration runs and is verified BEFORE the API is recreated or polled. That ordering is the
 # point: a failed migration leaves the previous API container running and healthy, so polling
@@ -22,6 +25,15 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HEALTH_URL="${LRNKI_API_HEALTH_URL:-https://api.lrnki.globesoul.com/health}"
 
 cd "$REPO_DIR"
+
+# An attached `docker compose watch` session re-syncs the working tree over whatever image is
+# running, so it would quietly undo the deploy moments after it succeeds. Refuse before building.
+# This is a process-name heuristic: a false positive costs one clear message, a false negative only
+# leaves the pre-guard behaviour.
+if pgrep -f 'compose.*watch' >/dev/null 2>&1; then
+  echo "!! a 'docker compose watch' session is running; stop it before deploying" >&2
+  exit 1
+fi
 
 if [[ "${LRNKI_SKIP_GIT_PULL:-0}" != "1" ]]; then
   echo "==> git pull --ff-only"
@@ -59,6 +71,31 @@ docker logs --tail 5 "$MIGRATE_CONTAINER"
 echo "==> docker compose up -d learner-api caddy"
 docker compose up -d learner-api caddy
 
+# Two checks, in this order, because they assert different things. This one asks the container
+# itself — the artifact just deployed — and cannot be answered by anything else. A public 200 alone
+# was the only evidence this script had until now, and on 2026-08-05 it was returned by a stale host
+# process while the deployed container sat idle (ADR-0040 exists to make that unreachable; the probe
+# stays because "the thing I deployed started" is not what an edge check measures).
+echo "==> probing the learner-api container directly"
+CONTAINER_HEALTHY=0
+for attempt in $(seq 1 30); do
+  if docker compose exec -T learner-api node -e \
+    "fetch('http://localhost:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" \
+    >/dev/null 2>&1; then
+    echo "==> container answered after ${attempt} attempt(s)"
+    CONTAINER_HEALTHY=1
+    break
+  fi
+  sleep 2
+done
+
+if [[ "$CONTAINER_HEALTHY" != "1" ]]; then
+  echo "!! the learner-api container did not answer /health in time" >&2
+  docker compose logs --tail 40 learner-api >&2 || true
+  exit 1
+fi
+
+# And this one asserts the public hostname reaches it — TLS, DNS, and Caddy routing.
 echo "==> waiting for ${HEALTH_URL}"
 for attempt in $(seq 1 30); do
   if curl -fsS --max-time 5 "$HEALTH_URL" >/dev/null 2>&1; then

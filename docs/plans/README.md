@@ -27,10 +27,7 @@ Deleted detail is not lost: git history is the provenance record for outcomes an
 
 ## Active implementation plans (execution order)
 
-- [Integrate Drizzle Migrations](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md) —
-  implementation, durable consolidation, and validation are complete. It stays open for one operator
-  action only, the shared cutover in [BLOCKERS](./BLOCKERS.md); delete it in the change that closes
-  that blocker.
+None.
 
 ## Ownership rules
 

@@ -45,3 +45,4 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0037 — Persist learner-scoped Scaffold Detours outside the neutral graph](./0037-persist-learner-scoped-scaffold-detours.md)
 - [0038 — Native interaction gate scope and physical-device authority](./0038-native-interaction-gate-scope-and-physical-authority.md)
 - [0039 — Code-first Drizzle persisted-shape authority](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)
+- [0040 — Serve the public API only from the deployed container](./0040-serve-public-api-only-from-the-deployed-container.md)

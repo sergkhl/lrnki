@@ -10,7 +10,6 @@
   },
   "scripts": {
     "dev:admin": "pnpm --filter @lrnki/admin-lab dev",
-    "dev:api": "pnpm --filter @lrnki/learner-api dev",
     "dev:learner": "pnpm --filter @lrnki/learner-app dev",
     "dev:android": "pnpm --filter @lrnki/learner-app android",
     "dev:ios": "pnpm --filter @lrnki/learner-app ios",

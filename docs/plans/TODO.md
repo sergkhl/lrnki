@@ -2,17 +2,6 @@
 
 ## TODO
 
-- **IN PROGRESS — Integrate Drizzle migrations; one operator action left.**
-  [Everything but the shared cutover is done](./2026-08-04-001-refactor-integrate-drizzle-migrations-plan.md).
-  U5 added [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md), moved
-  persisted-shape authority off the generated SQL in every document and code comment that claimed it,
-  and gave the root README the four-command workflow, the reset-required reason table, and the
-  `## Shared schema cutover` runbook. The remaining step is in [BLOCKERS](./BLOCKERS.md) because it
-  runs on the VPS. **Do not re-derive this:** the development Mac's `lrnki` is already Drizzle-current
-  (`b3350541…` / `1785857986885`), so the earlier "the shared deployment is still on the legacy
-  schema" claim applies only to the VPS — whose state cannot be read from here, and which the deploy
-  classifies safely by itself. Delete the plan in the change that closes the blocker.
-
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
   the same commit that decrements the shield — so the stage unmounts on the exact edge it watches and
@@ -87,12 +76,11 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   `.env`, and recreating the container — a plain `docker restart` will not do, since container env is
   fixed at creation. Keep any `.env` backup outside the repo: `.gitignore` covers `.env` but not
   `.env.bak-*`.
-- **A long-lived host `pnpm dev:api` races the container and can poison the attempts it steals.**
-  `topicGenerationSupervisor` polls every 15 s and allows only `MAX_GENERATION_ATTEMPTS = 3`, so a
-  host process splits the attempt budget with the container's. Worse, `tsx watch --env-file` reads
-  `.env` once at process start, so a session started before a key repair keeps serving the dead key.
-  Diagnose by source IP, not by message — in `docker logs lrnki-litellm` the container is `172.18.0.5`
-  and anything on the host is the gateway `172.18.0.1`. Use the container, or stop it first.
+- **Tell host-run tools apart from the container in LiteLLM's logs by source IP, not by message.**
+  In `docker logs lrnki-litellm` the container is `172.18.0.5` and anything on the host — admin-lab,
+  kg-worker — is the gateway `172.18.0.1`. This matters because a host process reads `.env` once at
+  start, so a session started before a virtual-key repair keeps presenting the dead key while the
+  container has already picked up the new one; the two look identical in the message text.
 - **Upstream Groq can throttle the topic pipeline to death while single calls look fine.**
   `openai/gpt-oss-120b` is the forced-tool provider lock and its shared free-tier limit is tripped by
   the pipeline's concurrent brackets, not by one request. A saturated bracket can also return a
@@ -108,6 +96,29 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   learner's active expedition.
 
 ## COMPLETED
+
+- **The public API serves from the deployed container only (2026-08-05).** Caddy's dev-first
+  fallback is gone: one upstream, no active health checks, and the host runtime it preferred
+  (`dev:api`, the learner-api `dev`/`start` scripts) deleted with it. The API dev loop moved inside
+  the container as `docker compose watch learner-api`, which works because the image runs `tsx` on
+  source and pnpm's in-image workspace symlinks are relative into `/app/packages` — the exact sync
+  target. The deploy now refuses while a watch session is attached and probes the container directly
+  before the public hostname, so the two claims *the artifact I deployed started* and *the public
+  hostname reaches it* are asserted separately. Durable decision in
+  [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md); the residual
+  same-basename Compose-project hazard is in [BLOCKERS](./BLOCKERS.md); the plan is deleted.
+
+- **Drizzle migrations integrated and the shared deployment cut over (2026-08-05).** The whole plan
+  shipped, closing with the VPS cutover that only an operator could run. The shared database
+  classified as **`stale-baseline`, not the `legacy-schema` the blocker predicted**: it already had a
+  `drizzle.__drizzle_migrations` row, hash `e9011ad9…` / `created_at 0`, which is the sha256 of
+  `0000_initial_lrnki_schema.sql` **as of `e8ffa42` (2026-06-19)** — back when that file was
+  hand-written and authoritative. The later shell/SQL init path re-applied newer DDL straight through
+  `psql` and never wrote the metadata table, so the schema advanced to 56 tables while the recorded
+  row stayed frozen in June; the guard was right that the row's claim no longer described the schema.
+  The runbook then ran exactly as written and the reset guard exited 0, the migrator applied `0000`
+  once, and a re-run reported `current` with no DDL. Durable decision stays in
+  [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md); the plan is deleted.
 
 - **Crystal Guardian Ward Obelisk closed by its ADR-0038 native pass (2026-08-01).** The last open
   item shipped: the native gate now reaches the Guardian at all, through a second Maestro flow over a
@@ -145,25 +156,23 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 - **Build unblocked and dependencies bumped (2026-07-31).** `pnpm build`'s root cause was an ambient
   `NODE_ENV`, not Next.js; Next was moved to 16.2.12 for a security fix.
 
-- **Treasure-map trail restyle (2026-07-19).** The trail screen became one parchment field-chart with
-  procedural, deterministic, nonsemantic decoration.
-
-- **Topic Expedition speed, generated-grounding reliability, and claim reliability (2026-07-18→19).**
-  Provider lock and alias work on generation speed, plus topic-claim fencing and DB-test isolation
-  against `lrnki_test`.
-
 ## VALIDATION
 
-- **Drizzle migration U5 — 2026-08-05. PASS on the full validation contract; shared cutover NOT
-  performed.** `env -u NODE_ENV pnpm check` exited 0 — `db:check` reported the schema and committed
-  baseline in sync, then typecheck, 1019 `node:test` assertions with 0 failures (91 skipped are the
-  DB-backed ones), 290 jest, lint, build, and 64 Playwright. `pnpm test:db` (9/9 migration state
-  matrix, the non-application-schema reset guard, every package suite), `docker compose config
-  --quiet`, and `git diff --check` also passed. The cutover runbook was **proven by running its exact
-  command shape**, not asserted: `docker compose exec -T postgres psql … < scripts/reset-app-schema.sql`
-  exits 3 against `litellm` and 0 against `lrnki_test`, where it left `public` at 0 relations and
-  dropped `drizzle`, while `lrnki` kept all 65 relations and LiteLLM kept its virtual key; `lrnki_test`
-  was then reapplied from the baseline back to 65 relations and exactly one metadata row. Piping that
-  `psql` hides the guard — the status becomes `tail`'s, the same trap the deploy script documents for
-  `docker compose build`. The VPS was never contacted beyond one public `/health` probe, whose 200
-  proves nothing about its schema.
+- **Compose Watch dev loop and the single public upstream — 2026-08-05, local. PASS; VPS deploy
+  still owed.** `env -u NODE_ENV pnpm check` and `pnpm test:db` both exit 0. Watch proved in both
+  directions on real containers: an `apps/learner-api/src/app.ts` edit synced, restarted, and was
+  **served** (`{"ok":true,"watchProbe":"alpha"}`), and a `packages/domain-core` edit landed at
+  `/app/packages/…`, resolved through `node_modules/@lrnki/domain-core`, and the container returned
+  to healthy — which is the symlink proof, since no `@lrnki/*` import resolves otherwise. Those links
+  are relative (`../../../../packages/…`), so they only survive because the sync target equals the
+  in-image install path. The one-shot `migrate` was a harmless no-op under watch bring-up (exit 0,
+  `Application schema is already initialized.`). Negative control: with a real imposter bound on host
+  8787, Caddy's **live** upstream registry stayed `[{"address":"learner-api:8787"}]` and its loaded
+  config contained zero references to the host — end-to-end over TLS is deferred to the VPS, since a
+  local Caddy cannot obtain a certificate for the public hostname. Deploy guard verified both ways:
+  exit 1 before `git pull`/build with watch attached, and no false positive without it.
+  **Two findings.** A host `pnpm --filter @lrnki/learner-api dev` from 2026-08-02 was still on this
+  machine's 8787, and killing its child was not enough — the `tsx watch` parent respawned it within
+  seconds, so the whole `pnpm → tsx watch → node` tree had to go. That respawn is why the VPS process
+  survived for days. Separately, the first watch build died on `no space left on device` with 21 GB of
+  build cache; `docker builder prune -f` reclaimed 12.3 GB.

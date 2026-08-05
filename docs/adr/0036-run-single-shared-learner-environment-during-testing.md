@@ -28,9 +28,9 @@ gate without any local infrastructure.
   bearer token (ADR-0035), not a privileged account.
 - Phone testing reduces to `pnpm --filter @lrnki/learner-app start` + Expo Go — no local API, no
   local migration, no same-network requirement.
-- The shared environment extends to the API dev loop: Caddy's first upstream is a host-run
-  `pnpm --filter @lrnki/learner-api dev` process with the `learner-api` container as fallback,
-  so `api.lrnki.globesoul.com` serves the watched dev process whenever one is running (runbook
-  in the README `## Deployment` section).
+- The shared environment extends to the API dev loop, but the loop runs *inside* the deployed
+  container rather than beside it: the public hostname has exactly one upstream and no developer
+  process may serve it ([ADR-0040](./0040-serve-public-api-only-from-the-deployed-container.md)
+  owns that mechanism; runbook in the README `## Deployment` section).
 - This decision is explicitly temporary. When a separate dev/staging backend is reintroduced,
   delete this ADR and repair inbound references (ADRs are never left as tombstones).
