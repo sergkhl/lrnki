@@ -33,18 +33,33 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Matching item quality — planned, not started.** The three defects (tautological pairs, ambiguous
-  prompt sets, graph vocabulary in learner copy) now have an interview-locked plan:
-  [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which freezes the pair-level
-  defect inventory and confirms the vocabulary leak's mechanism (lesson-prompt neighbor framing
-  quoted verbatim through bullet grounding — not the matching call, which receives no siblings).
-  Next action: merge `fix/study-item-grounding` to `main`, branch `fix/matching-item-quality`,
-  start U1.
+- **Matching item quality — U1 shipped, U2 returned FIX_FIRST.** Plan:
+  [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which owns the full gate
+  record. One defect class survives U1 and is precisely attributed: on a terminology-shaped node the
+  matching prompt never says that when the answer is a *named term* the match must BE the term, so
+  `Pycnocline` came back with a paraphrased definition on both sides of all four pairs — while
+  `Ocean stratification` answered the identical prompt text correctly with "The pycnocline". Next
+  action: add that one rule, extend the graph-vocabulary prohibition to the item prompts (U2 falsified
+  D9's premise that item copy is clean), re-run U2. **Do not start U3 first** — it verifies fit, not
+  paraphrase-degeneracy, so it would ship over this.
 
-- **The shared VPS runs `fix/study-item-grounding` at `bd0b3eb`; `main` is still at `943fffc`.**
-  The deploy checkout and the running container agree and are at the branch tip. Nothing on this
-  branch has merged to `main` — the whole Study Item grounding and key verification body of work
-  lives only here.
+- **`main` is at `f1224c3`; the shared VPS still runs `fix/study-item-grounding` at `bd0b3eb`.** The
+  Study Item grounding and key-verification work is now merged to `main`, but **the VPS was not
+  redeployed** and no matching work has shipped there. Local work continues on
+  `fix/matching-item-quality`. The plan's D11 VPS gate run is still outstanding; U2 ran locally
+  against the full real pipeline instead, which is what D11's "iterate locally with free hard resets"
+  licenses, and the deploy belongs with the unit that ships.
+
+- **`kg-independent-judge` now has a deployment fallback, which costs attribution.** Groq's
+  requests-per-minute ceiling on OpenRouter's *shared* account killed 3 of 3 topic-generation attempts
+  — it takes out every judge stage at once, including both key-verification brackets, because the
+  alias is `provider.only: ["groq"]` with `allow_fallbacks: false` to guarantee forced `tool_choice`.
+  Fallback added to `openrouter/deepseek/deepseek-v4-flash-0731`, locked to `deepseek/fp8`, reasoning
+  off, verified by live forced-tool probe. **Account credit cannot relieve a rate limit** — credits buy
+  tokens, not request rate. Open question the user raised and it is not settled: switch to a *single*
+  judge model and delete the fallback, since our `operation_run_stages` records only the alias and
+  cannot say which model judged. Decide it with U4's existing discrimination probes; note
+  `deepseek-v4-pro` output is $0.87/M, over the config's $0.50/M cap.
 
 ### Evidence-triggered follow-up
 
@@ -96,12 +111,18 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   start, so a session started before a virtual-key repair keeps presenting the dead key while the
   container has already picked up the new one; the two look identical in the message text.
 - **Upstream Groq can throttle the topic pipeline to death while single calls look fine.**
-  `openai/gpt-oss-120b` is the forced-tool provider lock and its shared free-tier limit is tripped by
-  the pipeline's concurrent brackets, not by one request. A saturated bracket can also return a
+  `openai/gpt-oss-120b` is the forced-tool provider lock (`provider.only: ["groq"]`,
+  `allow_fallbacks: false` — ADR-0006's guarantee paid for in availability) and the limit is Groq's
+  **requests-per-minute on OpenRouter's shared account**, tripped by the pipeline's concurrent
+  brackets, not by one request. **Account credit cannot relieve it** — credits buy tokens, not request
+  rate, so a funded balance and a sustained 429 coexist normally; `/v1/models` answering `200` is what
+  rules out a dead virtual key. It takes out *every* judge stage at once. `kg-independent-judge` now
+  has a LiteLLM deployment fallback (see `litellm/config.yaml`); no other judge alias does, so
+  `kg-prerequisite-ordering` still stalls outright, and waiting and retrying remain the only remedies
+  there. Do not lower production concurrency to make a gate pass. A saturated bracket can also return a
   degraded response with no tool call at all (`{"kind":"no_tool_call"}` in
-  `operation_run_stages.error_detail`) — that is upstream load, not a schema defect. There is no
-  fallback model group, so the only remedies are waiting and retrying; do not lower production
-  concurrency to make a gate pass. **Saturation is also visible as missing content rather than a
+  `operation_run_stages.error_detail`) — that is upstream load, not a schema defect.
+  **Saturation is also visible as missing content rather than a
   failed run:** a judge exhausted by 429s makes Study Item Key Verification unavailable, which drops
   impostor items with a `… key verification unavailable: … 429` reason in `rejected_study_items`
   while option-select is untouched. A topic short only on impostors is a throttling signature, not a

@@ -162,6 +162,42 @@ model_list:
           ignore:
             - "google-vertex"
             - "google-ai-studio"
+          # NOTE: `allow_fallbacks` here is OpenRouter's PROVIDER fallback, which stays off so a
+          # non-compliant provider can never answer a forced-tool call. It is a different mechanism
+          # from LiteLLM's DEPLOYMENT fallback in router_settings.fallbacks, which does now cover
+          # kg-independent-judge — see the deepseek-v4-flash deployment directly below.
+
+  # Fallback deployment for kg-independent-judge (see router_settings.fallbacks). The judge alias is
+  # pinned to Groq for forced tool_choice and Groq's shared-account request rate is the single
+  # busiest constraint in the pipeline: a sustained 429 there stalls EVERY judge stage at once,
+  # including both Study Item Key Verification brackets, and it failed 3 of 3 topic-generation
+  # attempts on 2026-08-07. Cross-family independent of the MiMo synthesizer, so ADR-0007/0005's
+  # "the judge is never the extractor grading its own output" survives the fallback.
+  # `reasoning.enabled: false` is REQUIRED: with reasoning on, DeepSeek double-encodes nested
+  # array-of-object tool arguments (the quirk cited in the MiMo comment below), and every judge
+  # verdict schema is exactly that shape — an array of per-candidate verdict objects.
+  # SCOPE LIMIT: flash is DISPROVEN for holistic whole-set reasoning — measured 2026-06-24, it
+  # returned 0 edges where gpt-oss-120b produced a correct 11-edge DAG. Never extend this fallback
+  # to kg-prerequisite-ordering. Judge stages are per-item classification, a different task shape.
+  - model_name: "openrouter/deepseek/deepseek-v4-flash-0731"
+    litellm_params:
+      model: "openrouter/deepseek/deepseek-v4-flash-0731"
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000009
+      output_cost_per_token: 0.00000018
+      cache_read_input_token_cost: 0.000000018
+      extra_body:
+        reasoning:
+          enabled: false
+        provider:
+          only:
+            - "deepseek/fp8"
+          order:
+            - "deepseek/fp8"
+          allow_fallbacks: false
+    model_info:
+      mode: "chat"
+      max_input_tokens: 1048576
 
   # Production extractor (AGENTS rule 5). Forced tool_choice verified across all six
   # extraction roles 2026-07-10. `reasoning.enabled: false` is required: with reasoning
@@ -370,6 +406,14 @@ router_settings:
   # against the small cross-family Qwen3-30B-A3B deployment. Keyed on the request's alias.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
+    # Same shape, same cause, for the judge alias: gpt-oss-120b is Groq-only for forced
+    # tool_choice, and a sustained Groq 429 there takes out every judge stage at once. Falls back
+    # to a cross-family DeepSeek flash deployment (reasoning off; see its deployment comment for
+    # the array-of-object tool-argument reason and the whole-set-ordering scope limit).
+    # A served fallback is observable: LiteLLM spend logs record the DEPLOYMENT, while our own
+    # operation_run_stages records only the ALIAS — so a quality gate that must attribute a judge
+    # verdict to a specific model reads the spend logs, not the stage row.
+    - kg-independent-judge: ["openrouter/deepseek/deepseek-v4-flash-0731"]
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5

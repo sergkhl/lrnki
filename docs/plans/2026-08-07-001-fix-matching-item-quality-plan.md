@@ -18,13 +18,15 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Matching Item Quality
 
-**Status:** Ready — no unit started.
+**Status:** In progress — U1 shipped (`d71d52b`); U2 ran and returned **FIX_FIRST**. Next action: add
+the named-term rule to the matching prompt plus the vocabulary prohibition to the item prompts, then
+re-run U2. Do not start U3 until U2 passes — it verifies fit, not paraphrase-degeneracy.
 
 **Decision state:** Interview-locked 2026-08-07. D1–D13 were each chosen in the planning interview;
 every recommendation was accepted as offered.
 
-**Precondition:** merge `fix/study-item-grounding` into `main` (it is complete, validated, and what
-the shared VPS already runs), then branch `fix/matching-item-quality` off `main`.
+**Precondition:** done — `fix/study-item-grounding` fast-forwarded into `main` at `f1224c3`; work
+continues on `fix/matching-item-quality`.
 
 ## Goal capsule
 
@@ -352,6 +354,137 @@ resolution; the match presentation order is the deterministic normalized sort.
 
 One entry per closed implementation unit; see the hygiene comment at the top of this file.
 
+### U1 — matching prompt redesign, containment veto, lesson vocabulary root-fix (2026-08-07)
+
+Commits: `d71d52b`. `pnpm check` and `pnpm test:db` are green.
+
+**Proved.** The matching pair contract is role-asymmetric in both places the model reads it: the
+prompt file and the forced-tool `description` fields, which still carried the old "the match side is
+the corresponding example, scenario, description, or application from the lesson" framing. Leaving
+that description in place would have let the generator keep quoting a bullet and paraphrasing it into
+the prompt — the exact cheapest-passing-item path — while the prompt file said otherwise, so U2's
+delta would have been unattributable.
+
+The containment veto is computed over **word sequences, not normalized characters**. A character
+`includes` is wrong in both directions simultaneously, and both directions are pinned by a test that
+was verified against a mutant: it rejects `Heap` / `Cheapest region to grow at runtime` (subword) and
+it misses `Allocates memory at runtime` inside `…allocates memory, at runtime…` (punctuation).
+Contiguous word containment is the provable reading of "one side wholly contains the other" and is
+therefore the only part rule 16 lets a deterministic gate own.
+
+**Invariants a later unit or re-run must not break.**
+
+- Containment stays *contiguous word* containment. A non-contiguous "all the prompt's words appear
+  somewhere in the match" check is a heuristic, not a guarantee, and rule 16 forbids it here.
+- Equality and containment keep **distinct** reason strings; the gate greps
+  `must not contain one another` and `must differ` separately.
+- Matching still opts out of the generated-passage citation fallback (D8). U3 verifies fit, not
+  claim truth, so it does not unlock that rung.
+- The lesson vocabulary fix lives at the **lesson** stage only. No lexical guard exists anywhere, by
+  D9: `dependent` and `sibling` have legitimate domain senses. The prohibition is a prompt rule and
+  the inspection query in U2 is an inspection query, never a veto.
+- `study-item-key-verification.prompt` still renders a `Sibling concepts:` label. That is a judge
+  prompt whose output is verdicts, never learner copy, so it is deliberately untouched.
+
+**Hands off to U2.** The gate must drive an API composed from the working tree
+(`LEARNER_API_PORT=… tsx --env-file=.env apps/learner-api/src/index.ts`), never the running
+`lrnki-learner-api` container: `.prompt` files are baked into the image, so a container older than
+the prompt edit judges the previous behavior and reports green.
+
+### U2 — prompt-fix gate, real-use pass 1 (2026-08-07)
+
+- **Milestone:** U1's matching pair redesign, containment veto, and lesson vocabulary root-fix.
+- **Fixture and source type:** topic expedition `Thermohaline circulation`, Oceanography, 16 derived
+  nodes, 16 matching items / **62 pairs**, every pair hand-inspected (ADR-0013). Node count matches
+  the baseline run, which is what makes the pair-level delta attributable to U1 rather than to a
+  different graph.
+- **Real model calls used:** yes — full production pipeline after `pnpm db:reset`, driving an API
+  composed from the working tree, **not** the container (see U1's hand-off).
+- **Result: FIX_FIRST.** Three of the four D13 criteria are met; the tautology criterion is not, and
+  the residual defect is precisely attributed.
+
+**Met.** Coverage is **48 of 48** with **zero rejections**. The containment veto fired zero times and
+cost zero items, so the **rule 16 verdict is keep, not remove** — no false negative to answer for.
+The baseline's verbatim-overlap tautologies are gone: no pair in the run has word-sequence
+containment, where the baseline had `Upwelling` solvable by string overlap on two of three pairs.
+Relationship vocabulary is **eliminated** — zero occurrences of `dependent`, `sibling`,
+`prerequisite`, or `node` across all 463 learner-copy rows, against a baseline that read "a
+*dependent concept*" and "a *sibling* water mass".
+
+**Not met — the paraphrase subclass survives, concentrated in one item.** `Pycnocline` is degenerate
+on **all four** pairs: each match restates its own prompt by synonym substitution ("Density gradient
+driven by salinity changes" → "The component of the pycnocline caused by variations in salt
+concentration"; "Global deep-ocean current system powered by density differences" → "A worldwide
+circulation pattern driven by density contrasts"). A learner solves these with no oceanography at
+all, and the keyed answers that *should* be there are names — halocline, thermocline, thermohaline
+circulation. Its question states the inverted contract outright: "Match each oceanographic term to
+its correct definition", so the model put a definition on **both** sides.
+
+**Diagnosis, and why it is a prompt gap rather than a model limit.** `Ocean stratification` pair 0
+carries the *identical prompt text* — "Layer where density rises sharply with depth" — and answers
+**"The pycnocline"** correctly, in the same run, from the same model. `Seawater density` likewise
+answers with names ("Haline contraction", "The pycnocline"). The redesigned prompt tells the model a
+match "CARRIES the content answering that aspect" but never says that **when the answer is a named
+term, the match must be that term, not a description of it**. On a terminology-shaped node the model
+resolves the ambiguity the wrong way. One sentence closes it.
+
+**Ambiguity incidence — U4's baseline, not gated here (D10).** Two items would fail an assignment
+check. `Thermohaline feedback mechanisms`: salt-advection feedback *is* a positive feedback and
+thermal feedback *is* a negative one, so matches 0↔2 and 1↔3 are interchangeable and a learner who
+knows the material can be marked wrong. `Deep water formation`: all three prompts are region
+questions, and "The North Atlantic" (pair 0) **contains** "The Labrador Sea and Nordic Seas" (pair 2);
+pair 0 also keys brine rejection to the North Atlantic when brine rejection is the Antarctic
+mechanism, so it may be mis-keyed as well — the shape D5 chose the full grid to expose.
+
+**Residual vocabulary.** Two hits of the bare word `concept`, both self-referential framing: a lesson
+applications bullet ("This coupling concept bridges…") and a matching *question* ("Match each ocean
+stratification concept to its correct description"). The lesson prompt already forbids this, so that
+one is adherence. The matching question is not covered at all: **D9's premise that item copy measured
+clean is now falsified by measurement**, so the prohibition sentence belongs in the item prompts too.
+
+**Method note that cost a false green.** The first inspection pass reported "zero vocabulary hits"
+because the query used `jsonb_array_elements_text` on `concept_lesson_sections.items`, which is
+`text[]` — psql printed the error and an empty result, which reads exactly like a clean pass. Any
+zero-row quality assertion needs a positive control in the same query; adding one surfaced 463 rows
+and the 2 real hits.
+
+**Safe to continue downstream: no.** Fix the naming gap and re-run this gate before U3. U3 verifies
+*fit*, not paraphrase-degeneracy, so it would ship over this defect without catching it.
+
 ### Open findings
 
-None yet.
+- **A judge verdict can no longer be attributed from our own records, and U4 depends on attribution.**
+  `kg-independent-judge` now has a LiteLLM deployment fallback to
+  `openrouter/deepseek/deepseek-v4-flash-0731` (user decision, 2026-08-07). Our
+  `operation_run_stages` rows record only the **alias**; the **deployment** that actually served the
+  call is recorded in LiteLLM's spend logs. So "was this board admitted because it is clean, or
+  because the flash fallback missed the ambiguity?" is unanswerable from the stage row alone. U4 must
+  read the spend logs alongside its veto counts and report the judge mix, or its
+  discrimination-not-distrust control (a clean board admitted 5 of 5) proves nothing about the
+  primary judge. This is the measurement cost the fallback bought availability with.
+- **The flash fallback is scope-limited and that limit is not enforced mechanically.** Measured
+  2026-06-24, deepseek flash returned 0 edges on an 11-node whole-set ordering task where
+  gpt-oss-120b produced a correct 11-edge DAG, so it is disproven for holistic reasoning and must
+  never back `kg-prerequisite-ordering`. Judge stages are per-item classification, a different task
+  shape, and a live forced-tool probe with the U3 verdict-grid schema returned all four cells as real
+  objects with correct verdicts. Nothing prevents a later edit from extending the fallback to the
+  ordering alias except the comment saying not to.
+- **Why the fallback was needed, kept for the ADR sweep.** All three U2 attempt failures were
+  `forced_tool_exhaustion` on `kg-independent-judge`, while every `kg-claim-extraction` stage (MiMo
+  v2.5) passed first try. The cause is Groq's requests-per-minute ceiling on OpenRouter's *shared*
+  account (`provider_name: "Groq"`, `is temporarily rate-limited upstream`), which account credit
+  cannot relieve — credits buy tokens, not request rate, so a funded balance and a sustained 429
+  coexist normally. The alias had no failover by design: `provider.only: ["groq"]` +
+  `allow_fallbacks: false`, because OpenRouter provider failover once landed on a provider that
+  rejects forced `tool_choice` with a 400 (expedition `bd89e63a`, 2026-07-06). That is ADR-0006's
+  guarantee paid for in availability, and it took out **every** judge stage at once, including both
+  shipped key-verification brackets. Failure modes stay separable by status: `401` = dead LiteLLM
+  virtual key, `429` = upstream request rate, `{"kind":"no_tool_call"}` = a saturated bracket
+  degrading. Do not lower production generation concurrency to make a gate pass.
+- **The TODO environment note's Groq attribution is right; its framing is incomplete.** Correct it
+  when U2 closes: the metering is Groq's, surfaced through OpenRouter, and the remedy the error names
+  is BYOK at `openrouter.ai/settings/integrations`. Also record that
+  `openrouter/deepseek/deepseek-v4-flash-0731` is locked to the `deepseek/fp8` tag deliberately —
+  the model's 23 endpoints include **fp4** variants, and drifting quantization would make judge
+  verdicts non-reproducible (ADR-0028). The curated widening, if first-party DeepSeek throttles, is
+  other **fp8** tags only (`baseten/fp8`, `novita/fp8`, `parasail/fp8`).
