@@ -26,10 +26,12 @@ implementation: D6/D9 amended — the fallback rung moves to U3 and applies only
 item types, so the D6 interlock is structural rather than aspirational — with a matching D5
 refinement, and mechanical corrections to D8, the passage-id scheme, and the U3 inventory.
 
-**Implementation state:** **U1 shipped** (2026-08-05); what it built, the invariants it establishes,
-and what U2 is therefore measuring are the U1 entry in the [Validation Log](#validation-log). U2 —
-the coverage gate — has not run, so no measured delta exists yet. U3 and U4 are untouched. Two steps
-precede U2: [Execution order before U2](#execution-order-before-u2).
+**Implementation state:** **U1 shipped** (2026-08-05) and both steps in
+[Execution order before U2](#execution-order-before-u2) are closed (2026-08-07) — the deterministic
+gate is green and U1's effect is sized offline. What each proved is in the
+[Validation Log](#validation-log). U2 — the coverage gate — has not run, so no measured delta exists
+yet; it is blocked on operator consent for a shared-host deploy and production spend, not on code.
+U3 and U4 are untouched.
 
 ## Goal capsule
 
@@ -479,6 +481,44 @@ Hands off to U2: because bullets are now grounding *the generator is shown*, an 
 lives in a bullet is admitted where it previously was not — the `Covers R10` orchestrator test
 flipped from two item types to three for exactly that reason. Expect U2's recovery to include that
 class and the paraphrased-quote class to stay rejected until U3.
+
+### Pre-U2 execution order — deterministic gate green, U1's effect sized offline — closed 2026-08-07
+
+No model calls and no spend: evidence about code and about an existing corpus, not about quality.
+`pnpm test:db` green on two consecutive runs, `pnpm typecheck` green, `pnpm lint` 0 errors.
+
+**Step 1 — the deterministic gate is green.** The KTD4 test in
+`PostgresLearnerRecallChallengeStore.test.ts` bracketed its writes with an *unscoped*
+`SELECT COUNT(*) FROM response_log`, so any concurrently running file that wrote a response row
+failed it. Both counts are now scoped to the test's own freshly seeded `L-${randomUUID()}` learner —
+the form `apps/learner-api/src/app.test.ts:189` already used. The race is closed **by construction,
+not by retry**: no other file can write a row under a UUID this test just minted.
+
+**Step 2 — U1's deterministic effect, sized against the local development corpus** (28 current
+`concept_lessons`, 14 rejected items, 6 distinct nodes carrying a citation-verify rejection). The
+deleted `studyItemGroundingFromLesson` / `groundedLessonFragments` were transcribed from `7417fbd^`
+and run beside the shipped `lessonGroundingShape`:
+
+- **Colliding ids are a *minor* channel here — 1 of 28 lessons**, only `Runtime vs Compile Time`,
+  which carried two generated citations of the same kind. 42 cited-section passages over 28 lessons
+  means most lessons hold a single citation and cannot collide at all. Defect 1 is real but small on
+  this corpus.
+- **Bullet grounding is the dominant channel — 43 passages before, 176 after (4.09x), 132 of them
+  bullets that were never quotable.** Every lesson gained; none lost. All six citation-verify nodes
+  gained (1→4, 1→9, 3→9).
+- **No node's pre-gate eligibility moves — 0 lose a type, 0 gain one.** The dedup drop this plan
+  worried about did not materialize at matching's threshold of 3. That confirms defect 2's direction:
+  the old pre-gate *already* counted bullets, so U1 raised the generator's view up to the pre-gate's
+  rather than changing which types are allowed. `Block Structure`, this plan's own named example,
+  reproduces exactly — 1 generator passage against a pre-gate count of 4.
+
+Hands off to U2: expect recovery through the **bullet channel**, not through id repair, and expect
+**matching to move most** — a node like `Block Structure` was pre-gated *for* matching while its
+generator saw 1 passage against a 3-pair requirement. Rung-2 id repair should be near-invisible in
+the delta; if U2's recovery instead tracks id repair, the attribution is wrong and needs diagnosis
+before U3. This corpus is software-engineering over 28 nodes while the frozen baseline is
+oceanography over 16, so the mechanism generalizes but the ratios need not. The failed citations
+themselves stay unreplayable — a rejected row stores a reason string, not the draft citation.
 
 ### Open findings
 

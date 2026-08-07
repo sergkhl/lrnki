@@ -49,3 +49,10 @@ reason values and their operator response are documented once, in the root READM
 The store suites beside it and the `test:migrations:db` state matrix are DB-backed: run them through
 `pnpm test:db` from the repo root, which targets only `lrnki_test` and resets it first. Never point
 them at a development database.
+
+**Never assert over a global table count.** Those suites share one `lrnki_test` database and run
+concurrently, so a bare `SELECT COUNT(*) FROM <table>` brackets every *other* file's writes as well
+as its own — it passes standalone and fails in the suite, which reads as flake rather than as the
+scoping bug it is. Scope the count to a row the test itself created, normally its own seeded
+`learner_state_ref`. That closes the window by construction; retrying or serializing the suite only
+hides it.

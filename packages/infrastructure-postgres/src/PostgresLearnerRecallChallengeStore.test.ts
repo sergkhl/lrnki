@@ -284,7 +284,10 @@ maybe("recall challenge writes leave response_log untouched (KTD4)", async () =>
     const { enrichmentId, nodeIds, itemIds } = await seedSubstrate(sql);
     const learner = await seedChallengeLearner(sql);
     const store = new PostgresLearnerRecallChallengeStore(sql);
-    const [{ count: before }] = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM response_log`;
+    // Scoped to this test's own freshly seeded learner: a global count races any concurrently
+    // running test file that writes a response row inside this window.
+    const [{ count: before }] = await sql<{ count: string }[]>`
+      SELECT COUNT(*) AS count FROM response_log WHERE learner_state_ref = ${learner}`;
 
     const challengeId = randomUUID();
     await store.create({
@@ -298,7 +301,8 @@ maybe("recall challenge writes leave response_log untouched (KTD4)", async () =>
     await store.appendEvent({ challengeId, learnerStateRef: learner, expectedSeq: 1, event: answerEvent(randomUUID(), itemIds[0], false) });
     await store.appendEvent({ challengeId, learnerStateRef: learner, expectedSeq: 2, event: answerEvent(randomUUID(), itemIds[0], true), materializeStatus: "won" });
 
-    const [{ count: after }] = await sql<{ count: string }[]>`SELECT COUNT(*) AS count FROM response_log`;
+    const [{ count: after }] = await sql<{ count: string }[]>`
+      SELECT COUNT(*) AS count FROM response_log WHERE learner_state_ref = ${learner}`;
     assert.equal(after, before);
   } finally {
     await sql.end();

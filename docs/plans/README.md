@@ -90,9 +90,9 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 ## Active implementation plans (execution order)
 
 - [2026-08-05-001 — Study Item grounding and key verification](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md)
-  — U1 shipped and is consolidated in the plan's Validation Log. Next is U2, a measured real-use gate
-  that needs operator consent for a shared-host deploy and production spend. The plan owns U1–U4 and
-  the two steps that precede U2.
+  — U1 and both pre-U2 steps are closed and consolidated in the plan's Validation Log. Next is U2, a
+  measured real-use gate awaiting operator consent for a shared-host deploy and production spend.
+  The plan owns U1–U4.
 
 ## Ownership rules
 
