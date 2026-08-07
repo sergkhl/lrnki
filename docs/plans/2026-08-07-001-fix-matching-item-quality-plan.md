@@ -453,38 +453,35 @@ and the 2 real hits.
 
 ### Open findings
 
-- **A judge verdict can no longer be attributed from our own records, and U4 depends on attribution.**
-  `kg-independent-judge` now has a LiteLLM deployment fallback to
-  `openrouter/deepseek/deepseek-v4-flash-0731` (user decision, 2026-08-07). Our
-  `operation_run_stages` rows record only the **alias**; the **deployment** that actually served the
-  call is recorded in LiteLLM's spend logs. So "was this board admitted because it is clean, or
-  because the flash fallback missed the ambiguity?" is unanswerable from the stage row alone. U4 must
-  read the spend logs alongside its veto counts and report the judge mix, or its
-  discrimination-not-distrust control (a clean board admitted 5 of 5) proves nothing about the
-  primary judge. This is the measurement cost the fallback bought availability with.
-- **The flash fallback is scope-limited and that limit is not enforced mechanically.** Measured
-  2026-06-24, deepseek flash returned 0 edges on an 11-node whole-set ordering task where
-  gpt-oss-120b produced a correct 11-edge DAG, so it is disproven for holistic reasoning and must
-  never back `kg-prerequisite-ordering`. Judge stages are per-item classification, a different task
-  shape, and a live forced-tool probe with the U3 verdict-grid schema returned all four cells as real
-  objects with correct verdicts. Nothing prevents a later edit from extending the fallback to the
-  ordering alias except the comment saying not to.
-- **Why the fallback was needed, kept for the ADR sweep.** All three U2 attempt failures were
-  `forced_tool_exhaustion` on `kg-independent-judge`, while every `kg-claim-extraction` stage (MiMo
-  v2.5) passed first try. The cause is Groq's requests-per-minute ceiling on OpenRouter's *shared*
-  account (`provider_name: "Groq"`, `is temporarily rate-limited upstream`), which account credit
-  cannot relieve — credits buy tokens, not request rate, so a funded balance and a sustained 429
-  coexist normally. The alias had no failover by design: `provider.only: ["groq"]` +
-  `allow_fallbacks: false`, because OpenRouter provider failover once landed on a provider that
-  rejects forced `tool_choice` with a 400 (expedition `bd89e63a`, 2026-07-06). That is ADR-0006's
-  guarantee paid for in availability, and it took out **every** judge stage at once, including both
-  shipped key-verification brackets. Failure modes stay separable by status: `401` = dead LiteLLM
-  virtual key, `429` = upstream request rate, `{"kind":"no_tool_call"}` = a saturated bracket
-  degrading. Do not lower production generation concurrency to make a gate pass.
-- **The TODO environment note's Groq attribution is right; its framing is incomplete.** Correct it
-  when U2 closes: the metering is Groq's, surfaced through OpenRouter, and the remedy the error names
-  is BYOK at `openrouter.ai/settings/integrations`. Also record that
-  `openrouter/deepseek/deepseek-v4-flash-0731` is locked to the `deepseek/fp8` tag deliberately —
-  the model's 23 endpoints include **fp4** variants, and drifting quantization would make judge
-  verdicts non-reproducible (ADR-0028). The curated widening, if first-party DeepSeek throttles, is
-  other **fp8** tags only (`baseten/fp8`, `novita/fp8`, `parasail/fp8`).
+- **U2 is FIX_FIRST and its fix is one sentence.** The matching prompt must say that when the answer
+  to an aspect is a *named term*, the match must BE that term and not a description of it. Then extend
+  the graph-vocabulary prohibition to the item generation prompts — U2 falsified D9's premise that
+  item copy measures clean, by finding "Match each ocean stratification **concept** to…" in a matching
+  question. Re-run U2 before U3.
+- **Judge competence on `deepseek-v4-flash-0731` is smoke-tested, not measured.** The judge moved off
+  gpt-oss-120b to a single DeepSeek v4 flash deployment (user decision, 2026-08-07) and there is
+  deliberately **no fallback**, so verdicts stay attributable from the alias alone. Evidence so far is
+  only two live probes: a U3-shaped verdict grid returned all four cells as real objects with correct
+  verdicts, and a two-candidate claim check classified true/false correctly with sound reasons. That
+  is schema compliance plus a smoke test, not discrimination measurement. **U4's probes are now doing
+  double duty** — they qualify the new judge as well as the new stage, so a failure there must be
+  diagnosed against both. Do not read the shipped key-verification evidence (30 of 30 impostors clean,
+  captured defect rejected 5 of 5) as covering this model; it was measured under gpt-oss-120b.
+  Beware of citing the 2026-06-24 "flash is disproven" note against it: that measured a *previous*
+  flash generation on whole-set ordering, and `litellm/config.yaml` now says so explicitly.
+- **Why the judge moved, kept for the ADR sweep.** All three U2 attempt failures were
+  `forced_tool_exhaustion` on `kg-independent-judge` while every `kg-claim-extraction` stage (MiMo
+  v2.5) passed first try. The cause was Groq's requests-per-minute ceiling on OpenRouter's *shared*
+  account, which account credit cannot relieve — credits buy tokens, not request rate, so a funded
+  balance and a sustained 429 coexist normally. The alias had no failover by design
+  (`provider.only: ["groq"]`, `allow_fallbacks: false`) because OpenRouter failover once landed on a
+  provider that rejects forced `tool_choice` with a 400 (expedition `bd89e63a`, 2026-07-06) — ADR-0006
+  paid for in availability, taking out every judge stage at once. `kg-prerequisite-ordering` still
+  runs gpt-oss-120b and therefore still carries that exposure. Failure modes stay separable by status:
+  `401` = dead LiteLLM virtual key, `429` = upstream request rate, `{"kind":"no_tool_call"}` = a
+  saturated bracket degrading. Never lower production generation concurrency to make a gate pass.
+- **Documentation debt to clear before this plan closes.** `docs/plans/TODO.md` is over its ~150-line
+  cap and owes a consolidation — the ~55-line Environment section belongs in owning READMEs per the
+  destination map. And the judge swap is a durable architectural decision affecting ADR-0007/0005 and
+  ADR-0013 evidence; it is currently recorded only in `litellm/config.yaml` comments and here, so it
+  needs an ADR amendment rather than dying with this plan.

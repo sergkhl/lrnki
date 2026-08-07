@@ -167,18 +167,20 @@ model_list:
           # from LiteLLM's DEPLOYMENT fallback in router_settings.fallbacks, which does now cover
           # kg-independent-judge — see the deepseek-v4-flash deployment directly below.
 
-  # Fallback deployment for kg-independent-judge (see router_settings.fallbacks). The judge alias is
-  # pinned to Groq for forced tool_choice and Groq's shared-account request rate is the single
-  # busiest constraint in the pipeline: a sustained 429 there stalls EVERY judge stage at once,
-  # including both Study Item Key Verification brackets, and it failed 3 of 3 topic-generation
-  # attempts on 2026-08-07. Cross-family independent of the MiMo synthesizer, so ADR-0007/0005's
-  # "the judge is never the extractor grading its own output" survives the fallback.
+  # THE production independent judge (kg-independent-judge, ADR-0007/0005). Replaced gpt-oss-120b on
+  # 2026-08-07: that deployment is Groq-pinned for forced tool_choice, and Groq's shared-account
+  # request rate is the busiest constraint in the pipeline — a sustained 429 stalls EVERY judge stage
+  # at once, including both Study Item Key Verification brackets, and it failed 3 of 3
+  # topic-generation attempts. Cross-family independent of the MiMo synthesizer, so ADR-0007/0005's
+  # "the judge is never the extractor grading its own output" holds.
   # `reasoning.enabled: false` is REQUIRED: with reasoning on, DeepSeek double-encodes nested
   # array-of-object tool arguments (the quirk cited in the MiMo comment below), and every judge
   # verdict schema is exactly that shape — an array of per-candidate verdict objects.
-  # SCOPE LIMIT: flash is DISPROVEN for holistic whole-set reasoning — measured 2026-06-24, it
-  # returned 0 edges where gpt-oss-120b produced a correct 11-edge DAG. Never extend this fallback
-  # to kg-prerequisite-ordering. Judge stages are per-item classification, a different task shape.
+  # Do NOT read the 2026-06-24 "deepseek-flash is disproven for whole-set ordering" note on
+  # kg-prerequisite-ordering as applying here: that measured a PREVIOUS flash generation, months
+  # before this model. It constrains the ordering alias, which still runs gpt-oss-120b, and says
+  # nothing about v4-flash-0731. Judge competence on THIS model is measured, not assumed — see the
+  # plan's U4 discrimination probes.
   - model_name: "openrouter/deepseek/deepseek-v4-flash-0731"
     litellm_params:
       model: "openrouter/deepseek/deepseek-v4-flash-0731"
@@ -406,14 +408,8 @@ router_settings:
   # against the small cross-family Qwen3-30B-A3B deployment. Keyed on the request's alias.
   fallbacks:
     - kg-knowledge-boundary-probe: ["openrouter/qwen/qwen3-30b-a3b-instruct-2507"]
-    # Same shape, same cause, for the judge alias: gpt-oss-120b is Groq-only for forced
-    # tool_choice, and a sustained Groq 429 there takes out every judge stage at once. Falls back
-    # to a cross-family DeepSeek flash deployment (reasoning off; see its deployment comment for
-    # the array-of-object tool-argument reason and the whole-set-ordering scope limit).
-    # A served fallback is observable: LiteLLM spend logs record the DEPLOYMENT, while our own
-    # operation_run_stages records only the ALIAS — so a quality gate that must attribute a judge
-    # verdict to a specific model reads the spend logs, not the stage row.
-    - kg-independent-judge: ["openrouter/deepseek/deepseek-v4-flash-0731"]
+  # NOTE: kg-independent-judge has NO fallback on purpose — it is a single model now, so its verdicts
+  # stay attributable from the alias alone. See its model_group_alias comment below.
   # disable_cooldowns: true
   # default_litellm_params:
   #   temperature: 0.5
@@ -450,21 +446,31 @@ router_settings:
     # Graph Enrichment, third operation (ADR-0019 amended — whole-set ordering, plan
     # U2/U5): ONE ordering call per Declared Domain returns the directed prerequisite
     # DAG over the deduplicated node set. Backed by gpt-oss-120b (reasoning-grade,
-    # forced-tool-ok). MEASURED 2026-06-24 (tmp/2026-06-24-deepseek-flash-ordering-rebaseline):
-    # deepseek-flash-no-thinking is forced-tool-ok + fast (10s) BUT INADEQUATE for the
-    # holistic ordering task — it returned 0 edges for an 11-node Rust domain where
-    # gpt-oss-120b produced a correct 11-edge DAG (same node set). Whole-set ordering
-    # needs a reasoning model; flash is disproven. Measured 2026-07-07:
+    # forced-tool-ok). MEASURED 2026-06-24, on the deepseek flash generation available THEN
+    # ("deepseek-flash-no-thinking", months before v4-flash-0731): forced-tool-ok + fast (10s) BUT
+    # INADEQUATE for the holistic ordering task — it returned 0 edges for an 11-node Rust domain where
+    # gpt-oss-120b produced a correct 11-edge DAG (same node set). Whole-set ordering needs a
+    # reasoning model. Scope: this disproves THAT model on THIS task, and is not evidence about a
+    # later flash generation or about per-item judging — do not generalize it (the judge alias moved
+    # to v4-flash-0731 on 2026-08-07 for reasons of its own). Measured 2026-07-07:
     # openrouter/qwen/qwen3-235b-a22b-2507 was forced-tool OK and faster but failed
     # quality parity, so the incumbent stays.
     kg-prerequisite-ordering: openrouter/openai/gpt-oss-120b
-    # Independent production judge (ADR-0007/0005): the concept-vs-proposition
-    # admission judge and the optional-assertion entailment judge. gpt-oss-120b is
-    # cross-family independent of the MiMo extractor, supports forced
-    # tool_choice, and is cheap ($0.039/$0.18 per Mtok), so the judge is never the
-    # extractor grading its own output. (The off-core oracle triangle and label
-    # aligner were retired after the admission-precision fix; see ADR-0013.)
-    kg-independent-judge: openrouter/openai/gpt-oss-120b
+    # Independent production judge (ADR-0007/0005): the concept-vs-proposition admission judge, the
+    # optional-assertion entailment judge, grounding factuality revision, semantic-dedup merge
+    # adjudication, and Study Item Key Verification. DeepSeek v4 flash is cross-family independent of
+    # the MiMo extractor, so the judge is never the extractor grading its own output, and it is
+    # cheaper than the gpt-oss-120b it replaced ($0.09/$0.18 vs $0.15/$0.60 per Mtok).
+    # ONE judge model, deliberately, with NO deployment fallback: our operation_run_stages rows record
+    # only the alias, so a two-model judge mix cannot be attributed from our own records and every
+    # quality gate that ranges over judge verdicts (ADR-0013, ADR-0028) becomes unreadable. Moving off
+    # the Groq-pinned gpt-oss-120b also removes the shared-account request-rate ceiling that took out
+    # every judge stage at once on 2026-08-07. If first-party DeepSeek throttles, widen to other
+    # **fp8** tags only (baseten/fp8, novita/fp8, parasail/fp8) — never to an fp4 endpoint, which would
+    # drift quantization and make verdicts non-reproducible.
+    # (The off-core oracle triangle and label aligner were retired after the admission-precision fix;
+    # see ADR-0013.)
+    kg-independent-judge: openrouter/deepseek/deepseek-v4-flash-0731
     # Derived-node semantic-dedup PROPOSE signal (plan U1, ADR-0012, AGENTS rule 20).
     # Embeddings only propose near-duplicate candidate pairs within a Declared Domain;
     # a separate cross-family adjudicator (kg-independent-judge) DECIDES each merge.

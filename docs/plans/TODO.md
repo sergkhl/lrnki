@@ -50,16 +50,18 @@
   against the full real pipeline instead, which is what D11's "iterate locally with free hard resets"
   licenses, and the deploy belongs with the unit that ships.
 
-- **`kg-independent-judge` now has a deployment fallback, which costs attribution.** Groq's
-  requests-per-minute ceiling on OpenRouter's *shared* account killed 3 of 3 topic-generation attempts
-  — it takes out every judge stage at once, including both key-verification brackets, because the
-  alias is `provider.only: ["groq"]` with `allow_fallbacks: false` to guarantee forced `tool_choice`.
-  Fallback added to `openrouter/deepseek/deepseek-v4-flash-0731`, locked to `deepseek/fp8`, reasoning
-  off, verified by live forced-tool probe. **Account credit cannot relieve a rate limit** — credits buy
-  tokens, not request rate. Open question the user raised and it is not settled: switch to a *single*
-  judge model and delete the fallback, since our `operation_run_stages` records only the alias and
-  cannot say which model judged. Decide it with U4's existing discrimination probes; note
-  `deepseek-v4-pro` output is $0.87/M, over the config's $0.50/M cap.
+- **The production judge is now one model: `deepseek/deepseek-v4-flash-0731`, no fallback.** It
+  replaced Groq-pinned `gpt-oss-120b` on `kg-independent-judge`, whose shared-account request-rate
+  ceiling killed 3 of 3 topic-generation attempts and takes out every judge stage at once (**account
+  credit cannot relieve a rate limit** — credits buy tokens, not request rate). Single model on
+  purpose: `operation_run_stages` records only the alias, so a two-model mix makes judge verdicts
+  unattributable. Locked to `deepseek/fp8` because the model's 23 endpoints include **fp4** variants
+  and drifting quantization would break verdict reproducibility; reasoning off because DeepSeek
+  double-encodes array-of-object tool arguments, which is every verdict schema.
+  **Competence is smoke-tested, not measured** — two live probes only. U4's discrimination probes now
+  qualify the judge as well as the new stage. The shipped key-verification evidence was measured under
+  gpt-oss-120b and does not carry over. Needs an ADR amendment (ADR-0007/0005, ADR-0013 evidence).
+  `kg-prerequisite-ordering` still runs gpt-oss-120b and keeps that availability exposure.
 
 ### Evidence-triggered follow-up
 
