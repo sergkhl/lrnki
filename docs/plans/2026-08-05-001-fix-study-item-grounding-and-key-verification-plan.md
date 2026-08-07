@@ -18,7 +18,7 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Study Item Grounding and Key Verification
 
-**Status:** Ready
+**Status:** Complete — consolidate outward and delete (docs/plans/README.md)
 
 **Decision state:** Interview-locked. D1–D11 were chosen directly in the planning interview; D12 was
 delegated to the recommended answer and is recorded as such. Re-evaluated 2026-08-05 before
@@ -26,13 +26,12 @@ implementation: D6/D9 amended — the fallback rung moves to U3 and applies only
 item types, so the D6 interlock is structural rather than aspirational — with a matching D5
 refinement, and mechanical corrections to D8, the passage-id scheme, and the U3 inventory.
 
-**Implementation state:** **U1, the two pre-U2 steps, U2, and U3 are closed** (U1 2026-08-05; the
-rest 2026-08-07). U2 measured a **complete coverage recovery — 48 of a possible 48 items, zero
-rejections, against a 24-of-48 baseline** — attributable to U1 alone. U3 shipped key verification,
-the D9 fallback rung, and the lie-only judge's deletion, all deterministic and unmeasured. **U4 is
-the only remaining unit** and is unblocked: it needs an operator, a shared-host deploy, and
-production spend. D3's revisit trigger is closed — matching stays unverified, re-decided in the
-decision ledger. Details in the [Validation Log](#validation-log).
+**Implementation state:** **All four units are closed** (U1 2026-08-05; the rest 2026-08-07). U2
+measured a complete coverage recovery attributable to U1 alone; U3 shipped key verification, the D9
+fallback rung, and the lie-only judge's deletion; U4 proved the captured defect is now rejected
+(5 of 5 draws) and measured two real-use runs in which **all 30 impostor items are free of a second
+falsehood** and coverage held. D3's revisit trigger is closed — matching stays unverified.
+Details in the [Validation Log](#validation-log).
 
 ## Goal capsule
 
@@ -584,6 +583,95 @@ Hands off to U4:
   move it in two directions — the fallback rung *adds* items the verbatim rungs rejected, and
   verification *subtracts* items whose key is not unique. U4 must report those two separately, or the
   net will be unattributable.
+
+### U4 — correctness gate (real-use pass 2), replay probe, and two runs — closed 2026-08-07, deployed at `bd0b3eb`
+
+**The plan's goal is met.** The captured defect is now rejected by the shipped code, coverage
+survived verification, and no impostor in either run carries a second falsehood. Deployed to the
+shared VPS after `pnpm check` and `pnpm test:db` green; the container's image id was compared
+against the freshly built image, so the measured artifact is the committed one.
+
+**1. Replay probe — PASS, 5 of 5 draws.** The four frozen `Deep ocean return flow` statements
+through the shipped judge and the shipped `impostorKeyVetoReason`:
+
+| Ordinal | Stored as | Verdict |
+| --- | --- | --- |
+| 0, 1 | true | `claim_true` ×5 |
+| 2 | true | **`claim_false` ×5** |
+| 3 | keyed lie | `claim_false` ×5 |
+
+The item is rejected in every draw, and **through the uniqueness half of the rule** — the branch the
+deleted lie-only judge did not have. Ordinals 0 and 1 holding `claim_true` is the negative control
+that makes the rejection mean something: the judge discriminates rather than distrusting everything.
+The judge's own reason was the documented distinction ("a specific boundary component, not a synonym
+for the whole deep return flow"). Grounding was reconstructed from the item's own true statements
+only, so no passage contradicts either false claim — the hard case D4 exists for.
+
+**2. Two runs, one reset and one deploy, sequential.** `Thermohaline circulation` for comparability
+and `Public-key cryptography` for a different domain (AGENTS rule 17).
+
+| Metric | Baseline | U2 | U4 thermohaline | U4 public-key |
+| --- | --- | --- | --- | --- |
+| Nodes | 16 | 16 | 16 | 16 |
+| Study items | 24 of 48 | 48 of 48 | **48 of 48** | **46 of 48** |
+| option-select / matching / impostor | 11 / 2 / 11 | 16 / 16 / 16 | 16 / 16 / 16 | 16 / 16 / **14** |
+| Nodes with zero items | 3 | 0 | **0** | **0** |
+| study-item phase wall-clock | 324 s | 112 s | **75.3 s** | **75.3 s** (coincidence) |
+
+**U2's 48-of-48 invariant held.** The two directions U3 required be reported separately:
+
+- **Verification subtracted nothing.** Zero uniqueness vetoes across both runs — no item was rejected
+  for a non-unique answer key.
+- **The fallback rung added at most 3 and 2 items** (thermohaline, public-key), all option-select,
+  measured as citations whose stored text equals a whole lesson passage. That is an *upper* bound: a
+  quote spanning an entire passage is indistinguishable from a fallback admission, because the rung
+  is transient build-time evidence and deliberately not persisted.
+
+**3. The two missing impostors are the D5 unavailability rule firing in production, not a veto.**
+`Diffie-Hellman key exchange` and `Discrete logarithm problem` both read `impostor key verification
+unavailable: … failed after 3 attempt(s): LiteLLM request failed with 429`. Under the *same*
+throttling, option-select lost nothing (16 of 16). That is D5's deliberate asymmetry observed on real
+traffic: an unverifiable impostor drops because a "lie" that is actually true teaches a falsehood,
+while a verbatim-anchored option-select passes through. No test can supply this evidence, because
+the 429 that produces it cannot be honestly faked.
+
+#### Real-use quality evaluation
+
+- **Milestone:** U3's key verification and fallback rung, measured on the shared deployed container.
+- **Fixture and source type:** two topic expeditions — `Thermohaline circulation` (Oceanography) and
+  `Public-key cryptography` (Cryptography) — 16 LLM-grounded nodes each, no source document.
+- **Real model calls used:** yes — production pipeline on the shared VPS after an application-schema
+  reset, plus 5 judge calls for the replay probe.
+- **Result:** **PASS.** All 30 impostor items across both runs hand-inspected; **none carries a
+  second false statement**, which is the defect class this plan exists to close.
+- **Useful output observed:** the sibling-sourced lies are the hard cases and they are correct
+  throughout — `Halocline[0]` is the thermocline definition, `Pycnocline[2]` the halocline's,
+  `NADW[0]` the AABW's, `PKI[0]` the digital-signature definition, and four separate nodes are given
+  Diffie-Hellman's definition as their lie. Each is a true sentence about a *neighbouring* concept,
+  which is exactly what a judge bound to the node can catch and a free-floating truth check cannot.
+- **Defects observed:** none of the gated class. Two sub-threshold observations: `Key distribution
+  problem[1]` is the weakest lie in either run (a CA arguably does address *public*-key distribution;
+  it is false only within the item's own framing, which credits public-key cryptography in [3]); and
+  `Seawater salinity[0]` / `Seawater temperature[0]` reuse one mis-attributed sentence as their lie,
+  so lie diversity across sibling nodes is lower than statement diversity within an item.
+- **Changes made after inspection:** none.
+- **Remaining caveats:** the shared free-tier `gpt-oss-120b` deployment was saturated throughout the
+  second run — attempt 1 died on a 429 in `prerequisite-ordering` and the supervisor retried to
+  success on attempt 2 (max 3, 2-minute stale window). Generation is non-deterministic and this is
+  one run per topic. Zero uniqueness vetoes is a **null result** for the subtraction direction; the
+  replay probe is what makes that null interpretable rather than unfalsifiable.
+- **Safe to continue downstream:** **yes.**
+
+Invariants a later change must not break:
+
+- **The bank is at 48 of a possible 48 per 16-node topic when the judge is reachable**, and the only
+  legitimate subtractions are a proven non-unique answer key or an unavailable judge on an impostor.
+- **Judge unavailability must stay per-type and asymmetric.** A future change that makes
+  option-select drop on an unresolved verdict, or impostor survive one, silently reverses an
+  ADR-0026 harm decision that this run confirms is load-bearing.
+- **`unclear` never vetoes**, and impostor's requirement that its lie be *proven* false is an
+  affirmative standing requirement, not `unclear` vetoing.
+- The **stage denominator is 15**, observed live in the learner-facing progress payload.
 
 ### Open findings
 
