@@ -88,6 +88,102 @@ test("matching rejects citations that do not verify against grounding", () => {
 });
 
 
+// --- Containment veto (plan 2026-08-07-001 D4) --------------------------------------------
+// The deterministic half of the cueing defect: a pair one side of which displays the other's whole
+// phrase is solvable by reading, provably, with no judgment. The paraphrase half belongs to the
+// generation prompt — rule 16 keeps it out of here.
+
+function groundingWith(extra: { passageId: string; text: string }[]): MatchingGrounding {
+  const base = sourceGrounding();
+  return {
+    ...base,
+    passages: [...base.passages, ...extra.map((p) => ({ ...p, sourceResourceId: "src-1", sourceBlockId: `blk-${p.passageId}` }))]
+  };
+}
+
+test("containment rejects in both directions: match displaying the whole prompt, and prompt displaying the whole match", () => {
+  const grounding = groundingWith([
+    { passageId: "p-5", text: "The heap performs runtime allocation of values whose size is unknown at compile time." },
+    { passageId: "p-6", text: "A stack stores frames for each call in last-in, first-out order." }
+  ]);
+
+  const matchContainsPrompt = validateMatchingItem(
+    draftOf([
+      validPairs[1],
+      validPairs[2],
+      pair(
+        "Runtime allocation",
+        "The heap performs runtime allocation of values whose size is unknown at compile time",
+        "p-5",
+        "The heap performs runtime allocation of values whose size is unknown at compile time."
+      )
+    ]),
+    grounding
+  );
+  assert.equal(matchContainsPrompt.ok, false);
+  if (!matchContainsPrompt.ok) assert.match(matchContainsPrompt.reason, /must not contain one another/);
+
+  const promptContainsMatch = validateMatchingItem(
+    draftOf([
+      validPairs[0],
+      validPairs[2],
+      pair("Stores frames for each call in last-in, first-out order", "Stores frames", "p-6", "A stack stores frames for each call in last-in, first-out order.")
+    ]),
+    grounding
+  );
+  assert.equal(promptContainsMatch.ok, false);
+  if (!promptContainsMatch.ok) assert.match(promptContainsMatch.reason, /must not contain one another/);
+});
+
+test("containment survives case, collapsed whitespace, and punctuation dropped between the words", () => {
+  // A character-level `includes` misses this one: the match reads "memory, at" with a comma.
+  const result = validateMatchingItem(
+    draftOf([
+      validPairs[1],
+      validPairs[2],
+      pair("Allocates memory at runtime", "A heap  ALLOCATES memory, at runtime; then reuses the freed space", "p-1", "A heap allocates memory at runtime.")
+    ]),
+    sourceGrounding()
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /must not contain one another/);
+});
+
+test("exact normalized equality still rejects under its own distinct reason", () => {
+  const result = validateMatchingItem(
+    draftOf([validPairs[0], validPairs[1], { ...validPairs[2], matchText: " OWNERSHIP " }]),
+    sourceGrounding()
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /must differ/);
+});
+
+test("a pair sharing a distinctive word without containment is accepted: this is not a shared-word veto", () => {
+  const result = validateMatchingItem(
+    draftOf([
+      validPairs[0],
+      validPairs[1],
+      pair("Value lifetime owner", "The binding responsible for freeing a value", "p-3", "Ownership tracks the binding responsible for freeing a value.")
+    ]),
+    sourceGrounding()
+  );
+  assert.equal(result.ok, true);
+});
+
+test("a prompt word appearing only inside a longer word is not containment (rule 16: veto only the provable)", () => {
+  // "cheapest" contains the characters of "heap". A character-level `includes` would reject this
+  // legitimate pair, which is the false negative rule 16's removal clause exists to prevent.
+  const result = validateMatchingItem(
+    draftOf([
+      validPairs[1],
+      validPairs[2],
+      pair("Heap", "Cheapest region to grow at runtime", "p-5", "The heap is the cheapest region to grow at runtime.")
+    ]),
+    groundingWith([{ passageId: "p-5", text: "The heap is the cheapest region to grow at runtime." }])
+  );
+  assert.equal(result.ok, true);
+});
+
 // --- Citation resolution ladder (plan 2026-08-05-001 D9) ----------------------------------
 // Matching shares `resolveGroundingCitation`, so U1's rungs reach it with no matching-specific
 // change (rule 18) — but D6 keeps the U3 generated-passage fallback away from matching, whose

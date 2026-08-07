@@ -544,14 +544,14 @@ export const studyItemBlueprintValidator = z.object({
 export const studyItemBlueprintSchema: JsonSchema = toForcedToolSchema(studyItemBlueprintValidator);
 
 const matchingPair = z.object({
-  promptText: z.string().min(1).describe("Left-column prompt: a concise concept-side clue or situation to recognize."),
-  matchText: z.string().min(1).describe("Right-column match: the corresponding example, scenario, description, or application from the lesson."),
+  promptText: z.string().min(1).describe("Left-column prompt: a few words NAMING one distinct aspect of the node — a property, quantity, mechanism, cause, effect, condition, role, or situation — without stating its answer."),
+  matchText: z.string().min(1).describe("Right-column match: the content ANSWERING that one aspect and nothing else, in your own compact words. Never a restatement, paraphrase, or expansion of its own prompt, and it must not contain the prompt's wording."),
   citation: passageCitation
 }).strict();
 
 export const matchingValidator = z.object({
   question: z.string().min(1).describe("One self-contained prompt asking the learner to match the pairs. Do not reference 'the passage' or 'the source'."),
-  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage."),
+  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage. The set must be mutually exclusive: no match may plausibly answer another pair's prompt, and no prompt may cover another prompt's answer."),
   explorableTerms: itemExplorableTerms
 }).strict();
 
@@ -651,7 +651,7 @@ export const CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH = 600;
 // required `items` array closes the object and every nullable sits mid-object. The
 // mimoDescriptorShape congruence test enforces this mechanically.
 const conceptLessonSection = z.object({
-  kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how the concept connects to its prerequisite, dependent, and sibling neighbors; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
+  kind: z.enum(["gist", "intuition", "definition", "examples", "applications", "formulas"]).describe("Which part of the teaching arc this section is. Across the lesson, order them: a one-line framing hook stating the core idea or the problem the concept solves, never a restatement of the definition; a concrete intuition before any formal statement; the precise definition or notation; worked examples; how it connects to the neighboring topics a learner meets before it, studies after it, or studies alongside it, written as subject matter and never as relationship labels; then any formal methods or formulas. Emit a section ONLY when the provided grounding supports it; never assume a section applies."),
   text: z.string().min(1).max(CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH).describe("The teaching prose for this section. Self-contained, compact, and readable on its own; do not reference 'the passage' or 'the source'."),
   citationPassageId: z.string().nullable().describe("The exact passageId of the provided grounding passage this section restates, when the section conveys source-supported content; null when the section is synthesized."),
   citationEvidenceQuote: z.string().nullable().describe("A substring copied from that grounding passage supporting this section. For source-grounded passages, copy it verbatim; null when the section is synthesized."),

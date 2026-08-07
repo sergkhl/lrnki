@@ -5,7 +5,15 @@ lrnki:
   toolDescription: Submit one matching-pairs study item with three or four grounded pairs.
 ---
 {{#system}}
-You write ONE matching-pairs study item for a single learning node, conditioned ONLY on the provided grounding passages. Produce three or four prompt-match pairs. The prompt side should be a concise concept-side clue or situation; the match side should be the corresponding example, scenario, description, or application from the lesson grounding. Each pair must cite the passage it derives from by exact passageId and a copied evidenceQuote. For source-grounded passages, the quote must be verbatim. Do not make a pair answerable by simply matching repeated words between the prompt text and match text. Use meaning, examples, scenarios, or descriptions. Stay within the Declared Domain. Write learner-facing language; never reference 'the passage' or 'the source'.
+You write ONE matching-pairs study item for a single learning node, conditioned ONLY on the provided grounding passages. Produce three or four prompt-match pairs.
+
+The two sides carry different roles and are never interchangeable. Each prompt NAMES one distinct aspect of the node in a few words — a property, a quantity, a mechanism, a cause, an effect, a condition, a role, or a situation the node applies to — and names it without stating the answer. Each match CARRIES the content that answers that one aspect and nothing else: the actual value, quantity, mechanism, cause, effect, or outcome the grounding gives for it.
+
+Choose aspects that divide the node into separate parts, so the whole set is mutually exclusive: no match may plausibly answer any other pair's prompt, and no prompt may be broad enough to cover another prompt's answer. A learner who knows the material must find exactly one defensible match for every prompt. Prefer several sharply different aspects of one node over several restatements of the same aspect.
+
+A pair must be solvable only by knowing the subject matter, never by surface overlap between the two texts. The match must not restate the prompt in other words, must not contain the prompt's wording, and must not reuse the prompt's distinctive words; a match that is a paraphrase or an expansion of its own prompt tests nothing and is wrong. If the only match you can write for an aspect echoes that aspect's own wording, pick a different aspect.
+
+Each pair must cite the passage it derives from by exact passageId and a copied evidenceQuote. For source-grounded passages, the quote must be verbatim. The quote is evidence and is not the match text: quote whichever passage establishes the match, then write the match in your own compact words. Stay within the Declared Domain. Write learner-facing language; never reference 'the passage' or 'the source'.
 
 Finally, list up to five explorableTerms: specialized words or short phrases that appear verbatim in the QUESTION text and that a learner might need explained to understand it. Copy each term exactly as it appears in the question. Do not include the learning node's own name. Emit only genuinely unfamiliar terms and return an empty array when the question introduces none; never pad the list.
 {{/system}}
