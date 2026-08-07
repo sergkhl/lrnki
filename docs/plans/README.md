@@ -89,11 +89,10 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 
 ## Active implementation plans (execution order)
 
-- [2026-08-05-001 — Study Item grounding and key verification](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md)
-  — U1, both pre-U2 steps, U2, and U3 are closed and consolidated in the plan's Validation Log. U2
-  measured a complete coverage recovery (48 of 48, zero rejections); U3 shipped key verification and
-  the fallback rung, deterministically. Only U4 remains — two real-use runs needing an operator, a
-  deploy, and spend. D3 was re-decided: matching stays unverified, and TODO owns its defects.
+None. `2026-08-05-001 — Study Item grounding and key verification` completed on 2026-08-07 and was
+deleted after consolidation: durable policy is in
+[ADR-0026](../adr/0026-typed-study-item-bank.md), the outcome in [TODO.md](./TODO.md), and the full
+record in git (`git log --diff-filter=D -p -- docs/plans/2026-08-05-001-*.md`).
 
 ## Ownership rules
 

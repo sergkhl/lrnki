@@ -33,25 +33,19 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Study Item truth and coverage — U3 shipped; U4 is the last unit and needs an operator.**
-  [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md) owns the
-  framing, decisions, units, acceptance, and every validation entry. Live state: U1, both pre-U2
-  steps, U2, and U3 are closed; only **U4** — two real-use runs on the shared VPS, requiring a
-  deploy, a `db:reset`, and production spend — remains. U2's measured **48 of a possible 48 items**
-  is the invariant U4 must not silently lose. D3 was re-decided: matching stays unverified.
-
 - **Matching item quality — three distinct defects, three distinct fixes.** Hand-inspected instances
-  are in
-  [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md)'s U2
-  entry; that plan will not fix them and D3 says why. Tautological pairs are a **prompt** problem
-  (the guard rewards quoting, so the cheapest passing item makes the match the quoted bullet);
-  ambiguous prompt sets are a **verification** problem needing an N×N assignment check, not the
-  per-candidate truth judge U3 shipped; graph vocabulary in learner copy ("dependent concept") is
-  likely unlabelled sibling context. Do not treat them as one fix. Delete the plan's link when it is.
+  are in the deleted plan's U2 entry (`git log --diff-filter=D -p --
+  docs/plans/2026-08-05-001-*.md`); D3 deliberately left matching unverified and says why.
+  Tautological pairs are a **prompt** problem (the guard rewards quoting, so the cheapest passing
+  item makes the match the quoted bullet); ambiguous prompt sets are a **verification** problem
+  needing an N×N assignment check, not the per-candidate truth judge U3 shipped; graph vocabulary in
+  learner copy ("dependent concept") is likely unlabelled sibling context. Do not treat them as one
+  fix. U4 hand-inspected impostor items only, so matching has had no second look since U2.
 
-- **The shared VPS is deployed from `fix/study-item-grounding` at `1b96900`, not `main` and no longer
-  the branch tip.** The deploy checkout and the running container agree with each other but are now
-  behind U3. `main` is untouched at `943fffc`. U4's first step is a redeploy, which also closes this.
+- **The shared VPS runs `fix/study-item-grounding` at `bd0b3eb`; `main` is still at `943fffc`.**
+  The deploy checkout and the running container agree and are at the branch tip. Nothing on this
+  branch has merged to `main` — the whole Study Item grounding and key verification body of work
+  lives only here.
 
 ### Evidence-triggered follow-up
 
@@ -108,7 +102,13 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   degraded response with no tool call at all (`{"kind":"no_tool_call"}` in
   `operation_run_stages.error_detail`) — that is upstream load, not a schema defect. There is no
   fallback model group, so the only remedies are waiting and retrying; do not lower production
-  concurrency to make a gate pass.
+  concurrency to make a gate pass. **Saturation is also visible as missing content rather than a
+  failed run:** a judge exhausted by 429s makes Study Item Key Verification unavailable, which drops
+  impostor items with a `… key verification unavailable: … 429` reason in `rejected_study_items`
+  while option-select is untouched. A topic short only on impostors is a throttling signature, not a
+  quality regression. The topic supervisor retries a failed attempt up to 3 times with a 2-minute
+  stale window, so a run that dies mid-pipeline usually self-heals — check
+  `learner_expeditions.generation_attempts` before re-triggering by hand.
 - **Native gate host setup** — emulator autofill, the starved-boot ANR, and the device selector are
   owned by `apps/learner-app/e2e-native/README.md`.
 - **Three real-backend app behaviours worth not rediscovering the hard way:** the Guardian arrival
@@ -118,34 +118,39 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## COMPLETED
 
-- **The public API serves from the deployed container only (2026-08-05).** Caddy's dev-first
-  fallback is gone: one upstream, no active health checks, and the host runtime it preferred
-  (`dev:api`, the learner-api `dev`/`start` scripts) deleted with it. The API dev loop moved inside
-  the container as `docker compose watch learner-api`, which works because the image runs `tsx` on
-  source and pnpm's in-image workspace symlinks are relative into `/app/packages` — the exact sync
-  target. The deploy now refuses while a watch session is attached and probes the container directly
-  before the public hostname, so the two claims *the artifact I deployed started* and *the public
-  hostname reaches it* are asserted separately. **Deployed to the VPS the same day**, which is what
-  actually closed the hole: `COMPOSE_PROFILES=public` set on the shared host, the single-upstream
-  Caddy built and running, and the `br-lrnki → 8787` ufw rule deleted (v4 and v6) now that nothing
-  binds it. The residual — one checkout reachable at two paths through an agent container, not two
-  checkouts — is closed too: every file bind now sets `create_host_path: false`, so a caller
-  resolving a path the daemon cannot see is refused by name instead of having an empty directory
-  created and mounted over a config file, and `AGENTS.md` rule 23 states where compose may run.
-  Durable decision in
-  [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md); the plan is deleted.
+- **Study Item grounding and key verification (2026-08-07).** One contract was failing in both
+  directions: it verified quote mechanics and never claim truth, so it destroyed half the bank over
+  quotes the model failed to reproduce while admitting an item whose "true" statement was false.
+  Fixed as one plan. Deterministic half: one grounding-shape owner, unique passage ids, bullet
+  grounding, and a resolution ladder that repairs a mis-addressed citation — measured alone at
+  **24 of 48 items → 48 of 48, zero rejections**. Semantic half: **Study Item Key Verification**
+  replaces the lie-only judge, classifying *every* candidate answer and enforcing answer-key
+  uniqueness, with the forgiving third rung admissible only where that judge checks the claim. The
+  captured `Deep ocean return flow` defect is now rejected 5 of 5 draws, through the uniqueness
+  branch the old judge lacked. Two real-use runs (Oceanography, Cryptography) held coverage at 48
+  and 46 of 48 and **all 30 impostor items were free of a second falsehood**. The 2 missing items
+  were the harm-based unavailability rule firing on a real 429, not vetoes — option-select lost
+  nothing under the same throttling. Durable policy in
+  [ADR-0026](../adr/0026-typed-study-item-bank.md); the plan is deleted, its detail in git at
+  `7fb9a2d`.
 
-- **Drizzle migrations integrated and the shared deployment cut over (2026-08-05).** The whole plan
-  shipped, closing with the VPS cutover that only an operator could run. The shared database
-  classified as **`stale-baseline`, not the `legacy-schema` the blocker predicted**: it already had a
-  `drizzle.__drizzle_migrations` row, hash `e9011ad9…` / `created_at 0`, which is the sha256 of
-  `0000_initial_lrnki_schema.sql` **as of `e8ffa42` (2026-06-19)** — back when that file was
-  hand-written and authoritative. The later shell/SQL init path re-applied newer DDL straight through
-  `psql` and never wrote the metadata table, so the schema advanced to 56 tables while the recorded
-  row stayed frozen in June; the guard was right that the row's claim no longer described the schema.
-  The runbook then ran exactly as written and the reset guard exited 0, the migrator applied `0000`
-  once, and a re-run reported `current` with no DDL. Durable decision stays in
-  [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md); the plan is deleted.
+- **The public API serves from the deployed container only (2026-08-05).** Caddy's dev-first
+  fallback and the host runtime it preferred are gone: one upstream, and the API dev loop moved
+  inside the container as `docker compose watch learner-api`. The deploy refuses while a watch
+  session is attached and probes the container before the public hostname, so *the artifact started*
+  and *the hostname reaches it* are asserted separately. Deployed the same day, which is what closed
+  the hole; file binds now set `create_host_path: false` and `AGENTS.md` rule 23 states where compose
+  may run. Durable decision in
+  [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md); plan deleted, detail
+  in git.
+
+- **Drizzle migrations integrated and the shared deployment cut over (2026-08-05).** Closed with the
+  VPS cutover only an operator could run. The shared database classified as **`stale-baseline`, not
+  the `legacy-schema` the blocker predicted** — it carried a migration row frozen at 2026-06-19 while
+  a later shell/SQL init path advanced the schema to 56 tables without updating it, so the guard was
+  right that the row no longer described the schema. The runbook then ran exactly as written. Durable
+  decision in [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md); plan
+  deleted, detail in git.
 
 - **Crystal Guardian Ward Obelisk closed by its ADR-0038 native pass (2026-08-01).** The last open
   item shipped: the native gate now reaches the Guardian at all, through a second Maestro flow over a
@@ -180,16 +185,11 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   moved into the app-owned wrappers. Durable rules folded into
   [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
-- **Build unblocked and dependencies bumped (2026-07-31).** `pnpm build`'s root cause was an ambient
-  `NODE_ENV`, not Next.js; Next was moved to 16.2.12 for a security fix.
-
 ## VALIDATION
 
-No active plan-less validation records. Active plans own their validation logs.
-
-The 2026-08-05 VPS deployment record was consolidated outward before deletion: its quality half is
-superseded by the frozen baseline and defect table in
-[2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md), and its
-path evidence — the interception negative control — now lives in
-[ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md). The run itself is in
-git history at `7417fbd`.
+No active plan-less validation records. There are no active plans; the latest validation is the
+Study Item key-verification gate of 2026-08-07, recorded in the deleted `2026-08-05-001` plan and
+reachable at `7fb9a2d`. The 2026-08-05 VPS deployment record was consolidated before deletion — its
+path evidence lives in
+[ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md), its run in git at
+`7417fbd`.

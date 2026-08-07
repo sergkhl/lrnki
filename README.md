@@ -46,6 +46,11 @@ pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 through the one-shot `migrate` service after PostgreSQL becomes healthy, and starts the learner API
 only after that migration and LiteLLM both succeed.
 
+**An ambient `NODE_ENV` in your shell breaks `pnpm build`.** Next.js reads it directly, so a value
+exported by a shell profile or left over from an earlier command sends the Admin Lab build down a
+configuration path it was never meant to take, and the failure reads as a Next.js defect rather than
+an environment one. Leave `NODE_ENV` unset and let each tool choose its own.
+
 The `caddy` service is behind the `public` profile, so that command **skips it** on a development
 machine — Caddy only makes sense where `api.lrnki.globesoul.com` resolves, and anywhere else it
 retries ACME against the real VPS forever. The shared host opts in with `COMPOSE_PROFILES=public` in
