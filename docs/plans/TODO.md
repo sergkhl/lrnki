@@ -33,16 +33,19 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Study Item truth and coverage — U2 is next and needs operator consent, not code.**
+- **Study Item truth and coverage — U2 passed; U3 is next and unblocked.**
   [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md) owns the
-  framing, decisions, units, acceptance, and every validation entry. Live state: U1 and **both steps
-  that precede U2 are closed** — `pnpm test:db` is green (the `response_log` count race is fixed by
-  scoping it to the test's own learner) and U1's deterministic effect is sized offline in the plan.
-  **Nothing has been measured against a real model yet.** U2 is a run of its own — D11 forbids
-  folding its delta into U4's gate — against the frozen baseline in the plan, and owes a
-  hand-inspection of every recovered matching item against D3's revisit trigger. It is blocked only
-  on the operator: D12 permits a shared-VPS deploy, a `db:reset` on the shared application schema,
-  and production spend, but plan permission is not the operator saying go on a shared environment.
+  framing, decisions, units, acceptance, and every validation entry. Live state: U1, both pre-U2
+  steps, and U2 are closed. U2 measured a **complete coverage recovery — 48 of a possible 48 items
+  with zero rejections, from a 24-of-48 baseline** — attributable to U1 alone, since no fallback rung
+  exists yet. It also fired **D3's revisit trigger**: the recovered matching flow carries
+  tautological and ambiguous pairs, so whether matching gets key verification is now an open scope
+  decision, recorded in the plan's `Open findings`. Decide that before folding anything into U3.
+
+- **The shared VPS is deployed from `fix/study-item-grounding`, not `main`.** The deploy checkout and
+  the running container both sit at `1b96900` on that branch, deliberately kept consistent so the
+  container never disagrees with the checkout. `main` is untouched at `943fffc`. Merge and redeploy,
+  or restore the checkout and redeploy, before treating the shared host as tracking `main` again.
 
 ### Evidence-triggered follow-up
 

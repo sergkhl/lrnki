@@ -26,12 +26,12 @@ implementation: D6/D9 amended — the fallback rung moves to U3 and applies only
 item types, so the D6 interlock is structural rather than aspirational — with a matching D5
 refinement, and mechanical corrections to D8, the passage-id scheme, and the U3 inventory.
 
-**Implementation state:** **U1 shipped** (2026-08-05) and both steps in
-[Execution order before U2](#execution-order-before-u2) are closed (2026-08-07) — the deterministic
-gate is green and U1's effect is sized offline. What each proved is in the
-[Validation Log](#validation-log). U2 — the coverage gate — has not run, so no measured delta exists
-yet; it is blocked on operator consent for a shared-host deploy and production spend, not on code.
-U3 and U4 are untouched.
+**Implementation state:** **U1, the two pre-U2 steps, and U2 are closed** (U1 2026-08-05; the rest
+2026-08-07). U2 measured a **complete coverage recovery — 48 of a possible 48 items, zero
+rejections, against a 24-of-48 baseline** — attributable to U1 alone. It also fired **D3's revisit
+trigger**: the recovered matching flow carries tautological and ambiguous pairs, recorded under
+[Open findings](#open-findings). U3 and U4 are untouched; U3 is unblocked. Details in the
+[Validation Log](#validation-log).
 
 ## Goal capsule
 
@@ -512,14 +512,75 @@ and run beside the shipped `lessonGroundingShape`:
   rather than changing which types are allowed. `Block Structure`, this plan's own named example,
   reproduces exactly — 1 generator passage against a pre-gate count of 4.
 
-Hands off to U2: expect recovery through the **bullet channel**, not through id repair, and expect
-**matching to move most** — a node like `Block Structure` was pre-gated *for* matching while its
-generator saw 1 passage against a 3-pair requirement. Rung-2 id repair should be near-invisible in
-the delta; if U2's recovery instead tracks id repair, the attribution is wrong and needs diagnosis
-before U3. This corpus is software-engineering over 28 nodes while the frozen baseline is
-oceanography over 16, so the mechanism generalizes but the ratios need not. The failed citations
-themselves stay unreplayable — a rejected row stores a reason string, not the draft citation.
+It predicted recovery would arrive through the **bullet channel** rather than id repair, with
+matching moving most. **U2 confirmed both.** The failed citations themselves stay unreplayable — a
+rejected row stores a reason string, not the draft citation.
+
+### U2 — coverage gate (real-use pass 1) — closed 2026-08-07, deployed at `1b96900`
+
+**Coverage recovered completely, and the recovery is attributable to U1 alone.** Neither the
+fallback rung nor key verification exists in this build, so every admitted citation resolved through
+the verbatim rungs 0–2: the model quoted real passages rather than being forgiven for missing them.
+
+| Metric | Frozen baseline | U2 |
+| --- | --- | --- |
+| Study items | 24 of a possible 48 | **48 of 48** |
+| option-select | 11 items, 5 rejected | 16, 0 rejected |
+| matching | 2 items, 14 rejected | **16, 0 rejected** |
+| impostor | 11 items, 5 rejected | 16, 0 rejected |
+| `citation does not verify against grounding` | 23 | **0** |
+| Nodes with zero items | 3 | **0** |
+| study-item stage wall-clock | 324 s | **112 s** |
+
+Both runs derived 16 nodes and the node sets overlap heavily but are not identical. The baseline's
+`Deep ocean return flow` did not recur, so U4's replay probe still needs the DWBC statements frozen
+in this plan's defect table.
+
+#### Real-use quality evaluation
+
+- **Milestone:** U1's deterministic grounding fixes, measured on the shared deployed container.
+- **Fixture and source type:** topic expedition `Thermohaline circulation`, Oceanography, 16
+  LLM-grounded nodes, no source document.
+- **Real model calls used:** yes — production pipeline on the shared VPS after `pnpm db:reset`.
+- **Result:** **PASS** for the coverage objective. Separately, **D3's revisit trigger has fired** on
+  matching quality — a scope decision, not a U3 blocker, since D3 leaves matching unverified.
+- **Useful output observed:** every node carries one item of each type. `North Atlantic Deep Water`
+  is the ideal matching shape — four crisp, mutually exclusive prompts (salinity / temperature /
+  depth / what it drives) against four factually correct values.
+- **Defects observed**, from hand-inspecting all 16 matching items (61 pairs):
+  1. **Tautological pairs.** `Upwelling` (all three) and `Downwelling` ordinal 0 restate the prompt
+     as the match; for `Upwelling` 0 and 1 the match *contains the prompt verbatim*, so the item is
+     solvable by string overlap and tests nothing. Plausibly a side effect of U1 rather than noise:
+     the guard still demands a verbatim quote, and the cheapest way to satisfy it is to make the
+     match the quoted bullet and the prompt its paraphrase — more quotable bullets, more opportunity.
+  2. **Ambiguous prompt sets.** `Thermohaline circulation disruption` ordinals 0 and 2 are near
+     synonyms on both sides; `Seawater density` ordinal 3 ("surface water becoming cooler or
+     saltier") subsumes ordinals 0 and 1; `Ocean overturning cells` ordinal 0 (deep water formation)
+     against ordinal 1 (downwelling) is a distinction the lesson itself blurs by calling deep water
+     formation "a specialized form of downwelling". A learner who knows the material can be marked
+     wrong — the same harm class as the captured impostor defect.
+  3. **Graph vocabulary in learner copy.** Two matches read "Deep ocean currents are a *dependent
+     concept*…" and "a *sibling* water mass". Matching only — options, impostor statements, and
+     questions are clean.
+- **Changes made after inspection:** none. Every defect is in matching, which D3 excludes from U3,
+  so repairing it here would change what U4 must measure.
+- **Remaining caveats:** the baseline expedition row had already been cleaned up, so the original
+  topic string was unrecoverable; `Thermohaline circulation` was reconstructed from the central node
+  label, and comparability therefore rests on the ratio and rejection mix rather than an identical
+  input string. Generation is non-deterministic and this is one run.
+- **Safe to continue downstream:** **yes** for U3.
+
+Invariants a later unit or a re-run must not break: the bank is at 48 of a possible 48 with zero
+rejections, and no node may lose its item; no citation is admitted except through a verbatim rung
+until U3 lands the fallback deliberately.
 
 ### Open findings
 
-- None recorded.
+- **D3's revisit trigger has fired — decide whether matching gets key verification.** U2's recovery
+  exposed tautological and ambiguous pairs (detail in the U2 entry). D3 excluded matching for want of
+  observed evidence; that evidence now exists. Note the two candidate causes are different fixes: the
+  tautology is a *prompt* problem (the generator is rewarded for quoting), the ambiguity is a
+  *verification* problem. Do not fold this into U3 without re-deciding scope.
+- **Graph vocabulary reaches learner-facing matching copy** ("dependent concept", "sibling water
+  mass"). Two instances, matching only. Likely the matching prompt passing sibling context through
+  unlabelled; check before it is assumed cosmetic.
