@@ -51,19 +51,43 @@ export type OptionSelectGrounding = StudyItemGuardGrounding;
 // Resolves a draft citation against the grounding passages: finds the cited passage, verifies
 // the evidence quote against it, and re-derives provenance authoritatively from the MATCHED
 // passage (never trusted from the draft's claim — fail-closed labeling). Returns null when the
-// citation doesn't verify. Shared by every guard (option-select, matching, impostor) so a future
+// citation doesn't resolve. Shared by every guard (option-select, matching, impostor) so a
 // change to citation verification lands in one place (rule 18).
+//
+// A deterministic resolution ladder, not an all-or-nothing string match (plan 2026-08-05-001 D9):
+//
+//   find(passageId)
+//     |- not found ............................... reject (nothing to attribute the claim to)
+//     |- found, quote verifies ................... cite it
+//     |- found, quote verifies on ANOTHER
+//     |    generated passage .................... cite THAT passage        (id repair)
+//     |- found, source passage, quote fails ...... reject
+//     `- found, generated passage, quote fails ... reject
+//
+// The id-repair rung is deterministic, not a threshold: the quote is still required to verify
+// VERBATIM, just against a passage the model mis-addressed. Repair only ever lands on a
+// GENERATED passage, so it can never mint a `source` citation from an id nobody cited, and no
+// similarity heuristic appears anywhere (AGENTS rule 16).
 export function resolveGroundingCitation(
   passages: OptionSelectGroundingPassage[],
   citationDraft: { passageId: string; evidenceQuote: string },
   derivedNodeId: string
 ): StudyItemCitation | null {
   const candidate = passages.find((passage) => passage.passageId === citationDraft.passageId);
-  const matchKind = candidate ? classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote) : "none";
-  if (!candidate || matchKind === "none") return null;
-  return "sourceResourceId" in candidate
-    ? { provenance: "source", sourceResourceId: candidate.sourceResourceId, sourceBlockId: candidate.sourceBlockId, evidenceQuote: citationDraft.evidenceQuote, matchKind }
-    : { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote };
+  if (!candidate) return null;
+  const matchKind = classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote);
+  if (matchKind !== "none") {
+    return "sourceResourceId" in candidate
+      ? { provenance: "source", sourceResourceId: candidate.sourceResourceId, sourceBlockId: candidate.sourceBlockId, evidenceQuote: citationDraft.evidenceQuote, matchKind }
+      : { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote };
+  }
+  const repaired = passages.some((passage) =>
+    passage !== candidate
+    && !("sourceResourceId" in passage)
+    && classifyEvidenceMatch(passage.text, citationDraft.evidenceQuote) !== "none"
+  );
+  if (repaired) return { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote };
+  return null;
 }
 
 export type OptionSelectGuardResult =

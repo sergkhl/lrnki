@@ -218,6 +218,82 @@ test("generated-grounding node: correct option quoting absent text → reject", 
   assert.match(result.reason, /does not verify/i);
 });
 
+// --- Citation resolution ladder (plan 2026-08-05-001 D9, rungs 1-2) -----------------------
+// The ladder is shared by all three guards; option-select is where it is exercised in detail.
+
+// A lesson-shaped grounding: two generated passages under positional ids, which is what
+// `lessonGroundingShape` now hands every generator.
+function twoGeneratedPassages(): OptionSelectGrounding {
+  return {
+    ...generatedGrounding(),
+    passages: [
+      { passageId: "dn-2:s0", text: "Ownership tracks which binding frees a value.", derivedNodeId: "dn-2" },
+      { passageId: "dn-2:s1", text: "Ownership transfers when a value is moved.", derivedNodeId: "dn-2" }
+    ]
+  };
+}
+
+function keyedCitation(passageId: string, evidenceQuote: string): StudyItemOptionDraft {
+  return { text: "Tracks ownership of a value", isCorrect: true, provenance: "generated", citation: { passageId, evidenceQuote } };
+}
+
+function guardWith(keyed: StudyItemOptionDraft, grounding: OptionSelectGrounding) {
+  return validateOptionSelectItem(
+    draftOf([keyed, distractor("Counts references"), distractor("Locks a mutex"), distractor("Pins to a core")]),
+    grounding
+  );
+}
+
+// Rung 2: the model quoted a real passage verbatim and addressed it with the wrong id. That is
+// a deterministic repair — the quote still has to verify verbatim somewhere — not a threshold.
+test("ladder rung 2: a verbatim quote citing the wrong generated passage id is repaired, not rejected", () => {
+  const result = guardWith(keyedCitation("dn-2:s0", "Ownership transfers when a value is moved."), twoGeneratedPassages());
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const keyed = result.item.options.find((o) => o.isCorrect);
+  assert.equal(keyed?.citation?.provenance, "generated");
+});
+
+test("ladder rung 0: an unknown passageId rejects even when the quote appears in the grounding", () => {
+  const result = guardWith(keyedCitation("dn-2:s9", "Ownership transfers when a value is moved."), twoGeneratedPassages());
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /does not verify/i);
+});
+
+// The repair rung only ever lands on a GENERATED passage, so it can never mint a `source`
+// citation from an id nobody cited. A source passage keeps the hard verbatim requirement.
+test("a source passage cited with a failing quote still rejects", () => {
+  const result = guardWith(
+    keyedCitation("blk-1", "a heap is a LIFO region"),
+    { ...sourceGrounding(), passages: [
+      { passageId: "blk-1", text: "A heap allocates memory at runtime.", sourceResourceId: "src-1", sourceBlockId: "blk-1" },
+      { passageId: "blk-2", text: "A stack stores frames in last-in, first-out order.", sourceResourceId: "src-1", sourceBlockId: "blk-2" }
+    ] }
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /does not verify/i);
+});
+
+test("a repair never upgrades provenance: a quote matching only a SOURCE passage does not rescue a wrong id", () => {
+  const result = guardWith(
+    keyedCitation("dn-2:s0", "A stack stores frames in last-in, first-out order."),
+    { ...twoGeneratedPassages(), passages: [
+      ...twoGeneratedPassages().passages,
+      { passageId: "blk-2", text: "A stack stores frames in last-in, first-out order.", sourceResourceId: "src-1", sourceBlockId: "blk-2" }
+    ] }
+  );
+  assert.equal(result.ok, false);
+});
+
+// No fallback rung exists yet: a quote that verifies against NO passage is still fatal. The
+// generated-passage fallback lands in U3, beside the semantic verification that admits it.
+test("a quote that verifies against no passage still rejects", () => {
+  const result = guardWith(keyedCitation("dn-2:s0", "ownership is reference counting"), twoGeneratedPassages());
+  assert.equal(result.ok, false);
+});
+
 test("normalization: '  Heap ' and 'heap' are duplicates; 'heap' and 'stack' are distinct", () => {
   const dupe = validateOptionSelectItem(
     draftOf([correct, distractor("  Heap "), distractor("Register"), distractor("Cache")]),

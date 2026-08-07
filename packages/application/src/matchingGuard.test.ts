@@ -87,3 +87,48 @@ test("matching rejects citations that do not verify against grounding", () => {
   if (!result.ok) assert.match(result.reason, /citation does not verify/);
 });
 
+
+// --- Citation resolution ladder (plan 2026-08-05-001 D9) ----------------------------------
+// Matching shares `resolveGroundingCitation`, so U1's rungs reach it with no matching-specific
+// change (rule 18) — but D6 keeps the U3 generated-passage fallback away from matching, whose
+// answer key is never judge-verified. These two tests are the boundary that fallback lands on.
+
+function generatedGrounding(): MatchingGrounding {
+  return {
+    ...sourceGrounding(),
+    derivedNodeId: "dn-2",
+    groundingProvenance: "generated",
+    passages: [
+      { passageId: "dn-2:s0", text: "A heap allocates memory at runtime.", derivedNodeId: "dn-2" },
+      { passageId: "dn-2:s1", text: "A stack stores frames in last-in, first-out order.", derivedNodeId: "dn-2" },
+      { passageId: "dn-2:s2", text: "Ownership tracks the binding responsible for freeing a value.", derivedNodeId: "dn-2" }
+    ]
+  };
+}
+
+test("ladder rung 2 reaches matching: a verbatim quote citing the wrong generated id is repaired", () => {
+  const result = validateMatchingItem(
+    draftOf([
+      pair("Heap", "Allocates memory at runtime", "dn-2:s1", "A heap allocates memory at runtime."),
+      pair("Stack", "Stores frames in LIFO order", "dn-2:s2", "A stack stores frames in last-in, first-out order."),
+      pair("Ownership", "Tracks who frees a value", "dn-2:s0", "Ownership tracks the binding responsible for freeing a value.")
+    ]),
+    generatedGrounding()
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.ok(result.item.pairs.every((p) => p.citation.provenance === "generated"));
+});
+
+test("a matching quote that verifies against no passage rejects", () => {
+  const result = validateMatchingItem(
+    draftOf([
+      pair("Heap", "Allocates memory at runtime", "dn-2:s0", "A heap allocates memory at runtime."),
+      pair("Stack", "Stores frames in LIFO order", "dn-2:s1", "A stack is a queue served oldest-first."),
+      pair("Ownership", "Tracks who frees a value", "dn-2:s2", "Ownership tracks the binding responsible for freeing a value.")
+    ]),
+    generatedGrounding()
+  );
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.reason, /citation does not verify/);
+});

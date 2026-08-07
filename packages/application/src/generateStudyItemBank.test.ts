@@ -170,7 +170,16 @@ function recordingReporter(): { reporter: RunProgressReporterPort; calls: Report
   };
 }
 
-function osDraft(correctQuote: string, distractors: [string, string, string] = ["Stack", "Register", "Cache"], passageId = "b1"): OptionSelectItemDraft {
+// The study-item generators are shown LESSON grounding, never the node's raw grounding: a
+// section's passage id is positional in the lesson (`${derivedNodeId}:s${sectionIndex}`) and a
+// bullet's is `${...}:i${bulletIndex}` (plan 2026-08-05-001 D10). Positional identity is what
+// makes two same-kind cited sections addressable apart. `goodLessonDraft` and its variants put
+// their definition section at index 1, so that is the id an option-select cites.
+function lessonPassageId(derivedNodeId: string, sectionIndex: number): string {
+  return `${derivedNodeId}:s${sectionIndex}`;
+}
+
+function osDraft(correctQuote: string, distractors: [string, string, string] = ["Stack", "Register", "Cache"], passageId = lessonPassageId("node-c1", 1)): OptionSelectItemDraft {
   return {
     itemType: "option_select",
     question: "Where is memory governed?",
@@ -383,7 +392,7 @@ test("structural blueprint pre-gate rejects matching and impostor when the lesso
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": sparseLesson } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: capturingLessonStore().store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": osDraft("rules that govern memory", ["Stack", "Register", "Cache"], lessonPassageId("node-c1", 0)) } }),
     studyItemBankStore: store
   });
 
@@ -664,7 +673,7 @@ test("an option-select generation that throws rejects only that node and continu
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-c1": goodLessonDraft("b1", ownershipDef), "node-c2": goodLessonDraft("b1", ownershipDef) } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: capturingLessonStore().store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": "throw", "node-c2": osDraft("rules that govern memory") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-c1": "throw", "node-c2": osDraft("rules that govern memory", ["Stack", "Register", "Cache"], lessonPassageId("node-c2", 1)) } }),
     studyItemBankStore: store
   });
 
@@ -693,14 +702,16 @@ test("an option-select whose correct answer cites text absent from the lesson gr
   assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching"]);
 });
 
-test("an option-select guard miss gets one fresh generation attempt before rejection", async () => {
+test("an option-select guard miss gets one INFORMED retry carrying the first attempt's reason", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted } = capturingStore();
   let calls = 0;
+  const retryFeedbacks: (string | undefined)[] = [];
   const retryingGeneration: StudyItemGenerationPort = {
     model: "mock-gen",
-    async generateOptionSelect() {
+    async generateOptionSelect(input) {
       calls += 1;
+      retryFeedbacks.push(input.retryFeedback);
       return calls === 1 ? osDraft("a fact never stated in the passage") : osDraft("rules that govern memory");
     },
     async generateImpostor(input) {
@@ -736,13 +747,18 @@ test("an option-select guard miss gets one fresh generation attempt before rejec
 
   assert.equal(calls, OPTION_SELECT_GENERATION_ATTEMPTS);
   assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
+  // Without the first attempt's reason the retry is a blind re-roll of the same failing call —
+  // the shape matching and impostor already had.
+  assert.equal(retryFeedbacks[0], undefined);
+  assert.match(retryFeedbacks[1] ?? "", /citation does not verify against grounding/);
 });
 
-test("Covers R10: option-select grounds in the lesson's source-cited section; a lesson with no grounded section falls back to generated substantive prose", async () => {
+test("Covers R10: an uncited lesson still grounds generated-labeled items from its substantive prose and its bullets", async () => {
   const snapshot = snapshotWith([{ conceptId: "c1", label: "Ownership", definitions: [passage("b1", ownershipDef)] }]);
   const { store, persisted, persistedRejected } = capturingStore();
-  // A lesson that meets the minimum but whose substantive section is uncited (all synthesized):
-  // the source-uniform fallback can still anchor generated-labeled items from substantive prose.
+  // A lesson that meets the minimum but whose substantive section is uncited (all synthesized).
+  // Its `applications` bullets are grounding of their own (D10), so the option-select's quote —
+  // which the examples body does not carry — still verifies verbatim against a bullet passage.
   const synthesizedLesson: ConceptLessonDraft = {
     explorableTerms: [],
     sections: [
@@ -771,9 +787,9 @@ test("Covers R10: option-select grounds in the lesson's source-cited section; a 
     studyItemBankStore: store
   });
 
-  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching"]);
+  assert.deepEqual(typesFor(persisted, "node-c1"), ["impostor", "matching", "option_select"]);
   assert.ok(persisted.every((item) => item.groundingProvenance === "generated"));
-  assert.match(persistedRejected[0].reason, /does not verify|no grounded sections/);
+  assert.deepEqual(persistedRejected, []);
 });
 
 test("a rescued node with a verified DEFINITION passage yields source_mentioned study items (R5/U4)", async () => {
@@ -788,7 +804,7 @@ test("a rescued node with a verified DEFINITION passage yields source_mentioned 
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-rescued": goodLessonDraft("def-1", def) } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: capturingLessonStore().store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-rescued": osDraft(cite, ["Stack", "Register", "Cache"], "def-1") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-rescued": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-rescued", 1)) } }),
     studyItemBankStore: store
   });
 
@@ -808,7 +824,7 @@ test("a rescued mention-only node still yields source_mentioned items (no regres
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-borrow": goodLessonDraft("m-1", m) } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: capturingLessonStore().store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], "m-1") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-borrow": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-borrow", 1)) } }),
     studyItemBankStore: store
   });
 
@@ -832,7 +848,7 @@ test("Covers AE5: a minted llm_grounded node yields a generated lesson and gener
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-minted": goodLessonDraft("node-minted:definition:0", generatedDef) } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: lessonStore.store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:0") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-minted", 1)) } }),
     studyItemBankStore: store
   });
 
@@ -873,7 +889,7 @@ test("Covers AE1: a sibling-sourced impostor passes the guard and persists with 
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
       optionSelect: { "node-c1": osDraft("rules that govern memory") },
-      impostor: { "node-c1": impDraftCiting("b1", "rules that govern memory", { lieSource: "sibling", siblingLabel: "Borrowing" }) }
+      impostor: { "node-c1": impDraftCiting(lessonPassageId("node-c1", 1), "rules that govern memory", { lieSource: "sibling", siblingLabel: "Borrowing" }) }
     }),
     studyItemBankStore: store
   });
@@ -901,7 +917,7 @@ test("Covers AE2: a model returning lieSource 'generated' produces a generated-l
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
       optionSelect: { "node-c1": osDraft("rules that govern memory") },
-      impostor: { "node-c1": impDraftCiting("b1", "rules that govern memory", { lieSource: "generated" }) }
+      impostor: { "node-c1": impDraftCiting(lessonPassageId("node-c1", 1), "rules that govern memory", { lieSource: "generated" }) }
     }),
     studyItemBankStore: store
   });
@@ -961,7 +977,7 @@ test("judge rejection sends feedback to one impostor retry and persists only aft
     async generateOptionSelect() { return osDraft("rules that govern memory"); },
     async generateImpostor(input) {
       retryFeedbacks.push(input.retryFeedback);
-      return impDraftCiting("b1", "rules that govern memory", { lieSource: "generated" });
+      return impDraftCiting(lessonPassageId("node-c1", 1), "rules that govern memory", { lieSource: "generated" });
     },
     async generateMatching(input) {
       return matchingDraftFrom(input.groundingPassages);
@@ -1002,7 +1018,7 @@ test("judge unavailable drops the impostor with a distinct operator-visible reas
     conceptLessonStore: capturingLessonStore().store,
     studyItemGeneration: generationReturning({
       optionSelect: { "node-c1": osDraft("rules that govern memory") },
-      impostor: { "node-c1": impDraftCiting("b1", "rules that govern memory", { lieSource: "generated" }) }
+      impostor: { "node-c1": impDraftCiting(lessonPassageId("node-c1", 1), "rules that govern memory", { lieSource: "generated" }) }
     }),
     studyItemBankStore: store
   });
@@ -1059,7 +1075,7 @@ test("rule 18: both stages derive grounding from the same lesson passages for a 
     },
     async generateImpostor(input) {
       impostorPassages = input.groundingPassages.map((p) => ({ passageId: p.passageId, text: p.text }));
-      return impDraftCiting("b1", "rules that govern memory");
+      return impDraftCiting(lessonPassageId("node-c1", 1), "rules that govern memory");
     },
     async generateMatching(input) {
       return matchingDraftFrom(input.groundingPassages);
@@ -1102,7 +1118,7 @@ test("a minted lesson with no surviving citation can still anchor generated opti
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-minted": uncitedGeneratedLesson } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: lessonStore.store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], "node-minted:definition:lesson") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-minted": osDraft(cite, ["Stack", "Register", "Cache"], lessonPassageId("node-minted", 1)) } }),
     studyItemBankStore: store
   });
 
@@ -1167,7 +1183,7 @@ test("Covers R9: study items + lessons generate over a synthetic (null-version) 
     conceptLessonGeneration: lessonGenerationReturning({ lessons: { "node-syn": generatedLessonDraft("node-syn", def) } }),
     impostorLieValidityJudge: lieJudgePassing(),
     conceptLessonStore: lessonStore.store,
-    studyItemGeneration: generationReturning({ optionSelect: { "node-syn": osDraft(def, ["Respiration", "Osmosis", "Diffusion"], "node-syn:definition:0") } }),
+    studyItemGeneration: generationReturning({ optionSelect: { "node-syn": osDraft(def, ["Respiration", "Osmosis", "Diffusion"], lessonPassageId("node-syn", 1)) } }),
     studyItemBankStore: store
   });
 

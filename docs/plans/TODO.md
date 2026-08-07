@@ -2,6 +2,15 @@
 
 ## TODO
 
+- **`pnpm test:db` fails on a test-isolation race, not a product defect — 2 of 2 runs on 2026-08-05.**
+  `recall challenge writes leave response_log untouched (KTD4)`
+  (`PostgresLearnerRecallChallengeStore.test.ts:302`) brackets a global
+  `SELECT COUNT(*) FROM response_log` with no learner or challenge scoping, so any test file writing
+  a response row inside that window fails it. It passes standalone. Scope the count to the test's own
+  learner rather than retrying until it passes, and rather than serializing the suite. **First in the
+  execution order in [README](./README.md)** — it is on the active plan's acceptance list and will be
+  on U3's.
+
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
   the same commit that decrements the shield — so the stage unmounts on the exact edge it watches and
@@ -25,16 +34,23 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **A generated impostor item can contain two false statements.** In the 2026-08-05 VPS real-use run,
-  the `Deep ocean return flow` impostor asked which statement is FALSE and designated the
-  wind-driven one (`lieSource: sibling`, `siblingLabel: Downwelling`) — a well-built lie with a
-  correct reveal. But a second option, *"Deep ocean return flow is also known as the deep western
-  boundary current"*, is also false: the DWBC is one western-intensified limb **of** the return flow,
-  not a synonym for it, and it contradicts the item's own third statement describing a basin-spanning
-  floor-hugging flow. A learner who knows the difference is marked wrong for the right answer.
-  Distractor truth is currently only constrained for the designated lie; the truth of the remaining
-  statements is not checked against the concept's own lesson. Establish the problem class and a
-  conventional check before designing one (rule 21).
+- **Study Item truth and coverage — U1 shipped, U2 not yet run.**
+  [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md) owns the
+  framing, decisions, units, acceptance, and what U1 actually built; [README](./README.md) owns where
+  the two steps before U2 sit. Live state: the deterministic coverage fixes are merged, `pnpm check`
+  green apart from the standing AE9 flake, and **nothing has been measured**. D11 forbids folding
+  U2's delta into the later verification gate, so U2 stays a run of its own against the frozen
+  baseline in the plan (24 of a possible 48 items; 23 of 24 rejections
+  `citation does not verify against grounding`; matching 2 items from 16 nodes), and owes a
+  hand-inspection of every recovered matching item against D3's revisit trigger.
+
+  The offline pre-check that precedes it has a corpus: the **local** development database holds 28
+  persisted `concept_lessons` and 14 rejected items, 13 of them the citation-verify class. It can
+  size how many lessons carried colliding passage ids, how much grounding the generator now sees,
+  and whether any node's pre-gate count *drops* — the last one matters because U1 deduplicates
+  passages by normalized text, and matching's threshold is 3. It cannot predict whether the model
+  will now quote correctly; only U2 can. A rejected row stores a reason string, not the draft
+  citation, so the failed citations themselves are not replayable.
 
 ### Evidence-triggered follow-up
 

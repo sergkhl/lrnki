@@ -191,3 +191,55 @@ test("generated-origin node: a truth citing a generated lesson passage verifies 
     assert.ok(truthStatement.citation && truthStatement.citation.provenance === "generated");
   }
 });
+
+// --- Citation resolution ladder (plan 2026-08-05-001 D9) ----------------------------------
+// The ladder lives in `resolveGroundingCitation`, so rungs 1-2 reach the impostor guard
+// without an impostor-specific change (rule 18). Detailed rung coverage is in
+// optionSelectGuard.test.ts; these pin that the shared resolver is in fact what the impostor
+// guard calls.
+
+function twoGeneratedPassages(): ImpostorGrounding {
+  return {
+    ...generatedGrounding(),
+    passages: [
+      { passageId: "dn-2:s0", text: "Ownership tracks which binding frees a value.", derivedNodeId: "dn-2" },
+      { passageId: "dn-2:s1", text: "Ownership transfers when a value is moved.", derivedNodeId: "dn-2" }
+    ]
+  };
+}
+
+test("ladder rung 2 reaches the impostor guard: truths quoting the wrong generated id are repaired", () => {
+  const result = validateImpostorItem(
+    draftOf(
+      [
+        truth("Ownership tracks which binding frees a value.", "Ownership tracks which binding frees a value", "dn-2:s1"),
+        truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s0"),
+        truth("Ownership decides when a value is dropped.", "frees a value", "dn-2:s1")
+      ],
+      { lie: { text: "Ownership is reference counting at runtime.", reveal: "r", lieSource: "generated" } }
+    ),
+    twoGeneratedPassages()
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  for (const statement of result.item.statements.filter((s) => !s.isImpostor)) {
+    assert.equal(statement.citation?.provenance, "generated");
+  }
+});
+
+test("no fallback rung yet: a truth quoting text in no passage still rejects", () => {
+  const result = validateImpostorItem(
+    draftOf(
+      [
+        truth("Ownership tracks which binding frees a value.", "Ownership tracks which binding frees a value", "dn-2:s0"),
+        truth("Ownership is reference counting.", "ownership is reference counting at runtime", "dn-2:s0"),
+        truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s1")
+      ],
+      { lie: { text: "Ownership pins a value to a core.", reveal: "r", lieSource: "generated" } }
+    ),
+    twoGeneratedPassages()
+  );
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.match(result.reason, /does not verify/);
+});

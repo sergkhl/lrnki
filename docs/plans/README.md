@@ -27,7 +27,23 @@ Deleted detail is not lost: git history is the provenance record for outcomes an
 
 ## Active implementation plans (execution order)
 
-None.
+- [2026-08-05-001 — Study Item grounding and key verification](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md)
+  — U1 shipped. Its next unit is U2, a measured real-use gate, and two steps precede it in this
+  order. The plan owns U1–U4; this list owns only where those two steps sit relative to them.
+
+  1. **Green the deterministic gates before running a measured one.** `pnpm test:db` is red on a
+     test-isolation race ([TODO](./TODO.md) owns the defect). It sits on this plan's acceptance list
+     and will sit on U3's, and a measured gate run beside a red automated gate makes every later
+     "was that mine?" more expensive to answer, not less.
+  2. **Spend nothing before spending something.** The local development database holds a free replay
+     corpus of persisted lessons. Size U1's deterministic effect there — colliding ids under the old
+     scheme, added grounding per lesson, and whether any node's pre-gate count *drops* below a
+     type threshold — before a run that costs a shared-host deploy and production tokens.
+  3. **Then U2**, which needs operator consent, not just plan authorization: D12 permits the shared
+     VPS, a `db:reset` on the shared application schema, and production spend, but permission in a
+     plan is not the operator saying go on a shared environment.
+
+  Steps 1 and 2 are independent of the shared environment and of each other.
 
 ## Ownership rules
 

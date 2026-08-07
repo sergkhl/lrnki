@@ -31,8 +31,9 @@ import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSe
 import { validateImpostorItem, type ImpostorGrounding } from "./impostorGuard";
 import { validateMatchingItem, type MatchingGrounding } from "./matchingGuard";
 import { selectSiblingContext } from "./selectSiblingContext";
-import { selectNodeGrounding, type GroundingPassage } from "./selectNodeGrounding";
+import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
+import { lessonGroundingShape } from "./lessonGroundingShape";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 
 // Lessons and blueprints are the sequential front half and can use wider per-node
@@ -317,17 +318,19 @@ export async function generateStudyItemBank(input: {
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: concept lesson is absent for this node" }] };
     }
-    const grounding = studyItemGroundingFromLesson(lesson);
+    const grounding = lessonGroundingShape(lesson);
     if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: the lesson has no grounded sections to anchor an item" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: the lesson yields no grounding passages to anchor an item" }] };
     }
 
     let failureReason: string | null = null;
 
     // Option-select — auto-graded studying. Generation/guard failure rejects this node
     // for the bank but never aborts the run. Citation guard failures are model-output
-    // quality misses, so give the generator one fresh attempt before recording absence.
+    // quality misses, so give the generator one INFORMED retry: without the previous
+    // attempt's reason the second call is a blind re-roll of the same failing call.
     const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
+    let retryFeedback: string | undefined;
     for (let attempt = 0; attempt < OPTION_SELECT_GENERATION_ATTEMPTS; attempt += 1) {
       try {
         const draft = await input.studyItemGeneration.generateOptionSelect({
@@ -336,7 +339,8 @@ export async function generateStudyItemBank(input: {
           groundingProvenance: grounding.provenance,
           groundingPassages: grounding.passages,
           siblings,
-          facet: typePlan.facet || undefined
+          facet: typePlan.facet || undefined,
+          retryFeedback
         });
         const guardContext: OptionSelectGrounding = {
           studyItemId: newStudyItemId(),
@@ -355,9 +359,11 @@ export async function generateStudyItemBank(input: {
           return { items: [guarded.item], rejected: [] };
         } else {
           failureReason = guarded.reason;
+          retryFeedback = guarded.reason;
         }
       } catch (error) {
         failureReason = `option-select generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        retryFeedback = failureReason;
       }
     }
 
@@ -392,9 +398,9 @@ export async function generateStudyItemBank(input: {
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: concept lesson is absent for this node" }] };
     }
-    const grounding = studyItemGroundingFromLesson(lesson);
+    const grounding = lessonGroundingShape(lesson);
     if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: the lesson has no grounded sections to anchor an item" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: the lesson yields no grounding passages to anchor an item" }] };
     }
     let failureReason: string | null = null;
     let retryFeedback: string | undefined;
@@ -446,7 +452,7 @@ export async function generateStudyItemBank(input: {
   );
   // --- Stage 5: impostor items (R3/R4/R7/R8/R9) ---------------------------------
   // A node's impostor derives its three truths from the SAME lesson grounding the
-  // option-select stage used (studyItemGroundingFromLesson, rule 18) and reads the
+  // option-select stage used (lessonGroundingShape, rule 18) and reads the
   // node's confusable siblings read-only as lie context. The model makes the hybrid
   // sibling-vs-generated lie choice in one call (KTD2); the guard re-derives provenance
   // and one fresh retry covers a citation-quality miss. A node that yields no groundable
@@ -460,9 +466,9 @@ export async function generateStudyItemBank(input: {
     if (!lesson) {
       return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: concept lesson is absent for this node" }] };
     }
-    const grounding = studyItemGroundingFromLesson(lesson);
+    const grounding = lessonGroundingShape(lesson);
     if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: the lesson has no grounded sections to anchor an item" }] };
+      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: the lesson yields no grounding passages to anchor an item" }] };
     }
 
     let failureReason: string | null = null;
@@ -603,13 +609,16 @@ function structuralPreGateBlueprint(node: DerivedGraphNode, lesson: ConceptLesso
       typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => ({ itemType, generate: false as const, reason: "concept lesson is absent for this node" }))
     };
   }
-  const fragmentCount = groundedLessonFragments(lesson).size;
+  // Counts the passages the generator will actually be shown (lessonGroundingShape, rule 18),
+  // so a pre-gate pass can no longer promise grounding that does not exist and a pre-gate
+  // decline can no longer hide grounding that does.
+  const passageCount = lessonGroundingShape(lesson)?.passages.length ?? 0;
   return {
     derivedNodeId: node.derivedNodeId,
     typePlans: SUPPORTED_STUDY_ITEM_TYPES.map((itemType) => {
-      if (itemType === "matching" && fragmentCount < 3) return { itemType, generate: false as const, reason: `matching requires at least 3 grounded fragments; found ${fragmentCount}` };
-      if (itemType === "impostor" && fragmentCount < 2) return { itemType, generate: false as const, reason: `impostor requires at least 2 grounded truth fragments; found ${fragmentCount}` };
-      if (fragmentCount < 1) return { itemType, generate: false as const, reason: "no grounded lesson fragments are available" };
+      if (itemType === "matching" && passageCount < 3) return { itemType, generate: false as const, reason: `matching requires at least 3 grounding passages; found ${passageCount}` };
+      if (itemType === "impostor" && passageCount < 2) return { itemType, generate: false as const, reason: `impostor requires at least 2 grounding passages; found ${passageCount}` };
+      if (passageCount < 1) return { itemType, generate: false as const, reason: "no lesson grounding passages are available" };
       return { itemType, generate: true as const, facet: "" };
     })
   };
@@ -627,74 +636,10 @@ function applyStructuralPreGate(planned: StudyItemBlueprint, preGate: StudyItemB
   };
 }
 
-function groundedLessonFragments(lesson: ConceptLesson): Set<string> {
-  const fragments = new Set<string>();
-  for (const section of lesson.sections) {
-    for (const item of section.items ?? []) fragments.add(item.trim().toLowerCase());
-    if (section.citation?.provenance === "source") fragments.add(section.citation.evidenceQuote.trim().toLowerCase());
-    if (section.citation?.provenance === "generated") fragments.add(section.citation.passageText.trim().toLowerCase());
-  }
-  return fragments;
-}
-
 function typePlanFor(blueprintByNode: ReadonlyMap<string, StudyItemBlueprint>, node: DerivedGraphNode, itemType: StudyItemType) {
   const plan = blueprintByNode.get(node.derivedNodeId)?.typePlans.find((candidate) => candidate.itemType === itemType);
   if (!plan) return { itemType, generate: false as const, reason: "blueprint did not request this item type" };
   return plan;
-}
-
-// Derive study-item grounding from a Concept Lesson's grounded sections (U5, R10, rule 18).
-// Shared by the option-select and impostor stages: both derive their grounded content from
-// the one lesson substrate, never from raw passages (KTD3). Source-origin nodes require
-// citations, because only cited sections carry a source-verifiable trace. Generated-origin
-// nodes may fall back to their generated substantive lesson sections when no citation
-// survived, because the item remains honestly generated and still derives from the lesson
-// substrate rather than raw graph grounding. Synthesized gist/intuition/applications never
-// become fallback grounding.
-// Returns null when the lesson has no grounded section to anchor an item.
-function studyItemGroundingFromLesson(
-  lesson: ConceptLesson
-): { provenance: "source_cep" | "source_mentioned" | "generated"; passages: GroundingPassage[] } | null {
-  const passages: GroundingPassage[] = [];
-  let sourceProvenance: "source_cep" | "source_mentioned" | null = null;
-  for (const section of lesson.sections) {
-    if (!section.citation) continue;
-    const passageKind: "definition" | "mention" = section.kind === "definition" ? "definition" : "mention";
-    if (section.citation.provenance === "source") {
-      passages.push({
-        passageId: section.citation.sourceBlockId,
-        kind: passageKind,
-        text: section.citation.evidenceQuote,
-        sourceResourceId: section.citation.sourceResourceId,
-        sourceBlockId: section.citation.sourceBlockId
-      });
-      if (!sourceProvenance && (section.groundingProvenance === "source_cep" || section.groundingProvenance === "source_mentioned")) {
-        sourceProvenance = section.groundingProvenance;
-      }
-    } else {
-      const generatedPassageKind: "definition" | "mention" = section.kind === "definition" ? "definition" : "mention";
-      passages.push({
-        passageId: `${lesson.derivedNodeId}:${generatedPassageKind}:0`,
-        kind: passageKind,
-        text: section.citation.passageText,
-        derivedNodeId: section.citation.derivedNodeId
-      });
-    }
-  }
-  if (passages.length === 0) {
-    for (const section of lesson.sections) {
-      if (!SUBSTANTIVE_KINDS.includes(section.kind)) continue;
-      const passageKind: "definition" | "mention" = section.kind === "definition" ? "definition" : "mention";
-      passages.push({
-        passageId: `${lesson.derivedNodeId}:${passageKind}:lesson`,
-        kind: passageKind,
-        text: section.text,
-        derivedNodeId: lesson.derivedNodeId
-      });
-    }
-  }
-  if (passages.length === 0) return null;
-  return { provenance: sourceProvenance ?? "generated", passages };
 }
 
 function hasVerifiedSubstantiveSourceCitation(lesson: ConceptLesson): boolean {
