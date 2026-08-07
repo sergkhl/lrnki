@@ -33,19 +33,25 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Study Item truth and coverage — U2 passed; U3 is next and unblocked.**
+- **Study Item truth and coverage — U3 shipped; U4 is the last unit and needs an operator.**
   [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md) owns the
   framing, decisions, units, acceptance, and every validation entry. Live state: U1, both pre-U2
-  steps, and U2 are closed. U2 measured a **complete coverage recovery — 48 of a possible 48 items
-  with zero rejections, from a 24-of-48 baseline** — attributable to U1 alone, since no fallback rung
-  exists yet. It also fired **D3's revisit trigger**: the recovered matching flow carries
-  tautological and ambiguous pairs, so whether matching gets key verification is now an open scope
-  decision, recorded in the plan's `Open findings`. Decide that before folding anything into U3.
+  steps, U2, and U3 are closed; only **U4** — two real-use runs on the shared VPS, requiring a
+  deploy, a `db:reset`, and production spend — remains. U2's measured **48 of a possible 48 items**
+  is the invariant U4 must not silently lose. D3 was re-decided: matching stays unverified.
 
-- **The shared VPS is deployed from `fix/study-item-grounding`, not `main`.** The deploy checkout and
-  the running container both sit at `1b96900` on that branch, deliberately kept consistent so the
-  container never disagrees with the checkout. `main` is untouched at `943fffc`. Merge and redeploy,
-  or restore the checkout and redeploy, before treating the shared host as tracking `main` again.
+- **Matching item quality — three distinct defects, three distinct fixes.** Hand-inspected instances
+  are in
+  [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md)'s U2
+  entry; that plan will not fix them and D3 says why. Tautological pairs are a **prompt** problem
+  (the guard rewards quoting, so the cheapest passing item makes the match the quoted bullet);
+  ambiguous prompt sets are a **verification** problem needing an N×N assignment check, not the
+  per-candidate truth judge U3 shipped; graph vocabulary in learner copy ("dependent concept") is
+  likely unlabelled sibling context. Do not treat them as one fix. Delete the plan's link when it is.
+
+- **The shared VPS is deployed from `fix/study-item-grounding` at `1b96900`, not `main` and no longer
+  the branch tip.** The deploy checkout and the running container agree with each other but are now
+  behind U3. `main` is untouched at `943fffc`. U4's first step is a redeploy, which also closes this.
 
 ### Evidence-triggered follow-up
 

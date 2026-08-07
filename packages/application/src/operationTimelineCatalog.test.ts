@@ -90,7 +90,7 @@ test("previously-dropped spend tags belong to their owning operation", () => {
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.conceptSetSynthesis, "enrichment"), true);
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.knowledgeBoundaryProbe, "enrichment"), true);
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.rescuedNodeLabeling, "enrichment"), true);
-  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.impostorLieValidityJudgment, "study_items"), true);
+  assert.equal(spendStageBelongsToOperation(STAGE_TAGS.impostorKeyVerification, "study_items"), true);
   // A stage owned by enrichment must not be attributed to a different operation.
   assert.equal(spendStageBelongsToOperation(STAGE_TAGS.conceptSetSynthesis, "study_items"), false);
 });

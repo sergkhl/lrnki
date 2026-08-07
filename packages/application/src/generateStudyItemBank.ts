@@ -5,7 +5,9 @@ import {
   type ConceptLessonRedundancyJudgment,
   type ConceptLessonSectionKind,
   type DerivedGraphNode,
+  type ImpostorItem,
   type LessonAbsentNode,
+  type OptionSelectItem,
   type RejectedStudyItem,
   type StudyItem,
   type StudyItemBlueprint,
@@ -18,22 +20,31 @@ import type {
   EnrichmentLayerPurposeStorePort,
   EnrichmentRunStorePort,
   GraphVersionStorePort,
-  ImpostorLieValidityJudgmentPort,
   LayerPurposeGenerationPort,
   RunProgressReporterPort,
   StudyItemBlueprintPort,
   StudyItemBankStorePort,
-  StudyItemGenerationPort
+  StudyItemGenerationPort,
+  StudyItemKeyVerificationPort
 } from "@lrnki/ports";
 import { mapWithConcurrency } from "./mapWithConcurrency";
 import { NON_LLM_STAGES, noopRunProgressReporter, runInstrumentedOperation } from "./runProgressReporter";
-import { validateOptionSelectItem, type OptionSelectGrounding } from "./optionSelectGuard";
-import { validateImpostorItem, type ImpostorGrounding } from "./impostorGuard";
-import { validateMatchingItem, type MatchingGrounding } from "./matchingGuard";
+import { validateOptionSelectItem, type StudyItemGuardGrounding } from "./optionSelectGuard";
+import { validateImpostorItem } from "./impostorGuard";
+import { validateMatchingItem } from "./matchingGuard";
+import {
+  DEFAULT_KEY_VERIFICATION_CONCURRENCY,
+  impostorKeyVetoReason,
+  optionSelectKeyVetoReason,
+  verifyStudyItemKeys,
+  type KeyVerificationOutcome,
+  type KeyVerificationRegeneration,
+  type KeyVerificationSubject
+} from "./verifyStudyItemKeys";
 import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
-import { lessonGroundingShape } from "./lessonGroundingShape";
+import { lessonGroundingShape, type LessonGroundingShape } from "./lessonGroundingShape";
 import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesson";
 
 // Lessons and blueprints are the sequential front half and can use wider per-node
@@ -41,6 +52,9 @@ import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesso
 // modest degree 4; mapWithConcurrency preserves input order within every stage.
 export const DEFAULT_LESSON_CONCURRENCY = 8;
 export const DEFAULT_STUDY_ITEM_CONCURRENCY = 4;
+// A vetoed item gets exactly ONE judge-informed regeneration inside the verification phase,
+// on top of whatever the generation attempts above spent on guard failures.
+export const KEY_VERIFICATION_REGENERATION_ATTEMPTS = 1;
 export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
 export const MATCHING_GENERATION_ATTEMPTS = 2;
 export const IMPOSTOR_GENERATION_ATTEMPTS = 2;
@@ -81,7 +95,10 @@ export async function generateStudyItemBank(input: {
   layerPurposeGeneration?: LayerPurposeGenerationPort;
   layerPurposeStore?: EnrichmentLayerPurposeStorePort;
   studyItemBlueprint?: StudyItemBlueprintPort;
-  impostorLieValidityJudge: ImpostorLieValidityJudgmentPort;
+  // Study Item Key Verification (ADR-0026, plan 2026-08-05-001 D2). Required, not optional:
+  // the option-select and impostor guards admit citations through the D9 fallback rung, which
+  // is only sound because this judge checks the claims those citations no longer anchor (D6).
+  studyItemKeyVerification: StudyItemKeyVerificationPort;
   conceptLessonStore: ConceptLessonStorePort;
   studyItemGeneration: StudyItemGenerationPort;
   studyItemBankStore: StudyItemBankStorePort;
@@ -106,6 +123,7 @@ export async function generateStudyItemBank(input: {
   const operationId = input.enrichmentId;
   const lessonConcurrency = input.concurrency ?? DEFAULT_LESSON_CONCURRENCY;
   const studyItemConcurrency = input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY;
+  const keyVerificationConcurrency = input.concurrency ?? DEFAULT_KEY_VERIFICATION_CONCURRENCY;
   return runInstrumentedOperation(reporter, "study_items", operationId, async (studyStage) => {
     const { layer, graphVersionId, snapshot } = await studyStage(NON_LLM_STAGES.load, async () => {
       const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
@@ -301,155 +319,224 @@ export async function generateStudyItemBank(input: {
     }
   }
 
+  // --- Per-node item context (rule 18) ------------------------------------------
+  // The three item types answer "may I generate for this node, and from what?" identically:
+  // the blueprint's type plan decides, the Concept Lesson is the only substrate (R10 — never
+  // raw passages), and `lessonGroundingShape` is the only answer to what grounding it yields.
+  // The decline reasons are the operator-visible strings a coverage measurement greps, so the
+  // item-type word is a parameter rather than three near-copies drifting apart.
+  type NodeItemContext =
+    | { kind: "skip" }
+    | { kind: "reject"; reason: string }
+    | { kind: "ready"; grounding: LessonGroundingShape; facet: string | undefined; siblings: { label: string; snippet: string }[] };
+  const nodeItemContext = (node: DerivedGraphNode, itemType: StudyItemType, label: string): NodeItemContext => {
+    const typePlan = typePlanFor(blueprintByNode, node, itemType);
+    if (!typePlan.generate) return { kind: "skip" };
+    const lesson = lessonByNode.get(node.derivedNodeId);
+    if (!lesson) return { kind: "reject", reason: `no ${label} item: concept lesson is absent for this node` };
+    const grounding = lessonGroundingShape(lesson);
+    if (!grounding) return { kind: "reject", reason: `no ${label} item: the lesson yields no grounding passages to anchor an item` };
+    return {
+      kind: "ready",
+      grounding,
+      facet: typePlan.facet || undefined,
+      siblings: siblingsByNode.get(node.derivedNodeId) ?? []
+    };
+  };
+  const guardGroundingFor = (node: DerivedGraphNode, context: { grounding: LessonGroundingShape; facet: string | undefined }): StudyItemGuardGrounding => ({
+    studyItemId: newStudyItemId(),
+    graphVersionId: graphVersionId,
+    enrichmentId: layer.enrichmentId,
+    derivedNodeId: node.derivedNodeId,
+    canonicalLabel: node.canonicalLabel,
+    groundingProvenance: context.grounding.provenance,
+    generatingModel: input.studyItemGeneration.model,
+    configHash: input.configHash,
+    facet: context.facet,
+    passages: context.grounding.passages
+  });
+  const generationInputFor = (node: DerivedGraphNode, context: { grounding: LessonGroundingShape; facet: string | undefined; siblings: { label: string; snippet: string }[] }, retryFeedback: string | undefined) => ({
+    declaredDomain: node.declaredDomain,
+    node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+    groundingProvenance: context.grounding.provenance,
+    groundingPassages: context.grounding.passages,
+    siblings: context.siblings,
+    facet: context.facet,
+    retryFeedback
+  });
+  const failureText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+  // A node's outcome for ONE item type, before key verification. `pending` is the shape the
+  // verified types (option-select, impostor) hand to their verification phase; matching goes
+  // straight to `item` because D3 leaves it unverified.
+  type NodeAttempt<TItem> =
+    | { kind: "skipped" }
+    | { kind: "rejected"; reason: string }
+    | { kind: "item"; item: StudyItem }
+    | { kind: "pending"; subject: KeyVerificationSubject<TItem> };
+
+  const pendingSubjects = <TItem>(attempts: readonly NodeAttempt<TItem>[]): KeyVerificationSubject<TItem>[] =>
+    attempts.flatMap((attempt) => (attempt.kind === "pending" ? [attempt.subject] : []));
+
+  // Re-joins one type's per-node attempts with its verification outcomes. Two order facts do
+  // the work and neither may be weakened: `mapWithConcurrency` is input-ordered, so
+  // `attempts[i]` is always `layer.derivedNodes[i]` regardless of response timing; and
+  // `verifyStudyItemKeys` is index-aligned to the PENDING SUBSET, walked here by a cursor in
+  // that same order. Persisted order therefore stays a function of node order alone (R4).
+  const mergeVerified = <TItem extends StudyItem>(
+    attempts: readonly NodeAttempt<TItem>[],
+    outcomes: readonly KeyVerificationOutcome<TItem>[],
+    itemType: StudyItemType
+  ): { items: StudyItem[]; rejected: RejectedStudyItem[] } => {
+    const items: StudyItem[] = [];
+    const rejected: RejectedStudyItem[] = [];
+    let cursor = 0;
+    attempts.forEach((attempt, index) => {
+      const node = layer.derivedNodes[index];
+      const record = (reason: string): void => {
+        rejected.push({ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType, reason });
+      };
+      if (attempt.kind === "skipped") return;
+      if (attempt.kind === "rejected") { record(attempt.reason); return; }
+      if (attempt.kind === "item") { items.push(attempt.item); return; }
+      const outcome = outcomes[cursor];
+      cursor += 1;
+      if (outcome.admitted) items.push(outcome.item);
+      else record(outcome.reason);
+    });
+    return { items, rejected };
+  };
+
   // --- Stage 3: option-select items ---------------------------------------------
   // Each derived node is an independent generation unit. Driving them through the
   // shared bounded mapper parallelizes wall-clock without changing persisted order.
   // Study-item generation stage with a per-node heartbeat: one progress write as
   // each derived node's items resolve, so a large bank shows N-of-M liveness.
   let studyDone = 0;
-  const generateForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
-    const typePlan = typePlanFor(blueprintByNode, node, "option_select");
-    if (!typePlan.generate) return { items: [], rejected: [] };
-    // Option-select derives FROM the Concept Lesson, never from raw passages (R10, rule 18).
-    // A lesson-absent node yields no item; the verbatim chain holds because the lesson's
-    // source citations already verified against source blocks (U6), so the guard re-anchors
-    // to the same source text.
-    const lesson = lessonByNode.get(node.derivedNodeId);
-    if (!lesson) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: concept lesson is absent for this node" }] };
-    }
-    const grounding = lessonGroundingShape(lesson);
-    if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "option_select", reason: "no option-select item: the lesson yields no grounding passages to anchor an item" }] };
-    }
-
+  const optionSelectSubject = (
+    node: DerivedGraphNode,
+    context: Extract<NodeItemContext, { kind: "ready" }>,
+    item: OptionSelectItem,
+    citationRung: KeyVerificationSubject<OptionSelectItem>["citationRung"]
+  ): KeyVerificationSubject<OptionSelectItem> => ({
+    request: {
+      itemType: "option_select",
+      declaredDomain: node.declaredDomain,
+      node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+      // Option-select passes its question so each option reads as a proposed answer (D8).
+      question: item.question,
+      candidates: item.options.map((option, ordinal) => ({ ordinal, text: option.text })),
+      groundingPassages: context.grounding.passages,
+      siblings: context.siblings
+    },
+    item,
+    citationRung,
+    regenerate: (feedback) => draftOptionSelect(node, context, KEY_VERIFICATION_REGENERATION_ATTEMPTS, feedback)
+  });
+  // Generation/guard failure rejects this node for the bank but never aborts the run.
+  // Citation guard failures are model-output quality misses, so give the generator one
+  // INFORMED retry: without the previous attempt's reason the second call is a blind
+  // re-roll of the same failing call.
+  const draftOptionSelect = async (
+    node: DerivedGraphNode,
+    context: Extract<NodeItemContext, { kind: "ready" }>,
+    attempts: number,
+    initialFeedback?: string
+  ): Promise<KeyVerificationRegeneration<OptionSelectItem>> => {
     let failureReason: string | null = null;
-
-    // Option-select — auto-graded studying. Generation/guard failure rejects this node
-    // for the bank but never aborts the run. Citation guard failures are model-output
-    // quality misses, so give the generator one INFORMED retry: without the previous
-    // attempt's reason the second call is a blind re-roll of the same failing call.
-    const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
-    let retryFeedback: string | undefined;
-    for (let attempt = 0; attempt < OPTION_SELECT_GENERATION_ATTEMPTS; attempt += 1) {
+    let retryFeedback = initialFeedback;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const draft = await input.studyItemGeneration.generateOptionSelect({
-          declaredDomain: node.declaredDomain,
-          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-          groundingProvenance: grounding.provenance,
-          groundingPassages: grounding.passages,
-          siblings,
-          facet: typePlan.facet || undefined,
-          retryFeedback
-        });
-        const guardContext: OptionSelectGrounding = {
-          studyItemId: newStudyItemId(),
-          graphVersionId: graphVersionId,
-          enrichmentId: layer.enrichmentId,
-          derivedNodeId: node.derivedNodeId,
-          canonicalLabel: node.canonicalLabel,
-          groundingProvenance: grounding.provenance,
-          generatingModel: input.studyItemGeneration.model,
-          configHash: input.configHash,
-          facet: typePlan.facet || undefined,
-          passages: grounding.passages
-        };
-        const guarded = validateOptionSelectItem(draft, guardContext, newOptionId);
-        if (guarded.ok) {
-          return { items: [guarded.item], rejected: [] };
-        } else {
-          failureReason = guarded.reason;
-          retryFeedback = guarded.reason;
-        }
-      } catch (error) {
-        failureReason = `option-select generation failed: ${error instanceof Error ? error.message : String(error)}`;
-        retryFeedback = failureReason;
-      }
-    }
-
-    return {
-      items: [],
-      rejected: [{
-        derivedNodeId: node.derivedNodeId,
-        canonicalLabel: node.canonicalLabel,
-        itemType: "option_select",
-        reason: failureReason ?? "no study item could be grounded"
-      }]
-    };
-  };
-  const optionSelectStage = studyStage(
-    STAGE_TAGS.studyItemGeneration,
-    () =>
-      mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
-        const result = await generateForNode(node);
-        studyDone += 1;
-        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
-        return result;
-      }),
-    layer.derivedNodes.length
-  );
-
-  // --- Stage 4: matching items ---------------------------------------------------
-  let matchingDone = 0;
-  const generateMatchingForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
-    const typePlan = typePlanFor(blueprintByNode, node, "matching");
-    if (!typePlan.generate) return { items: [], rejected: [] };
-    const lesson = lessonByNode.get(node.derivedNodeId);
-    if (!lesson) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: concept lesson is absent for this node" }] };
-    }
-    const grounding = lessonGroundingShape(lesson);
-    if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: "no matching item: the lesson yields no grounding passages to anchor an item" }] };
-    }
-    let failureReason: string | null = null;
-    let retryFeedback: string | undefined;
-    const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
-    for (let attempt = 0; attempt < MATCHING_GENERATION_ATTEMPTS; attempt += 1) {
-      try {
-        const draft = await input.studyItemGeneration.generateMatching({
-          declaredDomain: node.declaredDomain,
-          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-          groundingProvenance: grounding.provenance,
-          groundingPassages: grounding.passages,
-          siblings,
-          facet: typePlan.facet || undefined,
-          retryFeedback
-        });
-        const guardContext: MatchingGrounding = {
-          studyItemId: newStudyItemId(),
-          graphVersionId: graphVersionId,
-          enrichmentId: layer.enrichmentId,
-          derivedNodeId: node.derivedNodeId,
-          canonicalLabel: node.canonicalLabel,
-          groundingProvenance: grounding.provenance,
-          generatingModel: input.studyItemGeneration.model,
-          configHash: input.configHash,
-          facet: typePlan.facet || undefined,
-          passages: grounding.passages
-        };
-        const guarded = validateMatchingItem(draft, guardContext, newPairId, newPairId);
-        if (guarded.ok) return { items: [guarded.item], rejected: [] };
+        const draft = await input.studyItemGeneration.generateOptionSelect(generationInputFor(node, context, retryFeedback));
+        const guarded = validateOptionSelectItem(draft, guardGroundingFor(node, context), newOptionId);
+        if (guarded.ok) return { ok: true, subject: optionSelectSubject(node, context, guarded.item, guarded.citationRung) };
         failureReason = guarded.reason;
         retryFeedback = guarded.reason;
       } catch (error) {
-        failureReason = `matching generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        failureReason = `option-select generation failed: ${failureText(error)}`;
         retryFeedback = failureReason;
       }
     }
-    return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "matching", reason: failureReason ?? "no matching item could be grounded" }] };
+    return { ok: false, reason: failureReason ?? "no study item could be grounded" };
   };
-  const matchingStage = studyStage(
-    STAGE_TAGS.matchingGeneration,
-    () =>
-      mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
-        const result = await generateMatchingForNode(node);
-        matchingDone += 1;
-        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.matchingGeneration, done: matchingDone });
-        return result;
-      }),
-    layer.derivedNodes.length
-  );
+  const optionSelectForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<OptionSelectItem>> => {
+    const context = nodeItemContext(node, "option_select", "option-select");
+    if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
+    const drafted = await draftOptionSelect(node, context, OPTION_SELECT_GENERATION_ATTEMPTS);
+    return drafted.ok ? { kind: "pending", subject: drafted.subject } : { kind: "rejected", reason: drafted.reason };
+  };
+  const optionSelectStage = (async () => {
+    const attempts = await studyStage(
+      STAGE_TAGS.studyItemGeneration,
+      () =>
+        mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
+          const result = await optionSelectForNode(node);
+          studyDone += 1;
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.studyItemGeneration, done: studyDone });
+          return result;
+        }),
+      layer.derivedNodes.length
+    );
+    const subjects = pendingSubjects(attempts);
+    const outcomes = await studyStage(
+      STAGE_TAGS.optionSelectKeyVerification,
+      () =>
+        verifyStudyItemKeys(subjects, {
+          verifier: input.studyItemKeyVerification,
+          concurrency: keyVerificationConcurrency,
+          vetoReason: (subject, verdicts) => optionSelectKeyVetoReason(subject.item, verdicts),
+          // Pass-through on unavailability is option-select's status quo and the node's only
+          // primary activity (ADR-0026) — but ONLY for an item whose citation still holds a
+          // verbatim anchor. A fallback-admitted item exists solely because a judge was
+          // expected to check it, so with no verdict it drops like an impostor (D5).
+          onUnavailable: (subject, error) =>
+            subject.citationRung === "verbatim"
+              ? { admitted: true, item: subject.item }
+              : { admitted: false, reason: `option-select key verification unavailable and the item has no verbatim grounding anchor: ${failureText(error)}` }
+        }),
+      subjects.length
+    );
+    return mergeVerified(attempts, outcomes, "option_select");
+  })();
+
+  // --- Stage 4: matching items ---------------------------------------------------
+  // Unverified by design (D3): matching's observed defects are prompt ambiguity across
+  // pairs, which needs a different question shape than per-candidate claim truth.
+  let matchingDone = 0;
+  const generateMatchingForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<never>> => {
+    const context = nodeItemContext(node, "matching", "matching");
+    if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
+    let failureReason: string | null = null;
+    let retryFeedback: string | undefined;
+    for (let attempt = 0; attempt < MATCHING_GENERATION_ATTEMPTS; attempt += 1) {
+      try {
+        const draft = await input.studyItemGeneration.generateMatching(generationInputFor(node, context, retryFeedback));
+        const guarded = validateMatchingItem(draft, guardGroundingFor(node, context), newPairId, newPairId);
+        if (guarded.ok) return { kind: "item", item: guarded.item };
+        failureReason = guarded.reason;
+        retryFeedback = guarded.reason;
+      } catch (error) {
+        failureReason = `matching generation failed: ${failureText(error)}`;
+        retryFeedback = failureReason;
+      }
+    }
+    return { kind: "rejected", reason: failureReason ?? "no matching item could be grounded" };
+  };
+  const matchingStage = (async () => {
+    const attempts = await studyStage(
+      STAGE_TAGS.matchingGeneration,
+      () =>
+        mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
+          const result = await generateMatchingForNode(node);
+          matchingDone += 1;
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.matchingGeneration, done: matchingDone });
+          return result;
+        }),
+      layer.derivedNodes.length
+    );
+    return mergeVerified(attempts, [], "matching");
+  })();
+
   // --- Stage 5: impostor items (R3/R4/R7/R8/R9) ---------------------------------
   // A node's impostor derives its three truths from the SAME lesson grounding the
   // option-select stage used (lessonGroundingShape, rule 18) and reads the
@@ -459,120 +546,97 @@ export async function generateStudyItemBank(input: {
   // impostor is recorded impostor-absent — keyed per item type, independent of its
   // option-select outcome (R9, KTD8). Never aborts the run (R13).
   let impostorDone = 0;
-  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<{ items: StudyItem[]; rejected: RejectedStudyItem[] }> => {
-    const typePlan = typePlanFor(blueprintByNode, node, "impostor");
-    if (!typePlan.generate) return { items: [], rejected: [] };
-    const lesson = lessonByNode.get(node.derivedNodeId);
-    if (!lesson) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: concept lesson is absent for this node" }] };
-    }
-    const grounding = lessonGroundingShape(lesson);
-    if (!grounding) {
-      return { items: [], rejected: [{ derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, itemType: "impostor", reason: "no impostor item: the lesson yields no grounding passages to anchor an item" }] };
-    }
-
+  const impostorSubject = (
+    node: DerivedGraphNode,
+    context: Extract<NodeItemContext, { kind: "ready" }>,
+    item: ImpostorItem,
+    citationRung: KeyVerificationSubject<ImpostorItem>["citationRung"]
+  ): KeyVerificationSubject<ImpostorItem> => ({
+    request: {
+      itemType: "impostor",
+      declaredDomain: node.declaredDomain,
+      node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+      // No question: an impostor's question is the meta-form "which statement is FALSE?",
+      // which would invert per-statement judging (D8). The statements go as standalone claims.
+      candidates: item.statements.map((statement) => ({ ordinal: statement.ordinal, text: statement.text })),
+      groundingPassages: context.grounding.passages,
+      siblings: context.siblings
+    },
+    item,
+    citationRung,
+    regenerate: (feedback) => draftImpostor(node, context, KEY_VERIFICATION_REGENERATION_ATTEMPTS, feedback)
+  });
+  const draftImpostor = async (
+    node: DerivedGraphNode,
+    context: Extract<NodeItemContext, { kind: "ready" }>,
+    attempts: number,
+    initialFeedback?: string
+  ): Promise<KeyVerificationRegeneration<ImpostorItem>> => {
     let failureReason: string | null = null;
-    let retryFeedback: string | undefined;
-    const siblings = siblingsByNode.get(node.derivedNodeId) ?? [];
-    for (let attempt = 0; attempt < IMPOSTOR_GENERATION_ATTEMPTS; attempt += 1) {
+    let retryFeedback = initialFeedback;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
-        const draft = await input.studyItemGeneration.generateImpostor({
-          declaredDomain: node.declaredDomain,
-          node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-          groundingProvenance: grounding.provenance,
-          groundingPassages: grounding.passages,
-          siblings,
-          facet: typePlan.facet || undefined,
-          retryFeedback
-        });
-        const guardContext: ImpostorGrounding = {
-          studyItemId: newStudyItemId(),
-          graphVersionId: graphVersionId,
-          enrichmentId: layer.enrichmentId,
-          derivedNodeId: node.derivedNodeId,
-          canonicalLabel: node.canonicalLabel,
-          groundingProvenance: grounding.provenance,
-          generatingModel: input.studyItemGeneration.model,
-          configHash: input.configHash,
-          facet: typePlan.facet || undefined,
-          passages: grounding.passages
-        };
-        const guarded = validateImpostorItem(draft, guardContext, newStatementId);
-        if (guarded.ok) {
-          // validateImpostorItem always splices exactly one isImpostor:true statement into
-          // a successful item, so the keyed lie is always found here.
-          const lie = guarded.item.statements.find((statement) => statement.isImpostor)!;
-          try {
-            const judgment = await input.impostorLieValidityJudge.judge({
-              declaredDomain: node.declaredDomain,
-              node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
-              lie: { text: lie.text, reveal: lie.reveal },
-              groundingPassages: grounding.passages,
-              siblings
-            });
-            if (judgment.verdict === "lie_is_false") {
-              return { items: [guarded.item], rejected: [] };
-            }
-            failureReason = `impostor lie rejected by judge: ${judgment.reason}`;
-            retryFeedback = judgment.reason;
-          } catch (error) {
-            return {
-              items: [],
-              rejected: [{
-                derivedNodeId: node.derivedNodeId,
-                canonicalLabel: node.canonicalLabel,
-                itemType: "impostor",
-                reason: `impostor lie-validity judge unavailable: ${error instanceof Error ? error.message : String(error)}`
-              }]
-            };
-          }
-        } else {
-          failureReason = guarded.reason;
-        }
+        const draft = await input.studyItemGeneration.generateImpostor(generationInputFor(node, context, retryFeedback));
+        const guarded = validateImpostorItem(draft, guardGroundingFor(node, context), newStatementId);
+        if (guarded.ok) return { ok: true, subject: impostorSubject(node, context, guarded.item, guarded.citationRung) };
+        failureReason = guarded.reason;
+        retryFeedback = guarded.reason;
       } catch (error) {
-        failureReason = `impostor generation failed: ${error instanceof Error ? error.message : String(error)}`;
+        failureReason = `impostor generation failed: ${failureText(error)}`;
+        retryFeedback = failureReason;
       }
-      // A wrong impostor actively teaches a falsehood; no-impostor is the safe state. The
-      // loop bound (IMPOSTOR_GENERATION_ATTEMPTS) caps every failure kind — including a
-      // judge rejection — at one retry, after which the rejected-row reason is the operator
-      // signal instead of passing a suspect lie through.
     }
-
-    return {
-      items: [],
-      rejected: [{
-        derivedNodeId: node.derivedNodeId,
-        canonicalLabel: node.canonicalLabel,
-        itemType: "impostor",
-        reason: failureReason ?? "no impostor item could be grounded"
-      }]
-    };
+    return { ok: false, reason: failureReason ?? "no impostor item could be grounded" };
   };
-  const impostorStage = studyStage(
-    STAGE_TAGS.impostorGeneration,
-    () =>
-      mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
-        const result = await generateImpostorForNode(node);
-        impostorDone += 1;
-        await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.impostorGeneration, done: impostorDone });
-        return result;
-      }),
-    layer.derivedNodes.length
-  );
+  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<ImpostorItem>> => {
+    const context = nodeItemContext(node, "impostor", "impostor");
+    if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
+    const drafted = await draftImpostor(node, context, IMPOSTOR_GENERATION_ATTEMPTS);
+    return drafted.ok ? { kind: "pending", subject: drafted.subject } : { kind: "rejected", reason: drafted.reason };
+  };
+  const impostorStage = (async () => {
+    const attempts = await studyStage(
+      STAGE_TAGS.impostorGeneration,
+      () =>
+        mapWithConcurrency(layer.derivedNodes, studyItemConcurrency, async (node) => {
+          const result = await generateImpostorForNode(node);
+          impostorDone += 1;
+          await reporter.recordProgress({ operationType: "study_items", operationId, stage: STAGE_TAGS.impostorGeneration, done: impostorDone });
+          return result;
+        }),
+      layer.derivedNodes.length
+    );
+    const subjects = pendingSubjects(attempts);
+    const outcomes = await studyStage(
+      STAGE_TAGS.impostorKeyVerification,
+      () =>
+        verifyStudyItemKeys(subjects, {
+          verifier: input.studyItemKeyVerification,
+          concurrency: keyVerificationConcurrency,
+          vetoReason: (subject, verdicts) => impostorKeyVetoReason(subject.item, verdicts),
+          // Fail closed, unchanged from the judge this replaces and for the same reason
+          // ADR-0026 gives: a true "lie" teaches a falsehood, and impostor-absent is the
+          // designed safe state.
+          onUnavailable: (_subject, error) => ({ admitted: false, reason: `impostor key verification unavailable: ${failureText(error)}` })
+        }),
+      subjects.length
+    );
+    return mergeVerified(attempts, outcomes, "impostor");
+  })();
 
   // The stages launch together after blueprint, but their results merge only after the
   // join in the canonical type order. Each mapper is itself input-ordered, so neither
-  // response timing nor stage completion timing can perturb persisted order (R4).
-  const [perNode, perNodeMatching, perNodeImpostor] = await Promise.all([
+  // response timing nor stage completion timing can perturb persisted order (R4). Two of the
+  // three chains now carry a verification bracket after their generation bracket, so the two
+  // key-verification stages can overlap in wall-clock — see the concurrency knob's note.
+  const stageResults = await Promise.all([
     optionSelectStage,
     matchingStage,
     impostorStage
   ]);
-  for (const stageResults of [perNode, perNodeMatching, perNodeImpostor]) {
-    for (const result of stageResults) {
-      studyItems.push(...result.items);
-      for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
-    }
+  for (const result of stageResults) {
+    studyItems.push(...result.items);
+    for (const rejection of result.rejected) reject({ derivedNodeId: rejection.derivedNodeId, canonicalLabel: rejection.canonicalLabel }, rejection.itemType, rejection.reason);
   }
 
   const rejected = [...rejectedByNodeType.values()];

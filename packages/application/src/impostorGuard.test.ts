@@ -227,12 +227,39 @@ test("ladder rung 2 reaches the impostor guard: truths quoting the wrong generat
   }
 });
 
-test("no fallback rung yet: a truth quoting text in no passage still rejects", () => {
+// Rung 3 (U3): impostor opts into the generated-passage fallback, so a paraphrased truth is
+// admitted against its cited passage — and the ITEM's rung is the weakest of its three
+// truths, because one unanchored truth is enough to make correctness rest wholly on the judge.
+test("rung 3: one paraphrased truth admits the item and marks the whole item fallback-anchored", () => {
   const result = validateImpostorItem(
     draftOf(
       [
         truth("Ownership tracks which binding frees a value.", "Ownership tracks which binding frees a value", "dn-2:s0"),
         truth("Ownership is reference counting.", "ownership is reference counting at runtime", "dn-2:s0"),
+        truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s1")
+      ],
+      { lie: { text: "Ownership pins a value to a core.", reveal: "r", lieSource: "generated" } }
+    ),
+    twoGeneratedPassages()
+  );
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.citationRung, "generated_passage_fallback");
+  const paraphrased = result.item.statements
+    .filter((statement) => !statement.isImpostor)
+    .find((statement) => statement.text === "Ownership is reference counting.");
+  assert.equal(
+    paraphrased?.citation?.provenance === "generated" && paraphrased.citation.passageText,
+    "Ownership tracks which binding frees a value."
+  );
+});
+
+test("an unknown passageId still rejects every truth, fallback or not", () => {
+  const result = validateImpostorItem(
+    draftOf(
+      [
+        truth("Ownership tracks which binding frees a value.", "Ownership tracks which binding frees a value", "dn-2:s0"),
+        truth("Ownership is reference counting.", "ownership is reference counting", "dn-2:nobody-cited-this"),
         truth("Ownership transfers on a move.", "Ownership transfers when a value is moved", "dn-2:s1")
       ],
       { lie: { text: "Ownership pins a value to a core.", reveal: "r", lieSource: "generated" } }

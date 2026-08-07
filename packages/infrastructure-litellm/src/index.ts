@@ -83,12 +83,13 @@ export {
 export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,
-  createImpostorLieValidityJudgmentPort,
+  createStudyItemKeyVerificationPort,
   studyOptionSelectGenerationDescriptor,
   studyImpostorGenerationDescriptor,
   studyMatchingGenerationDescriptor,
   studyItemBlueprintDescriptor,
-  impostorLieValidityJudgmentDescriptor
+  optionSelectKeyVerificationDescriptor,
+  impostorKeyVerificationDescriptor
 } from "./studyItemGenerationAdapters";
 export {
   createConceptLessonGenerationPort,

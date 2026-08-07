@@ -69,7 +69,8 @@ export const OPERATION_TIMELINE_CATALOG: Record<OperationType, readonly Operatio
     llm(STAGE_TAGS.studyItemGeneration),
     llm(STAGE_TAGS.matchingGeneration),
     llm(STAGE_TAGS.impostorGeneration),
-    llm(STAGE_TAGS.impostorLieValidityJudgment),
+    llm(STAGE_TAGS.optionSelectKeyVerification),
+    llm(STAGE_TAGS.impostorKeyVerification),
     nonLlm(NON_LLM_STAGES.persist)
   ],
   // Learner-Scoped Scaffold generation (plan 2026-07-12-002 U3, KTD7). Two OWNED stages plus

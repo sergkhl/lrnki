@@ -1,22 +1,23 @@
 import type {
   ConceptLesson,
   ImpostorItemDraft,
-  ImpostorLieValidityJudgment,
   MatchingItemDraft,
   OptionSelectItemDraft,
+  StageTag,
   StudyItemBlueprint,
+  StudyItemCandidateVerdict,
   StudyItemOptionDraft,
   StudyItemType
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import type { ImpostorLieValidityJudgmentPort, StudyItemBlueprintPort, StudyItemGenerationPort } from "@lrnki/ports";
+import type { StudyItemBlueprintPort, StudyItemGenerationPort, StudyItemKeyVerificationPort } from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
 import { readPromptFile } from "./promptFile";
 import {
-  impostorLieValidityJudgmentSchema,
-  impostorLieValidityJudgmentValidator,
+  studyItemKeyVerificationSchema,
+  studyItemKeyVerificationValidator,
   impostorSchema,
   impostorValidator,
   matchingSchema,
@@ -49,10 +50,12 @@ type StudyItemBlueprintInput = {
   supportedItemTypes: StudyItemType[];
 };
 
-type ImpostorLieValidityInput = {
+type StudyItemKeyVerificationInput = {
+  itemType: "option_select" | "impostor";
   declaredDomain: string;
   node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-  lie: { text: string; reveal: string };
+  question?: string;
+  candidates: { ordinal: number; text: string }[];
   groundingPassages: GroundingPassage[];
   siblings: { label: string; snippet: string }[];
 };
@@ -61,7 +64,7 @@ type OptionSelectArgs = z.infer<typeof optionSelectValidator>;
 type ImpostorArgs = z.infer<typeof impostorValidator>;
 type MatchingArgs = z.infer<typeof matchingValidator>;
 type StudyItemBlueprintArgs = z.infer<typeof studyItemBlueprintValidator>;
-type ImpostorLieValidityArgs = z.infer<typeof impostorLieValidityJudgmentValidator>;
+type StudyItemKeyVerificationArgs = z.infer<typeof studyItemKeyVerificationValidator>;
 
 export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
   StudyItemGenerationInput,
@@ -175,33 +178,47 @@ export const studyItemBlueprintDescriptor: NeuralStageDescriptor<
   })
 };
 
-export const impostorLieValidityJudgmentDescriptor: NeuralStageDescriptor<
-  ImpostorLieValidityInput,
-  ImpostorLieValidityArgs,
-  ImpostorLieValidityJudgment
-> = {
-  promptPath: "impostor-lie-validity-judgment.prompt",
-  stageTag: STAGE_TAGS.impostorLieValidityJudgment,
-  schema: impostorLieValidityJudgmentSchema,
-  validator: impostorLieValidityJudgmentValidator,
-  sentinelInput: {
-    declaredDomain: "sentinel domain",
-    node: { derivedNodeId: "sentinel_node", canonicalLabel: "Sentinel node", aliases: ["Sentinel alias"] },
-    lie: { text: "A false sentinel statement.", reveal: "The statement is false." },
-    groundingPassages: [{ passageId: "sentinel_passage", kind: "definition", text: "A sentinel passage.", derivedNodeId: "sentinel_node" }],
-    siblings: [{ label: "Sentinel sibling", snippet: "A nearby concept." }]
-  },
-  templateData: (input) => ({
-    declaredDomain: input.declaredDomain,
-    nodeLabel: input.node.canonicalLabel,
-    aliasText: aliasText(input.node.aliases),
-    lieText: input.lie.text,
-    reveal: input.lie.reveal,
-    passages: renderPassages(input.groundingPassages),
-    siblings: renderSiblings(input.siblings)
-  }),
-  mapResult: (result) => ({ verdict: result.verdict, reason: result.reason })
-};
+// ONE prompt file behind TWO Neural Stage Descriptors (plan 2026-08-05-001 D8). The stage
+// split is not decoration: `stageTag` is a hashed descriptor field, so two separately
+// attributable brackets over one prompt necessarily mean two descriptor instances. The
+// factory keeps the prompt, schema, and rendering single-sourced across both.
+function studyItemKeyVerificationDescriptor(stageTag: StageTag): NeuralStageDescriptor<
+  StudyItemKeyVerificationInput,
+  StudyItemKeyVerificationArgs,
+  StudyItemCandidateVerdict[]
+> {
+  return {
+    promptPath: "study-item-key-verification.prompt",
+    stageTag,
+    schema: studyItemKeyVerificationSchema,
+    validator: studyItemKeyVerificationValidator,
+    sentinelInput: {
+      itemType: "option_select",
+      declaredDomain: "sentinel domain",
+      node: { derivedNodeId: "sentinel_node", canonicalLabel: "Sentinel node", aliases: ["Sentinel alias"] },
+      question: "A sentinel question?",
+      candidates: [{ ordinal: 0, text: "A sentinel candidate claim." }],
+      groundingPassages: [{ passageId: "sentinel_passage", kind: "definition", text: "A sentinel passage.", derivedNodeId: "sentinel_node" }],
+      siblings: [{ label: "Sentinel sibling", snippet: "A nearby concept." }]
+    },
+    templateData: (input) => ({
+      declaredDomain: input.declaredDomain,
+      nodeLabel: input.node.canonicalLabel,
+      aliasText: aliasText(input.node.aliases),
+      // Rendered only for option-select, where the question frames each candidate as a
+      // proposed answer. An impostor question is a meta-form ("which is FALSE?") that would
+      // invert per-statement judging, so its block renders empty (D8).
+      questionBlock: input.question ? `\nThe item asks: "${input.question}" Judge each candidate as a proposed answer to it.` : "",
+      candidates: renderCandidates(input.candidates),
+      passages: renderPassages(input.groundingPassages),
+      siblings: renderSiblings(input.siblings)
+    }),
+    mapResult: (args) => args.verdicts.map((entry) => ({ ordinal: entry.ordinal, verdict: entry.verdict, reason: entry.reason }))
+  };
+}
+
+export const optionSelectKeyVerificationDescriptor = studyItemKeyVerificationDescriptor(STAGE_TAGS.optionSelectKeyVerification);
+export const impostorKeyVerificationDescriptor = studyItemKeyVerificationDescriptor(STAGE_TAGS.impostorKeyVerification);
 
 export function createStudyItemGenerationPort(client: LiteLlmForcedToolClient): StudyItemGenerationPort {
   return {
@@ -219,10 +236,17 @@ export function createStudyItemBlueprintPort(client: LiteLlmForcedToolClient): S
   };
 }
 
-export function createImpostorLieValidityJudgmentPort(client: LiteLlmForcedToolClient): ImpostorLieValidityJudgmentPort {
+// One port, two stages: the item type selects which descriptor — and therefore which
+// STAGE_TAG the call's spend and wall-clock attribute to — while the prompt and schema are
+// identical. The application never names a stage tag; it names an item type.
+export function createStudyItemKeyVerificationPort(client: LiteLlmForcedToolClient): StudyItemKeyVerificationPort {
   return {
-    model: readPromptFile(impostorLieValidityJudgmentDescriptor.promptPath).model,
-    judge: (input) => executeForcedToolStage(client, impostorLieValidityJudgmentDescriptor, input)
+    model: readPromptFile(optionSelectKeyVerificationDescriptor.promptPath).model,
+    verify: (input) => executeForcedToolStage(
+      client,
+      input.itemType === "impostor" ? impostorKeyVerificationDescriptor : optionSelectKeyVerificationDescriptor,
+      input
+    )
   };
 }
 
@@ -253,6 +277,12 @@ function sentinelStudyItemInput(): StudyItemGenerationInput {
 
 function aliasText(aliases: string[]): string {
   return aliases.length ? ` (aliases: ${aliases.join(", ")})` : "";
+}
+
+// Numbered by the candidate's own ordinal, which the judge echoes back — so a response that
+// reorders or omits entries stays alignable without trusting array position.
+function renderCandidates(candidates: { ordinal: number; text: string }[]): string {
+  return candidates.map((candidate) => `${candidate.ordinal}. "${candidate.text}"`).join("\n") || "(none)";
 }
 
 function renderPassages(passages: GroundingPassage[]): string {

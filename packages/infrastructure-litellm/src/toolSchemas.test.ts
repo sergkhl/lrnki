@@ -16,8 +16,8 @@ import {
   CONCEPT_LESSON_SECTION_TEXT_MAX_LENGTH,
   conceptLessonSchema,
   conceptLessonValidator,
-  impostorLieValidityJudgmentSchema,
-  impostorLieValidityJudgmentValidator,
+  studyItemKeyVerificationSchema,
+  studyItemKeyVerificationValidator,
   impostorSchema,
   impostorValidator,
   optionSelectValidator,
@@ -226,11 +226,17 @@ test("impostorValidator rejects a non-closed lieSource enum", () => {
   }));
 });
 
-test("impostor lie-validity judgment schema is registered and fail-closed", () => {
-  assert.ok(toolValidators.includes(impostorLieValidityJudgmentValidator));
-  assert.ok(impostorLieValidityJudgmentSchema.properties);
-  assert.doesNotThrow(() => impostorLieValidityJudgmentValidator.parse({ verdict: "lie_is_false", reason: "false for the node" }));
-  assert.throws(() => impostorLieValidityJudgmentValidator.parse({ verdict: "maybe", reason: "unclear" }));
+test("study item key verification schema is registered and fail-closed", () => {
+  assert.ok(toolValidators.includes(studyItemKeyVerificationValidator));
+  assert.ok(studyItemKeyVerificationSchema.properties);
+  assert.doesNotThrow(() => studyItemKeyVerificationValidator.parse({
+    verdicts: [
+      { ordinal: 0, verdict: "claim_true", reason: "correct for the node" },
+      { ordinal: 1, verdict: "claim_false", reason: "true only of a neighbour" },
+      { ordinal: 2, verdict: "unclear", reason: "cannot decide" }
+    ]
+  }));
+  assert.throws(() => studyItemKeyVerificationValidator.parse({ verdicts: [{ ordinal: 0, verdict: "maybe", reason: "unclear" }] }));
 });
 
 // Plan 2026-07-13-002 U1 (R2, AE1): Explorable Term capacity is five in BOTH forced-tool

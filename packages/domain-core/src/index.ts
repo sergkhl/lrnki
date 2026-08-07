@@ -434,10 +434,24 @@ export type AdmissionLabelJudgment = {
   rationale: string;
 };
 
-export type ImpostorLieValidityVerdict = "lie_is_false" | "lie_is_true_of_node";
+// Study Item key verification (ADR-0026, amended by plan 2026-08-05-001 D2). One
+// cross-family judgment per guarded item classifies EVERY candidate answer, which is what
+// makes answer-key UNIQUENESS decidable: checking the key alone can never observe a second
+// true option or a second false statement, and that hole shipped items that marked a
+// learner wrong for the right answer.
+//
+// `claim_true` / `claim_false` rather than `true` / `false` so a verdict is never confused
+// with a boolean at a call site. `unclear` is a real third value, not an error: it is what
+// the judge returns when it cannot decide, and no admission rule may treat it as a
+// confident opposing verdict (AGENTS rule 16).
+export type StudyItemClaimVerdict = "claim_true" | "claim_false" | "unclear";
 
-export type ImpostorLieValidityJudgment = {
-  verdict: ImpostorLieValidityVerdict;
+export type StudyItemCandidateVerdict = {
+  // The candidate's position in the item — an option index for option-select, a statement
+  // ordinal for impostor. The judge echoes it back; the application matches on it rather
+  // than on array position, and treats an ordinal it never receives as `unclear`.
+  ordinal: number;
+  verdict: StudyItemClaimVerdict;
   reason: string;
 };
 
@@ -1801,7 +1815,12 @@ export const STAGE_TAGS = {
   // new operation type — but carries its own spend tag so its cost ⋈ wall-clock join stays
   // separable from option-select and lesson generation (R7, ADR-0029).
   impostorGeneration: "impostor-generation",
-  impostorLieValidityJudgment: "impostor-lie-validity-judgment",
+  // Study Item key verification (plan 2026-08-05-001 D7). One prompt, two stages: the two
+  // item-type brackets are separately attributable in the cost ⋈ wall-clock join, and the
+  // split is forced anyway — `stageTag` is baked into `stageConfigHash`, so two stages over
+  // one prompt file mean two Neural Stage Descriptors (ADR-0034).
+  optionSelectKeyVerification: "option-select-key-verification",
+  impostorKeyVerification: "impostor-key-verification",
   // Layer-purpose generation runs ONCE per bank inside the `study_items` operation: a
   // learner-neutral capability statement for the enrichment, stored in plain register and
   // themed only at render (ADR-0033). Fail-open: a stage failure writes no row.

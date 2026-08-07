@@ -33,11 +33,14 @@ export function validateMatchingItem(
     if (normalizeOptionText(pair.promptText) === normalizeOptionText(pair.matchText)) {
       return { ok: false, reason: "matching prompt and match text must differ" };
     }
-    const citation = resolveGroundingCitation(grounding.passages, pair.citation, grounding.derivedNodeId);
-    if (!citation) {
+    // No `generatedPassageFallback` opt-in: matching carries no key verification (D3), so
+    // its citations resolve through the verbatim rungs alone. Forgiving a paraphrase without
+    // a judge behind it would leave the claim attributed to nothing checkable (D6).
+    const resolved = resolveGroundingCitation(grounding.passages, pair.citation, grounding.derivedNodeId);
+    if (!resolved) {
       return { ok: false, reason: "matching pair citation does not verify against grounding" };
     }
-    pairs.push({ pairId: newPairId(), matchId: newMatchId(), promptText: pair.promptText, matchText: pair.matchText, citation });
+    pairs.push({ pairId: newPairId(), matchId: newMatchId(), promptText: pair.promptText, matchText: pair.matchText, citation: resolved.citation });
   }
 
   return {

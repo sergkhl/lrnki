@@ -62,36 +62,70 @@ export type OptionSelectGrounding = StudyItemGuardGrounding;
 //     |- found, quote verifies on ANOTHER
 //     |    generated passage .................... cite THAT passage        (id repair)
 //     |- found, source passage, quote fails ...... reject
-//     `- found, generated passage, quote fails ... reject
+//     `- found, generated passage, quote fails ... cite the WHOLE cited passage, but only
+//                                                  when the caller opted in    (fallback)
 //
 // The id-repair rung is deterministic, not a threshold: the quote is still required to verify
 // VERBATIM, just against a passage the model mis-addressed. Repair only ever lands on a
 // GENERATED passage, so it can never mint a `source` citation from an id nobody cited, and no
 // similarity heuristic appears anywhere (AGENTS rule 16).
+//
+// The fallback rung is the interlocked half of key verification (D6) and is admissible ONLY
+// because of it. It forgives a paraphrased quote — the model wrote the lesson and then failed
+// to copy its own sentence back, which on the frozen baseline destroyed half the bank — by
+// attributing the claim to the passage the model cited rather than to a span it reproduced.
+// That trades a mechanical guarantee for a semantic one, so it is offered only to the item
+// types a judge actually verifies: option-select and impostor opt in, matching never does.
+// SOURCE passages are never eligible under any opt-in; a source citation must still quote.
+export type CitationRung = "verbatim" | "generated_passage_fallback";
+
+export type ResolvedGroundingCitation = {
+  citation: StudyItemCitation;
+  // Which rung admitted it. `verbatim` spans rungs 0–2 — the quote was reproduced exactly,
+  // possibly against a mis-addressed passage. `generated_passage_fallback` means the item
+  // has NO verbatim anchor, which is what lets the D5 unavailability rule tell an item that
+  // can survive an unresolved verdict from one that cannot.
+  rung: CitationRung;
+};
+
 export function resolveGroundingCitation(
   passages: OptionSelectGroundingPassage[],
   citationDraft: { passageId: string; evidenceQuote: string },
-  derivedNodeId: string
-): StudyItemCitation | null {
+  derivedNodeId: string,
+  options: { generatedPassageFallback?: boolean } = {}
+): ResolvedGroundingCitation | null {
   const candidate = passages.find((passage) => passage.passageId === citationDraft.passageId);
   if (!candidate) return null;
   const matchKind = classifyEvidenceMatch(candidate.text, citationDraft.evidenceQuote);
   if (matchKind !== "none") {
-    return "sourceResourceId" in candidate
-      ? { provenance: "source", sourceResourceId: candidate.sourceResourceId, sourceBlockId: candidate.sourceBlockId, evidenceQuote: citationDraft.evidenceQuote, matchKind }
-      : { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote };
+    return {
+      rung: "verbatim",
+      citation: "sourceResourceId" in candidate
+        ? { provenance: "source", sourceResourceId: candidate.sourceResourceId, sourceBlockId: candidate.sourceBlockId, evidenceQuote: citationDraft.evidenceQuote, matchKind }
+        : { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote }
+    };
   }
   const repaired = passages.some((passage) =>
     passage !== candidate
     && !("sourceResourceId" in passage)
     && classifyEvidenceMatch(passage.text, citationDraft.evidenceQuote) !== "none"
   );
-  if (repaired) return { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote };
+  if (repaired) {
+    return { rung: "verbatim", citation: { provenance: "generated", derivedNodeId, passageText: citationDraft.evidenceQuote } };
+  }
+  if (options.generatedPassageFallback && !("sourceResourceId" in candidate)) {
+    // The whole cited passage, NOT the model's quote: the quote is the thing that failed to
+    // verify, so persisting it would record a span that appears nowhere.
+    return { rung: "generated_passage_fallback", citation: { provenance: "generated", derivedNodeId, passageText: candidate.text } };
+  }
   return null;
 }
 
 export type OptionSelectGuardResult =
-  | { ok: true; item: OptionSelectItem }
+  // `citationRung` is transient build-time evidence, never persisted: it tells the key
+  // verification phase whether this item still holds a verbatim anchor, which is the only
+  // thing that distinguishes a pass-through from a drop when the judge is unavailable (D5).
+  | { ok: true; item: OptionSelectItem; citationRung: CitationRung }
   | { ok: false; reason: string };
 
 const REQUIRED_OPTION_COUNT = 4;
@@ -140,10 +174,12 @@ export function validateOptionSelectItem(
     return { ok: false, reason: "option-select correct option carries no grounding citation" };
   }
   const citationDraft = correct.citation;
-  const citation = resolveGroundingCitation(grounding.passages, citationDraft, grounding.derivedNodeId);
-  if (!citation) {
+  // Option-select is a judge-verified type (D3), so it opts into the D9 fallback rung.
+  const resolved = resolveGroundingCitation(grounding.passages, citationDraft, grounding.derivedNodeId, { generatedPassageFallback: true });
+  if (!resolved) {
     return { ok: false, reason: "option-select correct option citation does not verify against grounding" };
   }
+  const citation = resolved.citation;
 
   // (5) every non-correct option is labeled provenance 'generated' (R10).
   const mislabeledDistractor = options.some((option) => !option.isCorrect && option.provenance !== "generated");
@@ -159,6 +195,7 @@ export function validateOptionSelectItem(
 
   return {
     ok: true,
+    citationRung: resolved.rung,
     item: {
       itemType: "option_select",
       studyItemId: grounding.studyItemId,

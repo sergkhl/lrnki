@@ -5,7 +5,7 @@ import {
   type ImpostorStatement,
   type ImpostorTruthStatement
 } from "@lrnki/domain-core";
-import { normalizeOptionText, resolveGroundingCitation, type StudyItemGuardGrounding } from "./optionSelectGuard";
+import { normalizeOptionText, resolveGroundingCitation, type CitationRung, type StudyItemGuardGrounding } from "./optionSelectGuard";
 import { validateItemExplorableTerms } from "./explorableTerms";
 
 // Deterministic impostor guard (U4, R1/R5/R6/R8, ADR-0026). Promotes an impostor draft to a
@@ -24,7 +24,10 @@ import { validateItemExplorableTerms } from "./explorableTerms";
 export type ImpostorGrounding = StudyItemGuardGrounding;
 
 export type ImpostorGuardResult =
-  | { ok: true; item: ImpostorItem }
+  // `generated_passage_fallback` when ANY of the three truths lost its verbatim anchor —
+  // the weakest link decides, since one unanchored truth is enough to make the item's
+  // correctness rest wholly on the judge (D5).
+  | { ok: true; item: ImpostorItem; citationRung: CitationRung }
   | { ok: false; reason: string };
 
 const REQUIRED_STATEMENT_COUNT = 4;
@@ -69,15 +72,19 @@ export function validateImpostorItem(
   // draft's claim — fail-closed labeling. The lie object carries no citation, labeled
   // `generated` (a source-cited impostor is the honesty inversion this guard blocks).
   const builtTruths: ImpostorTruthStatement[] = [];
+  let citationRung: CitationRung = "verbatim";
   for (const statement of truths) {
     if (!statement.citation) {
       return { ok: false, reason: "impostor true statement carries no grounding citation" };
     }
     const citationDraft = statement.citation;
-    const citation = resolveGroundingCitation(grounding.passages, citationDraft, grounding.derivedNodeId);
-    if (!citation) {
+    // Impostor is a judge-verified type (D3), so it opts into the D9 fallback rung.
+    const resolved = resolveGroundingCitation(grounding.passages, citationDraft, grounding.derivedNodeId, { generatedPassageFallback: true });
+    if (!resolved) {
       return { ok: false, reason: "impostor true statement citation does not verify against grounding" };
     }
+    if (resolved.rung === "generated_passage_fallback") citationRung = "generated_passage_fallback";
+    const citation = resolved.citation;
     builtTruths.push({ statementId: newStatementId(), ordinal: 0, text: statement.text, isImpostor: false, provenance: citation.provenance, citation });
   }
 
@@ -103,6 +110,7 @@ export function validateImpostorItem(
 
   return {
     ok: true,
+    citationRung,
     item: {
       itemType: "impostor",
       studyItemId: grounding.studyItemId,

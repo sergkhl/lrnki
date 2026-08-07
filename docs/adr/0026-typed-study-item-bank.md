@@ -65,13 +65,37 @@ does not become mastery.
 Each type's deterministic guard enforces only structural and provenance guarantees. Option-select
 keys exactly one correct option; matching enforces pair count, distinct normalized prompt/match text,
 non-self matches, and citation verification; impostor keys exactly one lie, verifies each grounded
-truth verbatim against its cited grounding, and makes a source-cited impostor unrepresentable. A
-cross-family lie-validity judge then checks whether the keyed lie is actually false for the target
-node. A rejected lie gets one judge-informed retry; if the retry still does not produce a false lie,
-or if the judge is unavailable, the impostor is dropped with an operator-visible rejected-row reason.
-This judge is intentionally fail-closed because a true "lie" teaches a falsehood, while a missing
-impostor item is the designed safe state. Distractor plausibility, matching anti-cueing, blueprint
-quality, and broader teaching quality remain real-use inspection responsibilities.
+truth against its cited grounding, and makes a source-cited impostor unrepresentable.
+
+A citation resolves through a deterministic ladder, not an all-or-nothing string match: the cited
+passage with a verbatim quote; the same quote verified verbatim against a *different* **generated**
+passage, which repairs a mis-addressed id without ever minting a `source` citation; and — for the
+key-verified types only — the whole cited generated passage when the quote verifies nowhere. An
+unknown passage id always rejects, and a **source** passage always requires its verbatim quote. No
+similarity heuristic appears at any rung.
+
+**Study Item Key Verification** then checks the answer key of every option-select and impostor item.
+One cross-family judgment per item classifies *every* candidate answer as true, false, or unclear for
+the target node in its Declared Domain — grounding passages and siblings as context, all candidates
+visible at once — and a deterministic rule enforces answer-key uniqueness: an impostor is admitted
+only when the keyed lie is judged false **and** no other statement is; an option-select only when no
+distractor is judged true **and** the key is not judged false. `unclear` is never a veto. A vetoed
+item gets one regeneration informed by the offending candidate, then one further verification.
+
+Verifying only the key cannot observe a second true option or a second false statement, so the
+lie-only judge this supersedes was structurally blind to items that mark a learner wrong for the
+right answer. The third resolution rung and this verification are **interlocked**: forgiving a quote
+the generator never reproduced is admissible only where a judge checks the claim it no longer
+anchors, which is why matching — deliberately unverified, because its failure mode is prompt
+ambiguity across pairs and needs a different question shape — resolves through the verbatim rungs
+alone.
+
+Unavailability stays asymmetric, decided by harm rather than symmetry. An impostor drops, because a
+true "lie" teaches a falsehood while a missing impostor is the designed safe state. An option-select
+passes through unverified — its status quo, and the node's only primary activity — unless it was
+admitted through the third rung, in which case it has no mechanical anchor either and drops too.
+Distractor plausibility, matching anti-cueing, blueprint quality, and broader teaching quality remain
+real-use inspection responsibilities.
 
 Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
 card. A learner records a mutable binary calibration verdict for a derived node. The application

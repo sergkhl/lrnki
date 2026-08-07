@@ -17,7 +17,7 @@ import { declaredDomainInferenceDescriptor } from "./domainInferenceAdapters";
 import { conceptLessonGenerationDescriptor } from "./conceptLessonGenerationAdapters";
 import { layerPurposeGenerationDescriptor } from "./layerPurposeGenerationAdapters";
 import { conceptLessonRedundancyJudgmentDescriptor } from "./conceptLessonRedundancyAdapters";
-import { impostorLieValidityJudgmentDescriptor, studyImpostorGenerationDescriptor, studyItemBlueprintDescriptor, studyMatchingGenerationDescriptor, studyOptionSelectGenerationDescriptor } from "./studyItemGenerationAdapters";
+import { impostorKeyVerificationDescriptor, optionSelectKeyVerificationDescriptor, studyImpostorGenerationDescriptor, studyItemBlueprintDescriptor, studyMatchingGenerationDescriptor, studyOptionSelectGenerationDescriptor } from "./studyItemGenerationAdapters";
 import { scaffoldContentGenerationDescriptor, scaffoldOutlineGenerationDescriptor } from "./learnerScaffoldGenerationAdapters";
 import { scaffoldContentCongruenceDescriptor } from "./scaffoldContentCongruenceAdapters";
 import { discoveryCoverageAuditDescriptor } from "./discoveryCoverageAuditAdapters";
@@ -104,7 +104,8 @@ export const neuralOperationRegistry = {
       studyOptionSelectGenerationDescriptor,
       studyImpostorGenerationDescriptor,
       studyMatchingGenerationDescriptor,
-      impostorLieValidityJudgmentDescriptor
+      optionSelectKeyVerificationDescriptor,
+      impostorKeyVerificationDescriptor
     ],
     embeddingStages: []
   },

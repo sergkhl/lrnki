@@ -202,12 +202,12 @@ test("generated-grounding node: correct option quoting the generated bundle verb
   assert.ok(keyed && keyed.citation && keyed.citation.provenance === "generated");
 });
 
-test("generated-grounding node: correct option quoting absent text → reject", () => {
+test("generated-grounding node: an unknown passageId still rejects, quote or no quote", () => {
   const genCorrect: StudyItemOptionDraft = {
     text: "Tracks ownership of a value",
     isCorrect: true,
     provenance: "generated",
-    citation: { passageId: "dn-2:definition:0", evidenceQuote: "ownership is reference counting" }
+    citation: { passageId: "dn-2:nobody-cited-this", evidenceQuote: "ownership is reference counting" }
   };
   const result = validateOptionSelectItem(
     draftOf([genCorrect, distractor("Counts references"), distractor("Locks a mutex"), distractor("Pins to a core")]),
@@ -276,7 +276,7 @@ test("a source passage cited with a failing quote still rejects", () => {
   assert.match(result.reason, /does not verify/i);
 });
 
-test("a repair never upgrades provenance: a quote matching only a SOURCE passage does not rescue a wrong id", () => {
+test("a repair never upgrades provenance: a quote matching only a SOURCE passage never mints a source citation", () => {
   const result = guardWith(
     keyedCitation("dn-2:s0", "A stack stores frames in last-in, first-out order."),
     { ...twoGeneratedPassages(), passages: [
@@ -284,14 +284,42 @@ test("a repair never upgrades provenance: a quote matching only a SOURCE passage
       { passageId: "blk-2", text: "A stack stores frames in last-in, first-out order.", sourceResourceId: "src-1", sourceBlockId: "blk-2" }
     ] }
   );
-  assert.equal(result.ok, false);
+  // The repair rung searches GENERATED passages only, so the source passage is invisible to it
+  // and the fallback takes over instead — landing on the CITED generated passage's own text,
+  // never on the source text the quote happens to match. A `source` citation stays
+  // unreachable from an id nobody cited, which is the provenance masquerade ADR-0026 forbids.
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.citationRung, "generated_passage_fallback");
+  const keyed = result.item.options.find((option) => option.isCorrect);
+  assert.equal(keyed?.citation?.provenance, "generated");
+  assert.equal(keyed?.citation?.provenance === "generated" && keyed.citation.passageText, "Ownership tracks which binding frees a value.");
 });
 
-// No fallback rung exists yet: a quote that verifies against NO passage is still fatal. The
-// generated-passage fallback lands in U3, beside the semantic verification that admits it.
-test("a quote that verifies against no passage still rejects", () => {
-  const result = guardWith(keyedCitation("dn-2:s0", "ownership is reference counting"), twoGeneratedPassages());
-  assert.equal(result.ok, false);
+// --- Rung 3: the generated-passage fallback (U3) ------------------------------------------
+// Admissible only because option-select and impostor are judge-verified (D6). It forgives a
+// PARAPHRASE — the model wrote the lesson and then failed to copy its own sentence back —
+// by attributing the claim to the passage the model cited rather than to a span it reproduced.
+test("rung 3: a paraphrased quote is admitted against the CITED passage's whole text", () => {
+  const result = guardWith(keyedCitation("dn-2:s0", "ownership decides who frees the value"), twoGeneratedPassages());
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.citationRung, "generated_passage_fallback");
+  const keyed = result.item.options.find((option) => option.isCorrect);
+  // The stored text is the PASSAGE, not the model's quote: the quote is the thing that failed
+  // to verify, so persisting it would record a span that appears nowhere.
+  assert.equal(keyed?.citation?.provenance === "generated" && keyed.citation.passageText, "Ownership tracks which binding frees a value.");
+});
+
+// The source-passage half of "rung 3 never fires" is already proven by "a source passage cited
+// with a failing quote still rejects" above — that test is now ALSO the fallback's negative
+// control, since option-select opts in and it still rejects. This one covers the other side:
+// an item that never needed the fallback must not be reported as if it had.
+test("a verbatim-anchored item reports the verbatim rung", () => {
+  const verbatim = guardWith(keyedCitation("dn-2:s0", "Ownership tracks which binding frees a value."), twoGeneratedPassages());
+  assert.equal(verbatim.ok, true);
+  if (!verbatim.ok) return;
+  assert.equal(verbatim.citationRung, "verbatim");
 });
 
 test("normalization: '  Heap ' and 'heap' are duplicates; 'heap' and 'stack' are distinct", () => {

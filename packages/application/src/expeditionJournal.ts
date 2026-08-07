@@ -134,7 +134,8 @@ export const EXPECTED_TOPIC_GENERATION_STAGE_PLAN = {
     STAGE_TAGS.studyItemGeneration,
     STAGE_TAGS.matchingGeneration,
     STAGE_TAGS.impostorGeneration,
-    STAGE_TAGS.impostorLieValidityJudgment
+    STAGE_TAGS.optionSelectKeyVerification,
+    STAGE_TAGS.impostorKeyVerification
   ]
 } as const;
 

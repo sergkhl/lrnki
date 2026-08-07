@@ -26,12 +26,13 @@ implementation: D6/D9 amended — the fallback rung moves to U3 and applies only
 item types, so the D6 interlock is structural rather than aspirational — with a matching D5
 refinement, and mechanical corrections to D8, the passage-id scheme, and the U3 inventory.
 
-**Implementation state:** **U1, the two pre-U2 steps, and U2 are closed** (U1 2026-08-05; the rest
-2026-08-07). U2 measured a **complete coverage recovery — 48 of a possible 48 items, zero
-rejections, against a 24-of-48 baseline** — attributable to U1 alone. It also fired **D3's revisit
-trigger**: the recovered matching flow carries tautological and ambiguous pairs, recorded under
-[Open findings](#open-findings). U3 and U4 are untouched; U3 is unblocked. Details in the
-[Validation Log](#validation-log).
+**Implementation state:** **U1, the two pre-U2 steps, U2, and U3 are closed** (U1 2026-08-05; the
+rest 2026-08-07). U2 measured a **complete coverage recovery — 48 of a possible 48 items, zero
+rejections, against a 24-of-48 baseline** — attributable to U1 alone. U3 shipped key verification,
+the D9 fallback rung, and the lie-only judge's deletion, all deterministic and unmeasured. **U4 is
+the only remaining unit** and is unblocked: it needs an operator, a shared-host deploy, and
+production spend. D3's revisit trigger is closed — matching stays unverified, re-decided in the
+decision ledger. Details in the [Validation Log](#validation-log).
 
 ## Goal capsule
 
@@ -165,6 +166,16 @@ answer-key uniqueness. Impostor call count is unchanged.
 prompt ambiguity across pairs, which needs a different question shape and has no observed evidence.
 Matching still benefits from every U1 coverage fix, because all three guards share
 `resolveGroundingCitation`.
+
+**D3 re-decided 2026-08-07 (U2 fired the revisit trigger; matching stays out).** U2 supplied the
+observed evidence D3 lacked — tautological and ambiguous pairs — and D3 still holds, now for a
+*stronger* reason than "no evidence": **D2's mechanism would fix neither defect.** A tautological
+pair is *true*, so a per-candidate truth judge admits it; and an ambiguous prompt set needs an N×N
+"does exactly one match fit each prompt?" assignment check — a different question, a different tool
+schema, and a third prompt file. Folding matching into U3 would have bought a third judge call per
+node that cannot see either defect. The two defects also need *different* fixes from each other
+(tautology is a prompt problem, ambiguity a verification one), so they are one follow-up, not an
+extension of this plan; [TODO.md](./TODO.md) owns them.
 
 **D4 — Judge posture.** Domain truth, not passage entailment. Ask whether the candidate is true of
 this concept in this Declared Domain, with grounding passages and siblings as context and all
@@ -345,23 +356,6 @@ Tests: unique ids across a multi-section multi-bullet lesson; a bullet passage i
 every guard (no fallback exists yet); a source passage with a failing quote still rejects; an
 unknown id still rejects; the second option-select attempt carries the first attempt's reason.
 
-### Execution order before U2
-
-Two steps precede U2. They are independent of the shared environment and of each other.
-
-1. **Green the deterministic gates before running a measured one.** `pnpm test:db` is red on a
-   test-isolation race ([TODO](./TODO.md) owns the defect). It sits on this plan's acceptance list
-   and will sit on U3's, and a measured gate run beside a red automated gate makes every later "was
-   that mine?" more expensive to answer, not less.
-2. **Spend nothing before spending something.** The local development database holds a free replay
-   corpus of persisted lessons. Size U1's deterministic effect there — colliding ids under the old
-   scheme, added grounding per lesson, and whether any node's pre-gate count *drops* below a type
-   threshold — before a run that costs a shared-host deploy and production tokens.
-
-U2 then needs operator consent, not just plan authorization: D12 permits the shared VPS, a
-`db:reset` on the shared application schema, and production spend, but permission in a plan is not
-the operator saying go on a shared environment.
-
 ### U2 — Coverage gate (real-use pass 1)
 
 Reset the shared schema, deploy, regenerate the thermohaline topic, record items-per-type and
@@ -451,23 +445,12 @@ One entry per closed implementation unit; see the hygiene comment at the top of 
 
 ### U1 — grounding shape, unique ids, resolution ladder, option-select retry — closed 2026-08-05, `7417fbd`
 
-Deterministic only: no real model calls and nothing measured, so this unit is evidence about code,
-not about quality. U2 owns the first measurement. `pnpm check` green apart from the standing AE9 e2e
-flake; `pnpm test:db` red on the test-isolation race that `TODO.md` owns, which is not this unit's.
-
-Proved:
-
-- `lessonGroundingShape.ts` is the single grounding-shape owner. Section passages are
-  `` `${derivedNodeId}:s${sectionIndex}` ``, bullet passages `` `${…}:i${bulletIndex}` ``. A section
-  contributes its citation text, or — when uncited and of a `SUBSTANTIVE_KINDS` kind — its body;
-  bullets always contribute, always `generated` (D10).
-- `groundedLessonFragments` and `studyItemGroundingFromLesson` are both deleted (AGENTS rule 18).
-  `structuralPreGateBlueprint` counts the owner's passages; its three decline reasons name "grounding
-  passages" rather than "fragments", and the three "no grounded sections" rejection reasons read "the
-  lesson yields no grounding passages to anchor an item" — the grep targets U2 measures against.
-- `resolveGroundingCitation` implements rungs 0–2. There is no fallback rung; U3 lands it beside the
-  verification it depends on (D6).
-- Option-select's attempt loop passes the previous attempt's guard reason as `retryFeedback`.
+Deterministic only; U2 measured it. `lessonGroundingShape.ts` is the single grounding-shape owner —
+section passages `` `${derivedNodeId}:s${sectionIndex}` ``, bullet passages
+`` `${…}:i${bulletIndex}` ``, bullets always `generated` (D10) — and both
+`groundedLessonFragments` and `studyItemGroundingFromLesson` are deleted, so
+`structuralPreGateBlueprint` counts exactly what the generator is shown. Option-select's attempt loop
+carries the previous guard reason as `retryFeedback`.
 
 Invariants a later unit or a re-run must not break:
 
@@ -475,46 +458,27 @@ Invariants a later unit or a re-run must not break:
   count of *distinct* grounding as ADR-0026 states, and the same text never reaches the generator
   under two ids.
 - Rung 2 searches only *generated* passages, so a repair can never mint a `source` citation from an
-  id nobody cited; a source passage with a failing quote still rejects.
-
-Hands off to U2: because bullets are now grounding *the generator is shown*, an item whose quote
-lives in a bullet is admitted where it previously was not — the `Covers R10` orchestrator test
-flipped from two item types to three for exactly that reason. Expect U2's recovery to include that
-class and the paraphrased-quote class to stay rejected until U3.
+  id nobody cited; a source passage with a failing quote still rejects. U3's rung 3 keeps both
+  properties.
+- The rejection reasons U2 and U4 grep against read "the lesson yields no grounding passages to
+  anchor an item" and "citation does not verify against grounding".
 
 ### Pre-U2 execution order — deterministic gate green, U1's effect sized offline — closed 2026-08-07
 
-No model calls and no spend: evidence about code and about an existing corpus, not about quality.
-`pnpm test:db` green on two consecutive runs, `pnpm typecheck` green, `pnpm lint` 0 errors.
+No model calls and no spend. Two invariants survive; the sizing numbers themselves are spent, since
+**U2 confirmed the prediction they existed to make** and the detail is in git at `1b96900`.
 
-**Step 1 — the deterministic gate is green.** The KTD4 test in
-`PostgresLearnerRecallChallengeStore.test.ts` bracketed its writes with an *unscoped*
-`SELECT COUNT(*) FROM response_log`, so any concurrently running file that wrote a response row
-failed it. Both counts are now scoped to the test's own freshly seeded `L-${randomUUID()}` learner —
-the form `apps/learner-api/src/app.test.ts:189` already used. The race is closed **by construction,
-not by retry**: no other file can write a row under a UUID this test just minted.
-
-**Step 2 — U1's deterministic effect, sized against the local development corpus** (28 current
-`concept_lessons`, 14 rejected items, 6 distinct nodes carrying a citation-verify rejection). The
-deleted `studyItemGroundingFromLesson` / `groundedLessonFragments` were transcribed from `7417fbd^`
-and run beside the shipped `lessonGroundingShape`:
-
-- **Colliding ids are a *minor* channel here — 1 of 28 lessons**, only `Runtime vs Compile Time`,
-  which carried two generated citations of the same kind. 42 cited-section passages over 28 lessons
-  means most lessons hold a single citation and cannot collide at all. Defect 1 is real but small on
-  this corpus.
-- **Bullet grounding is the dominant channel — 43 passages before, 176 after (4.09x), 132 of them
-  bullets that were never quotable.** Every lesson gained; none lost. All six citation-verify nodes
-  gained (1→4, 1→9, 3→9).
-- **No node's pre-gate eligibility moves — 0 lose a type, 0 gain one.** The dedup drop this plan
-  worried about did not materialize at matching's threshold of 3. That confirms defect 2's direction:
-  the old pre-gate *already* counted bullets, so U1 raised the generator's view up to the pre-gate's
-  rather than changing which types are allowed. `Block Structure`, this plan's own named example,
-  reproduces exactly — 1 generator passage against a pre-gate count of 4.
-
-It predicted recovery would arrive through the **bullet channel** rather than id repair, with
-matching moving most. **U2 confirmed both.** The failed citations themselves stay unreplayable — a
-rejected row stores a reason string, not the draft citation.
+- **Test-isolation invariant.** A DB test that counts rows in a shared table must scope the count to
+  a learner it just minted (`L-${randomUUID()}`), never bracket an unscoped
+  `SELECT COUNT(*) FROM response_log`. That closes the race **by construction, not by retry**: no
+  concurrently running file can write under a UUID this test alone knows.
+- **Where U1's recovery comes from.** Sized offline against the local development corpus (28 lessons)
+  before spending anything: colliding ids are a *minor* channel (1 lesson of 28); **bullet grounding
+  is the dominant one** (4.09x more passages, all previously unquotable); and no node's pre-gate
+  eligibility moves in either direction, which confirms defect 2's direction — the old pre-gate
+  already counted bullets, so U1 raised the *generator's* view up to the pre-gate's rather than
+  changing which types are allowed. The failed citations themselves stay unreplayable: a rejected row
+  stores a reason string, not the draft citation.
 
 ### U2 — coverage gate (real-use pass 1) — closed 2026-08-07, deployed at `1b96900`
 
@@ -574,13 +538,55 @@ Invariants a later unit or a re-run must not break: the bank is at 48 of a possi
 rejections, and no node may lose its item; no citation is admitted except through a verbatim rung
 until U3 lands the fallback deliberately.
 
+### U3 — Study Item Key Verification, fallback rung, and the lie-only judge's deletion — closed 2026-08-07
+
+Deterministic only: no real model calls and nothing measured, so this unit is evidence about code,
+not about quality. **U4 owns the first measurement** and is now the only thing between this plan and
+completion. `pnpm check` green end to end (including the 64 web e2e tests, with no AE9 flake this
+run); `pnpm test:db` green.
+
+Proved:
+
+- `verifyStudyItemKeys.ts` is the shared batched phase for both verified types, driven by
+  `gateByJudgment` — so the one divergent judge caller now lives in the rule-16 home, and
+  `vetoReason` is structurally unreachable when a judge call throws.
+- The two D5 uniqueness rules are deterministic functions over confident verdicts, and the
+  **captured `Deep ocean return flow` verdict set is rejected in a unit test** by the uniqueness
+  half, not the affirmative half — the exact blindness the lie-only judge had.
+- `resolveGroundingCitation` reports its admitting rung and takes a `generatedPassageFallback`
+  opt-in. Option-select and impostor opt in; matching does not (D6). A source passage is ineligible
+  under any opt-in, so "a source passage cited with a failing quote still rejects" is now also the
+  fallback's negative control.
+- The deletion ledger is complete: no `ImpostorLieValidity*` identifier survives outside this plan's
+  own ledger text. ADR-0026 and CONTEXT.md were amended in the same change.
+
+Invariants a later unit or a re-run must not break:
+
+- **`unclear` never vetoes, and a verdict the judge never returned is `unclear`.** Impostor's
+  requirement that its lie be *proven* false is an affirmative standing requirement ADR-0026 already
+  owned by harm — it is not `unclear` vetoing, and must not be re-derived as one.
+- **Persisted order stays a function of node order alone.** Two order facts carry it: the per-node
+  mappers are input-ordered, and verification outcomes are index-aligned to the *pending subset*,
+  walked by cursor. A test resolves judgments out of order to hold this.
+- **Rung 3 stores the cited passage's whole text, never the model's quote** — the quote is the thing
+  that failed to verify, so persisting it would record a span that appears nowhere.
+
+Hands off to U4:
+
+- **Two budget/shape changes to expect in the numbers.** The impostor's worst case moves from 2
+  generation calls to 3 (its 2 guard attempts no longer share a loop with the judge rejection, which
+  is now one regeneration in the verification phase). And the topic-generation stage denominator
+  moves **14 → 15**, so the learner's progress bar has one more beat.
+- The two verification brackets can overlap in wall-clock, so peak independent-judge load is up to
+  **twice** `DEFAULT_KEY_VERIFICATION_CONCURRENCY` (4). If U4 sees `gpt-oss-120b` throttling, that is
+  the knob — do not lower production generation concurrency to make the gate pass.
+- U2's frozen invariant is the thing at risk: the bank is at **48 of a possible 48**. U3 can only
+  move it in two directions — the fallback rung *adds* items the verbatim rungs rejected, and
+  verification *subtracts* items whose key is not unique. U4 must report those two separately, or the
+  net will be unattributable.
+
 ### Open findings
 
-- **D3's revisit trigger has fired — decide whether matching gets key verification.** U2's recovery
-  exposed tautological and ambiguous pairs (detail in the U2 entry). D3 excluded matching for want of
-  observed evidence; that evidence now exists. Note the two candidate causes are different fixes: the
-  tautology is a *prompt* problem (the generator is rewarded for quoting), the ambiguity is a
-  *verification* problem. Do not fold this into U3 without re-deciding scope.
-- **Graph vocabulary reaches learner-facing matching copy** ("dependent concept", "sibling water
-  mass"). Two instances, matching only. Likely the matching prompt passing sibling context through
-  unlabelled; check before it is assumed cosmetic.
+None. D3's revisit trigger is closed by the re-decision in the decision ledger above; the matching
+quality defects U2 found — tautological pairs, ambiguous prompt sets, and graph vocabulary in learner
+copy — now belong to [TODO.md](./TODO.md), because no unit of this plan owns them.

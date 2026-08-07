@@ -24,7 +24,7 @@ import {
 import { OPERATION_TIMELINE_CATALOG } from "./operationTimelineCatalog";
 import { OPERATION_HEARTBEAT_STALE_AFTER_MS } from "./operationRunLiveness";
 
-const TOTAL = 14;
+const TOTAL = 15;
 
 // AE8: every expected stage is locked to its operation's catalog entry with kind `llm`;
 // a stage that leaves the catalog (or a non-LLM bookkeeping stage sneaking in) fails here.
@@ -101,7 +101,7 @@ test("a running unexpected current stage signals indeterminate", async () => {
 
 // AE2: a succeeded study_items phase clamps to its full span even when conditional
 // stages (matching/impostor and their judges) never appeared.
-test("a succeeded study_items timeline with absent conditional stages still reaches 14/14", async () => {
+test("a succeeded study_items timeline with absent conditional stages still reaches 15/15", async () => {
   const journal = await journalWithTimeline(timeline({
     operationType: "study_items",
     status: "succeeded",
@@ -117,7 +117,7 @@ test("a succeeded study_items timeline with absent conditional stages still reac
   assert.equal(generation.fraction, 1);
 });
 
-test("a succeeded enrichment timeline with domain inference skipped reaches its phase boundary (6/14)", async () => {
+test("a succeeded enrichment timeline with domain inference skipped reaches its phase boundary (6/15)", async () => {
   const journal = await journalWithTimeline(timeline({
     status: "succeeded",
     stages: [

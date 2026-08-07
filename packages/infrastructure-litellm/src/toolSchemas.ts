@@ -601,18 +601,23 @@ export const impostorValidator = z.object({
 
 export const impostorSchema: JsonSchema = toForcedToolSchema(impostorValidator);
 
-// --- Impostor lie-validity judgment: submit_impostor_lie_validity_judgment
-// Cross-family semantic judgment over the one generated lie object after deterministic
-// grounding checks pass. It answers whether the keyed lie is actually false for the target
-// node, not merely true of a sibling or unsupported by phrasing. The application stage owns
-// fail-closed drop semantics and records an operator-visible rejection reason.
+// --- Study Item key verification: submit_study_item_key_verification
+// Cross-family semantic judgment over EVERY candidate answer of one guarded item, after the
+// deterministic grounding checks pass. It answers, per candidate, whether the claim is true
+// of the learning node — never which candidate the item keys, which is the application's
+// deterministic uniqueness rule to enforce over these verdicts. The array shape mirrors the
+// redundancy judgment's: one verdict per numbered candidate, echoed back by ordinal so a
+// reordered or short response cannot be silently misaligned by position.
 
-export const impostorLieValidityJudgmentValidator = z.object({
-  verdict: z.enum(["lie_is_false", "lie_is_true_of_node"]).describe("'lie_is_false' when the planted statement is false for the learning node. 'lie_is_true_of_node' when the statement is true, materially true, or not clearly false for the learning node."),
-  reason: z.string().min(1).describe("One terse explanation grounded in the provided node context, lie, reveal, grounding passages, and sibling labels.")
+export const studyItemKeyVerificationValidator = z.object({
+  verdicts: z.array(z.object({
+    ordinal: z.number().int().describe("The candidate's number, exactly as listed in the prompt."),
+    verdict: z.enum(["claim_true", "claim_false", "unclear"]).describe("'claim_true' when the candidate is a correct claim about the learning node. 'claim_false' when it is incorrect for that node. 'unclear' when it cannot be decided from the provided context and general knowledge of the declared domain."),
+    reason: z.string().min(1).describe("One terse justification for this candidate, grounded in the node context, the other candidates, the grounding passages, and the sibling labels.")
+  }).strict())
 }).strict();
 
-export const impostorLieValidityJudgmentSchema: JsonSchema = toForcedToolSchema(impostorLieValidityJudgmentValidator);
+export const studyItemKeyVerificationSchema: JsonSchema = toForcedToolSchema(studyItemKeyVerificationValidator);
 
 // --- Concept Lesson redundancy judgment: submit_concept_lesson_redundancy_judgment
 
@@ -762,7 +767,7 @@ export const toolValidators = [
   studyItemBlueprintValidator,
   matchingValidator,
   impostorValidator,
-  impostorLieValidityJudgmentValidator,
+  studyItemKeyVerificationValidator,
   conceptLessonRedundancyJudgmentValidator,
   conceptLessonValidator
 ] as const;

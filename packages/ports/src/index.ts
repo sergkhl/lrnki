@@ -18,7 +18,7 @@ import type {
   StudyItem,
   OptionSelectItemDraft,
   ImpostorItemDraft,
-  ImpostorLieValidityJudgment,
+  StudyItemCandidateVerdict,
   StudyItemBlueprint,
   StudyItemGroundingProvenance,
   StudyItemType,
@@ -248,20 +248,32 @@ export type StudyItemGroundingPassage =
   | { passageId: string; kind: "definition" | "mention"; text: string; sourceResourceId: string; sourceBlockId: string }
   | { passageId: string; kind: "definition" | "mention"; text: string; derivedNodeId: string };
 
-// Impostor lie-validity judge (ADR-0026 refinement). A bounded cross-family judgment over
-// a deterministic-guarded impostor lie. It answers whether the keyed lie is actually false
-// for the target node. Unlike other semantic judges that fail open/pass-through, the
-// application uses this one fail-closed with an operator-visible rejected-row reason because
-// a true "lie" teaches a falsehood and no-impostor is the designed safe state.
-export interface ImpostorLieValidityJudgmentPort {
+// Study Item key verification judge (ADR-0026, amended by plan 2026-08-05-001). A bounded
+// cross-family judgment over ONE deterministically guarded item: every candidate answer is
+// classified true / false / unclear for the target node in its Declared Domain. It replaces
+// the lie-only judge, whose blind spot was structural — checking the keyed answer alone can
+// never observe a second true option or a second false statement.
+//
+// The posture is DOMAIN TRUTH, not passage entailment (D4): the grounding passages and
+// sibling concepts are context, and every candidate is visible at once so a contradiction
+// between two candidates is observable. Strict entailment would answer "not stated" for the
+// exact defect this judge exists to catch.
+//
+// Option-select passes its question as framing so each candidate reads as an answer to it;
+// impostor OMITS the question, whose meta-form ("which statement is FALSE?") would corrupt
+// per-statement judging (D8). The application owns the per-type answer-key uniqueness rule
+// and the fail-closed / pass-through split on unavailability (ADR-0026, D5).
+export interface StudyItemKeyVerificationPort {
   readonly model: string;
-  judge(input: {
+  verify(input: {
+    itemType: "option_select" | "impostor";
     declaredDomain: string;
     node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
-    lie: { text: string; reveal: string };
+    question?: string;
+    candidates: { ordinal: number; text: string }[];
     groundingPassages: StudyItemGroundingPassage[];
     siblings: { label: string; snippet: string }[];
-  }): Promise<ImpostorLieValidityJudgment>;
+  }): Promise<StudyItemCandidateVerdict[]>;
 }
 
 export interface ConceptLessonRedundancyJudgmentPort {

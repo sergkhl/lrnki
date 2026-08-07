@@ -213,6 +213,15 @@ blueprint admits them. Item typing and learner-response identity are defined by
 [ADR-0026](docs/adr/0026-typed-study-item-bank.md).
 _Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 
+**Study Item Key Verification**:
+The generation-time check that a Study Item has exactly one defensible answer. One cross-family
+judgment classifies *every* candidate answer of an option-select or impostor item as true, false, or
+unclear for its concept, and a deterministic uniqueness rule admits the item only when the key stands
+alone. Matching is deliberately outside it. Rules, the unavailability asymmetry, and the citation
+resolution ladder it interlocks with are defined by
+[ADR-0026](docs/adr/0026-typed-study-item-bank.md).
+_Avoid_: lie-validity judge, fact check, grading, passage entailment, distractor quality review
+
 **Concept Lesson**:
 A learner-neutral teaching substrate keyed to `derived_node_id` and generated alongside the Study
 Item Bank. It teaches a concept before it is tested; structure and grounding are defined by
