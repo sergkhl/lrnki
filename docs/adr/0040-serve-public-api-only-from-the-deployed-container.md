@@ -51,6 +51,13 @@ makes the hazard unreachable, after which there is nothing for a health check to
 - A deploy refuses while a watch session is attached, since a sync would overwrite the image just
   deployed. The deploy also probes the container directly before the public hostname, so "the
   artifact I deployed started" and "the public hostname reaches it" are asserted separately.
+- The no-interception guarantee is verifiable rather than merely asserted, by a negative control:
+  bind an impostor on the host's `0.0.0.0:8787` and confirm the loopback serves the impostor while
+  the public hostname still serves the container. `host.docker.internal` is additionally `NXDOMAIN`
+  inside Caddy, since nothing grants it `host-gateway`. First run end-to-end over real TLS on the
+  VPS, 2026-08-05, alongside one authenticated round trip
+  (`POST /session` → `/me` → `/catalog` → `DELETE /session` → 401); run it against the deployed
+  stack, not a local Caddy, or it proves nothing about the public path.
 - Compose projects are keyed by directory basename, so anything that reaches the shared daemon with
   a project directory named `lrnki` resolves to these containers. On the VPS that is not a second
   checkout but the **same** checkout at a second path: an agent container binds the workspace at a

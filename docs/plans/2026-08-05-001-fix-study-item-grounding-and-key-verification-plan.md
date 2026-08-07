@@ -5,6 +5,17 @@ date: 2026-08-05
 execution: code
 ---
 
+<!--
+Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not a second definition.
+  * The Validation Log is append-only within a unit and REWRITTEN to one entry when that unit closes.
+  * Record one current metric value and its invariant, never the trajectory that produced it.
+  * Open work goes in the single `Open findings` section, never in a per-entry "not done" list.
+  * Durable mechanics belong in docs/adr/, AGENTS.md, CONTEXT.md, a rig README, or a skill — never
+    here. This plan is deleted at completion.
+  * Caps: Validation Log ~200 lines, this file ~600, the status header 15. Over a cap means
+    consolidate BEFORE appending.
+-->
+
 # Study Item Grounding and Key Verification
 
 **Status:** Ready
@@ -15,30 +26,10 @@ implementation: D6/D9 amended — the fallback rung moves to U3 and applies only
 item types, so the D6 interlock is structural rather than aspirational — with a matching D5
 refinement, and mechanical corrections to D8, the passage-id scheme, and the U3 inventory.
 
-**Implementation state:** **U1 shipped** (code + automated tests, 2026-08-05). U2 — the coverage
-gate — is next and has not run, so no measured delta exists yet. U3 and U4 are untouched.
-
-U1 as built, for the reader who needs to know what U2 is measuring:
-
-- `lessonGroundingShape.ts` is the single grounding-shape owner. Section passages are
-  `` `${derivedNodeId}:s${sectionIndex}` ``, bullet passages `` `${…}:i${bulletIndex}` ``. A section
-  contributes its citation text, or — when uncited and of a `SUBSTANTIVE_KINDS` kind — its body;
-  bullets always contribute, always `generated` (D10). Passages are deduplicated by the shared
-  `normalizeOptionText` collapse, so the pre-gate's count stays a count of *distinct* grounding as
-  ADR-0026 states and the same text never reaches the generator under two ids.
-- `groundedLessonFragments` and `studyItemGroundingFromLesson` are both deleted.
-  `structuralPreGateBlueprint` counts the owner's passages; its three decline reasons now name
-  "grounding passages" rather than "fragments", and the three "no grounded sections" rejection
-  reasons now read "the lesson yields no grounding passages to anchor an item" — grep targets for
-  the U2 gate.
-- `resolveGroundingCitation` implements rungs 0–2. Rung 2 searches only *generated* passages, so a
-  repair can never mint a `source` citation from an id nobody cited; a source passage with a failing
-  quote still rejects. There is no fallback rung — U3 lands it.
-- Option-select's attempt loop passes the previous attempt's guard reason as `retryFeedback`.
-
-One behavioral consequence worth expecting in U2: because bullets are now grounding *the generator
-is shown*, an item whose quote lives in a bullet is admitted where it previously was not — the
-`Covers R10` orchestrator test flipped from two item types to three for exactly that reason.
+**Implementation state:** **U1 shipped** (2026-08-05); what it built, the invariants it establishes,
+and what U2 is therefore measuring are the U1 entry in the [Validation Log](#validation-log). U2 —
+the coverage gate — has not run, so no measured delta exists yet. U3 and U4 are untouched. Two steps
+precede U2: [Execution order before U2](#execution-order-before-u2).
 
 ## Goal capsule
 
@@ -352,6 +343,23 @@ Tests: unique ids across a multi-section multi-bullet lesson; a bullet passage i
 every guard (no fallback exists yet); a source passage with a failing quote still rejects; an
 unknown id still rejects; the second option-select attempt carries the first attempt's reason.
 
+### Execution order before U2
+
+Two steps precede U2. They are independent of the shared environment and of each other.
+
+1. **Green the deterministic gates before running a measured one.** `pnpm test:db` is red on a
+   test-isolation race ([TODO](./TODO.md) owns the defect). It sits on this plan's acceptance list
+   and will sit on U3's, and a measured gate run beside a red automated gate makes every later "was
+   that mine?" more expensive to answer, not less.
+2. **Spend nothing before spending something.** The local development database holds a free replay
+   corpus of persisted lessons. Size U1's deterministic effect there — colliding ids under the old
+   scheme, added grounding per lesson, and whether any node's pre-gate count *drops* below a type
+   threshold — before a run that costs a shared-host deploy and production tokens.
+
+U2 then needs operator consent, not just plan authorization: D12 permits the shared VPS, a
+`db:reset` on the shared application schema, and production spend, but permission in a plan is not
+the operator saying go on a shared environment.
+
 ### U2 — Coverage gate (real-use pass 1)
 
 Reset the shared schema, deploy, regenerate the thermohaline topic, record items-per-type and
@@ -414,8 +422,8 @@ fallback-admitted option-select (D5); the retry feedback names the offending can
 - U2 records a measured coverage delta from the frozen baseline, attributable to U1 alone, and every
   recovered matching item is hand-inspected against D3's revisit trigger.
 - The replay probe returns `claim_false` for both false statements in the captured item.
-- Both U4 runs are hand-inspected with no impostor carrying a second false statement, and the
-  validation entry states items-per-type, item-less nodes, veto counts, and stage wall-clock.
+- Both U4 runs are hand-inspected with no impostor carrying a second false statement, and U4's
+  Validation Log entry states items-per-type, item-less nodes, veto counts, and stage wall-clock.
 - The deletion ledger in U3 is complete: no `ImpostorLieValidity*` identifier survives anywhere.
 - ADR-0026 and CONTEXT.md are updated in the same change as the code.
 
@@ -434,3 +442,44 @@ starting U3 rather than folding the uncertainty into the second gate.
   surface two more named stages, which is incidental, not the goal.
 - **Retry budget changes.** The existing two-attempt constants stay; if U4 shows the second attempt
   routinely failing, that is a separate measured decision.
+
+## Validation Log
+
+One entry per closed implementation unit; see the hygiene comment at the top of this file.
+
+### U1 — grounding shape, unique ids, resolution ladder, option-select retry — closed 2026-08-05, `7417fbd`
+
+Deterministic only: no real model calls and nothing measured, so this unit is evidence about code,
+not about quality. U2 owns the first measurement. `pnpm check` green apart from the standing AE9 e2e
+flake; `pnpm test:db` red on the test-isolation race that `TODO.md` owns, which is not this unit's.
+
+Proved:
+
+- `lessonGroundingShape.ts` is the single grounding-shape owner. Section passages are
+  `` `${derivedNodeId}:s${sectionIndex}` ``, bullet passages `` `${…}:i${bulletIndex}` ``. A section
+  contributes its citation text, or — when uncited and of a `SUBSTANTIVE_KINDS` kind — its body;
+  bullets always contribute, always `generated` (D10).
+- `groundedLessonFragments` and `studyItemGroundingFromLesson` are both deleted (AGENTS rule 18).
+  `structuralPreGateBlueprint` counts the owner's passages; its three decline reasons name "grounding
+  passages" rather than "fragments", and the three "no grounded sections" rejection reasons read "the
+  lesson yields no grounding passages to anchor an item" — the grep targets U2 measures against.
+- `resolveGroundingCitation` implements rungs 0–2. There is no fallback rung; U3 lands it beside the
+  verification it depends on (D6).
+- Option-select's attempt loop passes the previous attempt's guard reason as `retryFeedback`.
+
+Invariants a later unit or a re-run must not break:
+
+- Passages are deduplicated by the shared `normalizeOptionText` collapse, so a pre-gate count stays a
+  count of *distinct* grounding as ADR-0026 states, and the same text never reaches the generator
+  under two ids.
+- Rung 2 searches only *generated* passages, so a repair can never mint a `source` citation from an
+  id nobody cited; a source passage with a failing quote still rejects.
+
+Hands off to U2: because bullets are now grounding *the generator is shown*, an item whose quote
+lives in a bullet is admitted where it previously was not — the `Covers R10` orchestrator test
+flipped from two item types to three for exactly that reason. Expect U2's recovery to include that
+class and the paraphrased-quote class to stay rejected until U3.
+
+### Open findings
+
+- None recorded.

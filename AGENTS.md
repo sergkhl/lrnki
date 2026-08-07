@@ -11,9 +11,10 @@ Keep one canonical definition for every fact:
   ([ADR-0039](docs/adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
 - A linked file in `docs/brainstorms/` owns accepted problem framing, requirements, and scope until
   that work is completed or abandoned.
-- A linked ready/in-progress file in `docs/plans/` owns active implementation design.
-- `docs/plans/TODO.md` owns current work, grouped completed outcomes, and latest validation, under
-  the retention limits in [docs/plans/README.md](docs/plans/README.md).
+- A linked ready/in-progress file in `docs/plans/` owns active implementation design and, in its
+  `## Validation Log`, the validation record for its own implementation units.
+- `docs/plans/TODO.md` owns current work, grouped completed outcomes, and the latest validation for
+  work no plan owns, under the retention limits in [docs/plans/README.md](docs/plans/README.md).
 - `docs/plans/BLOCKERS.md` owns unresolved manual actions required from the user.
 
 Do not restate another document's content. Link to its canonical definition. Delete superseded

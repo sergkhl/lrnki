@@ -1,3 +1,11 @@
+<!-- Hygiene (rules: README.md → Retention). TODO 3–7 items (an item over ~15 lines needs a plan
+     file); COMPLETED ≤8 entries of ~8 lines, rolling — adding one deletes the oldest; VALIDATION =
+     exactly one entry, ~20 lines, and only for work no plan owns — a plan's own validation lives in
+     its `## Validation Log`. Whole file ≤ ~150 lines. Consolidate outward before deleting: move
+     anything that outlives this directory to its owner (ADR, AGENTS.md, CONTEXT.md, a rig README, a
+     skill) in the same change. Never delete an uncommitted plan or an uncommitted validation
+     record: commit first, delete in a later commit. -->
+
 # TODO
 
 ## TODO
@@ -8,8 +16,9 @@
   `SELECT COUNT(*) FROM response_log` with no learner or challenge scoping, so any test file writing
   a response row inside that window fails it. It passes standalone. Scope the count to the test's own
   learner rather than retrying until it passes, and rather than serializing the suite. **First in the
-  execution order in [README](./README.md)** — it is on the active plan's acceptance list and will be
-  on U3's.
+  active plan's
+  [execution order before U2](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md#execution-order-before-u2)**
+  — it is on that plan's acceptance list and will be on U3's.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -36,8 +45,8 @@
 
 - **Study Item truth and coverage — U1 shipped, U2 not yet run.**
   [2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md) owns the
-  framing, decisions, units, acceptance, and what U1 actually built; [README](./README.md) owns where
-  the two steps before U2 sit. Live state: the deterministic coverage fixes are merged, `pnpm check`
+  framing, decisions, units, acceptance, the U1 Validation Log entry, and the two steps that precede
+  U2. Live state: the deterministic coverage fixes are merged, `pnpm check`
   green apart from the standing AE9 flake, and **nothing has been measured**. D11 forbids folding
   U2's delta into the later verification gate, so U2 stays a run of its own against the frozen
   baseline in the plan (24 of a possible 48 items; 23 of 24 rejections
@@ -184,37 +193,11 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
 
 ## VALIDATION
 
-- **Single public upstream deployed to the VPS — 2026-08-05, shared environment. PASS.**
-  - *Milestone:* `api.lrnki.globesoul.com` now resolves only to the `learner-api` container
-    (ADR-0040), with the host dev runtime and its firewall hole gone.
-  - *Fixture and source type:* a cold synthetic topic expedition, *"How thermohaline circulation
-    moves heat through the ocean"* — deliberately outside `fixtures/` so nothing was rehearsed.
-  - *Real model calls:* yes, production, through the deployed container's own LiteLLM credentials.
-  - *Useful output observed:* 14 stages, `ready` in **324 s**, `declaredDomain` inferred as
-    *Oceanography* with all 16 concepts `llm_grounded` and zero anchor/source-mentioned. The
-    prerequisite graph is scientifically sound and monotone in difficulty — temperature/salinity
-    effects → seawater density → downwelling → deep water formation → NADW/AABW — over 13 certain
-    and 2 uncertain edges, partitioned into 7 sections. Lessons are accurate (the timescales lesson
-    gives the standard 500–1 000-year loop) and option-select distractors are domain-meaningful
-    rather than filler (tidal forcing, Ekman transport, solar heating alone).
-  - *Defects observed:* one content defect, recorded in TODO — a generated impostor item carries a
-    second false statement beside its designated lie. Also **3 of 16 concepts have no study item**,
-    including `Seawater density`, the highest-degree node in the graph (two prerequisites in, two
-    dependents out), so the hub concept is unassessable. And 324 s to first playable content is
-    direct evidence for the standing *progressive readiness* follow-up above.
-  - *Changes made after inspection:* none to generation — every defect predates this milestone and
-    none is caused by the traffic-path change.
-  - *Remaining caveats:* the content defect is unfixed; the generation layer does not check the
-    truth of non-designated statements.
-  - *Safe to continue downstream:* yes.
+No active plan-less validation records. Active plans own their validation logs.
 
-  Path evidence, separate from quality: the deploy's container-direct probe and public poll both
-  passed, and the **interception negative control now runs end-to-end over real TLS** rather than
-  against a local Caddy — with a real impostor bound on the VPS's `0.0.0.0:8787` returning
-  `{"impostor":"HOST-8787"}`, the loopback served the impostor while the public hostname served the
-  container's `{"ok":true}`. `host.docker.internal` is additionally `NXDOMAIN` inside Caddy, since
-  nothing grants it `host-gateway`. One authenticated round trip over TLS passed
-  (`POST /session` → `/me` → `/catalog` → `DELETE /session` → 401), and the probe learner was removed
-  through `cleanupReservedLearners`, leaving **0 rows in `learners`** — which also proves the two
-  reserved learners a previous TODO entry expected to delete were already destroyed by the schema
-  cutover.
+The 2026-08-05 VPS deployment record was consolidated outward before deletion: its quality half is
+superseded by the frozen baseline and defect table in
+[2026-08-05-001](./2026-08-05-001-fix-study-item-grounding-and-key-verification-plan.md), and its
+path evidence — the interception negative control — now lives in
+[ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md). The run itself is in
+git history at `7417fbd`.
