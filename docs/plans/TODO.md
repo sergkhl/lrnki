@@ -33,14 +33,13 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Matching item quality — three distinct defects, three distinct fixes.** Hand-inspected instances
-  are in the deleted plan's U2 entry (`git log --diff-filter=D -p --
-  docs/plans/2026-08-05-001-*.md`); D3 deliberately left matching unverified and says why.
-  Tautological pairs are a **prompt** problem (the guard rewards quoting, so the cheapest passing
-  item makes the match the quoted bullet); ambiguous prompt sets are a **verification** problem
-  needing an N×N assignment check, not the per-candidate truth judge U3 shipped; graph vocabulary in
-  learner copy ("dependent concept") is likely unlabelled sibling context. Do not treat them as one
-  fix. U4 hand-inspected impostor items only, so matching has had no second look since U2.
+- **Matching item quality — planned, not started.** The three defects (tautological pairs, ambiguous
+  prompt sets, graph vocabulary in learner copy) now have an interview-locked plan:
+  [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which freezes the pair-level
+  defect inventory and confirms the vocabulary leak's mechanism (lesson-prompt neighbor framing
+  quoted verbatim through bullet grounding — not the matching call, which receives no siblings).
+  Next action: merge `fix/study-item-grounding` to `main`, branch `fix/matching-item-quality`,
+  start U1.
 
 - **The shared VPS runs `fix/study-item-grounding` at `bd0b3eb`; `main` is still at `943fffc`.**
   The deploy checkout and the running container agree and are at the branch tip. Nothing on this

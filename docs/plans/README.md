@@ -89,10 +89,10 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 
 ## Active implementation plans (execution order)
 
-None. `2026-08-05-001 — Study Item grounding and key verification` completed on 2026-08-07 and was
-deleted after consolidation: durable policy is in
-[ADR-0026](../adr/0026-typed-study-item-bank.md), the outcome in [TODO.md](./TODO.md), and the full
-record in git (`git log --diff-filter=D -p -- docs/plans/2026-08-05-001-*.md`).
+- [2026-08-07-001 — Matching item quality](./2026-08-07-001-fix-matching-item-quality-plan.md) —
+  **Ready.** Three interview-locked fixes for the three matching defect classes: prompt redesign +
+  containment veto, an N×N Matching Assignment Verification stage, and the lesson-prompt vocabulary
+  root-fix. Precondition: merge `fix/study-item-grounding` to `main`, then branch.
 
 ## Ownership rules
 
