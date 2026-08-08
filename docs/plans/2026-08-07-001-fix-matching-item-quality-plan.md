@@ -18,9 +18,9 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Matching Item Quality
 
-**Status:** In progress — U1 shipped (`d71d52b`); U2 ran and returned **FIX_FIRST**. Next action: add
-the named-term rule to the matching prompt plus the vocabulary prohibition to the item prompts, then
-re-run U2. Do not start U3 until U2 passes — it verifies fit, not paraphrase-degeneracy.
+**Status:** In progress — U1 and U2 are closed; U2 **PASSES** on its re-run. Next action: U3, the
+Matching Assignment Verification stage, with its ADR-0026 and CONTEXT.md amendments in the same
+change. The residual matching defect U2 leaves behind is ambiguity, which is exactly what U3 checks.
 
 **Decision state:** Interview-locked 2026-08-07. D1–D13 were each chosen in the planning interview;
 every recommendation was accepted as offered.
@@ -184,10 +184,11 @@ citations through the verbatim rungs alone.
 `concept-lesson-generation.prompt` into learner-neutral framing; (2) add one system-prompt sentence
 — the neighbor lists are internal context; never call anything a "concept", "node", "prerequisite",
 "dependent", or "sibling" in learner-facing text; write about the subject matter directly; (3)
-reword the `toolSchemas.ts:654` section-kind description that repeats the same vocabulary. No
-item-prompt edits (their copy measured clean) and no lexical guard — a regex over "dependent" or
-"sibling" false-negatives on legitimate domains (dependent variables, sibling species), exactly what
-rule 16 forbids.
+reword the `toolSchemas.ts:654` section-kind description that repeats the same vocabulary. No lexical
+guard — a regex over "dependent" or "sibling" false-negatives on legitimate domains (dependent
+variables, sibling species), exactly what rule 16 forbids. **Amended by measurement:** D9 also
+excluded item-prompt edits on the premise that item copy was clean. U2 found graph vocabulary in a
+matching question, so the prohibition now covers the item prompts too, from one shared partial.
 
 **D10 — Sequencing.** U1 (both prompt-side fixes) → U2 (gate) → U3 (judge) → U4 (gate). U2 records
 ambiguity incidence as U4's baseline but does not gate on it — U1 ships nothing that targets it.
@@ -215,8 +216,11 @@ were reachable, and veto counts are reported by rule.
 
 The prompt's pair contract becomes role-asymmetric and facet-spanning: each prompt names a distinct
 facet, aspect, or situation of the node; each match carries the content answering *only* that facet;
-the pair set must be mutually exclusive — no match may plausibly answer another pair's prompt; and
-the match must not restate or contain the prompt's wording. Citation requirements are unchanged.
+**when that answer is a named term the match is the term itself, never a definition of it**; the pair
+set must be mutually exclusive — no match may plausibly answer another pair's prompt; **every match
+differs from every other match, resolved by re-choosing the aspect rather than padding a repeated
+answer**; and the match must not restate or contain the prompt's wording. The question must announce
+the pairing the pairs actually implement. Citation requirements are unchanged.
 Prompt language stays domain-neutral (rule 17). The guard adds one check beside the existing
 equality veto, with a stable reason string for gate greps:
 
@@ -277,10 +281,14 @@ gate sees 429s.
 
 ### U1 — matching prompt redesign, containment veto, lesson vocabulary root-fix
 
-- Rewrite `study-matching-generation.prompt` pair rules per the target design.
+- Rewrite `study-matching-generation.prompt` pair rules per the target design, mirroring every rule
+  into the `toolSchemas.ts` matching `describe` text.
 - Add the containment veto to `validateMatchingItem` beside the equality check.
-- Reword `concept-lesson-generation.prompt` neighbor labels + prohibition sentence; reword the
-  `toolSchemas.ts:654` kind description.
+- Constrain matching facets in `study-item-blueprint.prompt`: a facet whose answers collapse onto one
+  or two values cannot be built on a one-to-one board.
+- Own the graph-vocabulary prohibition in `prompts/partials/learner-copy-vocabulary.prompt` and
+  include it from the lesson and all three item prompts; reword their internal neighbor-list framing
+  and the `toolSchemas.ts` kind/neighbor descriptions to match.
 
 Tests: containment veto rejects both directions after normalization; a legitimate overlapping pair
 (shared words, no containment) passes; exact equality still rejects; reason strings match the gate
@@ -354,110 +362,139 @@ resolution; the match presentation order is the deterministic normalized sort.
 
 One entry per closed implementation unit; see the hygiene comment at the top of this file.
 
-### U1 — matching prompt redesign, containment veto, lesson vocabulary root-fix (2026-08-07)
+### U1 — matching prompt redesign, containment veto, lesson vocabulary root-fix (2026-08-08)
 
-Commits: `d71d52b`. `pnpm check` and `pnpm test:db` are green.
+Commits: `d71d52b` plus this unit's follow-up fix. `pnpm check` and `pnpm test:db` are green.
 
 **Proved.** The matching pair contract is role-asymmetric in both places the model reads it: the
-prompt file and the forced-tool `description` fields, which still carried the old "the match side is
-the corresponding example, scenario, description, or application from the lesson" framing. Leaving
-that description in place would have let the generator keep quoting a bullet and paraphrasing it into
-the prompt — the exact cheapest-passing-item path — while the prompt file said otherwise, so U2's
-delta would have been unattributable.
+prompt file and the forced-tool `description` fields. Every contract rule this unit added is written
+to **both**; a rule in only one of them makes the next gate's delta unattributable.
+
+The pair contract now carries three rules, each closing a gap where the guard or the board enforced
+something the prompt never stated:
+
+1. **Role asymmetry** — the prompt names an aspect, the match carries its answer.
+2. **Named terms** — when the answer to an aspect is a named term, the match must BE that term, never
+   a definition of it, and the question must announce the pairing the pairs actually implement. This
+   is what U2's first pass proved missing: the model resolved a terminology node by writing a
+   definition on both sides.
+3. **Distinct matches** — the guard has always rejected duplicate match texts, because the board
+   cannot render two identical tiles, but the prompt never asked for it. Stated now, together with
+   the instruction to *re-choose the aspect* rather than pad a repeated answer into looking different
+   — padding is how the pre-U1 prompt hid this, and padding is the paraphrase defect.
 
 The containment veto is computed over **word sequences, not normalized characters**. A character
-`includes` is wrong in both directions simultaneously, and both directions are pinned by a test that
-was verified against a mutant: it rejects `Heap` / `Cheapest region to grow at runtime` (subword) and
-it misses `Allocates memory at runtime` inside `…allocates memory, at runtime…` (punctuation).
-Contiguous word containment is the provable reading of "one side wholly contains the other" and is
-therefore the only part rule 16 lets a deterministic gate own.
+`includes` is wrong in both directions simultaneously, and both are pinned by a test verified against
+a mutant: it rejects `Heap` / `Cheapest region to grow at runtime` (subword) and it misses
+`Allocates memory at runtime` inside `…allocates memory, at runtime…` (punctuation). Contiguous word
+containment is the provable reading of "one side wholly contains the other" and therefore the only
+part of the cueing defect rule 16 lets a deterministic gate own.
+
+The graph-vocabulary prohibition is owned by one file,
+`prompts/partials/learner-copy-vocabulary.prompt`, and included with `{{> … }}` by the lesson and all
+three item-generation prompts (rule 18). `promptFileDependencyBytes` folds partial bytes into the
+config hash, so editing the shared rule re-derives every dependent stage's hash mechanically
+(ADR-0034). Each prompt keeps its own one-line internal-context lead-in; the shared file owns only
+the prohibition. The internal context itself was relabeled from "neighbor concepts" to "neighboring
+topics" everywhere, because a prompt that forbids a word while using it to describe its own input is
+self-undermining — the leak mechanism D9 identified is the model copying the framing it is given.
 
 **Invariants a later unit or re-run must not break.**
 
 - Containment stays *contiguous word* containment. A non-contiguous "all the prompt's words appear
   somewhere in the match" check is a heuristic, not a guarantee, and rule 16 forbids it here.
-- Equality and containment keep **distinct** reason strings; the gate greps
-  `must not contain one another` and `must differ` separately.
+- Equality, containment, and distinctness keep **distinct** reason strings; the gate greps
+  `must not contain one another`, `must differ`, and `must be distinct` separately.
 - Matching still opts out of the generated-passage citation fallback (D8). U3 verifies fit, not
   claim truth, so it does not unlock that rung.
-- The lesson vocabulary fix lives at the **lesson** stage only. No lexical guard exists anywhere, by
-  D9: `dependent` and `sibling` have legitimate domain senses. The prohibition is a prompt rule and
-  the inspection query in U2 is an inspection query, never a veto.
+- No lexical guard exists anywhere, by D9: `dependent` and `sibling` have legitimate domain senses.
+  The prohibition is a prompt rule; the vocabulary query in the gate is an inspection query, never a
+  veto.
 - `study-item-key-verification.prompt` still renders a `Sibling concepts:` label. That is a judge
-  prompt whose output is verdicts, never learner copy, so it is deliberately untouched.
+  prompt whose output is verdicts, never learner copy, so it is deliberately untouched. The same
+  reasoning exempts `learner-scaffold-*` — Support Path copy was outside this gate's measured set and
+  is an adjacent-layer gap, not a silent omission.
 
-**Hands off to U2.** The gate must drive an API composed from the working tree
-(`LEARNER_API_PORT=… tsx --env-file=.env apps/learner-api/src/index.ts`), never the running
-`lrnki-learner-api` container: `.prompt` files are baked into the image, so a container older than
-the prompt edit judges the previous behavior and reports green.
+**Hands off to U3.** Two rig facts, both of which cost a run to learn:
 
-### U2 — prompt-fix gate, real-use pass 1 (2026-08-07)
+- Drive an API composed from the working tree
+  (`LEARNER_API_PORT=… tsx --env-file=.env apps/learner-api/src/index.ts`), never the running
+  `lrnki-learner-api` container: `.prompt` files are baked into the image.
+- **Restart that process after every prompt edit.** `readPromptFile` and `readPartial` cache by path
+  in module state, so a long-lived API serves the prompts it read first and reports green on the
+  previous behavior — the container trap, reproduced inside the working-tree escape from it.
 
-- **Milestone:** U1's matching pair redesign, containment veto, and lesson vocabulary root-fix.
+### U2 — prompt-fix gate, real-use pass (2026-08-08)
+
+- **Milestone:** U1's matching pair contract (role asymmetry, named terms, distinct matches), the
+  containment veto, and the learner-copy vocabulary root-fix.
 - **Fixture and source type:** topic expedition `Thermohaline circulation`, Oceanography, 16 derived
-  nodes, 16 matching items / **62 pairs**, every pair hand-inspected (ADR-0013). Node count matches
-  the baseline run, which is what makes the pair-level delta attributable to U1 rather than to a
-  different graph.
-- **Real model calls used:** yes — full production pipeline after `pnpm db:reset`, driving an API
-  composed from the working tree, **not** the container (see U1's hand-off).
-- **Result: FIX_FIRST.** Three of the four D13 criteria are met; the tautology criterion is not, and
-  the residual defect is precisely attributed.
+  nodes, 16 matching items / **61 pairs**, every pair hand-inspected (ADR-0013), plus a 549-row
+  learner-copy vocabulary scan. Discovery is non-deterministic, so the node *labels* differ from the
+  frozen inventory's run; the node count and the terminology-shaped node class are what carry over.
+- **Real model calls used:** yes — full production pipeline after `pnpm db:reset`.
+- **Result: PASS**, with one residual defect class recorded below and handed to U3/U4.
 
-**Met.** Coverage is **48 of 48** with **zero rejections**. The containment veto fired zero times and
-cost zero items, so the **rule 16 verdict is keep, not remove** — no false negative to answer for.
-The baseline's verbatim-overlap tautologies are gone: no pair in the run has word-sequence
-containment, where the baseline had `Upwelling` solvable by string overlap on two of three pairs.
-Relationship vocabulary is **eliminated** — zero occurrences of `dependent`, `sibling`,
-`prerequisite`, or `node` across all 463 learner-copy rows, against a baseline that read "a
-*dependent concept*" and "a *sibling* water mass".
+**Met.** Coverage is **48 of 48 with zero rejections**. The containment veto fired zero times and cost
+zero items, so the **rule 16 verdict is keep, not remove**. The paraphrase-degeneracy class that made
+the first pass FIX_FIRST is **gone**: no match in 61 pairs restates its own prompt, and every
+terminology-shaped node now answers with the name — `Ocean upwelling` keys nitrates/phytoplankton/
+zooplankton/euphotic zone, `Surface ocean currents` keys `Wind` and `Gulf Stream`, `Temperature
+effect on seawater density` keys `thermal expansion coefficient`. Against a baseline where
+`Pycnocline` was degenerate on all four pairs and `Upwelling` was string-solvable on two of three,
+this is the intended shape. Relationship vocabulary is **eliminated**: zero occurrences of
+`dependent`, `sibling`, `prerequisite`, or `node` in 549 learner-copy rows.
 
-**Not met — the paraphrase subclass survives, concentrated in one item.** `Pycnocline` is degenerate
-on **all four** pairs: each match restates its own prompt by synonym substitution ("Density gradient
-driven by salinity changes" → "The component of the pycnocline caused by variations in salt
-concentration"; "Global deep-ocean current system powered by density differences" → "A worldwide
-circulation pattern driven by density contrasts"). A learner solves these with no oceanography at
-all, and the keyed answers that *should* be there are names — halocline, thermocline, thermohaline
-circulation. Its question states the inverted contract outright: "Match each oceanographic term to
-its correct definition", so the model put a definition on **both** sides.
+**Residual, recorded not gated.** One bare `concept` survives, in one matching question of 48
+("Match each thermohaline circulation concept to…"). The rule is now stated in both the prompt and
+the schema description, so this is adherence, not coverage — and rule 16 forbids answering it with a
+lexical veto. And on the two nodes whose facet is a direction-of-effect mapping, the pairs are
+low-discrimination: `Seawater density` pair 2 puts `pressure` in both the prompt and its own match,
+uniquely within that item, which is one surface-solvable pair in 61.
 
-**Diagnosis, and why it is a prompt gap rather than a model limit.** `Ocean stratification` pair 0
-carries the *identical prompt text* — "Layer where density rises sharply with depth" — and answers
-**"The pycnocline"** correctly, in the same run, from the same model. `Seawater density` likewise
-answers with names ("Haline contraction", "The pycnocline"). The redesigned prompt tells the model a
-match "CARRIES the content answering that aspect" but never says that **when the answer is a named
-term, the match must be that term, not a description of it**. On a terminology-shaped node the model
-resolves the ambiguity the wrong way. One sentence closes it.
+**The coverage story, attributed by probe.** An intermediate run of this gate lost two matching items
+to `matching matches must be distinct`. Re-running matching generation for exactly those nodes
+against the real model reproduced it **3 of 3** — and the cause was upstream: the blueprint had
+assigned `pairing each factor with its effect on density`, a facet whose answer space holds two
+values while the board needs four distinct ones, so duplicates were *forced*. Two things follow.
+First, U1's named-term rule did not create the defect; it exposed one the old prompt hid by padding
+matches into distinctness. Second, the fix had to say "re-choose the aspect", not "make the answers
+look different", or the cure reintroduces the disease. With the prompt rule and a matching-facet
+constraint added to `study-item-blueprint.prompt`, coverage returned to 48 of 48.
+
+**The blueprint constraint is stated but unproven.** The blueprint still assigned collapsing facets to
+2 of 16 nodes in the passing run (`density effect of each factor on seawater`). Those items are now
+admitted rather than rejected, because the generator resolves them into distinct matches — which is
+why coverage recovered and also why those two items are the low-discrimination ones. The rule is kept
+because it addresses a *proven* hard-failure mode, not because it was measured to work.
 
 **Ambiguity incidence — U4's baseline, not gated here (D10).** Two items would fail an assignment
-check. `Thermohaline feedback mechanisms`: salt-advection feedback *is* a positive feedback and
-thermal feedback *is* a negative one, so matches 0↔2 and 1↔3 are interchangeable and a learner who
-knows the material can be marked wrong. `Deep water formation`: all three prompts are region
-questions, and "The North Atlantic" (pair 0) **contains** "The Labrador Sea and Nordic Seas" (pair 2);
-pair 0 also keys brine rejection to the North Atlantic when brine rejection is the Antarctic
-mechanism, so it may be mis-keyed as well — the shape D5 chose the full grid to expose.
+check. `Freshwater input effects on thermohaline circulation`: matches 1 and 3 are interchangeable
+and match 0 also fits prompt 3. `Salinity effect on seawater density`: prompts 2 and 3 are near
+synonyms ("North Atlantic deep water formation" / "Polar deep water formation mechanism") with
+matches that swap freely. Both are the harm class — a learner who knows the material is marked wrong
+— and both are what D5 chose the full N×N grid to expose.
 
-**Residual vocabulary.** Two hits of the bare word `concept`, both self-referential framing: a lesson
-applications bullet ("This coupling concept bridges…") and a matching *question* ("Match each ocean
-stratification concept to its correct description"). The lesson prompt already forbids this, so that
-one is adherence. The matching question is not covered at all: **D9's premise that item copy measured
-clean is now falsified by measurement**, so the prohibition sentence belongs in the item prompts too.
+**Method note that cost a false green.** An earlier inspection reported "zero vocabulary hits" because
+the query used `jsonb_array_elements_text` on `concept_lesson_sections.items`, which is `text[]`;
+psql printed the error and an empty result, which reads exactly like a clean pass. Every zero-row
+quality assertion in this gate now carries a positive control in the same query — here, 74 of 97
+bullets matching a common-word regex proves the scan reads text at all.
 
-**Method note that cost a false green.** The first inspection pass reported "zero vocabulary hits"
-because the query used `jsonb_array_elements_text` on `concept_lesson_sections.items`, which is
-`text[]` — psql printed the error and an empty result, which reads exactly like a clean pass. Any
-zero-row quality assertion needs a positive control in the same query; adding one surfaced 463 rows
-and the 2 real hits.
-
-**Safe to continue downstream: no.** Fix the naming gap and re-run this gate before U3. U3 verifies
-*fit*, not paraphrase-degeneracy, so it would ship over this defect without catching it.
+**Safe to continue downstream: yes.** The blocking defect is fixed and the residual is ambiguity,
+which is precisely U3's subject.
 
 ### Open findings
 
-- **U2 is FIX_FIRST and its fix is one sentence.** The matching prompt must say that when the answer
-  to an aspect is a *named term*, the match must BE that term and not a description of it. Then extend
-  the graph-vocabulary prohibition to the item generation prompts — U2 falsified D9's premise that
-  item copy measures clean, by finding "Match each ocean stratification **concept** to…" in a matching
-  question. Re-run U2 before U3.
+- **Direction-of-effect facets still produce low-discrimination matching items.** The blueprint
+  constraint added in U1 did not stop them (2 of 16 nodes in the passing run), and the generator
+  rescues them into admissible-but-weak pairs. U4 should report how many admitted items carry this
+  shape. Do not fix it by tuning prompt text against the density nodes — that is fixture tuning
+  (rule 17). The open options are a measured blueprint change or letting U3's fit check speak first.
+- **Matching's second generation attempt is now known to fail routinely on a hard node** (3 of 3 on
+  the reproduced case before the fix). The plan puts retry-budget changes out of scope pending
+  measurement; that measurement now exists for one node, so raising `MATCHING_GENERATION_ATTEMPTS` is
+  a live, separate decision rather than a hypothetical one.
 - **Judge competence on `deepseek-v4-flash-0731` is smoke-tested, not measured.** The judge moved off
   gpt-oss-120b to a single DeepSeek v4 flash deployment (user decision, 2026-08-07) and there is
   deliberately **no fallback**, so verdicts stay attributable from the alias alone. Evidence so far is

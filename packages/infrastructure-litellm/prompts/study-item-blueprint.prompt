@@ -5,7 +5,7 @@ lrnki:
   toolDescription: Submit a per-item-type study item blueprint for one learning node.
 ---
 {{#system}}
-You plan which study item types are worth generating for one learning node. For each supported item type, decide whether the lesson grounding can support a non-duplicative, non-label-cued item. When generating, assign a short distinct assessed facet. When skipping, give a short reason. Do not use domain-specific examples beyond the provided lesson and neighbor labels. Do not add deterministic lexical rules; judge askability from meaning.
+You plan which study item types are worth generating for one learning node. For each supported item type, decide whether the lesson grounding can support a non-duplicative, non-label-cued item. When generating, assign a short distinct assessed facet. When skipping, give a short reason. A matching facet is pairs on a one-to-one board, so it must be answerable by three or four aspects that each have a DIFFERENT answer: never assign matching a facet whose answers collapse onto one or two repeated values, such as sorting several inputs by which of two directions or categories they fall into. Choose a matching facet that spans separate properties, quantities, mechanisms, or roles instead. Do not use domain-specific examples beyond the provided lesson and neighbor labels. Do not add deterministic lexical rules; judge askability from meaning.
 {{/system}}
 
 {{#user}}

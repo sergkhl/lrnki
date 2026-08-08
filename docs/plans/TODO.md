@@ -33,15 +33,15 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Matching item quality — U1 shipped, U2 returned FIX_FIRST.** Plan:
+- **Matching item quality — U1 and U2 closed, U2 PASSES; U3 is next.** Plan:
   [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which owns the full gate
-  record. One defect class survives U1 and is precisely attributed: on a terminology-shaped node the
-  matching prompt never says that when the answer is a *named term* the match must BE the term, so
-  `Pycnocline` came back with a paraphrased definition on both sides of all four pairs — while
-  `Ocean stratification` answered the identical prompt text correctly with "The pycnocline". Next
-  action: add that one rule, extend the graph-vocabulary prohibition to the item prompts (U2 falsified
-  D9's premise that item copy is clean), re-run U2. **Do not start U3 first** — it verifies fit, not
-  paraphrase-degeneracy, so it would ship over this.
+  record and the open findings. The re-run holds coverage at 48 of 48 with zero rejections, kills the
+  paraphrase-degeneracy class (terminology nodes now key the name, not a definition), and leaves zero
+  relationship vocabulary in 549 learner-copy rows. Next action: **U3 — Matching Assignment
+  Verification**, with the ADR-0026 and CONTEXT.md amendments in the same change. Two things to carry
+  in: restart the working-tree API after any prompt edit (`readPromptFile` caches by path in module
+  state, so a long-lived process serves stale prompts and reports green), and the residual defect is
+  *ambiguity*, which is exactly what U3 checks.
 
 - **`main` is at `f1224c3`; the shared VPS still runs `fix/study-item-grounding` at `bd0b3eb`.** The
   Study Item grounding and key-verification work is now merged to `main`, but **the VPS was not

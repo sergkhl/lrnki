@@ -524,7 +524,7 @@ export const optionSelectValidator = z.object({
     text: z.string().min(1).describe("The single correct option, grounded strictly in the provided passages."),
     citation: passageCitation
   }).strict(),
-  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT option in the same domain register as the provided neighbor concepts. It must be clearly wrong for this question, never a paraphrase of the correct answer.")).length(3),
+  distractors: z.array(z.string().min(1).describe("A plausible but INCORRECT option in the same domain register as the provided neighboring topics. It must be clearly wrong for this question, never a paraphrase of the correct answer.")).length(3),
   explorableTerms: itemExplorableTerms
 }).strict();
 
@@ -545,13 +545,13 @@ export const studyItemBlueprintSchema: JsonSchema = toForcedToolSchema(studyItem
 
 const matchingPair = z.object({
   promptText: z.string().min(1).describe("Left-column prompt: a few words NAMING one distinct aspect of the node — a property, quantity, mechanism, cause, effect, condition, role, or situation — without stating its answer."),
-  matchText: z.string().min(1).describe("Right-column match: the content ANSWERING that one aspect and nothing else, in your own compact words. Never a restatement, paraphrase, or expansion of its own prompt, and it must not contain the prompt's wording."),
+  matchText: z.string().min(1).describe("Right-column match: the content ANSWERING that one aspect and nothing else, in your own compact words. When the answer is a named term, this is that term itself — never a definition, description, or paraphrase of it. Never a restatement, paraphrase, or expansion of its own prompt, and it must not contain the prompt's wording."),
   citation: passageCitation
 }).strict();
 
 export const matchingValidator = z.object({
-  question: z.string().min(1).describe("One self-contained prompt asking the learner to match the pairs. Do not reference 'the passage' or 'the source'."),
-  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage. The set must be mutually exclusive: no match may plausibly answer another pair's prompt, and no prompt may cover another prompt's answer."),
+  question: z.string().min(1).describe("One self-contained prompt asking the learner to match each named aspect to the content answering it. It must announce the pairing the pairs actually implement, never a different mapping such as terms to their definitions. Do not reference 'the passage' or 'the source', and do not call anything a 'concept', 'node', 'prerequisite', 'dependent', or 'sibling'."),
+  pairs: z.array(matchingPair).min(3).max(4).describe("Three or four prompt-match pairs, each grounded in one provided passage. The set must be mutually exclusive: no match may plausibly answer another pair's prompt, and no prompt may cover another prompt's answer. Every match must also differ from every other match — two aspects with the same answer are the wrong aspects, so replace one rather than padding a repeated answer."),
   explorableTerms: itemExplorableTerms
 }).strict();
 
@@ -593,9 +593,9 @@ export const impostorValidator = z.object({
   truth3PassageId: impostorTruthFields("third").citationPassageId,
   truth3Quote: impostorTruthFields("third").citationEvidenceQuote,
   lieText: z.string().min(1).describe("The single planted lie: a statement that reads plausibly true of the learning node but is false for that node."),
-  reveal: z.string().min(1).describe("Post-answer explanation naming why the lie is false. When the lie is a mis-attributed neighbor fact, state that it is actually true of that neighbor concept."),
-  lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighbor concept rewritten as if about this node. 'generated' when no clean neighbor lie existed and the lie is a freshly minted plausible misconception."),
-  siblingLabel: z.string().describe("When lieSource is 'sibling', the exact label of the neighbor concept the lie was drawn from; when lieSource is 'generated', the empty string."),
+  reveal: z.string().min(1).describe("Post-answer explanation naming why the lie is false. When the lie is a fact mis-attributed from a neighboring topic, state that it is actually true of that named topic."),
+  lieSource: z.enum(["sibling", "generated"]).describe("'sibling' when the lie is a true fact about one provided neighboring topic rewritten as if about this node. 'generated' when no clean neighboring-topic lie existed and the lie is a freshly minted plausible misconception."),
+  siblingLabel: z.string().describe("When lieSource is 'sibling', the exact label of the neighboring topic the lie was drawn from; when lieSource is 'generated', the empty string."),
   explorableTerms: itemExplorableTerms
 }).strict();
 
