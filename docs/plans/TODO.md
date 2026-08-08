@@ -136,31 +136,6 @@ separation and log source IPs → root README `## Deployment`; throttling signat
   decision in [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md); plan
   deleted, detail in git.
 
-- **Crystal Guardian Ward Obelisk closed by its ADR-0038 native pass (2026-08-01).** The native gate
-  now reaches the Guardian at all, through a Maestro flow over a deterministic five-ward Leg
-  challenge whose combat state is folded by the **production** `foldRecallChallenge` /
-  `projectRecallChallengeView`, so no combat rule is represented twice. On a real APK, all five plan
-  states were observed, plus the seven-ward Expedition Guardian, 320 dp containment, and
-  animations-off. **The pair the pass existed to judge — resolved-versus-queued — separates
-  structurally on the native canvas.** Durable scope in
-  [ADR-0038](../adr/0038-native-interaction-gate-scope-and-physical-authority.md) and
-  `apps/learner-app/e2e-native/README.md`; plan deleted.
-
-- **Expedition summit reachability and Leg cadence (2026-08-01).** Legs became a boundary partition
-  over a fixed trail order — split at sub-terminal milestones past the Guardian's ward budget, merged
-  when a Leg carries no Study Item — so no unwinnable Leg can exist and the summit gate ranges over
-  winnable Legs. Both expeditions were played to a won Expedition Guardian on a real backend. Durable
-  rules folded into [CONTEXT](../../CONTEXT.md) and
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
-- **Guardian scope identity is (kind, anchor) on the client (2026-08-01).** The first reachable summit
-  exposed three defects with one cause — the summit's anchor IS the last Leg's milestone. The arrival
-  memory, the trail node's test id, and the figure's accessible title now all derive from scope
-  identity (`recallScopeKey`, `guardianScopeTitle`), so a Leg can no longer answer for the summit.
-
-- **Learner API survives a Postgres outage and reports real errors (2026-08-01).** Generation
-  bookkeeping no longer masks failures behind success-shaped records.
-
 ## VALIDATION
 
 No active plan-less validation records. The latest validation is the matching plan's U4 correctness
