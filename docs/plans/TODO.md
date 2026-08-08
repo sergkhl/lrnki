@@ -98,6 +98,9 @@ Verified 2026-08-01. Load `.env` before anything touching the database:
   bundle: `EXPO_PUBLIC_LEARNER_API_URL=http://127.0.0.1:8792 pnpm exec expo export --clear --platform
   web --output-dir dist-realuse` from `apps/learner-app`. Each run registers a disposable
   `realuse-probe-<id>` learner and does **not** delete it — clean up with `cleanupReservedLearners`.
+  **Restart any host-run API after a `.prompt` edit:** `readPromptFile`/`readPartial` cache by path in
+  module state, so a long-lived process keeps serving the prompts it read first — the stale-container
+  trap, reproduced inside the working-tree escape from it.
 - **A re-initialised `lrnki_postgres_data` volume silently breaks the LiteLLM app key.** LiteLLM's
   virtual keys live in its own database, so an empty volume leaves the `sk-…` in `.env` pointing at a
   key that no longer exists: generation dies `401` while `LITELLM_MASTER_KEY` still works, because
