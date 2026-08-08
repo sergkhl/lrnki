@@ -19,6 +19,18 @@ core.
 
 Stable curated sources remain under `fixtures/`; generated evaluation artifacts remain under `tmp/`.
 
+Quality evidence is scoped to the model assignment that produced it. An inspection establishes the
+quality of a *stage under a model*, never of the stage alone, so changing the model behind an alias
+retires every gate result that ranged over that alias's output — including results recorded in this
+ADR's own name. A model change is therefore complete only when the gates it invalidated are either
+re-run or explicitly recorded as unqualified; a stage left silently carrying evidence from the
+previous model reads as measured when it is not. This is about the evidence and applies to any
+single move; [ADR-0023](./0023-grounding-origin-model-and-cross-family-generated-node-judge.md)
+separately requires the extractor/judge pair to move together.
+
+An alias is qualified by measuring the consumers that will run on it, and an alias may serve many.
+Evidence gathered on one consumer does not qualify a change that moves all of them.
+
 Every zero-row quality assertion carries a **positive control in the same query**. "No learner copy
 carries graph vocabulary" and "the query is broken" produce the identical empty result, and psql
 prints an error above an empty table where it reads as a clean pass — which is how a scan that had

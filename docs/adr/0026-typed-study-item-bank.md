@@ -115,6 +115,16 @@ insufficient — an attached pair ordinal leaks the key more legibly than positi
 that can read the key has no reason to test any other cell. The permutation is a deterministic
 function of the item, so a re-run judges the same board.
 
+Assignment verification removes the ambiguity class it targets and leaves a **non-zero tail on
+borderline boards**, which is the accepted state rather than a defect awaiting repair. The measured
+value is 1 admitted item of 26 carrying a pair set whose two prompts are both defensibly answered by
+one match; re-judging that board vetoes it, so the residual is judgment sensitivity on a genuinely
+overlapping distinction, not a mechanism the stage lacks. The invariant is directional: the tail may
+shrink, and no change may reintroduce a board that a single judgment already vetoes. Closing it is a
+judge-stability question — repeated judgment, or a stricter reading of "defensibly" — and belongs
+with judge-model qualification. It is never closed by a lexical or surface gate (AGENTS rule 16);
+`dependent` and `sibling` have legitimate domain senses that such a gate false-negatives on.
+
 Unavailability stays asymmetric, decided by harm rather than symmetry. An impostor drops, because a
 true "lie" teaches a falsehood while a missing impostor is the designed safe state. An option-select
 passes through unverified — its status quo, and the node's only primary activity — unless it was
