@@ -89,11 +89,11 @@ function preflight(): { adb: string; maestro: string; device: string } {
 }
 
 let server: ChildProcess | null = null;
-function startFixture(ref: string, pin: string): Promise<void> {
+function startFixture(email: string, password: string): Promise<void> {
   const tsx = join(appRoot, "..", "..", "node_modules", ".bin", "tsx");
   server = spawn(tsx, [join(here, "server.ts")], {
     stdio: "inherit",
-    env: { ...process.env, NATIVE_FIXTURE_REF: ref, NATIVE_FIXTURE_PIN: pin, NATIVE_FIXTURE_PORT: FIXTURE_PORT }
+    env: { ...process.env, NATIVE_FIXTURE_EMAIL: email, NATIVE_FIXTURE_PASSWORD: password, NATIVE_FIXTURE_PORT: FIXTURE_PORT }
   });
   // Wait for the loopback health endpoint before installing/running.
   return new Promise((resolvePromise, reject) => {
@@ -124,12 +124,13 @@ async function main(): Promise<void> {
   mkdirSync(EVIDENCE, { recursive: true });
 
   // Ephemeral fixture-only login (R18): generated here, given only to the fixture server and
-  // Maestro's `-e` params, never persisted or committed.
-  const ref = `native-fixture-${randomBytes(4).toString("hex")}`;
-  const pin = String(1000 + (randomBytes(2).readUInt16BE(0) % 9000));
-  console.log(`[native] fixture login ref=${ref} (pin withheld)`);
+  // Maestro's `-e` params, never persisted or committed. `.invalid` is RFC 2606 reserved, so the
+  // address cannot resolve even if it escaped this process.
+  const email = `native-fixture-${randomBytes(4).toString("hex")}@fixture.invalid`;
+  const password = randomBytes(18).toString("base64url");
+  console.log(`[native] fixture login ${email} (password withheld)`);
 
-  await startFixture(ref, pin);
+  await startFixture(email, password);
 
   // Emulator reaches the host fixture via 10.0.2.2; nothing else is needed for host loopback.
   console.log(`[native] installing ${APK}`);
@@ -145,8 +146,8 @@ async function main(): Promise<void> {
     [
       "--device", device,
       "test", FLOWS,
-      "-e", `LEARNER_REF=${ref}`,
-      "-e", `PIN=${pin}`,
+      "-e", `LEARNER_EMAIL=${email}`,
+      "-e", `LEARNER_PASSWORD=${password}`,
       "-e", `GUARDIAN_CHALLENGE_ID=${NATIVE_CHALLENGE_ID}`,
       "-e", `SUMMIT_CHALLENGE_ID=${NATIVE_SUMMIT_CHALLENGE_ID}`,
       "--format", "junit",

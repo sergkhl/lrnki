@@ -18,9 +18,10 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Integrate Self-Hosted Better Auth
 
-**Status:** In progress on `feat/better-auth`. **U1 (server + schema) and U2 (client) are
-complete**; U3–U4 remain. Next action: open U3, the rigs — the last thing standing between here
-and a green `pnpm check`, whose final `e2e:web` stage is the only one still failing.
+**Status:** In progress on `feat/better-auth`. **U1 (server + schema), U2 (client) and U3 (rigs)
+are complete** and `pnpm check` is green. Only U4 remains — the deployment cutover and the rule-14
+real-use gate — and it cannot start until the user-owned credentials in
+[BLOCKERS](./BLOCKERS.md) exist. One carried item is in `Open findings`.
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
@@ -269,11 +270,10 @@ contract around `authClient` calls, the `profileComplete` routing decision, and 
 callback shape per platform. Verified live against a local API (email/password path end-to-end;
 Google against the deployed API once U4's credentials exist).
 
-### U3 — rigs
+### U3 — rigs — **done**
 
 The rewrite inventory in the target design: Playwright e2e, realuse rig + server, native fixture +
-Maestro flows, `cleanupReservedLearners`. Gate: web e2e suite green; realuse preflight green
-locally; native flows green on the e2e APK against the loopback fixture.
+Maestro flows, `cleanupReservedLearners`. Its gate is in the Validation Log.
 
 ### U4 — deployment cutover and real-use gate (rule 14)
 
@@ -383,18 +383,48 @@ U3's and still fails.
 
 **Hands off.** U3 (rigs), which owns the last failing `pnpm check` stage.
 
+### U3 — rigs (2026-08-08, branch `feat/better-auth`)
+
+**Proved.** Every rig authenticates through Better Auth's email + password route and none drives
+Google. `pnpm check` is green again end to end, its last stage included: the intercepted web suite
+passes over the real Expo export with `/auth/get-session` and the credential routes mocked, every
+token-seeding helper deleted, and "signed in" expressed only by what the session read returns. The
+reserved real-use identity moved from the learner ref to the sign-up **email**, so teardown still
+derives from the run id alone even though `user.id` is Better Auth's to choose and two of the three
+learners register inside the browser. The real-backend gate is green on both projects over real
+Postgres — stale-cookie recovery, a refused Enter, sign-up, one graded selection, persistence —
+and its teardown removed exactly the run's three learners, which is the only proof that
+email-resolution finds a browser sign-up. The native fixture answers Better Auth's own shapes and
+`Set-Cookie` while the flow drives the real gate, the real `authClient`, and the real SecureStore
+mirror — its auth contract is proved at the wire, not on a device (see `Open findings`).
+
+**Invariants a later unit or re-run must not break.**
+
+- **A rig's web build and its API must share a HOST, differing only in port.** Cookies are scoped
+  by host and ignore port, so that is same-site (the cookie rides the request) yet cross-origin
+  (the credentialed CORS path stays under test). `localhost` on one side and `127.0.0.1` on the
+  other is cross-site: the cookie is never sent and every journey fails signed out with no CORS
+  error naming the cause. Now owned by [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md)
+  beside the production subdomain constraint, because it is the same rule.
+- **A credentialed response may never carry `Access-Control-Allow-Origin: *`** — the browser
+  rejects it outright. The intercepted mock echoes the caller's exact origin and allows
+  credentials, matching the real API. Verified by mutation: the wildcard fails AE1.
+- **`cleanupReservedLearners` resolves by `user.email`, never by id.** Its test seeds an opaque
+  generated id carrying the reserved address, so a regression to id-matching fails by name rather
+  than silently deleting nothing. Verified by mutation.
+- **The realuse rig mints a per-run `BETTER_AUTH_SECRET` and points `BETTER_AUTH_URL` at its own
+  loopback base.** The deployment key never reaches a test process, and that base URL's scheme is
+  what drops the cookie's `Secure` flag — the https default would mint a cookie no http rig can
+  store. This is also why the gate does not wait on BLOCKERS.
+- **A local `lrnki` database that predates U1 cannot serve any of this** and fails with
+  `relation "user" does not exist`. Rule 9 reset, then reseed; the reset drops the catalog, which
+  the realuse gate needs and never generates.
+
+**Hands off.** U4 — deployment cutover and the rule-14 gate, blocked only on BLOCKERS.
+
 ### Open findings
 
-- **U3 must stop choosing the realuse learner ref.** The rig reserves refs shaped
-  `realuse-<role>-<runId>` and cleans up by that shape, but `learnerRef` is now a Better Auth
-  generated `user.id`, so a real sign-up can never produce one. `cleanupReservedLearners` still
-  validates the shape and `seedLearner` can still mint it, so the DB suite is honest; the *rig* is
-  what breaks. Give the reserved shape to the sign-up **email** instead and resolve the id from the
-  sign-up response, keeping the "no pattern deletes" guarantee.
-- **Every rig origin must be a trusted origin, or its writes 403 rather than 401.** Better Auth
-  CSRF-checks cookie-bearing writes against `trustedOrigins`, and a request with no `Origin` at all
-  is refused with `MISSING_OR_NULL_ORIGIN` — a browser always sends one, a scripted client does not.
-  `learnerWebOrigins()` currently lists the deployed origin plus `localhost:8881` and
-  `localhost:3000`; U3 must confirm the Playwright, realuse, and native fixture origins are among
-  them (the native leg is covered by the server `expo()` plugin, which rewrites the origin from the
-  `expo-origin` header).
+- **The native flows have not run on a device since the cutover.** The rig code is done and its
+  fixture's auth contract is proved at the wire, but the checked-out e2e APK predates U1/U2 (it
+  still carries the PIN gate), so the flows were never executed against a real build. Needs
+  `scripts/build-learner-android.sh e2e`, a booted emulator, then `pnpm e2e:native:maestro`.

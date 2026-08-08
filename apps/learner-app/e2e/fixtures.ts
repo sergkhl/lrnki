@@ -4,10 +4,10 @@ import { test as base, expect, type Page, type Route } from "@playwright/test";
 // 2026-07-14-001 U5, KTD8). The export is baked against the sentinel origin below; every call
 // to it is fulfilled here, so a scenario controls exactly which of the pending/error/data
 // branches each route sees. Response SHAPES mirror the learner-api projections (journal rows,
-// candidate cards, session/me identity) so the real bundle renders as it would in production.
+// candidate cards, Better Auth session payloads) so the real bundle renders as it would in
+// production.
 
 export const API_ORIGIN = process.env.E2E_API_ORIGIN ?? "http://127.0.0.1:8788";
-export const TOKEN_KEY = "lrnki_learner_token";
 
 export type Reply = { status: number; body: unknown };
 export const ok = (body: unknown): Reply => ({ status: 200, body });
@@ -26,9 +26,47 @@ export type MockState = {
 
 // ---- Fixture data -----------------------------------------------------------------------
 
-export const identity = { learnerStateRef: "gate-explorer", displayName: "Gate Explorer" };
+// The signed-in learner as Better Auth reports them (ADR-0041). `id` IS the learner ref every
+// learner-state row is keyed by, so it stays `gate-explorer` — scenarios build per-learner
+// localStorage keys (the Guardian arrival gate) out of it.
+export const sessionUser = {
+  id: "gate-explorer",
+  name: "Gate Explorer",
+  email: "gate-explorer@e2e.invalid",
+  emailVerified: false,
+  image: null,
+  profileComplete: true,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z"
+};
 
-export const sessionSuccess = { token: "e2e-session-token", ...identity };
+// `GET /auth/get-session` answers with this envelope, or with `null` for "no live session" —
+// the 200-with-null that lets the app separate signed-out from a read that did not complete.
+export const sessionPayload = {
+  session: {
+    id: "e2e-session",
+    userId: sessionUser.id,
+    token: "e2e-session-token",
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    createdAt: sessionUser.createdAt,
+    updatedAt: sessionUser.updatedAt
+  },
+  user: sessionUser
+};
+
+// What the credential routes return on success. The app seeds `me` straight from `user` here,
+// which is why a successful sign-up needs no second session round-trip (KTD1).
+export const credentialSuccess = { token: sessionPayload.session.token, user: sessionUser };
+
+// Better Auth reports refusals as a stable `code` plus an HTTP status; `sessionError` in
+// `lib/session.ts` maps codes, never messages, so these are the codes it actually branches on.
+export const invalidCredentials = { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" };
+
+// Handler sets for the two session states, spread into a scenario's `handlers` map. Signed-in is
+// a mock answer rather than a seeded credential: the browser cannot hold or read the HttpOnly
+// cookie, so what the session read returns IS the whole of "am I signed in".
+export const signedIn = (): MockState["handlers"] => ({ "GET /auth/get-session": () => ok(sessionPayload) });
+export const signedOut = (): MockState["handlers"] => ({ "GET /auth/get-session": () => ok(null) });
 
 export const journalPopulated = {
   started: [
@@ -99,11 +137,18 @@ export function failThenSucceed(failures: number, success: Reply, failure: Reply
   return () => (seen++ < failures ? failure : success);
 }
 
-const CORS_HEADERS = {
-  "access-control-allow-origin": "*",
+// Every learner request is credentialed now (`credentials: "include"`, ADR-0041), and the browser
+// rejects a credentialed response whose `Access-Control-Allow-Origin` is `*` — the mock must echo
+// the caller's exact origin and allow credentials, which is precisely the contract the real
+// learner-api CORS implements. Getting this wrong fails as an opaque network error rather than an
+// assertion, so it is derived per request instead of being a constant.
+const corsHeaders = (origin: string | undefined): Record<string, string> => ({
+  "access-control-allow-origin": origin ?? API_ORIGIN,
+  "access-control-allow-credentials": "true",
   "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
-  "access-control-allow-headers": "authorization,content-type"
-};
+  "access-control-allow-headers": "content-type",
+  vary: "origin"
+});
 
 async function installMock(page: Page, state: MockState): Promise<void> {
   await page.route(
@@ -111,18 +156,19 @@ async function installMock(page: Page, state: MockState): Promise<void> {
     async (route: Route) => {
       const request = route.request();
       const method = request.method();
-      // Web and API live on different origins (Pages ↔ VPS in production), so an authenticated
+      const headers = corsHeaders(request.headers()["origin"]);
+      // Web and API live on different origins (Pages ↔ VPS in production), so a credentialed
       // GET or a JSON POST is a non-simple CORS request and the browser preflights it. Answer
       // the preflight here or the real request never fires.
       if (method === "OPTIONS") {
-        await route.fulfill({ status: 204, headers: CORS_HEADERS, body: "" });
+        await route.fulfill({ status: 204, headers, body: "" });
         return;
       }
       const pathname = new URL(request.url()).pathname;
       const key = matchKey(method, pathname, state.handlers);
       if (!key) {
         state.unmatched.push(`${method} ${pathname}`);
-        await route.fulfill({ status: 500, headers: CORS_HEADERS, contentType: "application/json", body: JSON.stringify({ error: "unmocked" }) });
+        await route.fulfill({ status: 500, headers, contentType: "application/json", body: JSON.stringify({ error: "unmocked" }) });
         return;
       }
       let postData: unknown = undefined;
@@ -135,7 +181,7 @@ async function installMock(page: Page, state: MockState): Promise<void> {
       await route.fulfill({
         status: reply.status,
         contentType: "application/json",
-        headers: CORS_HEADERS,
+        headers,
         body: JSON.stringify(reply.body)
       });
     }
@@ -156,20 +202,11 @@ function matchKey(method: string, pathname: string, handlers: MockState["handler
   return undefined;
 }
 
-// Seed a stored token before the app boots, so scenarios can start signed-in or with a stale
-// credential. Runs as an init script (before any app JS), which is where the token mirror reads.
-export async function seedToken(page: Page, token: string | null): Promise<void> {
-  await page.addInitScript(
-    ([key, value]) => {
-      if (value === null) window.localStorage.removeItem(key);
-      else window.localStorage.setItem(key, value);
-    },
-    [TOKEN_KEY, token] as const
-  );
-}
-
-export async function readStoredToken(page: Page): Promise<string | null> {
-  return page.evaluate((key) => window.localStorage.getItem(key), TOKEN_KEY);
+// Every key the page can read. The web session is an HttpOnly cookie the app never mirrors
+// (ADR-0041), so there is no credential to seed and nothing to read back: scenarios assert on the
+// ABSENCE of one here, and "signed in" is expressed entirely by what the session read returns.
+export async function readableStorageKeys(page: Page): Promise<string[]> {
+  return page.evaluate(() => Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? ""));
 }
 
 // ---- Test fixture: mock + console-error guard -------------------------------------------

@@ -6,7 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
 // the bundle, starts the API + static server, runs preflight, and cleans up. So this config has NO
 // `webServer` block and assumes the server is already up at REALUSE_WEB_PORT.
 //
-// Tracing is OFF on purpose (R13): a Playwright trace captures the bearer Authorization header.
+// Tracing is OFF on purpose (R13): a Playwright trace captures request headers, which now carry
+// the session cookie.
 const PORT = Number(process.env.REALUSE_WEB_PORT ?? 8091);
 
 export default defineConfig({
@@ -21,8 +22,9 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
-    // `localhost` (not 127.0.0.1) so the browser Origin matches the API CORS allowlist exactly.
-    baseURL: `http://localhost:${PORT}`,
+    // `127.0.0.1` (not `localhost`) so the browser shares a HOST with the API and the session
+    // cookie is same-site; `run.ts` owns that constraint and derives the CORS allowlist from it.
+    baseURL: `http://127.0.0.1:${PORT}`,
     trace: "off",
     screenshot: "only-on-failure"
   },

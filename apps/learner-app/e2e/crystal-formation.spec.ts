@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { test, expect, identity, ok, seedToken } from "./fixtures";
+import { test, expect, ok, signedIn } from "./fixtures";
 import {
   FORMATION_ENRICHMENT_ID,
   formationExpedition,
@@ -65,7 +65,7 @@ async function seedVistaNavigationMemory(page: Page) {
 function installFormation(mock: { handlers: Record<string, unknown> }) {
   let phase: "collecting" | "collected" = "collecting";
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationExpedition(phase)),
     "POST /study/option-select": ({ postData }: { postData: unknown }) => {
       phase = "collected";
@@ -75,7 +75,6 @@ function installFormation(mock: { handlers: Record<string, unknown> }) {
 }
 
 test("compact surfaces speak exact honest progress with no miniature specimens (AE1)", async ({ page, mock }) => {
-  await seedToken(page, "valid-token");
   installFormation(mock as never);
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
 
@@ -89,7 +88,6 @@ test("compact surfaces speak exact honest progress with no miniature specimens (
 });
 
 test("mastering the final activity collects the new specimen into its shared Leg scene (AE2)", async ({ page, mock }) => {
-  await seedToken(page, "valid-token");
   installFormation(mock as never);
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
   await page.screenshot({ path: shot("trail-before", test.info().project.name), fullPage: true });
@@ -112,9 +110,8 @@ test("mastering the final activity collects the new specimen into its shared Leg
 });
 
 test("a directly reopened mastered capstone renders the settled scene without replaying entry (AE2)", async ({ page, mock }) => {
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationExpedition("collected"))
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -131,7 +128,6 @@ test("a directly reopened mastered capstone renders the settled scene without re
 
 test("reduced motion renders the final collected scene immediately with equivalent copy (AE9)", async ({ page, mock }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await seedToken(page, "valid-token");
   installFormation(mock as never);
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
 
@@ -150,10 +146,9 @@ test("Crystal Vista layers a dismissible memory sheet above the full-screen form
   if (test.info().project.name === "phone") {
     await page.setViewportSize({ width: 390, height: 844 });
   }
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition())
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -205,10 +200,9 @@ test("Crystal Vista layers a dismissible memory sheet above the full-screen form
 });
 
 test("explicit Vista focus opens once and closing consumes route intent (AE10)", async ({ page, mock }) => {
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition())
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}?vista=1&formationFocus=leg:2`);
@@ -222,9 +216,8 @@ test("explicit Vista focus opens once and closing consumes route intent (AE10)",
 
 test("final Guardian feedback hands a first Leg win into the refetched binding reward", async ({ page, mock }) => {
   const challengeId = "guardian-first-ready-leg";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
     "GET /expedition/*": () => ok(guardianLegRewardExpedition(challengeId))
@@ -246,9 +239,8 @@ test("final Guardian feedback hands a first Leg win into the refetched binding r
 
 test("a Guardian rematch keeps the formation settled and uses endurance copy", async ({ page, mock }) => {
   const challengeId = "guardian-ready-leg-rematch";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
     "GET /expedition/*": () => ok(guardianLegRewardExpedition("guardian-original-first-win"))
@@ -268,9 +260,8 @@ test("a rematch entered from the trail leaves both reward actions immediately us
   // query cache, which used to classify the reward from the STALE session, deadlocking the
   // settle-timer gating when the controller's refetch flipped the preview back to loading.
   const challengeId = "guardian-rematch-cached";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(guardianLegRewardExpedition("guardian-original-first-win")),
     "POST /challenge/create": () => ok({ created: true, view: guardianChallenge(challengeId) }),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
@@ -291,9 +282,8 @@ test("a rematch entered from the trail leaves both reward actions immediately us
 
 test("the first Expedition Guardian win seats the summit keystone", async ({ page, mock }) => {
   const challengeId = "guardian-first-summit";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId, "enrichment") }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId, "enrichment")),
     "GET /expedition/*": () => ok(guardianSummitRewardExpedition(challengeId))
@@ -309,9 +299,8 @@ test("the first Expedition Guardian win seats the summit keystone", async ({ pag
 
 test("reward preview failure preserves committed victory, Retry, and plain Continue", async ({ page, mock }) => {
   const challengeId = "guardian-preview-failure";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
     "GET /expedition/*": () => ({ status: 500, body: { error: "preview_failed" } })
@@ -328,10 +317,9 @@ test("reward preview failure preserves committed victory, Retry, and plain Conti
 // —— U6: complete production-web exercise (plan 2026-07-15-002) ——————————————————————
 
 test("a Guardian-ready Leg announces the engaged fight honestly (R7)", async ({ page, mock }) => {
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition("active"))
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -341,10 +329,9 @@ test("a Guardian-ready Leg announces the engaged fight honestly (R7)", async ({ 
 });
 
 test("a complete Leg with zero eligible items shows the honest unavailable copy (R7)", async ({ page, mock }) => {
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition("unavailable"))
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -355,9 +342,8 @@ test("a complete Leg with zero eligible items shows the honest unavailable copy 
 
 test("a summit rematch keeps the keystone seated with endurance copy (AE8)", async ({ page, mock }) => {
   const challengeId = "guardian-summit-rematch";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId, "enrichment") }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId, "enrichment")),
     "GET /expedition/*": () => ok(guardianSummitRewardExpedition("summit-original-first-win"))
@@ -379,9 +365,8 @@ test("reduced motion binds the first Leg statically with immediate actions (AE9)
     await page.setViewportSize({ width: 320, height: 568 });
   }
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId) }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId)),
     "GET /expedition/*": () => ok(guardianLegRewardExpedition(challengeId))
@@ -405,9 +390,8 @@ test("reduced motion binds the first Leg statically with immediate actions (AE9)
 test("reduced motion seats the summit keystone immediately with equivalent copy (AE9)", async ({ page, mock }) => {
   const challengeId = "guardian-first-summit";
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: guardianChallenge(challengeId, "enrichment") }),
     "POST /challenge/answer": () => ok(guardianAnswerReply(challengeId, "enrichment")),
     "GET /expedition/*": () => ok(guardianSummitRewardExpedition(challengeId))
@@ -425,10 +409,9 @@ test("reduced motion seats the summit keystone immediately with equivalent copy 
 
 test("reduced motion contextualizes an unseen bound Leg with static emphasis and copy (AE9)", async ({ page, mock }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition())
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -445,10 +428,9 @@ test("reduced motion contextualizes an unseen bound Leg with static emphasis and
 // redesign shipped a 320 px overflow defect that only final review caught.
 test("the cavern never overflows horizontally at 320 px", async ({ page, mock }) => {
   await page.setViewportSize({ width: 320, height: 640 });
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition())
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -477,10 +459,9 @@ test("the cavern never overflows horizontally at 320 px", async ({ page, mock })
 
 test("the warm formation remains contained and legible at 200% page zoom", async ({ page, mock }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await seedToken(page, "valid-token");
   await seedVistaNavigationMemory(page);
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /expedition/*": () => ok(formationVistaExpedition())
   };
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
@@ -564,9 +545,8 @@ function currentWardQuestion(page: Page): Promise<string | null> {
 test("a Guardian answer reveal keeps every option in its submitted position", async ({ page, mock }) => {
   const challengeId = "guardian-stable-answer-order";
   const fight = guardianFight({ challengeId, wardTotal: 2 });
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: fight.view() }),
     "POST /challenge/answer": ({ postData }) => ok(fight.answer(postData))
   };
@@ -585,9 +565,8 @@ test("a Guardian answer reveal keeps every option in its submitted position", as
 test("a five-ward Leg Guardian is one unchanged body from the base ward to the crown", async ({ page, mock }) => {
   const challengeId = "guardian-five-ward-leg";
   const fight = guardianFight({ challengeId, wardTotal: 5 });
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: fight.view() }),
     "POST /challenge/answer": ({ postData }) => ok(fight.answer(postData)),
     "GET /expedition/*": () => ok(guardianLegRewardExpedition(challengeId))
@@ -628,9 +607,8 @@ test("a five-ward Leg Guardian is one unchanged body from the base ward to the c
 test("a spent shield drops the Guardian into Last Stand without moving a ward", async ({ page, mock }) => {
   const challengeId = "guardian-last-stand";
   const fight = guardianFight({ challengeId, wardTotal: 5 });
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () => ok({ view: fight.view() }),
     "POST /challenge/answer": ({ postData }) => ok(fight.answer(postData))
   };
@@ -665,9 +643,8 @@ test("a spent shield drops the Guardian into Last Stand without moving a ward", 
 test("the seven-ward Expedition Guardian contains itself and its answers at 320 px", async ({ page, mock }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   const challengeId = "guardian-seven-ward-summit";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () =>
       ok({
         view: guardianChallenge(challengeId, "enrichment", {
@@ -715,9 +692,8 @@ test("the seven-ward Expedition Guardian contains itself and its answers at 320 
 test("the Guardian stage stays contained at 200% page zoom", async ({ page, mock }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   const challengeId = "guardian-zoom200";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () =>
       ok({ view: guardianChallenge(challengeId, "section", { wardTotal: 5, unresolvedItemCount: 3, missBufferTotal: 3 }) })
   };
@@ -733,9 +709,8 @@ test("the Guardian stage stays contained at 200% page zoom", async ({ page, mock
 test("reduced motion renders the Final Ward under Last Stand as one static body", async ({ page, mock }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const challengeId = "guardian-reduced-motion";
-  await seedToken(page, "valid-token");
   mock.handlers = {
-    "GET /me": () => ok(identity),
+    ...signedIn(),
     "GET /challenge/*": () =>
       ok({
         view: guardianChallenge(challengeId, "section", {

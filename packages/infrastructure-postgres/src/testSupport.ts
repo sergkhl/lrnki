@@ -17,10 +17,13 @@ import type { Sql } from "postgres";
 // identity themselves. Per-file (node runs each test file in its own process).
 const trackedLearnerRefs = new Set<string>();
 
-export async function seedLearner(sql: Sql, learnerRef: string): Promise<string> {
+// `email` is separable from the ref because the real-use gate's reserved identity lives on the
+// EMAIL, not the id (a Better Auth id is generated and cannot be chosen); a store-level test that
+// only needs an identity row still gets a derived default.
+export async function seedLearner(sql: Sql, learnerRef: string, email?: string): Promise<string> {
   await sql`
     INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
-    VALUES (${learnerRef}, ${learnerRef}, ${`${learnerRef}@test.invalid`}, false, now(), now())
+    VALUES (${learnerRef}, ${learnerRef}, ${email ?? `${learnerRef}@test.invalid`}, false, now(), now())
     ON CONFLICT (id) DO NOTHING`;
   trackedLearnerRefs.add(learnerRef);
   return learnerRef;
@@ -73,58 +76,72 @@ export async function cleanupTrackedLearners(databaseUrl: string | undefined): P
 // Durable real-use web gate cleanup (plan 2026-07-15-001 U1, R8-R9). The opt-in real-backend
 // runner creates exactly three disposable, run-unique learners — one per role — and this is the
 // ONLY teardown authority it uses. It replaces the deleted `cleanup-learner.sh` LIKE-pattern
-// script: no prefix or wildcard delete can ever be expressed here. Every accepted ref must match
-// the reserved shape `realuse-<role>-<runId>` exactly, so an arbitrary or attacker-supplied name
-// (including a SQL-wildcard-shaped value like `realuse-phone-%`) is rejected BEFORE any SQL runs.
+// script: no prefix or wildcard delete can ever be expressed here. Every accepted address must
+// match the reserved shape `realuse-<role>-<runId>@realuse.invalid` exactly, so an arbitrary or
+// attacker-supplied value (including a SQL-wildcard-shaped one like `realuse-phone-%@…`) is
+// rejected BEFORE any SQL runs.
+//
+// The reserved shape is on the EMAIL, not the learner ref, because the ref is now Better Auth's
+// generated `user.id` (ADR-0041) and nothing outside the library may choose it. The email is the
+// one identity field a sign-up DOES choose, so it carries the run's ownership claim — and it is
+// what makes teardown derivable from the run id alone, including for the two learners that sign
+// up inside the browser and whose ids the runner never sees.
 // ---------------------------------------------------------------------------
 
 export const REALUSE_ROLES = ["probe", "phone", "desktop"] as const;
 export type RealuseRole = (typeof REALUSE_ROLES)[number];
 
-// A run id is domain-neutral and format-locked to lowercase alphanumerics so it can never carry a
-// wildcard (`%`/`_`), separator, or SQL metacharacter into a reserved name.
-const RUN_ID_RE = /^[0-9a-z]{6,40}$/;
-// The full reserved-name grammar. `realuse-` prefix + one of the three fixed roles + the run id.
-const RESERVED_REF_RE = /^realuse-(probe|phone|desktop)-[0-9a-z]{6,40}$/;
+// RFC 2606 reserves `.invalid`, so a reserved address can never resolve or be delivered to — the
+// gate needs no mailbox (email verification is deliberately off, ADR-0041).
+const REALUSE_EMAIL_DOMAIN = "realuse.invalid";
 
-// The three exact learner refs a given run owns. Shared by the runner (to create/select) and by
-// `--cleanup-run=<id>` (to derive teardown scope from the run id alone). Throws on a malformed id.
-export function reservedLearnerRefs(runId: string): Record<RealuseRole, string> {
+// A run id is domain-neutral and format-locked to lowercase alphanumerics so it can never carry a
+// wildcard (`%`/`_`), separator, or SQL metacharacter into a reserved address.
+const RUN_ID_RE = /^[0-9a-z]{6,40}$/;
+// The full reserved-address grammar: `realuse-` + one of the three fixed roles + the run id, at
+// the reserved domain. Anchored, so nothing may precede or follow it.
+const RESERVED_EMAIL_RE = /^realuse-(probe|phone|desktop)-[0-9a-z]{6,40}@realuse\.invalid$/;
+
+// The three exact sign-up addresses a given run owns. Shared by the runner (to register each
+// role) and by `--cleanup-run=<id>` (to derive teardown scope from the run id alone). Throws on a
+// malformed id.
+export function reservedLearnerEmails(runId: string): Record<RealuseRole, string> {
   if (!RUN_ID_RE.test(runId)) {
     throw new Error(`Invalid real-use run id ${JSON.stringify(runId)}; expected /^[0-9a-z]{6,40}$/.`);
   }
   return {
-    probe: `realuse-probe-${runId}`,
-    phone: `realuse-phone-${runId}`,
-    desktop: `realuse-desktop-${runId}`
+    probe: `realuse-probe-${runId}@${REALUSE_EMAIL_DOMAIN}`,
+    phone: `realuse-phone-${runId}@${REALUSE_EMAIL_DOMAIN}`,
+    desktop: `realuse-desktop-${runId}@${REALUSE_EMAIL_DOMAIN}`
   };
 }
 
-// Delete exactly the named reserved learners and everything they own, each in its own transaction
-// so a partial FK sequence can be retried safely (R9). Validates the whole list up front — empty,
-// duplicate, malformed, non-reserved, or wildcard-shaped input throws before a single row is
-// touched — then resolves each ref by equality (never a pattern) and skips refs with no learner
-// row. Returns the refs that actually existed and were removed. Opens no client of its own; the
-// caller (runner `finally`, or the DB integration test) owns the `Sql` lifetime.
-export async function cleanupReservedLearners(sql: Sql, refs: readonly string[]): Promise<string[]> {
-  if (refs.length === 0) throw new Error("cleanupReservedLearners: no learner refs supplied.");
+// Delete exactly the learners behind the named reserved addresses and everything they own, each
+// in its own transaction so a partial FK sequence can be retried safely (R9). Validates the whole
+// list up front — empty, duplicate, malformed, non-reserved, or wildcard-shaped input throws
+// before a single row is touched — then resolves each address by equality (never a pattern) to
+// the generated id it belongs to, and skips addresses with no learner row. Returns the addresses
+// that actually existed and were removed. Opens no client of its own; the caller (runner
+// `finally`, or the DB integration test) owns the `Sql` lifetime.
+export async function cleanupReservedLearners(sql: Sql, emails: readonly string[]): Promise<string[]> {
+  if (emails.length === 0) throw new Error("cleanupReservedLearners: no learner emails supplied.");
   const seen = new Set<string>();
-  for (const ref of refs) {
-    if (!RESERVED_REF_RE.test(ref)) {
-      throw new Error(`cleanupReservedLearners: refusing non-reserved learner ref ${JSON.stringify(ref)}.`);
+  for (const email of emails) {
+    if (!RESERVED_EMAIL_RE.test(email)) {
+      throw new Error(`cleanupReservedLearners: refusing non-reserved learner email ${JSON.stringify(email)}.`);
     }
-    if (seen.has(ref)) throw new Error(`cleanupReservedLearners: duplicate learner ref ${JSON.stringify(ref)}.`);
-    seen.add(ref);
+    if (seen.has(email)) throw new Error(`cleanupReservedLearners: duplicate learner email ${JSON.stringify(email)}.`);
+    seen.add(email);
   }
   const deleted: string[] = [];
-  for (const ref of seen) {
+  for (const email of seen) {
     const [existing] = await sql<{ id: string }[]>`
-      SELECT id FROM "user" WHERE id = ${ref}`;
+      SELECT id FROM "user" WHERE email = ${email}`;
     if (!existing) continue;
     // postgres types don't declare TransactionSql assignable to Sql, but the tagged-template
     // surface deleteLearner uses is identical; the cast keeps the whole delete in one transaction.
-    await sql.begin((tx) => deleteLearner(tx as unknown as Sql, ref));
-    deleted.push(ref);
+    await sql.begin((tx) => deleteLearner(tx as unknown as Sql, existing.id));
+    deleted.push(email);
   }
   return deleted;
 }

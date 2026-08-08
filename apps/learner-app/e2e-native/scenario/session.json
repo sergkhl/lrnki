@@ -1,0 +1,20 @@
+{
+  "session": {
+    "id": "native-fixture-session",
+    "userId": "native-capture",
+    "token": "native-fixture-session-token",
+    "expiresAt": "2099-01-01T00:00:00.000Z",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  },
+  "user": {
+    "id": "native-capture",
+    "name": "Native Capture",
+    "email": "native-capture@fixture.invalid",
+    "emailVerified": false,
+    "image": null,
+    "profileComplete": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  }
+}

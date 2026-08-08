@@ -17,31 +17,47 @@ import { answerGuardianSelection, applyGuardianLifecycle, guardianView } from ".
 // Session reads replay those frozen captures. The Guardian challenge is the one stateful surface,
 // because the ward states this gate exists to look at are only reachable by answering — and its
 // combat rules come from the production fold, not from this file (see `guardianFixture.ts`).
+//
+// Identity is faked at the WIRE level, not stubbed in the app: the flow drives the real sign-in
+// UI, the real `authClient`, and the real `@better-auth/expo` SecureStore mirror, and this server
+// answers with the response shapes and `Set-Cookie` a real Better Auth would. So a break in the
+// app's cookie handling still fails here; only the identity authority behind it is deterministic.
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scenario = (name: string): unknown => JSON.parse(readFileSync(join(here, "scenario", `${name}.json`), "utf8"));
 
-const ME = scenario("me");
+const SESSION = scenario("session");
 const JOURNAL = scenario("journal");
 const CATALOG = scenario("catalog");
 const EXPEDITION = scenario("expedition");
 const LEADERBOARD = scenario("leaderboard");
 
 // Ephemeral fixture login, injected by the runner (never committed to flow YAML). The server
-// accepts exactly this ref/pin on POST /session and returns an opaque token; every authed read is
-// then served regardless of token value (the fixture models one learner).
-const FIXTURE_REF = process.env.NATIVE_FIXTURE_REF ?? "native-fixture";
-const FIXTURE_PIN = process.env.NATIVE_FIXTURE_PIN ?? "0000";
+// accepts exactly this address/password on Better Auth's credential sign-in route and answers with
+// a session cookie; every authed read is then served regardless of cookie value (the fixture
+// models one pre-existing learner, whose frozen journal a fresh sign-up could not plausibly have).
+const FIXTURE_EMAIL = process.env.NATIVE_FIXTURE_EMAIL ?? "native-fixture@fixture.invalid";
+const FIXTURE_PASSWORD = process.env.NATIVE_FIXTURE_PASSWORD ?? "native-fixture-password";
 const PORT = Number(process.env.NATIVE_FIXTURE_PORT ?? 8799);
+
+// `@better-auth/expo` only persists a `Set-Cookie` whose name carries the default `better-auth`
+// prefix and a `session_token`/`session_data` suffix — anything else is dropped silently and the
+// app returns to the gate with no error to read. No `Secure` flag: the emulator reaches this over
+// cleartext http, which is also how the real API behaves when its base URL is http.
+const SESSION_COOKIE = "better-auth.session_token";
 
 const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
-  "access-control-allow-headers": "authorization,content-type"
+  "access-control-allow-headers": "content-type,cookie,expo-origin,x-skip-oauth-proxy"
 };
 
-function send(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { "content-type": "application/json", ...CORS });
+function send(res: ServerResponse, status: number, body: unknown, setCookie?: string): void {
+  res.writeHead(status, {
+    "content-type": "application/json",
+    ...CORS,
+    ...(setCookie ? { "set-cookie": setCookie } : {})
+  });
   res.end(JSON.stringify(body));
 }
 
@@ -66,15 +82,27 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Registry entry: the flow's runner-generated fixture login. Accept exactly the injected values.
-  if (method === "POST" && pathname === "/session") {
-    const body = (await readBody(req)) as { learnerStateRef?: string; pin?: string; displayName?: string } | undefined;
-    if (!body || body.pin !== FIXTURE_PIN) return send(res, 401, { error: "unauthorized" });
-    return send(res, 200, { token: "native-fixture-token", learnerStateRef: body.learnerStateRef ?? FIXTURE_REF, displayName: body.displayName ?? body.learnerStateRef ?? FIXTURE_REF });
+  // Identity: Better Auth's credential sign-in, the one route any rig drives (ADR-0041). Accept
+  // exactly the injected address/password and hand back the session cookie the Expo plugin
+  // mirrors into SecureStore. Google is never involved — no rig automates a consent screen.
+  if (method === "POST" && pathname === "/auth/sign-in/email") {
+    const body = (await readBody(req)) as { email?: string; password?: string } | undefined;
+    if (body?.email !== FIXTURE_EMAIL || body?.password !== FIXTURE_PASSWORD) {
+      return send(res, 401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" });
+    }
+    const { session, user } = SESSION as { session: { token: string }; user: unknown };
+    return send(res, 200, { redirect: false, token: session.token, user }, `${SESSION_COOKIE}=${session.token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+  }
+
+  // The session read answers 200-with-null when the app carries no cookie, which is what makes
+  // `launchApp: clearState: true` land on the sign-in gate rather than straight in the Journal.
+  // Any cookie value is then accepted: the fixture models exactly one learner.
+  if (method === "GET" && pathname === "/auth/get-session") {
+    const signedIn = (req.headers.cookie ?? "").includes(SESSION_COOKIE);
+    return send(res, 200, signedIn ? SESSION : null);
   }
 
   if (method === "GET" && pathname === "/health") return send(res, 200, { ok: true });
-  if (method === "GET" && pathname === "/me") return send(res, 200, ME);
   if (method === "GET" && pathname === "/journal") return send(res, 200, JOURNAL);
   if (method === "GET" && pathname === "/catalog") return send(res, 200, CATALOG);
   if (method === "GET" && pathname === "/leaderboard") return send(res, 200, LEADERBOARD);

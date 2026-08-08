@@ -11,23 +11,26 @@
 #      the Support Paths panel and open the dialog, but its negative control (the touch-responder
 #      regression, commit ddc0ec9) fails only intermittently on the emulator, so the touch-responder
 #      class stays PHYSICALLY owned (docs/plans/BLOCKERS.md) and is not narrowed by this flow.
-# The fixture login (${LEARNER_REF}/${PIN}) is passed via `maestro test -e`, never committed here.
+# The fixture login (${LEARNER_EMAIL}/${LEARNER_PASSWORD}) is passed via `maestro test -e`, never
+# committed here.
 # Selectors are accessibility labels and app-owned testIDs, never generated prose or coordinates.
 appId: com.globesoul.lrnki
 ---
 - launchApp:
     clearState: true
 
-# --- Registry entry with runner-generated fixture-only login (R17) ---
+# --- Sign in with the runner-generated fixture-only credential (R17). Email + password is the
+# fallback route and the only one any rig drives; Google's consent screen is never automated
+# (ADR-0041). `clearState` wipes the SecureStore cookie, so the gate is the honest start state. ---
 - assertVisible: "Choose your explorer"
 - tapOn:
-    id: "gate-name"
-- inputText: ${LEARNER_REF}
+    id: "gate-email"
+- inputText: ${LEARNER_EMAIL}
 - tapOn:
-    id: "gate-pin"
-- inputText: ${PIN}
+    id: "gate-password"
+- inputText: ${LEARNER_PASSWORD}
 - hideKeyboard
-- tapOn: "Set out"
+- tapOn: "Enter"
 - assertVisible: "Choose an expedition"
 
 # --- Open the shared long-Theory expedition through the real Explore/Catalog UI (R17) ---

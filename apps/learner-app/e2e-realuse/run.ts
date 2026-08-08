@@ -4,12 +4,12 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { createDatabaseClient } from "@lrnki/infrastructure-postgres";
-import { cleanupReservedLearners, reservedLearnerRefs } from "@lrnki/infrastructure-postgres/test-support";
+import { cleanupReservedLearners, reservedLearnerEmails } from "@lrnki/infrastructure-postgres/test-support";
 import { selectCandidate } from "./preflight";
 
 // The ONE opt-in real-backend web gate command (plan 2026-07-15-001 U2). It loads the repo `.env`
 // into its OWN process (the learner-app script uses `tsx --env-file`), owns the generated run id +
-// ephemeral PIN, prints only the safe run id, starts a supervisor-free learner-api over real
+// ephemeral password, prints only the safe run id, starts a supervisor-free learner-api over real
 // Postgres + a shared static server for the production Expo export, runs capability preflight and
 // Playwright, and — on success OR failure — deletes exactly this run's three reserved learners and
 // stops its children. No DATABASE_URL or provider secret ever reaches the browser/export/static
@@ -27,9 +27,15 @@ const distDir = resolve(appRoot, "dist-realuse");
 const API_PORT = Number(process.env.REALUSE_API_PORT ?? 8790);
 const WEB_PORT = Number(process.env.REALUSE_WEB_PORT ?? 8091);
 const API_BASE = `http://127.0.0.1:${API_PORT}`;
-// The browser Origin MUST equal the API CORS allowlist value EXACTLY (localhost != 127.0.0.1),
-// because the bearer flow is credentialed and can never widen to "*" (R5).
-const WEB_ORIGIN = `http://localhost:${WEB_PORT}`;
+// Web and API must share a HOST, differing only in port (ADR-0041). The session is a cookie now,
+// and cookies are scoped by host, not by origin: same host + different port is same-SITE, so a
+// `SameSite=Lax` session cookie rides the XHR, while the differing port keeps it cross-ORIGIN so
+// the credentialed CORS path (exact-origin echo, never "*") is still the one under test. That
+// mirrors production, where `lrnki.` and `api.lrnki.globesoul.com` share a registrable domain.
+// `localhost` here instead of `127.0.0.1` would silently make the two cross-site and the whole
+// gate would fail signed out. Both servers bind 127.0.0.1 explicitly, so this also avoids the
+// `localhost` → ::1 resolution split.
+const WEB_ORIGIN = `http://127.0.0.1:${WEB_PORT}`;
 
 // Keys never handed to any child. The base child env is the toolchain env MINUS these, so expo /
 // pnpm / tsx keep the vars they need while no secret leaks; each child then re-adds only what it
@@ -115,10 +121,10 @@ async function stopChildren(): Promise<void> {
 // Delete exactly this run's three reserved learners. Returns true on success; on failure prints the
 // exact retry command (R9) so an operator can reclaim the rows without guessing the run id.
 async function cleanupRun(runId: string): Promise<boolean> {
-  const refs = reservedLearnerRefs(runId);
+  const emails = reservedLearnerEmails(runId);
   const sql = createDatabaseClient(process.env.DATABASE_URL);
   try {
-    const deleted = await cleanupReservedLearners(sql, Object.values(refs));
+    const deleted = await cleanupReservedLearners(sql, Object.values(emails));
     console.log(`[realuse] cleanup removed ${deleted.length} learner row(s) for run ${runId}.`);
     return true;
   } catch (err) {
@@ -130,8 +136,8 @@ async function cleanupRun(runId: string): Promise<boolean> {
   }
 }
 
-async function orchestrate(runId: string, pin: string): Promise<number> {
-  const refs = reservedLearnerRefs(runId);
+async function orchestrate(runId: string, password: string, authSecret: string): Promise<number> {
+  const emails = reservedLearnerEmails(runId);
   console.log(`[realuse] run id: ${runId} (API ${API_BASE}, web ${WEB_ORIGIN})`);
 
   for (const [port, label] of [[API_PORT, "API"], [WEB_PORT, "web"]] as const) {
@@ -150,9 +156,17 @@ async function orchestrate(runId: string, pin: string): Promise<number> {
     EXPO_PUBLIC_LEARNER_API_URL: API_BASE
   });
 
-  // 2. Supervisor-free API over real Postgres — the only child that receives DATABASE_URL.
+  // 2. Supervisor-free API over real Postgres — the only child that receives DATABASE_URL, and
+  //    the only one that receives this run's signing secret. `BETTER_AUTH_URL` is the loopback
+  //    API base, which is also what makes Better Auth drop the cookie's `Secure` flag (it derives
+  //    that from the base URL's scheme), so an http rig gets a usable cookie without any override.
   spawnGroup(tsxBin, ["src/realuseServer.ts"], learnerApiRoot, {
-    ...base, DATABASE_URL: process.env.DATABASE_URL, LEARNER_API_PORT: String(API_PORT), LEARNER_WEB_ORIGIN: WEB_ORIGIN
+    ...base,
+    DATABASE_URL: process.env.DATABASE_URL,
+    LEARNER_API_PORT: String(API_PORT),
+    LEARNER_WEB_ORIGIN: WEB_ORIGIN,
+    BETTER_AUTH_URL: API_BASE,
+    BETTER_AUTH_SECRET: authSecret
   });
   await waitForHttp(`${API_BASE}/health`, "learner-api");
 
@@ -163,14 +177,21 @@ async function orchestrate(runId: string, pin: string): Promise<number> {
   await waitForHttp(`${WEB_ORIGIN}/`, "static server");
 
   // 4. Capability preflight against public routes — selects a ready enrichment or fails closed.
-  const candidate = await selectCandidate({ apiBase: API_BASE, probeRef: refs.probe, pin });
+  const candidate = await selectCandidate({ apiBase: API_BASE, probeEmail: emails.probe, password });
   console.log(`[realuse] selected enrichment ${candidate.enrichmentId} (${candidate.totalStopCount} stops).`);
 
-  // 5. Playwright — only public origins + this run's ephemeral names/PIN/selected metadata.
+  // 5. Playwright — only public origins + this run's ephemeral addresses/password/selected
+  //    metadata. `REALUSE_PASSWORD` is re-added explicitly because `secretFreeEnv` strips every
+  //    PASSWORD-shaped key: the denylist exists to keep REPO secrets out of children, and this is
+  //    a run-scoped credential deleted at teardown — the same explicit re-add DATABASE_URL gets
+  //    for the one child that needs it.
   return runPlaywright({
     ...base,
     REALUSE_RUN_ID: runId,
-    REALUSE_PIN: pin,
+    REALUSE_PASSWORD: password,
+    REALUSE_API_BASE: API_BASE,
+    REALUSE_EMAIL_PHONE: emails.phone,
+    REALUSE_EMAIL_DESKTOP: emails.desktop,
     REALUSE_WEB_PORT: String(WEB_PORT),
     REALUSE_ENRICHMENT_ID: candidate.enrichmentId,
     REALUSE_ENRICHMENT_TITLE: candidate.title,
@@ -192,13 +213,21 @@ async function main(): Promise<number> {
     throw new Error("[realuse] DATABASE_URL is required. Run via `pnpm e2e:web:realuse` so the repo .env is loaded.");
   }
   // Domain-neutral, format-locked ids held only in process memory. The run id is safe to print; the
-  // PIN is not. Both are derived here so a mid-flight failure still reaches the exact-name cleanup.
+  // password is not. Both are derived here so a mid-flight failure still reaches the exact-address
+  // cleanup, which needs the run id and nothing else.
   const runId = `${Date.now().toString(36)}${randomBytes(4).toString("hex")}`;
-  const pin = String(Math.floor(1000 + Math.random() * 9000));
+  // Comfortably over Better Auth's 8-character minimum, and random per run so no reserved account
+  // is reachable after teardown even if a row somehow survived.
+  const password = randomBytes(18).toString("base64url");
+  // A signing secret of this run's OWN, never the deployment's. The rig's sessions become
+  // unverifiable the moment it exits, and the production key is not handed to a test process —
+  // the secret's value is not behavior, so the code path under test is identical either way.
+  // It also keeps this gate runnable before the deployment secret exists (BLOCKERS).
+  const authSecret = randomBytes(32).toString("base64");
 
   let exitCode = 1;
   try {
-    exitCode = await orchestrate(runId, pin);
+    exitCode = await orchestrate(runId, password, authSecret);
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
     exitCode = 1;

@@ -38,6 +38,13 @@ to any other registrable domain makes the session cookie third-party, and Safari
 sign-in would fail for that browser only, at deploy time, with no local reproduction. Changing the
 web origin is therefore an auth change, not a hosting change.
 
+The same constraint binds every rig that serves the web build against a real API: the two must share
+a **host**, differing only in port. Cookies are scoped by host and ignore port, so same host is
+same-site (the cookie rides the request) while a differing port keeps the exchange cross-origin (the
+credentialed CORS path stays under test) — `127.0.0.1:<web>` ↔ `127.0.0.1:<api>`. Splitting them
+across `localhost` and `127.0.0.1` makes them cross-site, and every journey then fails signed out
+with no CORS error naming the cause.
+
 **`learnerRef` is Better Auth's `user.id`.** Every learner-state foreign key points at `user.id`;
 `learnerStateRef` keeps its name through the application layer but carries the opaque user id, and
 `user.name` is the single owner of the display name. A learner names their explorer once, after

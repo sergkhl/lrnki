@@ -4,13 +4,14 @@ import {
   ok,
   status,
   delay,
-  identity,
-  sessionSuccess,
+  signedIn,
+  signedOut,
+  credentialSuccess,
+  invalidCredentials,
   journalPopulated,
   catalogPopulated,
   leaderboardFixture,
-  seedToken,
-  readStoredToken
+  readableStorageKeys
 } from "./fixtures";
 
 // Durable web acceptance for the reproduced runtime defects and the shared route-state
@@ -31,48 +32,50 @@ test.afterEach(async ({ pageErrors }) => {
 });
 
 test.describe("session entry", () => {
-  // AE1: a stale token is rejected by /me, an invalid Enter fails, then Set out succeeds and the
-  // Journal renders immediately with the new token — no reload, no bounce back to the gate.
-  test("stale token, failed Enter, then successful Set out reaches the Journal (AE1)", async ({ page, mock }) => {
-    await seedToken(page, "stale-token");
+  // AE1: no live session settles to the gate, an invalid Enter fails, then Set out succeeds and
+  // the Journal renders immediately — no reload, no bounce back to the gate.
+  test("no session, failed Enter, then successful Set out reaches the Journal (AE1)", async ({ page, mock }) => {
     mock.handlers = {
-      "GET /me": () => status(401, { error: "unauthorized" }),
-      "POST /session": ({ postData }) =>
-        (postData as { intent: string }).intent === "create" ? ok(sessionSuccess) : status(401, { error: "wrong_pin" }),
+      ...signedOut(),
+      "POST /auth/sign-in/email": () => status(401, invalidCredentials),
+      "POST /auth/sign-up/email": () => ok(credentialSuccess),
       "GET /journal": () => ok(journalPopulated),
       "GET /leaderboard": () => ok(leaderboardFixture)
     };
 
     await page.goto("/");
 
-    // The stale token is validated (/me 401), cleared, and the registry gate settles as the
-    // stable signed-out state (R3).
+    // `get-session` answers 200-with-null, so the sign-in gate is the stable signed-out state —
+    // distinct from a failed read, which would offer retry instead (R3).
     await expect(page.getByText(GATE)).toBeVisible();
-    expect(await readStoredToken(page)).toBeNull();
 
-    await page.getByLabel("Explorer name").fill("gate-explorer");
-    await page.getByLabel("PIN").fill("1234");
+    await page.getByLabel("Email").fill("gate-explorer@e2e.invalid");
+    await page.getByLabel("Password").fill("not-the-password");
 
-    // A failed Enter shows its refusal but must not block a later signup (R2).
+    // A refused Enter shows its refusal but must not block a later signup (R2).
     await page.getByRole("button", { name: "Enter" }).click();
-    await expect(page.getByText(re("That PIN doesn't match"))).toBeVisible();
+    await expect(page.getByText(re("don't match an explorer"))).toBeVisible();
     await expect(page.getByText(GATE)).toBeVisible();
 
     // Set out succeeds: the returned identity seeds `me` directly, so the observer flips to the
-    // Journal with no second /me round-trip and no reload (R1, KTD1/KTD2).
+    // Journal with no session round-trip and no reload (R1, KTD1/KTD2).
+    await page.getByTestId("gate-toggle-intent").click();
+    await page.getByLabel("Explorer name").fill("Gate Explorer");
     await page.getByRole("button", { name: "Set out" }).click();
     await expect(page.getByText(JOURNAL)).toBeVisible();
     await expect(page.getByText(GATE)).toHaveCount(0);
-    expect(await readStoredToken(page)).toBe(sessionSuccess.token);
+
+    // Signed in with nothing the page can read: the session is the server's HttpOnly cookie and
+    // the app keeps no mirror of it (the retired bearer design kept one here).
+    expect(await readableStorageKeys(page)).not.toContainEqual(expect.stringMatching(/token|session|auth/i));
   });
 
   // AE2: a successful session followed by a failing Journal keeps the learner signed in and
   // offers Retry + Log out; Retry recovers without another login. The gate never returns.
   test("Journal failure after signup stays signed in with Retry and Log out (AE2)", async ({ page, mock }) => {
-    await seedToken(page, "valid-token");
     let journalCalls = 0;
     mock.handlers = {
-      "GET /me": () => ok(identity),
+      ...signedIn(),
       "GET /journal": () => (++journalCalls <= 2 ? status(500) : ok(journalPopulated)),
       "GET /leaderboard": () => ok(leaderboardFixture)
     };
@@ -155,9 +158,8 @@ test.describe("route states", () => {
 
 test.describe("web planning sheet layer", () => {
   async function openPopulatedJournal(page: import("@playwright/test").Page, mock: { handlers: Record<string, unknown> }) {
-    await seedToken(page, "valid-token");
     mock.handlers = {
-      "GET /me": () => ok(identity),
+      ...signedIn(),
       "GET /journal": () => ok(journalPopulated),
       "GET /leaderboard": () => ok(leaderboardFixture),
       "POST /expedition/start": async () => {

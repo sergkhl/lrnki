@@ -10,8 +10,15 @@ import { createLearnerApp } from "./app";
 // runs here). It owns its OWN database client (not the process-shared pool) and closes both the
 // HTTP listener and the client on SIGINT/SIGTERM so the runner can join it cleanly.
 //
-// The runner supplies an explicit minimum environment: DATABASE_URL, LEARNER_API_PORT, and
-// LEARNER_WEB_ORIGIN (the exact-match CORS origin). No LiteLLM/provider/Expo secret is inherited.
+// The runner supplies an explicit minimum environment: DATABASE_URL, LEARNER_API_PORT,
+// LEARNER_WEB_ORIGIN (the exact-match CORS origin), and Better Auth's BETTER_AUTH_URL +
+// BETTER_AUTH_SECRET. No LiteLLM/provider/Expo secret is inherited.
+//
+// `BETTER_AUTH_URL` must be this process's own loopback base (`http://127.0.0.1:<port>`) and is
+// not optional in practice: Better Auth derives the cookie's `Secure` flag from that URL's scheme,
+// so the production https default would mint a cookie no http rig can ever store — the browser
+// simply drops it and every journey fails signed out, with nothing in any log to point at it.
+// The secret is deliberately a per-run ephemeral value from the runner, never the deployment's.
 const port = Number(process.env.LEARNER_API_PORT ?? 8790);
 const sql = createDatabaseClient(); // throws if DATABASE_URL is missing — the runner guarantees it
 // Better Auth needs a client of its own; sharing `sql` would strip json serialization from every

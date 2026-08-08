@@ -75,6 +75,23 @@ expedition with a long Theory activity and available Explorable Terms) and froze
 replays them and acks non-graded writes, so session reads hold no mutable state. The emulator reaches
 the host loopback fixture through Android's `10.0.2.2` alias.
 
+Identity is faked at the **wire** level, never stubbed in the app: the flow drives the real sign-in
+UI, the real `authClient`, and the real `@better-auth/expo` SecureStore mirror, and `server.ts`
+answers Better Auth's own shapes on `/auth/sign-in/email` and `/auth/get-session`. Three constraints
+that fail silently if broken, each already paid for once:
+
+- **The `Set-Cookie` name must be `better-auth.session_token`.** The Expo plugin persists a cookie
+  only when its name carries the default `better-auth` prefix and a `session_token`/`session_data`
+  suffix. Any other name is dropped with no error and the app returns to the gate.
+- **No `Secure` flag.** The emulator reaches the fixture over cleartext http, so a `Secure` cookie is
+  never stored. The real API behaves the same way — it derives that flag from its base URL's scheme.
+- **`get-session` answers `null` when the request carries no cookie.** `launchApp: clearState: true`
+  wipes SecureStore, so a fixture that always returned a session would boot straight into the Journal
+  and the flow's first assertion — the sign-in gate — would fail for the wrong reason.
+
+The flow **signs in** rather than signing up: the fixture models one pre-existing learner, and a
+freshly created account could not plausibly own the frozen 12-lesson journal it then reads.
+
 `guardianFixture.ts` is the one stateful surface, because the ward states the Guardian flow exists to
 look at are only reachable by answering. It holds a five-ward lineup and an append-only event log,
 and folds them with the **production** `foldRecallChallenge` / `projectRecallChallengeView`, so queue

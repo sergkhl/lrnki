@@ -5,7 +5,7 @@ import { createDatabaseClient } from "./db";
 import {
   cleanupReservedLearners,
   deleteLearner,
-  reservedLearnerRefs,
+  reservedLearnerEmails,
   seedLearner
 } from "./testSupport";
 
@@ -49,7 +49,9 @@ maybe("deleteLearner removes every learner-owned FK family and leaves shared gra
     assert.ok(triple, "needs at least one ready enrichment with a study item (the real-use precondition)");
     const { study_item_id, enrichment_id, derived_node_id } = triple;
 
-    const ref = `realuse-probe-${runIdChars()}`;
+    // An opaque generated id, exactly as Better Auth mints one (ADR-0041) — nothing downstream
+    // may assume a learner ref is readable or shaped.
+    const ref = randomUUID();
     seeded.add(ref);
     await seedLearner(sql, ref);
 
@@ -122,31 +124,39 @@ maybe("deleteLearner removes every learner-owned FK family and leaves shared gra
   }
 });
 
-maybe("cleanupReservedLearners removes only the exact reserved refs and preserves unrelated data", async () => {
+// Seed a learner the way a real sign-up leaves one: an OPAQUE generated id that has nothing in
+// common with the reserved shape, and the reserved address on `email`. Resolution by email is the
+// only thing that can find these, so a regression back to id-matching fails here rather than
+// silently deleting nothing.
+async function seedReserved(sql: ReturnType<typeof createDatabaseClient>, email: string): Promise<string> {
+  const generatedId = randomUUID();
+  seeded.add(generatedId);
+  await seedLearner(sql, generatedId, email);
+  return generatedId;
+}
+
+maybe("cleanupReservedLearners removes only the exact reserved addresses and preserves unrelated data", async () => {
   const sql = createDatabaseClient(databaseUrl);
   try {
     const runId = runIdChars();
-    const refs = reservedLearnerRefs(runId);
-    for (const ref of Object.values(refs)) {
-      seeded.add(ref);
-      await seedLearner(sql, ref);
-    }
-    const unrelated = `realuse-probe-${runIdChars()}`; // reserved-shaped but a DIFFERENT run
-    seeded.add(unrelated);
-    await seedLearner(sql, unrelated);
+    const emails = reservedLearnerEmails(runId);
+    const ids: string[] = [];
+    for (const email of Object.values(emails)) ids.push(await seedReserved(sql, email));
+    const unrelatedEmail = reservedLearnerEmails(runIdChars()).probe; // reserved-shaped, DIFFERENT run
+    const unrelatedId = await seedReserved(sql, unrelatedEmail);
     // Snapshot identities, not a global count: other test files legitimately create shared
     // enrichments concurrently under Node's test runner.
     const enrichmentsBefore = await sql<{ enrichment_id: string }[]>`SELECT enrichment_id FROM graph_enrichments`;
 
-    const deleted = await cleanupReservedLearners(sql, [refs.probe, refs.phone, refs.desktop]);
-    assert.deepEqual(deleted.sort(), [refs.desktop, refs.phone, refs.probe].sort());
+    const deleted = await cleanupReservedLearners(sql, [emails.probe, emails.phone, emails.desktop]);
+    assert.deepEqual(deleted.sort(), [emails.desktop, emails.phone, emails.probe].sort());
 
-    for (const ref of Object.values(refs)) {
-      const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${ref}`;
-      assert.equal(n, 0);
-      seeded.delete(ref);
+    for (const id of ids) {
+      const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${id}`;
+      assert.equal(n, 0, "the generated id behind a reserved address is gone");
+      seeded.delete(id);
     }
-    const [{ n: unrel }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${unrelated}`;
+    const [{ n: unrel }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${unrelatedId}`;
     assert.equal(unrel, 1, "an unrelated (different-run) reserved learner is NOT deleted");
     if (enrichmentsBefore.length > 0) {
       const [{ n: preserved }] = await sql<{ n: number }[]>`
@@ -163,22 +173,24 @@ maybe("cleanupReservedLearners rejects unsafe input before issuing any SQL", asy
   const sql = createDatabaseClient(databaseUrl);
   try {
     const runId = runIdChars();
-    const { phone } = reservedLearnerRefs(runId);
-    seeded.add(phone);
-    await seedLearner(sql, phone);
+    const { phone } = reservedLearnerEmails(runId);
+    const phoneId = await seedReserved(sql, phone);
 
-    await assert.rejects(cleanupReservedLearners(sql, []), /no learner refs/);
+    await assert.rejects(cleanupReservedLearners(sql, []), /no learner emails/);
     await assert.rejects(cleanupReservedLearners(sql, [phone, phone]), /duplicate/);
-    await assert.rejects(cleanupReservedLearners(sql, ["realuse-phone"]), /non-reserved/); // no run id
+    await assert.rejects(cleanupReservedLearners(sql, ["realuse-phone@realuse.invalid"]), /non-reserved/); // no run id
     await assert.rejects(cleanupReservedLearners(sql, ["not-reserved"]), /non-reserved/);
-    await assert.rejects(cleanupReservedLearners(sql, [`realuse-admin-${runId}`]), /non-reserved/); // role not allowed
-    await assert.rejects(cleanupReservedLearners(sql, [`realuse-phone-${runId}%`]), /non-reserved/); // wildcard-shaped
-    assert.throws(() => reservedLearnerRefs("bad-id!"), /Invalid real-use run id/);
+    await assert.rejects(cleanupReservedLearners(sql, [`realuse-admin-${runId}@realuse.invalid`]), /non-reserved/); // role not allowed
+    await assert.rejects(cleanupReservedLearners(sql, [`realuse-phone-${runId}%@realuse.invalid`]), /non-reserved/); // wildcard-shaped
+    // The reserved shape without its reserved domain is somebody's real mailbox, not this run's.
+    await assert.rejects(cleanupReservedLearners(sql, [`realuse-phone-${runId}`]), /non-reserved/);
+    await assert.rejects(cleanupReservedLearners(sql, [`realuse-phone-${runId}@example.com`]), /non-reserved/);
+    assert.throws(() => reservedLearnerEmails("bad-id!"), /Invalid real-use run id/);
 
-    // The one valid learner in a rejected mixed list was never deleted (validation precedes SQL).
-    await assert.rejects(cleanupReservedLearners(sql, [phone, "realuse-phone-%"]), /non-reserved/);
-    const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${phone}`;
-    assert.equal(n, 1, "a valid ref in a rejected batch is not touched");
+    // The one valid address in a rejected mixed list was never deleted (validation precedes SQL).
+    await assert.rejects(cleanupReservedLearners(sql, [phone, "realuse-phone-%@realuse.invalid"]), /non-reserved/);
+    const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${phoneId}`;
+    assert.equal(n, 1, "a valid address in a rejected batch is not touched");
   } finally {
     await sql.end();
   }

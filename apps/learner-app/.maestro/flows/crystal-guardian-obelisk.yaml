@@ -18,22 +18,24 @@
 # Answering rotates a missed ward to the back of the queue, which is what lets three deliberate
 # misses walk the shield 3 -> 0 into Last Stand without resolving anything.
 #
-# The fixture login (${LEARNER_REF}/${PIN}) and the challenge id (${GUARDIAN_CHALLENGE_ID}) are
-# passed by the runner via `maestro test -e`, so no id or credential is duplicated in this file.
+# The fixture login (${LEARNER_EMAIL}/${LEARNER_PASSWORD}) and the challenge id
+# (${GUARDIAN_CHALLENGE_ID}) are passed by the runner via `maestro test -e`, so no id or credential
+# is duplicated in this file.
 appId: com.globesoul.lrnki
 ---
 - launchApp:
     clearState: true
 
+# Email + password sign-in: the fallback route and the only one any rig drives (ADR-0041).
 - assertVisible: "Choose your explorer"
 - tapOn:
-    id: "gate-name"
-- inputText: ${LEARNER_REF}
+    id: "gate-email"
+- inputText: ${LEARNER_EMAIL}
 - tapOn:
-    id: "gate-pin"
-- inputText: ${PIN}
+    id: "gate-password"
+- inputText: ${LEARNER_PASSWORD}
 - hideKeyboard
-- tapOn: "Set out"
+- tapOn: "Enter"
 - assertVisible: "Choose an expedition"
 
 # Enter the fight directly. Trail-entry navigation is already owned by the web layers; what is

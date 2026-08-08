@@ -10,16 +10,17 @@
 
 ## TODO
 
-- **Better Auth integration — in progress on `feat/better-auth`, U1 and U2 done.** Plan:
+- **Better Auth integration — in progress on `feat/better-auth`, U1–U3 done.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
-  U1 at `f05c4d1` (server + schema); U2 at `d1a5caf` (client): one `authClient`, cookie sessions on
-  both platforms, sign-in gate + `profileComplete`-gated naming screen, tokenStore and
-  `LearnerNameGate` deleted. Typecheck, lint, `test:db`, `db:check` and `build` are green — the ONLY
-  failing `pnpm check` stage is its last, `e2e:web`. Next action: **U3, the rigs** (Playwright,
-  realuse, native fixture, `cleanupReservedLearners`); see the plan's `Open findings` for the
-  realuse-ref change and the trusted-origin requirement it must satisfy. The Google OAuth client +
-  `BETTER_AUTH_SECRET` are user-owned manual actions in [BLOCKERS](./BLOCKERS.md), needed only for
-  U4, and can happen in parallel.
+  U1 (server + schema) `f05c4d1`, U2 (client) `d1a5caf`, U3 (rigs) — every rig now signs in through
+  Better Auth's email + password route and none drives Google. **`pnpm check` is green again**,
+  including its last stage `e2e:web`. Next action: **U4, deployment cutover + the rule-14 real-use
+  gate**, which needs the user-owned Google OAuth client and `BETTER_AUTH_SECRET` in
+  [BLOCKERS](./BLOCKERS.md) — the only thing standing in its way. One carried item in the plan's
+  `Open findings`: the native Maestro flows are rewritten but have never run on a device, because
+  the checked-out e2e APK predates the cutover; needs an APK rebuild plus a booted emulator.
+  **Local dev DBs must be reset** — U1's schema replaced `learners`, so an un-reset `lrnki` fails
+  every DB-touching command with `relation "user" does not exist`.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
