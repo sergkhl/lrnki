@@ -18,16 +18,17 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Integrate Self-Hosted Better Auth
 
-**Status:** Ready — queued after
-[2026-08-07-001 (matching item quality)](./2026-08-07-001-fix-matching-item-quality-plan.md).
-No unit started. Next action: when the matching branch merges, branch `feat/better-auth` off `main`
-and open U1.
+**Status:** Ready, next in the execution order. No unit started. The matching work it was queued
+behind is closed and its plan deleted (outcome in [TODO](./TODO.md) `COMPLETED`, detail in git at
+`4ea7e64`). Next action: merge `fix/matching-item-quality` into `main`, then branch `feat/better-auth`
+off `main` and open U1.
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
 
-**Precondition:** `fix/matching-item-quality` merged to `main`. The shared-environment hard reset in
-U4 must not land while another branch is mid-validation against the old shared data (D9).
+**Precondition:** `fix/matching-item-quality` merged to `main` — the work is closed, the merge is the
+remaining mechanical step. The shared-environment hard reset in U4 must not land while another branch
+is mid-validation against the old shared data (D9).
 
 ## Goal capsule
 

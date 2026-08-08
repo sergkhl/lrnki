@@ -89,15 +89,15 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 
 ## Active implementation plans (execution order)
 
-- [2026-08-07-001 — Matching item quality](./2026-08-07-001-fix-matching-item-quality-plan.md) —
-  **Gated, awaiting one decision.** All four units shipped; U4's probes pass and its two VPS runs
-  removed four ambiguous items, but 1 admitted item of 26 still carries an ambiguous pair set against
-  a bar of none. Accept that tail and close, or spend a unit on judgment stability.
 - [2026-08-08-001 — Integrate self-hosted Better Auth](./2026-08-08-001-integrate-better-auth-plan.md) —
-  **Ready, queued second.** Interview-locked (D1–D9): Better Auth inside `learner-api` replaces the
-  PIN placeholder — Google primary + email/password e2e fallback, cookie sessions on both platforms,
-  `learnerRef` = `user.id`, hard reset. Precondition: the matching plan merges; then
+  **Ready, next.** Interview-locked (D1–D9): Better Auth inside `learner-api` replaces the PIN
+  placeholder — Google primary + email/password e2e fallback, cookie sessions on both platforms,
+  `learnerRef` = `user.id`, hard reset. Its precondition is met (matching is closed); branch
   `feat/better-auth` off `main`.
+
+Shaping, not yet a plan:
+[2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)
+needs a planning interview, and is gated on finding an independent home for the judge.
 
 ## Ownership rules
 
