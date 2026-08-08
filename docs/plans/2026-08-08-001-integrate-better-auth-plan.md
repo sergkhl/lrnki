@@ -19,9 +19,11 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 # Integrate Self-Hosted Better Auth
 
 **Status:** In progress on `feat/better-auth`. **U1 (server + schema), U2 (client) and U3 (rigs)
-are complete** and `pnpm check` is green. Only U4 remains — the deployment cutover and the rule-14
-real-use gate — and it cannot start until the user-owned credentials in
-[BLOCKERS](./BLOCKERS.md) exist. One carried item is in `Open findings`.
+are complete** — `pnpm check` is green and the native flows now pass on a device too, closing the
+last carried finding. Only U4 remains — the deployment cutover and the rule-14 real-use gate — and
+it cannot start until the user-owned credentials in [BLOCKERS](./BLOCKERS.md) exist. Everything U4
+needs that does *not* need those secrets is already landed: compose env block, README runbook, and
+`.env.example`.
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
@@ -396,7 +398,10 @@ Postgres — stale-cookie recovery, a refused Enter, sign-up, one graded selecti
 and its teardown removed exactly the run's three learners, which is the only proof that
 email-resolution finds a browser sign-up. The native fixture answers Better Auth's own shapes and
 `Set-Cookie` while the flow drives the real gate, the real `authClient`, and the real SecureStore
-mirror — its auth contract is proved at the wire, not on a device (see `Open findings`).
+mirror. **Proved on a device as well (2026-08-08):** both Maestro flows pass 2/2 on a freshly built
+e2e APK on `Medium_Phone_API_36.1` at 411 dp — `clearState` wipes the SecureStore cookie, so each
+run must cross the real sign-in gate before any learner read resolves, and the Guardian screenshots
+show authed fixture content painted behind it.
 
 **Invariants a later unit or re-run must not break.**
 
@@ -424,7 +429,5 @@ mirror — its auth contract is proved at the wire, not on a device (see `Open f
 
 ### Open findings
 
-- **The native flows have not run on a device since the cutover.** The rig code is done and its
-  fixture's auth contract is proved at the wire, but the checked-out e2e APK predates U1/U2 (it
-  still carries the PIN gate), so the flows were never executed against a real build. Needs
-  `scripts/build-learner-android.sh e2e`, a booted emulator, then `pnpm e2e:native:maestro`.
+None open. The device run closed the only carried item; the staleness trap that caused it now lives
+in `apps/learner-app/e2e-native/README.md`.

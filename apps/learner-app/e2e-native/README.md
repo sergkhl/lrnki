@@ -45,6 +45,14 @@ web suite. It never touches production or the real-use database.
   exists **only** in this disposable artifact; preview/production keep the Android secure default.
   The APK is gitignored and must never be uploaded or distributed.
 
+  **Rebuild it whenever app code changes.** It is gitignored, so it is never refreshed by a pull, and
+  the runner installs whatever is on disk without comparing it to the tree — a stale APK runs the
+  *old* app against the current flows and fails on selectors that the working tree already has, or
+  worse, passes on behaviour that no longer exists. This is not hypothetical: the Better Auth cutover
+  left the checked-out APK carrying the deleted PIN gate, which is why those flows went a whole
+  implementation unit without ever running. Check `ls -la` against your last app change before
+  trusting a run.
+
 ## Run
 
 ```bash

@@ -92,8 +92,9 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 - [2026-08-08-001 — Integrate self-hosted Better Auth](./2026-08-08-001-integrate-better-auth-plan.md) —
   **In progress on `feat/better-auth`; U1 (server + schema), U2 (client) and U3 (rigs) done.**
   Interview-locked (D1–D9): Google primary + email/password e2e fallback, cookie sessions on both
-  platforms, `learnerRef` = `user.id`, hard reset. `pnpm check` is green. Only U4 remains — the
-  deployment cutover and rule-14 gate — and it is blocked on the user-owned credentials in BLOCKERS.
+  platforms, `learnerRef` = `user.id`, hard reset. `pnpm check` is green and the native gate passes
+  on a device; no findings carried. Only U4 remains — the deployment cutover and rule-14 gate —
+  blocked solely on the user-owned credentials in BLOCKERS.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)
