@@ -93,6 +93,11 @@ a hygiene comment above its title, so whoever opens one to append sees them with
   **Ready.** Three interview-locked fixes for the three matching defect classes: prompt redesign +
   containment veto, an N×N Matching Assignment Verification stage, and the lesson-prompt vocabulary
   root-fix. Precondition: merge `fix/study-item-grounding` to `main`, then branch.
+- [2026-08-08-001 — Integrate self-hosted Better Auth](./2026-08-08-001-integrate-better-auth-plan.md) —
+  **Ready, queued second.** Interview-locked (D1–D9): Better Auth inside `learner-api` replaces the
+  PIN placeholder — Google primary + email/password e2e fallback, cookie sessions on both platforms,
+  `learnerRef` = `user.id`, hard reset. Precondition: the matching plan merges; then
+  `feat/better-auth` off `main`.
 
 ## Ownership rules
 

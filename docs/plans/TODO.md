@@ -43,6 +43,14 @@
   state, so a long-lived process serves stale prompts and reports green), and the residual defect is
   *ambiguity*, which is exactly what U3 checks.
 
+- **Better Auth integration — planned, queued after matching.** Plan:
+  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
+  Self-hosted Better Auth inside `learner-api` replaces the PIN placeholder: Google sign-in primary,
+  email/password as the e2e/fallback path, cookie sessions on web and native, `learnerRef` =
+  `user.id`, shared-DB hard reset at cutover. Next action: after `fix/matching-item-quality` merges,
+  branch `feat/better-auth` and open U1. The Google OAuth client + `BETTER_AUTH_SECRET` are
+  user-owned manual actions tracked in [BLOCKERS](./BLOCKERS.md) and can happen in parallel.
+
 - **`main` is at `f1224c3`; the shared VPS still runs `fix/study-item-grounding` at `bd0b3eb`.** The
   Study Item grounding and key-verification work is now merged to `main`, but **the VPS was not
   redeployed** and no matching work has shipped there. Local work continues on
@@ -50,18 +58,18 @@
   against the full real pipeline instead, which is what D11's "iterate locally with free hard resets"
   licenses, and the deploy belongs with the unit that ships.
 
-- **The production judge is now one model: `deepseek/deepseek-v4-flash-0731`, no fallback.** It
-  replaced Groq-pinned `gpt-oss-120b` on `kg-independent-judge`, whose shared-account request-rate
-  ceiling killed 3 of 3 topic-generation attempts and takes out every judge stage at once (**account
-  credit cannot relieve a rate limit** — credits buy tokens, not request rate). Single model on
-  purpose: `operation_run_stages` records only the alias, so a two-model mix makes judge verdicts
-  unattributable. Locked to `deepseek/fp8` because the model's 23 endpoints include **fp4** variants
-  and drifting quantization would break verdict reproducibility; reasoning off because DeepSeek
-  double-encodes array-of-object tool arguments, which is every verdict schema.
-  **Competence is smoke-tested, not measured** — two live probes only. U4's discrimination probes now
-  qualify the judge as well as the new stage. The shipped key-verification evidence was measured under
-  gpt-oss-120b and does not carry over. Needs an ADR amendment (ADR-0007/0005, ADR-0013 evidence).
-  `kg-prerequisite-ordering` still runs gpt-oss-120b and keeps that availability exposure.
+- **Model assignment, and a DeepSeek target gated on evidence.** `litellm/config.yaml` owns the
+  mapping and every per-model measurement (AGENTS rule 5); live state only here. The judge is
+  `deepseek-v4-flash-0731`, single, no fallback, **smoke-tested not measured** — U4's probes qualify it
+  as well as the new stage, gpt-oss-120b evidence does not carry over, and an ADR amendment is owed
+  (ADR-0007/0005, ADR-0013). `kg-prerequisite-ordering` keeps gpt-oss-120b and its Groq exposure.
+  **Intended direction: generation moves to DeepSeek if the evidence confirms.** The 2026-08-08
+  blueprint bake-off puts it ahead on yield, latency and price while buying part of that by never
+  declining a node; `mimo-v2.5-pro` is measured and rejected. The call is deferred to Matching
+  Assignment Verification, the gate that would veto the weak items DeepSeek added. Moving the
+  *default* alias has two hard preconditions: relocate the judge in the same change
+  ([ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md)), and
+  re-run the ADR-0013 gates — all of them were measured with MiMo generating.
 
 ### Evidence-triggered follow-up
 
