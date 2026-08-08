@@ -383,7 +383,7 @@ U3's and still fails.
 
 **Hands off.** U3 (rigs), which owns the last failing `pnpm check` stage.
 
-### U3 — rigs (2026-08-08, branch `feat/better-auth`)
+### U3 — rigs (2026-08-08, `7e99156`, branch `feat/better-auth`)
 
 **Proved.** Every rig authenticates through Better Auth's email + password route and none drives
 Google. `pnpm check` is green again end to end, its last stage included: the intercepted web suite

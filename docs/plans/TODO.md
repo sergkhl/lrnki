@@ -12,15 +12,16 @@
 
 - **Better Auth integration — in progress on `feat/better-auth`, U1–U3 done.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
-  U1 (server + schema) `f05c4d1`, U2 (client) `d1a5caf`, U3 (rigs) — every rig now signs in through
-  Better Auth's email + password route and none drives Google. **`pnpm check` is green again**,
-  including its last stage `e2e:web`. Next action: **U4, deployment cutover + the rule-14 real-use
-  gate**, which needs the user-owned Google OAuth client and `BETTER_AUTH_SECRET` in
-  [BLOCKERS](./BLOCKERS.md) — the only thing standing in its way. One carried item in the plan's
-  `Open findings`: the native Maestro flows are rewritten but have never run on a device, because
-  the checked-out e2e APK predates the cutover; needs an APK rebuild plus a booted emulator.
+  U1 (server + schema) `f05c4d1`, U2 (client) `d1a5caf`, U3 (rigs) `7e99156` — every rig signs in
+  through Better Auth's email + password route and none drives Google. **`pnpm check` is green
+  again**, including its last stage `e2e:web`, and the real-backend gate passes on both projects.
+  Next action: **U4, deployment cutover + the rule-14 real-use gate**, which needs the user-owned
+  Google OAuth client and `BETTER_AUTH_SECRET` in [BLOCKERS](./BLOCKERS.md) — the only thing
+  standing in its way. One carried item in the plan's `Open findings`: the native Maestro flows are
+  rewritten but have never run on a device, because the checked-out e2e APK predates the cutover.
   **Local dev DBs must be reset** — U1's schema replaced `learners`, so an un-reset `lrnki` fails
-  every DB-touching command with `relation "user" does not exist`.
+  every DB-touching command with `relation "user" does not exist`, and the reset drops the catalog
+  the real-backend gate needs and never generates.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
