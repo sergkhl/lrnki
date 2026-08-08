@@ -178,6 +178,24 @@ so a healthy old API can never report a successful deploy over a failed migratio
 reports reset-required is never resolved by the deploy — it waits for the explicit reset runbook.
 Learner sessions persist in `learner_sessions` and survive restarts.
 
+**The deploy does not reload LiteLLM.** It rebuilds `migrate`, `learner-api`, and `caddy` only.
+`litellm/config.yaml` is a read-only bind read once at process start, and `store_model_in_db` is
+unset, so the file is authoritative *only at that moment* — a commit that repoints a
+`model_group_alias` leaves the running router serving the previous model, with no error anywhere,
+because the alias still resolves. That is a silent stale deploy, and it happened: the
+`kg-independent-judge` → `deepseek-v4-flash-0731` swap of 2026-08-07 did not take effect on the
+shared host until 2026-08-08, so every judge call in between ran the model it replaced. After a
+deploy whose range touches `litellm/config.yaml`, reload it and confirm the new deployment is
+actually served:
+
+```bash
+docker compose up -d --force-recreate --no-deps litellm   # never `down -v`: it holds LiteLLM's keys
+curl -s -H "Authorization: Bearer $LITELLM_API_KEY" http://127.0.0.1:4000/models | grep -c <new-model>
+```
+
+A `200` from `/models` is not evidence the config is current — check for the deployment by name. The
+router's own answer is in `LiteLLM_SpendLogs.model`, which records which deployment actually served.
+
 **Shared schema cutover** — the only response to a reset-required deploy, and deliberately manual.
 It **discards the application data** in database `lrnki` (greenfield: no backup or data migration is
 an acceptance dependency) and preserves everything else. From the repo checkout on the VPS:

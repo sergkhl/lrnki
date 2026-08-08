@@ -52,10 +52,15 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **`main` is unpushed, and the shared VPS runs a merged-but-not-redeployed tree.** U4's gate
-  deployed `fix/matching-item-quality` to the VPS after a `pnpm db:reset`, so the shared environment
-  carries the matching work and its two gate expeditions. Redeploy from `main` so the VPS leaves a
-  feature branch, and push `origin/main`, which is still behind local.
+- **The shared host's judge model changed on 2026-08-08 and has never been exercised there.** The
+  08-07 swap of `kg-independent-judge` to `deepseek-v4-flash-0731` never reached the VPS — the deploy
+  rebuilds only `migrate`/`learner-api`/`caddy` and LiteLLM reads its config once at start, so the
+  alias resolved while serving the model it replaced. `LiteLLM_SpendLogs`: **0 deepseek, 654
+  gpt-oss-120b** across 08-07/08-08, so U4's VPS expeditions were judged by the old model (its
+  discrimination probes ran against a workstation LiteLLM that did have the new one). The router was
+  reloaded during the 08-08 redeploy, which makes the now-running judge the unexercised one — needs a
+  rule-14 gate on the shared host before the next gate leans on it. Reload step and trap in
+  [README](../../README.md) → Deployment.
 
 ### Evidence-triggered follow-up
 
@@ -92,7 +97,8 @@ separation and log source IPs → root README `## Deployment`; throttling signat
   carries an ambiguous pair set** — accepted as a directional invariant in
   [ADR-0026](../adr/0026-typed-study-item-bank.md). Two generation-side changes were deferred so the
   branch merged exactly as gated; both are carried in the model-evaluation brainstorm. Plan deleted,
-  detail in git at `4ea7e64`.
+  detail in git at `4ea7e64`. Fast-forwarded into `main`, pushed, and redeployed — the shared host
+  left the feature branch on 2026-08-08.
 
 - **Study Item grounding and key verification (2026-08-07).** One contract was failing in both
   directions: it verified quote mechanics and never claim truth, so it destroyed half the bank over
