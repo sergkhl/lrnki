@@ -95,6 +95,23 @@ if [[ "$CONTAINER_HEALTHY" != "1" ]]; then
   exit 1
 fi
 
+# `BETTER_AUTH_URL` is the one setting that can be wrong and still make every other check pass.
+# Better Auth derives BOTH the Google redirect URI it advertises AND `useSecureCookies` (from the
+# URL's scheme) out of it, so the `.env.example` dev default left on a deployment host yields an API
+# that health-checks green, serves the whole credential path, and quietly mints session cookies with
+# no `Secure` flag over HTTPS while Google rejects the callback (ADR-0041). Nothing errors, because a
+# wrong base URL still resolves — the same failure shape as a stale LiteLLM alias. Asserted against
+# the RUNNING container so this reads what shipped, not what a file said, and so compose's default
+# stays the single source of that value.
+EXPECTED_AUTH_URL="${HEALTH_URL%/health}"
+SHIPPED_AUTH_URL="$(docker compose exec -T learner-api printenv BETTER_AUTH_URL 2>/dev/null | tr -d '\r\n')"
+if [[ "$SHIPPED_AUTH_URL" != "$EXPECTED_AUTH_URL" ]]; then
+  echo "!! BETTER_AUTH_URL is '${SHIPPED_AUTH_URL:-<unset>}' but this deployment serves ${EXPECTED_AUTH_URL}" >&2
+  echo "!! Google sign-in will fail and session cookies lose their Secure flag. Fix .env, then redeploy." >&2
+  exit 1
+fi
+echo "==> BETTER_AUTH_URL matches the deployed origin (${SHIPPED_AUTH_URL})"
+
 # And this one asserts the public hostname reaches it — TLS, DNS, and Caddy routing.
 echo "==> waiting for ${HEALTH_URL}"
 for attempt in $(seq 1 30); do

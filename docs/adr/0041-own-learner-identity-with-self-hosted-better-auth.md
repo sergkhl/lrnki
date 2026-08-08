@@ -72,5 +72,12 @@ first sign-in, so a provider's real name never reaches the shared leaderboard un
   fallback fires only under `NODE_ENV=production` — which this repo deliberately leaves unset. The
   library's default would therefore be silently live here, so the check is ours and it fails the
   boot. Rotating the secret signs every learner out.
+- **`BETTER_AUTH_URL` is load-bearing twice over, and wrong values still resolve.** Better Auth
+  derives from it both the Google redirect URI it advertises and — from the URL's *scheme* —
+  whether session cookies carry `Secure`. A deployment host left on the `.env.example` dev default
+  therefore runs an API that health-checks green and serves the entire credential path while Google
+  rejects the callback and every session cookie ships without `Secure` over HTTPS. Nothing errors,
+  so no test or health probe can see it; `scripts/deploy-learner-api.sh` asserts the value off the
+  running container against the origin it serves and fails the deploy on a mismatch.
 - Apple sign-in, native Google ID-token sign-in, and account-linking UI stay additive later work.
   Better Auth links accounts by verified email, so adding a provider implies no further reset.

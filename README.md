@@ -180,9 +180,13 @@ migration that reports reset-required is never resolved by the deploy — it wai
 reset runbook. Learner sessions are Better Auth rows in `session`
 ([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)) and survive
 restarts; `BETTER_AUTH_SECRET` signs their cookies, so **rotating it signs every learner out**.
-`BETTER_AUTH_URL` must be the API's public origin — it is what Google redirects back to
-(`${BETTER_AUTH_URL}/auth/callback/google`), so a wrong value fails only the real OAuth round trip,
-never the local credential path.
+`BETTER_AUTH_URL` must be the API's public origin. Better Auth derives both the Google redirect URI
+it advertises (`${BETTER_AUTH_URL}/auth/callback/google`) and, from that URL's *scheme*, whether
+session cookies carry `Secure` — so the `.env.example` dev default left on this host deploys an API
+that health-checks green and serves the whole credential path while Google rejects the callback and
+every session cookie ships without `Secure` over HTTPS. Nothing errors, because a wrong base URL
+still resolves. The deploy now asserts the shipped value against the origin it serves and fails
+loudly on a mismatch; `curl -sSI` the `Set-Cookie` from a sign-up if you need to confirm by hand.
 
 **The deploy does not reload LiteLLM.** It rebuilds `migrate`, `learner-api`, and `caddy` only.
 `litellm/config.yaml` is a read-only bind read once at process start, and `store_model_in_db` is

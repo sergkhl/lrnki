@@ -18,12 +18,13 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Integrate Self-Hosted Better Auth
 
-**Status:** In progress on `feat/better-auth`. **U1 (server + schema), U2 (client) and U3 (rigs)
-are complete** — `pnpm check` is green and the native flows now pass on a device too, closing the
-last carried finding. Only U4 remains — the deployment cutover and the rule-14 real-use gate — and
-it cannot start until the user-owned credentials in [BLOCKERS](./BLOCKERS.md) exist. Everything U4
-needs that does *not* need those secrets is already landed: compose env block, README runbook, and
-`.env.example`.
+**Status:** Shipped and gated on the shared host; the plan closes when a human runs the two
+browser-driven Google legs. U1–U3 are complete and the cutover landed 2026-08-08: `main`
+fast-forwarded to `2b14eb9`, the shared schema was hard-reset through the README runbook, and both
+the API and the learner web SPA now serve Better Auth. **U4's checks 3 and 4 pass on the deployed
+stack, and the rule-14 real-use gate is `PASS`** — see the Validation Log. **Checks 1 and 2, the
+real Google round trip on web and on a physical Android, need a person at a consent screen** and
+are tracked in [BLOCKERS](./BLOCKERS.md).
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
@@ -427,7 +428,67 @@ show authed fixture content painted behind it.
 
 **Hands off.** U4 — deployment cutover and the rule-14 gate, blocked only on BLOCKERS.
 
+### U4 — deployment cutover and real-use gate (2026-08-08, `main` at `2b14eb9`)
+
+**Proved.** Better Auth is the deployed identity authority on the shared host. `main`
+fast-forwarded, the migration correctly refused as `reset-required: stale-baseline` and left the
+old API running, the README cutover reset ran, and the redeploy applied the regenerated `0000`
+baseline: exactly 1 migration row, `user`/`session`/`account`/`verification` present and
+`learners`/`learner_sessions` absent on the deployed database. The learner web SPA at
+`lrnki.globesoul.com` serves the new gate (`Continue with Google`, `gate-google`) with no
+`tokenStore` or PIN string in the bundle. **U4 checks 3 and 4 pass against the public hostname**:
+signed-out learner routes 401; sign-up mints a `__Secure-`-prefixed `HttpOnly; Secure; SameSite=Lax`
+cookie that resolves to the learner with `profileComplete` carried; a correct and an incorrect
+graded answer both persist under `user.id` with zero rows orphaned from `user`; a learner cannot
+read or write another's expedition; a session row deleted server-side 401s the next request; and a
+sign-in burst from one address trips the limiter at the 4th attempt. Teardown removed exactly the
+two learners that existed and left the enrichment, 16 lessons and 48 study items intact.
+
+**Invariants a later unit or re-run must not break.**
+
+- **`BETTER_AUTH_URL` is the one setting that can be wrong while every other check stays green.**
+  Better Auth derives both the Google redirect URI *and* `useSecureCookies` (from the URL's scheme)
+  out of it, so the `.env.example` dev default left on a deploy host yields a healthy API that
+  serves the whole credential path while Google rejects the callback and cookies ship without
+  `Secure`. Found this way on this host. `scripts/deploy-learner-api.sh` now reads the value off the
+  **running container** and fails the deploy on a mismatch with the origin it serves — asserting
+  what shipped, not what a file said, and leaving compose's default the only copy of that value.
+- **An ownership check on these routes needs a positive control.** `setActive` and `resetGeneration`
+  answer 200 and match zero rows when the ref does not own the id, by design (no existence oracle
+  for another learner's ids) — so "nothing changed" is also what a route broken for *everyone*
+  returns. Pair every cross-learner negative with the owner's own call. `resetGeneration`
+  additionally filters `status = 'failed'`, which makes it useless as an isolation probe against a
+  `generating` expedition.
+- **Deleting a learner is safe for content.** `cleanupReservedLearners` removed both learners and
+  every response, leaving enrichments, lessons and study items — they are learner-neutral.
+
+### Real-use quality evaluation
+
+- Milestone: U4 — the deployed identity/session swap, and the first exercise of
+  `deepseek-v4-flash-0731` as `kg-independent-judge` on the shared host.
+- Fixture and source type: one cold topic expedition, "Photosynthesis" (topic-declared; 16
+  `synthetic_primary` nodes, no source document).
+- Real model calls used: yes — 408 LiteLLM calls, of which **118 deepseek-v4-flash-0731**, closing
+  the "judge never exercised here" gap; every pipeline stage returned `ok`, none throttled.
+- Result: **PASS**
+- Useful output observed: 16 well-scoped, non-overlapping concepts (Chloroplast → Photosystem I/II
+  → water splitting → Calvin cycle → RuBisCO → photorespiration → C3/C4/CAM → stomatal regulation)
+  with 20 prerequisite edges; **48 of 48 study items admitted, 0 rejected**, 16 each of
+  option-select, matching and impostor; 16/16 option-selects carry exactly one key of four and
+  16/16 impostors exactly one lie of four. Hand-inspected items are true with unique keys —
+  including distractors that are individually true statements about *other* enzymes and so fail
+  only the question asked, which is the discrimination Key Verification exists to enforce.
+- Defects observed: none blocking. One impostor ("carbon fixation … proceeds through three phases")
+  is false only by scope rather than by fact — the weakest of the sampled set, and its reveal
+  explains the distinction correctly.
+- Changes made after inspection: the `BETTER_AUTH_URL` correction on the host, the deploy-time
+  guard above, and the doc repairs in `README.md`/`.env.example`.
+- Remaining caveats: **the Google legs are unverified** (BLOCKERS); one topic in one domain.
+- Safe to continue downstream: yes.
+
+**Hands off.** Nothing to a later unit. The plan closes when BLOCKERS' two Google checks are run.
+
 ### Open findings
 
-None open. The device run closed the only carried item; the staleness trap that caused it now lives
-in `apps/learner-app/e2e-native/README.md`.
+None open. The device run closed the last carried item; the staleness trap that caused it now lives
+in `apps/learner-app/e2e-native/README.md`. The two Google legs are user-owned, not findings.

@@ -10,18 +10,16 @@
 
 ## TODO
 
-- **Better Auth integration — in progress on `feat/better-auth`, U1–U3 done.** Plan:
-  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
-  U1 (server + schema) `f05c4d1`, U2 (client) `d1a5caf`, U3 (rigs) `7e99156` — every rig signs in
-  through Better Auth's email + password route and none drives Google. **`pnpm check` green**
-  (`e2e:web` included), real-backend gate green on both projects, and the native flows now pass
-  **2/2 on a device** over a rebuilt e2e APK (`d949177`) — the plan carries no open findings.
-  Next action: **U4, deployment cutover + the rule-14 real-use gate**. Every non-secret part of U4
-  (compose env, README runbook, `.env.example`) is landed, so the user-owned Google client and
-  `BETTER_AUTH_SECRET` in [BLOCKERS](./BLOCKERS.md) are the only thing left in its way.
-  **Local dev DBs must be reset** — U1's schema replaced `learners`, so an un-reset `lrnki` fails
-  every DB-touching command with `relation "user" does not exist`, and the reset drops the catalog
-  the real-backend gate needs and never generates.
+- **Better Auth integration — deployed and gated; awaiting the two Google legs.** Plan:
+  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md). U1–U4 are done and `main`
+  fast-forwarded to `2b14eb9`: the shared schema was hard-reset through the README runbook and both
+  the API and the learner web SPA now serve Better Auth. U4's checks 3 and 4 pass on the deployed
+  stack and the rule-14 gate is `PASS` (48/48 study items, 0 rejected) — detail in the plan's
+  Validation Log. Next action: **the two browser-driven Google round trips in
+  [BLOCKERS](./BLOCKERS.md)**, which no rig may drive; the plan closes on them and is deleted then.
+  **Local dev DBs still need a reset** — U1's schema replaced `learners`, so an un-reset local
+  `lrnki` fails every DB-touching command with `relation "user" does not exist`, and the reset drops
+  the catalog the local real-backend gate needs and never generates.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
@@ -63,16 +61,6 @@
     yield. Untouched by the Better Auth work (the suite's imports never reach `lib/api.ts`), but it
     makes `pnpm test` red often enough to train people to re-run rather than read.
 
-- **The shared host's judge model changed on 2026-08-08 and has never been exercised there.** The
-  08-07 swap of `kg-independent-judge` to `deepseek-v4-flash-0731` never reached the VPS — the deploy
-  rebuilds only `migrate`/`learner-api`/`caddy` and LiteLLM reads its config once at start, so the
-  alias resolved while serving the model it replaced. `LiteLLM_SpendLogs`: **0 deepseek, 654
-  gpt-oss-120b** across 08-07/08-08, so U4's VPS expeditions were judged by the old model (its
-  discrimination probes ran against a workstation LiteLLM that did have the new one). The router was
-  reloaded during the 08-08 redeploy, which makes the now-running judge the unexercised one — needs a
-  rule-14 gate on the shared host before the next gate leans on it. Reload step and trap in
-  [README](../../README.md) → Deployment.
-
 ### Evidence-triggered follow-up
 
 - **Progressive readiness / keep the learner busy under ~1 minute.** If full-ready generation still
@@ -96,6 +84,15 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 `apps/learner-app/e2e-realuse/README.md` and `apps/learner-app/e2e-native/README.md`.
 
 ## COMPLETED
+
+- **The shared host's judge is exercised on its new model (2026-08-08).** The 08-07 swap of
+  `kg-independent-judge` to `deepseek-v4-flash-0731` had never taken effect on the VPS — LiteLLM
+  reads its config once at start and the deploy rebuilds only `migrate`/`learner-api`/`caddy`, so a
+  repointed alias still resolved while serving the model it replaced (`LiteLLM_SpendLogs`: 0
+  deepseek, 654 gpt-oss-120b across 08-07/08-08). The 08-08 redeploy recreated the router, and U4's
+  rule-14 gate then drove **118 deepseek-v4-flash-0731 calls** through it with 48 of 48 study items
+  admitted and none rejected — so the now-running judge is exercised, not merely configured. Reload
+  step and the silent-stale-alias trap live in [README](../../README.md) → Deployment.
 
 - **Matching item quality (2026-08-08).** Matching was defective since its first measurement in three
   classes needing three mechanisms. All shipped: a role-asymmetric facet-spanning pair contract

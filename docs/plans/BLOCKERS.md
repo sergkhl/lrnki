@@ -1,10 +1,16 @@
 # Blockers
 
-- **Better Auth secrets (plan
-  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), needed before its U4; can be
-  done any time).** Two user-owned actions: (1) create a **web-type** Google OAuth client in Google
-  Cloud Console with authorized redirect URI
-  `https://api.lrnki.globesoul.com/auth/callback/google`, and put `GOOGLE_CLIENT_ID` /
-  `GOOGLE_CLIENT_SECRET` into the repo-root `.env`; (2) mint `BETTER_AUTH_SECRET`
-  (`openssl rand -base64 32`) into the same `.env`. One web-type client serves web and native (D5 —
-  browser-redirect flow, no SHA-1 fingerprints).
+- **The two Google sign-in legs of U4's gate (plan
+  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md)).** Both need a person at a
+  Google consent screen — no rig may drive Google
+  ([ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md)), so this is the
+  only part of the plan an agent cannot run. Everything else is deployed and gated.
+  1. **Web:** on `https://lrnki.globesoul.com`, Continue with Google → fresh account → name the
+     explorer → one graded answer → sign out, and confirm the session cookie is gone.
+  2. **Android:** the same on a physical device, which additionally exercises the `lrnki://` return
+     leg of the browser-redirect flow (D5) that no emulator gate covers.
+
+  If either fails at the consent screen with `redirect_uri_mismatch`, the registered redirect URI
+  and `BETTER_AUTH_URL` disagree; the deployed value is `https://api.lrnki.globesoul.com` and the
+  URI must be that plus `/auth/callback/google`. Report the outcome into the plan's Validation Log;
+  the plan closes on it.
