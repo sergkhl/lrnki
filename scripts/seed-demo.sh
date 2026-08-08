@@ -51,7 +51,10 @@ pnpm worker:kg run-extraction --all
 step "4/8 resolve latest succeeded extraction run per source"
 # One run per source (the most recent succeeded), so the published version spans the
 # full manifest. Read into a bash array of run IDs for the build command.
-mapfile -t RUN_IDS < <(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
+RUN_IDS=()
+while IFS= read -r run_id; do
+  [ -n "$run_id" ] && RUN_IDS+=("$run_id")
+done < <(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
   "SELECT DISTINCT ON (source_resource_id) run_id
    FROM extraction_runs
    WHERE status = 'succeeded'
@@ -92,7 +95,10 @@ step "8/8 seed demo learners over goal anchors"
 # highest certain-prerequisite-in-degree anchor from each of the two richest domains.
 # This yields goals with clear prerequisite chains regardless of which sources were
 # extracted, so a non-deterministic reseed still produces renderable quests.
-mapfile -t GOAL_NODES < <(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
+GOAL_NODES=()
+while IFS= read -r goal_node; do
+  [ -n "$goal_node" ] && GOAL_NODES+=("$goal_node")
+done < <(psql "$DB_URL" -tA -v ON_ERROR_STOP=1 -c \
   "SELECT derived_node_id FROM (
      SELECT DISTINCT ON (n.declared_domain)
             n.derived_node_id, n.declared_domain, count(e.*) AS prereq_count
