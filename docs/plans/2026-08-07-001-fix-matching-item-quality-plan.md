@@ -371,157 +371,91 @@ One entry per closed implementation unit; see the hygiene comment at the top of 
 
 ### U1 — matching prompt redesign, containment veto, lesson vocabulary root-fix (2026-08-08)
 
-Commits: `d71d52b`, `7ebe4ac`. `pnpm check` and `pnpm test:db` are green.
+Commits: `d71d52b`, `7ebe4ac`. `pnpm check` and `pnpm test:db` green.
 
-**Proved.** The matching pair contract is role-asymmetric and is written to **both** places the model
+**Proved.** The matching pair contract is role-asymmetric and written to **both** places the model
 reads it — the prompt file and the forced-tool `description` fields; a rule in only one makes the
-next gate's delta unattributable. Three rules, each closing a gap where the guard or the board
-enforced something the prompt never stated: **role asymmetry** (the prompt names an aspect, the match
-carries its answer), **named terms** (when the answer is a named term the match must BE that term,
-and the question must announce the pairing the pairs actually implement), and **distinct matches**
-— stated together with "re-choose the aspect" rather than "make the answers look different", because
-padding a repeated answer into distinctness *is* the paraphrase defect. The graph-vocabulary
-prohibition is owned by `prompts/partials/learner-copy-vocabulary.prompt` and included by the lesson
-and all three item prompts (rule 18); `promptFileDependencyBytes` re-derives every dependent stage
-hash mechanically (ADR-0034). The internal context was relabeled "neighbor concepts" → "neighboring
-topics" everywhere, because a prompt that forbids a word while using it to describe its own input is
-self-undermining.
+next gate's delta unattributable. Three rules: **role asymmetry** (the prompt names an aspect, the
+match carries its answer), **named terms** (when the answer is a named term the match must BE that
+term, and the question must announce the pairing the pairs implement), and **distinct matches**,
+stated as "re-choose the aspect" rather than "make the answers look different" — padding a repeated
+answer into distinctness *is* the paraphrase defect. The graph-vocabulary prohibition is owned by
+`prompts/partials/learner-copy-vocabulary.prompt` and included by the lesson and all three item
+prompts (rule 18); dependent stage hashes re-derive mechanically (ADR-0034).
 
-**Invariants a later unit or re-run must not break.**
+**Invariants a re-run must not break.**
 
-- Containment stays **contiguous word sequence** containment, never a character `includes` (wrong in
-  both directions at once: it over-fires on subwords and under-fires on punctuation — both pinned by
-  a mutant-verified test) and never a non-contiguous "all the prompt's words appear somewhere"
-  check, which is a heuristic rule 16 forbids here.
-- Equality, containment, and distinctness keep **distinct** reason strings; the gate greps
+- Containment stays **contiguous word sequence** containment — never a character `includes` (wrong
+  in both directions at once, both pinned by a mutant-verified test) and never a non-contiguous
+  "all the prompt's words appear somewhere" check, which is a heuristic rule 16 forbids here.
+- Equality, containment, and distinctness keep **distinct** reason strings; a gate greps
   `must not contain one another`, `must differ`, and `must be distinct` separately.
-- Matching still opts out of the generated-passage citation fallback (D8) — U3 verifies fit, not
-  claim truth, so it does not unlock that rung.
 - No lexical vocabulary guard exists anywhere, by D9: `dependent` and `sibling` have legitimate
-  domain senses. The prohibition is a prompt rule; the gate's vocabulary query is inspection, never
-  a veto.
-- Judge prompts keep their own labels (`study-item-key-verification.prompt` still says `Sibling
-  concepts:`): their output is verdicts, never learner copy. `learner-scaffold-*` is exempt for the
-  same reason plus being outside this gate's measured set — an adjacent-layer gap, not an omission.
-
-**Rig facts, each of which cost a run to learn.** Drive an API composed from the working tree
-(`LEARNER_API_PORT=… tsx --env-file=.env apps/learner-api/src/index.ts`), never the running
-`lrnki-learner-api` container — `.prompt` files are baked into the image. And **restart that process
-after every prompt edit**: `readPromptFile`/`readPartial` cache by path in module state, so a
-long-lived API serves the prompts it read first and reports green on the previous behavior.
+  domain senses — U4 met one. The prohibition is a prompt rule; a vocabulary query is inspection.
+- Judge prompts keep their own internal labels: their output is verdicts, never learner copy.
+  `learner-scaffold-*` is exempt for the same reason — an adjacent-layer gap, not an omission.
 
 ### U2 — prompt-fix gate, real-use pass (2026-08-08)
 
-- **Milestone:** U1's matching pair contract (role asymmetry, named terms, distinct matches), the
-  containment veto, and the learner-copy vocabulary root-fix.
-- **Fixture and source type:** topic expedition `Thermohaline circulation`, Oceanography, 16 derived
-  nodes, 16 matching items / **61 pairs**, every pair hand-inspected (ADR-0013), plus a 549-row
-  learner-copy vocabulary scan. Discovery is non-deterministic, so the node *labels* differ from the
-  frozen inventory's run; the node count and the terminology-shaped node class are what carry over.
-- **Real model calls used:** yes — full production pipeline after `pnpm db:reset`.
-- **Result: PASS**, with one residual defect class recorded below and handed to U3/U4.
+`Thermohaline circulation`, Oceanography, full production pipeline after `pnpm db:reset`, 16 nodes,
+16 matching items / 61 pairs hand-inspected. **Result: PASS.**
 
-**Met.** Coverage is **48 of 48 with zero rejections**. The containment veto fired zero times and cost
-zero items, so the **rule 16 verdict is keep, not remove**. The paraphrase-degeneracy class that made
-the first pass FIX_FIRST is **gone**: no match in 61 pairs restates its own prompt, and every
-terminology-shaped node now answers with the name — `Ocean upwelling` keys nitrates/phytoplankton/
-zooplankton/euphotic zone, `Surface ocean currents` keys `Wind` and `Gulf Stream`, `Temperature
-effect on seawater density` keys `thermal expansion coefficient`. Against a baseline where
-`Pycnocline` was degenerate on all four pairs and `Upwelling` was string-solvable on two of three,
-this is the intended shape. Relationship vocabulary is **eliminated**: zero occurrences of
-`dependent`, `sibling`, `prerequisite`, or `node` in 549 learner-copy rows.
+**Proved.** Coverage **48 of 48, zero rejections**. The containment veto fired zero times and cost
+zero items — the **rule 16 verdict is keep, not remove**. The paraphrase-degeneracy class is gone:
+no match in 61 pairs restates its own prompt, and every terminology-shaped node answers with the
+name, against a baseline where `Pycnocline` was degenerate on all four pairs. Relationship
+vocabulary eliminated: zero `dependent`/`sibling`/`prerequisite`/`node` in 549 learner-copy rows.
 
-**Residual, recorded not gated.** One bare `concept` survives, in one matching question of 48
-("Match each thermohaline circulation concept to…"). The rule is now stated in both the prompt and
-the schema description, so this is adherence, not coverage — and rule 16 forbids answering it with a
-lexical veto. And on the two nodes whose facet is a direction-of-effect mapping, the pairs are
-low-discrimination: `Seawater density` pair 2 puts `pressure` in both the prompt and its own match,
-uniquely within that item, which is one surface-solvable pair in 61.
+**Attribution that must not be re-litigated.** An intermediate run lost two matching items to
+`matching matches must be distinct`, reproduced **3 of 3** against the real model. The cause was
+upstream — the blueprint assigned a facet whose answer space holds two values while the board needs
+four — so U1's named-term rule did not create that defect, it exposed one the old prompt hid by
+padding. The matching-facet constraint added to `study-item-blueprint.prompt` restored 48 of 48, but
+**it is stated, not proven**, and U4 measured it over-firing (see Open findings).
 
-**The coverage story, attributed by probe.** An intermediate run lost two matching items to `matching
-matches must be distinct`, reproduced **3 of 3** against the real model on exactly those nodes. The
-cause was upstream: the blueprint had assigned a facet whose answer space holds two values while the
-board needs four distinct ones, so duplicates were *forced*. U1's named-term rule did not create that
-defect, it exposed one the old prompt hid by padding. A matching-facet constraint in
-`study-item-blueprint.prompt` plus the prompt rule returned coverage to 48 of 48 — but **that
-constraint is stated, not proven**: the blueprint still assigned collapsing facets to 2 of 16 nodes
-in the passing run, and the generator now rescues them into admissible-but-weak items. It is kept
-because it addresses a proven hard-failure mode.
-
-**Ambiguity incidence — U4's baseline, not gated here (D10).** Two items would fail an assignment
-check. `Freshwater input effects on thermohaline circulation`: matches 1 and 3 are interchangeable
-and match 0 also fits prompt 3. `Salinity effect on seawater density`: prompts 2 and 3 are near
-synonyms with matches that swap freely. Both are the harm class — a learner who knows the material is
-marked wrong — and both are what D5 chose the full N×N grid to expose.
-
-**Method invariant this gate established.** Every zero-row quality assertion carries a **positive
-control in the same query**. An earlier inspection reported "zero vocabulary hits" from a query that
-had errored (`jsonb_array_elements_text` on a `text[]` column); psql printed the error and an empty
-result, which reads exactly like a clean pass. Here, 74 of 97 bullets matching a common-word regex
-proves the scan reads text at all.
-
-**Safe to continue downstream: yes.** The blocking defect is fixed and the residual is ambiguity,
-which is precisely U3's subject.
+**Handed to U4 as its ambiguity baseline (D10).** Two admitted items would fail an assignment
+check: `Freshwater input effects on thermohaline circulation` (matches 1 and 3 interchangeable, 0
+also fits prompt 3) and `Salinity effect on seawater density` (prompts 2 and 3 near synonyms).
 
 ### U3 — Matching Assignment Verification, with same-change documentation (2026-08-08)
 
-`pnpm check` and `pnpm test:db` are green. Real-model evidence here is a **1-draw live probe of the
-new stage**, not the gate: U4 owns the 5-draw probes and the two full runs.
+Commit `d8d3bf2`. `pnpm check` and `pnpm test:db` green. Real-model evidence here is a **1-draw live
+probe**, superseded by U4's 5-draw probes and two full runs.
 
-**Proved.** Matching now runs a third verification bracket. `matching-assignment-verification` sits
-after `matching-generation` in the same shape option-select and impostor already use — guard →
-judge → deterministic veto → one informed regeneration → guard → verify once → settle. The topic
-generation stage denominator moves **15 → 16**.
+**Proved.** Matching runs a third verification bracket. `matching-assignment-verification` sits after
+`matching-generation` in the shape option-select and impostor already use — guard → judge →
+deterministic veto → one informed regeneration → guard → verify once → settle. Stage denominator
+**15 → 16**.
 
-The **control flow is now owned once**. `verifyGuardedItems.ts` holds the two-round envelope every
-verified type shares; `verifyStudyItemKeys.ts` keeps only the key-verification question and its two
-uniqueness rules, and `verifyMatchingAssignments.ts` holds the presentation, the assignment rule, and
-the pass-through disposition. Copying a second orchestrator would have put "a vetoed item gets
-exactly one informed regeneration" in two places (rule 18). The subject type is F-bounded
-(`TSubject extends VerifiableSubject<TSubject, TItem>`) because `regenerate` must return *another
-subject of its own type* — that is what makes the second pass judge the NEW candidates rather than
-re-judging the vetoed ones. Consequently `NodeAttempt`'s straight-to-persistence `item` variant is
-deleted: all three types now hand a pending subject to a phase.
+The **control flow is owned once**: `verifyGuardedItems.ts` holds the two-round envelope all three
+verified types share, and each type contributes only its question, its veto rule, and its
+unavailability disposition. Copying a second orchestrator would have put "a vetoed item gets exactly
+one informed regeneration" in two places (rule 18). The subject type is F-bounded because
+`regenerate` must return *another subject of its own type* — that is what makes the second pass
+judge the NEW candidates rather than re-judging the vetoed ones.
 
-**The presentation deviates from the plan's original target design, deliberately.** The plan said
-matches carry their pair ordinals; they carry a **presentation index** instead. Sorting hides the key
-by position, but printing the pair ordinal beside it hands the key back more legibly than position
-ever leaked it, and a judge that can read the key has no reason to test any other cell. The Target
-design section is amended to match the code.
+**Invariants a re-run must not break.**
 
-**Live probe, 1 draw each, `deepseek-v4-flash-0731`.** Reconstructed `Seawater density` subsumption
-board: **16 of 16 cells returned, vetoed** through the cross-fit branch, with the judge naming both
-interchangeable answers — and it did so on a non-identity presentation permutation (`[3,2,0,1]`), so
-the key-hiding does not blind it. Reconstructed `North Atlantic Deep Water` facet board: **16 of 16
-cells, admitted**, with exactly the four keyed cells fitting and every other cell `does_not_fit` —
-the discrimination-not-distrust control. Stage latency is **~5–7.5 s per item** at 4 pairs.
-
-**Invariants a later unit or re-run must not break.**
-
-- The match presentation is a **deterministic function of the item** — normalized text sort,
-  renumbered by sorted position. A random shuffle would make a re-run's disagreement unreadable, and
-  attaching pair ordinals would re-open the key leak.
+- The match presentation is a **deterministic function of the item** (normalized text sort,
+  renumbered by sorted position). A random shuffle makes a re-run's disagreement unreadable;
+  attaching pair ordinals re-opens the key leak. The contract is owned by
+  `MatchingAssignmentVerificationPort`'s doc comment and ADR-0026.
 - `unclear`, and a cell the judge never returned, **never veto** — in either branch. An N×N grid is
   where this bites hardest: a short response leaves whole rows unjudged.
 - Matching's unavailability disposition is **pass-through** (D6), the opposite of impostor's, and it
   depends on matching keeping its verbatim-only citation rungs (D8). If matching ever opts into the
   generated-passage fallback, this disposition must change with it.
-- The veto reason string starts `matching assignment verification rejected the item:` and names the
+- The veto reason starts `matching assignment verification rejected the item:` and names the
   offending cells by text — it is both the rejected-row reason and the regeneration feedback.
 - The bank test's matching stub returns `unclear` for every cell and **cannot** confirm the key,
-  because the presentation hides it. That is the cheapest standing proof of the key-hiding: a stub
-  that could rubber-stamp the diagonal would mean the judge could too.
+  because the presentation hides it: the cheapest standing proof of the key-hiding.
+- `DEFAULT_ITEM_VERIFICATION_CONCURRENCY` is the single knob all three brackets read — that is what
+  moves on 429s, never production generation concurrency.
 
 **Documented in the same change (D12).** ADR-0026 gains the Matching Assignment Verification
 paragraphs, the key-hiding rationale, matching's pass-through row in the unavailability asymmetry,
-and the containment veto in the guard sentence; CONTEXT.md gains the term and narrows *Study Item Key
-Verification* to "true and unique".
-
-**Hands to U4.** Both probes above are 1 draw and must be re-run at 5 (they double as the judge's
-qualification — see Open findings). Budget shift to report against: +1 judge call per matching item,
-a third verification bracket overlapping the two existing ones, and `DEFAULT_ITEM_VERIFICATION_CONCURRENCY`
-is the single knob all three read — that is what moves on 429s, never production generation
-concurrency.
+and the containment veto; CONTEXT.md gains the term and narrows *Study Item Key Verification* to
+"true and unique".
 
 ### Open findings
 

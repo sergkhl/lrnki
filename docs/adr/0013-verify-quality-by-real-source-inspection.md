@@ -19,6 +19,14 @@ core.
 
 Stable curated sources remain under `fixtures/`; generated evaluation artifacts remain under `tmp/`.
 
+Every zero-row quality assertion carries a **positive control in the same query**. "No learner copy
+carries graph vocabulary" and "the query is broken" produce the identical empty result, and psql
+prints an error above an empty table where it reads as a clean pass — which is how a scan that had
+errored on a column-type mismatch once got recorded as a passing vocabulary gate. Counting a
+common-word control over the same rows in the same statement proves the scan reads text at all, so
+the zero means what it says. This is measurement hygiene for the inspection above, not a gate: the
+control is never a veto.
+
 ## Context
 
 An earlier frozen oracle and scoring-only label aligner helped diagnose admission precision and
