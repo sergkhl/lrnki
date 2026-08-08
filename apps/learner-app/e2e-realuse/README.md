@@ -78,3 +78,21 @@ credential is committed.
 - **`--clear` on export is required.** Metro caches the inlined `EXPO_PUBLIC_LEARNER_API_URL`.
 - **The catalog must already contain a suitable ready enrichment.** This suite never generates one;
   preflight fails closed when none exists.
+- **`dist-realuse` only goes stale by hand.** `run.ts` re-exports the bundle on every run, so the
+  one-command path cannot judge an old build. A *hand-driven* session that starts `realuseServer.ts`
+  and serves an existing `dist-realuse` can, and it fails silently — rebuild with the same export
+  command `run.ts` uses, baked against whatever `REALUSE_API_PORT` you started the API on.
+- **Restart a hand-started API after editing a `.prompt`.** Prompt files are cached by path in module
+  state; see `packages/infrastructure-litellm/README.md`.
+
+## Real-backend app behaviours worth not rediscovering
+
+Three behaviours that make a hand-driven or scripted journey fail in a way that looks like an app
+defect:
+
+- **The Guardian arrival dialog owns the pointer when a Leg falls** — drive the dialog, not the trail
+  node behind it.
+- **`activate` needs the calling learner's own `learner_expeditions` row**, not merely an existing
+  expedition.
+- **A theory read is only recorded for the learner's active expedition**, so reads against any other
+  expedition leave no trace and no error.

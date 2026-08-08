@@ -61,6 +61,34 @@ Stop and fix the current layer when any of these occur:
 - Admin Lab obscures defects that an operator must inspect;
 - a downstream result appears plausible but cannot be traced to stable graph evidence.
 
+## Reading a throttled run before calling it a quality regression
+
+Upstream rate limiting produces *missing content*, which looks exactly like a quality regression in
+the output and is not one. Rule these out before recording a defect:
+
+- **The limit is requests-per-minute on a shared upstream account, tripped by the pipeline's
+  concurrent brackets — not by one request.** A single hand-run call succeeding proves nothing.
+  **Account credit cannot relieve it**: credits buy tokens, not request rate, so a funded balance and
+  a sustained 429 coexist normally. `/v1/models` answering `200` is what rules out a dead virtual key
+  (the 401-vs-429 separation is in the root README's deployment section).
+- **A saturated bracket can return a degraded response with no tool call at all** —
+  `{"kind":"no_tool_call"}` in `operation_run_stages.error_detail`. That is upstream load, not a
+  schema defect.
+- **A topic short on exactly one item type is a throttling signature.** A judge exhausted by 429s
+  makes Study Item Key Verification unavailable, which drops impostor items with a
+  `… key verification unavailable: … 429` reason in `rejected_study_items` while option-select is
+  untouched, because the unavailability dispositions differ by harm (ADR-0026). Read the rejection
+  reasons before concluding the generator got worse.
+- **Check `learner_expeditions.generation_attempts` before re-triggering by hand.** The topic
+  supervisor retries a failed attempt up to 3 times with a 2-minute stale window, so a run that dies
+  mid-pipeline usually self-heals.
+- **Forced-tool provider locks are paid for in availability.** ADR-0006's guarantee pins some aliases
+  to a single provider with `allow_fallbacks: false`, so that provider's ceiling takes out every
+  stage on the alias at once. `litellm/config.yaml` owns which aliases carry that exposure.
+
+**Never lower production concurrency to make a gate pass.** The verification concurrency constant is
+the knob that moves; changing generation concurrency changes the thing being measured.
+
 ## Required evaluation note
 
 Add a short note to the implementation report or pull-request summary:

@@ -129,6 +129,14 @@ There is one shared learner environment during testing
 `pnpm --filter @lrnki/learner-app start` needs no configuration. `EXPO_PUBLIC_LEARNER_API_URL` is
 the single opt-in override for pointing the app at some other API.
 
+**Containers.** Plain `docker compose` runs `lrnki-postgres` (5433), `lrnki-litellm` (4000),
+`lrnki-docling` (5001), `lrnki-caddy` (80/443), and `lrnki-learner-api`, which carries the generation
+supervisors and **publishes no port** — reach it from inside:
+
+```bash
+docker exec lrnki-learner-api node -e '…fetch("http://127.0.0.1:8787"…)'
+```
+
 **API dev loop** — the public hostname has exactly one upstream, the `learner-api` container
 ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Edit on the host,
 run in the container:
@@ -197,6 +205,33 @@ curl -fsS -H "Authorization: Bearer ${LITELLM_API_KEY}" http://127.0.0.1:4000/mo
 ```
 
 plus one authenticated learner read/write against the API.
+
+**Verifying a rebuild** — `learner-api` can look rebuilt and not be, in two independent ways:
+
+- **Never pipe the build.** `docker compose up -d --build --no-deps learner-api | tail` reports
+  *tail's* exit code, so a build that died on `no space left on device` still looks like exit 0.
+  Reclaim with `docker builder prune -f`.
+- **The container's `.Created` is not the image's.** Prove the recreate by comparing
+  `docker inspect lrnki-learner-api --format '{{.Image}}'` against
+  `docker image inspect lrnki-learner-api:latest --format '{{.Id}}'`. A stale container serves the
+  previous behaviour while every probe passes.
+
+**Telling a dead LiteLLM key from an upstream problem** — LiteLLM's virtual keys live in its own
+database inside the shared `postgres_data` volume, so a re-initialised volume leaves the `sk-…` in
+`.env` pointing at a key that no longer exists. The two failures are distinguishable:
+
+| Symptom | Cause | Remedy |
+| --- | --- | --- |
+| Generation `401` while `LITELLM_MASTER_KEY` still works | Dead virtual key — the master key is validated from config rather than the key table, and that asymmetry is the tell | Mint one via `POST /key/generate` with the master key, write it to `.env`, and **recreate** the container: container env is fixed at creation, so `docker restart` will not pick it up |
+| `429 "No deployments available"` | Upstream provider rate limit, not a key problem | Wait and retry; read the run against the throttling signatures in `.agents/skills/real-use-quality-evaluation/SKILL.md` |
+
+Keep any `.env` backup **outside the repo**: `.gitignore` covers `.env` but not `.env.bak-*`.
+
+**Reading `docker logs lrnki-litellm`** — tell host-run tools from the container by **source IP, not
+message text**: the container is `172.18.0.5`, anything on the host (admin-lab, kg-worker) is the
+gateway `172.18.0.1`. A host process reads `.env` once at start, so a session started before a key
+repair keeps presenting the dead key while the container has already picked up the new one — and the
+two are identical in the message text.
 
 **Web deploy** — automatic on push to `main`. `lrnki.globesoul.com` is attached as the Pages custom
 domain, so the default `sergkhl.github.io/lrnki/` URL 301s to it, and **Enforce HTTPS** is on.
