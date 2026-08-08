@@ -10,14 +10,16 @@
 
 ## TODO
 
-- **Better Auth integration — in progress on `feat/better-auth`, U1 done.** Plan:
+- **Better Auth integration — in progress on `feat/better-auth`, U1 and U2 done.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
-  U1 landed at `f05c4d1`: Better Auth at `/auth/*`, `learnerRef` = `user.id`, the whole PIN/bearer
-  subsystem deleted, baseline regenerated, `pnpm test:db` + lint green. Next action: **U2, the
-  client cutover** — which is also what unblocks `pnpm check`, since the app still compiles against
-  the routes U1 deleted (plan → `Open findings`, which also carries the U3 realuse-ref consequence).
-  The Google OAuth client + `BETTER_AUTH_SECRET` are user-owned manual actions tracked in
-  [BLOCKERS](./BLOCKERS.md), needed only for U4, and can happen in parallel.
+  U1 at `f05c4d1` (server + schema); U2 at `d1a5caf` (client): one `authClient`, cookie sessions on
+  both platforms, sign-in gate + `profileComplete`-gated naming screen, tokenStore and
+  `LearnerNameGate` deleted. Typecheck, lint, `test:db`, `db:check` and `build` are green — the ONLY
+  failing `pnpm check` stage is its last, `e2e:web`. Next action: **U3, the rigs** (Playwright,
+  realuse, native fixture, `cleanupReservedLearners`); see the plan's `Open findings` for the
+  realuse-ref change and the trusted-origin requirement it must satisfy. The Google OAuth client +
+  `BETTER_AUTH_SECRET` are user-owned manual actions in [BLOCKERS](./BLOCKERS.md), needed only for
+  U4, and can happen in parallel.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
@@ -45,12 +47,19 @@
   Mechanism and the constraint on fixing it (changing an adopted flow means re-running its negative
   control) are in `apps/learner-app/e2e-native/README.md`.
 
-- **Not fixed — pre-existing e2e flake.** `reduced motion renders the final collected scene
-  immediately with equivalent copy (AE9)` fails roughly 1 run in 20 on both projects: the click on
-  `checkpoint-option_select-available` lands but the Activity Sheet never opens. The neighbouring test
-  does identical clicks but screenshots first, which settles the page — so the suspect is the trail's
-  post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
-  load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
+- **Not fixed — two pre-existing flakes, both unclaimed by any plan.**
+  - Playwright: `reduced motion renders the final collected scene immediately with equivalent copy
+    (AE9)` fails roughly 1 run in 20 on both projects — the click on
+    `checkpoint-option_select-available` lands but the Activity Sheet never opens. The neighbouring
+    test does identical clicks but screenshots first, which settles the page, so the suspect is the
+    trail's post-load measure/auto-scroll racing the press: possibly a real "tap does nothing right
+    after load" defect rather than a test bug. Worth a bounded look before a wait papers over it.
+  - Jest: `LearnerMenuSheet` → `opening the Board closes the menu first and yields a frame — no
+    stacked overlays, no teardown race (D7)`. **Only under the full parallel `pnpm test`** — 8 of 8
+    pass in isolation, ~1 in 5 fail in the whole run. It asserts `onOpenBoard` has NOT fired
+    synchronously after the press, which under load loses its race with the component's own frame
+    yield. Untouched by the Better Auth work (the suite's imports never reach `lib/api.ts`), but it
+    makes `pnpm test` red often enough to train people to re-run rather than read.
 
 - **The shared host's judge model changed on 2026-08-08 and has never been exercised there.** The
   08-07 swap of `kg-independent-judge` to `deepseek-v4-flash-0731` never reached the VPS — the deploy

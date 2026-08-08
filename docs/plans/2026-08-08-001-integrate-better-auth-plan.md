@@ -18,9 +18,9 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Integrate Self-Hosted Better Auth
 
-**Status:** In progress on `feat/better-auth`. **U1 (server + schema) is complete**; U2–U4 remain.
-Next action: open U2, the client cutover — which is also what unblocks the `pnpm check` gate, since
-the app still consumes the routes U1 deleted (see `Open findings`).
+**Status:** In progress on `feat/better-auth`. **U1 (server + schema) and U2 (client) are
+complete**; U3–U4 remain. Next action: open U3, the rigs — the last thing standing between here
+and a green `pnpm check`, whose final `e2e:web` stage is the only one still failing.
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
@@ -261,7 +261,7 @@ replaces `bearerAuth`; FK repoint and baseline regeneration; the U1 deletion lis
 display-name read port; ADR work in the same change; `app.test.ts` rewritten over the credential
 endpoints. Its gate is in the Validation Log.
 
-### U2 — client cutover
+### U2 — client cutover — **done**
 
 `authClient`, `hc` cookie wiring, sign-in screen, explorer-naming screen, `session.ts`/`queries.ts`
 rework, deletion of the tokenStore seams and `LearnerNameGate`. Jest covers: the atomic-swap
@@ -342,21 +342,59 @@ before commit; the `0000` baseline regenerated mechanically and `pnpm db:check` 
 
 **Hands off.** U2 (client) — and U2 is what makes `pnpm check` runnable again.
 
+### U2 — client cutover (2026-08-08, `d1a5caf`, branch `feat/better-auth`)
+
+**Proved.** The app holds no readable credential on either platform. One `authClient` is its only
+identity surface; `tokenStore.ts`/`.web.ts`, the boot-time hydration step, `LearnerNameGate` and
+the PIN vocabulary are gone. `meQuery` reads Better Auth's session, `session.ts` wraps
+sign-in/sign-up/social/sign-out/naming around the unchanged atomic-swap contract, and a sign-in
+gate (Google primary, email + password fallback) plus a `profileComplete`-gated naming screen
+replace the registry gate. Verified live against a real learner-api over http on `lrnki_test`,
+driving the real Better Auth client: `basePath` meets on both sides, sign-up carries
+`profileComplete` and the session read returns it, `updateUser` writes name and flag together, the
+cookie authenticates `/journal`, and sign-out revokes server-side. `pnpm typecheck`, `pnpm lint`,
+`pnpm test:db`, `pnpm db:check` and `pnpm build` are green; `pnpm check`'s final `e2e:web` stage is
+U3's and still fails.
+
+**Invariants a later unit or re-run must not break.**
+
+- **The session transport is platform-asymmetric and neither half is the other's default.** Web
+  sends `credentials: "include"` and never a cookie header — it *cannot* read the HttpOnly cookie,
+  so a header appearing there means the app is holding a credential it must not have. Native
+  attaches the plugin's SecureStore copy by hand and sets `credentials: "omit"`, because React
+  Native's fetch jar is not the system browser's and must not contribute a second, stale cookie.
+  `authClient.test.ts` fails by name if either half is swapped.
+- **`get-session` answers 200-with-null for "no live session" and populates `error` only for a call
+  that did not complete.** The whole retry-versus-sign-out split rests on that, and on nothing else.
+- **`profileComplete` is the only thing between a Google account's legal name and the shared
+  board.** It is an `additionalFields` entry, so dropping it from the sign-up body or the session
+  projection compiles fine and silently stops gating. `app.test.ts` → "the naming gate's flag
+  round-trips…" is the standing gate; verified by mutation.
+- **The naming screen gates the learner-domain reads, not just the view.** Route hooks run before
+  early returns, so `enabled` is the only thing that can hold them.
+- **`@better-auth/expo`'s published `getActions` is not assignable to `BetterAuthClientPlugin`**
+  under `strictFunctionTypes`. Left unhandled it silently takes `inferAdditionalFields` down with
+  the whole plugin tuple and erases `profileComplete` everywhere. `authClient.ts` overrides that one
+  declaration; re-check on every Better Auth upgrade and delete the override once upstream fixes it.
+- **Better Auth is stubbed in `jest.setup.js`, not transformed.** It is ESM-only across a deep chain
+  and loading it cost the suite ~3x its runtime for code no assertion touches, growing by a package
+  per release. `pnpm typecheck` is what keeps the seam honest, so a green jest run is not evidence
+  on its own here.
+
+**Hands off.** U3 (rigs), which owns the last failing `pnpm check` stage.
+
 ### Open findings
 
-- **U1 cannot close `pnpm check` on its own; the gate moves to the end of U2.** The plan assumed
-  the API-level rewrite would let U1 close green. It cannot: `apps/learner-app` consumes
-  `POST/DELETE /session` and `GET /me` through the typed `AppType`, so deleting them is a compile
-  error in `session.ts`, `queries.ts`, and their tests until the client cuts over. Everything else
-  in the workspace typechecks, lints, and tests green today. Not a defect — a unit-boundary
-  correction. Run `pnpm check` once U2 lands.
 - **U3 must stop choosing the realuse learner ref.** The rig reserves refs shaped
   `realuse-<role>-<runId>` and cleans up by that shape, but `learnerRef` is now a Better Auth
   generated `user.id`, so a real sign-up can never produce one. `cleanupReservedLearners` still
   validates the shape and `seedLearner` can still mint it, so the DB suite is honest; the *rig* is
   what breaks. Give the reserved shape to the sign-up **email** instead and resolve the id from the
   sign-up response, keeping the "no pattern deletes" guarantee.
-- **`@better-auth/expo` is not installed yet** (U2 owns it). Note that a `pnpm add` in this
-  workspace stalled once for ~8 minutes mid-fetch with resolution already written to the lockfile;
-  a plain `pnpm install` then finished it in seconds. If it hangs again, kill it and re-run
-  `pnpm install` rather than restarting the `add`.
+- **Every rig origin must be a trusted origin, or its writes 403 rather than 401.** Better Auth
+  CSRF-checks cookie-bearing writes against `trustedOrigins`, and a request with no `Origin` at all
+  is refused with `MISSING_OR_NULL_ORIGIN` — a browser always sends one, a scripted client does not.
+  `learnerWebOrigins()` currently lists the deployed origin plus `localhost:8881` and
+  `localhost:3000`; U3 must confirm the Playwright, realuse, and native fixture origins are among
+  them (the native leg is covered by the server `expo()` plugin, which rewrites the origin from the
+  `expo-origin` header).
