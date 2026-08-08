@@ -12,12 +12,12 @@
 
 - **Better Auth integration — in progress on `feat/better-auth`, U1 done.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
-  U1 landed the server and schema cutover: Better Auth mounted at `/auth/*`, `learnerRef` =
-  `user.id`, the whole PIN/bearer subsystem deleted, baseline regenerated. Next action: **U2, the
+  U1 landed at `f05c4d1`: Better Auth at `/auth/*`, `learnerRef` = `user.id`, the whole PIN/bearer
+  subsystem deleted, baseline regenerated, `pnpm test:db` + lint green. Next action: **U2, the
   client cutover** — which is also what unblocks `pnpm check`, since the app still compiles against
-  the routes U1 deleted (plan → `Open findings`). The Google OAuth client + `BETTER_AUTH_SECRET`
-  are user-owned manual actions tracked in [BLOCKERS](./BLOCKERS.md), needed only for U4, and can
-  happen in parallel.
+  the routes U1 deleted (plan → `Open findings`, which also carries the U3 realuse-ref consequence).
+  The Google OAuth client + `BETTER_AUTH_SECRET` are user-owned manual actions tracked in
+  [BLOCKERS](./BLOCKERS.md), needed only for U4, and can happen in parallel.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
