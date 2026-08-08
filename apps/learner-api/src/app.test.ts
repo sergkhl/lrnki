@@ -3,26 +3,42 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { createLearnerApp } from "./app";
 import type { DatabaseClient } from "./db";
-import { FixedWindowRateLimiter } from "./auth";
 
-// DB-free surface tests through Hono's fetch-native `app.request` (KTD6): validation,
-// auth, and throttle behavior never reach the pool, so the stub client is never invoked.
-const stubSql = new Proxy(() => {}, {
-  apply() {
-    throw new Error("unexpected database access");
-  }
-}) as unknown as DatabaseClient;
+// Better Auth reads its secret and public origin from the environment when the app is
+// constructed. `app.request` issues `http://localhost/...` URLs, so the base URL must agree or
+// the handler resolves a different origin than the one it is being called on.
+process.env.BETTER_AUTH_SECRET ??= "test-only-secret-never-used-by-any-deployment";
+process.env.BETTER_AUTH_URL ??= "http://localhost";
 
-test("health responds without auth", async () => {
-  const app = createLearnerApp(stubSql);
+// DB-free surface tests through Hono's fetch-native `app.request` (KTD6): validation, auth, and
+// throttle behavior never reach the pool. The stub answers only what Drizzle reads while
+// *constructing* the Better Auth adapter (it rewrites `options.parsers`/`options.serializers` in
+// place); every actual query still throws, which is what makes "never reached the pool" an
+// assertion rather than a hope. Two independent stubs, because the app takes two clients — the
+// auth one is Drizzle's to mutate, the store one must survive untouched.
+function makeStubSql(): DatabaseClient {
+  return new Proxy(() => {}, {
+    apply() {
+      throw new Error("unexpected database access");
+    },
+    get(_target, prop) {
+      return prop === "options" ? { parsers: {}, serializers: {} } : undefined;
+    }
+  }) as unknown as DatabaseClient;
+}
+const stubSql = makeStubSql();
+const authStubSql = makeStubSql();
+
+test("health responds without a session", async () => {
+  const app = createLearnerApp(stubSql, authStubSql);
   const res = await app.request("/health");
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { ok: true });
 });
 
-test("authenticated routes refuse a missing bearer token", async () => {
-  const app = createLearnerApp(stubSql);
-  for (const path of ["/journal", "/catalog", "/leaderboard", "/me"]) {
+test("authenticated routes refuse a request with no session cookie", async () => {
+  const app = createLearnerApp(stubSql, authStubSql);
+  for (const path of ["/journal", "/catalog", "/leaderboard"]) {
     const res = await app.request(path);
     assert.equal(res.status, 401, path);
   }
@@ -40,55 +56,37 @@ test("authenticated routes refuse a missing bearer token", async () => {
   assert.equal(referenceGrade.status, 401);
 });
 
-test("session route validates its body", async () => {
-  const app = createLearnerApp(stubSql);
-  const res = await app.request("/session", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ pin: "1234" })
-  });
-  assert.equal(res.status, 400);
+test("the identity surface is mounted and reports no session for an anonymous request", async () => {
+  const app = createLearnerApp(stubSql, authStubSql);
+  const res = await app.request("/auth/get-session");
+  assert.equal(res.status, 200);
+  assert.equal(await res.json(), null, "an anonymous session read resolves without touching the pool");
 });
 
-test("session route rejects a blank name without touching the store", async () => {
-  const app = createLearnerApp(stubSql);
-  const res = await app.request("/session", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ learnerStateRef: "   ", pin: "1234" })
-  });
-  assert.equal(res.status, 422);
-  assert.deepEqual(await res.json(), { error: "invalid_name" });
-});
-
-test("session route rate-limits a PIN sweep from one client", async () => {
-  const app = createLearnerApp(stubSql);
-  let last = 0;
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const res = await app.request("/session", {
+// The framework's own limiter replaced the hand-rolled fixed-window one (ADR-0041). What matters
+// is that it is ON and keyed per client IP: a burst from one address is cut off, and a different
+// address is unaffected. The allowed attempts fail with 500 here because the stub pool throws —
+// that is itself the evidence they reached the handler rather than the limiter.
+test("the sign-in route rate-limits a burst per client IP", async () => {
+  const app = createLearnerApp(stubSql, authStubSql);
+  const attempt = (ip: string) =>
+    app.request("/auth/sign-in/email", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
-      body: JSON.stringify({ learnerStateRef: " ", pin: String(1000 + attempt) })
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
+      body: JSON.stringify({ email: "sweep@test.invalid", password: "not-the-password" })
     });
-    last = res.status;
-  }
-  assert.equal(last, 429);
+
+  const statuses: number[] = [];
+  for (let i = 0; i < 8; i += 1) statuses.push((await attempt("203.0.113.9")).status);
+  assert.ok(statuses.includes(429), `a sustained burst is refused, got ${statuses.join(",")}`);
+  assert.equal(statuses.at(-1), 429, "once tripped the window stays closed");
+
+  // A distinct address is a distinct bucket — one attacker cannot lock everyone else out.
+  assert.notEqual((await attempt("198.51.100.7")).status, 429);
 });
 
-test("fixed window resets after the window elapses", () => {
-  let at = 0;
-  const limiter = new FixedWindowRateLimiter(2, 1000, () => at);
-  assert.equal(limiter.allow("k"), true);
-  assert.equal(limiter.allow("k"), true);
-  assert.equal(limiter.allow("k"), false);
-  at = 1001;
-  assert.equal(limiter.allow("k"), true);
-});
-
-// --- Recall Challenge routes (plan 2026-07-13-003 U3, KTD7) --------------------
-
-test("challenge routes refuse a missing bearer token", async () => {
-  const app = createLearnerApp(stubSql);
+test("challenge routes refuse a request with no session cookie", async () => {
+  const app = createLearnerApp(stubSql, authStubSql);
   for (const path of [`/challenge/scopes/${randomUUID()}`, `/challenge/${randomUUID()}`]) {
     assert.equal((await app.request(path)).status, 401, path);
   }
@@ -106,22 +104,33 @@ const maybeDb = databaseUrl ? test : test.skip;
 
 maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempotent replay, response_log untouched", async () => {
   const { createDatabaseClient, PostgresResponseLogStore, PostgresStudyItemBankStore } = await import("@lrnki/infrastructure-postgres");
+  const { deleteLearner } = await import("@lrnki/infrastructure-postgres/test-support");
   const sql = createDatabaseClient(databaseUrl as string);
-  const learner = `L-${randomUUID().slice(0, 8)}`;
+  // Better Auth gets its own client. Sharing one here does not merely couple the two — Drizzle
+  // rewrites the json/jsonb serializers of whatever client it wraps, so the very next
+  // `sql.json(...)` write on the shared pool throws ERR_INVALID_ARG_TYPE. This test is where that
+  // regression surfaces, because `PostgresStudyItemBankStore.persist` writes `explorable_terms`
+  // through `sql.json`.
+  const authClientSql = createDatabaseClient(databaseUrl as string);
+  let learner = "";
   try {
-    const app = createLearnerApp(sql as unknown as DatabaseClient);
-    // Register through the real session route to get a bearer token.
-    const session = await app.request("/session", {
+    const app = createLearnerApp(sql as unknown as DatabaseClient, authClientSql as unknown as DatabaseClient);
+    // Register through the real Better Auth credential route — the same one the rigs and the
+    // sign-in UI use — and carry its session cookie. Google is never driven by any test.
+    const signUp = await app.request("/auth/sign-up/email", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ intent: "create", learnerStateRef: learner, pin: "1234" })
+      body: JSON.stringify({ email: `challenge-${randomUUID()}@test.invalid`, password: `pw-${randomUUID()}`, name: "Challenge Tester" })
     });
-    assert.equal(session.status, 200);
-    const { token } = (await session.json()) as { token: string };
+    assert.equal(signUp.status, 200);
+    const cookie = signUp.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
+    assert.ok(cookie.length > 0, "sign-up issues the session cookie");
+    // `learnerStateRef` IS the Better Auth user id (ADR-0041) — nothing chooses it client-side.
+    learner = ((await signUp.json()) as { user: { id: string } }).user.id;
     const authed = (path: string, body?: unknown) =>
       app.request(path, {
         method: body === undefined ? "GET" : "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        headers: { cookie, "content-type": "application/json" },
         ...(body === undefined ? {} : { body: JSON.stringify(body) })
       });
 
@@ -255,11 +264,40 @@ maybeDb("recall challenge end-to-end: create, Last Stand, recovery win, idempote
     assert.notEqual(rematch.view.challengeId, challengeId);
     assert.equal((await authed("/challenge/abandon", { challengeId: rematch.view.challengeId, operationRef: randomUUID() })).status, 200);
     assert.equal((await authed(`/challenge/${rematch.view.challengeId}`)).status, 404);
+
+    // Signing out revokes the session server-side: the very next request with the SAME cookie
+    // is refused, because the cookie names a `session` row that no longer exists. The `origin`
+    // header is not decoration — Better Auth CSRF-checks cookie-bearing state changes against its
+    // trusted origins, and a browser always sends one. `app.request` does not, so omitting it here
+    // reads as a cross-site attempt and is refused 403.
+    const signOut = await app.request("/auth/sign-out", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", origin: process.env.BETTER_AUTH_URL as string },
+      body: "{}"
+    });
+    assert.equal(signOut.status, 200);
+    assert.equal((await authed("/journal")).status, 401, "the revoked cookie no longer names a live session");
   } finally {
-    await sql`DELETE FROM recall_challenges WHERE learner_state_ref = ${learner}`;
-    await sql`DELETE FROM response_log WHERE learner_state_ref = ${learner}`;
-    await sql`DELETE FROM learner_sessions WHERE learner_ref = ${learner}`;
-    await sql`DELETE FROM learners WHERE learner_ref = ${learner}`;
-    await sql.end();
+    // One FK-ordered teardown, owned by `testSupport` (ADR-0039 reads the deletion graph off the
+    // schema authority) rather than restated here.
+    if (learner) await deleteLearner(sql, learner);
+    await Promise.all([sql.end(), authClientSql.end()]);
+  }
+});
+
+// The regression that the codec mutation would otherwise reintroduce silently. Composing the app
+// must leave the STORE pool's `sql.json()` intact; if a future change hands Better Auth the shared
+// client again, this fails immediately and by name instead of surfacing as an unrelated write
+// blowing up somewhere in study-item persistence.
+maybeDb("composing the app leaves the store pool's json serialization intact", async () => {
+  const { createDatabaseClient } = await import("@lrnki/infrastructure-postgres");
+  const sql = createDatabaseClient(databaseUrl as string);
+  const authClientSql = createDatabaseClient(databaseUrl as string);
+  try {
+    createLearnerApp(sql as unknown as DatabaseClient, authClientSql as unknown as DatabaseClient);
+    const [row] = await sql<{ value: { terms: string[] } }[]>`SELECT ${sql.json({ terms: ["a", "b"] })}::jsonb AS value`;
+    assert.deepEqual(row.value, { terms: ["a", "b"] });
+  } finally {
+    await Promise.all([sql.end(), authClientSql.end()]);
   }
 });

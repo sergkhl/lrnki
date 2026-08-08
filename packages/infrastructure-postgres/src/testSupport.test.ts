@@ -11,9 +11,10 @@ import {
 
 // Integration tests for the durable real-use gate teardown (plan 2026-07-15-001 U1). Skipped when
 // TEST_DATABASE_URL is absent so the hermetic suite stays green; the explicit Verification Contract
-// command loads `.env` and MUST execute these. `src/schema/learnerState.ts` is the deletion-graph
-// authority (ADR-0039) — scenario 1 populates every learner-owned FK family so a missing table
-// (the recall_challenges / learner_sessions drift this unit fixed) fails loudly.
+// command loads `.env` and MUST execute these. `src/schema/learnerState.ts` plus the generated
+// `src/schema/auth.ts` are the deletion-graph authority (ADR-0039/ADR-0041) — scenario 1 populates
+// every learner-owned FK family, identity rows included, so a table `deleteLearner` forgets fails
+// loudly instead of leaving a zero-row assertion that is trivially true.
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
 const runIdChars = () => randomUUID().replace(/-/g, ""); // 32 hex chars — a valid [0-9a-z]{6,40} run id
@@ -52,8 +53,13 @@ maybe("deleteLearner removes every learner-owned FK family and leaves shared gra
     seeded.add(ref);
     await seedLearner(sql, ref);
 
-    // One row in every table that FKs to `learners`, plus the cascading children.
-    await sql`INSERT INTO learner_sessions (token_hash, learner_ref) VALUES (${randomUUID()}, ${ref})`;
+    // One row in every table that FKs to `user`, plus the cascading children. The two Better Auth
+    // tables are seeded here too: they cascade, so only an explicit row proves `deleteLearner`
+    // actually clears them rather than passing because nothing was ever there.
+    await sql`INSERT INTO session (id, expires_at, token, updated_at, user_id)
+              VALUES (${randomUUID()}, now() + interval '1 day', ${randomUUID()}, now(), ${ref})`;
+    await sql`INSERT INTO account (id, account_id, provider_id, user_id, updated_at)
+              VALUES (${randomUUID()}, ${ref}, 'credential', ${ref}, now())`;
     await sql`INSERT INTO learner_awards (award_id, learner_ref, award_type, dedupe_key, context)
               VALUES (${randomUUID()}, ${ref}, 'weekly_podium', ${runIdChars()}, ${sql.json({ rank: 1 })})`;
     await sql`INSERT INTO learner_expeditions (learner_expedition_id, learner_state_ref, kind, title, status)
@@ -92,7 +98,7 @@ maybe("deleteLearner removes every learner-owned FK family and leaves shared gra
 
     // Every learner-owned table is empty for this ref, including the cascaded challenge children.
     for (const [table, col] of [
-      ["learners", "learner_ref"], ["learner_sessions", "learner_ref"], ["learner_awards", "learner_ref"],
+      ["user", "id"], ["session", "user_id"], ["account", "user_id"], ["learner_awards", "learner_ref"],
       ["learner_expeditions", "learner_state_ref"], ["calibration_verdicts", "learner_state_ref"],
       ["lesson_reads", "learner_state_ref"], ["learner_scaffold_detours", "learner_state_ref"],
       ["response_log", "learner_state_ref"], ["recall_challenges", "learner_state_ref"]
@@ -136,11 +142,11 @@ maybe("cleanupReservedLearners removes only the exact reserved refs and preserve
     assert.deepEqual(deleted.sort(), [refs.desktop, refs.phone, refs.probe].sort());
 
     for (const ref of Object.values(refs)) {
-      const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM learners WHERE learner_ref = ${ref}`;
+      const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${ref}`;
       assert.equal(n, 0);
       seeded.delete(ref);
     }
-    const [{ n: unrel }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM learners WHERE learner_ref = ${unrelated}`;
+    const [{ n: unrel }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${unrelated}`;
     assert.equal(unrel, 1, "an unrelated (different-run) reserved learner is NOT deleted");
     if (enrichmentsBefore.length > 0) {
       const [{ n: preserved }] = await sql<{ n: number }[]>`
@@ -171,7 +177,7 @@ maybe("cleanupReservedLearners rejects unsafe input before issuing any SQL", asy
 
     // The one valid learner in a rejected mixed list was never deleted (validation precedes SQL).
     await assert.rejects(cleanupReservedLearners(sql, [phone, "realuse-phone-%"]), /non-reserved/);
-    const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM learners WHERE learner_ref = ${phone}`;
+    const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM "user" WHERE id = ${phone}`;
     assert.equal(n, 1, "a valid ref in a rejected batch is not touched");
   } finally {
     await sql.end();

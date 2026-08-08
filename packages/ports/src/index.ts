@@ -715,27 +715,24 @@ export interface LearnerExpeditionStorePort {
 }
 
 // ---------------------------------------------------------------------------
-// Learner Registry + Awards ports (plan 2026-07-07-005, R1/R8). The registry is the
-// identity table every learner-state FK keys against; awards are durable flair. Real
-// humans only — simulated rivals (KTD1) never touch either store.
+// Learner profile reads + Awards ports (ADR-0041, plan 2026-07-07-005 R8). Identity,
+// credentials, and sessions belong entirely to self-hosted Better Auth: its `user` table
+// is what every learner-state FK keys against, and nothing outside Better Auth creates,
+// renames, or deletes a learner. Awards are durable flair. Real humans only — simulated
+// rivals (KTD1) never touch either.
 // ---------------------------------------------------------------------------
 
-export interface Learner {
+export interface LearnerProfile {
   learnerRef: string;
   displayName: string;
-  pinHash: string;
   createdAt: string;
 }
 
-// The registry store (R1, R2). `create` enforces ref uniqueness at insert (the
-// name-taken path is a conflict, surfaced as `created: false`); `get` and `list`
-// feed the picker; `exists` is a cheap presence check. PIN verification lives in the
-// `enterLearnerSession` use-case, which reads `pinHash` off `get` — the store never
-// hashes or compares (KTD8).
-export interface LearnerStorePort {
-  create(input: { learnerRef: string; displayName: string; pinHash: string }): Promise<{ created: boolean }>;
-  get(learnerRef: string): Promise<Learner | undefined>;
-  list(): Promise<Learner[]>;
+// The read-only projection of Better Auth's `user` table (ADR-0041). Read-only is the whole
+// point: a write method here would be a second way to mint an identity, which is exactly what
+// the framework now owns. `list` feeds the weekly board and the Admin Lab learner loop.
+export interface LearnerProfileReadPort {
+  list(): Promise<LearnerProfile[]>;
   // Refs of learners with ANY study evidence — at least one response, lesson read, or
   // calibration verdict (plan 2026-07-07-007, R4/KTD2). A cheap existence read over the
   // projection's own inputs: a learner with none cannot score or hold a lifetime crystal,
@@ -766,15 +763,6 @@ export interface LearnerAwardsStorePort {
   }): Promise<{ recorded: boolean }>;
   listForLearner(learnerRef: string): Promise<LearnerAward[]>;
   listForLearners(learnerRefs: string[]): Promise<LearnerAward[]>;
-}
-
-// Opaque bearer sessions for the learner API (plan 2026-07-08-003, KTD3). The store
-// only ever sees the SHA-256 of the token — the raw token exists client-side only.
-// Revocation is deletion; `resolve` also bumps `last_seen_at`.
-export interface LearnerSessionStorePort {
-  create(input: { tokenHash: string; learnerRef: string }): Promise<void>;
-  resolve(tokenHash: string): Promise<{ learnerRef: string } | undefined>;
-  revoke(tokenHash: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

@@ -172,11 +172,17 @@ scripts/deploy-learner-api.sh   # git pull → build → migrate (verified) → 
 ```
 
 The `learner-api` container reads `DATABASE_URL` and `LITELLM_BASE_URL` from compose;
-`LITELLM_API_KEY` comes from the repo-root `.env`. The deploy brings the schema to current through
-the one-shot `migrate` service and aborts before touching the API if that container exits nonzero,
-so a healthy old API can never report a successful deploy over a failed migration. A migration that
-reports reset-required is never resolved by the deploy — it waits for the explicit reset runbook.
-Learner sessions persist in `learner_sessions` and survive restarts.
+`LITELLM_API_KEY`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, and
+`GOOGLE_CLIENT_SECRET` come from the repo-root `.env`. The deploy brings the schema to current
+through the one-shot `migrate` service and aborts before touching the API if that container exits
+nonzero, so a healthy old API can never report a successful deploy over a failed migration. A
+migration that reports reset-required is never resolved by the deploy — it waits for the explicit
+reset runbook. Learner sessions are Better Auth rows in `session`
+([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)) and survive
+restarts; `BETTER_AUTH_SECRET` signs their cookies, so **rotating it signs every learner out**.
+`BETTER_AUTH_URL` must be the API's public origin — it is what Google redirects back to
+(`${BETTER_AUTH_URL}/auth/callback/google`), so a wrong value fails only the real OAuth round trip,
+never the local credential path.
 
 **The deploy does not reload LiteLLM.** It rebuilds `migrate`, `learner-api`, and `caddy` only.
 `litellm/config.yaml` is a read-only bind read once at process start, and `store_model_in_db` is

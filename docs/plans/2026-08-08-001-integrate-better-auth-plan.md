@@ -18,17 +18,15 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Integrate Self-Hosted Better Auth
 
-**Status:** Ready, next in the execution order. No unit started. The matching work it was queued
-behind is closed and its plan deleted (outcome in [TODO](./TODO.md) `COMPLETED`, detail in git at
-`4ea7e64`). Next action: merge `fix/matching-item-quality` into `main`, then branch `feat/better-auth`
-off `main` and open U1.
+**Status:** In progress on `feat/better-auth`. **U1 (server + schema) is complete**; U2–U4 remain.
+Next action: open U2, the client cutover — which is also what unblocks the `pnpm check` gate, since
+the app still consumes the routes U1 deleted (see `Open findings`).
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
 
-**Precondition:** `fix/matching-item-quality` merged to `main` — the work is closed, the merge is the
-remaining mechanical step. The shared-environment hard reset in U4 must not land while another branch
-is mid-validation against the old shared data (D9).
+**Precondition:** met — `fix/matching-item-quality` is in `main`. The shared-environment hard reset
+in U4 must not land while another branch is mid-validation against the old shared data (D9).
 
 ## Goal capsule
 
@@ -256,12 +254,12 @@ follows the existing reset runbook (README `## Deployment`), then `scripts/deplo
 
 ## Implementation units
 
-### U1 — server and schema cutover
+### U1 — server and schema cutover — **done**
 
 Better Auth instance + Drizzle adapter + generated schema file; mount handler; session middleware
 replaces `bearerAuth`; FK repoint and baseline regeneration; the U1 deletion list above; the
-display-name read port; ADR work in the same change. Tests: `app.test.ts` rewritten (see U3 scope
-note — the API-level rewrite lands here so U1 closes green); `pnpm check` and `pnpm test:db` green.
+display-name read port; ADR work in the same change; `app.test.ts` rewritten over the credential
+endpoints. Its gate is in the Validation Log.
 
 ### U2 — client cutover
 
@@ -314,9 +312,51 @@ the deployed stack, not a local Caddy:
 
 ## Validation Log
 
-One entry per closed implementation unit; see the hygiene comment at the top of this file. No unit
-has started.
+One entry per closed implementation unit; see the hygiene comment at the top of this file.
+
+### U1 — server and schema cutover (2026-08-08, branch `feat/better-auth`)
+
+**Proved.** Better Auth 1.6.26 is the only identity authority on the server: `/auth/*` mounted
+inside `learner-api`, session cookie → `learnerStateRef` = `user.id`, and the whole placeholder
+subsystem deleted (PIN hashing, token mint/hash, `FixedWindowRateLimiter`, `POST/DELETE /session`,
+`GET /me`, `learners`, `learner_sessions`, both registry ports and their stores). `schema/auth.ts`
+is generated, cross-checked field-for-field against the installed runtime's own `getAuthTables`
+before commit; the `0000` baseline regenerated mechanically and `pnpm db:check` is in sync.
+`pnpm test:db` green with zero failures in every package; `pnpm lint` clean; everything except
+`apps/learner-app` typechecks (see `Open findings`).
+
+**Invariants a later unit or re-run must not break.**
+
+- **Better Auth's Drizzle client is never the store pool.** `drizzle(client)` rewrites its client's
+  json/jsonb serializers in place, so sharing one strips `sql.json()` from every store on that pool
+  — a production write failure, not a test artifact. `createLearnerApp` takes the two clients
+  separately for exactly this reason, and `composing the app leaves the store pool's json
+  serialization intact` fails by name if they are merged again (verified by mutation).
+- **The API refuses to boot without `BETTER_AUTH_SECRET`, and compose gives it no default.** The
+  library's own fallback is a secret published in its source, guarded only by `NODE_ENV=production`
+  which this repo leaves unset.
+- **Sign-in rate limiting is per-IP** (3 per 10 s on `/sign-in/*`, from `x-forwarded-for`, which
+  Caddy ≥2.7 overwrites for untrusted peers). One address's burst must never lock out another's.
+- Any raw SQL against `user` uses **snake_case columns** (`email_verified`); the Drizzle property
+  names the adapter binds to are camelCase. Both live in the generated file.
+
+**Hands off.** U2 (client) — and U2 is what makes `pnpm check` runnable again.
 
 ### Open findings
 
-None.
+- **U1 cannot close `pnpm check` on its own; the gate moves to the end of U2.** The plan assumed
+  the API-level rewrite would let U1 close green. It cannot: `apps/learner-app` consumes
+  `POST/DELETE /session` and `GET /me` through the typed `AppType`, so deleting them is a compile
+  error in `session.ts`, `queries.ts`, and their tests until the client cuts over. Everything else
+  in the workspace typechecks, lints, and tests green today. Not a defect — a unit-boundary
+  correction. Run `pnpm check` once U2 lands.
+- **U3 must stop choosing the realuse learner ref.** The rig reserves refs shaped
+  `realuse-<role>-<runId>` and cleans up by that shape, but `learnerRef` is now a Better Auth
+  generated `user.id`, so a real sign-up can never produce one. `cleanupReservedLearners` still
+  validates the shape and `seedLearner` can still mint it, so the DB suite is honest; the *rig* is
+  what breaks. Give the reserved shape to the sign-up **email** instead and resolve the id from the
+  sign-up response, keeping the "no pattern deletes" guarantee.
+- **`@better-auth/expo` is not installed yet** (U2 owns it). Note that a `pnpm add` in this
+  workspace stalled once for ~8 minutes mid-fetch with resolution already written to the lockfile;
+  a plain `pnpm install` then finished it in seconds. If it hangs again, kill it and re-run
+  `pnpm install` rather than restarting the `add`.

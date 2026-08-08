@@ -1,3 +1,52 @@
+CREATE TABLE "account" (
+	"id" text PRIMARY KEY NOT NULL,
+	"account_id" text NOT NULL,
+	"provider_id" text NOT NULL,
+	"user_id" text NOT NULL,
+	"access_token" text,
+	"refresh_token" text,
+	"id_token" text,
+	"access_token_expires_at" timestamp,
+	"refresh_token_expires_at" timestamp,
+	"scope" text,
+	"password" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "session" (
+	"id" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"token" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"user_id" text NOT NULL,
+	CONSTRAINT "session_token_unique" UNIQUE("token")
+);
+--> statement-breakpoint
+CREATE TABLE "user" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"email_verified" boolean DEFAULT false NOT NULL,
+	"image" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"profile_complete" boolean DEFAULT false,
+	CONSTRAINT "user_email_unique" UNIQUE("email")
+);
+--> statement-breakpoint
+CREATE TABLE "verification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"identifier" text NOT NULL,
+	"value" text NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "concept_admission_decisions" (
 	"concept_admission_decision_id" uuid PRIMARY KEY NOT NULL,
 	"concept_candidate_id" uuid NOT NULL,
@@ -744,20 +793,6 @@ CREATE TABLE "learner_scaffold_steps" (
       ))
 );
 --> statement-breakpoint
-CREATE TABLE "learner_sessions" (
-	"token_hash" text PRIMARY KEY NOT NULL,
-	"learner_ref" text NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"last_seen_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "learners" (
-	"learner_ref" text PRIMARY KEY NOT NULL,
-	"display_name" text NOT NULL,
-	"pin_hash" text NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "lesson_reads" (
 	"learner_state_ref" text NOT NULL,
 	"derived_node_id" uuid NOT NULL,
@@ -894,6 +929,8 @@ CREATE TABLE "operation_runs" (
 	CONSTRAINT "operation_runs_check" CHECK (operation_type <> 'scaffold' OR config_hash IS NOT NULL)
 );
 --> statement-breakpoint
+ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_admission_decisions" ADD CONSTRAINT "concept_admission_decisions_concept_candidate_id_fkey" FOREIGN KEY ("concept_candidate_id") REFERENCES "public"."concept_candidates"("concept_candidate_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_candidate_mentions" ADD CONSTRAINT "concept_candidate_mentions_concept_candidate_id_fkey" FOREIGN KEY ("concept_candidate_id") REFERENCES "public"."concept_candidates"("concept_candidate_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "concept_candidate_mentions" ADD CONSTRAINT "concept_candidate_mentions_source_block_id_fkey" FOREIGN KEY ("source_block_id") REFERENCES "public"."source_blocks"("source_block_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -977,34 +1014,36 @@ ALTER TABLE "study_item_options" ADD CONSTRAINT "study_item_options_study_item_i
 ALTER TABLE "study_items" ADD CONSTRAINT "study_items_graph_version_id_fkey" FOREIGN KEY ("graph_version_id") REFERENCES "public"."graph_versions"("graph_version_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "study_items" ADD CONSTRAINT "study_items_enrichment_id_fkey" FOREIGN KEY ("enrichment_id") REFERENCES "public"."graph_enrichments"("enrichment_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "study_items" ADD CONSTRAINT "study_items_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "calibration_verdicts" ADD CONSTRAINT "calibration_verdicts_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "calibration_verdicts" ADD CONSTRAINT "calibration_verdicts_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "calibration_verdicts" ADD CONSTRAINT "calibration_verdicts_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "learner_awards" ADD CONSTRAINT "learner_awards_learner_ref_fkey" FOREIGN KEY ("learner_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "learner_expeditions" ADD CONSTRAINT "learner_expeditions_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "learner_awards" ADD CONSTRAINT "learner_awards_learner_ref_fkey" FOREIGN KEY ("learner_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "learner_expeditions" ADD CONSTRAINT "learner_expeditions_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_expeditions" ADD CONSTRAINT "learner_expeditions_enrichment_id_fkey" FOREIGN KEY ("enrichment_id") REFERENCES "public"."graph_enrichments"("enrichment_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "learner_scaffold_detours" ADD CONSTRAINT "learner_scaffold_detours_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "learner_scaffold_detours" ADD CONSTRAINT "learner_scaffold_detours_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_scaffold_detours" ADD CONSTRAINT "learner_scaffold_detours_enrichment_id_fkey" FOREIGN KEY ("enrichment_id") REFERENCES "public"."graph_enrichments"("enrichment_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_scaffold_detours" ADD CONSTRAINT "learner_scaffold_detours_parent_derived_node_id_fkey" FOREIGN KEY ("parent_derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_scaffold_steps" ADD CONSTRAINT "learner_scaffold_steps_detour_id_fkey" FOREIGN KEY ("detour_id") REFERENCES "public"."learner_scaffold_detours"("detour_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_scaffold_steps" ADD CONSTRAINT "learner_scaffold_steps_referenced_derived_node_id_fkey" FOREIGN KEY ("referenced_derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_scaffold_steps" ADD CONSTRAINT "learner_scaffold_steps_referenced_concept_lesson_id_refere_fkey" FOREIGN KEY ("referenced_concept_lesson_id","referenced_derived_node_id") REFERENCES "public"."concept_lessons"("concept_lesson_id","derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "learner_scaffold_steps" ADD CONSTRAINT "learner_scaffold_steps_referenced_study_item_id_referenced_fkey" FOREIGN KEY ("referenced_study_item_id","referenced_study_item_type","referenced_derived_node_id") REFERENCES "public"."study_items"("study_item_id","item_type","derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "learner_sessions" ADD CONSTRAINT "learner_sessions_learner_ref_fkey" FOREIGN KEY ("learner_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "lesson_reads" ADD CONSTRAINT "lesson_reads_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "lesson_reads" ADD CONSTRAINT "lesson_reads_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "lesson_reads" ADD CONSTRAINT "lesson_reads_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenge_events" ADD CONSTRAINT "recall_challenge_events_challenge_id_fkey" FOREIGN KEY ("challenge_id") REFERENCES "public"."recall_challenges"("challenge_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenge_events" ADD CONSTRAINT "recall_challenge_events_study_item_id_fkey" FOREIGN KEY ("study_item_id") REFERENCES "public"."study_items"("study_item_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenge_lineup" ADD CONSTRAINT "recall_challenge_lineup_challenge_id_fkey" FOREIGN KEY ("challenge_id") REFERENCES "public"."recall_challenges"("challenge_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenge_lineup" ADD CONSTRAINT "recall_challenge_lineup_study_item_id_fkey" FOREIGN KEY ("study_item_id") REFERENCES "public"."study_items"("study_item_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenge_lineup" ADD CONSTRAINT "recall_challenge_lineup_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "recall_challenges" ADD CONSTRAINT "recall_challenges_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "recall_challenges" ADD CONSTRAINT "recall_challenges_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenges" ADD CONSTRAINT "recall_challenges_enrichment_id_fkey" FOREIGN KEY ("enrichment_id") REFERENCES "public"."graph_enrichments"("enrichment_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recall_challenges" ADD CONSTRAINT "recall_challenges_scope_anchor_derived_node_id_fkey" FOREIGN KEY ("scope_anchor_derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "response_log" ADD CONSTRAINT "response_log_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."learners"("learner_ref") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "response_log" ADD CONSTRAINT "response_log_learner_state_ref_fkey" FOREIGN KEY ("learner_state_ref") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "response_log" ADD CONSTRAINT "response_log_study_item_id_fkey" FOREIGN KEY ("study_item_id") REFERENCES "public"."study_items"("study_item_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "response_log" ADD CONSTRAINT "response_log_derived_node_id_fkey" FOREIGN KEY ("derived_node_id") REFERENCES "public"."derived_graph_nodes"("derived_node_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "response_log" ADD CONSTRAINT "response_log_scaffold_step_id_fkey" FOREIGN KEY ("scaffold_step_id") REFERENCES "public"."learner_scaffold_steps"("scaffold_step_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "operation_run_stages" ADD CONSTRAINT "operation_run_stages_operation_run_id_fkey" FOREIGN KEY ("operation_run_id") REFERENCES "public"."operation_runs"("operation_run_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
 CREATE UNIQUE INDEX "concept_lessons_one_current_per_node" ON "concept_lessons" USING btree ("derived_node_id") WHERE superseded_at IS NULL;--> statement-breakpoint
 CREATE INDEX "concept_lessons_enrichment_current_idx" ON "concept_lessons" USING btree ("enrichment_id") WHERE superseded_at IS NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "impostor_statements_one_impostor_per_item" ON "impostor_statements" USING btree ("study_item_id") WHERE is_impostor;--> statement-breakpoint
@@ -1017,7 +1056,6 @@ CREATE UNIQUE INDEX "learner_expeditions_one_enrichment_per_learner" ON "learner
 CREATE INDEX "learner_expeditions_learner_state_ref_idx" ON "learner_expeditions" USING btree ("learner_state_ref","created_at" DESC NULLS FIRST);--> statement-breakpoint
 CREATE INDEX "learner_expeditions_enrichment_idx" ON "learner_expeditions" USING btree ("enrichment_id");--> statement-breakpoint
 CREATE INDEX "learner_scaffold_detours_active_idx" ON "learner_scaffold_detours" USING btree ("learner_state_ref","enrichment_id") WHERE status <> 'hidden';--> statement-breakpoint
-CREATE INDEX "learner_sessions_learner_idx" ON "learner_sessions" USING btree ("learner_ref");--> statement-breakpoint
 CREATE UNIQUE INDEX "recall_challenge_events_attempt_idempotency" ON "recall_challenge_events" USING btree ("challenge_id","attempt_ref") WHERE attempt_ref IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "recall_challenge_events_operation_idempotency" ON "recall_challenge_events" USING btree ("challenge_id","operation_ref") WHERE operation_ref IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "recall_challenges_one_active_per_scope" ON "recall_challenges" USING btree ("learner_state_ref","enrichment_id","scope_kind","scope_anchor_derived_node_id") WHERE status = 'active';--> statement-breakpoint

@@ -14,7 +14,10 @@ import { createLearnerApp } from "./app";
 // LEARNER_WEB_ORIGIN (the exact-match CORS origin). No LiteLLM/provider/Expo secret is inherited.
 const port = Number(process.env.LEARNER_API_PORT ?? 8790);
 const sql = createDatabaseClient(); // throws if DATABASE_URL is missing — the runner guarantees it
-const app = createLearnerApp(sql);
+// Better Auth needs a client of its own; sharing `sql` would strip json serialization from every
+// store on it (see `createAuthDatabase`). Closed alongside `sql` in `shutdown`.
+const authClientSql = createDatabaseClient();
+const app = createLearnerApp(sql, authClientSql);
 
 const server = serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
   console.log(`[realuse-api] supervisor-free learner-api on http://127.0.0.1:${info.port}`);
@@ -26,7 +29,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   closing = true;
   console.log(`[realuse-api] ${signal} — closing HTTP + database`);
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  await sql.end({ timeout: 5 });
+  await Promise.all([sql.end({ timeout: 5 }), authClientSql.end({ timeout: 5 })]);
   process.exit(0);
 }
 process.on("SIGINT", () => void shutdown("SIGINT"));

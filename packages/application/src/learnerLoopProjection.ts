@@ -1,5 +1,5 @@
 import { neutralResponses, type CalibrationVerdict, type JudgedOutcome, type NeutralResponseLogRow, type ResponseLogRow } from "@lrnki/domain-core";
-import type { LearnerLoopReadPort, LearnerStorePort } from "@lrnki/ports";
+import type { LearnerLoopReadPort, LearnerProfileReadPort } from "@lrnki/ports";
 import { foldConceptMastery } from "./responseLogLearnerState";
 
 // Pure learner-loop projection folds (ADR-0027 projection compute, KTD7). These turn a
@@ -186,10 +186,10 @@ export async function listLearnerStates(loopRead: LearnerLoopReadPort): Promise<
 }
 
 export async function listLearnerAdminSummaries(deps: {
-  learnerStore: LearnerStorePort;
+  learnerProfileRead: LearnerProfileReadPort;
   loopRead: LearnerLoopReadPort;
 }): Promise<LearnerAdminRegistry> {
-  const [registeredLearners, activitySummaries] = await Promise.all([deps.learnerStore.list(), listLearnerStates(deps.loopRead)]);
+  const [registeredLearners, activitySummaries] = await Promise.all([deps.learnerProfileRead.list(), listLearnerStates(deps.loopRead)]);
   const activityByLearnerRef = new Map(activitySummaries.map((summary) => [summary.learnerStateRef, summary] as const));
 
   const learners = registeredLearners

@@ -7,40 +7,41 @@ import type { Sql } from "postgres";
 // The FK operation_run_stages.operation_run_id → operation_runs is NO ACTION (no
 // cascade), so child stage rows are deleted before their parents. Scoping by
 // operation_id also cleans the shared-id case where two parents share one id.
-// The four learner-state tables FK to `learners` (plan 2026-07-07-005, R1), so an
-// integration test that writes verdicts / responses / lesson-reads / expeditions must
-// first register the learner. Idempotent placeholder insert — the PIN is irrelevant to
-// state-table tests.
+// Every learner-state table FKs to Better Auth's `user` (ADR-0041), so an integration test that
+// writes verdicts / responses / lesson-reads / expeditions must first seed the identity row.
+// This is the ONE place outside Better Auth that writes `user`, and it exists only because
+// driving a real sign-up for a store-level test would couple every DB suite to the HTTP surface.
 // Every learner ref a suite has created, so its `after` hook can delete exactly those rows
 // (plan 2026-07-07-007, R2) — no pattern deletes, and junk stops accumulating in the shared
-// dev DB. Populated by `seedLearner` and by explicit `trackLearner` for registry `create`
-// paths that bypass the seed helper. Per-file (node runs each test file in its own process).
+// dev DB. Populated by `seedLearner` and by explicit `trackLearner` for paths that mint an
+// identity themselves. Per-file (node runs each test file in its own process).
 const trackedLearnerRefs = new Set<string>();
 
 export async function seedLearner(sql: Sql, learnerRef: string): Promise<string> {
   await sql`
-    INSERT INTO learners (learner_ref, display_name, pin_hash)
-    VALUES (${learnerRef}, ${learnerRef}, 'test-pin-hash')
-    ON CONFLICT (learner_ref) DO NOTHING`;
+    INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
+    VALUES (${learnerRef}, ${learnerRef}, ${`${learnerRef}@test.invalid`}, false, now(), now())
+    ON CONFLICT (id) DO NOTHING`;
   trackedLearnerRefs.add(learnerRef);
   return learnerRef;
 }
 
-// Record a learner ref created outside `seedLearner` (e.g. a registry `create`) so the
-// suite's cleanup deletes it too. Returns the ref for inline use.
+// Record a learner ref created outside `seedLearner` (e.g. a real sign-up through the API) so
+// the suite's cleanup deletes it too. Returns the ref for inline use.
 export function trackLearner(learnerRef: string): string {
   trackedLearnerRefs.add(learnerRef);
   return learnerRef;
 }
 
 // FK-ordered delete of one learner and every learner-owned table (ADR-0039: the deletion graph is
-// read off the schema authority, `src/schema/learnerState.ts`, never off the generated SQL).
-// Children first, then the `learners` row. Ordering constraints, all read off that FK graph:
+// read off the schema authority, `src/schema/learnerState.ts` and the generated `src/schema/auth.ts`,
+// never off the generated SQL). Children first, then the `user` row. Ordering constraints, all read
+// off that FK graph:
 //   - recall_challenges cascades its lineup + events, so a plain challenge delete clears them.
 //   - response_log carries a scaffold_step_id FK into learner_scaffold_steps (which cascade from
 //     their detour), so response_log MUST be deleted before learner_scaffold_detours.
-//   - learner_sessions cascades on the learners delete, but is removed explicitly for clarity and
-//     so this function is complete on its own (not reliant on cascade side effects).
+//   - Better Auth's `session` and `account` cascade on the `user` delete, but are removed
+//     explicitly so this function is complete on its own, not reliant on cascade side effects.
 export async function deleteLearner(sql: Sql, learnerRef: string): Promise<void> {
   await sql`DELETE FROM recall_challenges WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM response_log WHERE learner_state_ref = ${learnerRef}`;
@@ -49,11 +50,12 @@ export async function deleteLearner(sql: Sql, learnerRef: string): Promise<void>
   await sql`DELETE FROM lesson_reads WHERE learner_state_ref = ${learnerRef}`;
   await sql`DELETE FROM learner_awards WHERE learner_ref = ${learnerRef}`;
   await sql`DELETE FROM learner_expeditions WHERE learner_state_ref = ${learnerRef}`;
-  await sql`DELETE FROM learner_sessions WHERE learner_ref = ${learnerRef}`;
-  await sql`DELETE FROM learners WHERE learner_ref = ${learnerRef}`;
+  await sql`DELETE FROM session WHERE user_id = ${learnerRef}`;
+  await sql`DELETE FROM account WHERE user_id = ${learnerRef}`;
+  await sql`DELETE FROM "user" WHERE id = ${learnerRef}`;
 }
 
-// A suite's `after` hook: delete every learner it created (AE2 — the `learners` row count is
+// A suite's `after` hook: delete every learner it created (AE2 — the `user` row count is
 // unchanged by the run). Opens its own short-lived client because per-test clients are ended.
 export async function cleanupTrackedLearners(databaseUrl: string | undefined): Promise<void> {
   if (!databaseUrl || trackedLearnerRefs.size === 0) return;
@@ -116,8 +118,8 @@ export async function cleanupReservedLearners(sql: Sql, refs: readonly string[])
   }
   const deleted: string[] = [];
   for (const ref of seen) {
-    const [existing] = await sql<{ learner_ref: string }[]>`
-      SELECT learner_ref FROM learners WHERE learner_ref = ${ref}`;
+    const [existing] = await sql<{ id: string }[]>`
+      SELECT id FROM "user" WHERE id = ${ref}`;
     if (!existing) continue;
     // postgres types don't declare TransactionSql assignable to Sql, but the tagged-template
     // surface deleteLearner uses is identical; the cast keeps the whole delete in one transaction.

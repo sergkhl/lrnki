@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CalibrationVerdict, NeutralResponseLogRow, ResponseLogRow, Verdict, JudgedOutcome } from "@lrnki/domain-core";
-import type { Learner, LearnerLoopReadPort, LearnerStorePort } from "@lrnki/ports";
+import type { LearnerProfile, LearnerLoopReadPort, LearnerProfileReadPort } from "@lrnki/ports";
 import { buildMasteryMap, detectConflicts, listLearnerAdminSummaries, summarizeLearnerStates, summarizeResponseSources } from "./learnerLoopProjection";
 
 let seq = 0;
@@ -11,17 +11,11 @@ function verdict(derivedNodeId: string, v: Verdict, learnerStateRef = "L1"): Cal
 function graded(derivedNodeId: string, outcome: JudgedOutcome, source: "synthetic" | "human" = "synthetic", learnerStateRef = "L1"): NeutralResponseLogRow & { createdAt: string } {
   return { responseId: `r${++seq}`, learnerStateRef, scope: "neutral", studyItemId: `studyItem-${derivedNodeId}`, derivedNodeId, signalType: "graded", judgedOutcome: outcome, gradedScore: outcome === "correct" ? 1 : outcome === "partial" ? 0.5 : 0, responseSource: source, graderIdentity: "kg-independent-judge", attemptSeq: seq, batchId: null, submittedAnswer: "answer", createdAt: new Date().toISOString() };
 }
-function learner(learnerRef: string, displayName = learnerRef, createdAt = "2026-06-01T00:00:00.000Z"): Learner {
-  return { learnerRef, displayName, pinHash: "hash", createdAt };
+function learner(learnerRef: string, displayName = learnerRef, createdAt = "2026-06-01T00:00:00.000Z"): LearnerProfile {
+  return { learnerRef, displayName, createdAt };
 }
-function fakeLearnerStore(rows: Learner[]): LearnerStorePort {
+function fakeProfileRead(rows: LearnerProfile[]): LearnerProfileReadPort {
   return {
-    async create() {
-      return { created: false };
-    },
-    async get(learnerRef) {
-      return rows.find((row) => row.learnerRef === learnerRef);
-    },
     async list() {
       return rows;
     },
@@ -104,7 +98,7 @@ test("summarizeLearnerStates includes a learner with verdicts but no graded rows
 
 test("listLearnerAdminSummaries includes a registered learner with no activity", async () => {
   const registry = await listLearnerAdminSummaries({
-    learnerStore: fakeLearnerStore([learner("L1", "Quiet Learner")]),
+    learnerProfileRead: fakeProfileRead([learner("L1", "Quiet Learner")]),
     loopRead: fakeLoopRead([], [])
   });
 
@@ -128,7 +122,7 @@ test("listLearnerAdminSummaries merges learner activity and aggregates stats", a
   l1Conflict.createdAt = "2026-06-20T11:00:00.000Z";
 
   const registry = await listLearnerAdminSummaries({
-    learnerStore: fakeLearnerStore([learner("L1", "Active Learner"), learner("L2", "Verdict Only")]),
+    learnerProfileRead: fakeProfileRead([learner("L1", "Active Learner"), learner("L2", "Verdict Only")]),
     loopRead: fakeLoopRead([l1Correct, l1Conflict], [verdict("nB", "known", "L1"), verdict("nC", "known", "L2")])
   });
 

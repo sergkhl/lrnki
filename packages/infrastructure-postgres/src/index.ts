@@ -1,4 +1,5 @@
 export { createDatabaseClient } from "./db";
+export { createAuthDatabase } from "./authDatabase";
 export { databaseConnectivityFailureCode } from "./databaseConnectivity";
 export {
   PostgresSourceRegistrationStore,
@@ -14,7 +15,7 @@ export { PostgresStudyItemBankStore, PostgresConceptLessonStore, PostgresEnrichm
 export { PostgresLearnerScaffoldStore, PostgresScaffoldReferenceActivityRead } from "./PostgresLearnerScaffoldStore";
 export { PostgresLearnerExpeditionStore } from "./PostgresLearnerExpeditionStore";
 export { PostgresLearnerRecallChallengeStore } from "./PostgresLearnerRecallChallengeStore";
-export { PostgresLearnerStore, PostgresLearnerAwardsStore, PostgresLearnerSessionStore } from "./PostgresLearnerRegistryStores";
+export { PostgresLearnerProfileRead, PostgresLearnerAwardsStore } from "./PostgresLearnerProfileStores";
 export { PostgresRunProgressReporter } from "./PostgresRunProgressReporter";
 export { PostgresOperationTimelineRead } from "./PostgresOperationTimelineRead";
 export { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";

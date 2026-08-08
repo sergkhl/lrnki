@@ -90,10 +90,10 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 ## Active implementation plans (execution order)
 
 - [2026-08-08-001 — Integrate self-hosted Better Auth](./2026-08-08-001-integrate-better-auth-plan.md) —
-  **Ready, next.** Interview-locked (D1–D9): Better Auth inside `learner-api` replaces the PIN
-  placeholder — Google primary + email/password e2e fallback, cookie sessions on both platforms,
-  `learnerRef` = `user.id`, hard reset. Its precondition is met (matching is closed); branch
-  `feat/better-auth` off `main`.
+  **In progress on `feat/better-auth`; U1 (server + schema) done.** Interview-locked (D1–D9):
+  Google primary + email/password e2e fallback, cookie sessions on both platforms, `learnerRef` =
+  `user.id`, hard reset. Next is U2, the client cutover, which is also what makes `pnpm check`
+  runnable again.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)

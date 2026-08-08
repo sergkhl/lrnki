@@ -16,17 +16,13 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { user } from "./auth.js";
 import { derivedGraphNodes, graphEnrichments } from "./derivedGraph.js";
 import { conceptLessons, studyItems } from "./learningAssets.js";
 
-export const learners = pgTable("learners", {
-  learnerRef: text("learner_ref").primaryKey().notNull(),
-  displayName: text("display_name").notNull(),
-  pinHash: text("pin_hash").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-    .defaultNow()
-    .notNull(),
-});
+// Every learner-state table keys against Better Auth's `user.id`
+// (docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md). `./auth.js` is a
+// generated file: identity columns are never declared here, only referenced.
 
 export const learnerAwards = pgTable(
   "learner_awards",
@@ -43,7 +39,7 @@ export const learnerAwards = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "learner_awards_learner_ref_fkey",
     }),
     unique("learner_awards_learner_ref_award_type_dedupe_key_key").on(
@@ -56,28 +52,6 @@ export const learnerAwards = pgTable(
       table.createdAt.desc().nullsFirst(),
     ),
     check("learner_awards_award_type_check", sql`award_type IN ('weekly_podium')`),
-  ],
-);
-
-export const learnerSessions = pgTable(
-  "learner_sessions",
-  {
-    tokenHash: text("token_hash").primaryKey().notNull(),
-    learnerRef: text("learner_ref").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.learnerRef],
-      foreignColumns: [learners.learnerRef],
-      name: "learner_sessions_learner_ref_fkey",
-    }).onDelete("cascade"),
-    index("learner_sessions_learner_idx").on(table.learnerRef),
   ],
 );
 
@@ -107,7 +81,7 @@ export const learnerExpeditions = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerStateRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "learner_expeditions_learner_state_ref_fkey",
     }),
     foreignKey({
@@ -161,7 +135,7 @@ export const calibrationVerdicts = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerStateRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "calibration_verdicts_learner_state_ref_fkey",
     }),
     foreignKey({
@@ -189,7 +163,7 @@ export const lessonReads = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerStateRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "lesson_reads_learner_state_ref_fkey",
     }),
     foreignKey({
@@ -228,7 +202,7 @@ export const learnerScaffoldDetours = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerStateRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "learner_scaffold_detours_learner_state_ref_fkey",
     }),
     foreignKey({
@@ -347,7 +321,7 @@ export const responseLog = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerStateRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "response_log_learner_state_ref_fkey",
     }),
     foreignKey({
@@ -417,7 +391,7 @@ export const recallChallenges = pgTable(
   (table) => [
     foreignKey({
       columns: [table.learnerStateRef],
-      foreignColumns: [learners.learnerRef],
+      foreignColumns: [user.id],
       name: "recall_challenges_learner_state_ref_fkey",
     }),
     foreignKey({

@@ -1,3 +1,4 @@
+export * from "./auth.js";
 export * from "./sourcesAndExtraction.js";
 export * from "./publishedGraph.js";
 export * from "./derivedGraph.js";

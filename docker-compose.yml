@@ -138,10 +138,19 @@ services:
         condition: service_completed_successfully
       litellm:
         condition: service_healthy
+    # Identity and sessions (ADR-0041). These carry NO compose default on purpose: an empty
+    # `BETTER_AUTH_SECRET` makes the API refuse to start, which is the whole point — Better Auth
+    # otherwise falls back to a secret published in its own source and only rejects that fallback
+    # when NODE_ENV=production, which this repo deliberately leaves unset. A loud boot failure
+    # beats a container that silently signs every learner's cookie with a public key.
     environment:
       DATABASE_URL: postgresql://lrnki:lrnki@postgres:5432/lrnki
       LITELLM_BASE_URL: http://litellm:4000
       LITELLM_API_KEY: ${LITELLM_API_KEY:-sk-local}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-https://api.lrnki.globesoul.com}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s

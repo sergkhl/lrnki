@@ -6,8 +6,8 @@ import type {
   EnrichmentInspectionReadPort,
   LearnerAward,
   LearnerAwardsStorePort,
-  Learner,
-  LearnerStorePort,
+  LearnerProfile,
+  LearnerProfileReadPort,
   LearnerExpeditionStorePort,
   LessonRead,
   LessonReadStorePort,
@@ -55,7 +55,7 @@ export type WeeklyLeaderboard = {
 // projection, AE4). Awards for the whole cohort are read in one batched call.
 export async function getWeeklyLeaderboard(input: {
   now: Date;
-  learnerStore: LearnerStorePort;
+  learnerProfileRead: LearnerProfileReadPort;
   expeditionStore: LearnerExpeditionStorePort;
   awardsStore: LearnerAwardsStorePort;
   enrichmentRead: EnrichmentInspectionReadPort;
@@ -67,8 +67,8 @@ export async function getWeeklyLeaderboard(input: {
 }): Promise<WeeklyLeaderboard> {
   const { startMs, endMs, key } = isoWeekRange(input.now);
   const [learners, evidenceRefs] = await Promise.all([
-    input.learnerStore.list(),
-    input.learnerStore.listRefsWithStudyEvidence()
+    input.learnerProfileRead.list(),
+    input.learnerProfileRead.listRefsWithStudyEvidence()
   ]);
   const withEvidence = new Set(evidenceRefs);
   const activeLearners = learners.filter((learner) => withEvidence.has(learner.learnerRef));
@@ -147,7 +147,7 @@ export async function getWeeklyLeaderboard(input: {
 // contributions (KTD2). Pure over its inputs — it reads no store, so the hoisted enrichment map
 // is reused across every learner without re-fetching.
 function computeLearnerContributions(input: {
-  learner: Learner;
+  learner: LearnerProfile;
   responses: ResponseLogRow[];
   lessonReads: LessonRead[];
   verdicts: CalibrationVerdict[];

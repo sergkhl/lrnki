@@ -59,13 +59,6 @@ export {
 } from "./generateTopicExpedition";
 export { GenerationClaimLostError, isGenerationClaimLostError } from "./generationClaimLost";
 export {
-  registerLearner,
-  enterLearnerSession,
-  hashLearnerPin,
-  type RegisterLearnerResult,
-  type EnterLearnerSessionResult
-} from "./learnerRegistry";
-export {
   isoWeekKey,
   isoWeekRange,
   previousIsoWeekKey,

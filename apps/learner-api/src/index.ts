@@ -1,11 +1,11 @@
 import { serve } from "@hono/node-server";
 import { createLearnerApp } from "./app";
-import { sharedSql } from "./db";
+import { authSql, sharedSql } from "./db";
 import { startScaffoldGenerationSupervisor } from "./scaffoldGenerationSupervisor";
 import { startTopicGenerationSupervisor } from "./topicGenerationSupervisor";
 
 const port = Number(process.env.LEARNER_API_PORT ?? 8787);
-const app = createLearnerApp(sharedSql());
+const app = createLearnerApp(sharedSql(), authSql());
 
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`learner-api listening on :${info.port}`);

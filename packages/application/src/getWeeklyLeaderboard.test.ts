@@ -7,7 +7,7 @@ import type {
   EnrichmentInspectionReadPort,
   LearnerAwardsStorePort,
   LearnerExpeditionStorePort,
-  LearnerStorePort,
+  LearnerProfileReadPort,
   LessonReadStorePort,
   ResponseLogStorePort,
   StudyItemBankStorePort
@@ -29,10 +29,8 @@ function fakeDeps(input: {
   const counts: Counts = { detail: new Map(), studyItems: new Map(), lessons: new Map(), absent: new Map() };
   const emptyDetail = { nodes: [], edges: [] } as unknown as DerivedGraphDetail;
 
-  const learnerStore: LearnerStorePort = {
-    async create() { return { created: false }; },
-    async get() { return undefined; },
-    async list() { return input.learnerRefs.map((learnerRef) => ({ learnerRef, displayName: learnerRef, pinHash: "h", createdAt: "2026-06-01T00:00:00.000Z" })); },
+  const learnerProfileRead: LearnerProfileReadPort = {
+    async list() { return input.learnerRefs.map((learnerRef) => ({ learnerRef, displayName: learnerRef, createdAt: "2026-06-01T00:00:00.000Z" })); },
     async listRefsWithStudyEvidence() { return input.evidenceRefs; }
   };
   const expeditionStore = {
@@ -61,7 +59,7 @@ function fakeDeps(input: {
 
   return {
     counts,
-    deps: { learnerStore, expeditionStore, awardsStore, enrichmentRead, studyItemStore, conceptLessonStore, responseLog, verdictStore, lessonReadStore }
+    deps: { learnerProfileRead, expeditionStore, awardsStore, enrichmentRead, studyItemStore, conceptLessonStore, responseLog, verdictStore, lessonReadStore }
   };
 }
 

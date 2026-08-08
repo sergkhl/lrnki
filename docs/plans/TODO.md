@@ -10,13 +10,13 @@
 
 ## TODO
 
-- **Better Auth integration — next, ready to start.** Plan:
+- **Better Auth integration — in progress on `feat/better-auth`, U1 done.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
-  Self-hosted Better Auth inside `learner-api` replaces the PIN placeholder: Google sign-in primary,
-  email/password as the e2e/fallback path, cookie sessions on web and native, `learnerRef` =
-  `user.id`, shared-DB hard reset at cutover. Its precondition is met — matching is closed. Next
-  action: branch `feat/better-auth` off `main` and open U1. The Google OAuth client +
-  `BETTER_AUTH_SECRET` are user-owned manual actions tracked in [BLOCKERS](./BLOCKERS.md) and can
+  U1 landed the server and schema cutover: Better Auth mounted at `/auth/*`, `learnerRef` =
+  `user.id`, the whole PIN/bearer subsystem deleted, baseline regenerated. Next action: **U2, the
+  client cutover** — which is also what unblocks `pnpm check`, since the app still compiles against
+  the routes U1 deleted (plan → `Open findings`). The Google OAuth client + `BETTER_AUTH_SECRET`
+  are user-owned manual actions tracked in [BLOCKERS](./BLOCKERS.md), needed only for U4, and can
   happen in parallel.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:

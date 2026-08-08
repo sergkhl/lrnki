@@ -5,7 +5,6 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import {
   checkMatchingAttempt,
-  enterLearnerSession,
   getExpeditionCatalog,
   getExpeditionJournal,
   getStudySession,
@@ -16,7 +15,6 @@ import {
   recordLearnerVerdict,
   recordLessonRead,
   recordScaffoldLessonRead,
-  registerLearner,
   requestLearnerScaffold,
   retryLearnerScaffold,
   type GradeRefusalReason
@@ -30,14 +28,12 @@ import {
   PostgresLearnerRecallChallengeStore,
   PostgresLearnerScaffoldStore,
   PostgresScaffoldReferenceActivityRead,
-  PostgresLearnerSessionStore,
-  PostgresLearnerStore,
   PostgresLessonReadStore,
   PostgresOperationTimelineRead,
   PostgresResponseLogStore,
   PostgresStudyItemBankStore
 } from "@lrnki/infrastructure-postgres";
-import { FixedWindowRateLimiter, bearerAuth, compactLearnerRef, hashSessionToken, mintSessionToken, type AuthEnv } from "./auth";
+import { createLearnerAuth, learnerWebOrigins, requireSession, type AuthEnv } from "./auth";
 import type { DatabaseClient } from "./db";
 import { loadLeaderboard } from "./leaderboard";
 import { createLearnerRecallChallenge } from "./recallChallenge";
@@ -66,13 +62,6 @@ function gradingMessage(refused: GradeRefusalReason, invalidCopy: string): strin
     : "This expedition is no longer active. Return to the expedition list and reopen it.";
 }
 
-const sessionBody = z.object({
-  intent: z.enum(["enter", "create"]).default("enter"),
-  learnerStateRef: z.string(),
-  pin: z.string(),
-  displayName: z.string().optional()
-});
-
 const matchingTrace = z.array(z.object({ promptId: z.string(), chosenMatchId: z.string() }));
 
 // Recall Challenge transport bounds (plan 2026-07-13-003 KTD7/KTD8): UUIDs validated before
@@ -99,20 +88,18 @@ function challengeRefusalStatus(refused: string): 404 | 409 | 422 {
   return 409;
 }
 
-// PIN brute-force throttle at the ONE route where PINs exist (R2/KTD8): fixed windows,
-// keyed per client IP and per learner name.
-const SESSION_ATTEMPT_LIMIT = 10;
-const SESSION_WINDOW_MS = 60 * 1000;
-
 // The complete learner HTTP API (R1): every route is a thin zod-validated mapper over
-// `@lrnki/application` use-cases on the shared pool. Identity comes from the bearer
-// token only (R2) — no route accepts a client-supplied learnerStateRef.
-export function createLearnerApp(sql: DatabaseClient) {
-  const sessions = new PostgresLearnerSessionStore(sql);
-  const learners = new PostgresLearnerStore(sql);
+// `@lrnki/application` use-cases on the shared pool. Identity comes from the Better Auth
+// session cookie only (ADR-0041) — no route accepts a client-supplied learnerStateRef.
+//
+// `authSql` is a SECOND client, and passing the same one twice is a bug: Better Auth's Drizzle
+// adapter rewrites its client's type codecs in place and would strip `sql.json()` from every
+// store on the shared pool (see `createAuthDatabase`). It is a separate parameter precisely so
+// the constraint is visible at every call site rather than buried in a composition root.
+export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
   const expeditionStore = new PostgresLearnerExpeditionStore(sql);
-  const rateLimiter = new FixedWindowRateLimiter(SESSION_ATTEMPT_LIMIT, SESSION_WINDOW_MS);
-  const auth = bearerAuth(sessions);
+  const learnerAuth = createLearnerAuth(authSql);
+  const auth = requireSession(learnerAuth);
   // The Recall Challenge deep module, bound once at the composition root (KTD1).
   const recallChallenges = createLearnerRecallChallenge(sql);
 
@@ -147,55 +134,25 @@ export function createLearnerApp(sql: DatabaseClient) {
       // One shared environment (ADR-0036): the same process may serve the Pages origin
       // (prod, or a host-run dev process behind Caddy's dev-first upstream) and the local
       // Expo web server (8881). Echo back any allowed origin so both topologies work
-      // without widening to "*", which the credentialed Authorization flow forbids.
-      origin: (origin) => {
-        const allowed = new Set([
-          process.env.LEARNER_WEB_ORIGIN ?? "https://lrnki.globesoul.com",
-          "http://localhost:8881",
-          "http://localhost:3000"
-        ]);
-        return allowed.has(origin) ? origin : null;
-      },
-      allowHeaders: ["Authorization", "Content-Type"],
+      // without widening to "*", which a credentialed request forbids outright.
+      origin: (origin) => (learnerWebOrigins().includes(origin) ? origin : null),
+      allowHeaders: ["Content-Type"],
+      // Session cookies ride the cross-origin (Pages web ↔ VPS api) fetch, so the browser
+      // needs this to send them at all and to expose the response (ADR-0041).
+      credentials: true,
       // Cache preflights for a day — the only real per-request cost of the two-origin
-      // (Pages web ↔ VPS api) topology, since web and api never share an origin.
+      // topology, since web and api never share an origin.
       maxAge: 86400
     }))
 
     .get("/health", (c) => c.json({ ok: true as const }))
 
-    // Login/register — the one place PINs exist (KTD8) and the swap seam for real auth.
-    .post("/session", zValidator("json", sessionBody), async (c) => {
-      const body = c.req.valid("json");
-      const learnerRef = compactLearnerRef(body.learnerStateRef);
-      const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-      if (!rateLimiter.allow(`ip:${ip}`) || !rateLimiter.allow(`name:${learnerRef}`)) {
-        return c.json({ error: "rate_limited" as const }, 429);
-      }
-      if (!learnerRef) return c.json({ error: "invalid_name" as const }, 422);
-      if (body.intent === "create") {
-        const displayName = compactLearnerRef(body.displayName ?? "") || learnerRef;
-        const result = await registerLearner({ learnerRef, displayName, pin: body.pin }, { learnerStore: learners });
-        if (!result.registered) return c.json({ error: result.reason }, 422);
-        return c.json(await issueSession(sessions, result.learner.learnerRef, result.learner.displayName));
-      }
-      const result = await enterLearnerSession({ learnerRef, pin: body.pin }, { learnerStore: learners });
-      if (!result.entered) {
-        return c.json({ error: result.reason === "not_found" ? ("invalid_name" as const) : ("wrong_pin" as const) }, 401);
-      }
-      return c.json(await issueSession(sessions, result.learner.learnerRef, result.learner.displayName));
-    })
-
-    .delete("/session", auth, async (c) => {
-      await sessions.revoke(c.get("tokenHash"));
-      return c.json({ ok: true as const });
-    })
-
-    .get("/me", auth, async (c) => {
-      const learner = await learners.get(c.get("learnerStateRef"));
-      if (!learner) return c.json({ error: "unauthorized" as const }, 401);
-      return c.json({ learnerStateRef: learner.learnerRef, displayName: learner.displayName });
-    })
+    // The complete identity surface (ADR-0041): sign-up, sign-in, sign-out, session read,
+    // profile update, and the Google callback are all Better Auth's own endpoints. Mounted
+    // AFTER cors so its responses carry the credentialed headers. It is deliberately outside
+    // the typed route chain — clients reach it through Better Auth's own typed client, not
+    // through `AppType`.
+    .on(["GET", "POST"], "/auth/*", (c) => learnerAuth.handler(c.req.raw))
 
     .get("/journal", auth, async (c) => {
       return c.json(await getExpeditionJournal(
@@ -580,12 +537,6 @@ export function createLearnerApp(sql: DatabaseClient) {
     });
 
   return app;
-}
-
-async function issueSession(sessions: PostgresLearnerSessionStore, learnerRef: string, displayName: string) {
-  const token = mintSessionToken();
-  await sessions.create({ tokenHash: hashSessionToken(token), learnerRef });
-  return { token, learnerStateRef: learnerRef, displayName };
 }
 
 export type AppType = ReturnType<typeof createLearnerApp>;

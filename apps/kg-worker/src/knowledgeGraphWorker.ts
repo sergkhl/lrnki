@@ -12,7 +12,6 @@ import {
   type ExtractionSourceUnit,
   generateStudyItemBank,
   synthesizeResponses,
-  hashLearnerPin,
   runGraphEnrichment,
   runSyntheticGeneration,
   costTimingReport,
@@ -760,14 +759,15 @@ async function synthesizeResponsesCommand(ctx: Context, enrichmentId?: string, t
     process.exitCode = 1;
     return;
   }
-  // The four learner-state tables now FK to `learners` (plan 2026-07-07-005, R1), so a
-  // synthetic demo learner needs a registry row before any verdict is written. Idempotent
-  // insert with a fixed placeholder PIN hash (KTD8) — demo learners are legitimate
-  // learner-state holders, not leaderboard rivals (KTD1).
+  // Every learner-state table FKs to Better Auth's `user` (ADR-0041), so a synthetic demo
+  // learner needs an identity row before any verdict is written. Idempotent insert with no
+  // credential of any kind — this account cannot be signed into, which is the point: demo
+  // learners are legitimate learner-state holders, not leaderboard rivals (KTD1) and not
+  // people. A real learner is only ever created by Better Auth itself.
   await ctx.sql`
-    INSERT INTO learners (learner_ref, display_name, pin_hash)
-    VALUES (${learnerStateRef}, ${learnerStateRef}, ${hashLearnerPin(learnerStateRef, "0000")})
-    ON CONFLICT (learner_ref) DO NOTHING`;
+    INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
+    VALUES (${learnerStateRef}, ${learnerStateRef}, ${`${learnerStateRef}@demo.invalid`}, false, now(), now())
+    ON CONFLICT (id) DO NOTHING`;
   console.log(`\n>> synthesizing responses for learner ${learnerStateRef} toward ${targetDerivedNodeId}`);
   const result = await synthesizeResponses({
     learnerStateRef,

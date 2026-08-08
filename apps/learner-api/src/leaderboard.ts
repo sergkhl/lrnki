@@ -6,7 +6,7 @@ import {
   PostgresEnrichmentInspectionRead,
   PostgresLearnerAwardsStore,
   PostgresLearnerExpeditionStore,
-  PostgresLearnerStore,
+  PostgresLearnerProfileRead,
   PostgresLessonReadStore,
   PostgresResponseLogStore,
   PostgresStudyItemBankStore
@@ -34,7 +34,7 @@ const PODIUM_RANK = 3;
 // week never double-awards (AE5). `sql` is the process's shared pool (KTD5).
 export async function loadLeaderboard(sql: DatabaseClient, learnerStateRef: string, now: Date = new Date()): Promise<LeaderboardView> {
   const deps = {
-    learnerStore: new PostgresLearnerStore(sql),
+    learnerProfileRead: new PostgresLearnerProfileRead(sql),
     expeditionStore: new PostgresLearnerExpeditionStore(sql),
     awardsStore: new PostgresLearnerAwardsStore(sql),
     enrichmentRead: new PostgresEnrichmentInspectionRead(sql),

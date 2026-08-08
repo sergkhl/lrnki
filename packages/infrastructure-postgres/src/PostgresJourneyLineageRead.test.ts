@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { createDatabaseClient } from "./db";
 import { PostgresJourneyLineageRead } from "./PostgresJourneyLineageRead";
+import { seedLearner } from "./testSupport";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const maybe = databaseUrl ? test : test.skip;
@@ -64,9 +65,7 @@ maybe("resolves journey display labels for document and synthetic enrichments", 
   const documentEnrichmentId = randomUUID();
   const syntheticEnrichmentId = randomUUID();
   try {
-    await sql`
-      INSERT INTO learners (learner_ref, display_name, pin_hash)
-      VALUES (${learnerRef}, 'Journey Display Test', 'hash')`;
+    await seedLearner(sql, learnerRef);
     for (let index = 0; index < sourceResourceIds.length; index += 1) {
       await sql`
         INSERT INTO source_resources
@@ -120,7 +119,7 @@ maybe("resolves journey display labels for document and synthetic enrichments", 
     ].sort((a, b) => a.enrichmentId.localeCompare(b.enrichmentId)));
   } finally {
     await sql`DELETE FROM learner_expeditions WHERE learner_state_ref = ${learnerRef}`;
-    await sql`DELETE FROM learners WHERE learner_ref = ${learnerRef}`;
+    await sql`DELETE FROM "user" WHERE id = ${learnerRef}`;
     await sql.end({ timeout: 5 });
   }
 });

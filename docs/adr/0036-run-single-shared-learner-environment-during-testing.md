@@ -24,8 +24,10 @@ gate without any local infrastructure.
 ## Consequences
 
 - Local learner-app development hits real production data by default. This is acceptable and
-  intended during testing; the learner surface is PIN-gated and identity is a server-derived
-  bearer token (ADR-0035), not a privileged account.
+  intended during testing; the learner surface is sign-in-gated by self-hosted Better Auth and
+  identity is a server-derived session cookie
+  ([ADR-0041](./0041-own-learner-identity-with-self-hosted-better-auth.md)), not a privileged
+  account.
 - Phone testing reduces to `pnpm --filter @lrnki/learner-app start` + Expo Go — no local API, no
   local migration, no same-network requirement.
 - The shared environment extends to the API dev loop, but the loop runs *inside* the deployed

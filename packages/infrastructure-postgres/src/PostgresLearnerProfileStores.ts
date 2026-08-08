@@ -1,61 +1,19 @@
-import type { Learner, LearnerAward, LearnerAwardsStorePort, LearnerSessionStorePort, LearnerStorePort } from "@lrnki/ports";
+import type { LearnerAward, LearnerAwardsStorePort, LearnerProfile, LearnerProfileReadPort } from "@lrnki/ports";
 import type { Sql } from "postgres";
 
 type JsonParam = Parameters<Sql["json"]>[0];
 
-// Bearer-session persistence (plan 2026-07-08-003, KTD3). Stores only token hashes;
-// `resolve` bumps `last_seen_at` in the same round trip.
-export class PostgresLearnerSessionStore implements LearnerSessionStorePort {
+// Read-only projection of Better Auth's `user` table (ADR-0041). Better Auth owns every write
+// to it — account creation, the explorer rename, deletion — so this class has no create, update,
+// or delete method and must never grow one: a second way to mint an identity is exactly what
+// adopting the framework removed. `user` is a reserved word in SQL, so it is always quoted.
+export class PostgresLearnerProfileRead implements LearnerProfileReadPort {
   constructor(private readonly sql: Sql) {}
 
-  async create(input: { tokenHash: string; learnerRef: string }): Promise<void> {
-    await this.sql`
-      INSERT INTO learner_sessions (token_hash, learner_ref)
-      VALUES (${input.tokenHash}, ${input.learnerRef})`;
-  }
-
-  async resolve(tokenHash: string): Promise<{ learnerRef: string } | undefined> {
-    const rows = await this.sql<{ learner_ref: string }[]>`
-      UPDATE learner_sessions SET last_seen_at = now()
-      WHERE token_hash = ${tokenHash}
-      RETURNING learner_ref`;
-    return rows.length > 0 ? { learnerRef: rows[0].learner_ref } : undefined;
-  }
-
-  async revoke(tokenHash: string): Promise<void> {
-    await this.sql`DELETE FROM learner_sessions WHERE token_hash = ${tokenHash}`;
-  }
-}
-
-// Learner Registry persistence (plan 2026-07-07-005, R1/R2). `create` inserts the row
-// and reports whether it landed: `ON CONFLICT DO NOTHING` on the `learner_ref` primary
-// key makes a duplicate ref a no-op, which the gate reads as "name taken" (KTD8 keeps
-// PIN comparison in the use-case; this store only persists the hash). Reads feed the
-// picker; the store never hashes.
-export class PostgresLearnerStore implements LearnerStorePort {
-  constructor(private readonly sql: Sql) {}
-
-  async create(input: { learnerRef: string; displayName: string; pinHash: string }): Promise<{ created: boolean }> {
-    const rows = await this.sql<{ learner_ref: string }[]>`
-      INSERT INTO learners (learner_ref, display_name, pin_hash)
-      VALUES (${input.learnerRef}, ${input.displayName}, ${input.pinHash})
-      ON CONFLICT (learner_ref) DO NOTHING
-      RETURNING learner_ref`;
-    return { created: rows.length > 0 };
-  }
-
-  async get(learnerRef: string): Promise<Learner | undefined> {
-    const rows = await this.sql<LearnerRow[]>`
-      SELECT learner_ref, display_name, pin_hash, created_at
-      FROM learners WHERE learner_ref = ${learnerRef} LIMIT 1`;
-    return rows.length > 0 ? hydrateLearner(rows[0]) : undefined;
-  }
-
-  async list(): Promise<Learner[]> {
-    const rows = await this.sql<LearnerRow[]>`
-      SELECT learner_ref, display_name, pin_hash, created_at
-      FROM learners ORDER BY created_at ASC`;
-    return rows.map(hydrateLearner);
+  async list(): Promise<LearnerProfile[]> {
+    const rows = await this.sql<LearnerProfileRow[]>`
+      SELECT id, name, created_at FROM "user" ORDER BY created_at ASC`;
+    return rows.map(hydrateProfile);
   }
 
   // The union of learner refs that appear in ANY of the three evidence tables (R4/KTD2). One
@@ -109,7 +67,7 @@ export class PostgresLearnerAwardsStore implements LearnerAwardsStorePort {
   }
 }
 
-type LearnerRow = { learner_ref: string; display_name: string; pin_hash: string; created_at: string };
+type LearnerProfileRow = { id: string; name: string; created_at: string };
 type LearnerAwardRow = {
   award_id: string;
   learner_ref: string;
@@ -119,11 +77,10 @@ type LearnerAwardRow = {
   created_at: string;
 };
 
-function hydrateLearner(row: LearnerRow): Learner {
+function hydrateProfile(row: LearnerProfileRow): LearnerProfile {
   return {
-    learnerRef: row.learner_ref,
-    displayName: row.display_name,
-    pinHash: row.pin_hash,
+    learnerRef: row.id,
+    displayName: row.name,
     createdAt: new Date(row.created_at).toISOString()
   };
 }
