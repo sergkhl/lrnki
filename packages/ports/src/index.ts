@@ -14,6 +14,7 @@ import type {
   ConceptLessonRedundancyJudgment,
   ConceptLessonSectionKind,
   LessonAbsentNode,
+  MatchingAssignmentVerdict,
   MatchingItemDraft,
   StudyItem,
   OptionSelectItemDraft,
@@ -274,6 +275,34 @@ export interface StudyItemKeyVerificationPort {
     groundingPassages: StudyItemGroundingPassage[];
     siblings: { label: string; snippet: string }[];
   }): Promise<StudyItemCandidateVerdict[]>;
+}
+
+// Matching Assignment Verification judge (ADR-0026, amended by plan 2026-08-07-001). One
+// bounded cross-family judgment over ONE deterministically guarded matching item: every
+// (prompt, match) cell of the N×N grid is classified fits / does_not_fit / unclear.
+//
+// It asks a different question from `StudyItemKeyVerificationPort`, which is why it is a
+// second port rather than a third `itemType` on that one: claim truth is per-candidate and
+// says nothing about whether a learner can assign the board, and a tautological or
+// interchangeable pair is individually TRUE. The grid shape (rather than a per-prompt fit
+// list) also exposes a mis-keyed pair, and sparse-list outputs are the shape this generator
+// family has historically fumbled.
+//
+// Prompts and matches arrive already ordered for presentation — matches in the deterministic
+// text sort that hides the diagonal — and both carry their PAIR ordinals, which the judge
+// echoes back. The application owns the deterministic uniqueness rule over the returned grid
+// and the pass-through disposition on unavailability (ADR-0026, D5/D6).
+export interface MatchingAssignmentVerificationPort {
+  readonly model: string;
+  verify(input: {
+    declaredDomain: string;
+    node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+    question: string;
+    prompts: { ordinal: number; text: string }[];
+    matches: { ordinal: number; text: string }[];
+    groundingPassages: StudyItemGroundingPassage[];
+    siblings: { label: string; snippet: string }[];
+  }): Promise<MatchingAssignmentVerdict[]>;
 }
 
 export interface ConceptLessonRedundancyJudgmentPort {

@@ -619,6 +619,29 @@ export const studyItemKeyVerificationValidator = z.object({
 
 export const studyItemKeyVerificationSchema: JsonSchema = toForcedToolSchema(studyItemKeyVerificationValidator);
 
+// --- Matching Assignment Verification: submit_matching_assignment_verification
+// Cross-family semantic judgment over the FULL N×N grid of one guarded matching item, after the
+// deterministic guard passes. It answers, per (prompt, match) cell, whether that match is a
+// defensible answer to that prompt — never which pairing the item keys, which is the
+// application's deterministic uniqueness rule to enforce over these verdicts.
+//
+// The grid, rather than a per-prompt list of fitting matches, is deliberate on two counts: it
+// also exposes a MIS-KEYED pair (a keyed cell judged not to fit), and sparse-list outputs are the
+// shape this generator family has historically fumbled — see the flat-impostor schema note above.
+// Both ordinals are echoed back so a reordered or short response cannot be silently misaligned by
+// position, and a cell the judge omits is read as `unclear`.
+
+export const matchingAssignmentVerificationValidator = z.object({
+  verdicts: z.array(z.object({
+    promptOrdinal: z.number().int().describe("The prompt's number, exactly as listed in the prompt list."),
+    matchOrdinal: z.number().int().describe("The match's number, exactly as listed in the match list. The two numberings are independent and equal numbers mean nothing."),
+    verdict: z.enum(["fits", "does_not_fit", "unclear"]).describe("'fits' when a learner who knows the subject matter could defensibly answer this prompt with this match. 'does_not_fit' when that pairing is wrong or answers a different aspect than the prompt names. 'unclear' when it cannot be decided from the provided context and general knowledge of the declared domain."),
+    reason: z.string().min(1).describe("One terse justification for this pairing, grounded in the node context, the grounding passages, and the neighboring topics.")
+  }).strict())
+}).strict();
+
+export const matchingAssignmentVerificationSchema: JsonSchema = toForcedToolSchema(matchingAssignmentVerificationValidator);
+
 // --- Concept Lesson redundancy judgment: submit_concept_lesson_redundancy_judgment
 
 export const conceptLessonRedundancyJudgmentValidator = z.object({
@@ -768,6 +791,7 @@ export const toolValidators = [
   matchingValidator,
   impostorValidator,
   studyItemKeyVerificationValidator,
+  matchingAssignmentVerificationValidator,
   conceptLessonRedundancyJudgmentValidator,
   conceptLessonValidator
 ] as const;

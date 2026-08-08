@@ -18,9 +18,12 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Matching Item Quality
 
-**Status:** In progress — U1 and U2 are closed; U2 **PASSES** on its re-run. Next action: U3, the
-Matching Assignment Verification stage, with its ADR-0026 and CONTEXT.md amendments in the same
-change. The residual matching defect U2 leaves behind is ambiguity, which is exactly what U3 checks.
+**Status:** In progress — U1, U2, and U3 are closed; U2 **PASSES** on its re-run. Next action:
+**U4, the correctness gate** — the two 5-draw probes, then two full real-use runs (Thermohaline plus
+one fresh different-domain topic) on the shared VPS deployed container after `pnpm db:reset` (D11),
+with every admitted matching item hand-inspected for ambiguity. U3's stage is live and its 1-draw
+probes both landed correctly; the probes must be re-run at 5 because they also qualify the judge
+model, and U4 owes two extra reports named in Open findings.
 
 **Decision state:** Interview-locked 2026-08-07. D1–D13 were each chosen in the planning interview;
 every recommendation was accepted as offered.
@@ -241,9 +244,13 @@ domain:"), one prohibition sentence in the system prompt, and the `kind` descrip
 ### Matching Assignment Verification (U3)
 
 One prompt file, one descriptor, one stage — on the existing cross-family `kg-independent-judge`
-alias, so no `litellm/config.yaml` change. Matches are presented to the judge sorted by normalized
-text with their pair ordinals attached: deterministic, and it removes the diagonal position cue an
-aligned listing would leak.
+alias, so no `litellm/config.yaml` change. Prompts keep their pair ordinals; matches are presented
+sorted by normalized text **and renumbered by sorted position**, with the application holding the
+presentation-index → pair-ordinal map. Deterministic, so a re-run judges the same board — and it
+removes the whole diagonal cue rather than only its positional half. *(Amended during U3: this
+originally said matches keep their pair ordinals attached. Sorting alone hides the key by position
+while the printed pair ordinal hands it straight back, more legibly than position ever leaked it.
+A judge that can read the key has no reason to test any other cell.)*
 
 ```text
 generate + guard (round 1)            STAGE matching-generation
@@ -364,65 +371,44 @@ One entry per closed implementation unit; see the hygiene comment at the top of 
 
 ### U1 — matching prompt redesign, containment veto, lesson vocabulary root-fix (2026-08-08)
 
-Commits: `d71d52b` plus this unit's follow-up fix. `pnpm check` and `pnpm test:db` are green.
+Commits: `d71d52b`, `7ebe4ac`. `pnpm check` and `pnpm test:db` are green.
 
-**Proved.** The matching pair contract is role-asymmetric in both places the model reads it: the
-prompt file and the forced-tool `description` fields. Every contract rule this unit added is written
-to **both**; a rule in only one of them makes the next gate's delta unattributable.
-
-The pair contract now carries three rules, each closing a gap where the guard or the board enforced
-something the prompt never stated:
-
-1. **Role asymmetry** — the prompt names an aspect, the match carries its answer.
-2. **Named terms** — when the answer to an aspect is a named term, the match must BE that term, never
-   a definition of it, and the question must announce the pairing the pairs actually implement. This
-   is what U2's first pass proved missing: the model resolved a terminology node by writing a
-   definition on both sides.
-3. **Distinct matches** — the guard has always rejected duplicate match texts, because the board
-   cannot render two identical tiles, but the prompt never asked for it. Stated now, together with
-   the instruction to *re-choose the aspect* rather than pad a repeated answer into looking different
-   — padding is how the pre-U1 prompt hid this, and padding is the paraphrase defect.
-
-The containment veto is computed over **word sequences, not normalized characters**. A character
-`includes` is wrong in both directions simultaneously, and both are pinned by a test verified against
-a mutant: it rejects `Heap` / `Cheapest region to grow at runtime` (subword) and it misses
-`Allocates memory at runtime` inside `…allocates memory, at runtime…` (punctuation). Contiguous word
-containment is the provable reading of "one side wholly contains the other" and therefore the only
-part of the cueing defect rule 16 lets a deterministic gate own.
-
-The graph-vocabulary prohibition is owned by one file,
-`prompts/partials/learner-copy-vocabulary.prompt`, and included with `{{> … }}` by the lesson and all
-three item-generation prompts (rule 18). `promptFileDependencyBytes` folds partial bytes into the
-config hash, so editing the shared rule re-derives every dependent stage's hash mechanically
-(ADR-0034). Each prompt keeps its own one-line internal-context lead-in; the shared file owns only
-the prohibition. The internal context itself was relabeled from "neighbor concepts" to "neighboring
+**Proved.** The matching pair contract is role-asymmetric and is written to **both** places the model
+reads it — the prompt file and the forced-tool `description` fields; a rule in only one makes the
+next gate's delta unattributable. Three rules, each closing a gap where the guard or the board
+enforced something the prompt never stated: **role asymmetry** (the prompt names an aspect, the match
+carries its answer), **named terms** (when the answer is a named term the match must BE that term,
+and the question must announce the pairing the pairs actually implement), and **distinct matches**
+— stated together with "re-choose the aspect" rather than "make the answers look different", because
+padding a repeated answer into distinctness *is* the paraphrase defect. The graph-vocabulary
+prohibition is owned by `prompts/partials/learner-copy-vocabulary.prompt` and included by the lesson
+and all three item prompts (rule 18); `promptFileDependencyBytes` re-derives every dependent stage
+hash mechanically (ADR-0034). The internal context was relabeled "neighbor concepts" → "neighboring
 topics" everywhere, because a prompt that forbids a word while using it to describe its own input is
-self-undermining — the leak mechanism D9 identified is the model copying the framing it is given.
+self-undermining.
 
 **Invariants a later unit or re-run must not break.**
 
-- Containment stays *contiguous word* containment. A non-contiguous "all the prompt's words appear
-  somewhere in the match" check is a heuristic, not a guarantee, and rule 16 forbids it here.
+- Containment stays **contiguous word sequence** containment, never a character `includes` (wrong in
+  both directions at once: it over-fires on subwords and under-fires on punctuation — both pinned by
+  a mutant-verified test) and never a non-contiguous "all the prompt's words appear somewhere"
+  check, which is a heuristic rule 16 forbids here.
 - Equality, containment, and distinctness keep **distinct** reason strings; the gate greps
   `must not contain one another`, `must differ`, and `must be distinct` separately.
-- Matching still opts out of the generated-passage citation fallback (D8). U3 verifies fit, not
+- Matching still opts out of the generated-passage citation fallback (D8) — U3 verifies fit, not
   claim truth, so it does not unlock that rung.
-- No lexical guard exists anywhere, by D9: `dependent` and `sibling` have legitimate domain senses.
-  The prohibition is a prompt rule; the vocabulary query in the gate is an inspection query, never a
-  veto.
-- `study-item-key-verification.prompt` still renders a `Sibling concepts:` label. That is a judge
-  prompt whose output is verdicts, never learner copy, so it is deliberately untouched. The same
-  reasoning exempts `learner-scaffold-*` — Support Path copy was outside this gate's measured set and
-  is an adjacent-layer gap, not a silent omission.
+- No lexical vocabulary guard exists anywhere, by D9: `dependent` and `sibling` have legitimate
+  domain senses. The prohibition is a prompt rule; the gate's vocabulary query is inspection, never
+  a veto.
+- Judge prompts keep their own labels (`study-item-key-verification.prompt` still says `Sibling
+  concepts:`): their output is verdicts, never learner copy. `learner-scaffold-*` is exempt for the
+  same reason plus being outside this gate's measured set — an adjacent-layer gap, not an omission.
 
-**Hands off to U3.** Two rig facts, both of which cost a run to learn:
-
-- Drive an API composed from the working tree
-  (`LEARNER_API_PORT=… tsx --env-file=.env apps/learner-api/src/index.ts`), never the running
-  `lrnki-learner-api` container: `.prompt` files are baked into the image.
-- **Restart that process after every prompt edit.** `readPromptFile` and `readPartial` cache by path
-  in module state, so a long-lived API serves the prompts it read first and reports green on the
-  previous behavior — the container trap, reproduced inside the working-tree escape from it.
+**Rig facts, each of which cost a run to learn.** Drive an API composed from the working tree
+(`LEARNER_API_PORT=… tsx --env-file=.env apps/learner-api/src/index.ts`), never the running
+`lrnki-learner-api` container — `.prompt` files are baked into the image. And **restart that process
+after every prompt edit**: `readPromptFile`/`readPartial` cache by path in module state, so a
+long-lived API serves the prompts it read first and reports green on the previous behavior.
 
 ### U2 — prompt-fix gate, real-use pass (2026-08-08)
 
@@ -452,37 +438,90 @@ lexical veto. And on the two nodes whose facet is a direction-of-effect mapping,
 low-discrimination: `Seawater density` pair 2 puts `pressure` in both the prompt and its own match,
 uniquely within that item, which is one surface-solvable pair in 61.
 
-**The coverage story, attributed by probe.** An intermediate run of this gate lost two matching items
-to `matching matches must be distinct`. Re-running matching generation for exactly those nodes
-against the real model reproduced it **3 of 3** — and the cause was upstream: the blueprint had
-assigned `pairing each factor with its effect on density`, a facet whose answer space holds two
-values while the board needs four distinct ones, so duplicates were *forced*. Two things follow.
-First, U1's named-term rule did not create the defect; it exposed one the old prompt hid by padding
-matches into distinctness. Second, the fix had to say "re-choose the aspect", not "make the answers
-look different", or the cure reintroduces the disease. With the prompt rule and a matching-facet
-constraint added to `study-item-blueprint.prompt`, coverage returned to 48 of 48.
-
-**The blueprint constraint is stated but unproven.** The blueprint still assigned collapsing facets to
-2 of 16 nodes in the passing run (`density effect of each factor on seawater`). Those items are now
-admitted rather than rejected, because the generator resolves them into distinct matches — which is
-why coverage recovered and also why those two items are the low-discrimination ones. The rule is kept
-because it addresses a *proven* hard-failure mode, not because it was measured to work.
+**The coverage story, attributed by probe.** An intermediate run lost two matching items to `matching
+matches must be distinct`, reproduced **3 of 3** against the real model on exactly those nodes. The
+cause was upstream: the blueprint had assigned a facet whose answer space holds two values while the
+board needs four distinct ones, so duplicates were *forced*. U1's named-term rule did not create that
+defect, it exposed one the old prompt hid by padding. A matching-facet constraint in
+`study-item-blueprint.prompt` plus the prompt rule returned coverage to 48 of 48 — but **that
+constraint is stated, not proven**: the blueprint still assigned collapsing facets to 2 of 16 nodes
+in the passing run, and the generator now rescues them into admissible-but-weak items. It is kept
+because it addresses a proven hard-failure mode.
 
 **Ambiguity incidence — U4's baseline, not gated here (D10).** Two items would fail an assignment
 check. `Freshwater input effects on thermohaline circulation`: matches 1 and 3 are interchangeable
 and match 0 also fits prompt 3. `Salinity effect on seawater density`: prompts 2 and 3 are near
-synonyms ("North Atlantic deep water formation" / "Polar deep water formation mechanism") with
-matches that swap freely. Both are the harm class — a learner who knows the material is marked wrong
-— and both are what D5 chose the full N×N grid to expose.
+synonyms with matches that swap freely. Both are the harm class — a learner who knows the material is
+marked wrong — and both are what D5 chose the full N×N grid to expose.
 
-**Method note that cost a false green.** An earlier inspection reported "zero vocabulary hits" because
-the query used `jsonb_array_elements_text` on `concept_lesson_sections.items`, which is `text[]`;
-psql printed the error and an empty result, which reads exactly like a clean pass. Every zero-row
-quality assertion in this gate now carries a positive control in the same query — here, 74 of 97
-bullets matching a common-word regex proves the scan reads text at all.
+**Method invariant this gate established.** Every zero-row quality assertion carries a **positive
+control in the same query**. An earlier inspection reported "zero vocabulary hits" from a query that
+had errored (`jsonb_array_elements_text` on a `text[]` column); psql printed the error and an empty
+result, which reads exactly like a clean pass. Here, 74 of 97 bullets matching a common-word regex
+proves the scan reads text at all.
 
 **Safe to continue downstream: yes.** The blocking defect is fixed and the residual is ambiguity,
 which is precisely U3's subject.
+
+### U3 — Matching Assignment Verification, with same-change documentation (2026-08-08)
+
+`pnpm check` and `pnpm test:db` are green. Real-model evidence here is a **1-draw live probe of the
+new stage**, not the gate: U4 owns the 5-draw probes and the two full runs.
+
+**Proved.** Matching now runs a third verification bracket. `matching-assignment-verification` sits
+after `matching-generation` in the same shape option-select and impostor already use — guard →
+judge → deterministic veto → one informed regeneration → guard → verify once → settle. The topic
+generation stage denominator moves **15 → 16**.
+
+The **control flow is now owned once**. `verifyGuardedItems.ts` holds the two-round envelope every
+verified type shares; `verifyStudyItemKeys.ts` keeps only the key-verification question and its two
+uniqueness rules, and `verifyMatchingAssignments.ts` holds the presentation, the assignment rule, and
+the pass-through disposition. Copying a second orchestrator would have put "a vetoed item gets
+exactly one informed regeneration" in two places (rule 18). The subject type is F-bounded
+(`TSubject extends VerifiableSubject<TSubject, TItem>`) because `regenerate` must return *another
+subject of its own type* — that is what makes the second pass judge the NEW candidates rather than
+re-judging the vetoed ones. Consequently `NodeAttempt`'s straight-to-persistence `item` variant is
+deleted: all three types now hand a pending subject to a phase.
+
+**The presentation deviates from the plan's original target design, deliberately.** The plan said
+matches carry their pair ordinals; they carry a **presentation index** instead. Sorting hides the key
+by position, but printing the pair ordinal beside it hands the key back more legibly than position
+ever leaked it, and a judge that can read the key has no reason to test any other cell. The Target
+design section is amended to match the code.
+
+**Live probe, 1 draw each, `deepseek-v4-flash-0731`.** Reconstructed `Seawater density` subsumption
+board: **16 of 16 cells returned, vetoed** through the cross-fit branch, with the judge naming both
+interchangeable answers — and it did so on a non-identity presentation permutation (`[3,2,0,1]`), so
+the key-hiding does not blind it. Reconstructed `North Atlantic Deep Water` facet board: **16 of 16
+cells, admitted**, with exactly the four keyed cells fitting and every other cell `does_not_fit` —
+the discrimination-not-distrust control. Stage latency is **~5–7.5 s per item** at 4 pairs.
+
+**Invariants a later unit or re-run must not break.**
+
+- The match presentation is a **deterministic function of the item** — normalized text sort,
+  renumbered by sorted position. A random shuffle would make a re-run's disagreement unreadable, and
+  attaching pair ordinals would re-open the key leak.
+- `unclear`, and a cell the judge never returned, **never veto** — in either branch. An N×N grid is
+  where this bites hardest: a short response leaves whole rows unjudged.
+- Matching's unavailability disposition is **pass-through** (D6), the opposite of impostor's, and it
+  depends on matching keeping its verbatim-only citation rungs (D8). If matching ever opts into the
+  generated-passage fallback, this disposition must change with it.
+- The veto reason string starts `matching assignment verification rejected the item:` and names the
+  offending cells by text — it is both the rejected-row reason and the regeneration feedback.
+- The bank test's matching stub returns `unclear` for every cell and **cannot** confirm the key,
+  because the presentation hides it. That is the cheapest standing proof of the key-hiding: a stub
+  that could rubber-stamp the diagonal would mean the judge could too.
+
+**Documented in the same change (D12).** ADR-0026 gains the Matching Assignment Verification
+paragraphs, the key-hiding rationale, matching's pass-through row in the unavailability asymmetry,
+and the containment veto in the guard sentence; CONTEXT.md gains the term and narrows *Study Item Key
+Verification* to "true and unique".
+
+**Hands to U4.** Both probes above are 1 draw and must be re-run at 5 (they double as the judge's
+qualification — see Open findings). Budget shift to report against: +1 judge call per matching item,
+a third verification bracket overlapping the two existing ones, and `DEFAULT_ITEM_VERIFICATION_CONCURRENCY`
+is the single knob all three read — that is what moves on 429s, never production generation
+concurrency.
 
 ### Open findings
 
@@ -501,28 +540,26 @@ which is precisely U3's subject.
   the reproduced case before the fix). The plan puts retry-budget changes out of scope pending
   measurement; that measurement now exists for one node, so raising `MATCHING_GENERATION_ATTEMPTS` is
   a live, separate decision rather than a hypothetical one.
-- **Judge competence on `deepseek-v4-flash-0731` is smoke-tested, not measured.** The judge moved off
-  gpt-oss-120b to a single DeepSeek v4 flash deployment (user decision, 2026-08-07) and there is
-  deliberately **no fallback**, so verdicts stay attributable from the alias alone. Evidence so far is
-  only two live probes: a U3-shaped verdict grid returned all four cells as real objects with correct
-  verdicts, and a two-candidate claim check classified true/false correctly with sound reasons. That
-  is schema compliance plus a smoke test, not discrimination measurement. **U4's probes are now doing
-  double duty** — they qualify the new judge as well as the new stage, so a failure there must be
-  diagnosed against both. Do not read the shipped key-verification evidence (30 of 30 impostors clean,
-  captured defect rejected 5 of 5) as covering this model; it was measured under gpt-oss-120b.
-  Beware of citing the 2026-06-24 "flash is disproven" note against it: that measured a *previous*
-  flash generation on whole-set ordering, and `litellm/config.yaml` now says so explicitly.
+- **Judge competence on `deepseek-v4-flash-0731` is under-measured, not unmeasured.** The judge moved
+  off gpt-oss-120b to a single DeepSeek v4 flash deployment (user decision, 2026-08-07) with
+  deliberately **no fallback**, so verdicts stay attributable from the alias alone. Evidence is now
+  U3's two live 4×4 probes — full grids, correct veto on the ambiguous board through the cross-fit
+  branch, clean admit on the facet board — **at one draw each**. That is discrimination on two
+  boards, not a measurement. **U4's probes are doing double duty**: they qualify the judge as well as
+  the stage, so a failure there must be diagnosed against both. Do not read the shipped
+  key-verification evidence (30 of 30 impostors clean, captured defect rejected 5 of 5) as covering
+  this model; it was measured under gpt-oss-120b. Beware of citing the 2026-06-24 "flash is
+  disproven" note against it: that measured a *previous* flash generation on whole-set ordering, and
+  `litellm/config.yaml` now says so explicitly.
 - **Why the judge moved, kept for the ADR sweep.** All three U2 attempt failures were
   `forced_tool_exhaustion` on `kg-independent-judge` while every `kg-claim-extraction` stage (MiMo
-  v2.5) passed first try. The cause was Groq's requests-per-minute ceiling on OpenRouter's *shared*
-  account, which account credit cannot relieve — credits buy tokens, not request rate, so a funded
-  balance and a sustained 429 coexist normally. The alias had no failover by design
-  (`provider.only: ["groq"]`, `allow_fallbacks: false`) because OpenRouter failover once landed on a
-  provider that rejects forced `tool_choice` with a 400 (expedition `bd89e63a`, 2026-07-06) — ADR-0006
-  paid for in availability, taking out every judge stage at once. `kg-prerequisite-ordering` still
-  runs gpt-oss-120b and therefore still carries that exposure. Failure modes stay separable by status:
-  `401` = dead LiteLLM virtual key, `429` = upstream request rate, `{"kind":"no_tool_call"}` = a
-  saturated bracket degrading. Never lower production generation concurrency to make a gate pass.
+  v2.5) passed first try — Groq's RPM ceiling on OpenRouter's shared account taking out every judge
+  stage at once, because ADR-0006's forced-tool provider lock (`provider.only: ["groq"]`,
+  `allow_fallbacks: false`, after a 2026-07-06 failover landed on a provider that rejects forced
+  `tool_choice`) is paid for in availability. `kg-prerequisite-ordering` still runs gpt-oss-120b and
+  still carries that exposure. Mechanism and the 401/429/`no_tool_call` separation are owned by
+  `docs/plans/TODO.md`'s Environment section; what belongs to the ADR sweep is the *rationale for the
+  swap itself*.
 - **Documentation debt to clear before this plan closes.** `docs/plans/TODO.md` is over its ~150-line
   cap and owes a consolidation — the ~55-line Environment section belongs in owning READMEs per the
   destination map. And the judge swap is a durable architectural decision affecting ADR-0007/0005 and

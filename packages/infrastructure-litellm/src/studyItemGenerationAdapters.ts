@@ -1,6 +1,7 @@
 import type {
   ConceptLesson,
   ImpostorItemDraft,
+  MatchingAssignmentVerdict,
   MatchingItemDraft,
   OptionSelectItemDraft,
   StageTag,
@@ -10,7 +11,12 @@ import type {
   StudyItemType
 } from "@lrnki/domain-core";
 import { STAGE_TAGS } from "@lrnki/domain-core";
-import type { StudyItemBlueprintPort, StudyItemGenerationPort, StudyItemKeyVerificationPort } from "@lrnki/ports";
+import type {
+  MatchingAssignmentVerificationPort,
+  StudyItemBlueprintPort,
+  StudyItemGenerationPort,
+  StudyItemKeyVerificationPort
+} from "@lrnki/ports";
 import type { z } from "zod";
 import type { LiteLlmForcedToolClient } from "./LiteLlmForcedToolClient";
 import { executeForcedToolStage, type NeuralStageDescriptor } from "./forcedToolStage";
@@ -18,6 +24,8 @@ import { readPromptFile } from "./promptFile";
 import {
   studyItemKeyVerificationSchema,
   studyItemKeyVerificationValidator,
+  matchingAssignmentVerificationSchema,
+  matchingAssignmentVerificationValidator,
   impostorSchema,
   impostorValidator,
   matchingSchema,
@@ -60,11 +68,22 @@ type StudyItemKeyVerificationInput = {
   siblings: { label: string; snippet: string }[];
 };
 
+type MatchingAssignmentVerificationInput = {
+  declaredDomain: string;
+  node: { derivedNodeId: string; canonicalLabel: string; aliases: string[] };
+  question: string;
+  prompts: { ordinal: number; text: string }[];
+  matches: { ordinal: number; text: string }[];
+  groundingPassages: GroundingPassage[];
+  siblings: { label: string; snippet: string }[];
+};
+
 type OptionSelectArgs = z.infer<typeof optionSelectValidator>;
 type ImpostorArgs = z.infer<typeof impostorValidator>;
 type MatchingArgs = z.infer<typeof matchingValidator>;
 type StudyItemBlueprintArgs = z.infer<typeof studyItemBlueprintValidator>;
 type StudyItemKeyVerificationArgs = z.infer<typeof studyItemKeyVerificationValidator>;
+type MatchingAssignmentVerificationArgs = z.infer<typeof matchingAssignmentVerificationValidator>;
 
 export const studyOptionSelectGenerationDescriptor: NeuralStageDescriptor<
   StudyItemGenerationInput,
@@ -220,6 +239,48 @@ function studyItemKeyVerificationDescriptor(stageTag: StageTag): NeuralStageDesc
 export const optionSelectKeyVerificationDescriptor = studyItemKeyVerificationDescriptor(STAGE_TAGS.optionSelectKeyVerification);
 export const impostorKeyVerificationDescriptor = studyItemKeyVerificationDescriptor(STAGE_TAGS.impostorKeyVerification);
 
+// Matching Assignment Verification (plan 2026-08-07-001 D5). A third judge stage on the SAME
+// cross-family `kg-independent-judge` alias, so no litellm/config.yaml change — but its own
+// prompt file, because it asks a different question: fit across a pair set, not claim truth per
+// candidate. Prompts and matches are rendered by the SAME numbered renderer the key-verification
+// candidates use (rule 18); the application decides what order and what numbers they carry, which
+// is what keeps the answer key out of the rendering.
+export const matchingAssignmentVerificationDescriptor: NeuralStageDescriptor<
+  MatchingAssignmentVerificationInput,
+  MatchingAssignmentVerificationArgs,
+  MatchingAssignmentVerdict[]
+> = {
+  promptPath: "study-matching-assignment-verification.prompt",
+  stageTag: STAGE_TAGS.matchingAssignmentVerification,
+  schema: matchingAssignmentVerificationSchema,
+  validator: matchingAssignmentVerificationValidator,
+  sentinelInput: {
+    declaredDomain: "sentinel domain",
+    node: { derivedNodeId: "sentinel_node", canonicalLabel: "Sentinel node", aliases: ["Sentinel alias"] },
+    question: "A sentinel pairing question?",
+    prompts: [{ ordinal: 0, text: "A sentinel aspect." }],
+    matches: [{ ordinal: 0, text: "A sentinel answer." }],
+    groundingPassages: [{ passageId: "sentinel_passage", kind: "definition", text: "A sentinel passage.", derivedNodeId: "sentinel_node" }],
+    siblings: [{ label: "Sentinel sibling", snippet: "A nearby concept." }]
+  },
+  templateData: (input) => ({
+    declaredDomain: input.declaredDomain,
+    nodeLabel: input.node.canonicalLabel,
+    aliasText: aliasText(input.node.aliases),
+    question: input.question,
+    prompts: renderCandidates(input.prompts),
+    matches: renderCandidates(input.matches),
+    passages: renderPassages(input.groundingPassages),
+    siblings: renderSiblings(input.siblings)
+  }),
+  mapResult: (args) => args.verdicts.map((entry) => ({
+    promptOrdinal: entry.promptOrdinal,
+    matchOrdinal: entry.matchOrdinal,
+    verdict: entry.verdict,
+    reason: entry.reason
+  }))
+};
+
 export function createStudyItemGenerationPort(client: LiteLlmForcedToolClient): StudyItemGenerationPort {
   return {
     model: readPromptFile(studyOptionSelectGenerationDescriptor.promptPath).model,
@@ -247,6 +308,13 @@ export function createStudyItemKeyVerificationPort(client: LiteLlmForcedToolClie
       input.itemType === "impostor" ? impostorKeyVerificationDescriptor : optionSelectKeyVerificationDescriptor,
       input
     )
+  };
+}
+
+export function createMatchingAssignmentVerificationPort(client: LiteLlmForcedToolClient): MatchingAssignmentVerificationPort {
+  return {
+    model: readPromptFile(matchingAssignmentVerificationDescriptor.promptPath).model,
+    verify: (input) => executeForcedToolStage(client, matchingAssignmentVerificationDescriptor, input)
   };
 }
 

@@ -84,12 +84,14 @@ export {
   createStudyItemBlueprintPort,
   createStudyItemGenerationPort,
   createStudyItemKeyVerificationPort,
+  createMatchingAssignmentVerificationPort,
   studyOptionSelectGenerationDescriptor,
   studyImpostorGenerationDescriptor,
   studyMatchingGenerationDescriptor,
   studyItemBlueprintDescriptor,
   optionSelectKeyVerificationDescriptor,
-  impostorKeyVerificationDescriptor
+  impostorKeyVerificationDescriptor,
+  matchingAssignmentVerificationDescriptor
 } from "./studyItemGenerationAdapters";
 export {
   createConceptLessonGenerationPort,

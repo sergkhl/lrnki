@@ -24,7 +24,7 @@ import {
 import { OPERATION_TIMELINE_CATALOG } from "./operationTimelineCatalog";
 import { OPERATION_HEARTBEAT_STALE_AFTER_MS } from "./operationRunLiveness";
 
-const TOTAL = 15;
+const TOTAL = 16;
 
 // AE8: every expected stage is locked to its operation's catalog entry with kind `llm`;
 // a stage that leaves the catalog (or a non-LLM bookkeeping stage sneaking in) fails here.

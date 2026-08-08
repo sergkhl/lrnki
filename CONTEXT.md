@@ -214,13 +214,23 @@ blueprint admits them. Item typing and learner-response identity are defined by
 _Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
 
 **Study Item Key Verification**:
-The generation-time check that a Study Item has exactly one defensible answer. One cross-family
+The generation-time check that a Study Item's answer key is *true and unique*. One cross-family
 judgment classifies *every* candidate answer of an option-select or impostor item as true, false, or
 unclear for its concept, and a deterministic uniqueness rule admits the item only when the key stands
-alone. Matching is deliberately outside it. Rules, the unavailability asymmetry, and the citation
-resolution ladder it interlocks with are defined by
-[ADR-0026](docs/adr/0026-typed-study-item-bank.md).
+alone. Matching is outside it and has its own check — see **Matching Assignment Verification**.
+Rules, the unavailability asymmetry, and the citation resolution ladder it interlocks with are
+defined by [ADR-0026](docs/adr/0026-typed-study-item-bank.md).
 _Avoid_: lie-validity judge, fact check, grading, passage entailment, distractor quality review
+
+**Matching Assignment Verification**:
+The generation-time check that a matching item's board is *assignable*: exactly one defensible match
+per prompt. One cross-family judgment classifies every (prompt, match) cell of the N×N grid as fits,
+does not fit, or unclear, and a deterministic rule admits the item only when no unkeyed cell fits and
+no keyed cell does not. It asks about **fit**, not claim truth — a tautological or interchangeable
+pair is individually true — which is why it is a separate check from **Study Item Key Verification**
+rather than a third case of it. The rule, the key-hiding presentation, and the pass-through on an
+unreachable judge are defined by [ADR-0026](docs/adr/0026-typed-study-item-bank.md).
+_Avoid_: matching key verification, claim check, answer-key uniqueness, grading, board shuffling
 
 **Concept Lesson**:
 A learner-neutral teaching substrate keyed to `derived_node_id` and generated alongside the Study

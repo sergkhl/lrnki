@@ -6,9 +6,9 @@ import {
   impostorKeyVetoReason,
   optionSelectKeyVetoReason,
   verifyStudyItemKeys,
-  type KeyVerificationRegeneration,
   type KeyVerificationSubject
 } from "./verifyStudyItemKeys";
+import type { VerificationRegeneration } from "./verifyGuardedItems";
 
 // Study Item Key Verification (plan 2026-08-05-001 U3). Two things are under test and they are
 // independent: the two answer-key uniqueness RULES (deterministic functions of verdicts), and
@@ -190,7 +190,7 @@ test("a vetoed subject is regenerated exactly once and the SECOND verification j
   ]);
   const feedbacks: string[] = [];
   let regenerations = 0;
-  const first = subject("The first keyed answer.", async (feedback): Promise<KeyVerificationRegeneration<OptionSelectItem>> => {
+  const first = subject("The first keyed answer.", async (feedback): Promise<VerificationRegeneration<KeyVerificationSubject<OptionSelectItem>>> => {
     feedbacks.push(feedback);
     regenerations += 1;
     return { ok: true, subject: subject("The regenerated keyed answer.", async () => ({ ok: false, reason: "a third round must never happen" })) };

@@ -33,15 +33,15 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Matching item quality — U1 and U2 closed, U2 PASSES; U3 is next.** Plan:
-  [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which owns the full gate
-  record and the open findings. The re-run holds coverage at 48 of 48 with zero rejections, kills the
-  paraphrase-degeneracy class (terminology nodes now key the name, not a definition), and leaves zero
-  relationship vocabulary in 549 learner-copy rows. Next action: **U3 — Matching Assignment
-  Verification**, with the ADR-0026 and CONTEXT.md amendments in the same change. Two things to carry
-  in: restart the working-tree API after any prompt edit (`readPromptFile` caches by path in module
-  state, so a long-lived process serves stale prompts and reports green), and the residual defect is
-  *ambiguity*, which is exactly what U3 checks.
+- **Matching item quality — U1–U3 closed; U4, the correctness gate, is next.** Plan:
+  [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which owns the full record and
+  the open findings. **Matching Assignment Verification is live**: a third verification bracket over
+  the N×N (prompt, match) grid, stage denominator 15 → 16, ADR-0026 and CONTEXT.md amended in the same
+  change. Its two 1-draw live probes both landed correctly (ambiguous board vetoed, clean facet board
+  admitted, 16 of 16 cells each). Next action: **U4** — re-run both probes at 5 draws, then two full
+  real-use runs (Thermohaline plus a fresh different-domain topic) on the VPS deployed container after
+  `pnpm db:reset`, hand-inspecting every admitted matching item. The probes double as the DeepSeek
+  judge's qualification, so a failure must be diagnosed against both the stage and the model.
 
 - **Better Auth integration — planned, queued after matching.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.

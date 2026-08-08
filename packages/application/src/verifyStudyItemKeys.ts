@@ -1,25 +1,19 @@
 import type { ImpostorItem, OptionSelectItem, StudyItemCandidateVerdict, StudyItemClaimVerdict } from "@lrnki/domain-core";
 import type { StudyItemGroundingPassage, StudyItemKeyVerificationPort } from "@lrnki/ports";
-import { gateByJudgment } from "./gateByJudgment";
-import { mapWithConcurrency } from "./mapWithConcurrency";
 import type { CitationRung } from "./optionSelectGuard";
+import {
+  verifyGuardedItems,
+  type VerificationOutcome,
+  type VerificationRegeneration
+} from "./verifyGuardedItems";
 
-// Study Item Key Verification (plan 2026-08-05-001 D2/D5/D7, amending ADR-0026). The shared
-// batched phase behind BOTH verified item types: one cross-family judgment per guarded item
-// classifies every candidate answer, a type-specific deterministic rule then decides whether
-// the answer key is unique, and a vetoed item gets exactly one judge-informed regeneration.
+// Study Item Key Verification (plan 2026-08-05-001 D2/D5/D7, amending ADR-0026). One
+// cross-family judgment per guarded item classifies every candidate answer, and a type-specific
+// deterministic rule then decides whether the answer key is unique.
 //
-// Why a phase rather than a call inside each node's generation loop (D7): it migrates the one
-// divergent judge caller into `gateByJudgment` — the single rule-16 home — and puts peak
-// independent-judge load under one explicit knob, which matters because the shared free-tier
-// deployment throttles on concurrent brackets rather than on single requests.
-//
-// The uniqueness RULE is the caller's; this module owns the control flow the two types share.
-
-// Both verified brackets read this one constant, so the option-select and impostor phases
-// cannot drift apart. They can overlap in wall-clock, so peak judge load is up to twice this
-// value — that is the knob's meaning, not a bug to correct with a second constant.
-export const DEFAULT_KEY_VERIFICATION_CONCURRENCY = 4;
+// The two-round control flow this phase runs is NOT owned here — `verifyGuardedItems` owns it
+// for every verified item type (rule 18). What this module owns is the key-verification QUESTION
+// (the port and its request shape) and the two answer-key uniqueness RULES.
 
 export type KeyVerificationRequest = {
   itemType: "option_select" | "impostor";
@@ -37,30 +31,14 @@ export type KeyVerificationSubject<TItem> = {
   // `generated_passage_fallback` = this item has no verbatim grounding anchor at all, so it
   // exists only because a judge is expected to check it (D6). Read by `onUnavailable`.
   citationRung: CitationRung;
-  // The ONE informed regeneration for this subject, closed over the node's generation context
-  // where that context already exists. Returning a fresh subject (not just an item) is what
-  // lets the second verification pass judge the NEW candidates rather than the vetoed ones.
-  regenerate: (feedback: string) => Promise<KeyVerificationRegeneration<TItem>>;
+  regenerate: (feedback: string) => Promise<VerificationRegeneration<KeyVerificationSubject<TItem>>>;
 };
-
-export type KeyVerificationRegeneration<TItem> =
-  | { ok: true; subject: KeyVerificationSubject<TItem> }
-  | { ok: false; reason: string };
-
-export type KeyVerificationOutcome<TItem> =
-  | { admitted: true; item: TItem }
-  | { admitted: false; reason: string };
 
 export type KeyVerificationSpec<TItem> = {
   verifier: StudyItemKeyVerificationPort;
   concurrency?: number;
-  // The type's answer-key uniqueness rule. Returns null to admit, or the veto reason — which
-  // becomes both the rejected-row reason and the regeneration's feedback, so it must name the
-  // offending candidate, not merely state that something was wrong.
   vetoReason: (subject: KeyVerificationSubject<TItem>, verdicts: readonly StudyItemCandidateVerdict[]) => string | null;
-  // Disposition when NO verdict resolved. Deliberately per-type and asymmetric (D5, ADR-0026):
-  // harm decides, not symmetry.
-  onUnavailable: (subject: KeyVerificationSubject<TItem>, error: unknown) => KeyVerificationOutcome<TItem>;
+  onUnavailable: (subject: KeyVerificationSubject<TItem>, error: unknown) => VerificationOutcome<TItem>;
 };
 
 // A verdict the judge never returned for an ordinal is `unclear`, never an error and never a
@@ -77,42 +55,13 @@ export function claimReasonFor(verdicts: readonly StudyItemCandidateVerdict[], o
 export async function verifyStudyItemKeys<TItem>(
   subjects: readonly KeyVerificationSubject<TItem>[],
   spec: KeyVerificationSpec<TItem>
-): Promise<KeyVerificationOutcome<TItem>[]> {
-  const concurrency = spec.concurrency ?? DEFAULT_KEY_VERIFICATION_CONCURRENCY;
-  const first = await verifyOnce(subjects, spec, concurrency);
-
-  // Only vetoed subjects get a second round, and each gets exactly one. Regeneration runs
-  // inside this stage's wall-clock bracket but tags its spend with its own GENERATION stage
-  // (the descriptor's `stageTag` travels with the call), so the cost report still separates
-  // "what generation cost" from "what verification cost".
-  const retryIndices = first.flatMap((result, index) => (result.status === "vetoed" ? [index] : []));
-  if (retryIndices.length === 0) return first.map(settled);
-
-  const regenerated = await mapWithConcurrency(retryIndices, concurrency, async (index) => {
-    const vetoed = first[index];
-    if (vetoed.status !== "vetoed") throw new Error("verifyStudyItemKeys: retry index is not vetoed");
-    return { index, result: await subjects[index].regenerate(vetoed.reason) };
+): Promise<VerificationOutcome<TItem>[]> {
+  return verifyGuardedItems<KeyVerificationSubject<TItem>, StudyItemCandidateVerdict[], TItem>(subjects, {
+    ...(spec.concurrency === undefined ? {} : { concurrency: spec.concurrency }),
+    judge: (subject) => spec.verifier.verify(subject.request),
+    vetoReason: spec.vetoReason,
+    onUnavailable: spec.onUnavailable
   });
-
-  const reverified = await verifyOnce(
-    regenerated.flatMap((entry) => (entry.result.ok ? [entry.result.subject] : [])),
-    spec,
-    concurrency
-  );
-
-  const outcomes = first.map(settled);
-  let reverifiedCursor = 0;
-  for (const entry of regenerated) {
-    if (!entry.result.ok) {
-      outcomes[entry.index] = { admitted: false, reason: entry.result.reason };
-      continue;
-    }
-    // The second pass has no third round: a veto here is final, and an unavailable judge here
-    // takes the same per-type disposition it would have taken on the first pass.
-    outcomes[entry.index] = settled(reverified[reverifiedCursor]);
-    reverifiedCursor += 1;
-  }
-  return outcomes;
 }
 
 // --- The two answer-key uniqueness rules (D5) ---------------------------------------
@@ -166,34 +115,4 @@ export function impostorKeyVetoReason(
   return offenders.length
     ? `impostor key verification rejected the item: ${offenders.join("; ")}. Rewrite so exactly one statement is false of this concept.`
     : null;
-}
-
-type PassResult<TItem> =
-  | { status: "admitted"; item: TItem }
-  | { status: "vetoed"; reason: string }
-  | { status: "unavailable"; outcome: KeyVerificationOutcome<TItem> };
-
-async function verifyOnce<TItem>(
-  subjects: readonly KeyVerificationSubject<TItem>[],
-  spec: KeyVerificationSpec<TItem>,
-  concurrency: number
-): Promise<PassResult<TItem>[]> {
-  // `onVerdict` is unreachable when the judge throws (gateByJudgment's load-bearing
-  // invariant), so `vetoReason` — the only thing that can subtract an item — only ever sees
-  // verdicts the judge actually resolved.
-  return gateByJudgment<KeyVerificationSubject<TItem>, StudyItemCandidateVerdict[], PassResult<TItem>>(subjects, {
-    concurrency,
-    judge: (subject) => spec.verifier.verify(subject.request),
-    onVerdict: (subject, verdicts) => {
-      const reason = spec.vetoReason(subject, verdicts);
-      return reason === null ? { status: "admitted", item: subject.item } : { status: "vetoed", reason };
-    },
-    onUnavailable: (subject, error) => ({ status: "unavailable", outcome: spec.onUnavailable(subject, error) })
-  });
-}
-
-function settled<TItem>(result: PassResult<TItem>): KeyVerificationOutcome<TItem> {
-  if (result.status === "admitted") return { admitted: true, item: result.item };
-  if (result.status === "unavailable") return result.outcome;
-  return { admitted: false, reason: result.reason };
 }

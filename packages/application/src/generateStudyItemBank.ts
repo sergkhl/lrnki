@@ -7,6 +7,7 @@ import {
   type DerivedGraphNode,
   type ImpostorItem,
   type LessonAbsentNode,
+  type MatchingItem,
   type OptionSelectItem,
   type RejectedStudyItem,
   type StudyItem,
@@ -21,6 +22,7 @@ import type {
   EnrichmentRunStorePort,
   GraphVersionStorePort,
   LayerPurposeGenerationPort,
+  MatchingAssignmentVerificationPort,
   RunProgressReporterPort,
   StudyItemBlueprintPort,
   StudyItemBankStorePort,
@@ -33,14 +35,21 @@ import { validateOptionSelectItem, type StudyItemGuardGrounding } from "./option
 import { validateImpostorItem } from "./impostorGuard";
 import { validateMatchingItem } from "./matchingGuard";
 import {
-  DEFAULT_KEY_VERIFICATION_CONCURRENCY,
   impostorKeyVetoReason,
   optionSelectKeyVetoReason,
   verifyStudyItemKeys,
-  type KeyVerificationOutcome,
-  type KeyVerificationRegeneration,
   type KeyVerificationSubject
 } from "./verifyStudyItemKeys";
+import {
+  matchingAssignmentPresentation,
+  verifyMatchingAssignments,
+  type MatchingAssignmentSubject
+} from "./verifyMatchingAssignments";
+import {
+  DEFAULT_ITEM_VERIFICATION_CONCURRENCY,
+  type VerificationOutcome,
+  type VerificationRegeneration
+} from "./verifyGuardedItems";
 import { selectSiblingContext } from "./selectSiblingContext";
 import { selectNodeGrounding } from "./selectNodeGrounding";
 import { selectLessonNeighborhood } from "./selectLessonNeighborhood";
@@ -52,9 +61,10 @@ import { assembleConceptLesson, SUBSTANTIVE_KINDS } from "./assembleConceptLesso
 // modest degree 4; mapWithConcurrency preserves input order within every stage.
 export const DEFAULT_LESSON_CONCURRENCY = 8;
 export const DEFAULT_STUDY_ITEM_CONCURRENCY = 4;
-// A vetoed item gets exactly ONE judge-informed regeneration inside the verification phase,
-// on top of whatever the generation attempts above spent on guard failures.
-export const KEY_VERIFICATION_REGENERATION_ATTEMPTS = 1;
+// A vetoed item gets exactly ONE judge-informed regeneration inside its verification phase,
+// on top of whatever the generation attempts above spent on guard failures. One constant for
+// all three verified types: the budget is a property of the shared phase, not of a type.
+export const VERIFICATION_REGENERATION_ATTEMPTS = 1;
 export const OPTION_SELECT_GENERATION_ATTEMPTS = 2;
 export const MATCHING_GENERATION_ATTEMPTS = 2;
 export const IMPOSTOR_GENERATION_ATTEMPTS = 2;
@@ -99,6 +109,10 @@ export async function generateStudyItemBank(input: {
   // the option-select and impostor guards admit citations through the D9 fallback rung, which
   // is only sound because this judge checks the claims those citations no longer anchor (D6).
   studyItemKeyVerification: StudyItemKeyVerificationPort;
+  // Matching Assignment Verification (ADR-0026, plan 2026-08-07-001 D5). Required for the same
+  // structural reason: matching is the only type whose defect class is cross-pair ambiguity, and
+  // an optional judge would make "the board is assignable" a property some banks silently lack.
+  matchingAssignmentVerification: MatchingAssignmentVerificationPort;
   conceptLessonStore: ConceptLessonStorePort;
   studyItemGeneration: StudyItemGenerationPort;
   studyItemBankStore: StudyItemBankStorePort;
@@ -123,7 +137,7 @@ export async function generateStudyItemBank(input: {
   const operationId = input.enrichmentId;
   const lessonConcurrency = input.concurrency ?? DEFAULT_LESSON_CONCURRENCY;
   const studyItemConcurrency = input.concurrency ?? DEFAULT_STUDY_ITEM_CONCURRENCY;
-  const keyVerificationConcurrency = input.concurrency ?? DEFAULT_KEY_VERIFICATION_CONCURRENCY;
+  const verificationConcurrency = input.concurrency ?? DEFAULT_ITEM_VERIFICATION_CONCURRENCY;
   return runInstrumentedOperation(reporter, "study_items", operationId, async (studyStage) => {
     const { layer, graphVersionId, snapshot } = await studyStage(NON_LLM_STAGES.load, async () => {
       const layer = await input.enrichmentStore.getLayer(input.enrichmentId);
@@ -366,26 +380,26 @@ export async function generateStudyItemBank(input: {
   });
   const failureText = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-  // A node's outcome for ONE item type, before key verification. `pending` is the shape the
-  // verified types (option-select, impostor) hand to their verification phase; matching goes
-  // straight to `item` because D3 leaves it unverified.
-  type NodeAttempt<TItem> =
+  // A node's outcome for ONE item type, before verification. All three types now hand a
+  // `pending` subject to a verification phase — option-select and impostor to Study Item Key
+  // Verification, matching to Matching Assignment Verification — so there is no longer a
+  // straight-to-persistence variant.
+  type NodeAttempt<TSubject> =
     | { kind: "skipped" }
     | { kind: "rejected"; reason: string }
-    | { kind: "item"; item: StudyItem }
-    | { kind: "pending"; subject: KeyVerificationSubject<TItem> };
+    | { kind: "pending"; subject: TSubject };
 
-  const pendingSubjects = <TItem>(attempts: readonly NodeAttempt<TItem>[]): KeyVerificationSubject<TItem>[] =>
+  const pendingSubjects = <TSubject>(attempts: readonly NodeAttempt<TSubject>[]): TSubject[] =>
     attempts.flatMap((attempt) => (attempt.kind === "pending" ? [attempt.subject] : []));
 
   // Re-joins one type's per-node attempts with its verification outcomes. Two order facts do
   // the work and neither may be weakened: `mapWithConcurrency` is input-ordered, so
   // `attempts[i]` is always `layer.derivedNodes[i]` regardless of response timing; and
-  // `verifyStudyItemKeys` is index-aligned to the PENDING SUBSET, walked here by a cursor in
+  // `verifyGuardedItems` is index-aligned to the PENDING SUBSET, walked here by a cursor in
   // that same order. Persisted order therefore stays a function of node order alone (R4).
-  const mergeVerified = <TItem extends StudyItem>(
-    attempts: readonly NodeAttempt<TItem>[],
-    outcomes: readonly KeyVerificationOutcome<TItem>[],
+  const mergeVerified = <TSubject, TItem extends StudyItem>(
+    attempts: readonly NodeAttempt<TSubject>[],
+    outcomes: readonly VerificationOutcome<TItem>[],
     itemType: StudyItemType
   ): { items: StudyItem[]; rejected: RejectedStudyItem[] } => {
     const items: StudyItem[] = [];
@@ -398,7 +412,6 @@ export async function generateStudyItemBank(input: {
       };
       if (attempt.kind === "skipped") return;
       if (attempt.kind === "rejected") { record(attempt.reason); return; }
-      if (attempt.kind === "item") { items.push(attempt.item); return; }
       const outcome = outcomes[cursor];
       cursor += 1;
       if (outcome.admitted) items.push(outcome.item);
@@ -431,7 +444,7 @@ export async function generateStudyItemBank(input: {
     },
     item,
     citationRung,
-    regenerate: (feedback) => draftOptionSelect(node, context, KEY_VERIFICATION_REGENERATION_ATTEMPTS, feedback)
+    regenerate: (feedback) => draftOptionSelect(node, context, VERIFICATION_REGENERATION_ATTEMPTS, feedback)
   });
   // Generation/guard failure rejects this node for the bank but never aborts the run.
   // Citation guard failures are model-output quality misses, so give the generator one
@@ -442,7 +455,7 @@ export async function generateStudyItemBank(input: {
     context: Extract<NodeItemContext, { kind: "ready" }>,
     attempts: number,
     initialFeedback?: string
-  ): Promise<KeyVerificationRegeneration<OptionSelectItem>> => {
+  ): Promise<VerificationRegeneration<KeyVerificationSubject<OptionSelectItem>>> => {
     let failureReason: string | null = null;
     let retryFeedback = initialFeedback;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -459,7 +472,7 @@ export async function generateStudyItemBank(input: {
     }
     return { ok: false, reason: failureReason ?? "no study item could be grounded" };
   };
-  const optionSelectForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<OptionSelectItem>> => {
+  const optionSelectForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<KeyVerificationSubject<OptionSelectItem>>> => {
     const context = nodeItemContext(node, "option_select", "option-select");
     if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
     const drafted = await draftOptionSelect(node, context, OPTION_SELECT_GENERATION_ATTEMPTS);
@@ -483,7 +496,7 @@ export async function generateStudyItemBank(input: {
       () =>
         verifyStudyItemKeys(subjects, {
           verifier: input.studyItemKeyVerification,
-          concurrency: keyVerificationConcurrency,
+          concurrency: verificationConcurrency,
           vetoReason: (subject, verdicts) => optionSelectKeyVetoReason(subject.item, verdicts),
           // Pass-through on unavailability is option-select's status quo and the node's only
           // primary activity (ADR-0026) — but ONLY for an item whose citation still holds a
@@ -500,19 +513,46 @@ export async function generateStudyItemBank(input: {
   })();
 
   // --- Stage 4: matching items ---------------------------------------------------
-  // Unverified by design (D3): matching's observed defects are prompt ambiguity across
-  // pairs, which needs a different question shape than per-candidate claim truth.
+  // Matching's defect class is cross-pair AMBIGUITY, not per-candidate claim truth, which is why
+  // it stays outside Study Item Key Verification and runs its own N×N assignment check instead
+  // (plan 2026-08-07-001 D5). The generation half is unchanged.
   let matchingDone = 0;
-  const generateMatchingForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<never>> => {
-    const context = nodeItemContext(node, "matching", "matching");
-    if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
+  const matchingSubject = (
+    node: DerivedGraphNode,
+    context: Extract<NodeItemContext, { kind: "ready" }>,
+    item: MatchingItem
+  ): MatchingAssignmentSubject => {
+    const presentation = matchingAssignmentPresentation(item);
+    return {
+      request: {
+        declaredDomain: node.declaredDomain,
+        node: { derivedNodeId: node.derivedNodeId, canonicalLabel: node.canonicalLabel, aliases: node.aliases },
+        // Matching's question IS the pairing instruction, so the judge needs it to know what the
+        // board claims to test — unlike impostor, whose meta-question would invert judging.
+        question: item.question,
+        prompts: presentation.prompts,
+        matches: presentation.matches,
+        groundingPassages: context.grounding.passages,
+        siblings: context.siblings
+      },
+      item,
+      matchPairOrdinals: presentation.matchPairOrdinals,
+      regenerate: (feedback) => draftMatching(node, context, VERIFICATION_REGENERATION_ATTEMPTS, feedback)
+    };
+  };
+  const draftMatching = async (
+    node: DerivedGraphNode,
+    context: Extract<NodeItemContext, { kind: "ready" }>,
+    attempts: number,
+    initialFeedback?: string
+  ): Promise<VerificationRegeneration<MatchingAssignmentSubject>> => {
     let failureReason: string | null = null;
-    let retryFeedback: string | undefined;
-    for (let attempt = 0; attempt < MATCHING_GENERATION_ATTEMPTS; attempt += 1) {
+    let retryFeedback = initialFeedback;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
         const draft = await input.studyItemGeneration.generateMatching(generationInputFor(node, context, retryFeedback));
         const guarded = validateMatchingItem(draft, guardGroundingFor(node, context), newPairId, newPairId);
-        if (guarded.ok) return { kind: "item", item: guarded.item };
+        if (guarded.ok) return { ok: true, subject: matchingSubject(node, context, guarded.item) };
         failureReason = guarded.reason;
         retryFeedback = guarded.reason;
       } catch (error) {
@@ -520,7 +560,13 @@ export async function generateStudyItemBank(input: {
         retryFeedback = failureReason;
       }
     }
-    return { kind: "rejected", reason: failureReason ?? "no matching item could be grounded" };
+    return { ok: false, reason: failureReason ?? "no matching item could be grounded" };
+  };
+  const generateMatchingForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<MatchingAssignmentSubject>> => {
+    const context = nodeItemContext(node, "matching", "matching");
+    if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
+    const drafted = await draftMatching(node, context, MATCHING_GENERATION_ATTEMPTS);
+    return drafted.ok ? { kind: "pending", subject: drafted.subject } : { kind: "rejected", reason: drafted.reason };
   };
   const matchingStage = (async () => {
     const attempts = await studyStage(
@@ -534,7 +580,16 @@ export async function generateStudyItemBank(input: {
         }),
       layer.derivedNodes.length
     );
-    return mergeVerified(attempts, [], "matching");
+    const subjects = pendingSubjects(attempts);
+    const outcomes = await studyStage(
+      STAGE_TAGS.matchingAssignmentVerification,
+      () => verifyMatchingAssignments(subjects, {
+        verifier: input.matchingAssignmentVerification,
+        concurrency: verificationConcurrency
+      }),
+      subjects.length
+    );
+    return mergeVerified(attempts, outcomes, "matching");
   })();
 
   // --- Stage 5: impostor items (R3/R4/R7/R8/R9) ---------------------------------
@@ -564,14 +619,14 @@ export async function generateStudyItemBank(input: {
     },
     item,
     citationRung,
-    regenerate: (feedback) => draftImpostor(node, context, KEY_VERIFICATION_REGENERATION_ATTEMPTS, feedback)
+    regenerate: (feedback) => draftImpostor(node, context, VERIFICATION_REGENERATION_ATTEMPTS, feedback)
   });
   const draftImpostor = async (
     node: DerivedGraphNode,
     context: Extract<NodeItemContext, { kind: "ready" }>,
     attempts: number,
     initialFeedback?: string
-  ): Promise<KeyVerificationRegeneration<ImpostorItem>> => {
+  ): Promise<VerificationRegeneration<KeyVerificationSubject<ImpostorItem>>> => {
     let failureReason: string | null = null;
     let retryFeedback = initialFeedback;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -588,7 +643,7 @@ export async function generateStudyItemBank(input: {
     }
     return { ok: false, reason: failureReason ?? "no impostor item could be grounded" };
   };
-  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<ImpostorItem>> => {
+  const generateImpostorForNode = async (node: DerivedGraphNode): Promise<NodeAttempt<KeyVerificationSubject<ImpostorItem>>> => {
     const context = nodeItemContext(node, "impostor", "impostor");
     if (context.kind !== "ready") return context.kind === "skip" ? { kind: "skipped" } : { kind: "rejected", reason: context.reason };
     const drafted = await draftImpostor(node, context, IMPOSTOR_GENERATION_ATTEMPTS);
@@ -612,7 +667,7 @@ export async function generateStudyItemBank(input: {
       () =>
         verifyStudyItemKeys(subjects, {
           verifier: input.studyItemKeyVerification,
-          concurrency: keyVerificationConcurrency,
+          concurrency: verificationConcurrency,
           vetoReason: (subject, verdicts) => impostorKeyVetoReason(subject.item, verdicts),
           // Fail closed, unchanged from the judge this replaces and for the same reason
           // ADR-0026 gives: a true "lie" teaches a falsehood, and impostor-absent is the
@@ -626,9 +681,9 @@ export async function generateStudyItemBank(input: {
 
   // The stages launch together after blueprint, but their results merge only after the
   // join in the canonical type order. Each mapper is itself input-ordered, so neither
-  // response timing nor stage completion timing can perturb persisted order (R4). Two of the
-  // three chains now carry a verification bracket after their generation bracket, so the two
-  // key-verification stages can overlap in wall-clock — see the concurrency knob's note.
+  // response timing nor stage completion timing can perturb persisted order (R4). All three
+  // chains now carry a verification bracket after their generation bracket, so up to three
+  // verification stages can overlap in wall-clock — see the concurrency knob's note.
   const stageResults = await Promise.all([
     optionSelectStage,
     matchingStage,

@@ -455,6 +455,29 @@ export type StudyItemCandidateVerdict = {
   reason: string;
 };
 
+// Matching Assignment Verification (ADR-0026, amended by plan 2026-08-07-001 D5). Matching's
+// harm class is not a false claim but an AMBIGUOUS assignment: two matches that both answer one
+// prompt mark a learner wrong for knowing the material. Per-candidate claim truth cannot express
+// that — a tautological or interchangeable pair is individually true — so this judgment ranges
+// over the whole N×N grid of (prompt, match) cells instead.
+//
+// `fits` / `does_not_fit` rather than true / false because the question is FIT, not claim truth
+// (D8): a pair set can be entirely factual and still be unpairable. `unclear` is a real third
+// value and may never veto (AGENTS rule 16).
+export type MatchingAssignmentFit = "fits" | "does_not_fit" | "unclear";
+
+export type MatchingAssignmentVerdict = {
+  // Both ordinals are pair ordinals, echoed back by the judge. The keyed cell is the diagonal
+  // (promptOrdinal === matchOrdinal); every other cell is a distractor pairing. Matches are
+  // presented in a text-sorted order that hides that diagonal, so the judge cannot read the
+  // answer key off the listing, and the application matches on the echoed ordinals rather than
+  // on array position. A cell the judge never returns is `unclear`.
+  promptOrdinal: number;
+  matchOrdinal: number;
+  verdict: MatchingAssignmentFit;
+  reason: string;
+};
+
 export type ConceptCandidate = {
   candidateId: string;
   canonicalLabel: string;
@@ -1821,6 +1844,11 @@ export const STAGE_TAGS = {
   // one prompt file mean two Neural Stage Descriptors (ADR-0034).
   optionSelectKeyVerification: "option-select-key-verification",
   impostorKeyVerification: "impostor-key-verification",
+  // Matching Assignment Verification (plan 2026-08-07-001 D5/D12). A THIRD verification
+  // bracket, separate from the two above because it asks a different question (fit across the
+  // pair set, not per-candidate claim truth) from its own prompt file — so it is its own
+  // Neural Stage Descriptor either way (ADR-0034).
+  matchingAssignmentVerification: "matching-assignment-verification",
   // Layer-purpose generation runs ONCE per bank inside the `study_items` operation: a
   // learner-neutral capability statement for the enrichment, stored in plain register and
   // themed only at render (ADR-0033). Fail-open: a stage failure writes no row.

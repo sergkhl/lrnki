@@ -28,6 +28,7 @@ const STAGE_COPY: Record<string, string> = {
   [STAGE_TAGS.impostorGeneration]: "Hiding false trails",
   [STAGE_TAGS.optionSelectKeyVerification]: "Checking the answers",
   [STAGE_TAGS.impostorKeyVerification]: "Checking the decoys",
+  [STAGE_TAGS.matchingAssignmentVerification]: "Checking the pairs",
   [NON_LLM_STAGES.documentLoad]: "Opening the satchel",
   [NON_LLM_STAGES.persist]: "Binding the journal",
   [NON_LLM_STAGES.load]: "Unrolling the map",

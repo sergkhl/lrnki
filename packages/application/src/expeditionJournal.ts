@@ -135,7 +135,8 @@ export const EXPECTED_TOPIC_GENERATION_STAGE_PLAN = {
     STAGE_TAGS.matchingGeneration,
     STAGE_TAGS.impostorGeneration,
     STAGE_TAGS.optionSelectKeyVerification,
-    STAGE_TAGS.impostorKeyVerification
+    STAGE_TAGS.impostorKeyVerification,
+    STAGE_TAGS.matchingAssignmentVerification
   ]
 } as const;
 

@@ -64,8 +64,14 @@ does not become mastery.
 
 Each type's deterministic guard enforces only structural and provenance guarantees. Option-select
 keys exactly one correct option; matching enforces pair count, distinct normalized prompt/match text,
-non-self matches, and citation verification; impostor keys exactly one lie, verifies each grounded
-truth against its cited grounding, and makes a source-cited impostor unrepresentable.
+non-self matches, contiguous-word non-containment between a pair's two sides, and citation
+verification; impostor keys exactly one lie, verifies each grounded truth against its cited
+grounding, and makes a source-cited impostor unrepresentable.
+
+Containment is the only part of matching's surface-solvability defect a deterministic veto may own:
+"one side displays the other's whole phrase" is provable, while "the match paraphrases the prompt" is
+a judgment the generation prompt owns instead (AGENTS rule 16). It is computed over word sequences,
+never raw characters, which both over-fire on subwords and under-fire on punctuation.
 
 A citation resolves through a deterministic ladder, not an all-or-nothing string match: the cited
 passage with a verbatim quote; the same quote verified verbatim against a *different* **generated**
@@ -86,15 +92,36 @@ Verifying only the key cannot observe a second true option or a second false sta
 lie-only judge this supersedes was structurally blind to items that mark a learner wrong for the
 right answer. The third resolution rung and this verification are **interlocked**: forgiving a quote
 the generator never reproduced is admissible only where a judge checks the claim it no longer
-anchors, which is why matching — deliberately unverified, because its failure mode is prompt
-ambiguity across pairs and needs a different question shape — resolves through the verbatim rungs
-alone.
+anchors.
+
+**Matching Assignment Verification** then checks the pair set of every guarded matching item. Its
+question is *fit*, not claim truth: one cross-family judgment classifies every `(prompt, match)` cell
+of the N×N grid as `fits`, `does_not_fit`, or `unclear`, and a deterministic rule admits the item
+only when no non-keyed cell fits and no keyed cell does not. `unclear` is never a veto, and a cell
+the judge omits is `unclear`. A vetoed item gets one regeneration whose feedback names the offending
+cells, then one further verification.
+
+Matching needs this second question because its harm class is invisible to the first. Two matches
+that both answer one prompt mark a learner wrong for a defensible answer, and every pair on such a
+board is individually TRUE — so a per-candidate claim judge admits it. The grid also exposes a
+mis-keyed pair, which a per-prompt list of fitting matches cannot. Because assignment fit is not
+claim truth, the interlock above still holds and **matching resolves its citations through the
+verbatim rungs alone**: forgiving a lost quote stays admissible only where a judge checks the claim
+that quote no longer anchors.
+
+The board is presented to the judge with the answer key removed: prompts keep their pair ordinals,
+matches are sorted by normalized text and renumbered by sorted position. Sorting alone is
+insufficient — an attached pair ordinal leaks the key more legibly than position does, and a judge
+that can read the key has no reason to test any other cell. The permutation is a deterministic
+function of the item, so a re-run judges the same board.
 
 Unavailability stays asymmetric, decided by harm rather than symmetry. An impostor drops, because a
 true "lie" teaches a falsehood while a missing impostor is the designed safe state. An option-select
 passes through unverified — its status quo, and the node's only primary activity — unless it was
-admitted through the third rung, in which case it has no mechanical anchor either and drops too.
-Distractor plausibility, matching anti-cueing, blueprint quality, and broader teaching quality remain
+admitted through the third rung, in which case it has no mechanical anchor either and drops too. A
+matching item passes through unverified: every pair still carries a verbatim mechanical anchor, and
+its worst failure is a `partial` grade rather than a taught falsehood. Distractor plausibility, the
+paraphrase half of matching anti-cueing, blueprint quality, and broader teaching quality remain
 real-use inspection responsibilities.
 
 Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
