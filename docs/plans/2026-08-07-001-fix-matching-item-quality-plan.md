@@ -18,12 +18,13 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Matching Item Quality
 
-**Status:** In progress — U1, U2, and U3 are closed; U2 **PASSES** on its re-run. Next action:
-**U4, the correctness gate** — the two 5-draw probes, then two full real-use runs (Thermohaline plus
-one fresh different-domain topic) on the shared VPS deployed container after `pnpm db:reset` (D11),
-with every admitted matching item hand-inspected for ambiguity. U3's stage is live and its 1-draw
-probes both landed correctly; the probes must be re-run at 5 because they also qualify the judge
-model, and U4 owes two extra reports named in Open findings.
+**Status:** All four units are implemented and gated; U4 **PASSES** with one acceptance clause **not
+met**. Both 5-draw probes pass, both real-use runs ran on the shared VPS deployed container after
+`pnpm db:reset` (D11), and all 26 admitted matching items were hand-inspected — of which **one**
+still carries an ambiguous pair set, against an acceptance bar of none. Next action is a decision,
+not code: accept that ~4% tail and close the plan, or spend one more unit on judgment stability. The
+Open findings also hold two live decisions this work surfaced (the blueprint's over-firing
+matching-facet constraint, `MATCHING_GENERATION_ATTEMPTS`) and the ADR sweep the judge swap owes.
 
 **Decision state:** Interview-locked 2026-08-07. D1–D13 were each chosen in the planning interview;
 every recommendation was accepted as offered.
@@ -457,31 +458,105 @@ paragraphs, the key-hiding rationale, matching's pass-through row in the unavail
 and the containment veto; CONTEXT.md gains the term and narrows *Study Item Key Verification* to
 "true and unique".
 
+### U4 — correctness gate, probes and two real-use runs (2026-08-08)
+
+- **Milestone:** Matching Assignment Verification live over the full pipeline, plus U1's pair
+  contract and containment veto, judged on the shared deployed container.
+- **Fixture and source type:** two topic expeditions on the VPS after `pnpm db:reset` and a deploy
+  of `d8d3bf2` — `Thermohaline circulation` (Oceanography, for comparability) and
+  `Monetary policy transmission` (Economics, fresh domain, rule 17). 16 derived nodes each; **all
+  26 admitted matching items and their 95 pairs hand-inspected** (ADR-0013), plus an 867-row
+  learner-copy vocabulary scan with its positive control.
+- **Real model calls used:** yes, throughout. The container was proved to be the freshly built
+  artifact by comparing `docker inspect lrnki-learner-api --format '{{.Image}}'` against
+  `docker compose images learner-api`, and by finding the new prompt file inside it.
+- **Result: PASS**, with one acceptance clause **not met** — see the residual below. The probes
+  pass outright; the stage removes the defect class it was built for; one admitted item in 26 still
+  carries an ambiguous pair set.
+
+**Probes, 5 draws each, live `deepseek-v4-flash-0731`.** The reconstructed `Seawater density`
+subsumption board was **vetoed 5 of 5**, every draw through the cross-fit branch with 4 offending
+cells and no keyed `does_not_fit`, on a non-identity permutation. The reconstructed
+`North Atlantic Deep Water` facet board was **admitted 5 of 5** with exactly the four keyed cells
+fitting — the discrimination-not-distrust control. Both returned the full 16-cell grid in every
+draw. **Caveat that belongs to the judge's qualification:** at production sampling (temperature 0,
+seed 7) the grids were *identical* across all five draws and only the free-text reasons varied, so
+this measures the shipped configuration's stability, not the model's dispersion under sampling.
+
+**The stage does its job, and both branches fire in real use.** Four items were finally rejected by
+assignment verification: three through the cross-fit branch and one — `Policy rate pass-through` —
+through **keyed `does_not_fit`**, a mis-keyed pair. That second branch is the one a per-prompt
+fit-set could not have exposed, and D5 chose the grid partly for it.
+
+**Both subtraction/addition directions, separated.** Assignment vetoes subtracted **4** items; judge
+unavailability added **0** unverified ones, because there were **zero** non-success calls across
+2,532 in the window — no throttling at all, so the D6 pass-through was never exercised. The other
+losses are neither: one guard rejection (`Seawater density`, duplicate matches, after its retry) and
+one blueprint decline. Coverage is **45 of 48 per run**, with nothing lost to an unreachable judge.
+
+**Round-1 vetoes and the rescue rate** are recoverable only from `LiteLLM_SpendLogs`, since a
+rescued item leaves no row anywhere in the application schema: 18 verification calls over 14 round-1
+items and 19 over 16 give **7 round-1 vetoes**, of which the one informed regeneration **rescued 3**
+— all three in run 1, none of the three in run 2. Budget: 37 judge calls, **$0.038 for both topics**,
+3.3–3.4 s a call, stage wall-clock 35.0 s and 27.6 s against run totals of 323 s and 215 s. Live
+denominator **16**.
+
+**Residual: one admitted item carries an ambiguous pair set**, so this acceptance clause is not
+met at 1 of 26. `Balance sheet channel` prompt 1 — "Channel that operates through changes in asset
+prices feeding into borrower net worth" — is keyed to `Asset price channel`, but that description is
+defensibly the balance sheet channel's own asset-price path, which is keyed to prompt 0. Replaying
+all 26 admitted items through the shipped stage put the judge's stability beyond doubt (**25 of 26
+identical, 0 unavailable, every grid complete**) and this was the single disagreement: the replay
+**vetoed** it. So the rule is at the edge of its sensitivity on this board rather than blind to it —
+though the replay's reason misread prompt 2's "alongside" directionally, reaching the right verdict
+by the wrong cell.
+
+**Vocabulary and surface-solvability.** 867 learner-copy rows, control 737, exactly one `dependent`
+— "heavily dependent on bank-intermediated credit", the legitimate domain sense, which is **evidence
+for D9's refusal to add a lexical guard** (rule 16) rather than a defect. One bare `concept`
+survives, now in a lesson body rather than U2's item question: same adherence class, still not
+answerable with a veto. The containment veto fired zero times; the shared-word shortlist is
+dominated in Economics by "channel" appearing in *every* match, which cues nothing, and the residual
+cue-y shape is the named-term one, inherent to keying a named term.
+
+**Safe to continue downstream: yes.** Four genuinely ambiguous items removed and the U2 baseline's
+two-per-topic incidence down to one in 26; the residual is a quality tail, not a foundation defect.
+
 ### Open findings
 
-- **Direction-of-effect facets still produce low-discrimination matching items, and U3 is now the
-  tie-breaker on how to fix it.** The blueprint constraint added in U1 did not stop them (2 of 16
-  nodes in the passing run), and the generator rescues them into admissible-but-weak pairs. The other
-  lever — a stronger blueprint model — was measured on 2026-08-08 and is recorded in
-  `litellm/config.yaml` beside `kg-claim-extraction`: `deepseek-v4-flash` yields 16 of 16 matching
-  items against MiMo v2.5's 12, but never declines a node, and the extra items include off-node drift
-  and one false match. That decision is deliberately deferred to this stage. **U4 must therefore
-  report two things it would not otherwise:** how many admitted items carry the direction-of-effect
-  shape, and whether the assignment judge vetoes the items a non-declining blueprint adds — the
-  second is what settles the model question. Do not fix either by tuning prompt text against the
-  density nodes; that is fixture tuning (rule 17).
+- **The blueprint's matching-facet constraint now over-fires, and the direction-of-effect worry did
+  not survive measurement.** U4 found 4 of 26 admitted items carrying the direction-of-effect facet
+  shape, and all four are discriminable — each match names its own property — with clean diagonals on
+  replay. The U2 collapse is not reproduced. The constraint, meanwhile, cost a real item: it declined
+  `Surface ocean circulation` for having "only two distinct answers (right in NH, left in SH)".
+  Forcing generation on that exact node with that exact facet, 3 draws, produced **no** collapsing
+  board — the generator re-chose aspects, as U1's distinct-matches rule tells it to, and the judge
+  admitted all three with perfect diagonals. So the decline is conservative rather than protective.
+  Removing or narrowing it is a live decision; do not tune it against these nodes (rule 17).
+- **Matching Assignment Verification does NOT settle the blueprint model question, and U4 is why.**
+  The bake-off in `litellm/config.yaml` beside `kg-claim-extraction` records `deepseek-v4-flash`
+  yielding 16 of 16 matching items against MiMo v2.5's 12 by never declining a node, with the extra
+  items carrying **off-node drift and one false match**. This stage checks *fit*, not claim truth
+  (D8) — a false but unambiguous match passes it by design, and off-node drift is not an assignment
+  defect at all. Its measured subtraction is 4 finally rejected of 30 generated, all for ambiguity.
+  So it is the wrong gate for that failure mode; the decision needs either claim-truth verification
+  for matching (explicitly out of scope here) or a direct A/B of the blueprint model.
 - **Matching's second generation attempt is now known to fail routinely on a hard node** (3 of 3 on
-  the reproduced case before the fix). The plan puts retry-budget changes out of scope pending
-  measurement; that measurement now exists for one node, so raising `MATCHING_GENERATION_ATTEMPTS` is
-  a live, separate decision rather than a hypothetical one.
-- **Judge competence on `deepseek-v4-flash-0731` is under-measured, not unmeasured.** The judge moved
-  off gpt-oss-120b to a single DeepSeek v4 flash deployment (user decision, 2026-08-07) with
-  deliberately **no fallback**, so verdicts stay attributable from the alias alone. Evidence is now
-  U3's two live 4×4 probes — full grids, correct veto on the ambiguous board through the cross-fit
-  branch, clean admit on the facet board — **at one draw each**. That is discrimination on two
-  boards, not a measurement. **U4's probes are doing double duty**: they qualify the judge as well as
-  the stage, so a failure there must be diagnosed against both. Do not read the shipped
-  key-verification evidence (30 of 30 impostors clean, captured defect rejected 5 of 5) as covering
+  the reproduced case before the fix; U4 saw it again, `Seawater density` losing its item to
+  `matching matches must be distinct` after its retry). The plan puts retry-budget changes out of
+  scope pending measurement; that measurement now exists, so raising `MATCHING_GENERATION_ATTEMPTS`
+  is a live, separate decision.
+- **One admitted item in 26 still carries an ambiguous pair set** (`Balance sheet channel`, run 2),
+  so the acceptance clause "no admitted item carries an ambiguous pair set" is not met. The shipped
+  rule vetoes that board on a re-judgment, so the lever is judgment stability on borderline boards —
+  a second draw, or a stricter reading of "defensibly" in the prompt — not a new mechanism. Whether
+  a ~4% ambiguity tail is acceptable is a product call this plan should not make silently.
+- **Judge competence on `deepseek-v4-flash-0731` is qualified for the shipped configuration, and
+  only that.** Evidence is now U4's two 5-draw probes (correct veto through the cross-fit branch,
+  clean admit on the control, full grids in all 10 draws) plus a 26-item replay agreeing with
+  production 25 times with zero unavailability. But production sampling is temperature 0 with a fixed
+  seed and the probe grids were **identical across draws**, so nothing here measures dispersion under
+  sampling. Do not read the shipped key-verification evidence (30 of 30 impostors clean) as covering
   this model; it was measured under gpt-oss-120b. Beware of citing the 2026-06-24 "flash is
   disproven" note against it: that measured a *previous* flash generation on whole-set ordering, and
   `litellm/config.yaml` now says so explicitly.

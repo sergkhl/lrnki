@@ -33,15 +33,16 @@
   post-load measure/auto-scroll racing the press, i.e. possibly a real "tap does nothing right after
   load" defect rather than a test bug. Worth a bounded look before it is papered over with a wait.
 
-- **Matching item quality — U1–U3 closed; U4, the correctness gate, is next.** Plan:
-  [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which owns the full record and
-  the open findings. **Matching Assignment Verification is live**: a third verification bracket over
-  the N×N (prompt, match) grid, stage denominator 15 → 16, ADR-0026 and CONTEXT.md amended in the same
-  change. Its two 1-draw live probes both landed correctly (ambiguous board vetoed, clean facet board
-  admitted, 16 of 16 cells each). Next action: **U4** — re-run both probes at 5 draws, then two full
-  real-use runs (Thermohaline plus a fresh different-domain topic) on the VPS deployed container after
-  `pnpm db:reset`, hand-inspecting every admitted matching item. The probes double as the DeepSeek
-  judge's qualification, so a failure must be diagnosed against both the stage and the model.
+- **Matching item quality — all four units gated; one acceptance clause is not met, and the call is
+  yours.** Plan: [2026-08-07-001](./2026-08-07-001-fix-matching-item-quality-plan.md), which owns the
+  full record and the open findings. U4 ran both 5-draw probes (pass) and two real-use runs on the
+  VPS deployed container after `pnpm db:reset` — `Thermohaline circulation` and `Monetary policy
+  transmission` — and hand-inspected all 26 admitted matching items. The stage works: 4 ambiguous
+  items removed, both veto branches fired, zero unavailability admissions, ~$0.019 a topic. But
+  **1 of 26 admitted items still carries an ambiguous pair set** against a bar of none. Next action
+  is a decision, not code: accept the tail and close the plan, or spend a unit on judgment stability
+  (the shipped rule vetoes that board on a re-judgment, so it is sensitivity, not a missing
+  mechanism).
 
 - **Better Auth integration — planned, queued after matching.** Plan:
   [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), interview-locked 2026-08-08.
@@ -51,12 +52,11 @@
   branch `feat/better-auth` and open U1. The Google OAuth client + `BETTER_AUTH_SECRET` are
   user-owned manual actions tracked in [BLOCKERS](./BLOCKERS.md) and can happen in parallel.
 
-- **`main` is at `f1224c3`; the shared VPS still runs `fix/study-item-grounding` at `bd0b3eb`.** The
-  Study Item grounding and key-verification work is now merged to `main`, but **the VPS was not
-  redeployed** and no matching work has shipped there. Local work continues on
-  `fix/matching-item-quality`. The plan's D11 VPS gate run is still outstanding; U2 ran locally
-  against the full real pipeline instead, which is what D11's "iterate locally with free hard resets"
-  licenses, and the deploy belongs with the unit that ships.
+- **`main` is at `f1224c3` and unpushed; the shared VPS now runs `fix/matching-item-quality` at
+  `d8d3bf2`.** U4's gate deployed the branch to the VPS after a `pnpm db:reset` (D11), so the shared
+  environment carries the matching work and its two gate expeditions but **not** `main`. The branch
+  is pushed to `origin`; `origin/main` is still behind local `main`. When the branch merges, redeploy
+  so the VPS leaves a feature branch, and check the checkout back onto `main`.
 
 - **Model assignment, and a DeepSeek target gated on evidence.** `litellm/config.yaml` owns the
   mapping and every per-model measurement (AGENTS rule 5); live state only here. The judge is
@@ -65,9 +65,10 @@
   (ADR-0007/0005, ADR-0013). `kg-prerequisite-ordering` keeps gpt-oss-120b and its Groq exposure.
   **Intended direction: generation moves to DeepSeek if the evidence confirms.** The 2026-08-08
   blueprint bake-off puts it ahead on yield, latency and price while buying part of that by never
-  declining a node; `mimo-v2.5-pro` is measured and rejected. The call is deferred to Matching
-  Assignment Verification, the gate that would veto the weak items DeepSeek added. Moving the
-  *default* alias has two hard preconditions: relocate the judge in the same change
+  declining a node; `mimo-v2.5-pro` is measured and rejected. **U4 removed the gate that decision was
+  waiting on:** Matching Assignment Verification checks fit, not claim truth, so it does not catch
+  the off-node drift and false match DeepSeek's extra items carried — the call needs a direct A/B
+  instead. Moving the *default* alias has two hard preconditions: relocate the judge in the same change
   ([ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md)), and
   re-run the ADR-0013 gates — all of them were measured with MiMo generating.
 

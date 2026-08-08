@@ -288,10 +288,14 @@ export interface StudyItemKeyVerificationPort {
 // list) also exposes a mis-keyed pair, and sparse-list outputs are the shape this generator
 // family has historically fumbled.
 //
-// Prompts and matches arrive already ordered for presentation — matches in the deterministic
-// text sort that hides the diagonal — and both carry their PAIR ordinals, which the judge
-// echoes back. The application owns the deterministic uniqueness rule over the returned grid
-// and the pass-through disposition on unavailability (ADR-0026, D5/D6).
+// Prompts and matches arrive already ordered for presentation, and the two ordinal spaces are
+// NOT the same. Prompts carry their pair ordinals; matches carry a PRESENTATION INDEX assigned
+// by the deterministic normalized-text sort, and the application holds the inverse map. Both
+// halves hide the key: an aligned listing leaks it by position, and printing the pair ordinal
+// beside a sorted match hands it back more legibly still — a judge that can read the key has no
+// reason to test any other cell. The judge echoes presentation indices; the application owns
+// the deterministic uniqueness rule over the returned grid and the pass-through disposition on
+// unavailability (ADR-0026, D5/D6).
 export interface MatchingAssignmentVerificationPort {
   readonly model: string;
   verify(input: {
