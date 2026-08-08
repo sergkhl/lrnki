@@ -5,8 +5,9 @@ import { Menu as MenuIcon } from "lucide-react-native";
 import { ExpeditionEntry } from "@/components/ExpeditionEntry";
 import { JournalSplashCoordinator } from "@/components/JournalSplashCoordinator";
 import { LeaderboardDialog } from "@/components/LeaderboardDialog";
+import { ExplorerNameGate } from "@/components/ExplorerNameGate";
 import { LearnerMenuSheet } from "@/components/LearnerMenuSheet";
-import { LearnerNameGate } from "@/components/LearnerNameGate";
+import { SignInGate } from "@/components/SignInGate";
 import { journalQuery, leaderboardQuery, meQuery } from "@/lib/queries";
 import { logout } from "@/lib/session";
 import { IconButton, RouteStatus, Screen, colors } from "@/ui";
@@ -15,30 +16,35 @@ import { learnerTerm } from "@/learn/vocabulary";
 const GENERATION_POLL_MS = 5_000;
 
 // The journal screen. `me` is the session state machine (plan 2026-07-14-001 KTD1): the
-// registry gate renders only for a SETTLED signed-out `null`, a stored token being
+// sign-in gate renders only for a SETTLED signed-out `null`, a session cookie being
 // validated shows a visible loading state, and a transport failure offers retry while
-// keeping the token — never a blank frame (R6). Once signed in, a Journal-fetch failure
+// leaving the cookie alone — never a blank frame (R6). Once signed in, a Journal-fetch failure
 // stays signed in and offers Retry + Sign out (R5), so a bad read never bounces the learner
 // back to the gate. Recall practice lives on each expedition's trail as Crystal Guardian
 // challenges (plan 2026-07-13-003 KTD10 removed the global Duel).
 export default function JournalPage() {
   const me = useQuery(meQuery);
-  const signedIn = me.data != null;
+  const learner = me.data ?? null;
+  // The learner-domain reads wait for a session that has cleared BOTH gates below. Hooks run
+  // before the early returns, so `enabled` is the only thing that can hold them — gating on
+  // `learner != null` alone would fire the journal and the board underneath the naming screen,
+  // which is a gate that fetches what it is gating.
+  const admitted = learner != null && learner.profileComplete;
   const [menuOpen, setMenuOpen] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
 
   const journal = useQuery({
     ...journalQuery,
-    enabled: signedIn,
+    enabled: admitted,
     refetchInterval: (query) =>
       query.state.data?.yours.some((expedition) => expedition.status === "generating")
         ? GENERATION_POLL_MS
         : false
   });
-  const board = useQuery({ ...leaderboardQuery, enabled: signedIn });
+  const board = useQuery({ ...leaderboardQuery, enabled: admitted });
 
-  // Session validation (KTD1): pending = a stored token is being checked; error = the check
-  // could not complete (network) — retain the token and retry, do not sign out.
+  // Session validation (KTD1): pending = the session cookie is being checked; error = the check
+  // could not complete (network) — leave the cookie alone and retry, do not sign out.
   if (me.isPending) {
     return <RouteStatus tone="loading" title={learnerTerm("sessionValidating")} />;
   }
@@ -52,10 +58,21 @@ export default function JournalPage() {
       />
     );
   }
-  if (!signedIn) {
+  if (!learner) {
     return (
       <Screen className="items-center justify-center p-4">
-        <LearnerNameGate />
+        <SignInGate />
+      </Screen>
+    );
+  }
+  // Signed in but unnamed (D7): a Google sign-in arrives carrying the provider's real name and
+  // nothing else, and the weekly board is shared. The naming screen stands between that name
+  // and the board, exactly once. Email sign-up sets the flag with the name it already collected,
+  // so the rigs' path never lands here.
+  if (!learner.profileComplete) {
+    return (
+      <Screen className="items-center justify-center p-4">
+        <ExplorerNameGate suggestedName={learner.displayName} />
       </Screen>
     );
   }
@@ -83,7 +100,7 @@ export default function JournalPage() {
     );
   }
 
-  const learnerStateRef = me.data!.learnerStateRef;
+  const learnerStateRef = learner.learnerStateRef;
 
   return (
     <Screen>

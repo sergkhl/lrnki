@@ -1,6 +1,10 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import type { Sql } from "postgres";
-import * as authSchema from "./schema/auth.js";
+// Extensionless, like every other relative import in this package's application code. The `.js`
+// suffixes inside `src/schema/` exist for drizzle-kit, which reads that subtree directly; this
+// file is ordinary application code, and it is the only one Turbopack pulls into the Admin Lab
+// bundle — where a `.js` specifier resolves to nothing and fails the build.
+import * as authSchema from "./schema/auth";
 
 // The ONE Drizzle handle in this package, and the only reason Drizzle exists at runtime rather
 // than as a schema-authoring tool (ADR-0039 keeps every store on raw `postgres` queries). Better

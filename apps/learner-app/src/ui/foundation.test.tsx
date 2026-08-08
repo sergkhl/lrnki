@@ -30,20 +30,20 @@ test("Text nests inline spans like raw RN text", async () => {
   expect(screen.getByText("inner")).toBeTruthy();
 });
 
-test("Input associates label and hint, shows error state, and supports secure numeric entry", async () => {
-  const { rerender } = await render(<Input label="PIN" hint="4 digits" secureTextEntry inputMode="numeric" value="" onChangeText={() => {}} />);
-  const input = screen.getByLabelText("PIN");
+test("Input associates label and hint, shows error state, and supports secure entry", async () => {
+  const { rerender } = await render(<Input label="Password" hint="At least 8 characters" secureTextEntry inputMode="text" value="" onChangeText={() => {}} />);
+  const input = screen.getByLabelText("Password");
   expect(input.props.secureTextEntry).toBe(true);
-  expect(input.props.inputMode).toBe("numeric");
-  expect(screen.getByText("4 digits")).toBeTruthy();
+  expect(input.props.inputMode).toBe("text");
+  expect(screen.getByText("At least 8 characters")).toBeTruthy();
 
   await fireEvent(input, "focus");
-  expect(screen.getByLabelText("PIN").props.className).toContain("border-frontier");
+  expect(screen.getByLabelText("Password").props.className).toContain("border-frontier");
 
-  await rerender(<Input label="PIN" hint="4 digits" error="Wrong PIN" secureTextEntry value="" onChangeText={() => {}} />);
-  expect(screen.getByText("Wrong PIN")).toBeTruthy();
-  expect(screen.queryByText("4 digits")).toBeNull();
-  expect(screen.getByLabelText("PIN").props.className).toContain("border-destructive");
+  await rerender(<Input label="Password" hint="At least 8 characters" error="Wrong password" secureTextEntry value="" onChangeText={() => {}} />);
+  expect(screen.getByText("Wrong password")).toBeTruthy();
+  expect(screen.queryByText("At least 8 characters")).toBeNull();
+  expect(screen.getByLabelText("Password").props.className).toContain("border-destructive");
 });
 
 test("Input can be disabled without losing its label", async () => {

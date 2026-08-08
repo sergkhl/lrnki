@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@better-auth/expo": "catalog:",
     "@faker-js/faker": "catalog:",
     "@hono/node-server": "catalog:",
     "@hono/zod-validator": "catalog:",

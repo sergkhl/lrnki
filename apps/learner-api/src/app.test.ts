@@ -301,3 +301,71 @@ maybeDb("composing the app leaves the store pool's json serialization intact", a
     await Promise.all([sql.end(), authClientSql.end()]);
   }
 });
+
+// The `profileComplete` round trip, which is the ONLY thing standing between a Google account's
+// real legal name and the shared weekly leaderboard (ADR-0041, D7). Every part of it is invisible
+// to the type system — the field is an `additionalFields` entry, so a config change that drops it
+// from the sign-up body or from the session projection compiles fine and simply stops gating the
+// naming screen. Nothing else in either suite would notice: the client would either ask a named
+// learner to name themselves again, or never ask at all and publish the provider's name.
+maybeDb("the naming gate's flag round-trips through sign-up, the session read, and updateUser", async () => {
+  const { createDatabaseClient } = await import("@lrnki/infrastructure-postgres");
+  const { deleteLearner } = await import("@lrnki/infrastructure-postgres/test-support");
+  const sql = createDatabaseClient(databaseUrl as string);
+  const authClientSql = createDatabaseClient(databaseUrl as string);
+  const created: string[] = [];
+  try {
+    const app = createLearnerApp(sql as unknown as DatabaseClient, authClientSql as unknown as DatabaseClient);
+    const signUp = async (body: Record<string, unknown>) =>
+      app.request("/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+    const sessionOf = async (cookie: string) =>
+      (await (await app.request("/auth/get-session", { headers: { cookie } })).json()) as {
+        user: { id: string; name: string; profileComplete: boolean };
+      };
+    const cookieOf = (res: Response) => res.headers.getSetCookie().map((value) => value.split(";")[0]).join("; ");
+
+    // The rig and fallback path: the name is collected inline, so the profile is complete on
+    // arrival and the naming screen must never be shown.
+    const named = await signUp({
+      email: `named-${randomUUID()}@test.invalid`,
+      password: `pw-${randomUUID()}`,
+      name: "Named Explorer",
+      profileComplete: true
+    });
+    assert.equal(named.status, 200);
+    const namedSession = await sessionOf(cookieOf(named));
+    created.push(namedSession.user.id);
+    assert.equal(namedSession.user.profileComplete, true, "an inline-named sign-up starts complete");
+
+    // The Google shape: an account arrives with a provider name and no choice made yet.
+    const unnamed = await signUp({
+      email: `unnamed-${randomUUID()}@test.invalid`,
+      password: `pw-${randomUUID()}`,
+      name: "Real Legal Name"
+    });
+    assert.equal(unnamed.status, 200);
+    const cookie = cookieOf(unnamed);
+    const before = await sessionOf(cookie);
+    created.push(before.user.id);
+    assert.equal(before.user.profileComplete, false, "the default is what opens the naming screen");
+
+    // Naming writes the chosen name and closes the gate in ONE call. `origin` is required because
+    // this is a cookie-bearing write and Better Auth CSRF-checks those against its trusted origins.
+    const update = await app.request("/auth/update-user", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", origin: process.env.BETTER_AUTH_URL as string },
+      body: JSON.stringify({ name: "Trailblazer", profileComplete: true })
+    });
+    assert.equal(update.status, 200);
+    const after = await sessionOf(cookie);
+    assert.equal(after.user.name, "Trailblazer", "the chosen name replaces the provider's");
+    assert.equal(after.user.profileComplete, true, "and the gate closes, so it is asked exactly once");
+  } finally {
+    for (const ref of created) await sql.begin((tx) => deleteLearner(tx as unknown as never, ref));
+    await Promise.all([sql.end(), authClientSql.end()]);
+  }
+});

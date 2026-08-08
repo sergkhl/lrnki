@@ -1,4 +1,5 @@
 import { createAuthDatabase } from "@lrnki/infrastructure-postgres";
+import { expo } from "@better-auth/expo";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createMiddleware } from "hono/factory";
@@ -61,6 +62,12 @@ export function createLearnerAuth(sql: DatabaseClient) {
     user: { additionalFields: { profileComplete: { type: "boolean", defaultValue: false } } },
     // `lrnki://` is the native return leg of the browser-redirect Google flow.
     trustedOrigins: [...learnerWebOrigins(), "lrnki://"],
+    // The native half of the browser-redirect flow (D5). It contributes the
+    // `/auth/expo-authorization-proxy` endpoint the in-app browser opens, and hands the
+    // session back on the `lrnki://` return leg as a URL parameter — because the system
+    // browser's cookie jar is not the app's. Without it the consent screen completes and
+    // the app returns signed out.
+    plugins: [expo()],
     // Replaces the hand-rolled fixed-window limiter that guarded the PIN route.
     rateLimit: { enabled: true }
   });

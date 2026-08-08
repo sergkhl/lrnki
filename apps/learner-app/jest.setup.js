@@ -101,3 +101,17 @@ jest.mock("@expo/ui/community/bottom-sheet", () => {
   const BottomSheetView = ({ children, ...props }) => React.createElement(View, props, children);
   return { __esModule: true, default: BottomSheet, BottomSheetView };
 });
+
+// `lib/authClient.ts` puts the Better Auth client in the module graph of every screen that makes
+// a request, and that client is ESM-only across a deep chain — better-call, @better-fetch,
+// @noble/hashes. Transforming it costs the whole suite roughly 3x its runtime to load a
+// crypto/JWT stack no assertion touches, and each release adds another package to chase. It is
+// stubbed here instead, the same way Reanimated and Expo UI are.
+//
+// What still guards the seam: `pnpm typecheck` compiles `lib/authClient.ts` against the REAL
+// declarations, so a renamed export or a changed signature fails there rather than passing green
+// here. The client's behaviour is covered where it is real — the e2e and real-use rigs, and the
+// deployed-stack gate. Suites needing a different stub re-mock these specifiers themselves.
+jest.mock("better-auth/client", () => ({ createAuthClient: () => ({ getCookie: () => "" }) }));
+jest.mock("better-auth/client/plugins", () => ({ inferAdditionalFields: () => ({ id: "additional-fields" }) }));
+jest.mock("@better-auth/expo/client", () => ({ expoClient: () => ({ id: "expo" }) }));

@@ -18,6 +18,7 @@
     "e2e:native:maestro": "tsx e2e-native/run.ts"
   },
   "dependencies": {
+    "@better-auth/expo": "catalog:",
     "@expo-google-fonts/im-fell-english": "catalog:expo",
     "@expo/ui": "catalog:expo",
     "@lrnki/application": "workspace:*",
@@ -28,6 +29,7 @@
     "@rn-primitives/dialog": "catalog:expo",
     "@rn-primitives/portal": "catalog:expo",
     "@tanstack/react-query": "catalog:",
+    "better-auth": "catalog:",
     "expo": "catalog:expo",
     "expo-build-properties": "catalog:",
     "expo-constants": "catalog:expo",
@@ -35,9 +37,11 @@
     "expo-font": "catalog:expo",
     "expo-haptics": "catalog:expo",
     "expo-linking": "catalog:expo",
+    "expo-network": "catalog:expo",
     "expo-router": "catalog:expo",
     "expo-secure-store": "catalog:expo",
     "expo-status-bar": "catalog:expo",
+    "expo-web-browser": "catalog:expo",
     "hono": "catalog:",
     "lucide-react-native": "catalog:expo",
     "nativewind": "catalog:expo",

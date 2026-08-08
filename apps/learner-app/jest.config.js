@@ -1,6 +1,7 @@
 // KTD8: the one learner-app test runner. jest-expo provides the RN transform chain;
 // the ignore-pattern extension lets the untranspiled UI deps (rn-primitives, lucide)
-// pass through Babel like the Expo packages do.
+// pass through Babel like the Expo packages do. The Better Auth family is NOT in it — it is
+// stubbed in `jest.setup.js`; the reasoning lives there, beside the stub.
 /** @type {import('jest').Config} */
 module.exports = {
   preset: "jest-expo",

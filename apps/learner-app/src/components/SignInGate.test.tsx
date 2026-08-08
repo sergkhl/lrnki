@@ -1,0 +1,84 @@
+import { beforeEach, expect, jest, test } from "@jest/globals";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { SignInGate, sessionErrorMessage } from "./SignInGate";
+import { signInWithEmail, signInWithGoogle, signUpWithEmail } from "@/lib/session";
+import { learnerTerm } from "@/learn/vocabulary";
+
+jest.mock("@/lib/session", () => ({
+  signInWithEmail: jest.fn(),
+  signInWithGoogle: jest.fn(),
+  signUpWithEmail: jest.fn()
+}));
+
+const signIn = signInWithEmail as jest.MockedFunction<typeof signInWithEmail>;
+const signUp = signUpWithEmail as jest.MockedFunction<typeof signUpWithEmail>;
+const google = signInWithGoogle as jest.MockedFunction<typeof signInWithGoogle>;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  signIn.mockResolvedValue({ ok: true });
+  signUp.mockResolvedValue({ ok: true });
+  google.mockResolvedValue({ ok: true });
+});
+
+test("the gate opens on Enter and offers Google as the primary route", async () => {
+  await render(<SignInGate />);
+  expect(screen.getByText(learnerTerm("googleAction"))).toBeTruthy();
+  expect(screen.getByText(learnerTerm("enterExplorerAction"))).toBeTruthy();
+  // The name field belongs to sign-up only: asking a returning learner for it is what makes
+  // a mistyped email silently create a second explorer.
+  expect(screen.queryByTestId("gate-name")).toBeNull();
+});
+
+test("switching to Set out asks for the explorer name and signs up with all three fields", async () => {
+  await render(<SignInGate />);
+  await fireEvent.press(screen.getByTestId("gate-toggle-intent"));
+
+  await fireEvent.changeText(screen.getByTestId("gate-name"), "Ada");
+  await fireEvent.changeText(screen.getByTestId("gate-email"), "ada@example.com");
+  await fireEvent.changeText(screen.getByTestId("gate-password"), "trailhead-8");
+  await fireEvent.press(screen.getByTestId("gate-create"));
+
+  await waitFor(() =>
+    expect(signUp).toHaveBeenCalledWith({ email: "ada@example.com", password: "trailhead-8", name: "Ada" })
+  );
+  expect(signIn).not.toHaveBeenCalled();
+});
+
+test("the email route signs in with exactly what was typed", async () => {
+  await render(<SignInGate />);
+  await fireEvent.changeText(screen.getByTestId("gate-email"), "ada@example.com");
+  await fireEvent.changeText(screen.getByTestId("gate-password"), "trailhead-8");
+  await fireEvent.press(screen.getByTestId("gate-enter"));
+
+  await waitFor(() => expect(signIn).toHaveBeenCalledWith({ email: "ada@example.com", password: "trailhead-8" }));
+  expect(google).not.toHaveBeenCalled();
+});
+
+test("a route in flight locks the others, so one gate cannot open two sessions", async () => {
+  let release: (result: { ok: true }) => void = () => {};
+  google.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+  await render(<SignInGate />);
+
+  await fireEvent.press(screen.getByText(learnerTerm("googleAction")));
+  await fireEvent.press(screen.getByTestId("gate-enter"));
+  await fireEvent.press(screen.getByText(learnerTerm("googleAction")));
+
+  expect(google).toHaveBeenCalledTimes(1);
+  expect(signIn).not.toHaveBeenCalled();
+  release({ ok: true });
+  await waitFor(() => expect(screen.queryByText(sessionErrorMessage("unavailable"))).toBeNull());
+});
+
+test("a refusal is shown in the gate's own words and cleared by switching intent", async () => {
+  signIn.mockResolvedValue({ ok: false, error: "invalid_credentials" });
+  await render(<SignInGate />);
+
+  await fireEvent.press(screen.getByTestId("gate-enter"));
+  await waitFor(() => expect(screen.getByText(sessionErrorMessage("invalid_credentials"))).toBeTruthy());
+
+  // The message described the other intent's attempt; leaving it up would accuse the learner of
+  // a bad password on a form that is now asking them to create one.
+  await fireEvent.press(screen.getByTestId("gate-toggle-intent"));
+  expect(screen.queryByText(sessionErrorMessage("invalid_credentials"))).toBeNull();
+});

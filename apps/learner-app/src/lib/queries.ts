@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
-import { api, clearToken, queryClient, readToken } from "./api";
+import { api, queryClient } from "./api";
+import { authClient } from "./authClient";
 
 // Typed read layer (R1). The hono client keeps the request paths honest and the response
 // payloads derive mechanically from `AppType` (plan 2026-07-12-001 R12): a projection
@@ -18,7 +19,11 @@ export const learnerScopeKey = [LEARNER_SCOPE] as const;
 export type JournalView = InferResponseType<typeof api.journal.$get, 200>;
 export type CatalogView = InferResponseType<typeof api.catalog.$get, 200>;
 export type ExpeditionView = InferResponseType<(typeof api.expedition)[":enrichmentId"]["$get"], 200>;
-export type MeView = InferResponseType<typeof api.me.$get, 200>;
+
+// The signed-in identity, projected from Better Auth's session (ADR-0041). `learnerStateRef`
+// keeps its name through the whole app but now carries `user.id` — the same opaque value every
+// learner-state row is keyed by (D3), so no screen below needs to know identity changed hands.
+export type MeView = { learnerStateRef: string; displayName: string; profileComplete: boolean };
 
 // Structural response shape instead of the DOM `Response`: React Native's fetch types
 // disagree with lib.dom on FormData, and ok/status/json are all this layer reads. The
@@ -29,26 +34,27 @@ async function unwrap<T>(res: { ok: boolean; status: number; json(): Promise<T> 
 }
 
 // The session state machine (KTD1). `me` is the SOLE signed-in source of truth:
-//   - pending  → a stored token is being validated (visible loading, plan U2)
-//   - error    → validation could not complete (network); the token is RETAINED and the
+//   - pending  → the session cookie is being validated (visible loading, plan U2)
+//   - error    → validation could not complete (network); the cookie is UNTOUCHED and the
 //                route offers retry — a transient failure must never silently sign out
 //   - data     → signed in
-//   - null     → signed out (no token, or the token was rejected)
-// A 401 means the stored token is stale/revoked (a dev DB reset orphans tokens): drop it
-// and every learner-scoped cache here so the registry gate becomes the stable signed-out
-// state (R3), then settle to null. Only a 401 clears the credential; a thrown transport
-// error propagates as the error state above.
+//   - null     → signed out (no cookie, or the session behind it is gone)
+// Better Auth separates those last two cleanly, which the retired bearer design could not:
+// `get-session` answers 200-with-null for "no live session" and only ever populates `error`
+// for a call that did not complete. So a revoked or reset-away session settles to the sign-in
+// gate while a dead network settles to retry, with no status-code guessing in between.
+// The learner-scoped purge stays on the null branch: a stale cookie (a dev DB reset orphans
+// them) must not leave the previous learner's journal readable behind the gate (R3).
 export const meQuery = queryOptions({
   queryKey: ["me"],
   queryFn: async (): Promise<MeView | null> => {
-    if (!readToken()) return null;
-    const res = await api.me.$get();
-    if (res.status === 401) {
-      clearToken();
+    const { data, error } = await authClient.getSession();
+    if (error) throw new Error(`session read failed: ${error.status}`);
+    if (!data) {
       queryClient.removeQueries({ queryKey: learnerScopeKey });
       return null;
     }
-    return unwrap(res);
+    return { learnerStateRef: data.user.id, displayName: data.user.name, profileComplete: data.user.profileComplete };
   },
   staleTime: Infinity
 });
