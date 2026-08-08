@@ -486,11 +486,17 @@ which is precisely U3's subject.
 
 ### Open findings
 
-- **Direction-of-effect facets still produce low-discrimination matching items.** The blueprint
-  constraint added in U1 did not stop them (2 of 16 nodes in the passing run), and the generator
-  rescues them into admissible-but-weak pairs. U4 should report how many admitted items carry this
-  shape. Do not fix it by tuning prompt text against the density nodes — that is fixture tuning
-  (rule 17). The open options are a measured blueprint change or letting U3's fit check speak first.
+- **Direction-of-effect facets still produce low-discrimination matching items, and U3 is now the
+  tie-breaker on how to fix it.** The blueprint constraint added in U1 did not stop them (2 of 16
+  nodes in the passing run), and the generator rescues them into admissible-but-weak pairs. The other
+  lever — a stronger blueprint model — was measured on 2026-08-08 and is recorded in
+  `litellm/config.yaml` beside `kg-claim-extraction`: `deepseek-v4-flash` yields 16 of 16 matching
+  items against MiMo v2.5's 12, but never declines a node, and the extra items include off-node drift
+  and one false match. That decision is deliberately deferred to this stage. **U4 must therefore
+  report two things it would not otherwise:** how many admitted items carry the direction-of-effect
+  shape, and whether the assignment judge vetoes the items a non-declining blueprint adds — the
+  second is what settles the model question. Do not fix either by tuning prompt text against the
+  density nodes; that is fixture tuning (rule 17).
 - **Matching's second generation attempt is now known to fail routinely on a hard node** (3 of 3 on
   the reproduced case before the fix). The plan puts retry-budget changes out of scope pending
   measurement; that measurement now exists for one node, so raising `MATCHING_GENERATION_ATTEMPTS` is

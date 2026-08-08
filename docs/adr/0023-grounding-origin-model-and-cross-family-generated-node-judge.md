@@ -25,7 +25,10 @@ passages must match their cited blocks. Generated passages cannot claim source-v
 so their exemption is recorded explicitly as `not_applicable_by_grounding`.
 
 Judgment over generated nodes must use a model family independent from the extraction and grounding
-generator. ADR-0019 owns prerequisite-ordering aggregation and ADR-0028 owns judgment uncertainty.
+generator. Independence is a property of the pair, not of either alias alone: moving the extractor
+into the judge's family breaks it exactly as moving the judge into the extractor's family does, so
+whichever moves second must move in the same change, never afterwards. ADR-0019 owns
+prerequisite-ordering aggregation and ADR-0028 owns judgment uncertainty.
 
 ## Context
 
