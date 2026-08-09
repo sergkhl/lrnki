@@ -7,7 +7,7 @@ import type { RecallScopeStatus, ScaffoldDetourView, StudySession } from "@lrnki
 import type { ScaffoldStepView } from "@lrnki/application/projection";
 import { ActivitySheet } from "./ActivitySheet";
 import { CheckpointCircle } from "./CheckpointCircle";
-import { MapGround } from "./MapGround";
+import { MapFrame, MapParchment } from "./MapGround";
 import { buildTreasureRoute } from "@/learn/treasureMap";
 import { ConceptMarker } from "./ConceptMarker";
 import { GuardianArrivalDialog } from "./GuardianArrivalDialog";
@@ -125,7 +125,6 @@ export function CheckpointPath({
   const containerRef = useRef<View>(null);
   const rowNodeRef = useRef<Record<string, View | null>>({});
   const [containerWidth, setContainerWidth] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
   const [waveAnchorYs, setWaveAnchorYs] = useState<Record<string, number>>({});
   const measureWaveAnchor = (stopId: string) => {
     const row = rowNodeRef.current[stopId];
@@ -164,24 +163,27 @@ export function CheckpointPath({
   }, [view.nextStopId]);
 
   return (
-    <>
+    // A real view, not a fragment, so the parchment has something to fill: it renders
+    // OUTSIDE the scroll because a flat wash and a uniform grain are a fixed texture, and
+    // one screen-sized canvas cannot grow with the expedition the way a ground stretched
+    // over the scroll content did.
+    <View className="flex-1">
+      <MapParchment seed={session.enrichmentId} />
       <ScrollView ref={scrollRef} className="flex-1 px-4" contentContainerClassName="py-4">
         <View
           ref={containerRef}
           className="relative mx-auto w-full max-w-sm gap-5 px-2 py-2"
           onLayout={(event) => {
             setContainerWidth(Math.round(event.nativeEvent.layout.width));
-            setContainerHeight(Math.round(event.nativeEvent.layout.height));
             // Container growth means rows moved without their own onLayout firing.
             for (const stopId of Object.keys(rowNodeRef.current)) measureWaveAnchor(stopId);
           }}
         >
-          {/* The parchment ground under everything, then the progressively inked route
-              over it (plan 2026-07-18-001 U2); trail content overlays both. */}
-          <MapGround
+          {/* The map sheet's edge and doodles over the parchment, then the progressively
+              inked route (plan 2026-07-18-001 U2); trail content overlays both. */}
+          <MapFrame
             seed={session.enrichmentId}
             width={containerWidth}
-            height={containerHeight}
             stopAnchors={view.concepts.flatMap((concept) =>
               concept.stops.flatMap((stop) => {
                 const y = waveAnchorYs[stop.stopId];
@@ -318,16 +320,23 @@ export function CheckpointPath({
           />
         );
       })()}
-    </>
+    </View>
   );
 }
 
-// The progressively inked route (plan 2026-07-18-001 U2, KTD5): one static SVG behind
-// the trail content, keeping TrailWave's measured-anchor serpentine — x from the same
-// sine offset the circles use, y from the measured-anchor state — with treasureMap's
-// seeded hand-drawn jitter. Segments through the last completed stop draw as solid ink;
-// segments ahead stay faint irregular dashes — a shape distinction, never color alone,
-// never gold, and no route motion (the mastery beat stays on the capstone).
+// The progressively inked route (plan 2026-07-18-001 U2, KTD5): static ink behind the
+// trail content, keeping TrailWave's measured-anchor serpentine — x from the same sine
+// offset the circles use, y from the measured-anchor state — with treasureMap's seeded
+// hand-drawn jitter. Segments through the last completed stop draw as solid ink; segments
+// ahead stay faint irregular dashes — a shape distinction, never color alone, never gold,
+// and no route motion (the mastery beat stays on the capstone).
+//
+// Each anchor-to-anchor segment gets its OWN row-scale canvas. One canvas spanning the
+// container looked simpler but sized its Android bitmap to the whole scrolled trail, which
+// crashes past ~90 stops (react-native-svg rasterizes an <Svg> at view size; Android caps a
+// drawn bitmap at 100MB). Neighbouring segments repeat their shared anchor and the round cap
+// closes the seam, so the split is invisible — and the dash phase only ever restarts under
+// an opaque checkpoint circle.
 function TrailRoute({
   view,
   seed,
@@ -353,29 +362,25 @@ function TrailRoute({
   });
   return (
     <View className="absolute inset-0" pointerEvents="none">
-      <Svg width="100%" height="100%">
-        {route.inkedPath ? (
-          <Path
-            d={route.inkedPath}
-            fill="none"
-            stroke={colors["map-ink"]}
-            strokeOpacity={0.85}
-            strokeWidth={3}
-            strokeLinecap="round"
-          />
-        ) : null}
-        {route.unchartedPath ? (
-          <Path
-            d={route.unchartedPath}
-            fill="none"
-            stroke={colors["map-ink-soft"]}
-            strokeOpacity={0.65}
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeDasharray={route.unchartedDash}
-          />
-        ) : null}
-      </Svg>
+      {route.segments.map((segment, index) => (
+        <View
+          key={index}
+          style={{ position: "absolute", left: segment.box.x, top: segment.box.y, width: segment.box.width, height: segment.box.height }}
+        >
+          {/* The path stays in container coordinates; the viewBox does the translation. */}
+          <Svg width="100%" height="100%" viewBox={`${segment.box.x} ${segment.box.y} ${segment.box.width} ${segment.box.height}`}>
+            <Path
+              d={segment.d}
+              fill="none"
+              stroke={segment.state === "inked" ? colors["map-ink"] : colors["map-ink-soft"]}
+              strokeOpacity={segment.state === "inked" ? 0.85 : 0.65}
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray={segment.state === "inked" ? undefined : route.unchartedDash}
+            />
+          </Svg>
+        </View>
+      ))}
     </View>
   );
 }
