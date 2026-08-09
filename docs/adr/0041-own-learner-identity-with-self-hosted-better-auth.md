@@ -71,6 +71,10 @@ first sign-in, so a provider's real name never reaches the shared leaderboard un
 - The Better Auth tables are a **generated** Drizzle schema file under the authority of
   [ADR-0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md): regenerated from the auth
   config, never hand-tuned, and the `0000` baseline regenerates mechanically from it.
+- **Better Auth's Drizzle adapter and the raw-SQL stores use separate postgres.js clients.**
+  Constructing Drizzle over a client rewrites that client's JSON/JSONB serializers in place; sharing
+  the store client would remove `sql.json()` from production writes. The learner-api composition
+  boundary therefore requires both clients, and a DB-backed regression guards the separation.
 - Cutting over hard-resets the shared database. The shared test data is disposable by
   [ADR-0036](./0036-run-single-shared-learner-environment-during-testing.md), so existing learner
   accounts and progress are lost by decision, not by accident.

@@ -10,12 +10,10 @@
 
 ## TODO
 
-- **Better Auth integration — complete, including the user-confirmed Android Google leg.** Its
-  [plan](./2026-08-08-001-integrate-better-auth-plan.md) holds the gate record. Both completed auth
-  plans retain their final records; consolidate and delete them only in a later, separate commit.
-  **Local dev DBs still need a reset** — U1's schema replaced `learners`, so an un-reset local
-  `lrnki` fails every DB-touching command with `relation "user" does not exist`, and the reset drops
-  the catalog the local real-backend gate needs and never generates.
+- **Reset and reseed the local development database for Better Auth.** The schema cutover replaced
+  `learners`, so an un-reset local `lrnki` fails every DB-touching command with
+  `relation "user" does not exist`. Follow the guarded reset in [Database schema](../../README.md#database-schema),
+  then seed a ready catalog enrichment before running the real-backend gate, which never generates.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
@@ -25,7 +23,9 @@
   but is unmeasured on truth, the bake-off's pre-registered re-decision test turned out to be the
   wrong instrument, and `kg-claim-extraction` serves **11 prompts** including `grounding-generation`
   — which drags the judge along under [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
-  **The judge has nowhere independent to go today, and that is what actually gates this.**
+  **The judge has nowhere independent to go today, and that is what actually gates this.** No
+  implementation plan is ready after the auth-plan consolidation; the next code-agent session
+  should resume with the planning interview, one decision at a time, starting with that ownership.
 
 - **The Guardian's shield-loss shake is unreachable in production.** `GuardianFight` renders either
   the corrective reveal or the `GuardianStage`, never both, and a selection answer sets the reveal in
@@ -81,12 +81,12 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 
 ## COMPLETED
 
-- **Web Google sign-in return leg (2026-08-09).** The user confirms the real Google round trip, and
-  the deployed bundle, stored absolute return URLs, both callback branches, and visible refusal all
-  pass. One Playwright smoke now runs on phone and desktop inside `pnpm check` and manually against
-  the Pages artifact with `pnpm e2e:web:deployed`; it intercepts the anonymous session read and
-  preserves unrelated route state without a sign-in, real API call, or database touch. Evidence:
-  [plan U1](./2026-08-09-001-web-google-signin-leg.md); durable policy: [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md).
+- **Self-hosted Better Auth and Google return legs (2026-08-08–09).** The shared API, schema, app,
+  and rigs use Better Auth; the user confirmed real Google round trips on Android and web. Deployed
+  controls cover cookie security, revocation, learner isolation, persistence, and rate limiting.
+  Playwright also proves the returned refusal locally and against the Pages artifact without a
+  sign-in or database touch. Durable policy: [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md);
+  final gate commits: `03cdc32`, `d949177`, `3361bfc`.
 
 - **The shared host's judge is exercised on its new model (2026-08-08).** The 08-07 swap of
   `kg-independent-judge` to `deepseek-v4-flash-0731` had never taken effect on the VPS — LiteLLM
@@ -140,11 +140,11 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 
 ## VALIDATION
 
-No active plan-less validation records. The latest validation is the matching plan's U4 correctness
-gate of 2026-08-08 — two topic expeditions on the shared VPS deployed container after `pnpm db:reset`,
-all 26 admitted matching items hand-inspected, both 5-draw probes passing — recorded in the
-now-deleted `2026-08-07-001` plan and reachable at `4ea7e64`. Consolidated before deletion: the
-accepted ambiguity tail into [ADR-0026](../adr/0026-typed-study-item-bank.md), the
-model-scoped-evidence rule into [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md),
-and the single-judge/no-fallback attribution invariant into
-[ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
+**2026-08-09 — completed auth-plan consolidation.** Both final validation records were committed
+before deletion (`3361bfc` contains the latest one). The durable identity, cookie, OAuth-return,
+and database-client separation policies are in
+[ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md); deployment and rig
+mechanics remain with their owning READMEs. The grouped completion above retains the observed gate
+authority and evidence commits. Repository-relative Markdown links resolve, no references to either
+deleted plan remain, `git diff --check` passes, and no behavior suite was rerun for this docs-only
+consolidation.

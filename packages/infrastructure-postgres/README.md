@@ -24,7 +24,9 @@ one way only:
 `index.ts` aggregates them for Drizzle Kit only. None of it is a package export, and **no store
 imports a schema table** — the adapters here run raw `postgres` queries and keep doing so. The one
 Drizzle handle that exists at runtime is `authDatabase.ts`, and only because Better Auth's adapter
-requires one; it wraps the process's existing pool rather than opening a second.
+requires one. It wraps the dedicated auth client supplied by the composition root; it must not wrap
+the raw-store client, for the serializer-mutation reason owned by
+[ADR-0041](../../docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md).
 
 `src/schema/auth.ts` is generated output and is never hand-tuned
 ([ADR-0041](../../docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)). Regenerate
