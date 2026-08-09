@@ -38,13 +38,6 @@
   Mechanism and the constraint on fixing it (changing an adopted flow means re-running its negative
   control) are in `apps/learner-app/e2e-native/README.md`.
 
-- **Learner web SPA deployment verification remains.** The production-format local export now uses
-  the client-rendered `single` output required by
-  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md), and its dynamic Expedition
-  and Guardian hard-load gates are green. No commit, push, or deployment was authorized here. After
-  the automatic Pages deployment is observed, run `pnpm e2e:web:deployed`; remove this follow-up only
-  when both deployed dynamic routes settle without React hydration errors.
-
 ### Evidence-triggered follow-up
 
 - **Progressive readiness / keep the learner busy under ~1 minute.** If full-ready generation still
@@ -68,6 +61,13 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 `apps/learner-app/e2e-realuse/README.md` and `apps/learner-app/e2e-native/README.md`.
 
 ## COMPLETED
+
+- **Learner web SPA hard loads are deployed and verified (2026-08-09).** GitHub Pages successfully
+  deployed `b0bd09e`, the client-rendered `single` export required by
+  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md). The post-deploy
+  `pnpm e2e:web:deployed` gate passed all three scenarios: arbitrary Expedition and Guardian hard
+  loads reached their named unavailable surfaces with no page or console errors, and the OAuth
+  refusal return remained clean. Deployment evidence: [Pages run 31327027343](https://github.com/sergkhl/lrnki/actions/runs/31327027343).
 
 - **Self-hosted Better Auth and Google return legs (2026-08-08–09).** The shared API, schema, app,
   and rigs use Better Auth; the user confirmed real Google round trips on Android and web. Deployed
@@ -131,12 +131,12 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 
 ### Real-use quality evaluation — 2026-08-09
 
-- Milestone: learner web hard loads use one client-rendered SPA shell and the menu handoff test is deterministic.
-- Fixture and source type: production-format local Expo export; dynamic Expedition/Guardian 404s and the AE9 checkpoint journey on phone and desktop.
+- Milestone: learner web hard loads use one client-rendered SPA shell, that shell is deployed to Pages, and the menu handoff test is deterministic.
+- Fixture and source type: production-format local Expo export plus the Pages artifact at `b0bd09e`; dynamic Expedition/Guardian 404s, the AE9 checkpoint journey on phone and desktop, and the deployed OAuth-refusal return.
 - Real model calls used: not applicable; transport is intercepted and no generated content is evaluated.
 - Result: PASS.
-- Useful output observed: both dynamic hard loads reached their named unavailable surfaces with zero page/console errors; after an Expedition hard load, the first checkpoint press exposed the Activity Sheet option and the journey completed.
+- Useful output observed: both local and deployed dynamic hard loads reached their named unavailable surfaces with zero page/console errors; after a local Expedition hard load, the first checkpoint press exposed the Activity Sheet option and the journey completed. Pages run 31327027343 deployed successfully and `pnpm e2e:web:deployed` passed 3/3.
 - Defects observed: pre-fix stress reproduced React #418 in 2/100 hard loads and the artifacts carried `__EXPO_ROUTER_HYDRATE__`; no hydration defect remains in the local `single` export. One non-gating five-worker saturation run lost a press without a page error; the required one-worker-per-journey stress passed 100/100 and the full five-worker suite passed 70/70.
 - Changes made after inspection: selected Expo `single` output, added a prerendered-artifact guard and dynamic-route gates, and controlled the menu's real zero-delay timer in Jest without changing shipped behavior.
-- Remaining caveats: the Pages artifact is not deployed or verified; the existing Expo/Jest post-test logger and Watchman warnings remain unrelated.
-- Safe to continue downstream: yes for local completion; deployed completion remains gated by `pnpm e2e:web:deployed` after deployment.
+- Remaining caveats: the existing Expo/Jest post-test logger and Watchman warnings remain unrelated.
+- Safe to continue downstream: yes; local and deployed completion are both verified.
