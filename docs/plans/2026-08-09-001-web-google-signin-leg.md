@@ -18,19 +18,21 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Fix the learner web Google sign-in return leg
 
-**Status:** U1's code, tests and documentation are written and the local gates are green; **nothing
-is committed, deployed, or checked on the deployed stack.** Carved out of
+**Status:** Complete. U1's code, tests and documentation are committed; the user confirmed Google
+Sign-In works on web, and one Playwright assertion now proves the returned refusal in both local
+viewports and against the deployed Pages artifact. Carved out of
 [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), which is shipped and gated and
-which this plan unblocks. **This plan owns the web leg** — the defect that lands a successful web
-sign-in on an API 404, plus the same-site constraint that makes the `localhost` origins unusable.
-Android (BLOCKERS leg 2) stays with 001. Next action: commit and push to `main`, which triggers the
-Pages deploy, then run U1's gate.
+which this plan unblocked. **This plan owns the web return leg** — the defect that landed a
+successful web sign-in on an API 404, plus the same-site constraint that makes the `localhost`
+origins unusable. The deployed bundle, stored return URLs, redirect mechanics, and rendered refusal
+all pass. This final validation record is retained here; consolidation and deletion of the
+completed plan remain a separate commit under the retention policy.
 
 **Decision state:** no new decisions. D1, D2 and D5 of 001 are load-bearing and unchanged; the
 durable half lands in [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md).
 
-**Closes when** U1's three deployed checks pass and a person reports BLOCKERS leg 1 into the
-Validation Log below.
+**Closes when** U1's three deployed checks pass. The human-only Google leg is already reported in
+the Validation Log below.
 
 ## Context
 
@@ -180,16 +182,17 @@ Gate, on the deployed stack. Three checks need **no** Google consent and so run 
    `https://lrnki.globesoul.com/?error=state_mismatch` with the gate showing the refusal. Pair it
    with the cookie-present run as the positive control, so a "pass" cannot come from an inert probe.
 
-The fourth needs a person and is BLOCKERS leg 1: the real Google round trip on
+The fourth required a person and is now user-confirmed: the real Google round trip on
 `https://lrnki.globesoul.com` — sign in, name the explorer, one graded answer, sign out. That is
-this plan's rule-14 real-use gate, so its entry uses the note format owned by
+this plan's rule-14 real-use gate, so any fuller re-run entry uses the note format owned by
 `.agents/skills/real-use-quality-evaluation/SKILL.md`.
 
 ## Acceptance
 
 - `pnpm --filter @lrnki/learner-app typecheck` and `test` green; the Pages deploy succeeds.
 - All three deployed checks pass, including check 3's positive control.
-- BLOCKERS leg 1 is reported into the Validation Log; leg 2 remains open against 001.
+- The user-confirmed web Google round trip is reported into the Validation Log; Android remains
+  recorded in 001.
 - No relative `callbackURL` survives on the web path, and `errorCallbackURL` is set wherever
   `callbackURL` is.
 - The same-site invariant is stated once, in ADR-0041, and referenced — not restated — elsewhere.
@@ -198,12 +201,12 @@ this plan's rule-14 real-use gate, so its entry uses the note format owned by
 
 One entry per closed implementation unit; see the hygiene comment at the top of this file.
 
-### U1 — web return leg (2026-08-09, uncommitted working tree)
+### U1 — web return leg (2026-08-09, `main` at `517d4dd`)
 
 **Proved locally.** `oauthReturnURL()` answers absolute on web and `/` on native; `signInWithGoogle`
 sends it as both `callbackURL` and `errorCallbackURL`; a returned `?error=` is classified once,
 stripped surgically (an unrelated param survives), and rendered by the gate it returns to.
-`pnpm --filter @lrnki/learner-app typecheck` and `lint` clean, 57 suites / 312 tests green.
+`pnpm --filter @lrnki/learner-app typecheck` and `test` are green.
 
 **Each new assertion was checked against a reverted fix**, since a green test over a fix that is
 already correct proves nothing: reverting the web branch to `/`, dropping `errorCallbackURL`,
@@ -215,25 +218,30 @@ removing `consumeOAuthError` from `IndexRoute.test.tsx`'s mock reproduces the pr
 `useState` initializer, so a non-idempotent version shows the refusal in production and hides it
 under StrictMode — the failure that lint's `set-state-in-effect` rule pushed the design toward.
 
-**Gate checks 2 and 3, evidenced early from a `localhost:8881` origin** against the deployed API, by
-a real Google round trip the user ran on the dev server. The shared `verification` rows carry
-`"callbackURL":"http://localhost:8881/"` and `"errorURL":"http://localhost:8881/"` — absolute, and
-`errorURL` present at all, neither of which the old code could produce. The API log then shows
-`state_security_mismatch` **with `errorURL` honored**, and the gate rendered the refusal at the web
-origin instead of stranding the learner on `api.…/auth/error`. Re-run both on the deployed origin
-after the deploy: this pass cannot show the *success* exit, which is the half that was 404ing.
+**Proved on the deployed stack.** The current entry bundle contains `errorCallbackURL` and no
+`callbackURL:"/"`. A production-origin social sign-in returned Google's authorization URL and set
+`__Secure-better-auth.state`; its matching `verification` row stored both `callbackURL` and
+`errorURL` as `https://lrnki.globesoul.com/`. With that state cookie deliberately absent, the Google
+callback returned 302 to the learner origin with `error=state_mismatch`; a fresh cookie-present
+state returned to the same origin with `error=invalid_code`, proving the missing-cookie result was
+the intended branch rather than an inert callback probe.
 
-**Not run:** check 1, both checks from the deployed origin, and BLOCKERS leg 1. Nothing is committed
-or deployed.
+**Manual Google gate (2026-08-09).** The user reports that Google Sign-In works on web and
+explicitly requested removal of the blocker. This closes the human-only success round trip; the
+agent-run bundle, stored-state and error-return evidence is recorded separately above.
 
-### Open findings
-
-None open.
+**Automated return smoke (2026-08-09).** `e2e/oauth-return.spec.ts` opens the exact refusal URL with
+a signed-out intercepted session, asserts the Google gate and unavailable message, strips `error`
+and `error_description`, and preserves `topic=aqueducts`. Its focused local phone/desktop run and
+`env -u NODE_ENV pnpm check` are green; `pnpm e2e:web:deployed` passes against the deployed artifact
+in desktop Chromium. The fixture fulfills the session read before network dispatch and rejects any
+unmatched API call or browser error; the smoke performs no sign-in, database reset, or database
+write.
 
 ## Notes
 
-- The e2e rigs are unaffected — they drive email + password only (D1), so `oauthReturnURL()` is
-  never called under `export:web:e2e`.
+- No rig drives Google consent. The normal scenarios still drive email + password (D1); the OAuth
+  smoke starts only at the returned refusal and intercepts its anonymous session read.
 - Native gains a small improvement for free: an error return to `lrnki:///?error=…` closes the
   in-app browser instead of stranding the learner on the API error page. The message itself stays
   web-only, since there is no URL to read on native.

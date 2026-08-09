@@ -10,18 +10,12 @@
 
 ## TODO
 
-- **Better Auth integration — deployed and gated; awaiting the Android Google leg.** Plan:
-  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), which holds the gate record.
-  Next action: **the Android round trip in [BLOCKERS](./BLOCKERS.md)**, which no rig may drive; the
-  plan closes on it and is deleted then. The web leg moved to the plan below.
+- **Better Auth integration — complete, including the user-confirmed Android Google leg.** Its
+  [plan](./2026-08-08-001-integrate-better-auth-plan.md) holds the gate record. Both completed auth
+  plans retain their final records; consolidate and delete them only in a later, separate commit.
   **Local dev DBs still need a reset** — U1's schema replaced `learners`, so an un-reset local
   `lrnki` fails every DB-touching command with `relation "user" does not exist`, and the reset drops
   the catalog the local real-backend gate needs and never generates.
-
-- **Web Google sign-in return leg — implemented locally, nothing committed or deployed.** Plan:
-  [2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md). A successful web sign-in landed on the
-  API's 404 because `callbackURL` was relative. Next action: **commit and push to `main`**, which
-  triggers the Pages deploy, then the plan's three deployed checks and BLOCKERS leg 1.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
@@ -86,6 +80,13 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 `apps/learner-app/e2e-realuse/README.md` and `apps/learner-app/e2e-native/README.md`.
 
 ## COMPLETED
+
+- **Web Google sign-in return leg (2026-08-09).** The user confirms the real Google round trip, and
+  the deployed bundle, stored absolute return URLs, both callback branches, and visible refusal all
+  pass. One Playwright smoke now runs on phone and desktop inside `pnpm check` and manually against
+  the Pages artifact with `pnpm e2e:web:deployed`; it intercepts the anonymous session read and
+  preserves unrelated route state without a sign-in, real API call, or database touch. Evidence:
+  [plan U1](./2026-08-09-001-web-google-signin-leg.md); durable policy: [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md).
 
 - **The shared host's judge is exercised on its new model (2026-08-08).** The 08-07 swap of
   `kg-independent-judge` to `deepseek-v4-flash-0731` had never taken effect on the VPS — LiteLLM

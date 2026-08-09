@@ -25,6 +25,7 @@
     "typecheck": "pnpm -r --sort --if-present run typecheck",
     "check": "pnpm run tmp:clean && pnpm run db:check && pnpm run typecheck && pnpm run test && pnpm run lint && pnpm run build && pnpm run e2e:web",
     "e2e:web": "pnpm --filter @lrnki/learner-app e2e",
+    "e2e:web:deployed": "pnpm --filter @lrnki/learner-app e2e:deployed",
     "e2e:web:realuse": "pnpm --filter @lrnki/learner-app e2e:realuse",
     "e2e:native:maestro": "pnpm --filter @lrnki/learner-app e2e:native:maestro",
     "tmp:clean": "node scripts/cleanup-tmp.mjs --days 3",

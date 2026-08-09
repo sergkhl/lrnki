@@ -86,7 +86,15 @@ pnpm check
 ```
 
 `pnpm check` includes the intercepted production-web Playwright gate (`pnpm e2e:web`), which mocks
-the API and runs deterministically. Two heavier suites are **opt-in** and not part of `pnpm check`
+the API and runs deterministically. The OAuth-return case can also be rerun manually against the
+deployed Pages artifact; it intercepts the deployed bundle's session read, performs no sign-in or
+real API request, and touches no database:
+
+```bash
+pnpm e2e:web:deployed
+```
+
+Two heavier suites are **opt-in** and not part of `pnpm check`
 ([ADR-0038](docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md)):
 
 ```bash

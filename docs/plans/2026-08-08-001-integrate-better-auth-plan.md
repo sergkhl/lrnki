@@ -18,13 +18,13 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 
 # Integrate Self-Hosted Better Auth
 
-**Status:** Shipped and gated on the shared host; the plan closes when a human runs the two
-browser-driven Google legs. U1–U3 are complete and the cutover landed 2026-08-08: `main`
+**Status:** Complete. U1–U3 and the shared-host cutover are gated; on 2026-08-09 the user confirmed
+Google Sign-In works on Android and explicitly closed the final manual blocker. The cutover landed
+2026-08-08: `main`
 fast-forwarded to `2b14eb9`, the shared schema was hard-reset through the README runbook, and both
 the API and the learner web SPA now serve Better Auth. **U4's checks 3 and 4 pass on the deployed
-stack, and the rule-14 real-use gate is `PASS`** — see the Validation Log. **Check 2, the real
-Google round trip on a physical Android, needs a person at a consent screen** and is tracked in
-[BLOCKERS](./BLOCKERS.md). Check 1 (web) moved with its blocking defect to
+stack, and the rule-14 real-use gate is `PASS`** — see the Validation Log. Check 1 (web) moved with
+its return-leg defect to
 [2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md).
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
@@ -445,6 +445,10 @@ read or write another's expedition; a session row deleted server-side 401s the n
 sign-in burst from one address trips the limiter at the 4th attempt. Teardown removed exactly the
 two learners that existed and left the enrichment, 16 lessons and 48 study items intact.
 
+**Manual Google gate (2026-08-09).** The user reports that Google Sign-In works on Android and
+explicitly requested removal of the blocker. Under ADR-0038, that user report is the authority for
+the Android round trip that an agent cannot substitute with web, Jest or emulator evidence.
+
 **Invariants a later unit or re-run must not break.**
 
 - **`BETTER_AUTH_URL` is the one setting that can be wrong while every other check stays green.**
@@ -484,14 +488,14 @@ two learners that existed and left the enrichment, 16 lessons and 48 study items
   explains the distinction correctly.
 - Changes made after inspection: the `BETTER_AUTH_URL` correction on the host, the deploy-time
   guard above, and the doc repairs in `README.md`/`.env.example`.
-- Remaining caveats: **the Google legs are unverified** (BLOCKERS); one topic in one domain.
+- Remaining caveats: one topic in one domain.
 - Safe to continue downstream: yes.
 
-**Hands off.** The web Google leg, and the return-leg defect that blocks it, moved to
-[2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md), which owns that record. This plan closes
-on BLOCKERS' Android leg alone.
+**Complete.** The web return leg remains owned by
+[2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md). This final validation record is
+retained here; consolidation and deletion of the completed plan remain a separate commit.
 
 ### Open findings
 
 None open. The device run closed the last carried item; the staleness trap that caused it now lives
-in `apps/learner-app/e2e-native/README.md`. The two Google legs are user-owned, not findings.
+in `apps/learner-app/e2e-native/README.md`.
