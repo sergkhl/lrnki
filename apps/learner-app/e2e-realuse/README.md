@@ -80,6 +80,11 @@ committed.
 
 ## Gotchas
 
+- **The supervisor-free API can log Better Auth's missing-client-IP warning.** Direct loopback
+  requests have no proxy-supplied address, so this isolated per-run process falls back to one
+  per-path rate-limit bucket. That is expected here: the gate runs sequentially and then exits.
+  The deployed Caddy path overwrites `X-Forwarded-For` with the real client address, and the API
+  suite separately proves that distinct forwarded addresses use distinct buckets.
 - **Web and API must share a HOST, differing only in port.** The session is a cookie, and cookies
   are scoped by host and ignore port — so `127.0.0.1:<web>` ↔ `127.0.0.1:<api>` is same-SITE (the
   `SameSite=Lax` cookie rides the XHR) while still cross-ORIGIN (the credentialed CORS path stays

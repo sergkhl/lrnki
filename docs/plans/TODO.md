@@ -10,11 +10,6 @@
 
 ## TODO
 
-- **Reset and reseed the local development database for Better Auth.** The schema cutover replaced
-  `learners`, so an un-reset local `lrnki` fails every DB-touching command with
-  `relation "user" does not exist`. Follow the guarded reset in [Database schema](../../README.md#database-schema),
-  then seed a ready catalog enrichment before running the real-backend gate, which never generates.
-
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
   framing, the measured evidence, the candidate options, and the two carried generation-side changes
@@ -84,9 +79,10 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 - **Self-hosted Better Auth and Google return legs (2026-08-08–09).** The shared API, schema, app,
   and rigs use Better Auth; the user confirmed real Google round trips on Android and web. Deployed
   controls cover cookie security, revocation, learner isolation, persistence, and rate limiting.
-  Playwright also proves the returned refusal locally and against the Pages artifact without a
-  sign-in or database touch. Durable policy: [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md);
-  final gate commits: `03cdc32`, `d949177`, `3361bfc`.
+  The reset/reseeded local database also passes the real-backend phone and desktop journeys, while
+  the returned-refusal gate remains proven locally and against the Pages artifact without a sign-in
+  or database touch. Durable policy: [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md);
+  auth gate commits: `03cdc32`, `d949177`, `3361bfc`.
 
 - **The shared host's judge is exercised on its new model (2026-08-08).** The 08-07 swap of
   `kg-independent-judge` to `deepseek-v4-flash-0731` had never taken effect on the VPS — LiteLLM
@@ -140,11 +136,14 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 
 ## VALIDATION
 
-**2026-08-09 — completed auth-plan consolidation.** Both final validation records were committed
-before deletion (`3361bfc` contains the latest one). The durable identity, cookie, OAuth-return,
-and database-client separation policies are in
-[ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md); deployment and rig
-mechanics remain with their owning READMEs. The grouped completion above retains the observed gate
-authority and evidence commits. Repository-relative Markdown links resolve, no references to either
-deleted plan remain, `git diff --check` passes, and no behavior suite was rerun for this docs-only
-consolidation.
+### Real-use quality evaluation — 2026-08-09
+
+- Milestone: reset/reseeded Better Auth database serves the production web artifact through the real API.
+- Fixture and source type: ready mixed-source enrichment `c3de4387-fdcd-4afb-834c-733a6d47bf36`; phone and desktop web.
+- Real model calls used: no; this gate selects existing content and never generates.
+- Result: PASS.
+- Useful output observed: both projects signed up, chose the 73-stop expedition, graded an option, and showed persisted `Continue` after reload; 2 passed.
+- Defects observed: none; only documented build/runtime warnings, with no visible or persistence failure.
+- Changes made after inspection: cleared the stale reset/reseed TODO and documented the loopback client-IP warning in the rig README.
+- Remaining caveats: this gate does not exercise generation, Google OAuth, the deployed host, or physical-device interaction.
+- Safe to continue downstream: yes; cleanup removed all 3 reserved learners, leaving no reserved user or session rows.
