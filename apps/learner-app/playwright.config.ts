@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Durable web acceptance over the production Expo static export (plan 2026-07-14-001 U5, KTD8).
+// Durable web acceptance over the production-format client-rendered Expo SPA export
+// (plan 2026-07-14-001 U5, KTD8; ADR-0035).
 // The suite proves the two reproduced web failures (failed-login-then-signup session entry and
 // the planning-sheet layer) plus the shared route-state contract against a real bundle, with the
 // typed API origin fully intercepted by deterministic fixtures. It is NOT the real-use gate (U6):

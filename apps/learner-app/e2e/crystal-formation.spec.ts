@@ -132,6 +132,7 @@ test("reduced motion renders the final collected scene immediately with equivale
   await page.goto(`/expedition/${FORMATION_ENRICHMENT_ID}`);
 
   await page.getByTestId("checkpoint-option_select-available").click();
+  await expect(page.getByLabel("The waypoint marker")).toBeVisible();
   await page.getByLabel("The waypoint marker").click();
   await expect(page.getByText("Correct.")).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();

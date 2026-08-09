@@ -1,7 +1,8 @@
 # 0035 — Separate the Learner App into a universal Expo app over a typed learner API
 
 Date: 2026-07-08, amended 2026-07-10 (universal Expo cutover), 2026-07-11 (app-owned interaction
-system), 2026-07-14 (static/animated style boundary), and 2026-08-08 (identity swap seam realized).
+system), 2026-07-14 (static/animated style boundary), 2026-08-08 (identity swap seam realized), and
+2026-08-09 (client-rendered web SPA output).
 Status: accepted.
 
 ## Decision
@@ -15,10 +16,13 @@ The Learner App is extracted from Admin Lab into two apps with a shared typed co
   for routes and supervisor alike. Its exported Hono `AppType` is the single client contract.
 - **`apps/learner-app`** — one Expo universal app (React Native + React Native Web + Expo
   Router, NativeWind styling, `react-native-svg` crystals) whose **single rendering layer**
-  serves both the installable mobile app and the static web build. `expo export --platform web`
-  output is fully static (GitHub Pages deployable; a `404.html` copy of `index.html` is the SPA
-  fallback for deep links). Platform seams are RN file extensions with one exported contract
-  each: the session cookie lives in SecureStore on native and in the browser cookie jar on web
+  serves both the installable mobile app and a client-rendered web SPA. The Expo config uses
+  `web.output: "single"`; `expo export --platform web` emits static hostable files with one empty
+  client shell, and GitHub Pages serves a `404.html` copy of `index.html` so arbitrary runtime
+  Expedition and Guardian ids reach Expo Router. Route-prerendered `web.output: "static"` HTML is
+  not served as an SPA fallback because its server tree cannot match every dynamic client route.
+  Platform seams are RN file extensions with one exported contract each: the session cookie lives
+  in SecureStore on native and in the browser cookie jar on web
   ([ADR-0041](./0041-own-learner-identity-with-self-hosted-better-auth.md)); nav memory in
   AsyncStorage / localStorage.
 

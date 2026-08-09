@@ -7,7 +7,7 @@ process.env.E2E_API_ORIGIN = "https://api.lrnki.globesoul.com";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "oauth-return.spec.ts",
+  testMatch: ["oauth-return.spec.ts", "deep-links.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,

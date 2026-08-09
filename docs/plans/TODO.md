@@ -38,19 +38,12 @@
   Mechanism and the constraint on fixing it (changing an adopted flow means re-running its negative
   control) are in `apps/learner-app/e2e-native/README.md`.
 
-- **Not fixed — two pre-existing flakes, both unclaimed by any plan.**
-  - Playwright: `reduced motion renders the final collected scene immediately with equivalent copy
-    (AE9)` fails roughly 1 run in 20 on both projects — the click on
-    `checkpoint-option_select-available` lands but the Activity Sheet never opens. The neighbouring
-    test does identical clicks but screenshots first, which settles the page, so the suspect is the
-    trail's post-load measure/auto-scroll racing the press: possibly a real "tap does nothing right
-    after load" defect rather than a test bug. Worth a bounded look before a wait papers over it.
-  - Jest: `LearnerMenuSheet` → `opening the Board closes the menu first and yields a frame — no
-    stacked overlays, no teardown race (D7)`. **Only under the full parallel `pnpm test`** — 8 of 8
-    pass in isolation, ~1 in 5 fail in the whole run. It asserts `onOpenBoard` has NOT fired
-    synchronously after the press, which under load loses its race with the component's own frame
-    yield. Untouched by the Better Auth work (the suite's imports never reach `lib/api.ts`), but it
-    makes `pnpm test` red often enough to train people to re-run rather than read.
+- **Learner web SPA deployment verification remains.** The production-format local export now uses
+  the client-rendered `single` output required by
+  [ADR-0035](../adr/0035-separate-learner-app-static-spa-typed-api.md), and its dynamic Expedition
+  and Guardian hard-load gates are green. No commit, push, or deployment was authorized here. After
+  the automatic Pages deployment is observed, run `pnpm e2e:web:deployed`; remove this follow-up only
+  when both deployed dynamic routes settle without React hydration errors.
 
 ### Evidence-triggered follow-up
 
@@ -138,12 +131,12 @@ separation and log source IPs → root README `## Deployment`; throttling signat
 
 ### Real-use quality evaluation — 2026-08-09
 
-- Milestone: reset/reseeded Better Auth database serves the production web artifact through the real API.
-- Fixture and source type: ready mixed-source enrichment `c3de4387-fdcd-4afb-834c-733a6d47bf36`; phone and desktop web.
-- Real model calls used: no; this gate selects existing content and never generates.
+- Milestone: learner web hard loads use one client-rendered SPA shell and the menu handoff test is deterministic.
+- Fixture and source type: production-format local Expo export; dynamic Expedition/Guardian 404s and the AE9 checkpoint journey on phone and desktop.
+- Real model calls used: not applicable; transport is intercepted and no generated content is evaluated.
 - Result: PASS.
-- Useful output observed: both projects signed up, chose the 73-stop expedition, graded an option, and showed persisted `Continue` after reload; 2 passed.
-- Defects observed: none; only documented build/runtime warnings, with no visible or persistence failure.
-- Changes made after inspection: cleared the stale reset/reseed TODO and documented the loopback client-IP warning in the rig README.
-- Remaining caveats: this gate does not exercise generation, Google OAuth, the deployed host, or physical-device interaction.
-- Safe to continue downstream: yes; cleanup removed all 3 reserved learners, leaving no reserved user or session rows.
+- Useful output observed: both dynamic hard loads reached their named unavailable surfaces with zero page/console errors; after an Expedition hard load, the first checkpoint press exposed the Activity Sheet option and the journey completed.
+- Defects observed: pre-fix stress reproduced React #418 in 2/100 hard loads and the artifacts carried `__EXPO_ROUTER_HYDRATE__`; no hydration defect remains in the local `single` export. One non-gating five-worker saturation run lost a press without a page error; the required one-worker-per-journey stress passed 100/100 and the full five-worker suite passed 70/70.
+- Changes made after inspection: selected Expo `single` output, added a prerendered-artifact guard and dynamic-route gates, and controlled the menu's real zero-delay timer in Jest without changing shipped behavior.
+- Remaining caveats: the Pages artifact is not deployed or verified; the existing Expo/Jest post-test logger and Watchman warnings remain unrelated.
+- Safe to continue downstream: yes for local completion; deployed completion remains gated by `pnpm e2e:web:deployed` after deployment.

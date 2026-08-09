@@ -1,4 +1,4 @@
-# Learner web deploy: builds the Expo universal app's static web export and publishes it to
+# Learner web deploy: builds the Expo universal app's client-rendered SPA files and publishes them to
 # GitHub Pages on every push to main (plan 2026-07-09-001 U5). The API base is hardcoded here —
 # the one file that consumes it — because the hostname is stable and public.
 name: Deploy learner web
@@ -56,8 +56,7 @@ jobs:
         env:
           EXPO_PUBLIC_LEARNER_API_URL: https://api.lrnki.globesoul.com
 
-      # Pages SPA fallback: deep links like /expedition/:id resolve to the router
-      # instead of a Pages 404.
+      # ADR-0035 Pages SPA fallback: the client-rendered shell resolves arbitrary runtime ids.
       - run: cp apps/learner-app/dist/index.html apps/learner-app/dist/404.html
 
       - uses: actions/configure-pages@v6

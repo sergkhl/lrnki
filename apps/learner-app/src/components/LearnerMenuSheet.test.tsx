@@ -1,5 +1,5 @@
-import { beforeEach, expect, jest, test } from "@jest/globals";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { afterEach, beforeEach, expect, jest, test } from "@jest/globals";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { PortalHost } from "@rn-primitives/portal";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LearnerMenuSheet } from "./LearnerMenuSheet";
@@ -18,6 +18,10 @@ const handlers = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 function renderMenu(boardAvailable = true) {
@@ -42,12 +46,16 @@ test("the menu exposes Board and logout rows", async () => {
 });
 
 test("opening the Board closes the menu first and yields a frame — no stacked overlays, no teardown race (D7)", async () => {
+  jest.useFakeTimers();
   await renderMenu();
   await fireEvent.press(screen.getByLabelText(learnerTerm("viewBoard")));
   expect(handlers.onOpenChange).toHaveBeenCalledWith(false);
   // The action fires only after the frame yield, never in the sheet's closing tick.
   expect(handlers.onOpenBoard).not.toHaveBeenCalled();
-  await waitFor(() => expect(handlers.onOpenBoard).toHaveBeenCalledTimes(1));
+  await act(async () => {
+    jest.runOnlyPendingTimers();
+  });
+  expect(handlers.onOpenBoard).toHaveBeenCalledTimes(1);
 });
 
 test("an unavailable board disables its row without hiding it", async () => {

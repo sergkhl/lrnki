@@ -12,7 +12,7 @@
 // same bundle and let expo-router render from the URL. As a convenience for a bare local
 // `playwright test`, it also (re)builds `dist-e2e/` when it is missing (or E2E_FORCE_EXPORT is set).
 import { execFileSync } from "node:child_process";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,15 @@ if (process.env.E2E_FORCE_EXPORT || !existsSync(indexHtml)) {
   });
 }
 
+// ADR-0035 requires Expo's client-rendered `single` output. A static/prerendered index is unsafe
+// behind an SPA fallback because React would hydrate route-specific client content over the root
+// route's server tree. Refuse that artifact before Playwright can accidentally normalize the race.
+if (readFileSync(indexHtml, "utf8").includes("__EXPO_ROUTER_HYDRATE__")) {
+  throw new Error(
+    `[e2e] ${indexHtml} is a prerendered Expo artifact; expected web.output \"single\" without the hydration marker`
+  );
+}
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -65,8 +74,6 @@ function resolveFile(urlPath) {
   const candidate = join(outDir, clean);
   if (!candidate.startsWith(outDir)) return null; // path traversal guard
   if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
-  // Expo emits per-route HTML (`catalog.html`); honor it when the client asks for the path.
-  if (extname(candidate) === "" && existsSync(`${candidate}.html`)) return `${candidate}.html`;
   return null;
 }
 

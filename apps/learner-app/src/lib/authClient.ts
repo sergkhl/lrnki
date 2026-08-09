@@ -75,8 +75,8 @@ export const sessionTransport = {
 //     leg (D5); an absolute https URL would send the device to the website instead.
 // The web origin must also be same-site with `API_URL` for the leg to complete at all — that
 // invariant belongs to ADR-0041, not to this comment.
-// `window` is read per call, never at module scope: `app.config.ts` sets `web.output: "static"`,
-// so this module is evaluated in Node during the static render, where the global does not exist.
+// `window` is read per call, never at module scope, so importing this universal module never
+// requires a browser global during bundling or on native.
 export function oauthReturnURL(): string {
   return IS_WEB ? `${window.location.origin}/` : "/";
 }

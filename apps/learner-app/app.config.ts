@@ -24,7 +24,8 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.globesoul.lrnki"
   },
   web: {
-    output: "static"
+    // ADR-0035: one client-rendered SPA shell handles arbitrary runtime route ids.
+    output: "single"
   },
   owner: "globesoul",
   extra: {
