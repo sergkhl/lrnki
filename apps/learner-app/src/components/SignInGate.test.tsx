@@ -1,10 +1,11 @@
 import { beforeEach, expect, jest, test } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { SignInGate, sessionErrorMessage } from "./SignInGate";
-import { signInWithEmail, signInWithGoogle, signUpWithEmail } from "@/lib/session";
+import { consumeOAuthError, signInWithEmail, signInWithGoogle, signUpWithEmail } from "@/lib/session";
 import { learnerTerm } from "@/learn/vocabulary";
 
 jest.mock("@/lib/session", () => ({
+  consumeOAuthError: jest.fn(),
   signInWithEmail: jest.fn(),
   signInWithGoogle: jest.fn(),
   signUpWithEmail: jest.fn()
@@ -13,12 +14,15 @@ jest.mock("@/lib/session", () => ({
 const signIn = signInWithEmail as jest.MockedFunction<typeof signInWithEmail>;
 const signUp = signUpWithEmail as jest.MockedFunction<typeof signUpWithEmail>;
 const google = signInWithGoogle as jest.MockedFunction<typeof signInWithGoogle>;
+const returnedError = consumeOAuthError as jest.MockedFunction<typeof consumeOAuthError>;
 
 beforeEach(() => {
   jest.clearAllMocks();
   signIn.mockResolvedValue({ ok: true });
   signUp.mockResolvedValue({ ok: true });
   google.mockResolvedValue({ ok: true });
+  // The ordinary mount: the learner arrived without a failed OAuth leg behind them.
+  returnedError.mockReturnValue(null);
 });
 
 test("the gate opens on Enter and offers Google as the primary route", async () => {
@@ -68,6 +72,18 @@ test("a route in flight locks the others, so one gate cannot open two sessions",
   expect(signIn).not.toHaveBeenCalled();
   release({ ok: true });
   await waitFor(() => expect(screen.queryByText(sessionErrorMessage("unavailable"))).toBeNull());
+});
+
+test("a Google leg that failed away from the app is reported by the gate it returns to", async () => {
+  // The browser left for the consent screen and came back to a fresh mount, so the refusal
+  // arrives from the URL rather than from the press that started it — before this, the learner
+  // was left on the API's error page on another domain with nothing to read.
+  returnedError.mockReturnValue("unavailable");
+
+  await render(<SignInGate />);
+
+  await waitFor(() => expect(screen.getByText(sessionErrorMessage("unavailable"))).toBeTruthy());
+  expect(returnedError).toHaveBeenCalled();
 });
 
 test("a refusal is shown in the gate's own words and cleared by switching intent", async () => {

@@ -1,5 +1,6 @@
+import { Platform } from "react-native";
 import { queryClient } from "./api";
-import { authClient } from "./authClient";
+import { authClient, oauthReturnURL } from "./authClient";
 import { learnerScopeKey, meQuery, type MeView } from "./queries";
 
 // Every way a sign-in attempt can be refused, collapsed to what the gate can actually tell the
@@ -87,10 +88,46 @@ export async function signInWithEmail(input: { email: string; password: string }
 // caller never resumes; on native the promise resolves only after the system browser has
 // closed and the returned session cookie is in SecureStore.
 export async function signInWithGoogle(): Promise<SessionResult> {
-  const { error } = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
+  // Both legs get the same destination: a failure that dead-ends on the API's error page is a
+  // learner stranded on another domain with no route back, so the refusal is carried home as a
+  // URL param and read by `consumeOAuthError` below.
+  const returnURL = oauthReturnURL();
+  const { error } = await authClient.signIn.social({
+    provider: "google",
+    callbackURL: returnURL,
+    errorCallbackURL: returnURL
+  });
   if (error) return { ok: false, error: sessionError(error) };
   await adoptRedirectedSession();
   return { ok: true };
+}
+
+// Answered once per page load, then remembered. The read is destructive — it strips the param
+// so a reload cannot re-accuse a learner who has since signed in fine — and a destructive read
+// is not safe to call from a React render. Memoizing makes the call IDEMPOTENT instead, which
+// is exactly what a `useState` initializer needs: StrictMode double-invokes it, and the second
+// call must return what the first did. That is why the gate needs no effect for this, and why
+// this cache must not be cleared — a second failed leg on web means a full page navigation, so
+// the module is fresh anyway.
+let consumed: SessionError | null | undefined;
+
+// The failed Google leg's only channel back into the app. The browser left for the consent
+// screen and returns to a fresh mount, so there is no promise left to reject — Better Auth
+// appends `?error=…` to `errorCallbackURL` instead (`redirectOnError`). Every OAuth code
+// collapses to `unavailable` deliberately: none of them names something the learner mistyped,
+// and `sessionErrorMessage` already owns that copy (ADR-0033). Web-only, because on native the
+// same failure closes the system browser on the `lrnki://` leg and leaves no URL to read.
+export function consumeOAuthError(): SessionError | null {
+  if (consumed !== undefined) return consumed;
+  consumed = null;
+  if (Platform.OS !== "web") return consumed;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("error")) return consumed;
+  url.searchParams.delete("error");
+  url.searchParams.delete("error_description");
+  window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  consumed = "unavailable";
+  return consumed;
 }
 
 // First-run explorer naming (D7). `profileComplete` is what makes it exactly once, so it is

@@ -46,6 +46,28 @@ pnpm dev:learner    # Learner app web (Expo, no browser auto-open)
 through the one-shot `migrate` service after PostgreSQL becomes healthy, and starts the learner API
 only after that migration and LiteLLM both succeed.
 
+**Google sign-in does not work from `pnpm dev:learner` against the deployed API**, and no setting
+fixes it: `localhost:8881` is cross-site with `api.lrnki.globesoul.com`, so the browser drops the
+OAuth state cookie and every callback fails with `state_mismatch`
+([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)). Email + password —
+the path the rigs drive — is unaffected. To exercise Google, run the API yourself so that it shares
+the web origin's host *and* scheme:
+
+```bash
+pnpm dev:api            # the learner-api container, published on :8787 for this machine only
+pnpm dev:learner:local  # web on :8881, pointed at it (--clear: Metro inlines and caches the origin)
+```
+
+One-time setup: register `http://localhost:8787/auth/callback/google` as an authorized redirect URI
+on the Google client — Google exempts `localhost` from its https-only rule. `pnpm dev:api` is
+`docker compose watch` over `docker-compose.dev.yml`, whose entire content is a loopback publish of
+the port that container already serves: the base file gives `learner-api` no host port, because on
+the VPS only Caddy reaches it
+([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)). Edits under
+`apps/learner-api/src` and `packages/` sync into the running container and restart it; a
+`pnpm-lock.yaml` change rebuilds the image. It runs attached — if it is not on screen it is not
+syncing.
+
 **An ambient `NODE_ENV` in your shell breaks `pnpm build`.** Next.js reads it directly, so a value
 exported by a shell profile or left over from an earlier command sends the Admin Lab build down a
 configuration path it was never meant to take, and the failure reads as a Next.js defect rather than
@@ -278,20 +300,30 @@ pnpm build:android:dev   # development profile
 ```
 
 **Native dev loop** — build, install, and launch a development build on a connected device (else
-the emulator/simulator) and start Metro with the dev client:
+the emulator/simulator) and start Metro with the dev client. Both target the local API, so start it
+first:
 
 ```bash
+pnpm dev:api        # the learner-api they point at
 pnpm dev:android    # needs Java 17 + Android SDK
 pnpm dev:ios        # needs macOS + Xcode
 ```
 
-`expo run:*` generates `apps/learner-app/android/` and `ios/` in-tree (gitignored); no
-`EXPO_TOKEN` needed. Builds default to the live API. `EXPO_PUBLIC_LEARNER_API_URL` remains the
-opt-in override for pointing a build at some other API — `http://10.0.2.2:<port>` from the Android
-emulator, `http://localhost:<port>` from the iOS simulator, and debug builds permit cleartext HTTP
-so no config change is needed. Nothing binds 8787 on a development machine anymore
-([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)), so supply that
-API yourself.
+`expo run:*` generates `apps/learner-app/android/` and `ios/` in-tree (gitignored); no `EXPO_TOKEN`
+needed. These and `dev:learner:local` all go through `scripts/dev-learner-app.sh`, which points the
+app at whatever `BETTER_AUTH_URL` names in `.env` — deliberately the same value the API signs and
+advertises to Google, since a build pointed anywhere else cannot complete the sign-in leg
+([ADR-0041](docs/adr/0041-own-learner-identity-with-self-hosted-better-auth.md)). Android also gets
+an `adb reverse` for that port, so `localhost` inside the device means this machine; that works on a
+USB-attached physical device too, where the `10.0.2.2` emulator alias does not. With no device
+attached the script boots an AVD (`ANDROID_AVD`, else the first one) and blocks until it answers as
+booted — `expo run:android` installs as soon as a serial appears, and treats every emulator as ready
+whether or not it is. Because a quick-boot guest can still drop `system_server` during the build
+that follows, the script re-runs once when the install fails with `Can't find service: package`, and
+never for any other reason. Debug builds permit
+cleartext HTTP, so no config change is needed. Export `EXPO_PUBLIC_LEARNER_API_URL` to override —
+that is how you point a native build at the deployed API, which nothing binds locally
+([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)).
 
 EAS iOS builds (distributable artifacts) — future work.
 

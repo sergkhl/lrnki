@@ -22,19 +22,57 @@ jest.mock("@/lib/authClient", () => ({
     signUp: { email: jest.fn() },
     signOut: jest.fn(),
     updateUser: jest.fn()
-  }
+  },
+  // The platform branch itself is proved in `authClient.test.ts`; here it is a fixed value, so
+  // what these cases show is that both callback fields carry whatever it returns.
+  oauthReturnURL: jest.fn(() => "https://lrnki.globesoul.com/")
 }));
 
 import { api, queryClient } from "@/lib/api";
 import { authClient } from "@/lib/authClient";
-import { logout, nameExplorer, sessionError, signInWithEmail, signUpWithEmail } from "./session";
+import {
+  consumeOAuthError,
+  logout,
+  nameExplorer,
+  sessionError,
+  signInWithEmail,
+  signInWithGoogle,
+  signUpWithEmail,
+  type SessionError
+} from "./session";
 import { expeditionQuery, journalQuery, learnerScopeKey, meQuery } from "./queries";
 
 const getSession = jest.mocked(authClient.getSession);
 const signInEmail = jest.mocked(authClient.signIn.email);
+const signInSocial = jest.mocked(authClient.signIn.social);
 const signUpEmail = jest.mocked(authClient.signUp.email);
 const signOut = jest.mocked(authClient.signOut);
 const updateUser = jest.mocked(authClient.updateUser);
+
+// `consumeOAuthError` reads two web globals that a node runner does not have, under a
+// `Platform.OS` this runner fixes to a native value. Both are supplied for the length of the
+// call only — the native cases must keep proving they never reach for either. The module is
+// loaded fresh per case because the answer is memoized for a page's lifetime, which is the
+// property the two-call case is here to pin down.
+function onWeb<T>(href: string, replaceState: jest.Mock, run: (consume: () => SessionError | null) => T): T {
+  const target = globalThis as unknown as { window?: unknown };
+  const had = "window" in target;
+  const previous = target.window;
+  target.window = { location: { href }, history: { replaceState } };
+  try {
+    let loaded!: typeof import("./session");
+    jest.isolateModules(() => {
+      jest.doMock("react-native", () => ({ Platform: { OS: "web" } }));
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      loaded = require("./session") as typeof import("./session");
+    });
+    return run(loaded.consumeOAuthError);
+  } finally {
+    jest.dontMock("react-native");
+    if (had) target.window = previous;
+    else delete target.window;
+  }
+}
 
 // Better Auth's client resolves `{ data, error }` rather than throwing, so the fakes below
 // return that envelope — the shape the mapping under test actually reads.
@@ -115,6 +153,67 @@ test("email sign-up completes the profile, so the rigs' path never meets the nam
     name: "Ada",
     profileComplete: true
   });
+});
+
+test("the Google leg sends the same absolute return URL for the success and the failure exit", async () => {
+  signInSocial.mockResolvedValue(ok({ url: "https://accounts.google.com/o/oauth2/v2/auth", redirect: true }));
+
+  const result = await signInWithGoogle();
+
+  expect(result).toEqual({ ok: true });
+  // Both fields, not just the success one. Better Auth emits each verbatim as the callback's
+  // `Location`: a relative `callbackURL` resolved against the API host and landed a successful
+  // sign-in on a 404, and an unset `errorCallbackURL` dead-ends a refused leg on the API's own
+  // error page — a different domain, with no route back to the app.
+  expect(signInSocial).toHaveBeenCalledWith({
+    provider: "google",
+    callbackURL: "https://lrnki.globesoul.com/",
+    errorCallbackURL: "https://lrnki.globesoul.com/"
+  });
+});
+
+test("a refused Google leg is read off the returned URL, classified once, and stripped", () => {
+  const replaceState = jest.fn();
+
+  const returned = onWeb(
+    "https://lrnki.globesoul.com/?error=state_mismatch&error_description=state+not+persisted&topic=aqueducts",
+    replaceState,
+    (consume) => consume()
+  );
+
+  // Every OAuth code collapses here: none of them names something the learner can retype.
+  expect(returned).toBe("unavailable");
+  // Consumed, not merely read — left in place, a reload would re-accuse a learner who has since
+  // signed in fine. The strip stays surgical: an unrelated param survives it.
+  expect(replaceState).toHaveBeenCalledWith({}, "", "/?topic=aqueducts");
+});
+
+test("asking twice in one page load answers the same and strips once (the initializer's premise)", () => {
+  const replaceState = jest.fn();
+
+  // The gate reads this from a `useState` initializer, which StrictMode double-invokes. A
+  // second answer of `null` would hide the refusal in development only; a second strip would
+  // rewrite a URL the learner may have navigated since.
+  const answers = onWeb("https://lrnki.globesoul.com/?error=access_denied", replaceState, (consume) => [
+    consume(),
+    consume()
+  ]);
+
+  expect(answers).toEqual(["unavailable", "unavailable"]);
+  expect(replaceState).toHaveBeenCalledTimes(1);
+});
+
+test("an ordinary web load carries no error param and the URL is left untouched", () => {
+  const replaceState = jest.fn();
+
+  expect(onWeb("https://lrnki.globesoul.com/?topic=aqueducts", replaceState, (consume) => consume())).toBeNull();
+  expect(replaceState).not.toHaveBeenCalled();
+});
+
+test("native never reports a returned OAuth error, because there is no URL to read", () => {
+  // Under the runner's native `Platform.OS` and with no `window` stubbed: the guard has to
+  // answer before the globals are touched, or this throws instead of returning null.
+  expect(consumeOAuthError()).toBeNull();
 });
 
 test("a successful entry cancels an in-flight learner read so a late response cannot repopulate it", async () => {

@@ -15,6 +15,9 @@ jest.mock("@/lib/api", () => {
 });
 jest.mock("@/lib/authClient", () => ({ authClient: { getSession: jest.fn() } }));
 jest.mock("@/lib/session", () => ({
+  // `consumeOAuthError` is called by `SignInGate` on mount; an explicit object literal mock
+  // means a missing export is not `undefined` at the call site but a TypeError in this route.
+  consumeOAuthError: jest.fn(() => null),
   logout: jest.fn(() => Promise.resolve()),
   signInWithEmail: jest.fn(),
   signInWithGoogle: jest.fn(),

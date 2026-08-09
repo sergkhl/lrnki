@@ -1,0 +1,19 @@
+# Local dev overlay, used through `pnpm dev:api`. Named rather than `docker-compose.override.yml`
+# so compose never auto-loads it, and `scripts/deploy-learner-api.sh` runs plain `docker compose`
+# with no `-f` — between them, this file cannot reach the VPS.
+#
+# All it adds is a loopback publish of the port the learner-api container already serves. The base
+# file gives it none, because on the VPS only Caddy reaches it
+# ([ADR-0040](docs/adr/0040-serve-public-api-only-from-the-deployed-container.md)) — but a dev
+# machine has no Caddy, so without this there is nothing for the app to point at: the origin must be
+# byte-identical to BETTER_AUTH_URL to survive the Google leg (ADR-0041), and on Android
+# `adb reverse tcp:8787` can only forward the device's loopback to a HOST listener.
+#
+# This does not reopen what ADR-0040 closed. What binds 8787 here is the deployed container itself,
+# not a second runtime standing beside it, so there is no shadowing upstream and nothing to arbitrate
+# between. 127.0.0.1 rather than 0.0.0.0 because Docker's iptables rules bypass ufw — the same reason
+# the postgres and litellm publishes in the base file are loopback-only.
+services:
+  learner-api:
+    ports:
+      - "127.0.0.1:8787:8787"

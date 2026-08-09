@@ -22,9 +22,10 @@ Plan hygiene — docs/plans/README.md owns these rules; this is a signpost, not 
 browser-driven Google legs. U1–U3 are complete and the cutover landed 2026-08-08: `main`
 fast-forwarded to `2b14eb9`, the shared schema was hard-reset through the README runbook, and both
 the API and the learner web SPA now serve Better Auth. **U4's checks 3 and 4 pass on the deployed
-stack, and the rule-14 real-use gate is `PASS`** — see the Validation Log. **Checks 1 and 2, the
-real Google round trip on web and on a physical Android, need a person at a consent screen** and
-are tracked in [BLOCKERS](./BLOCKERS.md).
+stack, and the rule-14 real-use gate is `PASS`** — see the Validation Log. **Check 2, the real
+Google round trip on a physical Android, needs a person at a consent screen** and is tracked in
+[BLOCKERS](./BLOCKERS.md). Check 1 (web) moved with its blocking defect to
+[2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md).
 
 **Decision state:** Interview-locked 2026-08-08. D1–D9 were each chosen in the planning interview;
 D1's email/password fallback was user-directed (e2e testability), the rest accepted as recommended.
@@ -486,7 +487,9 @@ two learners that existed and left the enrichment, 16 lessons and 48 study items
 - Remaining caveats: **the Google legs are unverified** (BLOCKERS); one topic in one domain.
 - Safe to continue downstream: yes.
 
-**Hands off.** Nothing to a later unit. The plan closes when BLOCKERS' two Google checks are run.
+**Hands off.** The web Google leg, and the return-leg defect that blocks it, moved to
+[2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md), which owns that record. This plan closes
+on BLOCKERS' Android leg alone.
 
 ### Open findings
 

@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { NATIVE_CHALLENGE_ID, NATIVE_SUMMIT_CHALLENGE_ID } from "./guardianFixture";
+import appConfig from "../app.config";
 
 // Native Maestro runner (plan 2026-07-15-001 U5). It owns fixture-only login values, the loopback
 // fixture server lifetime, APK installation, the Maestro process, and evidence paths. It passes the
@@ -22,6 +23,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(here, "..");
 const FIXTURE_PORT = process.env.NATIVE_FIXTURE_PORT ?? "8799";
 const APK = process.env.NATIVE_APK ?? join(appRoot, "lrnki-learner-e2e.apk");
+// Read from the canonical Expo config rather than restated here, so the id this runner uninstalls
+// is by construction the one the APK installs as.
+const APP_ID = appConfig.android?.package ?? fail("app.config.ts does not define android.package.");
 // The whole flows directory: each file is one scenario with its own ADR-0038 claim, and mixing an
 // unproven visual-evidence capture into the adopted-authority flow would blur what a green run
 // means. Maestro reports them as separate entries.
@@ -88,6 +92,27 @@ function preflight(): { adb: string; maestro: string; device: string } {
   return { adb, maestro, device };
 }
 
+// Android identifies an installed app by package name AND signing certificate jointly, so a package
+// left behind by a differently-signed build cannot be updated: `pm` answers
+// INSTALL_FAILED_UPDATE_INCOMPATIBLE whatever the version code, and neither `-r` nor `-d` overrides
+// it. That collision is routine here, because two legitimate pipelines claim the same id — this gate
+// installs the EAS-signed `e2e` APK, while `pnpm dev:android` installs a local build signed with the
+// React Native template debug keystore. Uninstalling the resident copy is the only resolution, so do
+// it and retry once instead of aborting a run whose fixture server is already up. Every other
+// install failure still fails closed on the first attempt: this recovers from one identified cause,
+// it is not a blanket retry.
+function installApk(adb: string, device: string): { ok: boolean; out: string } {
+  const first = tool(adb, ["-s", device, "install", "-r", "-g", APK]);
+  if (first.ok || !first.out.includes("INSTALL_FAILED_UPDATE_INCOMPATIBLE")) return first;
+
+  console.log(`[native] ${APP_ID} is installed from a differently-signed build; uninstalling it (its app data is erased) and retrying`);
+  const removed = tool(adb, ["-s", device, "uninstall", APP_ID]);
+  if (!removed.ok) return { ok: false, out: `${first.out}\nuninstall ${APP_ID} failed:\n${removed.out}` };
+
+  const second = tool(adb, ["-s", device, "install", "-r", "-g", APK]);
+  return second.ok ? second : { ok: false, out: `${first.out}\nafter uninstalling ${APP_ID}:\n${second.out}` };
+}
+
 let server: ChildProcess | null = null;
 function startFixture(email: string, password: string): Promise<void> {
   const tsx = join(appRoot, "..", "..", "node_modules", ".bin", "tsx");
@@ -134,7 +159,7 @@ async function main(): Promise<void> {
 
   // Emulator reaches the host fixture via 10.0.2.2; nothing else is needed for host loopback.
   console.log(`[native] installing ${APK}`);
-  const install = tool(adb, ["-s", device, "install", "-r", "-g", APK]);
+  const install = installApk(adb, device);
   if (!install.ok) {
     stopFixture();
     fail(`adb install failed:\n${install.out}`);

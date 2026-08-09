@@ -92,8 +92,12 @@ a hygiene comment above its title, so whoever opens one to append sees them with
 - [2026-08-08-001 — Integrate self-hosted Better Auth](./2026-08-08-001-integrate-better-auth-plan.md) —
   **U1–U4 done; deployed to the shared host and gated (rule-14 `PASS`).** Interview-locked (D1–D9),
   durable policy now in [ADR-0041](../adr/0041-own-learner-identity-with-self-hosted-better-auth.md).
-  Open only on the two browser-driven Google round trips in BLOCKERS, which no rig may drive.
-  Delete this plan once those are reported into its Validation Log.
+  Open only on the Android Google round trip in BLOCKERS, which no rig may drive. Delete this plan
+  once that is reported into its Validation Log.
+- [2026-08-09-001 — Fix the learner web Google sign-in return leg](./2026-08-09-001-web-google-signin-leg.md) —
+  carved out of 001, which it unblocks. **Code, tests and docs are in; the deployed checks and the
+  web Google round trip (BLOCKERS leg 1) are not run.** The same-site and absolute-return-URL
+  invariants are already recorded in ADR-0041.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)

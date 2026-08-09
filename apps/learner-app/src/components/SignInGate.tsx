@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { Compass, LogIn, UserPlus } from "lucide-react-native";
-import { signInWithEmail, signInWithGoogle, signUpWithEmail, type SessionError } from "@/lib/session";
+import { consumeOAuthError, signInWithEmail, signInWithGoogle, signUpWithEmail, type SessionError } from "@/lib/session";
 import { Button, Card, Input, PressableSurface, Text, buttonIconColor } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
 
@@ -40,7 +40,13 @@ export function SignInGate() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [error, setError] = useState<SessionError | null>(null);
+  // A Google leg that failed comes back as a URL param on a fresh mount, not as a rejected
+  // promise — `run` never resumes on web, because the browser left this app for the consent
+  // screen. It seeds the same `error` state a local refusal sets, so it clears the same ways.
+  // An initializer rather than an effect: `consumeOAuthError` answers once per page load and
+  // repeats itself after that, so StrictMode's double-invoke is harmless, and setting state
+  // from an effect would spend a cascading render on a value known before the first one.
+  const [error, setError] = useState<SessionError | null>(consumeOAuthError);
   const [pending, setPending] = useState<Intent | "google" | null>(null);
 
   const run = (route: Intent | "google", attempt: () => Promise<{ ok: true } | { ok: false; error: SessionError }>) => {

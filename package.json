@@ -10,9 +10,11 @@
   },
   "scripts": {
     "dev:admin": "pnpm --filter @lrnki/admin-lab dev",
+    "dev:api": "docker compose -f docker-compose.yml -f docker-compose.dev.yml watch learner-api",
     "dev:learner": "pnpm --filter @lrnki/learner-app dev",
-    "dev:android": "pnpm --filter @lrnki/learner-app android",
-    "dev:ios": "pnpm --filter @lrnki/learner-app ios",
+    "dev:learner:local": "scripts/dev-learner-app.sh web",
+    "dev:android": "scripts/dev-learner-app.sh android",
+    "dev:ios": "scripts/dev-learner-app.sh ios",
     "build": "pnpm --filter @lrnki/admin-lab build && pnpm --filter @lrnki/learner-app export:web",
     "build:android": "scripts/build-learner-android.sh",
     "build:android:dev": "scripts/build-learner-android.sh development",

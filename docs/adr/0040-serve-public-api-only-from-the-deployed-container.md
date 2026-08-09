@@ -40,10 +40,17 @@ makes the hazard unreachable, after which there is nothing for a health check to
 
 - Active health checks are gone from the Caddyfile. With one upstream they have nothing to fail over
   to and would only turn a restart-window 502 into a 503.
-- The host runtime is deleted, not merely discouraged: `dev:api`, and the learner-api `dev`/`start`
-  scripts that read a host `.env` pointing at `localhost:5433`. Env divergence goes with them.
-  `realuse-server` is unaffected — it is a separate supervisor-free harness process on its own port,
-  not a shadow of the production one.
+- The host runtime is deleted, not merely discouraged: the learner-api `dev`/`start` scripts that
+  read a host `.env` pointing at `localhost:5433`. Env divergence goes with them. `realuse-server` is
+  unaffected — it is a separate supervisor-free harness process on its own port, not a shadow of the
+  production one. `dev:api` survives only as the name of the watch session.
+- A dev machine reaches the container through `docker-compose.dev.yml`, whose only content is
+  `127.0.0.1:8787:8787`. The learner app needs a host listener there: its origin must be
+  byte-identical to `BETTER_AUTH_URL` (ADR-0041), and `adb reverse` forwards a device's loopback
+  only to one. The publish cannot reach the VPS — compose does not auto-load a named overlay, and
+  `scripts/deploy-learner-api.sh` passes no `-f` — so "nothing on the host binds 8787" still holds
+  where it was decided. It is also not a second upstream: what binds the port is the deployed
+  container itself, which is what leaves nothing for a health check to arbitrate.
 - The dev reload is a container restart (~1–3s with a brief 502), not sub-second `tsx watch`.
   Accepted.
 - `docker compose watch` is foreground and attached, and dies with its terminal or SSH session.

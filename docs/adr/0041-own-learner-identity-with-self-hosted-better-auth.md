@@ -45,6 +45,15 @@ credentialed CORS path stays under test) — `127.0.0.1:<web>` ↔ `127.0.0.1:<a
 across `localhost` and `127.0.0.1` makes them cross-site, and every journey then fails signed out
 with no CORS error naming the cause.
 
+The OAuth leg sharpens the same constraint into a hard one. Better Auth binds the `state` twice — a
+`verification` row **and** a signed, host-only `__Secure-better-auth.state` cookie set on the API
+origin — and checks the cookie first. A web origin that is cross-site with `BETTER_AUTH_URL`
+therefore fails every callback with `state_security_mismatch` ("State mismatch: State not persisted
+correctly"), and the loss happened at the sign-in POST, where the browser discarded a `SameSite=Lax`
+cookie, not at the callback the error names. Chromium, Firefox and WebKit all behave this way, so a
+**development origin is not exempt**: Google sign-in cannot work from `localhost` against the
+deployed API, and the local loop uses email + password or an API served from a matching origin.
+
 **`learnerRef` is Better Auth's `user.id`.** Every learner-state foreign key points at `user.id`;
 `learnerStateRef` keeps its name through the application layer but carries the opaque user id, and
 `user.name` is the single owner of the display name. A learner names their explorer once, after
@@ -79,5 +88,12 @@ first sign-in, so a provider's real name never reaches the shared leaderboard un
   rejects the callback and every session cookie ships without `Secure` over HTTPS. Nothing errors,
   so no test or health probe can see it; `scripts/deploy-learner-api.sh` asserts the value off the
   running container against the origin it serves and fails the deploy on a mismatch.
+- **The OAuth return URL is absolute on web and relative on native**, so no single value serves
+  both. Better Auth emits `callbackURL` and `errorCallbackURL` verbatim as the callback's
+  `Location`: a relative path resolves against the API host, which serves the app nowhere, and lands
+  a successful sign-in on a 404. The Expo client does the opposite — it rewrites a *relative* value
+  into the `lrnki://` return leg, so an absolute https URL there sends the device to the website.
+  Both fields are always set: an unset `errorCallbackURL` strands a refused leg on the API's own
+  error page, on a domain the app does not serve, with no route back.
 - Apple sign-in, native Google ID-token sign-in, and account-linking UI stay additive later work.
   Better Auth links accounts by verified email, so adding a provider implies no further reset.

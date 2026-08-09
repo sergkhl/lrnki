@@ -65,3 +65,18 @@ export const sessionTransport = {
     return cookie ? { cookie } : {};
   }
 };
+
+// Where the OAuth leg sends the browser when it ends, success or failure. The platforms need
+// OPPOSITE forms here, and each one's answer is broken on the other:
+//   - Web: ABSOLUTE. Better Auth copies this value verbatim into the callback's `Location`, so
+//     a relative path resolves against the API host and lands a successful sign-in on
+//     `https://api.…/` — a 404 with no route back to the app.
+//   - Native: RELATIVE. The expo client rewrites a relative value into the `lrnki://` return
+//     leg (D5); an absolute https URL would send the device to the website instead.
+// The web origin must also be same-site with `API_URL` for the leg to complete at all — that
+// invariant belongs to ADR-0041, not to this comment.
+// `window` is read per call, never at module scope: `app.config.ts` sets `web.output: "static"`,
+// so this module is evaluated in Node during the static render, where the global does not exist.
+export function oauthReturnURL(): string {
+  return IS_WEB ? `${window.location.origin}/` : "/";
+}

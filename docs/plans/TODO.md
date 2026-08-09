@@ -10,16 +10,18 @@
 
 ## TODO
 
-- **Better Auth integration — deployed and gated; awaiting the two Google legs.** Plan:
-  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md). U1–U4 are done and `main`
-  fast-forwarded to `2b14eb9`: the shared schema was hard-reset through the README runbook and both
-  the API and the learner web SPA now serve Better Auth. U4's checks 3 and 4 pass on the deployed
-  stack and the rule-14 gate is `PASS` (48/48 study items, 0 rejected) — detail in the plan's
-  Validation Log. Next action: **the two browser-driven Google round trips in
-  [BLOCKERS](./BLOCKERS.md)**, which no rig may drive; the plan closes on them and is deleted then.
+- **Better Auth integration — deployed and gated; awaiting the Android Google leg.** Plan:
+  [2026-08-08-001](./2026-08-08-001-integrate-better-auth-plan.md), which holds the gate record.
+  Next action: **the Android round trip in [BLOCKERS](./BLOCKERS.md)**, which no rig may drive; the
+  plan closes on it and is deleted then. The web leg moved to the plan below.
   **Local dev DBs still need a reset** — U1's schema replaced `learners`, so an un-reset local
   `lrnki` fails every DB-touching command with `relation "user" does not exist`, and the reset drops
   the catalog the local real-backend gate needs and never generates.
+
+- **Web Google sign-in return leg — implemented locally, nothing committed or deployed.** Plan:
+  [2026-08-09-001](./2026-08-09-001-web-google-signin-leg.md). A successful web sign-in landed on the
+  API's 404 because `callbackURL` was relative. Next action: **commit and push to `main`**, which
+  triggers the Pages deploy, then the plan's three deployed checks and BLOCKERS leg 1.
 
 - **Generation model evaluation — shaping, needs a planning interview.** Brainstorm:
   [2026-08-08-002](../brainstorms/2026-08-08-002-generation-model-evaluation.md), which owns the
