@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
-import { withSequence, withTiming } from "react-native-reanimated";
-import { useSharedValue, useAnimatedStyle } from "react-native-reanimated";
 import { ArrowLeft, RotateCcw, ShieldAlert, Swords } from "lucide-react-native";
 import type {
   RecallAnswerFeedback,
@@ -25,20 +23,17 @@ import { TileButton } from "./MatchingBoard";
 import { useShuffledLookup } from "@/learn/useShuffledLookup";
 import { learnerTerm } from "@/learn/vocabulary";
 import {
-  AnimatedView,
   Button,
   Card,
   Dialog,
   DialogBody,
   DialogFooter,
-  MOTION,
   OverlayHeader,
   Screen,
   Text,
   buttonIconColor,
   colors,
-  triggerHaptic,
-  useReducedMotion
+  triggerHaptic
 } from "@/ui";
 
 // The Crystal Guardian fight surface (plan 2026-07-13-003 U5, F2-F4). Driven ONLY by the
@@ -347,27 +342,9 @@ export function GuardianFight({
 }
 
 // The Guardian figure plus the always-present textual status line (ward and shield counts
-// are never conveyed by the drawing alone). A shield loss shakes the figure once; reduced
-// motion keeps the static state change only.
+// are never conveyed by the drawing alone). The corrective reveal owns the response to a miss;
+// after Continue, this stage returns calmly with the server-owned shield and ward state.
 function GuardianStage({ view, title }: Readonly<{ view: Extract<RecallChallengeView, { state: "active" | "recovery" }>; title: string }>) {
-  const reduceMotion = useReducedMotion();
-  const shake = useSharedValue(0);
-  const prevShieldRef = useRef(view.remainingMissBuffer);
-  useEffect(() => {
-    const previous = prevShieldRef.current;
-    prevShieldRef.current = view.remainingMissBuffer;
-    if (reduceMotion || view.remainingMissBuffer >= previous) return;
-    shake.set(
-      withSequence(
-        withTiming(-6, { duration: MOTION.nudge }),
-        withTiming(6, { duration: MOTION.nudge }),
-        withTiming(-3, { duration: MOTION.nudge }),
-        withTiming(0, { duration: MOTION.nudge })
-      )
-    );
-  }, [view.remainingMissBuffer, reduceMotion, shake]);
-  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.get() }] }));
-
   const wardsLine =
     view.unresolvedItemCount === 1
       ? learnerTerm("guardianWardsRemainingSingular")
@@ -378,7 +355,7 @@ function GuardianStage({ view, title }: Readonly<{ view: Extract<RecallChallenge
         <Swords size={18} color={colors.ink} />
         <Text variant="title">{title}</Text>
       </View>
-      <AnimatedView animatedStyle={shakeStyle}>
+      <View>
         <CrystalGuardian
           scopeKind={view.scopeKind}
           phase={view.state}
@@ -388,7 +365,7 @@ function GuardianStage({ view, title }: Readonly<{ view: Extract<RecallChallenge
           shieldTotal={view.missBufferTotal}
           size={180}
         />
-      </AnimatedView>
+      </View>
       <Text variant="caption" color="muted">
         {wardsLine} · {learnerTerm("guardianShield")} {view.remainingMissBuffer}/{view.missBufferTotal}
       </Text>

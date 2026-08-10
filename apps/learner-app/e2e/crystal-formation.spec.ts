@@ -25,7 +25,7 @@ const EVIDENCE_DIR = path.resolve(__dirname, `${EVIDENCE_ROOT}/collection`);
 const VISTA_EVIDENCE_DIR = path.resolve(__dirname, `${EVIDENCE_ROOT}/vista`);
 const GUARDIAN_EVIDENCE_DIR = path.resolve(__dirname, `${EVIDENCE_ROOT}/guardian`);
 const U6_EVIDENCE_DIR = path.resolve(__dirname, `${EVIDENCE_ROOT}/states`);
-const OBELISK_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-07-31-guardian-obelisk/web");
+const OBELISK_EVIDENCE_DIR = path.resolve(__dirname, "../../../tmp/2026-08-10-guardian-calm-correction/web");
 
 test.afterEach(async ({ pageErrors }) => {
   expect(pageErrors, `unexpected runtime errors:\n${pageErrors.join("\n")}`).toEqual([]);
@@ -531,12 +531,20 @@ async function breakWard(page: Page) {
   await expect(page.getByTestId("guardian-obelisk-frame")).toBeVisible();
 }
 
-// One miss: the ward holds, the shield spends a segment, and the queue rotates.
+// One miss: the reveal replaces the Guardian; Continue returns its calm, server-owned state with
+// one spent shield segment and the queue rotated.
 async function holdWard(page: Page) {
+  const intactBefore = await page.locator('[data-testid="shield-intact"]').count();
+  const spentBefore = await page.locator('[data-testid="shield-spent"]').count();
   await page.getByRole("button", { name: "An unrelated marker" }).click();
   await expect(page.getByText("The ward holds")).toBeVisible();
+  await expect(page.getByTestId("guardian-obelisk-frame")).toHaveCount(0);
+  await expect(page.locator('[data-testid="shield-intact"],[data-testid="shield-spent"]')).toHaveCount(0);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByTestId("guardian-obelisk-frame")).toBeVisible();
+  await expect(page.locator('[data-testid="shield-intact"]')).toHaveCount(intactBefore - 1);
+  await expect(page.locator('[data-testid="shield-spent"]')).toHaveCount(spentBefore + 1);
+  await expect(page.getByText(new RegExp(`Shield ${intactBefore - 1}/${intactBefore + spentBefore}$`))).toBeVisible();
 }
 
 function currentWardQuestion(page: Page): Promise<string | null> {
@@ -558,9 +566,16 @@ test("a Guardian answer reveal keeps every option in its submitted position", as
   const submittedOrder = await choices.allTextContents();
   await page.getByRole("button", { name: "An unrelated marker" }).click();
   await expect(page.getByText("The ward holds")).toBeVisible();
+  await expect(page.getByTestId("guardian-obelisk-frame")).toHaveCount(0);
+  await expect(page.locator('[data-testid="shield-intact"],[data-testid="shield-spent"]')).toHaveCount(0);
   await expect(choices).toHaveCount(2);
   expect(await choices.allTextContents()).toEqual(submittedOrder);
   await page.screenshot({ path: obeliskShot("answer-reveal-stable-order", test.info().project.name), fullPage: false });
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("2 wards left · Shield 2/3")).toBeVisible();
+  await expect(page.locator('[data-testid="shield-intact"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="shield-spent"]')).toHaveCount(1);
+  await page.screenshot({ path: obeliskShot("answer-continued-static-shield", test.info().project.name), fullPage: false });
 });
 
 test("a five-ward Leg Guardian is one unchanged body from the base ward to the crown", async ({ page, mock }) => {

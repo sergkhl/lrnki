@@ -212,9 +212,19 @@ test("a miss keeps the ward, cracks the shield, and Last Stand appears when the 
   await renderFight(activeView({ remainingMissBuffer: 1 }));
   await fireEvent.press(screen.getByText("Wrong answer for q1"));
   await waitFor(() => expect(screen.getByText(learnerTerm("guardianWardHolds"))).toBeTruthy());
+  expect(screen.queryByTestId("guardian-obelisk-frame")).toBeNull();
+  expect(screen.queryAllByTestId("shield-intact")).toHaveLength(0);
+  expect(screen.queryAllByTestId("shield-spent")).toHaveLength(0);
   await fireEvent.press(screen.getByText(learnerTerm("guardianContinue")));
   expect(screen.getByText(learnerTerm("guardianLastStand"))).toBeTruthy();
   expect(screen.getByText(learnerTerm("guardianLastStandBody"))).toBeTruthy();
+  expect(
+    screen.getByText(
+      `${learnerTerm("guardianWardsRemainingTemplate").replace("{count}", "3")} · ${learnerTerm("guardianShield")} 0/3`
+    )
+  ).toBeTruthy();
+  expect(screen.queryAllByTestId("shield-intact")).toHaveLength(0);
+  expect(screen.queryAllByTestId("shield-spent")).toHaveLength(3);
 });
 
 test("a selection reveal preserves the submitted option order instead of reshuffling the learner's choice", async () => {
@@ -271,6 +281,17 @@ test("matching pairs post individually and a dirty completed round presents the 
   expect(call.chosenMatchId).toBe("m2");
   expect(call.attemptRef).toMatch(UUID_PATTERN);
   await waitFor(() => expect(screen.getByText(learnerTerm("guardianRecoveryReshuffle"))).toBeTruthy());
+  expect(screen.queryByTestId("guardian-obelisk-frame")).toBeNull();
+  expect(screen.queryAllByTestId("shield-intact")).toHaveLength(0);
+  expect(screen.queryAllByTestId("shield-spent")).toHaveLength(0);
+  await fireEvent.press(screen.getByText(learnerTerm("guardianContinue")));
+  expect(
+    screen.getByText(
+      `${learnerTerm("guardianWardsRemainingTemplate").replace("{count}", "3")} · ${learnerTerm("guardianShield")} 2/3`
+    )
+  ).toBeTruthy();
+  expect(screen.queryAllByTestId("shield-intact")).toHaveLength(2);
+  expect(screen.queryAllByTestId("shield-spent")).toHaveLength(1);
 });
 
 test("retreat records the lifecycle edge and returns to the trail with the fight preserved (F3)", async () => {

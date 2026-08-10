@@ -10,19 +10,16 @@
   interview, one decision at a time, starting with change scope; judge ownership is required only if
   grounding generation moves.
 
-- **Decide the Guardian shield-loss response.** The current shake is unreachable because the
-  corrective reveal unmounts GuardianStage on the same state transition that reduces the shield.
-  Decide whether a corrective Guardian should react at all; then delete the dead animation or move
-  the effect to a surviving surface and cover the chosen behavior. The corrective, non-punitive
-  constraint comes from
-  [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-
 - **Repair the 320 dp native Support Path flow.** Maestro can report the panel visible too early and
   tap Continue instead of the intended term control. The app remains manually reachable; this is a
   false-authority risk in the adopted scenario. Fix the flow and repeat its negative control as
   required by [the rig contract](../../apps/learner-app/e2e-native/README.md).
 
 ## COMPLETED
+
+- **Guardian shield-loss correction is calm (2026-08-10).** The dead shake is removed: the keyed
+  correction owns the miss response, then Continue restores the static server-owned shield or Last
+  Stand state under [ADR-0032](../adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
 
 - **Learner web SPA hard loads deployed and verified (2026-08-09).** GitHub Pages deployed
   commit b0bd09e under the client-rendered single-shell policy in
@@ -61,20 +58,21 @@
 
 ## VALIDATION
 
-### Real-use quality evaluation — 2026-08-09
+### Real-use quality evaluation — 2026-08-10
 
-- Milestone: learner web hard loads use one client-rendered SPA shell, the shell is deployed to
-  Pages, and the menu handoff test is deterministic.
-- Fixture and source type: production-format local Expo export plus the deployed Pages artifact at
-  b0bd09e; dynamic Expedition and Guardian routes, the AE9 checkpoint journey, and the OAuth-refusal
-  return.
-- Real model calls used: not applicable; transport is intercepted and no generated content is
-  evaluated.
+- Milestone: a shield-loss correction remains calm while Continue restores the authoritative static
+  Guardian shield or Last Stand state.
+- Fixture and source type: production-format local Expo export with intercepted Guardian answer
+  transport; phone reveal, post-Continue 2/3 shield, and 0/3 Last Stand captures, plus the same
+  answer-reveal and spent-shield scenarios on desktop.
+- Real model calls used: not applicable; no generated content is evaluated.
 - Result: PASS.
-- Useful output observed: local and deployed dynamic routes reached their named unavailable surfaces
-  without page or console errors; the checkpoint journey completed on phone and desktop.
-- Defects observed: none in the required gate.
-- Changes made after inspection: selected Expo single output, added artifact and dynamic-route gates,
-  and made the menu handoff deterministic in Jest without changing shipped behavior.
-- Remaining caveats: the existing Expo/Jest post-test logger and Watchman warnings are unrelated.
-- Safe to continue downstream: yes; local and deployed completion are both verified.
+- Useful output observed: the correction clearly replaces the Guardian and keeps the keyed answer in
+  place; Continue returns a compact static shield count, and Last Stand remains supportive and
+  non-punitive without moving wards.
+- Defects observed: none in the inspected milestone.
+- Changes made after inspection: none; the first inspected output met the intended contract.
+- Remaining caveats: this is intercepted-web presentation evidence only. The unchanged warning
+  haptic was not requalified, and the full Jest command still exits after 314 passing tests because
+  of the existing post-test Expo logger warning.
+- Safe to continue downstream: yes.

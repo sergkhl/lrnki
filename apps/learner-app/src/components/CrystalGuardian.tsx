@@ -160,9 +160,10 @@ function WardSegment({ segment, ward }: Readonly<{ segment: GuardianObeliskSegme
 }
 
 // The three-segment crystal shield at the Guardian's base — the learner's own protection, fully
-// independent of the ward segmentation above it: a miss spends a shield and may shake the whole
-// figure, but never resolves or rearranges a ward. Remaining segments are filled, spent segments
-// hollow — a fill/shape difference, not a hue difference.
+// independent of the ward segmentation above it. The corrective reveal owns a miss response; when
+// the Guardian returns it statically reflects the server-owned shield count without resolving or
+// rearranging a ward. Remaining segments are filled, spent segments hollow — a fill/shape
+// difference, not a hue difference.
 function ShieldRow({ total, remaining }: Readonly<{ total: number; remaining: number }>) {
   const width = 22;
   const gap = 5;
