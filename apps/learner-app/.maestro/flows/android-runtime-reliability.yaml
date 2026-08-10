@@ -26,6 +26,7 @@ appId: com.globesoul.lrnki
 - tapOn:
     id: "gate-email"
 - inputText: ${LEARNER_EMAIL}
+- hideKeyboard
 - tapOn:
     id: "gate-password"
 - inputText: ${LEARNER_PASSWORD}
@@ -56,9 +57,16 @@ appId: com.globesoul.lrnki
 - assertVisible: "Field notes"
 - scrollUntilVisible:
     element:
-      id: "support-paths-panel"
+      id: "support-path-add-phospholipid bilayer"
+      enabled: true
     direction: DOWN
     timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    id: "support-path-add-phospholipid bilayer"
+    enabled: true
+- takeScreenshot: support-path-exact-action-ready
 - assertVisible: "Continue"      # footer control reachable after the long scroll
 - assertVisible: "Field notes"   # fixed header still present
 
@@ -67,6 +75,7 @@ appId: com.globesoul.lrnki
 # assertion). ---
 - tapOn:
     id: "support-path-add-phospholipid bilayer"
+    enabled: true
 - assertVisible: "Support paths"                 # dialog title (OverlayHeader)
 - assertVisible: "Add support path"              # dialog body/primary action reachable
 - assertVisible: "Keep exploring"               # dialog footer close action reachable

@@ -10,10 +10,12 @@
   interview, one decision at a time, starting with change scope; judge ownership is required only if
   grounding generation moves.
 
-- **Repair the 320 dp native Support Path flow.** Maestro can report the panel visible too early and
-  tap Continue instead of the intended term control. The app remains manually reachable; this is a
-  false-authority risk in the adopted scenario. Fix the flow and repeat its negative control as
-  required by [the rig contract](../../apps/learner-app/e2e-native/README.md).
+- **Repair the 320 dp native Support Path flow — U2 sensitivity remains.** The
+  [implementation plan](./2026-08-10-001-repair-320dp-native-support-path-flow.md) records the closed
+  exact-action repair, fresh current-APK 320 dp positives, and normal-width smoke. Resume with the
+  isolated historic dialog-collapse mutant: require three failures in the dialog reachability block,
+  then reinstall the current APK and complete its final 320 dp restoration pass before retaining or
+  withdrawing automatic authority.
 
 ## COMPLETED
 
