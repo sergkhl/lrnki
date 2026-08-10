@@ -4,155 +4,40 @@ Status: Accepted
 
 ## Decision
 
-The learner loop uses `derived_node_id` as its subject identity. Mastery, calibration, learner paths,
-and study-item coverage key to the node in one Derived Graph Layer, whether that node is an anchor or
-an Enrichment Node. Asserted `concept_id` remains a separate identity available only for anchors.
+The learner loop uses the derived node within one Derived Graph Layer as its subject identity. A
+learner-neutral Study Item Bank is a typed union of option-select, matching, and impostor activities
+keyed to that subject; source types own exact payloads and
+[ADR-0039](0039-own-persisted-shape-in-code-first-drizzle-schema.md) owns their persistence.
 
-The learner-neutral **Study Item Bank** is a typed discriminated union keyed by `itemType`.
-Implemented item payloads are `option_select`, `matching`, and `impostor`.
+A per-node blueprint may select a sparse set of suitable item types. Deterministic guards enforce only
+provable structure and provenance, while semantic suitability remains neural and measurable. A
+missing type is a valid, inspectable absence rather than permission to fabricate an activity.
 
-A per-node Study Item Blueprint stage runs inside the existing `study_items` operation. It decides
-which item types to generate for the node and assigns each generated type a distinct assessed facet.
-Declined types are persisted as rejected study-item rows, not as a separate capability map. Exact
-payload fields are owned by source types and their persisted shapes by the internal Drizzle schema
-([ADR-0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
+Learner-facing projections never expose answer keys. The server resolves the persisted key, grades
+every type through one grading-neutral path, and appends observations to the Response Log. Calibration
+is a separate mutable self-report over a derived node, never a Study Item or graded observation.
 
-Blueprints have a sparse default. A deterministic structural pre-gate vetoes only provable
-impossibilities from the Concept Lesson substrate: no lesson means no item type; matching requires
-enough distinct grounded fragments to form pairs; impostor requires enough truth fragments to test a
-false statement. The neural blueprint may decline additional types for semantic suitability, and
-blueprint failures fall back to the pre-gate survivors rather than generating every type. Sparse item
-sets are valid Study Item Banks, with every declined type recorded as an inspectable rejection.
+Study Items retain whether their grounding is source CEP evidence, rescued source evidence, or
+generated grounding. Source citations require verified source text; generated citations are labeled
+generated and cannot masquerade as quotes.
 
-Learner-facing Study Session views never serialize answer keys. The client receives option ids,
-statement ids, and matching tile ids needed for interaction; grading re-resolves the server-side key
-from persisted current items.
+Two semantic verification questions remain distinct:
 
-The impostor item shape single-sources the planted lie. Generation returns three cited truths plus
-one lie payload; the application inserts that lie into the four statement positions, and persistence
-stores `reveal`, `lie_source`, and `sibling_label` on the keyed lie statement row. The item itself
-does not duplicate lie metadata. This keeps the learner-facing reveal, grading key, and persisted
-statement identity bound to the same lie object.
+- Study Item Key Verification checks truth and answer-key uniqueness for option-select and impostor
+  candidates.
+- Matching Assignment Verification checks whether a whole matching board has exactly one defensible
+  assignment; individually true pairs do not answer that question.
 
-Study items preserve grounding provenance:
+Both use a cross-family judge and may veto only their named harm class. Unclear or unavailable
+judgment is not converted into a lexical hard veto; deterministic rules continue to own only
+provable guarantees under AGENTS rule 16.
 
-- `source_cep` for anchor evidence;
-- `source_mentioned` for rescued evidence; and
-- `generated` for Generated Grounding Bundle passages.
-
-Source citations retain source identifiers and verbatim evidence. Generated citations identify
-generated grounding and never masquerade as source quotes.
-
-Study responses are auto-graded from server-side keys:
-
-- `option_select` keys the one correct option.
-- `matching` keys each prompt to one match tile and grades one completed board from the submitted
-  attempt trace. A zero-mispair board records `correct`; a cleared board with mispairs records
-  `partial` with fractional score for inspection.
-- `impostor` keys the one planted lie among three grounded truths.
-
-All item types append graded Response Log entries through one grading-neutral path; a node's mastery
-folds across all graded observations at one threshold regardless of item type. `partial` is a graded
-outcome below the mastery threshold and may remain replayable in learner projections.
-
-A node with a Concept Lesson and no current study items is still masterable downstream: the Study
-Session projection treats the persisted lesson read as completion for that itemless node. This does
-not write a Response Log row and does not change the graded-only response contract. A node with
-neither lesson nor current items may be treated as complete by projection only when it is explicitly
-recorded as lesson-absent, so sparse generation cannot deadlock dependents while silent missing data
-does not become mastery.
-
-Each type's deterministic guard enforces only structural and provenance guarantees. Option-select
-keys exactly one correct option; matching enforces pair count, distinct normalized prompt/match text,
-non-self matches, contiguous-word non-containment between a pair's two sides, and citation
-verification; impostor keys exactly one lie, verifies each grounded truth against its cited
-grounding, and makes a source-cited impostor unrepresentable.
-
-Containment is the only part of matching's surface-solvability defect a deterministic veto may own:
-"one side displays the other's whole phrase" is provable, while "the match paraphrases the prompt" is
-a judgment the generation prompt owns instead (AGENTS rule 16). It is computed over word sequences,
-never raw characters, which both over-fire on subwords and under-fire on punctuation.
-
-A citation resolves through a deterministic ladder, not an all-or-nothing string match: the cited
-passage with a verbatim quote; the same quote verified verbatim against a *different* **generated**
-passage, which repairs a mis-addressed id without ever minting a `source` citation; and — for the
-key-verified types only — the whole cited generated passage when the quote verifies nowhere. An
-unknown passage id always rejects, and a **source** passage always requires its verbatim quote. No
-similarity heuristic appears at any rung.
-
-**Study Item Key Verification** then checks the answer key of every option-select and impostor item.
-One cross-family judgment per item classifies *every* candidate answer as true, false, or unclear for
-the target node in its Declared Domain — grounding passages and siblings as context, all candidates
-visible at once — and a deterministic rule enforces answer-key uniqueness: an impostor is admitted
-only when the keyed lie is judged false **and** no other statement is; an option-select only when no
-distractor is judged true **and** the key is not judged false. `unclear` is never a veto. A vetoed
-item gets one regeneration informed by the offending candidate, then one further verification.
-
-Verifying only the key cannot observe a second true option or a second false statement, so the
-lie-only judge this supersedes was structurally blind to items that mark a learner wrong for the
-right answer. The third resolution rung and this verification are **interlocked**: forgiving a quote
-the generator never reproduced is admissible only where a judge checks the claim it no longer
-anchors.
-
-**Matching Assignment Verification** then checks the pair set of every guarded matching item. Its
-question is *fit*, not claim truth: one cross-family judgment classifies every `(prompt, match)` cell
-of the N×N grid as `fits`, `does_not_fit`, or `unclear`, and a deterministic rule admits the item
-only when no non-keyed cell fits and no keyed cell does not. `unclear` is never a veto, and a cell
-the judge omits is `unclear`. A vetoed item gets one regeneration whose feedback names the offending
-cells, then one further verification.
-
-Matching needs this second question because its harm class is invisible to the first. Two matches
-that both answer one prompt mark a learner wrong for a defensible answer, and every pair on such a
-board is individually TRUE — so a per-candidate claim judge admits it. The grid also exposes a
-mis-keyed pair, which a per-prompt list of fitting matches cannot. Because assignment fit is not
-claim truth, the interlock above still holds and **matching resolves its citations through the
-verbatim rungs alone**: forgiving a lost quote stays admissible only where a judge checks the claim
-that quote no longer anchors.
-
-The board is presented to the judge with the answer key removed: prompts keep their pair ordinals,
-matches are sorted by normalized text and renumbered by sorted position. Sorting alone is
-insufficient — an attached pair ordinal leaks the key more legibly than position does, and a judge
-that can read the key has no reason to test any other cell. The permutation is a deterministic
-function of the item, so a re-run judges the same board.
-
-Assignment verification removes the ambiguity class it targets and leaves a **non-zero tail on
-borderline boards**, which is the accepted state rather than a defect awaiting repair. The measured
-value is 1 admitted item of 26 carrying a pair set whose two prompts are both defensibly answered by
-one match; re-judging that board vetoes it, so the residual is judgment sensitivity on a genuinely
-overlapping distinction, not a mechanism the stage lacks. The invariant is directional: the tail may
-shrink, and no change may reintroduce a board that a single judgment already vetoes. Closing it is a
-judge-stability question — repeated judgment, or a stricter reading of "defensibly" — and belongs
-with judge-model qualification. It is never closed by a lexical or surface gate (AGENTS rule 16);
-`dependent` and `sibling` have legitimate domain senses that such a gate false-negatives on.
-
-Unavailability stays asymmetric, decided by harm rather than symmetry. An impostor drops, because a
-true "lie" teaches a falsehood while a missing impostor is the designed safe state. An option-select
-passes through unverified — its status quo, and the node's only primary activity — unless it was
-admitted through the third rung, in which case it has no mechanical anchor either and drops too. A
-matching item passes through unverified: every pair still carries a verbatim mechanical anchor, and
-its worst failure is a `partial` grade rather than a taught falsehood. Distractor plausibility, the
-paraphrase half of matching anti-cueing, blueprint quality, and broader teaching quality remain
-real-use inspection responsibilities.
-
-Calibration is a separate self-report surface keyed directly to derived nodes, not a study-item
-card. A learner records a mutable binary calibration verdict for a derived node. The application
-composes those verdicts with the graded Response Log and surfaces disagreement rather than hiding it
-behind a precedence rule.
-
-The Response Log port is append-only and graded-only. Corrections append another graded observation;
-an explicit operator reset is a separate administrative operation. Learner history remains scoped to
-one Derived Graph Layer until stable cross-enrichment learner-facing identity is designed.
-
-A Response Log observation's subject/item identity is a discriminated **neutral-or-scaffold**
-reference over mutually exclusive foreign keys: the neutral `(study_item_id, derived_node_id)` pair
-this ADR defines, or a single `scaffold_step_id`. This ADR owns only the neutral side; the scaffold
-side, and the rule that every neutral mastery/calibration/leaderboard/journal fold consumes neutral
-observations only, are owned by [ADR-0037](0037-persist-learner-scoped-scaffold-detours.md). One
-append-only monotonic sequence per learner still spans both scopes.
+The Response Log is append-only and graded-only for neutral activities. Learner-scoped Support Steps
+share grading mechanics but use the discriminated scoped identity and evidence-isolation rules in
+[ADR-0037](0037-persist-learner-scoped-scaffold-detours.md).
 
 ## Context
 
-A concept-only item identity excluded rescued and minted nodes from recall, while a single untyped
-card could not support multiple study mechanics. Separating derived-node subject identity, typed item
-identity, calibration verdicts, and graded observations keeps learner state downstream and makes
-grounding provenance explicit.
+Concept-only identity excluded rescued and generated nodes, while one untyped card could not support
+several mechanics. Typed activities, server-owned keys, explicit grounding, and scoped observations
+keep learner evidence trustworthy without moving learner state into the neutral graph.

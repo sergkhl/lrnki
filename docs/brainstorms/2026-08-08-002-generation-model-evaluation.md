@@ -6,159 +6,82 @@ date: 2026-08-08
 
 # Generation Model Evaluation — MiMo v2.5 vs DeepSeek v4 Flash
 
-**Status:** Shaping. Not a plan; no unit exists. Written at the close of
-`2026-08-07-001 (matching item quality)`, which surfaced the findings below and proved that the test
-this decision was waiting on does not answer it. Needs a planning interview before any code.
+**Status:** Shaping. No implementation plan is ready; resolve the open decisions below through a
+planning interview.
 
-**The question.** A 2026-08-08 bake-off put `deepseek-v4-flash` ahead of the production extractor
-`mimo-v2.5` on yield, latency, and price. Should production generation move? This document records
-what is measured, what is not, and the two preconditions that make it a larger change than it looks.
+## Question
 
-## What is actually measured
+A dated study-item-blueprint comparison put DeepSeek v4 Flash ahead of production MiMo v2.5 on
+downstream yield, latency, and price. Should any production generation stage move, and what evidence
+would justify that scope?
 
-`litellm/config.yaml` owns the measurement (AGENTS rule 5); it is summarized here only to scope it.
-Three arms, 16 nodes × 2 draws, identical inputs, reasoning off, scored by **downstream yield** —
-each arm's facet replayed through the production matching generator + guard, generator held constant:
+litellm/config.yaml owns the current alias-to-deployment mapping. This brainstorm owns the decision
+framing and the dated measurement summary; a future plan must re-read the current mapping rather than
+copy it.
 
-| Arm | Items | Notes |
-| --- | --- | --- |
-| `mimo-v2.5` | 12 of 16 | incumbent; declines nodes |
-| `mimo-v2.5-pro` | 11 of 16 | measured and rejected; do not re-test |
-| `deepseek-v4-flash` | **16 of 16** | zero guard rejections, ~3× lower median latency, tighter tail |
+## Evidence and gap
 
-The yield win is **partly bought by never declining**: DeepSeek skipped 0 of 96 type-decisions, and
-hand inspection of the nodes v2.5 declined found off-node drift (an NADW board keyed to AABW), a
-label-cued board whose matches are just neighbour node names, and one **false match** ("freshwater
-lowers density by expanding water molecules"). Its facet text is also off-spec at 206 chars mean
-against v2.5's 69, for a schema asking for a "short" facet — and that text rides into three
-downstream prompts per node.
+The 2026-08-08 comparison ran three models over 16 nodes with two draws per node, reasoning disabled,
+and identical inputs. Each blueprint facet was replayed through the same production matching generator
+and guard:
 
-So the honest summary is: **confirmed better on yield, latency, and price; unmeasured to suspect on
-truth**, which is the axis that decides it.
+| Arm | Downstream matching items | Decision-relevant observation |
+| --- | ---: | --- |
+| MiMo v2.5 | 12 of 16 | Incumbent; declined some nodes |
+| MiMo v2.5 Pro | 11 of 16 | Rejected on yield, guard failures, latency, and price |
+| DeepSeek v4 Flash | 16 of 16 | Best yield and latency; never declined |
 
-## Why the pre-registered re-decision test is void
+DeepSeek's added yield is not yet trustworthy. Hand inspection found off-node facets, label-cued
+matching, one false match, and much longer facet text. Matching Assignment Verification measures
+board assignability, not claim truth, so its later shipment did not answer the pre-registered
+re-decision test. The missing evidence is a direct comparison of claim truth and on-node relevance for
+the items unique to each arm.
 
-The bake-off wrote its own re-decision rule: *"Re-decide once Matching Assignment Verification ships:
-if those extra items survive it, the coverage win is real; if it vetoes them, v2.5's skips were
-right."*
+## Constraints
 
-That test does not work, and the matching plan's U4 is why. Matching Assignment Verification checks
-**fit, not claim truth** ([ADR-0026](../adr/0026-typed-study-item-bank.md), D8): a false but
-unambiguous match passes it by design, and off-node drift is not an assignment defect at all. Its
-measured subtraction was 4 finally rejected of 30 generated, every one for ambiguity. It is the wrong
-instrument for the exact failure class DeepSeek's extra items carried.
-
-**Consequence: we are further from a decision than when the bake-off was written, not closer.** The
-evidence this needs — a direct A/B whose scoring is claim truth on the items each arm uniquely
-produces — does not exist and has to be built.
-
-## Blast radius: one alias, eleven consumers
-
-This is the finding that most changes the shape of the work. `study-item-blueprint` — the only stage
-the bake-off measured — resolves through `kg-claim-extraction`, and so do **ten other prompts**:
-
-```
-cep-extraction                     grounding-generation           missing-prerequisite-proposal
-concept-lesson-generation          layer-purpose                  study-item-blueprint
-study-option-select-generation     study-matching-generation      study-impostor-generation
-learner-scaffold-outline-generation                learner-scaffold-content-generation
-```
-
-Moving that alias moves the CEP extraction contract ([ADR-0007](../adr/0007-extract-concept-evidence-profiles-in-concept-context.md)),
-Concept Lessons ([ADR-0031](../adr/0031-concept-lesson-teaching-substrate.md)), all three study-item
-generators, minted prerequisites, and the scaffold surface — on evidence gathered from **1 of 11
-consumers**, whose metric held one of the other ten constant. A separate five aliases
-(`default-model`, `kg-concept-discovery`, `kg-concept-admission`, `kg-concept-synthesis`,
-`kg-domain-inference`) also point at `mimo-v2.5`, so "move generation to DeepSeek" is not one
-decision — the *scope* is itself an open question.
-
-## Two hard preconditions
-
-**1. `grounding-generation` is on this alias, so the judge must move in the same change.**
-[ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md) requires
-judgment over generated nodes to use a family independent of the extraction **and grounding**
-generator, and states that whichever of the pair moves second must move in the same change. The judge
-became `deepseek-v4-flash-0731` on 2026-08-07 (`23f7146`) specifically to escape the Groq
-requests-per-minute ceiling on OpenRouter's shared account that took out **every** judge stage at
-once. So moving `kg-claim-extraction` to DeepSeek pushes the judge back into the family whose
-availability failure caused the swap, or onto an unmeasured third family — and the judge is itself
-only qualified for its shipped matching configuration, not for its five other duties. **This
-precondition has no answer today, and it is what actually gates the work.**
-
-**2. The prefix-cache pin is part of the incumbent's cost, and the comparison ignored it.**
-MiMo is provider-pinned to the single xiaomi host so the ~23k-token document re-sent on every
-admission batch can warm a per-host prefix cache (`cache_read_input_token_cost` is set on the
-deployment); OpenRouter load-balancing would spread those calls across hosts whose caches are
-per-host and never warm it. The bake-off scored short per-node blueprint calls, where that cache is
-irrelevant. Any price or latency claim about the document-heavy stages must be made against MiMo's
-**cached** cost, and a DeepSeek arm has to show it can be pinned and warmed the same way — which
-costs the multi-provider fp8 resilience the judge deployment currently relies on.
-
-Beyond those: AGENTS rule 5 names MiMo as production extraction, so the switch is a rule amendment;
-and [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md) now states that evidence is
-scoped to the model that produced it, so every gate measured under MiMo is retired by the move.
+- **One alias has a broad blast radius.** At the time of the comparison, kg-claim-extraction served
+  eleven prompt descriptors, including grounding generation, CEP extraction, Concept Lessons, all
+  Study Item generators, and scaffold generation. Prompt frontmatter is authoritative; re-derive the
+  consumer set before planning.
+- **Grounding generation and its judge must stay cross-family.**
+  [ADR-0023](../adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md) requires the
+  generating and judging roles to move as an independent pair. The judge has no independently
+  qualified destination if the whole alias moves today.
+- **The cost comparison did not cover document-heavy caching.** MiMo's production deployment is
+  provider-pinned for prefix caching, as documented beside the mapping in litellm/config.yaml. Any
+  comparison of document-heavy stages must include that current behavior.
+- **A model move retires affected quality evidence.** AGENTS rule 14 and
+  [ADR-0013](../adr/0013-verify-quality-by-real-source-inspection.md) require every moved consumer to
+  be re-gated or explicitly marked unqualified.
 
 ## Candidate options
 
-1. **Split `study-item-blueprint` onto its own alias and move only that.** Confines the change to the
-   one consumer that was actually measured, leaves the grounding generator and CEP extraction on
-   MiMo, and — because the blueprint is neither extractor nor grounding generator — plausibly does
-   not trip ADR-0023's pair constraint at all. **Leading candidate**, but the interview must settle
-   the ADR-0023 reading explicitly rather than assume it, and must decide whether the blueprint's
-   off-spec facet verbosity is acceptable given it feeds three downstream prompts.
-2. **Move `kg-claim-extraction` wholesale.** Needs the judge relocation, a claim-truth A/B across
-   several of the eleven consumers, and a full ADR-0013 re-gate. Largest option; currently blocked on
-   precondition 1.
-3. **Do not switch; close the question.** Record the bake-off as decided-against and stop paying
-   attention cost. Cheapest, and defensible while precondition 1 has no answer.
-4. **Give matching claim-truth verification instead.** Attacks the underlying gap (matching is the
-   one type with no truth check, ADR-0026 D8) rather than the model choice, and would make a future
-   A/B scorable by machine. Independently valuable; does not by itself decide the model.
+1. **Give study-item-blueprint its own alias and move only that stage.** This is the smallest scope
+   supported by the existing comparison, but claim truth, on-node relevance, and facet length still
+   need evaluation.
+2. **Move kg-claim-extraction wholesale.** This requires a qualified independent judge destination,
+   a multi-consumer comparison, cache-aware economics, and a full re-gate.
+3. **Keep MiMo and close the question.** This is justified if the required evidence costs more than
+   the measured upside.
+4. **Add matching claim-truth verification first.** This addresses a real measurement gap but is a
+   separate product decision and does not itself choose a model.
 
-## Carried from the matching plan
+## Carried generation changes
 
-Two generation-side changes were deliberately not shipped there, so `fix/matching-item-quality` would
-merge exactly as its U4 gate measured it. Both belong to whichever plan next pays for a real-use gate
-cycle:
+These changes were intentionally excluded from the measured matching-quality branch and belong to the
+next plan that pays for a real-use gate:
 
-- **Remove the blueprint's matching-facet constraint.** It declined a real node
-  (`Surface ocean circulation`, "only two distinct answers") while the collapse it guards against
-  could not be reproduced — 3 forced draws on that exact node and facet produced no collapsing board,
-  and all 4 admitted direction-of-effect items were discriminable with clean diagonals. It is
-  conservative rather than protective. **Removing it should precede any A/B**: it is a *decline*
-  instruction, and the A/B's headline metric is yield-where-MiMo-declines-and-DeepSeek-does-not, so
-  leaving it in confounds exactly the comparison being made. Do not tune it against these nodes
-  (AGENTS rule 17).
-- **Raise `MATCHING_GENERATION_ATTEMPTS`** (`packages/application/src/generateStudyItemBank.ts:69`,
-  currently 2, beside `OPTION_SELECT_*` and `IMPOSTOR_*`). The measurement the matching plan waited
-  for exists: matching's second attempt fails routinely on a hard node (3 of 3 on the reproduced
-  case; `Seawater density` lost its item to the distinctness veto after its retry). Monotone-safe —
-  a third attempt is still guarded and still judged — so it can only add items or cost one call. An
-  asymmetric budget is justified because matching's failure is structural (board-level distinctness)
-  rather than per-candidate.
+- Remove the blueprint's matching-facet decline constraint if a fresh gate confirms it rejects useful
+  nodes without preventing a reproduced defect.
+- Consider a third matching generation attempt. The existing retry remains guarded, so the decision
+  is a measured yield-versus-cost trade-off rather than a relaxation of quality.
 
-## Open questions for the planning interview
+## Open decisions
 
-1. **Scope**: one stage (option 1), one alias, or the whole extractor assignment?
-2. **Does ADR-0023's pair constraint reach the blueprint?** It is neither extractor nor grounding
-   generator, but it shapes the facet that the judged matching item is built from.
-3. **Where does the judge go** if `kg-claim-extraction` moves? `gpt-oss-120b` carries the Groq
-   exposure that forced the swap; `qwen3-235b-a22b-2507` was measured forced-tool OK but failed
-   quality parity on whole-set ordering (a different task); nothing else is measured.
-4. **What is the A/B's scoring instrument?** Hand inspection of claim truth on each arm's unique
-   items (ADR-0013), or build matching claim-truth verification first (option 4) and score by machine?
-5. **How many domains and how many draws** make the result readable under
-   [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md)? The
-   bake-off's 2 draws are thin for a decision this wide.
-6. **Which gates get re-run** versus recorded as unqualified, per the ADR-0013 evidence-scope rule?
-
-## Do not re-litigate
-
-- **`mimo-v2.5-pro` is measured and rejected** — 11 of 16, the only arm to produce guard rejections,
-  and more expensive. Do not re-test it on this stage.
-- **The 2026-06-24 "deepseek flash is disproven" note is not about this model.** It measured
-  `deepseek-flash-no-thinking` on *whole-set prerequisite ordering*, months before `v4-flash-0731`,
-  and `litellm/config.yaml` now says so explicitly. It is not evidence about per-item judging or
-  about generation.
-- **`kg-prerequisite-ordering` stays on `gpt-oss-120b`** and keeps its Groq exposure; whole-set
-  ordering needs a reasoning model and the flash-generation result above stands for that task.
+1. Is the decision scoped to study-item-blueprint, kg-claim-extraction, or a wider model assignment?
+2. What independent model can own judging if grounding generation moves?
+3. Will claim truth be scored by representative human inspection or by a separately justified
+   matching truth verifier?
+4. How many domains and repeated draws make the comparison readable under
+   [ADR-0028](../adr/0028-measure-non-deterministic-quality-with-non-deterministic-methods.md)?
+5. Which affected gates will be re-run, and which will be explicitly marked unqualified?

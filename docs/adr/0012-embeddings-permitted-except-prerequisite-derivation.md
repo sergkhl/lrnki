@@ -4,25 +4,18 @@ Status: Accepted
 
 ## Decision
 
-Embeddings may support:
+Embeddings may support similarity, retrieval, and candidate generation. For identity they may only
+propose near-duplicates; an explicit deterministic rule or measured semantic adjudicator makes and
+records the merge decision. Raw similarity never creates or merges a Concept or derived node.
 
-- Concept identity and deduplication candidate generation;
-- similarity; and
-- recall or retrieval.
+Embeddings must not propose, gate, order, or derive prerequisite edges. Those directional judgments
+operate over the whole derived node set under
+[ADR-0019](0019-graph-enrichment-derived-layer.md).
 
-For identity, embeddings only **propose** near-duplicate candidates. A separate measured LLM
-adjudicator or recorded deterministic identity rule makes the merge decision, and every merge is
-recorded. Raw cosine similarity never creates or merges a Concept, alias, or derived node.
-
-Embeddings must not propose, gate, order, or derive prerequisite edges. Prerequisite existence and
-direction remain LLM-judged over the domain's derived node set under ADR-0019.
-
-Any embedding mechanism is an explicit measured module evaluated against current behavior. Failure
-must not silently change authoritative identity or graph structure.
+Any embedding use is an explicit measured module whose failure cannot silently change authoritative
+identity or graph structure.
 
 ## Context
 
-An earlier raw-cosine path coupled candidate proposal and merge authority and performed poorly.
-Removing embeddings entirely discarded useful recall and candidate-generation capability. Separating
-proposal from adjudication retains that capability without repeating the identity failure or applying
-similarity to directional prerequisite judgment.
+The former raw-similarity merge path performed poorly. Keeping embeddings as a recall signal preserves
+their useful leverage without granting them authority over identity or prerequisite semantics.

@@ -4,28 +4,19 @@ Status: Accepted
 
 ## Decision
 
-Judgment-based quality—including Concept correctness, identity adjudication, prerequisite existence
-and direction, difficulty, and definition quality—must be evaluated with methods that represent
-uncertainty:
+Judgment-based quality—Concept correctness, identity, prerequisites, difficulty, and evidence
+quality—is evaluated with representative real-use judgment, repeated sampling, and recorded agreement
+or uncertainty where the decision needs it.
 
-- representative real-use LLM-as-judge evaluation;
-- repeated judgment or self-consistency sampling; and
-- calibrated agreement or uncertainty distributions.
+Do not replace an ambiguous semantic judgment with a deterministic proxy that pretends one answer is
+known, and do not chase bit-identical neural output. Variance is measurement signal; deterministic
+code may hard-veto only provable guarantees under AGENTS rule 16.
 
-Do not replace those judgments with a deterministic proxy that pretends one answer is objectively
-known. Do not chase bit-level model-output determinism. Mixture-of-experts routing, hosted backends,
-and floating-point execution can vary even with temperature zero and a seed; instability on an
-ambiguous input is measurement signal.
-
-ADR-0013 owns the deterministic-test boundary, real-source inspection policy, and
-measurement-harness retention.
-
-Published reproducibility comes from immutable persisted artifacts with full provenance. Re-running a
-neural operation creates a fresh observation; replaying the stored artifact reproduces the published
-state.
+[ADR-0013](0013-verify-quality-by-real-source-inspection.md) owns the test and inspection boundary.
+Published reproducibility comes from immutable persisted artifacts with provenance: a re-run is a new
+observation, while replaying the artifact reproduces the published state.
 
 ## Context
 
-Attempts to force reproducible prerequisite judgments showed that variance concentrated on genuinely
-ambiguous pairs and persisted under seeded greedy inference. Measuring the judgment distribution
-exposed useful uncertainty that deterministic parity checks obscured.
+Seeded greedy prerequisite judgments still varied on genuinely ambiguous pairs. Recording their
+distribution exposed uncertainty that deterministic parity checks concealed.

@@ -131,7 +131,7 @@ export function createLearnerApp(sql: DatabaseClient, authSql: DatabaseClient) {
 
   const app = new Hono<AuthEnv>()
     .use("*", cors({
-      // One shared environment (ADR-0036): the same process may serve the Pages origin
+      // One shared environment (root README): the same process may serve the Pages origin
       // (prod, or a host-run dev process behind Caddy's dev-first upstream) and the local
       // Expo web server (8881). Echo back any allowed origin so both topologies work
       // without widening to "*", which a credentialed request forbids outright.

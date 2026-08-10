@@ -21,7 +21,7 @@ export type NeuralClients = {
   // across processes even at temperature 0 (MoE non-determinism), and the replayable
   // unit is the graph-version build, not the extraction run (ADR-0017).
   discoveryClient: LiteLlmForcedToolClient;
-  // Determinism lever (ADR-0018) applied where it is both effective and beneficial:
+  // Determinism lever applied where it is both effective and beneficial:
   // admission is the precision gate and, GIVEN a fixed candidate set, greedy decoding
   // collapses its core-set drift (probe: spread 3→1/4→0/1→0 across the three
   // fixtures); claims are per-subject and benefit from stable text. Not bit-exact on

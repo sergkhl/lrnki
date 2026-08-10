@@ -7,7 +7,7 @@ import {
 import type { OptionSelectItem, StudyItem } from "@lrnki/domain-core";
 import type { RecallChallengeEvent } from "@lrnki/ports";
 
-// Deterministic five-ward Leg Guardian for the native gate (ADR-0038; Ward Obelisk plan U4).
+// Deterministic five-ward Leg Guardian for the native gate documented in this rig's README.
 // The obelisk separates its ward states by fill, facet, gloss and contour weight rather than hue,
 // and Android draws those primitives through react-native-svg's native canvas rather than
 // Chromium's SVG — so the states have to be reachable on a real APK, not just in the web suite.

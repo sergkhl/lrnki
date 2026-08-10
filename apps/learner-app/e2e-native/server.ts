@@ -109,7 +109,7 @@ const server = createServer(async (req, res) => {
   // The long-Theory session is served for any expedition id the flow opens (the fixture models one).
   if (method === "GET" && pathname.startsWith("/expedition/")) return send(res, 200, EXPEDITION);
 
-  // --- Crystal Guardian (ADR-0038 / Ward Obelisk plan U4). The ONLY stateful part of this
+  // --- Crystal Guardian. The ONLY stateful part of this
   // fixture: a five-ward Leg challenge whose combat state is folded by the production pure
   // functions, so the native gate can reach entry, partial, miss, Last Stand, and Final Ward on a
   // real APK. See `guardianFixture.ts`. ------------------------------------------------------

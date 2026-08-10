@@ -14,11 +14,47 @@ Keep one canonical definition for every fact:
 - A linked ready/in-progress file in `docs/plans/` owns active implementation design and, in its
   `## Validation Log`, the validation record for its own implementation units.
 - `docs/plans/TODO.md` owns current work, grouped completed outcomes, and the latest validation for
-  work no plan owns, under the retention limits in [docs/plans/README.md](docs/plans/README.md).
+  work no plan owns.
 - `docs/plans/BLOCKERS.md` owns unresolved manual actions required from the user.
 
 Do not restate another document's content. Link to its canonical definition. Delete superseded
 definitions and repair their references in the same change.
+
+## Documentation workflow
+
+- `CONTEXT.md` is a glossary only. Keep each project-specific term to one or two sentences; put
+  behavior, data shape, implementation, and validation elsewhere.
+- Keep an ADR only for a decision that is hard to reverse, surprising without its context, and the
+  result of a real trade-off. Keep one decision per ADR, state current policy and rationale, and omit
+  implementation walkthroughs, rollout history, validation transcripts, and exact interfaces or
+  persisted shapes. Delete a fully superseded ADR and repair inbound links; never reuse its number.
+- A brainstorm may own accepted framing, requirements, and unresolved product decisions. Turn it
+  into a plan only after those decisions are resolved enough to implement.
+- Keep only ready or in-progress implementation plans. When a plan finishes, first move durable
+  decisions to ADRs, terminology to `CONTEXT.md`, workflow to this file, operational mechanics to the
+  owning README or skill, and current status to `TODO.md`; then delete the plan.
+- A plan's Validation Log keeps one consolidated entry per closed implementation unit and one `Open
+  findings` section. Record current evidence and invariants, not metric or suite-count trajectories.
+  Keep a Validation Log under about 200 lines and a plan under about 600 lines.
+- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep 3–7 current tasks, at most
+  eight grouped completed outcomes, and exactly one latest plan-less validation; keep the whole file
+  under about 150 lines. Conditional future ideas do not belong in `TODO.md`.
+- Never link retained documentation to gitignored `tmp/`. Git history archives deleted detail, but
+  any knowledge that must remain discoverable needs a live canonical owner before deletion. Preserve
+  an uncommitted plan or validation record in history before deleting it, and commit consolidation
+  separately from the detailed record it replaces.
+
+## Validation authority
+
+- Intercepted web, real-backend web, native emulator, deployed, and physical-device evidence each
+  prove only the layer they actually exercise; none substitutes for another.
+- A native scenario earns automatic authority for one regression class only after a behavior-only
+  negative control fails at the intended assertion and a user-recorded physical pass correlates it.
+  Current scenario claims and rig mechanics live in
+  `apps/learner-app/e2e-native/README.md`.
+- Agents may initiate emulator runs on a tooling-capable host. Physical-device runs remain
+  user-initiated; record a concrete unresolved user action in `docs/plans/BLOCKERS.md` rather than
+  claiming evidence that was not produced.
 
 ## Rules
 
@@ -56,6 +92,9 @@ definitions and repair their references in the same change.
 
 14. After every important behavior-changing milestone, apply
     `.agents/skills/real-use-quality-evaluation/SKILL.md`. A green suite is not quality evidence.
+    A model reassignment invalidates prior quality evidence for every affected consumer; re-run the
+    relevant gates or record them as unqualified. Every zero-row inspection assertion must carry a
+    positive control over the same rows in the same query.
     `DATABASE_URL` lives in the repo-root `.env`; the shell and test runner do not auto-load it, so
     `process.env.DATABASE_URL` reads empty until you do. Load it before DB-touching commands
     (`node --env-file=.env …`, `tsx --env-file=.env …`, or `set -a; . ./.env; set +a`). Never defer

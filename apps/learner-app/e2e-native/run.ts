@@ -26,7 +26,8 @@ const APK = process.env.NATIVE_APK ?? join(appRoot, "lrnki-learner-e2e.apk");
 // Read from the canonical Expo config rather than restated here, so the id this runner uninstalls
 // is by construction the one the APK installs as.
 const APP_ID = appConfig.android?.package ?? fail("app.config.ts does not define android.package.");
-// The whole flows directory: each file is one scenario with its own ADR-0038 claim, and mixing an
+// The whole flows directory: each file is one scenario with the claim documented in this rig's
+// README, and mixing an
 // unproven visual-evidence capture into the adopted-authority flow would blur what a green run
 // means. Maestro reports them as separate entries.
 const FLOWS = join(appRoot, ".maestro", "flows");

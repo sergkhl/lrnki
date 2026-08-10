@@ -233,14 +233,8 @@ model_list:
       max_input_tokens: 1048576
       max_output_tokens: 131072
 
-  # Registered for manual experiments only. Do not alias production learner-generation
-  # traffic here while the output price is above the $0.50/M cap.
-  # MEASURED 2026-08-08 on study-item-blueprint (16 nodes x 2 draws, reasoning off, identical
-  # inputs across arms): REJECTED. Lowest downstream yield of the three arms (11 of 16 matching
-  # items against v2.5's 12 and deepseek-v4-flash's 16), the ONLY arm to produce guard rejections,
-  # skipped impostor on 9 of 32 draws, and the worst latency tail (35s) — at ~4.8x
-  # deepseek-v4-flash's token price. It lost on every axis; do not re-test it on this stage
-  # without a reason that names something this run did not cover.
+  # Registered for manual experiments only. The current rejection evidence and model-evaluation
+  # question are owned by docs/brainstorms/2026-08-08-002-generation-model-evaluation.md.
   - model_name: "openrouter/xiaomi/mimo-v2.5-pro"
     litellm_params:
       model: "openrouter/xiaomi/mimo-v2.5-pro"
@@ -436,20 +430,8 @@ router_settings:
     default-model: openrouter/xiaomi/mimo-v2.5
     kg-concept-discovery: openrouter/xiaomi/mimo-v2.5
     kg-concept-admission: openrouter/xiaomi/mimo-v2.5
-    # study-item-blueprint resolves through this alias. MEASURED 2026-08-08, three arms over 16
-    # nodes x 2 draws with identical inputs and reasoning off, scored by DOWNSTREAM yield (each
-    # arm's facet replayed through the production matching generator + guard, generator held
-    # constant): mimo-v2.5 12 of 16 items, mimo-v2.5-pro 11, deepseek-v4-flash 16 with zero guard
-    # rejections, ~3x lower median latency and a far tighter tail. NOT switched, because the yield
-    # is partly bought: deepseek skipped 0 of 96 type-decisions, and hand inspection of the nodes
-    # v2.5 declined found off-node drift (an NADW board keyed to AABW), a label-cued board whose
-    # matches are just neighbour node names, and a FALSE match ("freshwater lowers density by
-    # expanding water molecules"). Matching carries no claim-truth verification by design
-    # (ADR-0026 D8), so that class lands where nothing catches it — a quiet failure replacing the
-    # loud guard rejection it removed. Re-decide once Matching Assignment Verification ships: if
-    # those extra items survive it, the coverage win is real; if it vetoes them, v2.5's skips were
-    # right. Facet verbosity is also off-spec (206 chars mean vs v2.5's 69, against a schema
-    # asking for a "short" facet) and rides into three downstream prompts per node.
+    # Production generation assignment. The unresolved DeepSeek comparison, its evidence gap, and
+    # scope options are owned by docs/brainstorms/2026-08-08-002-generation-model-evaluation.md.
     kg-claim-extraction: openrouter/xiaomi/mimo-v2.5
     # Synthetic topic generation, second pipeline arm (ADR-0019 amended, plan
     # 2026-06-30-001). Concept-set synthesis is the source-less analog of Candidate

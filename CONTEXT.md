@@ -1,16 +1,24 @@
-# Lrnki Greenfield Context
+# Lrnki Context
 
-Lrnki converts curated learning resources into one authoritative, learner-neutral graph of durable
-domain Concepts. Each published Concept carries source-grounded evidence. Prerequisite structure and
-learner-specific state remain outside the published asserted graph.
+Lrnki turns curated learning resources into an authoritative learner-neutral graph, derives
+prerequisite structure and study assets, and presents them as playable expeditions.
 
-This file owns project language. Architectural behavior belongs in the linked ADRs.
+This file is the project glossary. Architectural behavior belongs in ADRs; exact interfaces and
+persisted shapes belong in source.
 
-## Language
+## Curated knowledge
+
+**Curated Source**:
+A learning resource intentionally registered for processing in a Declared Domain.
+_Avoid_: corpus item, arbitrary document
+
+**Structured Document**:
+The normalized, source-located blocks produced from a Curated Source before extraction.
+_Avoid_: raw file, prompt text
 
 **Learner-Neutral Core Concept Graph**:
-The authoritative published graph of durable **Concepts**, independent of learner goals and mastery.
-Its asserted layer has no asserted edges.
+The authoritative published graph of durable Concepts and their source-grounded evidence, independent
+of learner goals, mastery, and inferred prerequisites.
 _Avoid_: neutral KG, fact graph, knowledge base
 
 **Concept**:
@@ -18,8 +26,8 @@ A durable unit of domain knowledge admitted from source evidence and assigned a 
 _Avoid_: node, entity, term, topic
 
 **Candidate**:
-A run-scoped possible Concept surfaced from one source. It is not part of a published graph.
-_Avoid_: concept before admission, keyword
+A run-scoped possible Concept surfaced from one Curated Source; it is not published knowledge.
+_Avoid_: Concept before admission, keyword
 
 **Candidate Discovery**:
 The recall-oriented stage that surfaces Candidates from a Structured Document.
@@ -27,51 +35,48 @@ _Avoid_: Concept Admission, keyword extraction
 
 **Core Concept Eligibility**:
 The evidence-backed judgment that an atomic Candidate is a standalone learning objective with
-established meaning in its Declared Domain and substantive organizing power.
+established meaning and substantive organizing power in its Declared Domain.
 _Avoid_: concept importance, prominence, mention frequency
 
 **Atomic Admission Proposal**:
-One atomic admission decision derived from a discovered Candidate. A Candidate may yield several
-proposals, each with its own source-grounded label and evidence.
+One atomic admission decision derived from a Candidate; a Candidate may yield several proposals.
 _Avoid_: conflated label, multi-concept candidate
 
 **Core Set Selection**:
-The source-level choice of a small, non-redundant set of eligible atomic proposals that preserves the
+The source-level choice of a small, non-redundant set of eligible proposals that preserves the
 source's principal learning structure.
 _Avoid_: top-k selection, fixed concept-count target
 
 **Concept Admission**:
-The precision-first stage that applies Core Concept Eligibility and Core Set Selection and classifies
-an atomic proposal as `core`, `optional`, `reject`, or `quarantine`.
+The precision-oriented stage that applies Core Concept Eligibility and Core Set Selection to atomic
+proposals before evidence-profile extraction.
 _Avoid_: filtering, ranking, scoring
 
 **Canonical Concept Label**:
-The precise, evidence-preserving, domain-qualified label assigned to an admitted Concept while
-retaining source labels as aliases.
+The precise, evidence-preserving, domain-qualified label assigned to an admitted Concept while source
+labels remain aliases.
 _Avoid_: display-name cleanup, free rewrite
 
 **Concept Evidence Profile (CEP)**:
-The published source context for one Concept: verified Definition Passages, salience-ordered Mention
-Passages, and optional guarded typed evidence. Every element retains source provenance. Its
-composition is defined by [ADR-0007](docs/adr/0007-extract-concept-evidence-profiles-in-concept-context.md).
+The published, provenance-preserving source context for one Concept, composed from verified Definition
+Passages, selected Mention Passages, and the one permitted Optional Typed Assertion.
 _Avoid_: claim, fact, triple, edge
 
 **Definition Passage**:
-A verbatim source passage that establishes a Concept's meaning. It need not use an “X is Y” form.
+A verbatim source passage that establishes a Concept's meaning.
 _Avoid_: copula whitelist, connective list
 
 **Mention Passage**:
-A verbatim source passage that substantively mentions a Concept. General relationships stated in
-prose remain untyped evidence.
+A verbatim source passage that substantively mentions a Concept without turning its prose into an
+authoritative relation.
 _Avoid_: claim, asserted relation
 
 **Optional Typed Assertion**:
-The guarded CEP evidence type `defines`, whose object is a literal definition. It remains evidence
-inside a CEP and never becomes an authoritative edge.
-_Avoid_: relation registry, asserted relation, edge
+The guarded `defines` evidence inside a CEP; it never becomes an authoritative graph edge.
+_Avoid_: relation registry, asserted relation
 
 **Declared Domain**:
-A human-assigned domain attached to a curated source and used to scope Concept identity.
+The human-assigned identity scope of a Curated Source.
 _Avoid_: topic, category, subject area
 
 **Concept IRI**:
@@ -79,14 +84,21 @@ The stable readable identifier minted for a Concept at first publication and ret
 versions.
 _Avoid_: recomputable label-derived ID
 
+**Quarantine**:
+An unresolved identity or meaning conflict within one identity scope that blocks publication; a
+cross-domain homograph is only flagged for inspection.
+_Avoid_: every duplicate label, cross-domain homograph
+
+## Publication and derivation
+
 **Extraction Run**:
-One source processed by one pipeline configuration into run-scoped Candidates, admission decisions,
-and CEPs. It never publishes.
+One Curated Source processed by one pipeline configuration into run-scoped Candidates, admission
+decisions, and CEPs; it never publishes.
 _Avoid_: build, publication, claim extraction
 
 **Graph-Version Build**:
 The deterministic assembly and atomic publication of an asserted graph version from an explicit base
-version and explicitly selected Extraction Runs.
+version and selected Extraction Runs.
 _Avoid_: extraction, enrichment
 
 **Static Graph Refinement**:
@@ -96,247 +108,121 @@ _Avoid_: Graph Enrichment, inference
 
 **Concept Canonicalization**:
 The domain-scoped process that decides whether source Candidates represent one Concept.
-_Avoid_: raw-cosine auto-merge, embedding-derived prerequisites
+_Avoid_: raw-cosine auto-merge, prerequisite derivation
 
 **Graph Enrichment**:
-The operation that derives learner-neutral nodes, prerequisite edges, and supporting projections from
-one published graph version. Its ownership and lifecycle are defined by
-[ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
-_Avoid_: graph mutation, Static Graph Refinement
+The operation that derives learner-neutral nodes, inferred prerequisite edges, and supporting
+projections from a published graph version.
+_Avoid_: asserted graph mutation, Static Graph Refinement
 
 **Enrichment Run**:
 One immutable execution of Graph Enrichment against one published graph version and configuration.
 _Avoid_: Derived Graph Layer
 
-**Processing Journey**:
-A read-only lineage scope anchored on one Enrichment Run: its direct member Extraction Runs, the
-Graph-Version Build, Graph Enrichment, and Study Item Bank generation. It is an inspection scope, not
-a durable pipeline identity or orchestration boundary.
-_Avoid_: pipeline run, workflow instance, journey entity
-
 **Derived Graph Layer**:
-The immutable inferred prerequisite graph generated by an Enrichment Run and stored separately from
-the asserted graph version.
-_Avoid_: asserted graph mutation, embedding sidecar, asserted edge
+An immutable inferred prerequisite graph produced downstream of asserted knowledge and stored
+separately from the published graph.
+_Avoid_: asserted graph mutation, asserted edge
 
 **Grounding Origin**:
-The provenance category carried by every graph node: `document_anchored`, `source_mentioned`, or
-`llm_grounded`; `web_grounded` is reserved.
-_Avoid_: trust score, confidence, separate layer flag
+The provenance category explaining whether a graph node is anchored in a document, mentioned by a
+source, generated by a model, or grounded through a future retrieval path.
+_Avoid_: trust score, confidence score
 
 **Enrichment Node**:
-A `source_mentioned` or `llm_grounded` node introduced by Graph Enrichment. It is always derived and
-never published asserted.
-_Avoid_: published concept, asserted node, anchor
+A source-mentioned or model-grounded node introduced by Graph Enrichment and never published as
+asserted knowledge.
+_Avoid_: published Concept, anchor
 
 **Generated Grounding Bundle**:
-The CEP-shaped, source-quoteless grounding generated for an `llm_grounded` Enrichment Node.
-_Avoid_: verbatim evidence, source quote, Concept Evidence Profile
+Source-quoteless grounding generated for a model-grounded Enrichment Node and labeled as generated.
+_Avoid_: verbatim evidence, source quote, CEP
 
 **Synthetic Topic Generation**:
-The second derived-fact-producing operation. From a `topic` plus a Declared Domain it generates a
-free-standing, **anchor-less** Derived Graph Layer of `synthetic_primary` nodes, gated per concept
-by the Knowledge-Boundary Probe. Its lifecycle and asserted-graph boundaries are owned by
-[ADR-0019](docs/adr/0019-graph-enrichment-derived-layer.md).
-_Avoid_: synthetic Grounding Origin, asserted synthetic concept, curated-source treatment of generated text
-
-**Topic Expedition**:
-A learner-owned expedition created from a requested topic, backed when ready by one Synthetic Topic
-Generation Derived Graph Layer and its Study Item Bank.
-_Avoid_: Learner Expedition, synthetic pipeline, source-grounded expedition
+The source-less operation that creates an anchor-less Derived Graph Layer for a requested topic in a
+Declared Domain.
+_Avoid_: asserted synthetic graph, curated-source extraction
 
 **Synthetic Concept**:
-A `synthetic_primary` `llm_grounded` Enrichment Node — a first-class topic concept produced by
-Synthetic Topic Generation and grounded by a Generated Grounding Bundle that cites no source. Its
-provenance is owned by [ADR-0023](docs/adr/0023-grounding-origin-model-and-cross-family-generated-node-judge.md).
-_Avoid_: minted prerequisite, `source_mentioned`, published concept
+A model-grounded primary node created by Synthetic Topic Generation.
+_Avoid_: asserted Concept, source-mentioned node
 
 **Knowledge-Boundary Probe**:
-The per-concept gate for source-less synthesis that classifies a concept as `core_knowledge`
-(synthesize) or `boundary` (an `uncertain` disposition, retained and inspectable but held out of
-trusted learner surfaces). Probe mechanism and rationale are owned by
-[ADR-0030](docs/adr/0030-confidence-gated-synthesis.md).
-_Avoid_: verbalized confidence, lexical overlap, new judge
+The selective-synthesis check that distinguishes concepts suitable for parametric generation from
+concepts that must remain outside trusted learner surfaces.
+_Avoid_: verbalized confidence, lexical overlap
 
-**Study Session**:
-A learner-stateful projection over one whole Derived Graph Layer that gates each derived node into
-locked / frontier / mastered and carries its study payload. It is layer-wide, not goal-scoped: the
-trail covers every non-floored node as one continuous **Expedition Trail** broken into milestone-
-anchored **Expedition Sections**, and the summit is derived at read time (the last section's
-milestone), never a persisted target. Composed behind an application use-case, not the UI. A node's
-study surface is an ordered linear segment sequence — its **Concept Lesson** (theory), then each
-Study Item Bank type in canonical order (option-select, matching, then impostor). A node is mastered
-by a **completion rule**: its lesson (if any) is read AND every activity segment is latest-correct
-(a calibration `known` verdict masters instantly); one correct answer never completes a multi-segment
-node. This one rule drives gating, the capstone gem, and per-stop visuals.
-_Avoid_: study screen, quiz session, item picker, goal-scoped cone, chosen target
+**Processing Journey**:
+A read-only inspection scope joining one Enrichment Run to its contributing extraction, publication,
+enrichment, and study-asset operations; it is not an orchestration identity.
+_Avoid_: pipeline run, workflow instance, journey entity
 
-**Expedition Section**:
-A milestone-anchored contiguous stretch of the Expedition Trail. A section anchors on a terminal
-concept (no dependents on the trusted contracted edge set) and claims all its not-yet-claimed
-trusted ancestors, so every prerequisite lands in the earliest section needing it. Sections are
-ordered easiest-first (ascending mean difficulty); their concatenation is a topological order of the
-whole floored layer. Sections are then a **boundary partition** over that fixed order: derivation
-splits a section at its sub-terminal milestones when it holds more Study-Item-carrying concepts than
-a Leg Guardian has wards, and merges a section carrying no Study Item into its neighbour, the later
-milestone winning. Both edits only insert or delete a boundary — the concatenated stop order, the
-summit, and trail membership are identical before and after — so a Leg is always winnable and always
-ends on a recognizable milestone. Sections are derived during generation, never persisted.
-_Avoid_: quest, goal cone, chapter, persisted section
+## Learner experience
 
-**Expedition Journal**:
-The Learner App's entry projection: one application use-case composes expedition candidates, the
-learner's owned expeditions with study progress and layer purpose, and topic-generation progress
-into finished tiers — started, yours, and shared — plus a separate full browse catalog. Composition
-never lives in HTTP adapters or UI code; consuming surfaces apply themed vocabulary only.
-_Avoid_: route-stitched journal payload, client-side stage math, raw persistence rows on the wire
+**Topic Expedition**:
+A learner-owned expedition created from a requested topic and backed, when ready, by a Synthetic Topic
+Generation layer and its study assets.
+_Avoid_: source-grounded expedition, synthetic pipeline
 
 **Learner App**:
-The downstream learner-facing application that turns Derived Graph Layers and Learner State into
-playable study experiences. Its game UX policy is defined by
-[ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md).
-_Avoid_: Learner Application, Admin Lab study screen, neutral asset generator
+The learner-facing application that turns Derived Graph Layers and Learner State into playable study
+experiences.
+_Avoid_: Admin Lab study screen, neutral asset generator
+
+**Learner State**:
+Learner-specific calibration, graded outcomes, and progress kept outside learner-neutral graph and
+study assets.
+_Avoid_: graph confidence, neutral metadata
 
 **Flow Channel**:
 A learner-specific band of clear, just-hard-enough challenges paced through tension and release.
 _Avoid_: static difficulty target, engagement score
 
-**Learner State**:
-A learner-specific account of calibration and graded outcomes consumed by projection and never stored
-in the learner-neutral graph. Calibration is a mutable per-derived-node verdict set; graded outcomes
-come from server-graded study responses (option-select, matching, and impostor).
+**Study Session**:
+The learner-stateful projection of one whole Derived Graph Layer into a playable trail of gated
+lessons and activities.
+_Avoid_: study screen, quiz session, item picker
+
+**Expedition Section**:
+A milestone-anchored contiguous part of an expedition trail used to pace progress and scope a Leg
+Recall Challenge.
+_Avoid_: chapter, persisted section
+
+**Expedition Journal**:
+The Learner App's entry projection over available and learner-owned expeditions, their progress, and
+generation state.
+_Avoid_: route-stitched payload, raw persistence rows
 
 **Study Item Bank**:
-A learner-neutral study-asset set generated alongside one Derived Graph Layer and keyed to
-`derived_node_id`; it contains option-select, matching, and impostor items when the per-node
-blueprint admits them. Item typing and learner-response identity are defined by
-[ADR-0026](docs/adr/0026-typed-study-item-bank.md).
-_Avoid_: Card, Card Bank, concept-only items, asserted graph mutation, self-report prompt
-
-**Study Item Key Verification**:
-The generation-time check that a Study Item's answer key is *true and unique*. One cross-family
-judgment classifies *every* candidate answer of an option-select or impostor item as true, false, or
-unclear for its concept, and a deterministic uniqueness rule admits the item only when the key stands
-alone. Matching is outside it and has its own check — see **Matching Assignment Verification**.
-Rules, the unavailability asymmetry, and the citation resolution ladder it interlocks with are
-defined by [ADR-0026](docs/adr/0026-typed-study-item-bank.md).
-_Avoid_: lie-validity judge, fact check, grading, passage entailment, distractor quality review
-
-**Matching Assignment Verification**:
-The generation-time check that a matching item's board is *assignable*: exactly one defensible match
-per prompt. One cross-family judgment classifies every (prompt, match) cell of the N×N grid as fits,
-does not fit, or unclear, and a deterministic rule admits the item only when no unkeyed cell fits and
-no keyed cell does not. It asks about **fit**, not claim truth — a tautological or interchangeable
-pair is individually true — which is why it is a separate check from **Study Item Key Verification**
-rather than a third case of it. The rule, the key-hiding presentation, and the pass-through on an
-unreachable judge are defined by [ADR-0026](docs/adr/0026-typed-study-item-bank.md).
-_Avoid_: matching key verification, claim check, answer-key uniqueness, grading, board shuffling
+A learner-neutral set of typed graded activities generated for the nodes of one Derived Graph Layer.
+_Avoid_: Card Bank, asserted graph mutation, self-report prompt
 
 **Concept Lesson**:
-A learner-neutral teaching substrate keyed to `derived_node_id` and generated alongside the Study
-Item Bank. It teaches a concept before it is tested; structure and grounding are defined by
-[ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md). Reading it is non-graded.
-_Avoid_: course, study screen, quiz, graded card, asserted graph mutation
+A learner-neutral teaching artifact for one derived node that explains the concept before its Study
+Item Bank activities test it.
+_Avoid_: course, quiz, personalized hint
 
 **Recall Challenge**:
-A durable, scope-shaped retrieval challenge over an Expedition Section (a **Leg**) or the whole Topic
-Expedition (the **summit**). Its lineup is a snapshot of only that scope's current neutral Study Item
-Bank items whose latest acquisition grade is correct — coverage-first, milestone/summit concept first,
-five-per-Leg / seven-per-Expedition maxima; a scope with no eligible item is unavailable, not
-auto-rewarded. Grading is server-owned and shares the Study Item response semantics but its evidence
-is written only to the challenge's own durable tables: challenge answers never enter the neutral
-acquisition `response_log`, Concept Mastery, learning points, or prerequisite gating (a miss cannot
-unmaster, a recovery cannot master). The Expedition (summit) scope stays locked until every
-**winnable** Leg is won — winnable meaning the Leg carries at least one current Study Item, so its
-scope can ever produce a lineup. With no winnable Leg the summit is unavailable rather than locked,
-so the gate is never an unsatisfiable precondition. The first victory is the sole, permanent reward for a scope (a Leg **crystal formation**, or the
-summit **keystone** binding the formations); rematches rotate coverage but never dim, revoke,
-duplicate, or re-award it. Its learner-facing presentation is the **Crystal Guardian** (Leg) and
-**Expedition Guardian** (summit) duel — wards, a recoverable crystal shield, and Last Stand — a
-corrective, never punitive metaphor rendered through the Learner App vocabulary
-([ADR-0033](docs/adr/0033-plain-identifiers-single-themed-vocabulary-mapping.md)); why this mechanic
-is admissible game UX rather than a parallel objective is owned by
-[ADR-0032](docs/adr/0032-keep-learner-app-in-flow-through-mastery-aligned-game-ux.md). Support Steps
-and other non-neutral evidence are excluded from lineups.
-_Avoid_: Crystal Duel, retrieval sprint over all items, weakness-first selection, correctness timer,
-mastery-affecting challenge, boss-only generated content
+A durable retrieval challenge over one Expedition Section or whole Topic Expedition whose evidence
+and rewards remain separate from acquisition mastery.
+_Avoid_: mastery-affecting challenge, correctness timer
+
+## Learner-scoped support
 
 **Learner-Scoped Scaffold**:
-Learner/session-scoped generated support content that restores a Learner App's Flow Channel without
-becoming neutral graph or Study Item Bank content. Its durable, learner-requested realization is the
-**Scaffold Detour** of **Support Steps** below: a one-level, optional branch that records only
-learner-scoped evidence (or, for a reference Support Step, normal neutral evidence for the existing
-node) and never feeds neutral mastery, prerequisite gating, or rewards. Durable persistence,
-exact-reuse-as-reference, and the discriminated neutral-or-scaffold response identity are owned by
-[ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
-_Avoid_: generated prerequisite, personalized Concept Lesson, Study Item Bank item
+Generated support for one learner that restores flow without becoming neutral graph or Study Item
+Bank content.
+_Avoid_: generated prerequisite, personalized Concept Lesson
 
 **Scaffold Detour**:
-A durable learner-owned support branch under one parent node of a Derived Graph Layer, identified by
-learner, enrichment, parent node, and normalized term. It holds one to three ordered Support Steps
-and never feeds neutral mastery, prerequisite gating, or rewards; its lifecycle states and atomic
-publication are owned by [ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md).
-_Avoid_: sub-expedition, generated prerequisite edge, second trail
+A durable optional support branch owned by one learner beneath a parent derived node.
+_Avoid_: sub-expedition, second trail
 
 **Support Step**:
-One ordered element of a Scaffold Detour: either a reference that pins an existing node's concrete
-neutral Concept Lesson and option-select identities in the parent's own layer and Declared Domain
-without copying their payloads, or a generated learner-scoped node carrying a citation-free
-micro-lesson and one option-select item. Reference steps record normal neutral evidence; generated
-steps record learner-scoped evidence that never enters neutral mastery.
-_Avoid_: cloned concept, Study Item Bank item, locked stop
+One ordered element of a Scaffold Detour, either referencing existing neutral study assets or carrying
+generated learner-scoped teaching content.
+_Avoid_: cloned Concept, neutral Study Item
 
 **Explorable Term**:
-Generation-time metadata on a Concept Lesson section or Study Item question: a specialized word or
-short phrase, verified as an exact substring of the final rendered text, that a learner may turn
-into a Scaffold Detour. At most five per lesson and per question; zero terms render no affordance.
-Discovered in place: theory prose cues each term's first occurrence and a compact Support Paths
-panel lists the terms still available, both opening one state-aware dialog
-([ADR-0037](docs/adr/0037-persist-learner-scoped-scaffold-detours.md)).
-_Avoid_: keyword, Candidate
-
-**Grounding Provenance**:
-The citation/provenance language shared by learner-facing study assets. Source-grounded content cites
-source evidence; generated content is labeled generated. Its study-asset contracts are owned by
-[ADR-0026](docs/adr/0026-typed-study-item-bank.md) and
-[ADR-0031](docs/adr/0031-concept-lesson-teaching-substrate.md).
-_Avoid_: fake source citation, unlabeled generated quote
-
-**Neural Stage Descriptor**:
-The single home for one forced-tool LLM stage's knowledge: a dotprompt `.prompt` file owning the
-model alias, tool name, tool description, and prompt templates, plus a typed rim (zod schema,
-stage tag, result mapping) executed by one generic forced-tool executor. Per-operation
-configuration hashes derive mechanically from descriptor content; the descriptor split and hash
-mechanics are owned by [ADR-0034](docs/adr/0034-neural-stage-descriptors-dotprompt-config-hashes.md).
-_Avoid_: adapter class per stage, hand-bumped config hash, prompt string in code
-
-**Inspection Read Model**:
-A finished read-only projection of persisted state returned by an inspection port. It is distinct
-from a learner-facing projection, which combines reads with adaptation compute behind an application
-use-case.
-_Avoid_: raw UI query, JSON_TABLE in the app, learner projection
-
-## Flagged Ambiguities
-
-- Use **Static Graph Refinement** for asserted graph assembly and **Graph Enrichment** for inferred
-  structure.
-- “Prerequisite” belongs to the Derived Graph Layer. Source prerequisite prose remains CEP evidence.
-- “Quarantine” is an unresolved identity or meaning conflict that blocks publication. A cross-domain
-  homograph is flagged, not quarantined.
-- A **Processing Journey** groups existing operations for inspection; it does not merge their
-  ownership or lifecycle.
-
-## Example Dialogue
-
-> **Dev:** Discovery found “PageRank.” Is it already a Concept?
-> **Expert:** No. It is a Candidate until Concept Admission selects it.
->
-> **Dev:** The source says ranking builds on eigenvector centrality. Is that a published edge?
-> **Expert:** No. It remains CEP evidence. Graph Enrichment may derive a prerequisite edge separately.
->
-> **Dev:** Two domains contain a Concept labeled “Mercury.” Must publication stop?
-> **Expert:** No. Declared Domain keeps their identities separate; flag the homograph for inspection.
->
-> **Dev:** Can the Learner App generate a personalized hint and add it to the Study Item Bank?
-> **Expert:** No. That is a Learner-Scoped Scaffold: useful for one learner's Flow Channel, but not
-> a neutral study asset.
+A specialized phrase in learner-facing study text that can open a Scaffold Detour.
+_Avoid_: Candidate, extraction keyword

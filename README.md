@@ -94,8 +94,8 @@ real API request, and touches no database:
 pnpm e2e:web:deployed
 ```
 
-Two heavier suites are **opt-in** and not part of `pnpm check`
-([ADR-0038](docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md)):
+Two heavier suites are **opt-in** and not part of `pnpm check`; the evidence boundaries are defined
+in [AGENTS.md](AGENTS.md#validation-authority):
 
 ```bash
 pnpm e2e:web:realuse    # real supervisor-free API over Postgres, no generation
@@ -107,9 +107,8 @@ selects one by capability, never generates, and cleans up its disposable learner
 failure. See [apps/learner-app/e2e-realuse/README.md](apps/learner-app/e2e-realuse/README.md).
 
 The native gate drives a standalone e2e-profile APK on a booted Android emulator with Maestro.
-What a green run does and does not prove is owned by
-[ADR-0038](docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md); prerequisites and
-setup are in [apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
+Its current scenario claims, prerequisites, and setup are in
+[apps/learner-app/e2e-native/README.md](apps/learner-app/e2e-native/README.md).
 
 ## Database schema
 
@@ -154,10 +153,9 @@ Both hostnames are stable and hardcoded in the single file that consumes each (w
 `EXPO_PUBLIC_LEARNER_API_URL`, the `apps/learner-api/src/app.ts` CORS default,
 `scripts/docker/caddy/Caddyfile`).
 
-There is one shared learner environment during testing
-([ADR-0036](docs/adr/0036-run-single-shared-learner-environment-during-testing.md)), so
-`pnpm --filter @lrnki/learner-app start` needs no configuration. `EXPO_PUBLIC_LEARNER_API_URL` is
-the single opt-in override for pointing the app at some other API.
+There is one shared learner environment during testing, so `pnpm --filter @lrnki/learner-app start`
+needs no configuration. `EXPO_PUBLIC_LEARNER_API_URL` is the single opt-in override for pointing the
+app at some other API.
 
 **Containers.** Plain `docker compose` runs `lrnki-postgres` (5433), `lrnki-litellm` (4000),
 `lrnki-docling` (5001), `lrnki-caddy` (80/443), and `lrnki-learner-api`, which carries the generation

@@ -1,14 +1,7 @@
 # Architecture Decision Records
 
 ADRs are the canonical source for current durable architectural decisions and rationale.
-
-- Keep one decision per ADR.
-- State current policy, boundaries, and consequences; omit implementation walkthroughs, rollout
-  progress, plan-unit references, branch names, and validation transcripts.
-- Link to another ADR instead of restating its decision.
-- Delete a fully superseded ADR and repair inbound references. ADR numbers are never reused.
-- Source types remain authoritative for exact interfaces, and the internal Drizzle schema for exact
-  persisted shapes ([0039](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)).
+Creation, scope, and retirement rules live in [AGENTS.md](../../AGENTS.md#documentation-workflow).
 
 ## Current decisions
 
@@ -27,7 +20,6 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0015 — Cross-source Concept identity](./0015-deterministic-cross-source-identity.md)
 - [0016 — CEP typed evidence vocabulary](./0016-retire-relation-registry-keep-one-cep-assertion.md)
 - [0017 — Extraction Runs and Graph-Version Builds](./0017-split-extraction-runs-from-graph-version-builds.md)
-- [0018 — Extraction-stage sampling policy](./0018-deterministic-extraction-sampling.md)
 - [0019 — Derived Graph Layer ownership](./0019-graph-enrichment-derived-layer.md)
 - [0023 — Grounding-origin model](./0023-grounding-origin-model-and-cross-family-generated-node-judge.md)
 - [0024 — Learner-neutral intrinsic difficulty](./0024-learner-neutral-intrinsic-difficulty.md)
@@ -41,9 +33,7 @@ ADRs are the canonical source for current durable architectural decisions and ra
 - [0033 — Plain identifiers with themed learner vocabulary](./0033-plain-identifiers-single-themed-vocabulary-mapping.md)
 - [0034 — Neural learner-facing stage descriptors](./0034-neural-stage-descriptors-dotprompt-config-hashes.md)
 - [0035 — Separate Learner App: universal Expo app over a typed learner API](./0035-separate-learner-app-static-spa-typed-api.md)
-- [0036 — Single shared learner environment during testing](./0036-run-single-shared-learner-environment-during-testing.md)
 - [0037 — Persist learner-scoped Scaffold Detours outside the neutral graph](./0037-persist-learner-scoped-scaffold-detours.md)
-- [0038 — Native interaction gate scope and physical-device authority](./0038-native-interaction-gate-scope-and-physical-authority.md)
 - [0039 — Code-first Drizzle persisted-shape authority](./0039-own-persisted-shape-in-code-first-drizzle-schema.md)
 - [0040 — Serve the public API only from the deployed container](./0040-serve-public-api-only-from-the-deployed-container.md)
 - [0041 — Learner identity and sessions via self-hosted Better Auth](./0041-own-learner-identity-with-self-hosted-better-auth.md)

@@ -5,7 +5,7 @@ import { createAuthClient } from "better-auth/client";
 import { inferAdditionalFields } from "better-auth/client/plugins";
 import type { LearnerAuth } from "@lrnki/learner-api/client";
 
-// Single working environment during testing (ADR-0036): the app defaults to the deployed
+// The shared-environment default documented in the root README points the app at the deployed
 // learner-api. Set EXPO_PUBLIC_LEARNER_API_URL to point at a local API instead. It lives HERE
 // rather than beside the RPC client because the dependency has to point one way: `api.ts`
 // needs this module for the session transport, so this module can import nothing from it.

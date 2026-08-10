@@ -1,8 +1,8 @@
 # Native Android Maestro gate (opt-in)
 
-The **native interaction gate**
-([ADR-0038](../../../docs/adr/0038-native-interaction-gate-scope-and-physical-authority.md)). It
-drives the **real standalone e2e-profile APK** on an Android emulator with
+This file owns the native gate's current scenario claims and mechanics; general evidence authority
+lives in [AGENTS.md](../../../AGENTS.md#validation-authority). The gate drives the **real standalone
+e2e-profile APK** on an Android emulator with
 [Maestro](https://maestro.dev), against a **deterministic loopback fixture** — real React Native
 primitives, real Yoga layout, real gesture dispatch; only the upstream data service is mocked.
 
@@ -18,7 +18,7 @@ primitives, real Yoga layout, real gesture dispatch; only the upstream data serv
    before it actually is at that width, so the following `tapOn` lands on the Theory footer
    `Continue` and advances to the Question activity, whose own panel has no dialog open. A flow that
    can tap the wrong control is a flow that could also pass for the wrong reason, so this wants a
-   fix — but changing an adopted-authority flow means re-running its negative control (ADR-0038).
+   fix — but changing an adopted-authority flow means re-running its negative control.
 2. **Theory scroll — NAVIGATION only.** The real device swipe reaches the Support Paths panel to open
    the dialog, but the touch-responder regression (commit `ddc0ec9`) is only intermittently
    reproducible on the emulator, so that class stays **physically owned** and is not narrowed here.
