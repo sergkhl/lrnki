@@ -12,10 +12,16 @@
 
 - **Repair the 320 dp native Support Path flow — U2 sensitivity remains.** The
   [implementation plan](./2026-08-10-001-repair-320dp-native-support-path-flow.md) records the closed
-  exact-action repair, fresh current-APK 320 dp positives, and normal-width smoke. Resume with the
-  isolated historic dialog-collapse mutant: require three failures in the dialog reachability block,
-  then reinstall the current APK and complete its final 320 dp restoration pass before retaining or
-  withdrawing automatic authority.
+  exact-action repair plus two final one-tap-flow 320 dp positives and a normal-width full-suite
+  pass. Resume with the isolated historic dialog-collapse mutant: require three failures in the
+  dialog reachability block, then reinstall the fresh current APK and complete its final 320 dp
+  restoration pass before retaining or withdrawing automatic authority.
+
+- **One-tap native e2e sign-in — U4 sensitivity and consolidation remain.** The
+  [implementation plan](./2026-08-10-002-one-tap-e2e-signin-gate.md) records closed U1-U3, the
+  implemented Support Path swap, fresh APK evidence, and the manual refusal/success flow. Its U4
+  closes only with the Support Path mutant/restoration gate above; then consolidate and retire both
+  plans together.
 
 ## COMPLETED
 

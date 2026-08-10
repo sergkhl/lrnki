@@ -3,12 +3,12 @@ import type { ExpoConfig } from "expo/config";
 // Canonical dynamic Expo config (plan 2026-07-15-001 U5, R24). It reproduces every value the
 // former static `app.json` carried, and adds ONE build-profile-controlled seam: Android cleartext
 // HTTP. Android 9+ blocks cleartext by default, but the disposable e2e APK must reach the loopback
-// fixture at `http://10.0.2.2:<port>`. `LRNKI_E2E_BUILD` is set per EAS build profile — `1` ONLY in
+// fixture at `http://10.0.2.2:<port>`. `EXPO_PUBLIC_LRNKI_E2E_BUILD` is set per EAS build profile — `1` ONLY in
 // the `e2e` profile, `0` in development/preview/production. Config resolution maps `1` → cleartext
 // permitted and EVERYTHING else → the secure default (`false`), so preview/production-capable
 // builds never ship cleartext. The e2e artifact is never distributed or uploaded as a release.
 
-const isE2eBuild = process.env.LRNKI_E2E_BUILD === "1";
+const isE2eBuild = process.env.EXPO_PUBLIC_LRNKI_E2E_BUILD === "1";
 
 const config: ExpoConfig = {
   name: "lrnki",

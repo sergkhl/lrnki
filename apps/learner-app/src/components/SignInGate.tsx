@@ -4,6 +4,7 @@ import { Compass, LogIn, UserPlus } from "lucide-react-native";
 import { consumeOAuthError, signInWithEmail, signInWithGoogle, signUpWithEmail, type SessionError } from "@/lib/session";
 import { Button, Card, Input, PressableSurface, Text, buttonIconColor } from "@/ui";
 import { learnerTerm } from "@/learn/vocabulary";
+import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD, isE2eBuild } from "@/lib/e2eFixture";
 
 // Map a refusal to its themed copy (ADR-0033 keeps copy in the UI).
 export function sessionErrorMessage(error: SessionError): string {
@@ -74,6 +75,21 @@ export function SignInGate() {
         <View accessibilityLiveRegion="polite" className="rounded-card border border-destructive bg-card px-3 py-2">
           <Text variant="label" color="destructive">{sessionErrorMessage(error)}</Text>
         </View>
+      ) : null}
+      {isE2eBuild() ? (
+        <Button
+          testID="gate-e2e-signin"
+          disabled={pending !== null && pending !== "enter"}
+          busy={pending === "enter"}
+          onPress={() =>
+            run("enter", () =>
+              signInWithEmail({ email: E2E_FIXTURE_EMAIL, password: E2E_FIXTURE_PASSWORD })
+            )
+          }
+          icon={<Compass size={16} color={buttonIconColor("secondary")} />}
+          label="E2E sign-in"
+          variant="secondary"
+        />
       ) : null}
       <Button
         testID="gate-google"

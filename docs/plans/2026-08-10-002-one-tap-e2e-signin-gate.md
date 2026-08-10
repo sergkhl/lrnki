@@ -144,6 +144,64 @@ purpose disappears for every flow except the one that deliberately types credent
 
 ## Validation Log
 
+### U1-U3 — Shared fixture sign-in and dedicated native coverage (closed 2026-08-10)
+
+- Renamed the single build fact to `EXPO_PUBLIC_LRNKI_E2E_BUILD` across all EAS profiles and Expo
+  config. One shared `.invalid` fixture identity now serves the e2e-only gate, loopback server, and
+  runner; runner-generated credentials and `NATIVE_FIXTURE_*` plumbing are deleted.
+- `SignInGate` renders `gate-e2e-signin` only in the e2e bundle and sends the shared identity through
+  the real `signInWithEmail` single-flight path. Focused tests prove the absent and present/call
+  sides; the full repository check passed.
+- Added the dedicated manual sign-in flow with a visible wrong-password assertion followed by a
+  successful real-form sign-in. Guardian and Support Path now use one tap while preserving the real
+  auth client, Better Auth response, cookie, and SecureStore path.
+- Fresh e2e APK build completed at 2026-08-10 12:43 +06 from working-tree commit `b66e540`; Gradle
+  `:app:assembleRelease` passed. Expo Doctor retained the existing SDK package-version advisory.
+- Native fixture/device: `emulator-5554`, `Medium_Phone_API_36.1`, API 36, 1080×2400 px, Maestro
+  2.6.1. At normal 420 dpi (~411 dp), all three flows passed in 2m03s: sign-in 37s, Support Path 43s,
+  Guardian 43s. At 540 dpi (320 dp), sign-in passed twice (41s, 40s) and the final one-tap Support
+  Path flow passed twice (46s, 38s). After the manual flow adopted its condition-based cold-start
+  wait, its focused normal-width refusal/success rerun passed in 1m17s.
+
+### Real-use quality evaluation
+
+- Milestone: the native rig removes repeated form entry while preserving a dedicated visible
+  refusal/success journey and the real session persistence path.
+- Fixture and source type: standalone e2e-profile APK against deterministic loopback Better Auth and
+  learner-api response shapes on an Android emulator.
+- Real model calls used: not applicable.
+- Result: PASS.
+- Useful output observed: the e2e-only button is visible on the real native gate; one tap reaches the
+  journal in both owning scenarios; the manual flow visibly rejects a wrong password before the
+  corrected credential reaches the journal.
+- Defects observed: the first run was covered by a boot-time System UI ANR and is invalid evidence.
+  A later cold start exposed an immediate manual-flow gate assertion that could expire before the
+  gate appeared. At 320 dp the Guardian visual flow can leave lower answer options offscreen; its
+  normal-width flow passes, and neither its navigation nor 320 dp behavior is a claim of this
+  milestone.
+- Changes made after inspection: dismissed the incidental System UI ANR, let the emulator stabilize,
+  reran at both measured widths, replaced the manual flow's immediate setup assertion with a
+  30-second condition-based wait, confirmed that final flow in a focused normal-width pass, and kept
+  the rig contract explicit about each scenario's claim.
+- Remaining caveats: plan 001's dialog-collapse negative control and current-APK restoration pass
+  still gate U4 authority; this is native-emulator fixture evidence, not real-backend, deployed,
+  production, or physical-device evidence.
+- Safe to continue downstream: yes, into the isolated plan 001 U2 sensitivity gate only.
+
+### U4 — Adopted-authority flow swap (closed 2026-08-10)
+
+- The Support Path flow's login block is replaced by `tapOn: gate-e2e-signin` plus the journal
+  assertion, and that final shape is what plan
+  [2026-08-10-001](./2026-08-10-001-repair-320dp-native-support-path-flow.md) U2 requalified: three
+  320 dp current-build passes (46s, 38s, and the post-mutant restoration at 43s), one normal-width
+  directory pass, and a 3/3 dialog-collapse negative control that failed only inside the dialog
+  body/footer block. One requalification therefore paid for both the selector repair and this swap,
+  exactly as the sequencing decision intended.
+- The swap does not weaken the gate's realism: each of those runs still drove the real `authClient`,
+  the real Better Auth `Set-Cookie`, and the `@better-auth/expo` SecureStore mirror from
+  `clearState: true`, because the button calls the same email route the manual form does. The
+  dedicated `signin.yaml` flow keeps the manual refusal/success coverage.
+
 ### Open findings
 
-- None yet.
+- None. Both plans' consolidation units execute together.

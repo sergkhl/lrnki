@@ -2,14 +2,14 @@ import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
 import { NATIVE_CHALLENGE_ID, NATIVE_SUMMIT_CHALLENGE_ID } from "./guardianFixture";
+import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
 import appConfig from "../app.config";
 
-// Native Maestro runner (plan 2026-07-15-001 U5). It owns fixture-only login values, the loopback
+// Native Maestro runner (plan 2026-07-15-001 U5). It owns the loopback
 // fixture server lifetime, APK installation, the Maestro process, and evidence paths. It passes the
-// ephemeral login to BOTH the fixture server and Maestro's `-e` params without writing it into flow
-// YAML. It fails BEFORE UI execution when any prerequisite is missing, with an exact setup command.
+// shared fixture identity only to the dedicated manual sign-in flow. It fails BEFORE UI execution
+// when any prerequisite is missing, with an exact setup command.
 // The APK and UI are real; only the upstream data service is deterministic (KTD7). Run:
 //   pnpm e2e:native:maestro   (from repo root; requires a booted emulator + installed Maestro)
 //   pnpm e2e:native:maestro --device emulator-5554     (when more than one device is attached)
@@ -115,11 +115,11 @@ function installApk(adb: string, device: string): { ok: boolean; out: string } {
 }
 
 let server: ChildProcess | null = null;
-function startFixture(email: string, password: string): Promise<void> {
+function startFixture(): Promise<void> {
   const tsx = join(appRoot, "..", "..", "node_modules", ".bin", "tsx");
   server = spawn(tsx, [join(here, "server.ts")], {
     stdio: "inherit",
-    env: { ...process.env, NATIVE_FIXTURE_EMAIL: email, NATIVE_FIXTURE_PASSWORD: password, NATIVE_FIXTURE_PORT: FIXTURE_PORT }
+    env: { ...process.env, NATIVE_FIXTURE_PORT: FIXTURE_PORT }
   });
   // Wait for the loopback health endpoint before installing/running.
   return new Promise((resolvePromise, reject) => {
@@ -149,14 +149,9 @@ async function main(): Promise<void> {
   // evidence lands beside the JUnit report instead of in the repository.
   mkdirSync(EVIDENCE, { recursive: true });
 
-  // Ephemeral fixture-only login (R18): generated here, given only to the fixture server and
-  // Maestro's `-e` params, never persisted or committed. `.invalid` is RFC 2606 reserved, so the
-  // address cannot resolve even if it escaped this process.
-  const email = `native-fixture-${randomBytes(4).toString("hex")}@fixture.invalid`;
-  const password = randomBytes(18).toString("base64url");
-  console.log(`[native] fixture login ${email} (password withheld)`);
+  console.log(`[native] fixture login ${E2E_FIXTURE_EMAIL} (fixture-only password withheld)`);
 
-  await startFixture(email, password);
+  await startFixture();
 
   // Emulator reaches the host fixture via 10.0.2.2; nothing else is needed for host loopback.
   console.log(`[native] installing ${APK}`);
@@ -172,8 +167,8 @@ async function main(): Promise<void> {
     [
       "--device", device,
       "test", FLOWS,
-      "-e", `LEARNER_EMAIL=${email}`,
-      "-e", `LEARNER_PASSWORD=${password}`,
+      "-e", `LEARNER_EMAIL=${E2E_FIXTURE_EMAIL}`,
+      "-e", `LEARNER_PASSWORD=${E2E_FIXTURE_PASSWORD}`,
       "-e", `GUARDIAN_CHALLENGE_ID=${NATIVE_CHALLENGE_ID}`,
       "-e", `SUMMIT_CHALLENGE_ID=${NATIVE_SUMMIT_CHALLENGE_ID}`,
       "--format", "junit",

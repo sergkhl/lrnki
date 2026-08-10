@@ -1,0 +1,30 @@
+# Manual sign-in coverage for the standalone native e2e APK. Other scenarios use the fixture-only
+# one-tap button; this flow proves the real form visibly rejects a wrong password and then signs in.
+appId: com.globesoul.lrnki
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible: "Choose your explorer"
+    timeout: 30000
+- tapOn:
+    id: "gate-email"
+- inputText: ${LEARNER_EMAIL}
+- hideKeyboard
+- tapOn:
+    id: "gate-password"
+- inputText: wrong-fixture-password
+- hideKeyboard
+- tapOn:
+    id: "gate-enter"
+- assertVisible: ".*email and password.*match an explorer.*"
+
+- tapOn:
+    id: "gate-password"
+- eraseText
+- inputText: ${LEARNER_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "gate-enter"
+- assertVisible: "Choose an expedition"

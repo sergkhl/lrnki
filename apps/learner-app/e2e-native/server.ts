@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { answerGuardianSelection, applyGuardianLifecycle, guardianView } from "./guardianFixture";
+import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "../src/lib/e2eFixture";
 
 // Deterministic loopback fixture server for the native Maestro gate (plan 2026-07-15-001 U5, R15-R16).
 // It serves REAL learner-api response SHAPES — captured once from the supervisor-free API over a
@@ -32,12 +33,10 @@ const CATALOG = scenario("catalog");
 const EXPEDITION = scenario("expedition");
 const LEADERBOARD = scenario("leaderboard");
 
-// Ephemeral fixture login, injected by the runner (never committed to flow YAML). The server
+// Fixture-only login shared with the e2e-build gate. The server
 // accepts exactly this address/password on Better Auth's credential sign-in route and answers with
 // a session cookie; every authed read is then served regardless of cookie value (the fixture
 // models one pre-existing learner, whose frozen journal a fresh sign-up could not plausibly have).
-const FIXTURE_EMAIL = process.env.NATIVE_FIXTURE_EMAIL ?? "native-fixture@fixture.invalid";
-const FIXTURE_PASSWORD = process.env.NATIVE_FIXTURE_PASSWORD ?? "native-fixture-password";
 const PORT = Number(process.env.NATIVE_FIXTURE_PORT ?? 8799);
 
 // `@better-auth/expo` only persists a `Set-Cookie` whose name carries the default `better-auth`
@@ -87,7 +86,7 @@ const server = createServer(async (req, res) => {
   // mirrors into SecureStore. Google is never involved — no rig automates a consent screen.
   if (method === "POST" && pathname === "/auth/sign-in/email") {
     const body = (await readBody(req)) as { email?: string; password?: string } | undefined;
-    if (body?.email !== FIXTURE_EMAIL || body?.password !== FIXTURE_PASSWORD) {
+    if (body?.email !== E2E_FIXTURE_EMAIL || body?.password !== E2E_FIXTURE_PASSWORD) {
       return send(res, 401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "Invalid email or password" });
     }
     const { session, user } = SESSION as { session: { token: string }; user: unknown };

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { SignInGate, sessionErrorMessage } from "./SignInGate";
 import { consumeOAuthError, signInWithEmail, signInWithGoogle, signUpWithEmail } from "@/lib/session";
 import { learnerTerm } from "@/learn/vocabulary";
+import { E2E_FIXTURE_EMAIL, E2E_FIXTURE_PASSWORD } from "@/lib/e2eFixture";
 
 jest.mock("@/lib/session", () => ({
   consumeOAuthError: jest.fn(),
@@ -17,12 +18,32 @@ const google = signInWithGoogle as jest.MockedFunction<typeof signInWithGoogle>;
 const returnedError = consumeOAuthError as jest.MockedFunction<typeof consumeOAuthError>;
 
 beforeEach(() => {
+  delete process.env.EXPO_PUBLIC_LRNKI_E2E_BUILD;
   jest.clearAllMocks();
   signIn.mockResolvedValue({ ok: true });
   signUp.mockResolvedValue({ ok: true });
   google.mockResolvedValue({ ok: true });
   // The ordinary mount: the learner arrived without a failed OAuth leg behind them.
   returnedError.mockReturnValue(null);
+});
+
+test("the fixture-only one-tap sign-in is absent outside e2e builds", async () => {
+  await render(<SignInGate />);
+  expect(screen.queryByTestId("gate-e2e-signin")).toBeNull();
+});
+
+test("the e2e build signs in through the real email route with the shared fixture identity", async () => {
+  process.env.EXPO_PUBLIC_LRNKI_E2E_BUILD = "1";
+  await render(<SignInGate />);
+
+  await fireEvent.press(screen.getByTestId("gate-e2e-signin"));
+
+  await waitFor(() =>
+    expect(signIn).toHaveBeenCalledWith({
+      email: E2E_FIXTURE_EMAIL,
+      password: E2E_FIXTURE_PASSWORD
+    })
+  );
 });
 
 test("the gate opens on Enter and offers Google as the primary route", async () => {

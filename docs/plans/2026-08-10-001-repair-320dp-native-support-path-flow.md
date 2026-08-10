@@ -199,15 +199,45 @@ also supports centering the selected element away from overlapping chrome
   and post-mutant restoration pass remain open, so automatic authority is not yet requalified.
 - Safe to continue downstream: yes, into the isolated U2 negative control only.
 
+### U2 — Requalified dialog-geometry authority (closed 2026-08-10)
+
+- Current-build positives (final flow shape, including plan 002 U4's one-tap sign-in): a fresh e2e
+  APK built 2026-08-10 12:43 +06 from working-tree commit `b66e540` passed the focused Support Path
+  scenario twice at 320 dp (46s, 38s), and the normal-width directory passed all three native
+  scenarios in 2m03s. The first attempted native run was invalid because a boot-time System UI ANR
+  covered the app; it counts as neither product nor sensitivity evidence.
+- Isolated mutant: a disposable worktree at `b66e540` carrying the same uncommitted learner-app
+  changes reverted **only** the `Dialog` geometry contract derived from `0b1c9d3` — the numeric
+  `maxHeight: Math.round(height * 0.85)` cap back to `max-h-[85%]` with the web-only `85vh` style,
+  and the `OverlayEntrance`/`DialogBody` children back from `shrink` to `flex-1`. `FullScreenDialog`,
+  `sheets.tsx`, every testID and selector, the repaired flow, the fixture, and all unrelated code
+  were preserved, so the flow still reaches Theory and the exact term action. Mutant e2e APK built
+  2026-08-10 13:25 +06; Gradle `:app:assembleRelease` BUILD SUCCESSFUL in 7m24s. No production
+  fault-injection flag exists; the worktree and mutant APK were deleted after the runs.
+- Native fixture/device for every run in this unit: deterministic loopback learner-api shapes;
+  `emulator-5554`, AVD `Medium_Phone_API_36.1`, Android API 36, physical size 1080×2400 px, density
+  override 540 dpi, derived viewport width 320 dp; Maestro 2.6.1; emulator autofill disabled.
+- Negative control: the repaired flow failed 3/3 against the mutant APK (50s, 48s, 49s), every run at
+  the same intended assertion — `Assertion is false: "Add support path" is visible`. Each run wrote
+  `support-path-exact-action-ready.png`, so each had already passed the exact-action 100%-visibility
+  assertion, activated the term action, and opened the dialog far enough for its title. No run failed
+  in setup, authentication, navigation, the server, or on a wrong control.
+- Sensitivity is carried by the dialog **body/footer** assertions, not the title: under the collapse
+  the `Support paths` title still resolved while `Add support path` did not. A flow that asserted only
+  the dialog title would have passed the mutant.
+- Restoration: reinstalling the freshly built current APK returned the focused 320 dp scenario to
+  PASS in 43s, so the failures track the injected behavior and not accumulated device state.
+- Runs in this unit used a focused single-flow invocation rather than the directory runner, because
+  at 320 dp the out-of-scope Guardian visual flow does not scroll lower answer options into view and
+  would make the runner exit nonzero after the Support Path flow's own outcome. That Guardian flow
+  passes at its normal width; its 320 dp behavior is not this plan's claim and was not repaired here.
+- **Verdict: R9 holds. The Support Path dialog class retains ADOPTED automatic authority.** Plan
+  [2026-08-10-002](./2026-08-10-002-one-tap-e2e-signin-gate.md) U4's one-tap swap is qualified by the
+  same evidence, because every run above executed the final flow shape.
+
 ### Open findings
 
-- U2 current-build positives and the normal-width smoke are complete. Next, create a disposable
-  worktree at the same revision, apply only the historic dialog-collapse behavior derived from
-  `0b1c9d3`, build its e2e APK, and run the repaired Support Path flow three times at 320 dp. Count
-  only runs that activate the exact term action and then fail in the dialog title/body/footer block.
-- Reinstall the freshly built current APK after the mutant, complete one final 320 dp focused pass,
-  remove the disposable worktree/artifact after summarizing evidence, and then execute U3.
-- At 320 dp the directory runner exits nonzero after the Support Path flow passes because the
-  out-of-scope Guardian flow's login does not dismiss the keyboard before targeting its password.
-  Read per-flow JUnit outcomes for this unit; do not count that setup failure as Support Path
-  sensitivity evidence or broaden this plan into Guardian maintenance.
+- None for this plan. Remaining native caveats are owned by the
+  [rig contract](../../apps/learner-app/e2e-native/README.md): the touch-responder class stays
+  physically owned, the Guardian scenario remains visual evidence with no measured control, and its
+  320 dp answer-option reachability is unaddressed.

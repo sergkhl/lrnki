@@ -8,21 +8,21 @@ primitives, real Yoga layout, real gesture dispatch; only the upstream data serv
 
 **Scope (measured, U6 negative-control sensitivity):**
 
-1. **Support Path dialog — ADOPTED automatic authority.** The contextual term dialog must show its
+1. **Support Path dialog — REQUALIFICATION PENDING.** The contextual term dialog must show its
    title, body, and close action, and closing must return to the same Theory activity (the measured
-   dialog-geometry regression, commit `0b1c9d3`). Its negative control collapses the dialog to zero
-   height and fails this block deterministically 3/3, so these assertions are a trustworthy gate.
-   **Known width sensitivity (2026-08-01):** at a 320 dp-wide display this block fails, and not
-   because the app is broken — driven by hand at 320 dp the Support Paths panel is fully reachable
-   with every term row and affordance on screen. `scrollUntilVisible` reports the panel visible
-   before it actually is at that width, so the following `tapOn` lands on the Theory footer
-   `Continue` and advances to the Question activity, whose own panel has no dialog open. A flow that
-   can tap the wrong control is a flow that could also pass for the wrong reason, so this wants a
-   fix — but changing an adopted-authority flow means re-running its negative control.
+   dialog-geometry regression, commit `0b1c9d3`). The 320 dp repair now scrolls to, verifies, and
+   taps the exact `support-path-add-phospholipid bilayer` action instead of accepting ancestor-panel
+   visibility. Current-build positives pass, but the final flow now includes one-tap fixture sign-in
+   and still owes the isolated dialog-collapse negative control plus restoration pass before its
+   former ADOPTED authority can be retained.
 2. **Theory scroll — NAVIGATION only.** The real device swipe reaches the Support Paths panel to open
    the dialog, but the touch-responder regression (commit `ddc0ec9`) is only intermittently
    reproducible on the emulator, so that class stays **physically owned** and is not narrowed here.
-3. **Crystal Guardian obelisk — VISUAL EVIDENCE, no automatic authority.** A second flow walks a
+3. **Manual sign-in — NATIVE INTEGRATION COVERAGE, no automatic authority.** A dedicated flow proves
+   the real email/password form visibly rejects a wrong password and then establishes a session.
+   Other flows use the e2e-only one-tap action, which calls the same email route and exercises the
+   same Better Auth cookie persistence path without repeatedly typing the fixture identity.
+4. **Crystal Guardian obelisk — VISUAL EVIDENCE, no automatic authority.** A separate flow walks a
    deterministic five-ward Leg Guardian through entry, partial, miss, Last Stand, and Final Ward, and
    screenshots each. Its assertions only prove the flow reached the intended state; whether the ward
    states are still separable by fill, facet, gloss, and contour on react-native-svg's native canvas
@@ -40,8 +40,9 @@ web suite. It never touches production or the real-use database.
 - **Android SDK + a booted emulator.** e.g. `$ANDROID_HOME/emulator/emulator -avd <name>`.
 - **Maestro CLI**: `curl -fsSL https://get.maestro.mobile.dev | bash`.
 - **The e2e APK**: `scripts/build-learner-android.sh e2e` → `apps/learner-app/lrnki-learner-e2e.apk`.
-  This profile sets `LRNKI_E2E_BUILD=1` (Android `usesCleartextTraffic: true`, via `app.config.ts`
-  + `expo-build-properties`) and bakes `EXPO_PUBLIC_LEARNER_API_URL=http://10.0.2.2:8799`. Cleartext
+  This profile sets `EXPO_PUBLIC_LRNKI_E2E_BUILD=1` (Android `usesCleartextTraffic: true`, via
+  `app.config.ts` + `expo-build-properties`) and bakes
+  `EXPO_PUBLIC_LEARNER_API_URL=http://10.0.2.2:8799`. Cleartext
   exists **only** in this disposable artifact; preview/production keep the Android secure default.
   The APK is gitignored and must never be uploaded or distributed.
 
@@ -63,9 +64,9 @@ pnpm e2e:native:maestro --device emulator-5554     # required when several devic
 The runner (`run.ts`) checks prerequisites and fails early with an exact setup command; resolves one
 device serial and gives it to **both** `adb` and Maestro (they disagree about ambient config — `adb`
 honours `ANDROID_SERIAL`, Maestro does not — so it fails closed rather than let the two drive
-different devices); generates an **ephemeral fixture-only login** and passes it, with the fixture
-challenge id, to both the fixture server and Maestro's `-e` params (never committed to flow YAML);
-starts the loopback fixture (`server.ts`) on `:8799`; `adb install`s the APK; runs the flows; and
+different devices); passes the shared fixture-only identity to the dedicated manual sign-in flow
+and the fixture challenge ids to their owning flows; starts the loopback fixture (`server.ts`) on
+`:8799`; `adb install`s the APK; runs the flows; and
 tears the fixture down. Evidence (JUnit report, screenshots) lands under
 `tmp/2026-07-15-durable-learner-e2e-gates/native/`.
 
@@ -83,8 +84,9 @@ expedition with a long Theory activity and available Explorable Terms) and froze
 replays them and acks non-graded writes, so session reads hold no mutable state. The emulator reaches
 the host loopback fixture through Android's `10.0.2.2` alias.
 
-Identity is faked at the **wire** level, never stubbed in the app: the flow drives the real sign-in
-UI, the real `authClient`, and the real `@better-auth/expo` SecureStore mirror, and `server.ts`
+Identity is faked at the **wire** level, never stubbed in the app: the flows drive the real
+`authClient` and the real `@better-auth/expo` SecureStore mirror, and the dedicated sign-in flow also
+drives the real form. `server.ts`
 answers Better Auth's own shapes on `/auth/sign-in/email` and `/auth/get-session`. Three constraints
 that fail silently if broken, each already paid for once:
 
@@ -97,8 +99,10 @@ that fail silently if broken, each already paid for once:
   wipes SecureStore, so a fixture that always returned a session would boot straight into the Journal
   and the flow's first assertion — the sign-in gate — would fail for the wrong reason.
 
-The flow **signs in** rather than signing up: the fixture models one pre-existing learner, and a
-freshly created account could not plausibly own the frozen 12-lesson journal it then reads.
+The flows **sign in** rather than signing up: the fixture identity is a committed `.invalid` address
+and password shared by the e2e gate, runner, and server. It authenticates only against this loopback
+fixture; the real Better Auth store never holds it. The fixture models one pre-existing learner, and
+a freshly created account could not plausibly own the frozen 12-lesson journal it then reads.
 
 `guardianFixture.ts` is the one stateful surface, because the ward states the Guardian flow exists to
 look at are only reachable by answering. It holds a five-ward lineup and an append-only event log,
@@ -119,6 +123,7 @@ at the entry state.
 
 Accessibility labels and app-owned `testID`s only — never generated prose or coordinates. The
 inline Explorable Term is a nested `<Text>` span with no queryable Android resource-id, so the flow
-targets the real `SupportPathsPanel` views (`support-paths-panel`, `support-path-add-<term>`, the
-component's designed large-target equivalent); scrolling to the panel still exercises the long-Theory
-device swipe. The specific term value is fixed by the checked-in deterministic scenario.
+targets the real `SupportPathsPanel` action (`support-path-add-<term>`, the component's designed
+large-target equivalent). Scroll readiness, full visibility, enabled state, and tap all use that same
+action ID; the device swipe still traverses the long Theory. The specific term value is fixed by the
+checked-in deterministic scenario.

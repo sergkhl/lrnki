@@ -11,27 +11,18 @@
 #      the Support Paths panel and open the dialog, but its negative control (the touch-responder
 #      regression, commit ddc0ec9) fails only intermittently on the emulator, so the touch-responder
 #      class stays PHYSICALLY owned (docs/plans/BLOCKERS.md) and is not narrowed by this flow.
-# The fixture login (${LEARNER_EMAIL}/${LEARNER_PASSWORD}) is passed via `maestro test -e`, never
-# committed here.
+# The e2e-only button calls the real email sign-in route with the shared fixture identity.
 # Selectors are accessibility labels and app-owned testIDs, never generated prose or coordinates.
 appId: com.globesoul.lrnki
 ---
 - launchApp:
     clearState: true
 
-# --- Sign in with the runner-generated fixture-only credential (R17). Email + password is the
-# fallback route and the only one any rig drives; Google's consent screen is never automated
-# (ADR-0041). `clearState` wipes the SecureStore cookie, so the gate is the honest start state. ---
+# --- One-tap fixture sign-in still drives the real auth client and cookie mirror. The dedicated
+# signin flow owns manual email/password coverage; Google's consent screen is never automated. ---
 - assertVisible: "Choose your explorer"
 - tapOn:
-    id: "gate-email"
-- inputText: ${LEARNER_EMAIL}
-- hideKeyboard
-- tapOn:
-    id: "gate-password"
-- inputText: ${LEARNER_PASSWORD}
-- hideKeyboard
-- tapOn: "Enter"
+    id: "gate-e2e-signin"
 - assertVisible: "Choose an expedition"
 
 # --- Open the shared long-Theory expedition through the real Explore/Catalog UI (R17) ---
