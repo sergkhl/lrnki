@@ -6,15 +6,16 @@ e2e-profile APK** on an Android emulator with
 [Maestro](https://maestro.dev), against a **deterministic loopback fixture** — real React Native
 primitives, real Yoga layout, real gesture dispatch; only the upstream data service is mocked.
 
-**Scope (measured, U6 negative-control sensitivity):**
+**Scope (measured by negative control):**
 
-1. **Support Path dialog — REQUALIFICATION PENDING.** The contextual term dialog must show its
-   title, body, and close action, and closing must return to the same Theory activity (the measured
-   dialog-geometry regression, commit `0b1c9d3`). The 320 dp repair now scrolls to, verifies, and
-   taps the exact `support-path-add-phospholipid bilayer` action instead of accepting ancestor-panel
-   visibility. Current-build positives pass, but the final flow now includes one-tap fixture sign-in
-   and still owes the isolated dialog-collapse negative control plus restoration pass before its
-   former ADOPTED authority can be retained.
+1. **Support Path dialog — ADOPTED automatic authority, requalified at 320 dp on 2026-08-10.** The
+   contextual term dialog must show its title, body, and close action, and closing must return to the
+   same Theory activity (the measured dialog-geometry regression, commit `0b1c9d3`). An isolated
+   mutant carrying only that regression's `Dialog` geometry failed the flow 3/3 at `Add support path`
+   — in every run *after* reaching, fully seeing, and activating the term action — while the current
+   build passed the same focused scenario three times at the same width. The **body and footer**
+   assertions carry the sensitivity: under the collapse the dialog *title* still resolves, so a
+   title-only oracle would pass the mutant. Keep all three.
 2. **Theory scroll — NAVIGATION only.** The real device swipe reaches the Support Paths panel to open
    the dialog, but the touch-responder regression (commit `ddc0ec9`) is only intermittently
    reproducible on the emulator, so that class stays **physically owned** and is not narrowed here.
@@ -26,7 +27,9 @@ primitives, real Yoga layout, real gesture dispatch; only the upstream data serv
    deterministic five-ward Leg Guardian through entry, partial, miss, Last Stand, and Final Ward, and
    screenshots each. Its assertions only prove the flow reached the intended state; whether the ward
    states are still separable by fill, facet, gloss, and contour on react-native-svg's native canvas
-   is a judgement made from the PNGs, and no negative control has been measured for it.
+   is a judgement made from the PNGs, and no negative control has been measured for it. It also does
+   not scroll lower answer options into view, so it fails at a 320 dp viewport; run it at the AVD's
+   physical density until that is repaired.
 
 Each flow file is one scenario with one claim: mixing an unproven visual capture into the
 adopted-authority flow would blur what a green run means. The runner runs the whole directory.
@@ -69,6 +72,14 @@ and the fixture challenge ids to their owning flows; starts the loopback fixture
 `:8799`; `adb install`s the APK; runs the flows; and
 tears the fixture down. Evidence (JUnit report, screenshots) lands under
 `tmp/2026-07-15-durable-learner-e2e-gates/native/`.
+
+**Narrow-viewport runs.** `adb shell wm density 540` on the 1080 px-wide AVD gives a 320 dp viewport
+(`1080 / 540 * 160`); `adb shell wm density reset` restores it. That width is where fixed chrome
+overlaps content, so it is the width the Support Path dialog authority was requalified at. Because
+the Guardian flow (claim 4) fails there for its own unrelated reason, drive a single flow rather than
+the directory when 320 dp is the point: run the fixture and `adb install` as `run.ts` does, then
+`maestro --device <serial> test .maestro/flows/<one>.yaml`. Set `NATIVE_APK` to point the runner at a
+different artifact.
 
 Two host gotchas, each already paid for once. Turn emulator autofill off
 (`adb shell settings put secure autofill_service null`) or a "Save password?" sheet covers the app
@@ -127,3 +138,11 @@ targets the real `SupportPathsPanel` action (`support-path-add-<term>`, the comp
 large-target equivalent). Scroll readiness, full visibility, enabled state, and tap all use that same
 action ID; the device swipe still traverses the long Theory. The specific term value is fixed by the
 checked-in deterministic scenario.
+
+One selector rule is not style but a paid-for correctness constraint: **the wait condition and the
+action target must be the same node.** Scrolling until an ancestor container reports visible and then
+tapping a descendant lets the scroll stop while the descendant is still under the fixed footer — the
+tap lands on `Continue`, the activity advances, and the flow keeps asserting against the wrong
+screen. State `visibilityPercentage: 100`, `enabled: true`, and `centerElement: true` on the exact
+action, then assert and tap that same selector. Never recover from a missed target with coordinates,
+fixed sleeps, selector indexes, repeated taps, or a duplicated test-only control.

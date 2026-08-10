@@ -11,12 +11,7 @@ lifecycle, retention, and validation rules live in
 
 ## Active implementation plans (execution order)
 
-1. [2026-08-10-001 — Repair the 320 dp native Support Path flow](./2026-08-10-001-repair-320dp-native-support-path-flow.md)
-   — in progress; the exact-action and final one-tap flow positives pass, while the isolated
-   dialog-collapse negative control and restoration pass remain.
-2. [2026-08-10-002 — One-tap e2e sign-in for the native Maestro rig](./2026-08-10-002-one-tap-e2e-signin-gate.md)
-   — in progress; U1–U3 are closed and U4 is implemented with current-build positives, but its
-   authority and consolidation ride with plan 001 U2's negative-control re-run.
+None.
 
 Shaping, not yet a plan:
 [2026-08-08-002 — Generation model evaluation](../brainstorms/2026-08-08-002-generation-model-evaluation.md)

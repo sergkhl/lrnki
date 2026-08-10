@@ -10,20 +10,21 @@
   interview, one decision at a time, starting with change scope; judge ownership is required only if
   grounding generation moves.
 
-- **Repair the 320 dp native Support Path flow — U2 sensitivity remains.** The
-  [implementation plan](./2026-08-10-001-repair-320dp-native-support-path-flow.md) records the closed
-  exact-action repair plus two final one-tap-flow 320 dp positives and a normal-width full-suite
-  pass. Resume with the isolated historic dialog-collapse mutant: require three failures in the
-  dialog reachability block, then reinstall the fresh current APK and complete its final 320 dp
-  restoration pass before retaining or withdrawing automatic authority.
-
-- **One-tap native e2e sign-in — U4 sensitivity and consolidation remain.** The
-  [implementation plan](./2026-08-10-002-one-tap-e2e-signin-gate.md) records closed U1-U3, the
-  implemented Support Path swap, fresh APK evidence, and the manual refusal/success flow. Its U4
-  closes only with the Support Path mutant/restoration gate above; then consolidate and retire both
-  plans together.
+- **The Crystal Guardian native flow fails at a 320 dp viewport.** It does not scroll lower answer
+  options into view, so it only runs at the AVD's physical density. The claim boundary and the
+  narrow-viewport procedure are owned by the
+  [rig contract](../../apps/learner-app/e2e-native/README.md); this is scenario navigation work, and
+  it does not affect the Support Path dialog authority requalified beside it.
 
 ## COMPLETED
+
+- **The native Support Path dialog gate is requalified and sign-in is one tap (2026-08-10).** The
+  flow now scrolls to, fully verifies, and taps the exact term action instead of trusting ancestor
+  visibility, and an e2e-build-only gate action replaced the duplicated login block while a dedicated
+  flow keeps manual refusal/success coverage. An isolated dialog-collapse mutant failed 3/3 inside the
+  dialog body/footer block, so ADOPTED automatic authority is retained; the
+  [rig contract](../../apps/learner-app/e2e-native/README.md) owns the claims and mechanics. Detailed
+  record: commit 3bc24e9.
 
 - **Guardian shield-loss correction is calm (2026-08-10).** The dead shake is removed: the keyed
   correction owns the miss response, then Continue restores the static server-owned shield or Last
@@ -60,27 +61,27 @@
   and host runtime are gone; deployment and development use the container path. Durable decision:
   [ADR-0040](../adr/0040-serve-public-api-only-from-the-deployed-container.md).
 
-- **Code-first Drizzle migrations deployed (2026-08-05).** The shared database completed the guarded
-  reset and cutover to the generated baseline and one programmatic migrator. Durable decision:
-  [ADR-0039](../adr/0039-own-persisted-shape-in-code-first-drizzle-schema.md).
-
 ## VALIDATION
 
 ### Real-use quality evaluation — 2026-08-10
 
-- Milestone: a shield-loss correction remains calm while Continue restores the authoritative static
-  Guardian shield or Last Stand state.
-- Fixture and source type: production-format local Expo export with intercepted Guardian answer
-  transport; phone reveal, post-Continue 2/3 shield, and 0/3 Last Stand captures, plus the same
-  answer-reveal and spent-shield scenarios on desktop.
+- Milestone: the native Support Path dialog gate keeps automatic authority over its measured
+  dialog-geometry regression while every flow reaches its own claim through one-tap fixture sign-in.
+- Fixture and source type: the standalone e2e-profile APK against deterministic loopback Better Auth
+  and learner-api response shapes; `emulator-5554`, AVD `Medium_Phone_API_36.1`, Android API 36,
+  1080×2400 px, density override 540 dpi (320 dp) and physical 420 dpi (~411 dp); Maestro 2.6.1.
 - Real model calls used: not applicable; no generated content is evaluated.
 - Result: PASS.
-- Useful output observed: the correction clearly replaces the Guardian and keeps the keyed answer in
-  place; Continue returns a compact static shield count, and Last Stand remains supportive and
-  non-punitive without moving wards.
-- Defects observed: none in the inspected milestone.
-- Changes made after inspection: none; the first inspected output met the intended contract.
-- Remaining caveats: this is intercepted-web presentation evidence only. The unchanged warning
-  haptic was not requalified, and the full Jest command still exits after 314 passing tests because
-  of the existing post-test Expo logger warning.
+- Useful output observed: the whole term action sits unobscured above the fixed footer, its
+  activation opens the complete dialog, and dismissal returns to the same Theory activity. An
+  isolated mutant carrying only the historic `Dialog` geometry failed 3/3 at `Add support path`,
+  always after activating that action, and the restored current build passed again at 43s.
+- Defects observed: the dialog *title* still resolves under the collapse, so the body and footer
+  assertions are the ones that bite. The Guardian visual flow leaves lower answer options offscreen
+  at 320 dp and is not repaired here.
+- Changes made after inspection: dismissed the keyboard after 320 dp email entry, gave the manual
+  sign-in flow a condition-based cold-start wait, and recorded both the title-insensitivity and the
+  Guardian narrow-width limit in the rig contract.
+- Remaining caveats: this is native-emulator fixture evidence — not real-backend, deployed,
+  production, or new physical-device evidence. The touch-responder class stays physically owned.
 - Safe to continue downstream: yes.
