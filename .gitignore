@@ -31,3 +31,13 @@ apps/learner-app/lrnki-learner-*.apk
 # Native projects are generated in-tree by `expo run:android` / `expo run:ios` (prebuild)
 apps/learner-app/android/
 apps/learner-app/ios/
+
+# Claude Design sync (design-sync skill): staged converter scripts, generated
+# bundle output, machine-local caches, and the fork's node_modules link. The
+# durable inputs under .design-sync/ (config.json, NOTES.md, conventions.md,
+# previews/, overrides/, fonts/) ARE committed.
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules

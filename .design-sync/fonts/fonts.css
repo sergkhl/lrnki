@@ -1,0 +1,12 @@
+/* The learner app loads this face through expo-font at runtime (see
+   src/app/_layout.tsx); a static @font-face is how it reaches designs built with
+   the DS. The family name must stay exactly the key expo-font registers, because
+   src/ui/foundation.tsx sets fontFamily: "IMFellEnglish_400Regular" for the
+   map-title variant. SIL OFL 1.1 — LICENSE_FONT ships alongside. */
+@font-face {
+  font-family: "IMFellEnglish_400Regular";
+  src: url("./IMFellEnglish_400Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
