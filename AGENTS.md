@@ -3,6 +3,7 @@
 Keep one canonical definition for every fact:
 
 - `AGENTS.md` owns engineering workflow and enforcement rules.
+- `README.md` owns setup, commands, deployment, and shared-host runbooks.
 - `CONTEXT.md` owns project language and ambiguity resolution.
 - `docs/adr/` owns current durable architectural decisions and rationale.
 - Source types own implemented interfaces; the internal Drizzle schema in
@@ -36,9 +37,9 @@ definitions and repair their references in the same change.
 - A plan's Validation Log keeps one consolidated entry per closed implementation unit and one `Open
   findings` section. Record current evidence and invariants, not metric or suite-count trajectories.
   Keep a Validation Log under about 200 lines and a plan under about 600 lines.
-- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep 3–7 current tasks, at most
-  eight grouped completed outcomes, and exactly one latest plan-less validation; keep the whole file
-  under about 150 lines. Conditional future ideas do not belong in `TODO.md`.
+- `TODO.md` has exactly `TODO`, `COMPLETED`, and `VALIDATION` sections. Keep at most seven current
+  tasks, at most eight grouped completed outcomes, and exactly one latest plan-less validation; keep
+  the whole file under about 150 lines. Conditional future ideas do not belong in `TODO.md`.
 - Never link retained documentation to gitignored `tmp/`. Git history archives deleted detail, but
   any knowledge that must remain discoverable needs a live canonical owner before deletion. Preserve
   an uncommitted plan or validation record in history before deleting it, and commit consolidation
@@ -46,15 +47,19 @@ definitions and repair their references in the same change.
 
 ## Validation authority
 
-- Intercepted web, real-backend web, native emulator, deployed, and physical-device evidence each
-  prove only the layer they actually exercise; none substitutes for another.
+- Intercepted web, real-backend web, native emulator or simulator, deployed, and physical-device
+  evidence each prove only the layer they actually exercise; none substitutes for another.
 - A native scenario earns automatic authority for one regression class only after a behavior-only
   negative control fails at the intended assertion and a user-recorded physical pass correlates it.
-  Current scenario claims and rig mechanics live in
+  Current Android scenario claims and rig mechanics live in
   `apps/learner-app/e2e-native/README.md`.
-- Agents may initiate emulator runs on a tooling-capable host. Physical-device runs remain
-  user-initiated; record a concrete unresolved user action in `docs/plans/BLOCKERS.md` rather than
-  claiming evidence that was not produced.
+- Agents may initiate emulator or simulator runs on a tooling-capable host. Physical-device runs
+  remain user-initiated; record a concrete unresolved user action in `docs/plans/BLOCKERS.md`
+  rather than claiming evidence that was not produced.
+- Before running or qualifying lrnki evidence, apply
+  `.agents/skills/validate-lrnki/SKILL.md`; it routes to the smallest relevant environment reference
+  and owns execution, failure-triage, and claim-qualification workflow. Owning test READMEs and
+  source retain current scenario claims and rig mechanics.
 
 ## Rules
 
@@ -90,8 +95,9 @@ definitions and repair their references in the same change.
 
 13. Prioritize real-use quality evaluation and run real extraction with production LLM calls.
 
-14. After every important behavior-changing milestone, apply
-    `.agents/skills/real-use-quality-evaluation/SKILL.md`. A green suite is not quality evidence.
+14. After every important behavior-changing milestone, follow the
+    [real-use quality route](.agents/skills/validate-lrnki/references/real-use-quality.md) in the
+    validation skill. A green suite is not quality evidence.
     A model reassignment invalidates prior quality evidence for every affected consumer; re-run the
     relevant gates or record them as unqualified. Every zero-row inspection assertion must carry a
     positive control over the same rows in the same query.
@@ -102,8 +108,8 @@ definitions and repair their references in the same change.
     exception: run `pnpm test:db`, which resets and targets only `lrnki_test`; test files must opt
     in through `TEST_DATABASE_URL` and must never use the development `DATABASE_URL`.
 
-15. Admin Lab web UI uses shadcn base-ui components and `.agents/skills/shadcn/SKILL.md`; graph
-    visualization uses Cytoscape. For the learner surface, enforce
+15. Admin Lab web UI uses shadcn base-ui components; graph visualization uses Cytoscape. For the
+    learner surface, enforce
     [ADR-0035](docs/adr/0035-separate-learner-app-static-spa-typed-api.md).
 
 16. A deterministic gate over neural output may hard-veto only a provable guarantee. Heuristic

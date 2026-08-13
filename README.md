@@ -95,7 +95,8 @@ pnpm e2e:web:deployed
 ```
 
 Two heavier suites are **opt-in** and not part of `pnpm check`; the evidence boundaries are defined
-in [AGENTS.md](AGENTS.md#validation-authority):
+in [AGENTS.md](AGENTS.md#validation-authority), and the single agent workflow entry point is the
+[validation skill](.agents/skills/validate-lrnki/SKILL.md):
 
 ```bash
 pnpm e2e:web:realuse    # real supervisor-free API over Postgres, no generation
@@ -279,7 +280,7 @@ database inside the shared `postgres_data` volume, so a re-initialised volume le
 | Symptom | Cause | Remedy |
 | --- | --- | --- |
 | Generation `401` while `LITELLM_MASTER_KEY` still works | Dead virtual key — the master key is validated from config rather than the key table, and that asymmetry is the tell | Mint one via `POST /key/generate` with the master key, write it to `.env`, and **recreate** the container: container env is fixed at creation, so `docker restart` will not pick it up |
-| `429 "No deployments available"` | Upstream provider rate limit, not a key problem | Wait and retry; read the run against the throttling signatures in `.agents/skills/real-use-quality-evaluation/SKILL.md` |
+| `429 "No deployments available"` | Upstream provider rate limit, not a key problem | Wait and retry; read the run against the [real-use throttling signatures](.agents/skills/validate-lrnki/references/real-use-quality.md#throttled-runs) |
 
 Keep any `.env` backup **outside the repo**: `.gitignore` covers `.env` but not `.env.bak-*`.
 

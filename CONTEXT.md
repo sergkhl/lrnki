@@ -174,10 +174,6 @@ Learner-specific calibration, graded outcomes, and progress kept outside learner
 study assets.
 _Avoid_: graph confidence, neutral metadata
 
-**Flow Channel**:
-A learner-specific band of clear, just-hard-enough challenges paced through tension and release.
-_Avoid_: static difficulty target, engagement score
-
 **Study Session**:
 The learner-stateful projection of one whole Derived Graph Layer into a playable trail of gated
 lessons and activities.

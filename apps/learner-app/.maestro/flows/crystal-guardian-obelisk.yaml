@@ -1,4 +1,4 @@
-# Crystal Guardian Ward Obelisk — native VISUAL-EVIDENCE flow (Ward Obelisk plan U4, ADR-0038).
+# Crystal Guardian Ward Obelisk — native VISUAL-EVIDENCE flow (Ward Obelisk plan U4).
 #
 # WHY IT EXISTS. The obelisk separates resolved / current / queued wards by fill, facet, gloss and
 # contour weight rather than by hue. The web gate rendered those primitives through Chromium's SVG;
@@ -6,12 +6,12 @@
 # two earlier Android-only overlay defect classes hid. So the five ward states have to be reached on
 # a real APK and looked at.
 #
-# WHAT IT IS AUTHORITY FOR: nothing automatic. Under ADR-0038 a native scenario earns automatic
-# authority only from a measured negative control, and no negative control has been run for obelisk
-# segment rendering — a luminance/facet difference is a judgement, not an assertion. The
-# `assertVisible` lines here only PROVE THE FLOW REACHED THE INTENDED STATE, so the screenshot beside
-# them is evidence of that state and not of some other one. The verdict is human/agent inspection of
-# the captured PNGs.
+# WHAT IT IS AUTHORITY FOR: nothing automatic. Under the AGENTS.md validation authority a native
+# scenario earns automatic authority only from a measured negative control, and no negative control
+# has been run for obelisk segment rendering — a luminance/facet difference is a judgement, not an
+# assertion. The `assertVisible` lines here only PROVE THE FLOW REACHED THE INTENDED STATE, so the
+# screenshot beside them is evidence of that state and not of some other one. The verdict is
+# human/agent inspection of the captured PNGs.
 #
 # The five states are driven through the deterministic five-ward Leg challenge in
 # `e2e-native/guardianFixture.ts`, whose combat state is folded by the production pure functions.
@@ -45,34 +45,199 @@ appId: com.globesoul.lrnki
 # is the weakest visual pair: it rests on a luminance step plus the queued facet, and at the
 # rendered 180 px the crown's facet is small. Judge WITHOUT reading hue whether a bare stone slot
 # and a lit-facet slot are still distinguishable on the device panel. ---
-- tapOn: "Osmosis carries water toward the more concentrated side"
+- scrollUntilVisible:
+    element:
+      text: "Osmosis carries water toward the more concentrated side"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Osmosis carries water toward the more concentrated side"
+    enabled: true
+- tapOn:
+    text: "Osmosis carries water toward the more concentrated side"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "Ward broken!"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "Ward broken!"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: ".*4 wards left.*Shield 3/3.*"
-- tapOn: "Active transport spends ATP against the gradient"
+- scrollUntilVisible:
+    element:
+      text: "Active transport spends ATP against the gradient"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Active transport spends ATP against the gradient"
+    enabled: true
+- tapOn:
+    text: "Active transport spends ATP against the gradient"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "Ward broken!"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "Ward broken!"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: ".*3 wards left.*Shield 3/3.*"
 - takeScreenshot: guardian-2-partial-2-resolved
 
 # --- 3. A miss. The shield drops by one and the ward segmentation does NOT move: still two stone
 # slots at the base, one current boundary, two queued above. (The wards-left count is unchanged
 # here, which is the whole KTD8 claim — a miss costs shield, never ward progress.) ---
-- tapOn: "Endocytosis dissolves the particle in the bilayer"
+- scrollUntilVisible:
+    element:
+      text: "Endocytosis dissolves the particle in the bilayer"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Endocytosis dissolves the particle in the bilayer"
+    enabled: true
+- tapOn:
+    text: "Endocytosis dissolves the particle in the bilayer"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "The ward holds"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "The ward holds"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: ".*3 wards left.*Shield 2/3.*"
 - takeScreenshot: guardian-3-miss-shield-2
 
 # --- 4. Last Stand, shield 0/3. All three ward states on screen at once under the destructive
 # ring; the wards stay exactly where they were. ---
-- tapOn: "A hypotonic solution draws water out"
+- scrollUntilVisible:
+    element:
+      text: "A hypotonic solution draws water out"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "A hypotonic solution draws water out"
+    enabled: true
+- tapOn:
+    text: "A hypotonic solution draws water out"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "The ward holds"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "The ward holds"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: ".*3 wards left.*Shield 1/3.*"
-- tapOn: "Fluid mosaic structure admits some and blocks others"
+- scrollUntilVisible:
+    element:
+      text: "Fluid mosaic structure admits some and blocks others"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Fluid mosaic structure admits some and blocks others"
+    enabled: true
+- tapOn:
+    text: "Fluid mosaic structure admits some and blocks others"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "The ward holds"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "The ward holds"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: "Last Stand"
 - assertVisible: ".*3 wards left.*Shield 0/3.*"
 - takeScreenshot: guardian-4-last-stand
@@ -80,19 +245,105 @@ appId: com.globesoul.lrnki
 # --- 5. Final Ward, 1 remaining: the current segment IS the crown, beside the visible `Final ward`
 # line. Two clean answers get there; the first also restores exactly one shield segment, which is
 # the recovery rule the production fold owns. ---
-- tapOn: "Endocytosis wraps the particle in membrane"
+- scrollUntilVisible:
+    element:
+      text: "Endocytosis wraps the particle in membrane"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Endocytosis wraps the particle in membrane"
+    enabled: true
+- tapOn:
+    text: "Endocytosis wraps the particle in membrane"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "Ward broken!"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "Ward broken!"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: ".*2 wards left.*Shield 1/3.*"
-- tapOn: "A hypertonic solution draws water out"
+- scrollUntilVisible:
+    element:
+      text: "A hypertonic solution draws water out"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "A hypertonic solution draws water out"
+    enabled: true
+- tapOn:
+    text: "A hypertonic solution draws water out"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "Ward broken!"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "Ward broken!"
-- tapOn: "Continue"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Continue"
+    enabled: true
+- tapOn:
+    text: "Continue"
+    enabled: true
 - assertVisible: ".*Final ward.*Shield 1/3.*"
 - takeScreenshot: guardian-5-final-ward-crown
 
 # --- The win edge (KTD9): a committed win renders NO won Guardian — the fight hands straight off to
 # the Crystal Formation reward, so the last thing the body ever shows is the Final Ward above. ---
-- tapOn: "Selective permeability admits some and blocks others"
+- scrollUntilVisible:
+    element:
+      text: "Selective permeability admits some and blocks others"
+      enabled: true
+    direction: DOWN
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
+- assertVisible:
+    text: "Selective permeability admits some and blocks others"
+    enabled: true
+- tapOn:
+    text: "Selective permeability admits some and blocks others"
+    enabled: true
+- scrollUntilVisible:
+    element:
+      text: "Ward broken!"
+    direction: UP
+    timeout: 20000
+    visibilityPercentage: 100
+    centerElement: true
 - assertVisible: "Ward broken!"
 - takeScreenshot: guardian-6-final-reveal
 

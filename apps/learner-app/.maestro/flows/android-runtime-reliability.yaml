@@ -2,7 +2,7 @@
 # e2e-profile APK against the deterministic loopback fixture (10.0.2.2) — real React Native
 # primitives, real Yoga layout, real gesture dispatch; only the upstream data is mocked.
 #
-# U6 sensitivity result (see docs/adr/0038) scopes what this flow is AUTHORITY for:
+# U6 sensitivity result (AGENTS.md "Validation authority") scopes what this flow is AUTHORITY for:
 #   1. Support Path dialog — ADOPTED automatic authority. Opening a contextual term dialog must show
 #      its title, body, and close/footer action, and closing must return to the same Theory activity
 #      (the measured dialog-geometry regression, commit 0b1c9d3). Its negative control fails this
@@ -39,7 +39,7 @@ appId: com.globesoul.lrnki
 - tapOn:
     id: "checkpoint-theory-available"
 
-# --- Theory scroll (NAVIGATION, not a proven gate — see header + ADR-0038): a real device swipe
+# --- Theory scroll (NAVIGATION, not a proven gate — see header + AGENTS.md): a real device swipe
 # over long Theory content reaches the post-content Support Paths panel to open the dialog. The
 # fixed header (Field notes) + footer (Continue) reachability are cheap sanity checks, not the
 # adopted authority (the touch-responder negative control is emulator-flaky). scrollUntilVisible

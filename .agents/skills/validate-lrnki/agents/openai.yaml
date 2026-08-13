@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validate lrnki"
+  short_description: "Route lrnki validation by evidence layer"
+  default_prompt: "Use $validate-lrnki to select, run, and qualify the right validation layer for this change."

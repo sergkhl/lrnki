@@ -1,8 +1,10 @@
 # Native Android Maestro gate (opt-in)
 
 This file owns the native gate's current scenario claims and mechanics; general evidence authority
-lives in [AGENTS.md](../../../AGENTS.md#validation-authority). The gate drives the **real standalone
-e2e-profile APK** on an Android emulator with
+lives in [AGENTS.md](../../../AGENTS.md#validation-authority), and agent execution/failure triage
+lives in the
+[native Android route of the validation skill](../../../.agents/skills/validate-lrnki/SKILL.md).
+The gate drives the **real standalone e2e-profile APK** on an Android emulator with
 [Maestro](https://maestro.dev), against a **deterministic loopback fixture** — real React Native
 primitives, real Yoga layout, real gesture dispatch; only the upstream data service is mocked.
 
@@ -25,11 +27,12 @@ primitives, real Yoga layout, real gesture dispatch; only the upstream data serv
    same Better Auth cookie persistence path without repeatedly typing the fixture identity.
 4. **Crystal Guardian obelisk — VISUAL EVIDENCE, no automatic authority.** A separate flow walks a
    deterministic five-ward Leg Guardian through entry, partial, miss, Last Stand, and Final Ward, and
-   screenshots each. Its assertions only prove the flow reached the intended state; whether the ward
-   states are still separable by fill, facet, gloss, and contour on react-native-svg's native canvas
-   is a judgement made from the PNGs, and no negative control has been measured for it. It also does
-   not scroll lower answer options into view, so it fails at a 320 dp viewport; run it at the AVD's
-   physical density until that is repaired.
+   captures the final reveal and seven-ward Expedition Guardian beside them. Its assertions only
+   prove the flow reached the intended state; whether the ward states are still separable by fill,
+   facet, gloss, and contour on react-native-svg's native canvas is a judgement made from the PNGs,
+   and no negative control has been measured for it. At 320 dp every intended answer, outcome, and
+   Continue action is scrolled to full visibility before activation, so shuffled lower choices do
+   not restrict the flow to the AVD's physical density.
 
 Each flow file is one scenario with one claim: mixing an unproven visual capture into the
 adopted-authority flow would blur what a green run means. The runner runs the whole directory.
@@ -60,8 +63,8 @@ web suite. It never touches production or the real-use database.
 ## Run
 
 ```bash
-pnpm e2e:native:maestro                            # from repo root
-pnpm e2e:native:maestro --device emulator-5554     # required when several devices are attached
+caffeinate -dimsu pnpm e2e:native:maestro                         # from repo root
+caffeinate -dimsu pnpm e2e:native:maestro --device emulator-5554  # when several devices are attached
 ```
 
 The runner (`run.ts`) checks prerequisites and fails early with an exact setup command; resolves one
@@ -75,17 +78,24 @@ tears the fixture down. Evidence (JUnit report, screenshots) lands under
 
 **Narrow-viewport runs.** `adb shell wm density 540` on the 1080 px-wide AVD gives a 320 dp viewport
 (`1080 / 540 * 160`); `adb shell wm density reset` restores it. That width is where fixed chrome
-overlaps content, so it is the width the Support Path dialog authority was requalified at. Because
-the Guardian flow (claim 4) fails there for its own unrelated reason, drive a single flow rather than
-the directory when 320 dp is the point: run the fixture and `adb install` as `run.ts` does, then
-`maestro --device <serial> test .maestro/flows/<one>.yaml`. Set `NATIVE_APK` to point the runner at a
-different artifact.
+overlaps content, so it is the width the Support Path dialog authority was requalified at and the
+Guardian navigation was repaired against. The complete directory is supported there through the
+normal runner. To diagnose one scenario in isolation, run the fixture and `adb install` as `run.ts`
+does, then `maestro --device <serial> test .maestro/flows/<one>.yaml`. Set `NATIVE_APK` to point the
+runner at a different artifact, and restore density even after a failed run.
 
-Two host gotchas, each already paid for once. Turn emulator autofill off
+Keep the macOS display awake and the session unlocked for the whole run; wrap the runner with
+`caffeinate -dimsu` and use `pmset -g assertions` when host sleep is relevant to a failure. An
+awake-host pass after a screen-off or System UI failure supports a host/AVD lifecycle explanation,
+but it does not isolate display sleep as the cause unless APK, AVD state, density, CPU load, and flow
+are held constant in a controlled comparison.
+
+Two other host gotchas, each already paid for once. Turn emulator autofill off
 (`adb shell settings put secure autofill_service null`) or a "Save password?" sheet covers the app
 right after the fixture login. And do not boot the AVD while a Gradle build is saturating the CPU: a
 starved cold boot raises a **"System UI isn't responding"** ANR that covers a perfectly rendered app
-and fails the first assertion of every flow.
+and fails the first assertion of every flow. Exclude that run from product evidence, stabilize the
+host and AVD, and rerun.
 
 ## Fixture data
 
@@ -138,6 +148,11 @@ targets the real `SupportPathsPanel` action (`support-path-add-<term>`, the comp
 large-target equivalent). Scroll readiness, full visibility, enabled state, and tap all use that same
 action ID; the device swipe still traverses the long Theory. The specific term value is fixed by the
 checked-in deterministic scenario.
+
+The Guardian flow uses the answer tiles' accessibility labels from its checked-in deterministic
+fixture. Shuffled presentation means any intended answer can land below the viewport, so every
+answer is scrolled to 100% visibility, centered, asserted enabled, and tapped through that same
+label. Its outcome and Continue actions receive the same treatment before the next ward.
 
 One selector rule is not style but a paid-for correctness constraint: **the wait condition and the
 action target must be the same node.** Scrolling until an ancestor container reports visible and then

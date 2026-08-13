@@ -39,10 +39,10 @@ jobs:
       - run: pnpm --filter @lrnki/learner-app typecheck
       - run: pnpm --filter @lrnki/learner-app test
 
-      # The preview profile is a standalone APK against the live API (ADR-0036 in-code
-      # default); the development profile needs `expo start` as its dev server. The script
-      # is the canonical invocation (also `pnpm build:android` locally); with no .env on
-      # the runner it reads EXPO_TOKEN from the step environment.
+      # The preview profile is a standalone APK against the live API (the one shared learner
+      # environment; see README "Deployment"); the development profile needs `expo start` as its
+      # dev server. The script is the canonical invocation (also `pnpm build:android` locally);
+      # with no .env on the runner it reads EXPO_TOKEN from the step environment.
       - name: Build APK locally on the runner
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

@@ -10,21 +10,16 @@
   interview, one decision at a time, starting with change scope; judge ownership is required only if
   grounding generation moves.
 
-- **The Crystal Guardian native flow fails at a 320 dp viewport.** It does not scroll lower answer
-  options into view, so it only runs at the AVD's physical density. The claim boundary and the
-  narrow-viewport procedure are owned by the
-  [rig contract](../../apps/learner-app/e2e-native/README.md); this is scenario navigation work, and
-  it does not affect the Support Path dialog authority requalified beside it.
-
 ## COMPLETED
 
-- **The native Support Path dialog gate is requalified and sign-in is one tap (2026-08-10).** The
-  flow now scrolls to, fully verifies, and taps the exact term action instead of trusting ancestor
-  visibility, and an e2e-build-only gate action replaced the duplicated login block while a dedicated
-  flow keeps manual refusal/success coverage. An isolated dialog-collapse mutant failed 3/3 inside the
-  dialog body/footer block, so ADOPTED automatic authority is retained; the
-  [rig contract](../../apps/learner-app/e2e-native/README.md) owns the claims and mechanics. Detailed
-  record: commit 3bc24e9.
+- **The native flows navigate exactly at 320 dp (2026-08-10–12).** Support Path scrolls to, fully
+  verifies, and taps its exact term action, while Crystal Guardian now does the same for every
+  shuffled answer, outcome, and Continue action. One-tap fixture sign-in keeps the scenarios focused
+  while the dedicated flow retains manual refusal/success coverage. Support Path's isolated
+  dialog-collapse mutant failed 3/3 inside the body/footer block, so its ADOPTED automatic authority
+  is unchanged; Guardian remains visual evidence without automatic authority. The
+  [rig contract](../../apps/learner-app/e2e-native/README.md) owns the claims and mechanics. Support
+  Path detailed record: commit 3bc24e9.
 
 - **Guardian shield-loss correction is calm (2026-08-10).** The dead shake is removed: the keyed
   correction owns the miss response, then Continue restores the static server-owned shield or Last
@@ -63,25 +58,32 @@
 
 ## VALIDATION
 
-### Real-use quality evaluation — 2026-08-10
+### Real-use quality evaluation — 2026-08-12
 
-- Milestone: the native Support Path dialog gate keeps automatic authority over its measured
-  dialog-geometry regression while every flow reaches its own claim through one-tap fixture sign-in.
+- Milestone: Crystal Guardian navigation reaches every visual-evidence state at 320 dp without
+  changing the neighboring Support Path authority claim.
 - Fixture and source type: the standalone e2e-profile APK against deterministic loopback Better Auth
   and learner-api response shapes; `emulator-5554`, AVD `Medium_Phone_API_36.1`, Android API 36,
   1080×2400 px, density override 540 dpi (320 dp) and physical 420 dpi (~411 dp); Maestro 2.6.1.
 - Real model calls used: not applicable; no generated content is evaluated.
 - Result: PASS.
-- Useful output observed: the whole term action sits unobscured above the fixed footer, its
-  activation opens the complete dialog, and dismissal returns to the same Theory activity. An
-  isolated mutant carrying only the historic `Dialog` geometry failed 3/3 at `Add support path`,
-  always after activating that action, and the restored current build passed again at 43s.
-- Defects observed: the dialog *title* still resolves under the collapse, so the body and footer
-  assertions are the ones that bite. The Guardian visual flow leaves lower answer options offscreen
-  at 320 dp and is not repaired here.
-- Changes made after inspection: dismissed the keyboard after 320 dp email entry, gave the manual
-  sign-in flow a condition-based cold-start wait, and recorded both the title-insensitivity and the
-  Guardian narrow-width limit in the rig contract.
+- Useful output observed: the full directory passed at physical density and 320 dp. At 320 dp the
+  Guardian reached entry, partial, miss, Last Stand, Final Ward, final reveal, and the seven-ward
+  Expedition Guardian; inspection showed the intended shield and ward progression, a distinct
+  destructive Last Stand ring, a lit Final Ward crown, and a distinct summit crown and palette. A
+  later complete 320 dp rerun with the macOS display awake and `UserIsActive=1` passed again without
+  a System UI ANR.
+- Defects observed: answer-only scrolling first exposed an offscreen outcome banner after a lower
+  option was centered. The initial boot also produced a System UI ANR and was excluded from evidence;
+  its absence during the awake-host rerun is consistent with a host/AVD lifecycle issue but does not
+  isolate display sleep as the cause.
+- Changes made after inspection: every deterministic answer, outcome, and Continue action now uses
+  exact-target full-visibility scrolling before assertion or activation. Native execution and
+  failure triage now live in the
+  [validation skill](../../.agents/skills/validate-lrnki/SKILL.md), while the rig
+  contract retains scenario mechanics; density was restored to physical 420 dpi after the runs.
 - Remaining caveats: this is native-emulator fixture evidence — not real-backend, deployed,
-  production, or new physical-device evidence. The touch-responder class stays physically owned.
+  production, or new physical-device evidence. Guardian remains human/agent-judged visual evidence
+  without a measured negative control, and the Support Path touch-responder class stays physically
+  owned.
 - Safe to continue downstream: yes.
